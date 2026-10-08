@@ -1,0 +1,7 @@
+<%- include('partials/head') %>
+<div class="card center">
+  <h1><%= title %></h1>
+  <p class="muted"><%= message %></p>
+  <p><a class="btn" href="<%= currentUser ? '/' : '/login' %>">Voltar ao início</a></p>
+</div>
+<%- include('partials/foot') %>

@@ -1,0 +1,14 @@
+<%- include('partials/head') %>
+<div class="card auth-card">
+  <h1>🎙️ <%= podcastName %></h1>
+  <p class="muted">Gestão do podcast — entre com a sua conta.</p>
+  <% if (notice) { %><div class="flash flash-ok"><%= notice %></div><% } %>
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <form method="post" action="/login" class="stack">
+    <label>E-mail<input type="email" name="email" value="<%= email %>" autocomplete="username" required autofocus></label>
+    <label>Senha<input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn primary" type="submit">Entrar</button>
+  </form>
+  <p class="center small"><a href="/esqueci-senha">Esqueci minha senha</a></p>
+</div>
+<%- include('partials/foot') %>

@@ -1,0 +1,29 @@
+<%- include('../partials/head') %>
+<h1><%= template ? 'Editar modelo' : 'Novo modelo' %></h1>
+<div class="grid-2 align-start editor-grid">
+  <div class="card">
+    <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+    <form method="post" action="<%= template ? '/modelos/' + template.id : '/modelos' %>" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label>Nome do modelo<input type="text" name="name" value="<%= values.name %>" maxlength="120" required></label>
+      <label>Assunto do e-mail<input type="text" name="subject" value="<%= values.subject %>" maxlength="200" required></label>
+      <label>HTML do convite
+        <textarea name="html_body" rows="22" class="code" spellcheck="false" required><%= values.html_body %></textarea>
+      </label>
+      <div class="row">
+        <button class="btn primary" type="submit">Salvar</button>
+        <a class="btn" href="/modelos">Cancelar</a>
+      </div>
+    </form>
+  </div>
+  <aside class="card">
+    <h2>Variáveis</h2>
+    <p class="small muted">Escreva no HTML exatamente assim, com chaves duplas. Os valores são inseridos com segurança.</p>
+    <dl class="kv vars">
+      <% variables.forEach(function (v) { %><dt><code>{{<%= v[0] %>}}</code></dt><dd><%= v[1] %></dd><% }) %>
+    </dl>
+    <p class="small muted">Scripts (<code>&lt;script&gt;</code>) são bloqueados na página do convite. Imagens, fontes e CSS externos precisam de endereço <code>https://</code>.</p>
+    <% if (template) { %><a class="btn" href="/modelos/<%= template.id %>/previa" target="_blank" rel="noopener">Abrir prévia (versão salva)</a><% } %>
+  </aside>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,48 @@
+version: "3.8"
+
+# Stack de referência (Docker Swarm + Traefik) do módulo "Pulso Gestão".
+# Copie para stack.yml, preencha os valores reais (NUNCA commite o stack.yml com segredos)
+# e ajuste rede overlay, domínios e resolver de certificado ao seu ambiente.
+#
+# Não usa basic auth do Traefik: o painel tem login próprio, e o convite (/convite/*)
+# precisa ser público para o convidado abrir.
+
+services:
+  pulso_gestao:
+    image: pulso-gestao:1
+    networks:
+      - BrunoNet
+    environment:
+      - PORT=3100
+      - APP_BASE_URL=https://gestao.podcastpulso.com
+      # Opcional: servir os convites em outro domínio (adicione o Host no router abaixo)
+      - PUBLIC_BASE_URL=
+      - PODCAST_NAME=Podcast Pulso
+      - SESSION_SECRET=
+      - PODCAST_DATABASE_URL=postgresql://usuario:senha@postgres:5432/pulso
+      - BREVO_SERVER=smtp-relay.brevo.com
+      - BREVO_PORT=587
+      - BREVO_USER=
+      - BREVO_CHAVE_SMTP=
+      - BREVO_EMAIL=
+      - YOURLS_LINK=link.podcastpulso.com
+      - YOURLS_KEY=
+      - TZ=America/Sao_Paulo
+    deploy:
+      replicas: 1 # o limitador de login é em memória; mantenha 1 réplica
+      restart_policy:
+        condition: any
+        delay: 5s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.pulso_gestao.rule=Host(`gestao.podcastpulso.com`)"
+        # Se usar PUBLIC_BASE_URL em outro domínio, troque a regra acima por:
+        # Host(`gestao.podcastpulso.com`) || (Host(`kit.podcastpulso.com`) && (PathPrefix(`/convite`) || PathPrefix(`/static`)))
+        - "traefik.http.routers.pulso_gestao.entrypoints=websecure"
+        - "traefik.http.routers.pulso_gestao.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.pulso_gestao.loadbalancer.server.port=3100"
+        - "traefik.http.services.pulso_gestao.loadbalancer.passhostheader=1"
+
+networks:
+  BrunoNet:
+    external: true

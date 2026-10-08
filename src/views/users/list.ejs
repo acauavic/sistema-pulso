@@ -1,0 +1,64 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <h1>Usuários</h1>
+  <% if (can('users.write')) { %><a class="btn primary" href="/usuarios/novo">+ Novo usuário</a><% } %>
+</div>
+
+<form method="get" action="/usuarios" class="filters">
+  <input type="search" name="q" value="<%= q %>" placeholder="Buscar por nome ou e-mail">
+  <select name="role">
+    <option value="">Todos os perfis</option>
+    <% Object.keys(ROLES).forEach(function (k) { %><option value="<%= k %>" <%= role === k ? 'selected' : '' %>><%= ROLES[k].label %></option><% }) %>
+  </select>
+  <select name="status">
+    <option value="">Todos os status</option>
+    <option value="ativo" <%= status === 'ativo' ? 'selected' : '' %>>Ativos</option>
+    <option value="pendente" <%= status === 'pendente' ? 'selected' : '' %>>Aguardando senha</option>
+    <option value="inativo" <%= status === 'inativo' ? 'selected' : '' %>>Desativados</option>
+  </select>
+  <button class="btn" type="submit">Filtrar</button>
+</form>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Último acesso</th><th></th></tr></thead>
+  <tbody>
+    <% if (!users.length) { %><tr><td colspan="6" class="muted center">Nenhum usuário encontrado.</td></tr><% } %>
+    <% users.forEach(function (u) {
+         const manageable = canManageUser(myRole, u.role);
+         const isSelf = u.id === currentUser.id; %>
+    <tr>
+      <td><strong><%= u.name %></strong><%= isSelf ? ' (você)' : '' %></td>
+      <td><%= u.email %></td>
+      <td><span class="badge b-role-<%= u.role %>"><%= ROLES[u.role].label %></span></td>
+      <td>
+        <% if (!u.active) { %><span class="badge b-gray">Desativado</span>
+        <% } else if (!u.has_password) { %><span class="badge b-amber">Aguardando senha</span>
+        <% } else { %><span class="badge b-green">Ativo</span><% } %>
+      </td>
+      <td class="nowrap"><%= u.last_login_at ? fmt.formatDateTime(u.last_login_at) : 'Nunca' %></td>
+      <td class="actions">
+        <% if (manageable) { %>
+          <a class="btn sm" href="/usuarios/<%= u.id %>/editar">Editar</a>
+          <% if (u.active) { %>
+            <form method="post" action="/usuarios/<%= u.id %>/reenviar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%= u.has_password ? 'Enviar nova senha' : 'Reenviar acesso' %></button></form>
+          <% } %>
+          <% if (!isSelf) { %>
+            <form method="post" action="/usuarios/<%= u.id %>/status" class="inline" <% if (u.active) { %>data-confirm="Desativar <%= u.name %>? A pessoa será desconectada."<% } %>>
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="active" value="<%= u.active ? 'false' : 'true' %>">
+              <button class="btn sm" type="submit"><%= u.active ? 'Desativar' : 'Reativar' %></button>
+            </form>
+            <% if (can('users.delete')) { %>
+            <form method="post" action="/usuarios/<%= u.id %>/excluir" class="inline" data-confirm="Excluir <%= u.name %> definitivamente? Esta ação não pode ser desfeita.">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm danger" type="submit">Excluir</button>
+            </form>
+            <% } %>
+          <% } %>
+        <% } %>
+      </td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
+</div>
+<%- include('../partials/foot') %>

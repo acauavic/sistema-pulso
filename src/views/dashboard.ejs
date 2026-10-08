@@ -1,0 +1,41 @@
+<%- include('partials/head') %>
+<h1>Olá, <%= currentUser.name.split(' ')[0] %> 👋</h1>
+<% if (can('guests.read')) { %>
+<p class="muted">Você tem <strong><%= myOpen %></strong> convidado(s) seus aguardando convite ou resposta.</p>
+
+<section class="stat-grid">
+  <% cards.forEach(function (c) { %>
+    <a class="stat" href="/convidados?view=lista&status=<%= c.key %>">
+      <span class="stat-n"><%= c.n %></span>
+      <span class="stat-label"><%= c.label %></span>
+    </a>
+  <% }) %>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Próximas gravações</h2>
+    <% if (!upcoming.length) { %><p class="muted">Nenhuma gravação confirmada com data futura.</p><% } %>
+    <ul class="plain">
+      <% upcoming.forEach(function (g) { %>
+        <li><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a>
+          <span class="muted">— <%= fmt.formatDateTime(g.proposed_at) %><%= g.topic ? ' · ' + g.topic : '' %></span></li>
+      <% }) %>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Atividade recente</h2>
+    <% if (!recent.length) { %><p class="muted">Sem atividade ainda.</p><% } %>
+    <ul class="plain">
+      <% recent.forEach(function (e) { %>
+        <li><a href="/convidados/<%= e.guest_id %>"><strong><%= e.guest_name %></strong></a>
+          <span class="muted">— <%= e.message %> · <%= fmt.formatDateTime(e.created_at) %><%= e.user_name ? ' · ' + e.user_name : '' %></span></li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+<% } else { %>
+<p class="muted">Bem-vindo(a) à gestão do <%= podcastName %>.</p>
+<% } %>
+<%- include('partials/foot') %>

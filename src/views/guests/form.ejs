@@ -1,0 +1,55 @@
+<%- include('../partials/head') %>
+<h1><%= guest ? 'Editar convidado' : 'Novo convidado' %></h1>
+<div class="card form-card wide">
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <form method="post" action="<%= guest ? '/convidados/' + guest.id : '/convidados' %>" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label>Nome * <small class="muted">(como aparece no convite; para dupla: "Dr. João e Dra. Maria")</small>
+      <input type="text" name="name" value="<%= values.name || '' %>" maxlength="150" required autofocus>
+    </label>
+    <div class="grid-2 tight">
+      <label>Gênero (flexiona “convidado/convidada”)
+        <select name="gender">
+          <option value="m" <%= values.gender !== 'f' ? 'selected' : '' %>>Masculino</option>
+          <option value="f" <%= values.gender === 'f' ? 'selected' : '' %>>Feminino</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" name="is_plural" value="1" <%= values.is_plural ? 'checked' : '' %>> Convite para uma dupla (plural)</label>
+      <label>E-mail<input type="email" name="email" value="<%= values.email || '' %>" maxlength="254"></label>
+      <label>WhatsApp / telefone<input type="text" name="phone" value="<%= values.phone || '' %>" maxlength="40"></label>
+      <label>Instagram<input type="text" name="instagram" value="<%= values.instagram || '' %>" maxlength="80" placeholder="sem @"></label>
+      <label>Empresa / projeto<input type="text" name="company" value="<%= values.company || '' %>" maxlength="150"></label>
+      <label>Cargo / ocupação<input type="text" name="job_title" value="<%= values.job_title || '' %>" maxlength="150"></label>
+    </div>
+    <label>Tema / pauta do episódio<input type="text" name="topic" value="<%= values.topic || '' %>" maxlength="300"></label>
+    <label>Mini bio<textarea name="bio" rows="3" maxlength="2000"><%= values.bio || '' %></textarea></label>
+    <div class="grid-2 tight">
+      <label>Data e hora sugeridas da gravação
+        <input type="datetime-local" name="proposed_at" value="<%= typeof values.proposed_at === 'string' ? values.proposed_at : fmt.toInputValue(values.proposed_at) %>">
+      </label>
+      <label>Responsável
+        <select name="owner_id">
+          <option value="">— ninguém —</option>
+          <% owners.forEach(function (o) { %><option value="<%= o.id %>" <%= values.owner_id === o.id ? 'selected' : '' %>><%= o.name %></option><% }) %>
+        </select>
+      </label>
+      <label>Modelo de convite
+        <select name="template_id">
+          <option value="">Modelo padrão</option>
+          <% templates.forEach(function (t) { %><option value="<%= t.id %>" <%= Number(values.template_id) === t.id ? 'selected' : '' %>><%= t.name %><%= t.is_default ? ' (padrão)' : '' %></option><% }) %>
+        </select>
+      </label>
+      <label>Etapa
+        <select name="status">
+          <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= values.status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
+        </select>
+      </label>
+    </div>
+    <label>Observações internas<textarea name="notes" rows="3" maxlength="4000"><%= values.notes || '' %></textarea></label>
+    <div class="row">
+      <button class="btn primary" type="submit">Salvar</button>
+      <a class="btn" href="<%= guest ? '/convidados/' + guest.id : '/convidados' %>">Cancelar</a>
+    </div>
+  </form>
+</div>
+<%- include('../partials/foot') %>

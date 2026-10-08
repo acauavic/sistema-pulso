@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*.local
+
+# Contém credenciais reais preenchidas manualmente pro deploy
+stack.yml
+
+*.log
+.DS_Store
+._*

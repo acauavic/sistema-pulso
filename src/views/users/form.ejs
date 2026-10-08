@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<h1><%= target ? 'Editar usuário' : 'Novo usuário' %></h1>
+<div class="card form-card">
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <form method="post" action="<%= target ? '/usuarios/' + target.id : '/usuarios' %>" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label>Nome<input type="text" name="name" value="<%= values.name || '' %>" maxlength="120" required autofocus></label>
+    <label>E-mail<input type="email" name="email" value="<%= values.email || '' %>" maxlength="254" required></label>
+    <label>Perfil
+      <select name="role" <%= (typeof isSelf !== 'undefined' && isSelf) ? 'disabled' : '' %>>
+        <% roles.forEach(function (r) { %><option value="<%= r %>" <%= values.role === r ? 'selected' : '' %>><%= ROLES[r].label %></option><% }) %>
+        <% if (typeof isSelf !== 'undefined' && isSelf && !roles.includes(values.role)) { %><option selected><%= ROLES[values.role].label %></option><% } %>
+      </select>
+      <% if (typeof isSelf !== 'undefined' && isSelf) { %><small class="muted">Você não pode alterar o seu próprio perfil.</small><% } %>
+    </label>
+    <% if (!target) { %><p class="muted small">Enviaremos um e-mail com um link (válido por 72h) para a pessoa definir a própria senha.</p><% } %>
+    <div class="row">
+      <button class="btn primary" type="submit"><%= target ? 'Salvar' : 'Criar e enviar acesso' %></button>
+      <a class="btn" href="/usuarios">Cancelar</a>
+    </div>
+  </form>
+</div>
+<%- include('../partials/foot') %>

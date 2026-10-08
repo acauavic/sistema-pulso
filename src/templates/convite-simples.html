@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Convite · {{podcast}}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0f1120; color: #1f2340; font: 17px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 32px 16px 56px; }
+  .hero { text-align: center; color: #fff; padding: 28px 8px 30px; }
+  .hero .mic { font-size: 44px; }
+  .hero .kicker { letter-spacing: .18em; text-transform: uppercase; font-size: 12px; opacity: .7; margin-top: 6px; }
+  .hero h1 { font-size: 30px; line-height: 1.2; margin: 8px 0 0; }
+  .card { background: #fff; border-radius: 16px; padding: 30px 28px; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+  .card h2 { margin: 0 0 14px; font-size: 22px; }
+  .details { margin: 22px 0; padding: 16px 18px; background: #f3f1ff; border-radius: 12px; font-size: 15px; }
+  .details div { margin: 4px 0; }
+  .details b { color: #4529d6; }
+  .foot { text-align: center; color: #8a90b5; font-size: 13px; margin-top: 22px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="mic">🎙️</div>
+      <div class="kicker">Você foi convidado(a) para o</div>
+      <h1>{{podcast}}</h1>
+    </div>
+    <div class="card">
+      <h2>Olá, {{primeiro_nome}}!</h2>
+      <p>Seria uma honra receber você no <strong>{{podcast}}</strong>. Acompanhamos o seu trabalho e acreditamos que a sua história tem muito a somar com a nossa audiência.</p>
+      <div class="details">
+        <div><b>Tema da conversa:</b> {{tema}}</div>
+        <div><b>Data sugerida:</b> {{data_gravacao}}</div>
+        <div><b>Quem cuida do seu convite:</b> {{responsavel}}</div>
+      </div>
+      <p>Pode confirmar sua presença abaixo. Se precisar de outra data, é só deixar um recado que a gente ajusta.</p>
+      {{bloco_resposta}}
+    </div>
+    <div class="foot">Convite pessoal e intransferível · {{podcast}}</div>
+  </div>
+</body>
+</html>

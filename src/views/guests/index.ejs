@@ -1,0 +1,72 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <h1>Convidados</h1>
+  <div class="row">
+    <div class="seg">
+      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/convidados?view=quadro&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>">Quadro</a>
+      <a class="<%= view === 'lista' ? 'on' : '' %>" href="/convidados?view=lista&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>">Lista</a>
+    </div>
+    <% if (can('guests.write')) { %><a class="btn primary" href="/convidados/novo">+ Novo convidado</a><% } %>
+  </div>
+</div>
+
+<form method="get" action="/convidados" class="filters">
+  <input type="hidden" name="view" value="<%= view %>">
+  <input type="search" name="q" value="<%= q %>" placeholder="Buscar nome, e-mail, empresa ou tema">
+  <select name="owner">
+    <option value="">Todos os responsáveis</option>
+    <option value="eu" <%= ownerFilter === 'eu' ? 'selected' : '' %>>Só os meus</option>
+    <% owners.forEach(function (o) { %><option value="<%= o.id %>" <%= ownerFilter === o.id ? 'selected' : '' %>><%= o.name %></option><% }) %>
+  </select>
+  <% if (view === 'lista') { %>
+  <select name="status">
+    <option value="">Todas as etapas</option>
+    <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
+  </select>
+  <% } %>
+  <button class="btn" type="submit">Filtrar</button>
+</form>
+
+<% if (view === 'quadro') { %>
+<div class="board" data-board data-can-move="<%= can('guests.write') ? '1' : '0' %>">
+  <% columns.forEach(function (col) { %>
+  <section class="column" data-status="<%= col.key %>">
+    <header><span><%= col.label %></span><span class="count"><%= col.guests.length %></span></header>
+    <div class="cards" data-dropzone>
+      <% col.guests.forEach(function (g) { %>
+      <a class="kcard" href="/convidados/<%= g.id %>" data-guest-id="<%= g.id %>" draggable="<%= can('guests.write') ? 'true' : 'false' %>">
+        <strong><%= g.name %></strong>
+        <% if (g.company || g.job_title) { %><span class="muted small"><%= [g.job_title, g.company].filter(Boolean).join(' · ') %></span><% } %>
+        <% if (g.topic) { %><span class="small"><%= g.topic %></span><% } %>
+        <span class="meta small muted">
+          <% if (g.proposed_at) { %>📅 <%= fmt.formatDate(g.proposed_at) %><% } %>
+          <% if (g.invite_viewed_at) { %>👁️ visto<% } else if (g.invite_sent_at) { %>✉️ enviado<% } else if (g.invite_token) { %>🔗 link pronto<% } %>
+        </span>
+        <% if (g.owner_name) { %><span class="owner small"><%= g.owner_name %></span><% } %>
+      </a>
+      <% }) %>
+    </div>
+  </section>
+  <% }) %>
+</div>
+<% } else { %>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Convidado</th><th>Tema</th><th>Etapa</th><th>Gravação</th><th>Convite</th><th>Responsável</th></tr></thead>
+  <tbody>
+    <% if (!guests.length) { %><tr><td colspan="6" class="muted center">Nenhum convidado encontrado.</td></tr><% } %>
+    <% guests.forEach(function (g) { %>
+    <tr>
+      <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a><br><span class="muted small"><%= [g.job_title, g.company].filter(Boolean).join(' · ') %></span></td>
+      <td><%= g.topic || '—' %></td>
+      <td><span class="badge b-st-<%= g.status %>"><%= statuses.find(function (s) { return s.key === g.status; }).label %></span></td>
+      <td class="nowrap"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : '—' %></td>
+      <td class="small"><%= g.invite_viewed_at ? 'Visto' : g.invite_sent_at ? 'Enviado' : g.invite_token ? 'Link pronto' : '—' %></td>
+      <td><%= g.owner_name || '—' %></td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+<%- include('../partials/foot') %>

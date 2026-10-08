@@ -1,0 +1,32 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <h1>Modelos de convite</h1>
+  <% if (can('templates.write')) { %><a class="btn primary" href="/modelos/novo">+ Novo modelo</a><% } %>
+</div>
+<p class="muted">O HTML do convite que o convidado vê. Cole o seu modelo e use variáveis como <code>{{primeiro_nome}}</code> e <code>{{tema}}</code>.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Modelo</th><th>Assunto do e-mail</th><th>Convidados</th><th>Atualizado</th><th></th></tr></thead>
+  <tbody>
+    <% templates.forEach(function (t) { %>
+    <tr>
+      <td><strong><%= t.name %></strong> <% if (t.is_default) { %><span class="badge b-green">Padrão</span><% } %></td>
+      <td class="small"><%= t.subject %></td>
+      <td><%= t.uses %></td>
+      <td class="nowrap"><%= fmt.formatDateTime(t.updated_at) %></td>
+      <td class="actions">
+        <a class="btn sm" href="/modelos/<%= t.id %>/previa" target="_blank" rel="noopener">Prévia</a>
+        <% if (can('templates.write')) { %>
+          <a class="btn sm" href="/modelos/<%= t.id %>/editar">Editar</a>
+          <% if (!t.is_default) { %>
+          <form method="post" action="/modelos/<%= t.id %>/padrao" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit">Tornar padrão</button></form>
+          <form method="post" action="/modelos/<%= t.id %>/excluir" class="inline" data-confirm="Excluir o modelo “<%= t.name %>”?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm danger" type="submit">Excluir</button></form>
+          <% } %>
+        <% } %>
+      </td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
+</div>
+<%- include('../partials/foot') %>

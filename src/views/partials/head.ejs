@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf" content="<%= csrf %>">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= title %> · <%= podcastName || 'Pulso' %></title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<% if (currentUser) { %>
+<header class="topbar">
+  <a class="brand" href="/">🎙️ <%= podcastName %></a>
+  <button class="nav-toggle" type="button" data-nav-toggle aria-label="Abrir menu">☰</button>
+  <nav class="nav" data-nav>
+    <a href="/" class="<%= currentPath === '/' ? 'active' : '' %>">Início</a>
+    <% if (can('guests.read')) { %><a href="/convidados" class="<%= currentPath.startsWith('/convidados') ? 'active' : '' %>">Convidados</a><% } %>
+    <% if (can('templates.read')) { %><a href="/modelos" class="<%= currentPath.startsWith('/modelos') ? 'active' : '' %>">Modelos</a><% } %>
+    <% if (can('users.read')) { %><a href="/usuarios" class="<%= currentPath.startsWith('/usuarios') ? 'active' : '' %>">Usuários</a><% } %>
+    <% if (can('audit.read')) { %><a href="/auditoria" class="<%= currentPath.startsWith('/auditoria') ? 'active' : '' %>">Auditoria</a><% } %>
+    <% if (can('integrations.manage')) { %><a href="/integracoes" class="<%= currentPath.startsWith('/integracoes') ? 'active' : '' %>">Integrações</a><% } %>
+    <span class="nav-spacer"></span>
+    <a href="/perfil" class="who" title="Meu perfil"><%= currentUser.name %> <small>· <%= ROLES[currentUser.role].label %></small></a>
+    <form method="post" action="/logout" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">Sair</button></form>
+  </nav>
+</header>
+<% } %>
+<main class="<%= currentUser ? 'container' : 'container narrow' %>">
+<% if (flash) { %><div class="flash <%= flash.type === 'ok' ? 'flash-ok' : 'flash-error' %>" role="status"><%= flash.message %></div><% } %>

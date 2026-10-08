@@ -1,0 +1,21 @@
+<%- include('partials/head') %>
+<h1>Auditoria</h1>
+<p class="muted">Últimas 300 ações registradas no sistema.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Alvo</th><th>Detalhes</th><th>IP</th></tr></thead>
+  <tbody>
+    <% rows.forEach(function (r) { %>
+    <tr>
+      <td class="nowrap"><%= fmt.formatDateTime(r.created_at) %></td>
+      <td><%= r.user_email || '—' %></td>
+      <td><code><%= r.action %></code></td>
+      <td><%= r.entity ? r.entity + (r.entity_id ? ' #' + String(r.entity_id).slice(0, 8) : '') : '—' %></td>
+      <td class="small"><%= r.meta ? JSON.stringify(r.meta) : '' %></td>
+      <td class="small"><%= r.ip || '' %></td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
+</div>
+<%- include('partials/foot') %>

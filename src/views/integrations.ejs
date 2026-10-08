@@ -1,0 +1,30 @@
+<%- include('partials/head') %>
+<h1>Integrações</h1>
+<p class="muted">Status das integrações. Por segurança, chaves e senhas nunca aparecem aqui — elas ficam nas variáveis de ambiente do servidor.</p>
+<div class="grid-2">
+  <section class="card">
+    <h2>E-mail transacional (Brevo SMTP)</h2>
+    <p><span class="badge <%= smtp.ok ? 'b-green' : 'b-red' %>"><%= smtp.ok ? (smtp.dry ? 'Modo teste (não envia)' : 'Configurado') : 'Não configurado' %></span></p>
+    <ul class="plain small">
+      <li>Servidor: <code><%= smtp.host %>:<%= smtp.port %></code></li>
+      <li>Remetente: <code><%= smtp.from || '—' %></code></li>
+    </ul>
+    <form method="post" action="/integracoes/email">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn" type="submit">Enviar e-mail de teste para mim</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Encurtador (YOURLS)</h2>
+    <p><span class="badge <%= yourls.ok ? 'b-green' : 'b-red' %>"><%= yourls.ok ? 'Configurado' : 'Não configurado' %></span></p>
+    <ul class="plain small">
+      <li>Endereço: <code><%= yourls.base || '—' %></code></li>
+      <li>Links dos convites apontam para: <code><%= appBaseUrl %>/convite/…</code></li>
+    </ul>
+    <form method="post" action="/integracoes/yourls">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn" type="submit">Testar conexão (somente leitura)</button>
+    </form>
+  </section>
+</div>
+<%- include('partials/foot') %>

@@ -1,0 +1,25 @@
+<%- include('partials/head') %>
+<h1>Meu perfil</h1>
+<div class="grid-2">
+  <section class="card">
+    <h2>Dados</h2>
+    <form method="post" action="/perfil" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label>Nome<input type="text" name="name" value="<%= currentUser.name %>" maxlength="120" required></label>
+      <label>E-mail<input type="email" value="<%= currentUser.email %>" disabled></label>
+      <label>Perfil<input type="text" value="<%= ROLES[currentUser.role].label %>" disabled></label>
+      <button class="btn primary" type="submit">Salvar</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Alterar senha</h2>
+    <form method="post" action="/perfil/senha" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label>Senha atual<input type="password" name="current" autocomplete="current-password" required></label>
+      <label>Nova senha<input type="password" name="password" minlength="10" autocomplete="new-password" required></label>
+      <label>Confirmar nova senha<input type="password" name="confirm" minlength="10" autocomplete="new-password" required></label>
+      <button class="btn primary" type="submit">Alterar senha</button>
+    </form>
+  </section>
+</div>
+<%- include('partials/foot') %>
