@@ -1,5 +1,5 @@
 <%- include('../partials/head') %>
-<h1><%= guest ? 'Editar convidado' : 'Novo convidado' %></h1>
+<div class="page-head"><div><span class="kicker">Convidados · CRM</span><h1><%= guest ? 'Editar convidado' : 'Novo convidado' %></h1></div></div>
 <div class="card form-card wide">
   <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
   <form method="post" action="<%= guest ? '/convidados/' + guest.id : '/convidados' %>" class="stack">

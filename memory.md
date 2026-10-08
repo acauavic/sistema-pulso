@@ -24,6 +24,11 @@
 - **Integrações**: Brevo SMTP (`BREVO_SERVER/PORT/USER/CHAVE_SMTP/EMAIL`, porta 587 STARTTLS) e YOURLS
   (`YOURLS_LINK` = host `link.podcastpulso.com`, `YOURLS_KEY` = signature; API via POST). Em dev as credenciais
   vinham do ambiente da sessão, não de `.env`.
+- **Interface (design system)**: todo o painel segue `docs/design-system.md` + `docs/manual-de-marca.md` (originais em
+  `docs/referencias/`). Tema escuro padrão + claro opcional (botão "Tema", `localStorage`), barra lateral com ícones Lucide
+  (`src/utils/icons.js`), fontes Space Grotesk/Inter/JetBrains Mono/Instrument Serif **hospedadas** em `src/public/fonts/`
+  (CSP `'self'`), tokens como variáveis em `src/public/app.css`. Etapa do convidado → chip de status do DS (mapa no doc).
+  E-mails do sistema (`mailer.js`) e a página 404 do convite também na marca. **`CLAUDE.md` importa os dois docs**: é a regra de ouro do projeto.
 - **Testes**: `npm test` (55 testes, banco `*_test`, YOURLS mockado, e-mail dry-run). Verificado em navegador
   real (Playwright). **NÃO validado**: login SMTP real da Brevo (o sandbox de dev bloqueia portas SMTP),
   criação real de link no YOURLS (só `db-stats`, leitura) e build Docker.
@@ -32,6 +37,12 @@
 
 ## Últimas Decisões
 
+- **Identidade visual aplicada (2026-10-08)**: usuário enviou o Design System de interface e o Manual de Marca (HTML do designer). Painel
+  refeito: sidebar em vez de topbar, wordmark `pulso.`, linha de pulso no login/estados vazios, saudação com serifa, KPIs em Space Grotesk,
+  datas/contagens em mono, sem emoji. Fontes e ícones **dentro do repo** (CSP não muda; sem CDN). Criado `CLAUDE.md` (regras + imports dos docs).
+  Mapeamento etapa→status: prospect=PAUTA, convite_enviado=AGENDADO (plum), confirmado=GRAVADO, gravado=EM EDIÇÃO, publicado=PUBLICADO (único lime), recusou/cancelado=CANCELADO.
+  O convite público do convidado (`convite-pulso.html`) **não foi alterado** (tem identidade própria, sandbox). Módulos do DS ainda não construídos:
+  Episódios, Gravações, Cortes, Métricas, Patrocinadores, Financeiro; portais do patrocinador e do convidado.
 - **Projeto movido para `sistema-pulso` (2026-10-08)**. Nasceu por engano em `podcast/` dentro de
   `acauavic/agente_bruno` (repo do agente da clínica); o usuário pediu pra mover. Histórico git não foi
   preservado (repo novo começa do zero, 1 commit).

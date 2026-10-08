@@ -4,6 +4,7 @@ const config = require('./config');
 const sessions = require('./auth/sessions');
 const { can, ROLES } = require('./permissions');
 const fmt = require('./utils/format');
+const { icon } = require('./utils/icons');
 
 // Cabeçalhos de segurança + CSP restritiva para o painel (sem scripts inline).
 function securityHeaders(req, res, next) {
@@ -50,6 +51,7 @@ async function attachSession(req, res, next) {
     res.locals.can = (perm) => Boolean(req.user && can(req.user.role, perm));
     res.locals.ROLES = ROLES;
     res.locals.fmt = fmt;
+    res.locals.icon = icon;
     res.locals.podcastName = config.podcastName;
     res.locals.currentPath = req.path;
 

@@ -20,8 +20,9 @@ const rsvpLimiter = createLimiter({ max: 15, windowMs: 10 * 60_000 });
 const gone = (res) =>
   res.status(404).set(tpl.publicHeaders()).type('html').send(
     '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>Convite não encontrado</title><body style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 20px;text-align:center;color:#334155">' +
-    '<h1 style="font-size:22px">Convite não encontrado</h1><p>Este link não é válido ou foi substituído por um mais recente. Fale com a equipe do podcast para receber um novo.</p></body></html>');
+    '<title>Convite não encontrado</title><body style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 20px;text-align:center;color:#FAFAFA;background:#0A0A0A">' +
+    '<p style="font-size:44px;font-weight:700;letter-spacing:-0.06em;margin:0 0 24px">pulso<span style="color:#C8FF42">.</span></p>' +
+    '<h1 style="font-size:22px">Convite não encontrado</h1><p style="color:#B5B5B5">Este link não é válido ou foi substituído por um mais recente. Fale com a equipe do podcast para receber um novo.</p></body></html>');
 
 async function guestByToken(token) {
   if (!TOKEN_RE.test(token)) return null;

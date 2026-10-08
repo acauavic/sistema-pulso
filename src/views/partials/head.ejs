@@ -1,30 +1,52 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf" content="<%= csrf %>">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0A0A0A">
   <title><%= title %> · <%= podcastName || 'Pulso' %></title>
+  <script src="/static/theme.js"></script>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<% if (currentUser) { %>
-<header class="topbar">
-  <a class="brand" href="/">🎙️ <%= podcastName %></a>
-  <button class="nav-toggle" type="button" data-nav-toggle aria-label="Abrir menu">☰</button>
-  <nav class="nav" data-nav>
-    <a href="/" class="<%= currentPath === '/' ? 'active' : '' %>">Início</a>
-    <% if (can('guests.read')) { %><a href="/convidados" class="<%= currentPath.startsWith('/convidados') ? 'active' : '' %>">Convidados</a><% } %>
-    <% if (can('templates.read')) { %><a href="/modelos" class="<%= currentPath.startsWith('/modelos') ? 'active' : '' %>">Modelos</a><% } %>
-    <% if (can('users.read')) { %><a href="/usuarios" class="<%= currentPath.startsWith('/usuarios') ? 'active' : '' %>">Usuários</a><% } %>
-    <% if (can('audit.read')) { %><a href="/auditoria" class="<%= currentPath.startsWith('/auditoria') ? 'active' : '' %>">Auditoria</a><% } %>
-    <% if (can('integrations.manage')) { %><a href="/integracoes" class="<%= currentPath.startsWith('/integracoes') ? 'active' : '' %>">Integrações</a><% } %>
-    <span class="nav-spacer"></span>
-    <a href="/perfil" class="who" title="Meu perfil"><%= currentUser.name %> <small>· <%= ROLES[currentUser.role].label %></small></a>
-    <form method="post" action="/logout" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">Sair</button></form>
+<% if (currentUser) {
+     const initials = currentUser.name.split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0]; }).join('').toUpperCase();
+     const navItem = function (href, iconName, label, active) {
+       return '<a href="' + href + '" class="' + (active ? 'active' : '') + '"' + (active ? ' aria-current="page"' : '') + '>' + icon(iconName) + '<span>' + label + '</span></a>';
+     };
+     const adminOpen = can('users.read') || can('audit.read') || can('integrations.manage'); %>
+<div class="app">
+<aside class="sidebar" data-sidebar>
+  <a class="wordmark" href="/" aria-label="pulso. — início">pulso<span class="dot">.</span></a>
+  <button class="icon-btn sidebar-toggle" type="button" data-nav-toggle aria-label="Abrir menu"><%- icon('menu', 20) %></button>
+  <nav class="nav" aria-label="Principal">
+    <%- navItem('/', 'layout-dashboard', 'Painel', currentPath === '/') %>
+    <% if (can('guests.read')) { %><%- navItem('/convidados', 'mic', 'Convidados', currentPath.startsWith('/convidados')) %><% } %>
+    <% if (can('templates.read')) { %><%- navItem('/modelos', 'file-text', 'Modelos de convite', currentPath.startsWith('/modelos')) %><% } %>
+    <% if (adminOpen) { %><span class="kicker nav-group">Sistema</span><% } %>
+    <% if (can('users.read')) { %><%- navItem('/usuarios', 'users', 'Usuários', currentPath.startsWith('/usuarios')) %><% } %>
+    <% if (can('audit.read')) { %><%- navItem('/auditoria', 'scroll-text', 'Auditoria', currentPath.startsWith('/auditoria')) %><% } %>
+    <% if (can('integrations.manage')) { %><%- navItem('/integracoes', 'plug', 'Integrações', currentPath.startsWith('/integracoes')) %><% } %>
   </nav>
-</header>
+  <div class="sidebar-foot">
+    <a class="who" href="/perfil" title="Meu perfil">
+      <span class="avatar"><%= initials %></span>
+      <span class="who-txt"><strong><%= currentUser.name %></strong><span class="kicker" style="margin:0"><%= ROLES[currentUser.role].label %></span></span>
+    </a>
+    <div class="foot-actions">
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="Alternar tema claro/escuro"><span class="theme-moon"><%- icon('moon') %></span><span class="theme-sun"><%- icon('sun') %></span><span>Tema</span></button>
+      <form method="post" action="/logout" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn" type="submit"><%- icon('log-out') %><span>Sair</span></button></form>
+    </div>
+  </div>
+</aside>
+<main class="main"><div class="container">
+<% } else { %>
+<div class="auth"><div class="auth-box">
+  <div>
+    <div class="wordmark" role="img" aria-label="pulso.">pulso<span class="dot">.</span></div>
+    <%- include('pulse-line') %>
+  </div>
 <% } %>
-<main class="<%= currentUser ? 'container' : 'container narrow' %>">
 <% if (flash) { %><div class="flash <%= flash.type === 'ok' ? 'flash-ok' : 'flash-error' %>" role="status"><%= flash.message %></div><% } %>

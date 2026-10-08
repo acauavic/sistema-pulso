@@ -1,7 +1,7 @@
 <%- include('../partials/head') %>
 <div class="page-head">
-  <h1>Usuários</h1>
-  <% if (can('users.write')) { %><a class="btn primary" href="/usuarios/novo">+ Novo usuário</a><% } %>
+  <div><span class="kicker">Sistema · Acesso</span><h1>Usuários</h1></div>
+  <% if (can('users.write')) { %><a class="btn primary" href="/usuarios/novo"><%- icon('user-plus') %> Novo usuário</a><% } %>
 </div>
 
 <form method="get" action="/usuarios" class="filters">
@@ -23,7 +23,7 @@
 <table>
   <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Último acesso</th><th></th></tr></thead>
   <tbody>
-    <% if (!users.length) { %><tr><td colspan="6" class="muted center">Nenhum usuário encontrado.</td></tr><% } %>
+    <% if (!users.length) { %><tr><td colspan="6"><div class="empty"><strong>Nenhum usuário encontrado</strong><span>Ajuste a busca ou os filtros.</span></div></td></tr><% } %>
     <% users.forEach(function (u) {
          const manageable = canManageUser(myRole, u.role);
          const isSelf = u.id === currentUser.id; %>
@@ -36,7 +36,7 @@
         <% } else if (!u.has_password) { %><span class="badge b-amber">Aguardando senha</span>
         <% } else { %><span class="badge b-green">Ativo</span><% } %>
       </td>
-      <td class="nowrap"><%= u.last_login_at ? fmt.formatDateTime(u.last_login_at) : 'Nunca' %></td>
+      <td class="nowrap mono"><%= u.last_login_at ? fmt.formatDateTime(u.last_login_at) : 'Nunca' %></td>
       <td class="actions">
         <% if (manageable) { %>
           <a class="btn sm" href="/usuarios/<%= u.id %>/editar">Editar</a>

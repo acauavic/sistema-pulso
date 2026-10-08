@@ -1,15 +1,16 @@
 <%- include('../partials/head') %>
 <div class="page-head">
   <div>
+    <span class="kicker">Convidado</span>
     <h1><%= guest.name %> <span class="badge b-st-<%= guest.status %>"><%= statusInfo.label %></span></h1>
-    <p class="muted"><%= [guest.job_title, guest.company].filter(Boolean).join(' · ') %></p>
+    <p class="muted" style="margin-top:8px"><%= [guest.job_title, guest.company].filter(Boolean).join(' · ') %></p>
   </div>
   <div class="row">
-    <a class="btn" href="/convidados">← Voltar</a>
-    <% if (can('guests.write')) { %><a class="btn" href="/convidados/<%= guest.id %>/editar">Editar</a><% } %>
+    <a class="btn ghost" href="/convidados"><%- icon('arrow-left') %> Voltar</a>
+    <% if (can('guests.write')) { %><a class="btn" href="/convidados/<%= guest.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
     <% if (can('guests.delete')) { %>
     <form method="post" action="/convidados/<%= guest.id %>/excluir" class="inline" data-confirm="Excluir <%= guest.name %> e todo o histórico? Esta ação não pode ser desfeita.">
-      <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn danger" type="submit">Excluir</button>
+      <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn danger" type="submit"><%- icon('trash-2') %> Excluir</button>
     </form>
     <% } %>
   </div>
@@ -29,7 +30,7 @@
         <dt>Responsável</dt><dd><%= guest.owner_name || '—' %></dd>
         <% if (guest.bio) { %><dt>Bio</dt><dd class="pre"><%= guest.bio %></dd><% } %>
         <% if (guest.notes) { %><dt>Observações</dt><dd class="pre"><%= guest.notes %></dd><% } %>
-        <% if (guest.rsvp_message) { %><dt>Recado do convidado</dt><dd class="pre">“<%= guest.rsvp_message %>”</dd><% } %>
+        <% if (guest.rsvp_message) { %><dt>Recado do convidado</dt><dd class="quote pre"><%= guest.rsvp_message %></dd><% } %>
       </dl>
       <% if (can('guests.write')) { %>
       <form method="post" action="/convidados/<%= guest.id %>/status" class="row top-gap">
@@ -68,7 +69,7 @@
       <p class="muted">Ainda não há link. Ao gerar, criamos uma página exclusiva do convite com os dados deste convidado<%= yourlsReady ? ' e um link curto' : '' %>.</p>
       <% if (can('guests.invite')) { %>
       <form method="post" action="/convidados/<%= guest.id %>/convite">
-        <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn primary" type="submit">🔗 Gerar link do convite</button>
+        <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn primary" type="submit"><%- icon('link') %> Gerar link do convite</button>
       </form>
       <% } %>
     <% } else { %>
@@ -93,7 +94,7 @@
         <li>Resposta: <%= guest.responded_at ? fmt.formatDateTime(guest.responded_at) + ' — ' + (guest.status === 'confirmado' ? 'aceitou' : guest.status === 'recusou' ? 'recusou' : 'respondeu') : 'sem resposta' %></li>
       </ul>
       <div class="row">
-        <a class="btn" href="/convidados/<%= guest.id %>/previa" target="_blank" rel="noopener">👁️ Ver convite</a>
+        <a class="btn" href="/convidados/<%= guest.id %>/previa" target="_blank" rel="noopener"><%- icon('eye') %> Ver convite</a>
         <% if (can('guests.invite')) { %>
         <form method="post" action="/convidados/<%= guest.id %>/convite" class="inline" data-confirm="Gerar um novo link? O link atual deixará de funcionar.">
           <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="regenerar" value="1"><button class="btn" type="submit">Gerar novo link</button>
