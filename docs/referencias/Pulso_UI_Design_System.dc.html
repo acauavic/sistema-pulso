@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#0A0A0A;}
+*{box-sizing:border-box;}
+a{color:#C8FF42;text-decoration:none;}
+a:hover{color:#FAFAFA;}
+</style>
+</helmet>
+
+<div style="font-family:'Inter',sans-serif;color:#FAFAFA;background:#0A0A0A;-webkit-font-smoothing:antialiased;">
+
+<!-- CAPA -->
+<section data-screen-label="00 Capa" style="padding:clamp(32px,5vw,72px) clamp(24px,4vw,56px) clamp(56px,7vw,96px);border-bottom:1px solid #1F1F1F;">
+  <div style="max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:56px;">
+    <div style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#B5B5B5;">
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.06em;color:#FAFAFA;">pulso<span style="color:#C8FF42;">.</span></span>
+      <span>SISTEMA · DESIGN SYSTEM DE INTERFACE · V1.0</span>
+    </div>
+    <div>
+      <h1 style="margin:0;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(52px,8vw,120px);letter-spacing:-0.05em;line-height:.9;max-width:1000px;">O estúdio por trás do estúdio.</h1>
+      <p style="margin:28px 0 0;font-size:18px;line-height:1.6;color:#B5B5B5;max-width:640px;text-wrap:pretty;">Tokens, componentes e telas do sistema Pulso: gestão de episódios, convidados, gravações, cortes, métricas, contratos, portal do patrocinador e portal do convidado. Tema escuro e claro, desktop e mobile.</p>
+    </div>
+    <div style="display:flex;gap:8px 28px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.12em;">
+      <a href="#principios">01 PRINCÍPIOS</a><a href="#tokens">02 TOKENS</a><a href="#componentes">03 COMPONENTES</a><a href="#telas">04 TELAS</a><a href="#mobile">05 MOBILE</a>
+    </div>
+  </div>
+</section>
+
+<!-- PRINCÍPIOS -->
+<section id="principios" data-screen-label="01 Princípios" style="padding:clamp(56px,8vw,120px) clamp(24px,4vw,56px);">
+  <div style="max-width:1280px;margin:0 auto;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#C8FF42;">01 — PRINCÍPIOS</div>
+    <div style="margin-top:32px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:#1F1F1F;border:1px solid #1F1F1F;">
+      <div style="background:#0A0A0A;padding:28px;display:flex;flex-direction:column;gap:12px;"><span style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;">Lime é ação</span><span style="font-size:15px;line-height:1.55;color:#B5B5B5;">Um único elemento lime por área: o botão principal, o status publicado ou o dado que importa. Nunca decoração.</span></div>
+      <div style="background:#0A0A0A;padding:28px;display:flex;flex-direction:column;gap:12px;"><span style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;">Dados em mono</span><span style="font-size:15px;line-height:1.55;color:#B5B5B5;">Números de episódio, datas, horários e métricas em JetBrains Mono. Alinhados à direita em tabelas.</span></div>
+      <div style="background:#0A0A0A;padding:28px;display:flex;flex-direction:column;gap:12px;"><span style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;">Plum é externo</span><span style="font-size:15px;line-height:1.55;color:#B5B5B5;">O plum marca o que o patrocinador e o convidado veem. A equipe trabalha em preto e bone.</span></div>
+      <div style="background:#0A0A0A;padding:28px;display:flex;flex-direction:column;gap:12px;"><span style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;">Serifa só para gente</span><span style="font-size:15px;line-height:1.55;color:#B5B5B5;">Instrument Serif aparece em boas-vindas, frases de convidados e mensagens pessoais. Nunca em controles.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- TOKENS -->
+<section id="tokens" data-screen-label="02 Tokens" style="padding:clamp(56px,8vw,120px) clamp(24px,4vw,56px);border-top:1px solid #1F1F1F;">
+  <div style="max-width:1280px;margin:0 auto;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#C8FF42;">02 — TOKENS</div>
+    <h2 style="margin:20px 0 0;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(36px,5vw,64px);letter-spacing:-0.04em;line-height:1;">Dois temas, um sistema.</h2>
+
+    <div style="margin-top:48px;display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
+      <div style="background:#0A0A0A;border:1px solid #262626;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;">Escuro</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6B6B6B;">PADRÃO · EQUIPE E PATROCINADOR</span></div>
+        <sc-for list="{{ darkTokens }}" as="t" hint-placeholder-count="9">
+          <div style="display:grid;grid-template-columns:36px 1fr auto;gap:14px;align-items:center;">
+            <div style="width:36px;height:36px;border-radius:4px;border:1px solid #333333;background:{{ t.hex }};"></div>
+            <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#FAFAFA;">{{ t.name }}</span><span style="font-size:13px;color:#6B6B6B;">{{ t.use }}</span></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#B5B5B5;">{{ t.hex }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#F4F2EC;color:#0A0A0A;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;">Claro</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6B6B6B;">OPCIONAL · CONVIDADO E RELATÓRIOS</span></div>
+        <sc-for list="{{ lightTokens }}" as="t" hint-placeholder-count="9">
+          <div style="display:grid;grid-template-columns:36px 1fr auto;gap:14px;align-items:center;">
+            <div style="width:36px;height:36px;border-radius:4px;border:1px solid #D6D1C4;background:{{ t.hex }};"></div>
+            <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;">{{ t.name }}</span><span style="font-size:13px;color:#6B6B6B;">{{ t.use }}</span></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#4A4A4A;">{{ t.hex }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="margin-top:40px;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#6B6B6B;">STATUS DE EPISÓDIO · ESCURO / CLARO</div>
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+      <sc-for list="{{ statuses }}" as="s" hint-placeholder-count="6">
+        <div style="border:1px solid #262626;border-radius:6px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;">
+          <div style="background:#121212;padding:16px;display:flex;flex-direction:column;gap:10px;"><span style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:{{ s.dBg }};color:{{ s.dFg }};font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;"><span style="width:6px;height:6px;border-radius:50%;background:{{ s.dFg }};"></span>{{ s.label }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">{{ s.dFg }}</span></div>
+          <div style="background:#FFFFFF;padding:16px;display:flex;flex-direction:column;gap:10px;"><span style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:{{ s.lBg }};color:{{ s.lFg }};font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;"><span style="width:6px;height:6px;border-radius:50%;background:{{ s.lFg }};"></span>{{ s.label }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">{{ s.lFg }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:56px;display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
+      <div style="border:1px solid #262626;border-radius:6px;padding:24px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#6B6B6B;margin-bottom:20px;">ESCALA TIPOGRÁFICA</div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:baseline;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">display 40</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:40px;letter-spacing:-0.04em;line-height:1;">Episódios</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:baseline;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">h1 28</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;letter-spacing:-0.03em;">Próximas gravações</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:baseline;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">h2 20</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:20px;letter-spacing:-0.02em;">Entregáveis do plano</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:baseline;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">body 14</span><span style="font-size:14px;line-height:1.5;color:#B5B5B5;">Texto de interface, descrições e células de tabela.</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:baseline;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">label 13</span><span style="font-size:13px;font-weight:500;">Rótulo de campo</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:baseline;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">data 12</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.06em;">EP.014 · 18 OUT · 09:00</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:baseline;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">voz 24</span><span style="font-family:'Instrument Serif',serif;font-style:italic;font-size:24px;">Bem-vinda à mesa, Rachel.</span></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div style="border:1px solid #262626;border-radius:6px;padding:24px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#6B6B6B;margin-bottom:20px;">ESPAÇAMENTO · BASE 4</div>
+          <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;">
+            <sc-for list="{{ spacing }}" as="sp" hint-placeholder-count="8"><div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="width:{{ sp.px }};height:{{ sp.px }};background:#C8FF42;"></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#B5B5B5;">{{ sp.v }}</span></div></sc-for>
+          </div>
+        </div>
+        <div style="border:1px solid #262626;border-radius:6px;padding:24px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#6B6B6B;margin-bottom:20px;">RAIOS</div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;gap:8px;"><div style="width:64px;height:48px;border:1px solid #FAFAFA;border-radius:2px;"></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#B5B5B5;">2 · tag</span></div>
+            <div style="display:flex;flex-direction:column;gap:8px;"><div style="width:64px;height:48px;border:1px solid #FAFAFA;border-radius:6px;"></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#B5B5B5;">6 · card</span></div>
+            <div style="display:flex;flex-direction:column;gap:8px;"><div style="width:64px;height:48px;border:1px solid #FAFAFA;border-radius:10px;"></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#B5B5B5;">10 · campo</span></div>
+            <div style="display:flex;flex-direction:column;gap:8px;"><div style="width:64px;height:48px;border:1px solid #FAFAFA;border-radius:999px;"></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#B5B5B5;">full · botão</span></div>
+          </div>
+        </div>
+        <div style="border:1px solid #262626;border-radius:6px;padding:24px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#6B6B6B;margin-bottom:12px;">ELEVAÇÃO E MOVIMENTO</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#B5B5B5;">No escuro, profundidade vem de superfície mais clara + borda, sem sombra. No claro, sombra única <span style="font-family:'JetBrains Mono',monospace;color:#FAFAFA;">0 8px 24px rgba(10,10,10,.08)</span> para menus e modais. Transições 160ms <span style="font-family:'JetBrains Mono',monospace;color:#FAFAFA;">cubic-bezier(.2,.8,.2,1)</span>; o ponto de status "ao vivo" pulsa a 1,2s.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPONENTES -->
+<section id="componentes" data-screen-label="03 Componentes" style="padding:clamp(56px,8vw,120px) clamp(24px,4vw,56px);border-top:1px solid #1F1F1F;">
+  <div style="max-width:1280px;margin:0 auto;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#C8FF42;">03 — COMPONENTES</div>
+    <h2 style="margin:20px 0 0;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(36px,5vw,64px);letter-spacing:-0.04em;line-height:1;">Peças de construção.</h2>
+
+    <div style="margin-top:48px;display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
+
+      <!-- Botões -->
+      <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:18px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;">BOTÕES</span>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button style="height:40px;padding:0 18px;border-radius:999px;border:none;background:#C8FF42;color:#0A0A0A;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;cursor:pointer;" style-hover="background:#D6FF6E;"><span style="width:16px;height:16px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/plus.svg) center/contain no-repeat;"></span>Novo episódio</button>
+          <button style="height:40px;padding:0 18px;border-radius:999px;border:1px solid #333333;background:transparent;color:#FAFAFA;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;" style-hover="border-color:#FAFAFA;">Secundário</button>
+          <button style="height:40px;padding:0 14px;border-radius:999px;border:none;background:transparent;color:#B5B5B5;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;" style-hover="color:#FAFAFA;background:#1A1A1A;">Fantasma</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button style="height:40px;padding:0 18px;border-radius:999px;border:none;background:#2D1B4E;color:#F0EDE3;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;">Plum · externo</button>
+          <button style="height:40px;padding:0 18px;border-radius:999px;border:1px solid #5C2626;background:transparent;color:#FF7A6B;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;">Cancelar gravação</button>
+          <button style="height:40px;padding:0 18px;border-radius:999px;border:none;background:#1F1F1F;color:#6B6B6B;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;" disabled="">Desativado</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button style="height:32px;padding:0 14px;border-radius:999px;border:none;background:#C8FF42;color:#0A0A0A;font-size:13px;font-weight:600;cursor:pointer;">Pequeno 32</button>
+          <button style="height:48px;padding:0 24px;border-radius:999px;border:none;background:#C8FF42;color:#0A0A0A;font-size:15px;font-weight:600;cursor:pointer;">Grande 48</button>
+          <button style="width:40px;height:40px;border-radius:999px;border:1px solid #333333;background:transparent;color:#FAFAFA;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;"><span style="width:16px;height:16px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/ellipsis.svg) center/contain no-repeat;"></span></button>
+        </div>
+      </div>
+
+      <!-- Campos -->
+      <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:16px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;">CAMPOS</span>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <span style="font-size:13px;font-weight:500;">Nome do convidado</span>
+          <div style="height:40px;border-radius:10px;border:1px solid #333333;background:#0A0A0A;padding:0 12px;display:flex;align-items:center;font-size:14px;">Dra. Rachel Furtado</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <span style="font-size:13px;font-weight:500;">Pauta principal</span>
+          <div style="height:40px;border-radius:10px;border:1px solid #C8FF42;box-shadow:0 0 0 3px rgba(200,255,66,.15);background:#0A0A0A;padding:0 12px;display:flex;align-items:center;font-size:14px;">Conteúdo médico nas redes<span style="width:1px;height:18px;background:#C8FF42;margin-left:2px;"></span></div>
+          <span style="font-size:12px;color:#6B6B6B;">Foco · borda lime + halo 15%</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <span style="font-size:13px;font-weight:500;">Eixo</span>
+            <div style="height:40px;border-radius:10px;border:1px solid #333333;background:#0A0A0A;padding:0 12px;display:flex;align-items:center;justify-content:space-between;font-size:14px;">Histórias<span style="width:16px;height:16px;background:#6B6B6B;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg) center/contain no-repeat;"></span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <span style="font-size:13px;font-weight:500;">Instagram</span>
+            <div style="height:40px;border-radius:10px;border:1px solid #FF7A6B;background:#0A0A0A;padding:0 12px;display:flex;align-items:center;font-size:14px;color:#B5B5B5;">rachelfurtado</div>
+            <span style="font-size:12px;color:#FF7A6B;">Inclua o @</span>
+          </div>
+        </div>
+        <div style="height:40px;border-radius:999px;background:#1A1A1A;padding:0 14px;display:flex;align-items:center;gap:10px;font-size:14px;color:#6B6B6B;"><span style="width:16px;height:16px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/search.svg) center/contain no-repeat;"></span>Buscar episódio, convidado ou patrocinador<span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;border:1px solid #333333;border-radius:4px;padding:2px 6px;">⌘K</span></div>
+      </div>
+
+      <!-- Seleção -->
+      <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:18px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;">SELEÇÃO</span>
+        <div style="display:flex;flex-direction:column;gap:12px;font-size:14px;">
+          <div style="display:flex;align-items:center;gap:10px;"><span style="width:18px;height:18px;border-radius:4px;background:#C8FF42;display:flex;align-items:center;justify-content:center;"><span style="width:12px;height:12px;background:#0A0A0A;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/check.svg) center/contain no-repeat;"></span></span>Inserção gravada</div>
+          <div style="display:flex;align-items:center;gap:10px;"><span style="width:18px;height:18px;border-radius:4px;border:1.5px solid #6B6B6B;"></span>QR Code aplicado</div>
+          <div style="display:flex;align-items:center;gap:10px;"><span style="width:18px;height:18px;border-radius:50%;border:5px solid #C8FF42;"></span>Plano Ouro</div>
+          <div style="display:flex;align-items:center;gap:10px;"><span style="width:18px;height:18px;border-radius:50%;border:1.5px solid #6B6B6B;"></span>Plano Diamond</div>
+        </div>
+        <div style="display:flex;gap:28px;flex-wrap:wrap;font-size:14px;">
+          <div style="display:flex;align-items:center;gap:10px;"><span style="width:36px;height:20px;border-radius:999px;background:#C8FF42;position:relative;"><span style="position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#0A0A0A;"></span></span>Notificar convidado</div>
+          <div style="display:flex;align-items:center;gap:10px;"><span style="width:36px;height:20px;border-radius:999px;background:#333333;position:relative;"><span style="position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#B5B5B5;"></span></span>Público</div>
+        </div>
+        <div style="display:flex;padding:3px;border-radius:999px;background:#1A1A1A;align-self:flex-start;font-size:13px;font-weight:500;">
+          <span style="padding:6px 14px;border-radius:999px;background:#FAFAFA;color:#0A0A0A;">Lista</span>
+          <span style="padding:6px 14px;color:#B5B5B5;">Quadro</span>
+          <span style="padding:6px 14px;color:#B5B5B5;">Calendário</span>
+        </div>
+      </div>
+
+      <!-- Tags e avatares -->
+      <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:18px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;">TAGS, EIXOS E AVATARES</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:2px;border:1px solid #333333;"><span style="width:7px;height:7px;border-radius:50%;background:#C8FF42;"></span>HISTÓRIAS</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:2px;border:1px solid #333333;"><span style="width:7px;height:7px;border-radius:50%;background:#FAFAFA;"></span>INOVAÇÃO</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:2px;border:1px solid #333333;"><span style="width:7px;height:7px;border-radius:50%;border:1.5px solid #C8FF42;"></span>NEGÓCIOS</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:2px;border:1px solid #333333;"><span style="width:7px;height:7px;border-radius:50%;border:1.5px solid #FAFAFA;"></span>IA</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:2px;background:#2D1B4E;color:#F0EDE3;">PATROCINADO</span>
+        </div>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+          <div style="width:40px;height:40px;border-radius:50%;background:#2D1B4E;color:#F0EDE3;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;">AR</div>
+          <div style="width:40px;height:40px;border-radius:50%;background:#262626;color:#FAFAFA;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;">AV</div>
+          <div style="display:flex;">
+            <div style="width:32px;height:32px;border-radius:50%;background:#262626;border:2px solid #121212;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">GG</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:#333333;border:2px solid #121212;margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">TM</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:#C8FF42;color:#0A0A0A;border:2px solid #121212;margin-left:-8px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;">+4</div>
+          </div>
+          <div style="position:relative;width:40px;height:40px;border-radius:50%;background:#262626;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;font-family:'Space Grotesk',sans-serif;">MM<span style="position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:#C8FF42;border:2px solid #121212;"></span></div>
+        </div>
+        <span style="font-size:13px;color:#6B6B6B;">Hosts em plum, convidados em grafite. O ponto lime indica convite aceito.</span>
+      </div>
+
+      <!-- Métrica + progresso -->
+      <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:18px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;">MÉTRICA E PROGRESSO</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="background:#0A0A0A;border:1px solid #262626;border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:13px;color:#B5B5B5;">Visualizações</span>
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:32px;letter-spacing:-0.04em;line-height:1;">1,04M</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#C8FF42;">▲ 18,2% · 30D</span>
+          </div>
+          <div style="background:#0A0A0A;border:1px solid #262626;border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:13px;color:#B5B5B5;">Leituras de QR</span>
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:32px;letter-spacing:-0.04em;line-height:1;">412</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#FF7A6B;">▼ 3,1% · 30D</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;"><span>Episódios patrocinados</span><span style="font-family:'JetBrains Mono',monospace;">2 / 4</span></div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;"><span style="height:6px;border-radius:1px;background:#C8FF42;"></span><span style="height:6px;border-radius:1px;background:#C8FF42;"></span><span style="height:6px;border-radius:1px;background:#333333;"></span><span style="height:6px;border-radius:1px;background:#333333;"></span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;"><span>Cortes publicados</span><span style="font-family:'JetBrains Mono',monospace;">7 / 10</span></div>
+          <div style="height:6px;border-radius:999px;background:#262626;"><div style="width:70%;height:100%;border-radius:999px;background:#FAFAFA;"></div></div>
+        </div>
+      </div>
+
+      <!-- Feedback -->
+      <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:14px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;">FEEDBACK</span>
+        <div style="background:#FAFAFA;color:#0A0A0A;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;font-size:14px;"><span style="width:20px;height:20px;border-radius:50%;background:#C8FF42;display:flex;align-items:center;justify-content:center;flex:none;"><span style="width:12px;height:12px;background:#0A0A0A;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/check.svg) center/contain no-repeat;"></span></span><span style="flex:1;">Convite enviado para Dra. Rachel Furtado.</span><span style="font-weight:600;">Desfazer</span></div>
+        <div style="border:1px solid #4D3A1A;background:#1E1810;color:#FFC266;border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;font-size:14px;line-height:1.45;"><span style="width:16px;height:16px;background:currentColor;flex:none;margin-top:2px;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/triangle-alert.svg) center/contain no-repeat;"></span><span>EP.015 sem pauta aprovada. Gravação em 3 dias.</span></div>
+        <div style="border:1px solid #262626;background:#0A0A0A;border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;font-size:14px;line-height:1.45;color:#B5B5B5;"><span style="width:16px;height:16px;background:#FAFAFA;flex:none;margin-top:2px;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/info.svg) center/contain no-repeat;"></span><span>Os cortes ficam disponíveis ao patrocinador 48h após a aprovação.</span></div>
+        <div style="align-self:flex-start;background:#FAFAFA;color:#0A0A0A;border-radius:6px;padding:6px 10px;font-size:12px;">Tooltip · sempre claro sobre escuro</div>
+      </div>
+    </div>
+
+    <!-- Navegação + tabela + modal -->
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+      <div style="background:#0A0A0A;border:1px solid #262626;border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:2px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;padding:8px 10px 12px;">NAVEGAÇÃO · MÓDULOS</span>
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="9">
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:8px;font-size:14px;color:{{ n.color }};background:{{ n.bg }};">
+            <span style="width:16px;height:16px;flex:none;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/{{ n.icon }}.svg) center/contain no-repeat;"></span>
+            <span style="flex:1;">{{ n.label }}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">{{ n.count }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#121212;border:1px solid #262626;border-radius:6px;display:flex;flex-direction:column;overflow:hidden;grid-column:span 2;min-width:0;">
+        <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #262626;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;">TABELA</span><span style="display:flex;gap:6px;"><span style="font-size:12px;padding:4px 10px;border-radius:999px;background:#FAFAFA;color:#0A0A0A;">Todos</span><span style="font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid #333333;color:#B5B5B5;">Em edição</span></span></div>
+        <div style="overflow-x:auto;">
+          <div style="min-width:560px;">
+            <div style="display:grid;grid-template-columns:70px 1.6fr 1fr 110px 80px;gap:12px;padding:10px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:#6B6B6B;border-bottom:1px solid #262626;"><span>EP.</span><span>CONVIDADO</span><span>STATUS</span><span>DATA</span><span style="text-align:right;">VIEWS</span></div>
+            <sc-for list="{{ tableRows }}" as="r" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:70px 1.6fr 1fr 110px 80px;gap:12px;padding:12px 20px;align-items:center;font-size:14px;border-bottom:1px solid #1F1F1F;" style-hover="background:#1A1A1A;">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#B5B5B5;">{{ r.ep }}</span>
+                <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;">{{ r.guest }}</span><span style="font-size:12px;color:#6B6B6B;">{{ r.topic }}</span></span>
+                <span><span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:{{ r.s.dBg }};color:{{ r.s.dFg }};font-family:'JetBrains Mono',monospace;font-size:11px;"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.s.dFg }};"></span>{{ r.s.label }}</span></span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#B5B5B5;">{{ r.date }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:12px;text-align:right;">{{ r.views }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
+      <div style="background:#1A1A1A;border:1px solid #262626;border-radius:6px;padding:32px;display:flex;align-items:center;justify-content:center;">
+        <div style="width:100%;max-width:400px;background:#121212;border:1px solid #333333;border-radius:10px;overflow:hidden;">
+          <div style="padding:20px 22px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+            <div style="display:flex;flex-direction:column;gap:6px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:#C8FF42;">EP.016</span><span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-0.02em;">Confirmar gravação</span></div>
+            <span style="width:18px;height:18px;background:#6B6B6B;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/x.svg) center/contain no-repeat;"></span>
+          </div>
+          <div style="padding:0 22px 20px;font-size:14px;line-height:1.55;color:#B5B5B5;">Fillipe Holzer recebe o convite com data, endereço do Estúdio GH e link para alinhar a pauta.</div>
+          <div style="padding:14px 22px;border-top:1px solid #262626;display:flex;justify-content:flex-end;gap:8px;"><button style="height:36px;padding:0 16px;border-radius:999px;border:1px solid #333333;background:transparent;color:#FAFAFA;font-size:13px;">Voltar</button><button style="height:36px;padding:0 16px;border-radius:999px;border:none;background:#C8FF42;color:#0A0A0A;font-size:13px;font-weight:600;">Enviar convite</button></div>
+        </div>
+      </div>
+      <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;">
+        <svg viewBox="0 0 200 40" style="width:160px;"><path d="M0 20 H80 L86 20 L92 6 L100 34 L106 12 L110 20 H200" fill="none" stroke="#333333" stroke-width="2" stroke-linejoin="round"></path></svg>
+        <span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-0.02em;">Nenhum corte por aqui ainda</span>
+        <span style="font-size:14px;line-height:1.5;color:#B5B5B5;max-width:300px;">Os cortes aparecem assim que a edição do episódio for aprovada.</span>
+        <button style="height:36px;padding:0 16px;border-radius:999px;border:1px solid #333333;background:transparent;color:#FAFAFA;font-size:13px;">Ver episódios</button>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6B6B6B;margin-top:8px;">ESTADO VAZIO · LINHA DE PULSO PLANA</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TELAS -->
+<section id="telas" data-screen-label="04 Telas" style="padding:clamp(56px,8vw,120px) clamp(24px,4vw,56px);border-top:1px solid #1F1F1F;">
+  <div style="max-width:1360px;margin:0 auto;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#C8FF42;">04 — TELAS · DESKTOP</div>
+    <h2 style="margin:20px 0 0;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(36px,5vw,64px);letter-spacing:-0.04em;line-height:1;">Em uso.</h2>
+
+    <!-- TELA A: Painel equipe (escuro) -->
+    <div style="margin-top:48px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;color:#6B6B6B;"><span>A · PAINEL DA EQUIPE · ESCURO</span><span>1360 × 860</span></div>
+    <div style="margin-top:14px;overflow-x:auto;border:1px solid #262626;border-radius:10px;">
+      <div data-screen-label="Tela A Painel" style="min-width:1180px;display:grid;grid-template-columns:232px minmax(0,1fr);background:#0A0A0A;min-height:820px;">
+        <aside style="border-right:1px solid #1F1F1F;padding:20px 14px;display:flex;flex-direction:column;gap:2px;">
+          <div style="padding:4px 10px 24px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:26px;letter-spacing:-0.06em;">pulso<span style="color:#C8FF42;">.</span></div>
+          <sc-for list="{{ nav }}" as="n" hint-placeholder-count="9">
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:8px;font-size:14px;color:{{ n.color }};background:{{ n.bg }};cursor:pointer;" style-hover="color:#FAFAFA;">
+              <span style="width:16px;height:16px;flex:none;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/{{ n.icon }}.svg) center/contain no-repeat;"></span>
+              <span style="flex:1;">{{ n.label }}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">{{ n.count }}</span>
+            </div>
+          </sc-for>
+          <div style="margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 10px;border-top:1px solid #1F1F1F;">
+            <div style="width:32px;height:32px;border-radius:50%;background:#2D1B4E;color:#F0EDE3;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;">AV</div>
+            <div style="display:flex;flex-direction:column;gap:2px;font-size:13px;"><span>Acauã Victor</span><span style="color:#6B6B6B;font-size:12px;">Host · Admin</span></div>
+          </div>
+        </aside>
+        <main style="padding:28px 32px;display:flex;flex-direction:column;gap:24px;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
+            <div style="height:40px;width:420px;border-radius:999px;background:#1A1A1A;padding:0 14px;display:flex;align-items:center;gap:10px;font-size:14px;color:#6B6B6B;"><span style="width:16px;height:16px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/search.svg) center/contain no-repeat;"></span>Buscar<span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;border:1px solid #333333;border-radius:4px;padding:2px 6px;">⌘K</span></div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button style="width:40px;height:40px;border-radius:999px;border:1px solid #333333;background:transparent;color:#FAFAFA;display:inline-flex;align-items:center;justify-content:center;position:relative;"><span style="width:16px;height:16px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/bell.svg) center/contain no-repeat;"></span><span style="position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:#C8FF42;"></span></button>
+              <button style="height:40px;padding:0 18px;border-radius:999px;border:none;background:#C8FF42;color:#0A0A0A;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;"><span style="width:16px;height:16px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/plus.svg) center/contain no-repeat;"></span>Novo episódio</button>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;">
+            <div style="display:flex;flex-direction:column;gap:6px;"><span style="font-family:'Instrument Serif',serif;font-style:italic;font-size:22px;color:#B5B5B5;">Bom dia, Acauã.</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:40px;letter-spacing:-0.04em;line-height:1;">Semana 41</span></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;color:#6B6B6B;">06 — 12 OUT 2026</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:10px;">
+                <span style="font-size:13px;color:#B5B5B5;">{{ k.label }}</span>
+                <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;letter-spacing:-0.04em;line-height:1;">{{ k.value }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:{{ k.deltaColor }};">{{ k.delta }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start;">
+            <div style="background:#121212;border:1px solid #262626;border-radius:6px;overflow:hidden;">
+              <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #262626;">
+                <span style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;">Episódios</span>
+                <div style="display:flex;padding:3px;border-radius:999px;background:#1A1A1A;font-size:12px;font-weight:500;"><span style="padding:5px 12px;border-radius:999px;background:#FAFAFA;color:#0A0A0A;">Lista</span><span style="padding:5px 12px;color:#B5B5B5;">Quadro</span></div>
+              </div>
+              <div style="display:grid;grid-template-columns:70px 1.6fr 1fr 110px 80px;gap:12px;padding:10px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:#6B6B6B;border-bottom:1px solid #262626;"><span>EP.</span><span>CONVIDADO</span><span>STATUS</span><span>DATA</span><span style="text-align:right;">VIEWS</span></div>
+              <sc-for list="{{ episodes }}" as="r" hint-placeholder-count="7">
+                <div style="display:grid;grid-template-columns:70px 1.6fr 1fr 110px 80px;gap:12px;padding:12px 20px;align-items:center;font-size:14px;border-bottom:1px solid #1F1F1F;" style-hover="background:#1A1A1A;">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#B5B5B5;">{{ r.ep }}</span>
+                  <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;">{{ r.guest }}</span><span style="font-size:12px;color:#6B6B6B;">{{ r.topic }}</span></span>
+                  <span><span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:{{ r.s.dBg }};color:{{ r.s.dFg }};font-family:'JetBrains Mono',monospace;font-size:11px;"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.s.dFg }};"></span>{{ r.s.label }}</span></span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#B5B5B5;">{{ r.date }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:12px;text-align:right;">{{ r.views }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px;">
+              <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;">Próximas gravações</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">ESTÚDIO GH</span></div>
+                <sc-for list="{{ upcoming }}" as="u" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;padding-top:12px;border-top:1px solid #1F1F1F;">
+                    <div style="display:flex;flex-direction:column;align-items:center;border:1px solid #333333;border-radius:6px;padding:6px 0;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#6B6B6B;">{{ u.month }}</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;line-height:1;">{{ u.day }}</span></div>
+                    <div style="display:flex;flex-direction:column;gap:3px;"><span style="font-size:14px;font-weight:500;">{{ u.guest }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#B5B5B5;">{{ u.meta }}</span></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="background:#2D1B4E;border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:12px;color:#F0EDE3;">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:#C8FF42;">PATROCÍNIO ATIVO</span>
+                <span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;">Vitta Lab · Ouro</span>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;"><span style="height:6px;border-radius:1px;background:#C8FF42;"></span><span style="height:6px;border-radius:1px;background:#C8FF42;"></span><span style="height:6px;border-radius:1px;background:#4A3570;"></span><span style="height:6px;border-radius:1px;background:#4A3570;"></span></div>
+                <span style="font-size:13px;color:#C9BFDE;">2 de 4 episódios entregues · próximo EP.015</span>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- TELA B: Quadro de produção (claro) -->
+    <div style="margin-top:56px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;color:#6B6B6B;"><span>B · GESTÃO DE EPISÓDIOS · QUADRO · CLARO</span><span>1360 × 760</span></div>
+    <div style="margin-top:14px;overflow-x:auto;border-radius:10px;">
+      <div data-screen-label="Tela B Quadro" style="min-width:1180px;display:grid;grid-template-columns:232px minmax(0,1fr);background:#F4F2EC;color:#0A0A0A;min-height:740px;">
+        <aside style="border-right:1px solid #E2DED3;padding:20px 14px;display:flex;flex-direction:column;gap:2px;">
+          <div style="padding:4px 10px 24px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:26px;letter-spacing:-0.06em;">pulso.</div>
+          <sc-for list="{{ navLight }}" as="n" hint-placeholder-count="9">
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:8px;font-size:14px;color:{{ n.color }};background:{{ n.bg }};">
+              <span style="width:16px;height:16px;flex:none;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/{{ n.icon }}.svg) center/contain no-repeat;"></span>
+              <span style="flex:1;">{{ n.label }}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">{{ n.count }}</span>
+            </div>
+          </sc-for>
+        </aside>
+        <main style="padding:28px 32px;display:flex;flex-direction:column;gap:22px;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;">
+            <div style="display:flex;flex-direction:column;gap:8px;"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;color:#6B6B6B;">TEMPORADA 01 · 18 EPISÓDIOS</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:40px;letter-spacing:-0.04em;line-height:1;">Produção</span></div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <div style="display:flex;padding:3px;border-radius:999px;background:#E9E5DA;font-size:13px;font-weight:500;"><span style="padding:6px 14px;color:#4A4A4A;">Lista</span><span style="padding:6px 14px;border-radius:999px;background:#0A0A0A;color:#FAFAFA;">Quadro</span><span style="padding:6px 14px;color:#4A4A4A;">Calendário</span></div>
+              <button style="height:40px;padding:0 18px;border-radius:999px;border:none;background:#0A0A0A;color:#FAFAFA;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;"><span style="width:16px;height:16px;background:#C8FF42;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/plus.svg) center/contain no-repeat;"></span>Novo episódio</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;align-items:start;">
+            <sc-for list="{{ board }}" as="col" hint-placeholder-count="5">
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px;">
+                  <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:{{ col.s.lBg }};color:{{ col.s.lFg }};font-family:'JetBrains Mono',monospace;font-size:11px;"><span style="width:6px;height:6px;border-radius:50%;background:{{ col.s.lFg }};"></span>{{ col.s.label }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">{{ col.count }}</span>
+                </div>
+                <sc-for list="{{ col.cards }}" as="c" hint-placeholder-count="2">
+                  <div style="background:#FFFFFF;border:1px solid #E2DED3;border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:10px;" style-hover="box-shadow:0 8px 24px rgba(10,10,10,.08);">
+                    <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;"><span>{{ c.ep }}</span><span>{{ c.date }}</span></div>
+                    <span style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.01em;line-height:1.2;">{{ c.guest }}</span>
+                    <span style="font-size:13px;line-height:1.4;color:#4A4A4A;">{{ c.topic }}</span>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;padding:3px 6px;border-radius:2px;border:1px solid #D6D1C4;">{{ c.axis }}</span>
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#2D1B4E;">{{ c.sponsor }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- TELA C: Portal do patrocinador -->
+    <div style="margin-top:56px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;color:#6B6B6B;"><span>C · PORTAL DO PATROCINADOR · ESCURO + PLUM</span><span>1360 × 840</span></div>
+    <div style="margin-top:14px;overflow-x:auto;border:1px solid #262626;border-radius:10px;">
+      <div data-screen-label="Tela C Patrocinador" style="min-width:1180px;background:#0A0A0A;min-height:800px;display:flex;flex-direction:column;">
+        <header style="height:64px;padding:0 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1F1F1F;">
+          <div style="display:flex;align-items:center;gap:16px;"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:24px;letter-spacing:-0.06em;">pulso<span style="color:#C8FF42;">.</span></span><span style="width:1px;height:20px;background:#333333;"></span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.12em;color:#B5B5B5;">PORTAL DO PATROCINADOR</span></div>
+          <div style="display:flex;gap:24px;align-items:center;font-size:14px;color:#B5B5B5;"><span style="color:#FAFAFA;border-bottom:2px solid #C8FF42;padding:20px 0;">Visão geral</span><span>Episódios</span><span>Cortes</span><span>Relatórios</span><span>Contrato</span><div style="width:32px;height:32px;border-radius:50%;background:#FAFAFA;color:#0A0A0A;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;">VL</div></div>
+        </header>
+        <div style="padding:32px;display:flex;flex-direction:column;gap:20px;">
+          <div style="background:#2D1B4E;border-radius:10px;padding:32px;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px;color:#F0EDE3;position:relative;overflow:hidden;">
+            <div style="position:absolute;inset:0;background-image:radial-gradient(#3a2663 1.4px,transparent 1.6px);background-size:22px 22px;"></div>
+            <div style="position:relative;display:flex;flex-direction:column;gap:14px;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;color:#C8FF42;">PLANO OURO · VIGENTE ATÉ DEZ 2026</span>
+              <span style="font-family:'Instrument Serif',serif;font-style:italic;font-size:26px;">Olá, equipe Vitta Lab.</span>
+              <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:44px;letter-spacing:-0.04em;line-height:1;max-width:600px;">Sua marca esteve em 2 conversas este mês.</span>
+            </div>
+            <div style="position:relative;background:#0A0A0A;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:14px;">
+              <div style="display:flex;justify-content:space-between;font-size:13px;color:#B5B5B5;"><span>Episódios patrocinados</span><span style="font-family:'JetBrains Mono',monospace;color:#FAFAFA;">2 / 4</span></div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;"><span style="height:8px;border-radius:1px;background:#C8FF42;"></span><span style="height:8px;border-radius:1px;background:#C8FF42;"></span><span style="height:8px;border-radius:1px;background:#333333;"></span><span style="height:8px;border-radius:1px;background:#333333;"></span></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;color:#B5B5B5;"><span>Cortes com a marca</span><span style="font-family:'JetBrains Mono',monospace;color:#FAFAFA;">7 / 10</span></div>
+              <div style="height:8px;border-radius:999px;background:#262626;"><div style="width:70%;height:100%;border-radius:999px;background:#FAFAFA;"></div></div>
+              <button style="margin-top:6px;height:40px;border-radius:999px;border:none;background:#C8FF42;color:#0A0A0A;font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;"><span style="width:16px;height:16px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/download.svg) center/contain no-repeat;"></span>Baixar relatório de outubro</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+            <sc-for list="{{ sponsorKpis }}" as="k" hint-placeholder-count="4">
+              <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:10px;">
+                <span style="font-size:13px;color:#B5B5B5;">{{ k.label }}</span>
+                <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;letter-spacing:-0.04em;line-height:1;">{{ k.value }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:{{ k.deltaColor }};">{{ k.delta }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;align-items:start;">
+            <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;">Cortes com sua marca</span><span style="font-size:13px;color:#C8FF42;">Ver todos →</span></div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+                <sc-for list="{{ cuts }}" as="c" hint-placeholder-count="4">
+                  <div style="display:flex;flex-direction:column;gap:8px;">
+                    <div style="aspect-ratio:9/16;border-radius:6px;background:repeating-linear-gradient(135deg,#1c1c1c 0 10px,#161616 10px 20px);position:relative;overflow:hidden;">
+                      <span style="position:absolute;left:8px;top:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#C8FF42;">{{ c.ep }}</span>
+                      <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:rgba(250,250,250,.12);display:flex;align-items:center;justify-content:center;"><span style="width:14px;height:14px;background:#FAFAFA;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/play.svg) center/contain no-repeat;"></span></span>
+                      <span style="position:absolute;left:8px;right:8px;bottom:8px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;line-height:1.1;">{{ c.title }}</span>
+                    </div>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#B5B5B5;">{{ c.views }} VIEWS</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#121212;border:1px solid #262626;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:4px;">
+              <span style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;margin-bottom:10px;">Entregáveis</span>
+              <sc-for list="{{ deliverables }}" as="d" hint-placeholder-count="6">
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #1F1F1F;font-size:14px;">
+                  <span style="width:18px;height:18px;border-radius:4px;flex:none;background:{{ d.boxBg }};border:{{ d.boxBorder }};display:flex;align-items:center;justify-content:center;"><span style="width:12px;height:12px;background:#0A0A0A;opacity:{{ d.checkOpacity }};mask:url(https://unpkg.com/lucide-static@0.460.0/icons/check.svg) center/contain no-repeat;"></span></span>
+                  <span style="flex:1;color:{{ d.color }};">{{ d.label }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">{{ d.meta }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MOBILE -->
+<section id="mobile" data-screen-label="05 Mobile" style="padding:clamp(56px,8vw,120px) clamp(24px,4vw,56px);border-top:1px solid #1F1F1F;">
+  <div style="max-width:1280px;margin:0 auto;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:#C8FF42;">05 — MOBILE</div>
+    <h2 style="margin:20px 0 0;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(36px,5vw,64px);letter-spacing:-0.04em;line-height:1;">No bolso do convidado e da produção.</h2>
+    <div style="margin-top:48px;display:flex;gap:40px;flex-wrap:wrap;justify-content:center;">
+
+      <!-- D: Convidado aceite -->
+      <div style="display:flex;flex-direction:column;gap:14px;align-items:center;">
+        <div data-screen-label="Tela D Convidado" style="width:375px;height:780px;border-radius:44px;border:10px solid #1F1F1F;background:#F0EDE3;color:#0A0A0A;overflow:hidden;display:flex;flex-direction:column;">
+          <div style="height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;"><span>9:41</span><span style="width:24px;height:11px;border-radius:3px;border:1.5px solid #0A0A0A;"></span></div>
+          <div style="padding:16px 24px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.06em;">pulso.</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6B6B6B;">CONVITE · EP.016</span></div>
+          <div style="padding:28px 24px 0;display:flex;flex-direction:column;gap:12px;">
+            <span style="font-family:'Instrument Serif',serif;font-style:italic;font-size:30px;line-height:1.05;">Fillipe, você é nosso convidado.</span>
+            <span style="font-size:15px;line-height:1.5;color:#4A4A4A;">Escolhemos você pela trajetória que construiu e pela perspectiva que o nosso público precisa ouvir.</span>
+          </div>
+          <div style="margin:24px 24px 0;background:#0A0A0A;color:#FAFAFA;border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px;">
+            <div style="display:flex;gap:12px;align-items:center;"><span style="width:16px;height:16px;background:#C8FF42;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/calendar.svg) center/contain no-repeat;"></span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;">QUI · 23 OUT · 09:00</span></div>
+            <div style="display:flex;gap:12px;align-items:center;"><span style="width:16px;height:16px;background:#C8FF42;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/map-pin.svg) center/contain no-repeat;"></span><span style="font-size:14px;">Estúdio GH · Alphaville, SP</span></div>
+            <div style="display:flex;gap:12px;align-items:center;"><span style="width:16px;height:16px;background:#C8FF42;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/clock.svg) center/contain no-repeat;"></span><span style="font-size:14px;">60–90 min · Áudio + vídeo</span></div>
+          </div>
+          <div style="margin:20px 24px 0;display:flex;flex-direction:column;gap:2px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6B6B6B;margin-bottom:8px;">O QUE FICA COM VOCÊ</span>
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #D6D1C4;font-size:14px;"><span>Cortes editados</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;">15–30</span></div>
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #D6D1C4;font-size:14px;"><span>Fotos de bastidores</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;">✓</span></div>
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #D6D1C4;font-size:14px;"><span>Kit do convidado</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;">✓</span></div>
+          </div>
+          <div style="margin-top:auto;padding:16px 24px 28px;display:flex;flex-direction:column;gap:10px;">
+            <button style="height:52px;border-radius:999px;border:none;background:#0A0A0A;color:#FAFAFA;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;">Aceitar o convite<span style="width:8px;height:8px;border-radius:50%;background:#C8FF42;"></span></button>
+            <button style="height:44px;border-radius:999px;border:none;background:transparent;color:#4A4A4A;font-size:14px;">Sugerir outra data</button>
+          </div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.12em;color:#6B6B6B;">D · PORTAL DO CONVIDADO · CLARO</span>
+      </div>
+
+      <!-- E: Produção dia de gravação -->
+      <div style="display:flex;flex-direction:column;gap:14px;align-items:center;">
+        <div data-screen-label="Tela E Produção" style="width:375px;height:780px;border-radius:44px;border:10px solid #1F1F1F;background:#0A0A0A;overflow:hidden;display:flex;flex-direction:column;">
+          <div style="height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;font-size:14px;font-weight:600;"><span>9:41</span><span style="width:24px;height:11px;border-radius:3px;border:1.5px solid #FAFAFA;"></span></div>
+          <div style="padding:16px 20px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.06em;">pulso<span style="color:#C8FF42;">.</span></span><div style="width:32px;height:32px;border-radius:50%;background:#2D1B4E;color:#F0EDE3;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;">AR</div></div>
+          <div style="padding:20px 20px 0;display:flex;flex-direction:column;gap:6px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6B6B6B;">HOJE · QUI 23 OUT</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:32px;letter-spacing:-0.04em;line-height:1;">Dia de gravação</span></div>
+          <div style="margin:18px 20px 0;background:#121212;border:1px solid #262626;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#C8FF42;">EP.016</span><span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#2A3311;color:#C8FF42;font-family:'JetBrains Mono',monospace;font-size:11px;"><span style="width:6px;height:6px;border-radius:50%;background:#C8FF42;"></span>AO VIVO</span></div>
+            <span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;">Fillipe Holzer</span>
+            <span style="font-size:13px;color:#B5B5B5;">Inovação e escala em negócios de saúde</span>
+            <svg viewBox="0 0 300 30" style="width:100%;"><path d="M0 15 H110 L116 15 L122 3 L130 27 L136 8 L140 15 H170" fill="none" stroke="#C8FF42" stroke-width="2" stroke-linejoin="round"></path><path d="M170 15 H300" fill="none" stroke="#333333" stroke-width="2"></path></svg>
+            <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;"><span>00:42:18</span><span>META 75:00</span></div>
+          </div>
+          <div style="margin:18px 20px 0;display:flex;flex-direction:column;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6B6B6B;margin-bottom:6px;">CHECKLIST</span>
+            <sc-for list="{{ checklist }}" as="c" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid #1F1F1F;font-size:14px;min-height:44px;">
+                <span style="width:20px;height:20px;border-radius:50%;flex:none;background:{{ c.boxBg }};border:{{ c.boxBorder }};display:flex;align-items:center;justify-content:center;"><span style="width:12px;height:12px;background:#0A0A0A;opacity:{{ c.checkOpacity }};mask:url(https://unpkg.com/lucide-static@0.460.0/icons/check.svg) center/contain no-repeat;"></span></span>
+                <span style="flex:1;color:{{ c.color }};">{{ c.label }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6B6B;">{{ c.meta }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:auto;height:76px;border-top:1px solid #1F1F1F;display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:14px;">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#C8FF42;font-size:11px;"><span style="width:20px;height:20px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/calendar.svg) center/contain no-repeat;"></span>Hoje</div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#6B6B6B;font-size:11px;"><span style="width:20px;height:20px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/mic.svg) center/contain no-repeat;"></span>Episódios</div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#6B6B6B;font-size:11px;"><span style="width:20px;height:20px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/users.svg) center/contain no-repeat;"></span>Convidados</div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#6B6B6B;font-size:11px;"><span style="width:20px;height:20px;background:currentColor;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/scissors.svg) center/contain no-repeat;"></span>Cortes</div>
+          </div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.12em;color:#6B6B6B;">E · PRODUÇÃO NO ESTÚDIO · ESCURO</span>
+      </div>
+    </div>
+    <p style="margin:48px auto 0;max-width:640px;text-align:center;font-size:14px;line-height:1.6;color:#6B6B6B;">Dados, patrocinador (Vitta Lab) e pautas são exemplos. Ícones: Lucide, traço 2px, 16px no desktop e 20px no mobile.</p>
+  </div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const S = {
+      pauta:    { label: 'PAUTA',     dBg: '#1F1F1F', dFg: '#B5B5B5', lBg: '#E9E5DA', lFg: '#4A4A4A' },
+      agendado: { label: 'AGENDADO',  dBg: '#241A38', dFg: '#B9A6E8', lBg: '#E9E3F5', lFg: '#2D1B4E' },
+      gravado:  { label: 'GRAVADO',   dBg: '#262626', dFg: '#FAFAFA', lBg: '#0A0A0A', lFg: '#FAFAFA' },
+      edicao:   { label: 'EM EDIÇÃO', dBg: '#2E2412', dFg: '#FFC266', lBg: '#FBEFD9', lFg: '#7A4E00' },
+      publicado:{ label: 'PUBLICADO', dBg: '#2A3311', dFg: '#C8FF42', lBg: '#C8FF42', lFg: '#0A0A0A' },
+      cancelado:{ label: 'CANCELADO', dBg: '#2E1614', dFg: '#FF7A6B', lBg: '#FBE3E0', lFg: '#9E2A1E' }
+    };
+    const navItems = [
+      ['layout-dashboard','Painel',''],['mic','Episódios','18'],['users','Convidados','42'],['calendar','Gravações','3'],
+      ['scissors','Cortes e distribuição','27'],['trending-up','Métricas',''],['badge-dollar-sign','Patrocinadores','2'],
+      ['file-text','Financeiro e contratos',''],['settings','Configurações','']
+    ];
+    const nav = navItems.map(([icon,label,count],i)=>({icon,label,count,color:i===0?'#FAFAFA':'#B5B5B5',bg:i===0?'#1A1A1A':'transparent'}));
+    const navLight = navItems.map(([icon,label,count],i)=>({icon,label,count,color:i===1?'#0A0A0A':'#4A4A4A',bg:i===1?'#E9E5DA':'transparent'}));
+    const episodes = [
+      { ep:'EP.017', guest:'Dra. Rachel Furtado', topic:'Conteúdo médico nas redes', s:S.pauta, date:'06 NOV', views:'—' },
+      { ep:'EP.016', guest:'Fillipe Holzer', topic:'Inovação e escala', s:S.agendado, date:'23 OUT', views:'—' },
+      { ep:'EP.015', guest:'Dr. Carlos Torres', topic:'IA no diagnóstico', s:S.edicao, date:'09 OUT', views:'—' },
+      { ep:'EP.014', guest:'Dr. Márcio Martins', topic:'Empreendedorismo médico', s:S.publicado, date:'02 OUT', views:'48,2K' },
+      { ep:'EP.013', guest:'Dra. Tamiris Mariano', topic:'Autoridade digital', s:S.publicado, date:'25 SET', views:'112K' },
+      { ep:'EP.012', guest:'Guto Galamba', topic:'Comportamento e negócios', s:S.publicado, date:'18 SET', views:'203K' }
+    ];
+    const card = (e, axis, sponsor) => ({ ep:e.ep, guest:e.guest, topic:e.topic, date:e.date, axis, sponsor });
+    const board = [
+      { s:S.pauta, count:'2', cards:[card(episodes[0],'HISTÓRIAS',''), { ep:'EP.018', guest:'A definir', topic:'Gestão de clínicas', date:'—', axis:'NEGÓCIOS', sponsor:'' }] },
+      { s:S.agendado, count:'1', cards:[card(episodes[1],'INOVAÇÃO','● VITTA LAB')] },
+      { s:S.gravado, count:'0', cards:[] },
+      { s:S.edicao, count:'1', cards:[card(episodes[2],'IA','● VITTA LAB')] },
+      { s:S.publicado, count:'14', cards:[card(episodes[3],'NEGÓCIOS',''), card(episodes[4],'HISTÓRIAS','')] }
+    ];
+    const done = (on) => on
+      ? { boxBg:'#C8FF42', boxBorder:'none', checkOpacity:1, color:'#FAFAFA' }
+      : { boxBg:'transparent', boxBorder:'1.5px solid #6B6B6B', checkOpacity:0, color:'#B5B5B5' };
+    return {
+      darkTokens: [
+        { name:'bg/base', hex:'#0A0A0A', use:'Fundo da aplicação' },
+        { name:'bg/surface', hex:'#121212', use:'Cards, tabelas, painéis' },
+        { name:'bg/raised', hex:'#1A1A1A', use:'Hover, item ativo, busca' },
+        { name:'border/default', hex:'#262626', use:'Divisores e contornos' },
+        { name:'border/strong', hex:'#333333', use:'Campos, botão secundário' },
+        { name:'text/primary', hex:'#FAFAFA', use:'Texto principal' },
+        { name:'text/secondary', hex:'#B5B5B5', use:'Apoio, células' },
+        { name:'text/muted', hex:'#6B6B6B', use:'Rótulos, metadados' },
+        { name:'accent/action', hex:'#C8FF42', use:'Ação principal, foco, sucesso' }
+      ],
+      lightTokens: [
+        { name:'bg/base', hex:'#F4F2EC', use:'Fundo da aplicação' },
+        { name:'bg/surface', hex:'#FFFFFF', use:'Cards e tabelas' },
+        { name:'bg/raised', hex:'#E9E5DA', use:'Hover, item ativo' },
+        { name:'border/default', hex:'#E2DED3', use:'Divisores e contornos' },
+        { name:'border/strong', hex:'#D6D1C4', use:'Campos' },
+        { name:'text/primary', hex:'#0A0A0A', use:'Texto principal' },
+        { name:'text/secondary', hex:'#4A4A4A', use:'Apoio, células' },
+        { name:'accent/action', hex:'#0A0A0A', use:'Botão principal (com ponto lime)' },
+        { name:'accent/external', hex:'#2D1B4E', use:'Patrocinador e convidado' }
+      ],
+      statuses: Object.values(S),
+      spacing: [4,8,12,16,24,32,48,64].map(v=>({ v:String(v), px: Math.min(v,48)+'px' })),
+      nav, navLight,
+      tableRows: episodes.slice(1,5),
+      episodes,
+      board,
+      kpis: [
+        { label:'Episódios publicados', value:'14', delta:'1 NOVO / SEMANA', deltaColor:'#6B6B6B' },
+        { label:'Views (30 dias)', value:'1,04M', delta:'▲ 18,2%', deltaColor:'#C8FF42' },
+        { label:'Convites pendentes', value:'5', delta:'2 SEM RESPOSTA > 7D', deltaColor:'#FFC266' },
+        { label:'Cortes na fila', value:'27', delta:'12 PRONTOS P/ APROVAR', deltaColor:'#6B6B6B' }
+      ],
+      upcoming: [
+        { month:'OUT', day:'23', guest:'Fillipe Holzer', meta:'09:00 · EP.016 · PAUTA OK' },
+        { month:'NOV', day:'06', guest:'Dra. Rachel Furtado', meta:'09:00 · EP.017 · PAUTA PENDENTE' },
+        { month:'NOV', day:'13', guest:'A definir', meta:'09:00 · EP.018' }
+      ],
+      sponsorKpis: [
+        { label:'Visualizações com a marca', value:'318K', delta:'▲ 22% VS. SET', deltaColor:'#C8FF42' },
+        { label:'Leituras do QR Code', value:'412', delta:'EP.013 + EP.014', deltaColor:'#6B6B6B' },
+        { label:'Cliques no link', value:'1.286', delta:'CTR 0,4%', deltaColor:'#6B6B6B' },
+        { label:'Menções em descrição', value:'4', delta:'YOUTUBE + SPOTIFY', deltaColor:'#6B6B6B' }
+      ],
+      cuts: [
+        { ep:'EP.014', title:'Ninguém te ensina a cobrar', views:'84K' },
+        { ep:'EP.014', title:'O consultório como empresa', views:'41K' },
+        { ep:'EP.013', title:'Autoridade se empresta', views:'126K' },
+        { ep:'EP.013', title:'Corte exclusivo Vitta Lab', views:'22K' }
+      ],
+      deliverables: [
+        { label:'Inserção nos episódios', meta:'2/4', ...done(true) },
+        { label:'QR Code na tela', meta:'2/4', ...done(true) },
+        { label:'Moldura de patrocinador', meta:'2/4', ...done(true) },
+        { label:'Presença no YouTube e Spotify', meta:'OK', ...done(true) },
+        { label:'Corte exclusivo', meta:'EP.013', ...done(true) },
+        { label:'Presença em até 10 cortes', meta:'7/10', ...done(false) }
+      ],
+      checklist: [
+        { label:'Convidado confirmou chegada', meta:'08:12', ...done(true) },
+        { label:'Inserção Vitta Lab gravada', meta:'08:55', ...done(true) },
+        { label:'Fotos de bastidores', meta:'EM CURSO', ...done(false) },
+        { label:'Vídeo teaser', meta:'—', ...done(false) },
+        { label:'Entrega do kit do convidado', meta:'—', ...done(false) }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

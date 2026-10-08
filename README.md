@@ -18,6 +18,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - [Deploy (Docker Swarm + Traefik)](#deploy-docker-swarm--traefik)
 - [Modelos de convite (HTML)](#modelos-de-convite-html)
 - [Segurança](#segurança)
+- [Identidade visual](#identidade-visual)
 - [Estrutura do código](#estrutura-do-código)
 
 ## O que tem
@@ -141,6 +142,17 @@ Imagens, fontes e CSS externos do modelo precisam ser `https://`. Limite de 200 
   tocar no painel nem em dados da sessão, mesmo que alguém coloque código malicioso num modelo.
 - Papéis checados no servidor em cada rota; ações sensíveis vão para a **Auditoria**.
 
+## Identidade visual
+
+O painel segue o **Design System de interface** e o **Manual de Marca** do Pulso:
+
+- `docs/design-system.md` — tokens (escuro/claro), status, tipografia, componentes e checklist de UI.
+- `docs/manual-de-marca.md` — logo, cores, tipografia, tom de voz e aplicações.
+- `docs/referencias/` — os HTMLs originais do designer (abrem só no ambiente de origem; os `.md` são a versão de trabalho).
+
+Fontes (Space Grotesk, Inter, JetBrains Mono, Instrument Serif) e ícones Lucide ficam **dentro do repositório**
+(`src/public/fonts/`, `src/utils/icons.js`): o painel não carrega nada de CDN. Tema escuro por padrão; há botão "Tema" na barra lateral.
+
 ## Estrutura do código
 
 ```
@@ -152,9 +164,12 @@ Imagens, fontes e CSS externos do modelo precisam ser `https://`. Limite de 200 
 │   ├── services/      mailer (Brevo), yourls, guests, inviteTemplate, audit
 │   ├── routes/        auth, users, guests, templates, public (convite), misc (início/auditoria/integrações)
 │   ├── views/         EJS (painel)
-│   ├── public/        app.css, app.js, convite/ (fotos do modelo Pulso)
+│   ├── public/        app.css (tokens), app.js, theme.js, fonts/, convite/ (fotos do modelo Pulso)
+│   ├── utils/         format (datas em Brasília), icons (Lucide), wrap, …
 │   ├── templates/     convite-pulso.html (padrão) e convite-simples.html (exemplo)
 │   └── scripts/       createSuperadmin.js
+├── docs/              design-system.md, manual-de-marca.md, referencias/ (HTML do designer)
+├── CLAUDE.md · AGENTS.md · memory.md   instruções e memória pra IA
 └── test/              node:test (unitários + fluxos ponta a ponta)
 ```
 

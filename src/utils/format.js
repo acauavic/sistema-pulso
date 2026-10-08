@@ -56,10 +56,35 @@ function clean(value, max = 500) {
   return s.slice(0, max);
 }
 
+const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+const partsFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: '2-digit', month: 'numeric', year: 'numeric', hour: '2-digit', hourCycle: 'h23' });
+function zoned(v) {
+  const d = toDate(v);
+  if (!valid(d)) return null;
+  const p = Object.fromEntries(partsFmt.formatToParts(d).map((x) => [x.type, x.value]));
+  return { day: p.day, month: MONTHS[Number(p.month) - 1], year: p.year, hour: Number(p.hour) };
+}
+
+// "23 OUT" — datas curtas em caixa alta (camada mono da marca).
+function shortDate(v) {
+  const z = zoned(v);
+  return z ? `${z.day} ${z.month}` : '—';
+}
+function monthShort(v) { const z = zoned(v); return z ? z.month : ''; }
+function dayNum(v) { const z = zoned(v); return z ? z.day : ''; }
+function todayLabel() { const z = zoned(new Date()); return `${z.day} ${z.month} ${z.year}`; }
+
+// Saudação pelo horário de Brasília.
+function greeting() {
+  const h = zoned(new Date()).hour;
+  return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+}
+
 const EMAIL_RE = /^[^\s@<>"',;:]+@[^\s@<>"',;:]+\.[^\s@<>"',;:]{2,}$/;
 const isEmail = (value) => typeof value === 'string' && value.length <= 254 && EMAIL_RE.test(value);
 
 module.exports = {
   TZ, formatDateTime, formatDate, formatLong, toInputValue, parseInputDateTime,
+  shortDate, monthShort, dayNum, todayLabel, greeting,
   slugify, firstName, clean, isEmail,
 };

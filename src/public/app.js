@@ -4,7 +4,15 @@
 
   // menu mobile
   document.querySelector('[data-nav-toggle]')?.addEventListener('click', () => {
-    document.querySelector('[data-nav]')?.classList.toggle('open');
+    document.querySelector('[data-sidebar]')?.classList.toggle('open');
+  });
+
+  // tema: escuro (padrão) ou claro; a escolha fica só neste navegador
+  document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('pulso-theme', next); } catch { /* storage bloqueado */ }
   });
 
   // confirmação antes de ações destrutivas: <form data-confirm="...">
@@ -25,7 +33,7 @@
       tmp.value = text; document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); tmp.remove();
     }
     const old = btn.textContent;
-    btn.textContent = 'Copiado ✓';
+    btn.textContent = 'Copiado';
     setTimeout(() => { btn.textContent = old; }, 1600);
   });
 

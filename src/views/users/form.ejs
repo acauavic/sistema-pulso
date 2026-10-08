@@ -1,5 +1,5 @@
 <%- include('../partials/head') %>
-<h1><%= target ? 'Editar usuário' : 'Novo usuário' %></h1>
+<div class="page-head"><div><span class="kicker">Sistema · Usuários</span><h1><%= target ? 'Editar usuário' : 'Novo usuário' %></h1></div></div>
 <div class="card form-card">
   <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
   <form method="post" action="<%= target ? '/usuarios/' + target.id : '/usuarios' %>" class="stack">

@@ -10,6 +10,10 @@
   decisões antigas já consolidadas no código.
 - `memory.md` é commitado junto com o código que ele descreve.
 
+## Design e marca
+
+- Toda UI/e-mail/texto novo segue `docs/design-system.md` e `docs/manual-de-marca.md` (originais em `docs/referencias/`). Veja o `CLAUDE.md`.
+
 ## Outras notas
 
 - Testes: `npm test` (precisa de um Postgres e de um banco que **termine em `_test`** — a suíte

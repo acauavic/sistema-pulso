@@ -1,7 +1,7 @@
 <%- include('partials/head') %>
-<h1>Integrações</h1>
-<p class="muted">Status das integrações. Por segurança, chaves e senhas nunca aparecem aqui — elas ficam nas variáveis de ambiente do servidor.</p>
-<div class="grid-2">
+<div class="page-head"><div><span class="kicker">Sistema · Conexões</span><h1>Integrações</h1></div></div>
+<p class="lead">Status das integrações. Por segurança, chaves e senhas nunca aparecem aqui — elas ficam nas variáveis de ambiente do servidor.</p>
+<div class="grid-2 tight">
   <section class="card">
     <h2>E-mail transacional (Brevo SMTP)</h2>
     <p><span class="badge <%= smtp.ok ? 'b-green' : 'b-red' %>"><%= smtp.ok ? (smtp.dry ? 'Modo teste (não envia)' : 'Configurado') : 'Não configurado' %></span></p>

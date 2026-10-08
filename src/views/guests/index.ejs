@@ -1,12 +1,12 @@
 <%- include('../partials/head') %>
 <div class="page-head">
-  <h1>Convidados</h1>
+  <div><span class="kicker">CRM · Funil de convidados</span><h1>Convidados</h1></div>
   <div class="row">
     <div class="seg">
-      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/convidados?view=quadro&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>">Quadro</a>
-      <a class="<%= view === 'lista' ? 'on' : '' %>" href="/convidados?view=lista&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>">Lista</a>
+      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/convidados?view=quadro&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>"><%- icon('columns-3') %> Quadro</a>
+      <a class="<%= view === 'lista' ? 'on' : '' %>" href="/convidados?view=lista&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>"><%- icon('list') %> Lista</a>
     </div>
-    <% if (can('guests.write')) { %><a class="btn primary" href="/convidados/novo">+ Novo convidado</a><% } %>
+    <% if (can('guests.write')) { %><a class="btn primary" href="/convidados/novo"><%- icon('plus') %> Novo convidado</a><% } %>
   </div>
 </div>
 
@@ -31,16 +31,16 @@
 <div class="board" data-board data-can-move="<%= can('guests.write') ? '1' : '0' %>">
   <% columns.forEach(function (col) { %>
   <section class="column" data-status="<%= col.key %>">
-    <header><span><%= col.label %></span><span class="count"><%= col.guests.length %></span></header>
+    <header><span class="badge b-st-<%= col.key %>"><%= col.label %></span><span class="count"><%= col.guests.length %></span></header>
     <div class="cards" data-dropzone>
       <% col.guests.forEach(function (g) { %>
       <a class="kcard" href="/convidados/<%= g.id %>" data-guest-id="<%= g.id %>" draggable="<%= can('guests.write') ? 'true' : 'false' %>">
         <strong><%= g.name %></strong>
         <% if (g.company || g.job_title) { %><span class="muted small"><%= [g.job_title, g.company].filter(Boolean).join(' · ') %></span><% } %>
-        <% if (g.topic) { %><span class="small"><%= g.topic %></span><% } %>
+        <% if (g.topic) { %><span class="small" style="color:var(--text-2)"><%= g.topic %></span><% } %>
         <span class="meta small muted">
-          <% if (g.proposed_at) { %>📅 <%= fmt.formatDate(g.proposed_at) %><% } %>
-          <% if (g.invite_viewed_at) { %>👁️ visto<% } else if (g.invite_sent_at) { %>✉️ enviado<% } else if (g.invite_token) { %>🔗 link pronto<% } %>
+          <% if (g.proposed_at) { %><span><%- icon('calendar', 12) %><%= fmt.shortDate(g.proposed_at) %></span><% } %>
+          <% if (g.invite_viewed_at) { %><span><%- icon('eye', 12) %>visto</span><% } else if (g.invite_sent_at) { %><span><%- icon('send', 12) %>enviado</span><% } else if (g.invite_token) { %><span><%- icon('link', 12) %>link pronto</span><% } %>
         </span>
         <% if (g.owner_name) { %><span class="owner small"><%= g.owner_name %></span><% } %>
       </a>
@@ -54,13 +54,13 @@
 <table>
   <thead><tr><th>Convidado</th><th>Tema</th><th>Etapa</th><th>Gravação</th><th>Convite</th><th>Responsável</th></tr></thead>
   <tbody>
-    <% if (!guests.length) { %><tr><td colspan="6" class="muted center">Nenhum convidado encontrado.</td></tr><% } %>
+    <% if (!guests.length) { %><tr><td colspan="6"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum convidado por aqui ainda</strong><span>Cadastre o primeiro convidado ou ajuste os filtros.</span></div></td></tr><% } %>
     <% guests.forEach(function (g) { %>
     <tr>
       <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a><br><span class="muted small"><%= [g.job_title, g.company].filter(Boolean).join(' · ') %></span></td>
       <td><%= g.topic || '—' %></td>
       <td><span class="badge b-st-<%= g.status %>"><%= statuses.find(function (s) { return s.key === g.status; }).label %></span></td>
-      <td class="nowrap"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : '—' %></td>
+      <td class="nowrap mono"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : '—' %></td>
       <td class="small"><%= g.invite_viewed_at ? 'Visto' : g.invite_sent_at ? 'Enviado' : g.invite_token ? 'Link pronto' : '—' %></td>
       <td><%= g.owner_name || '—' %></td>
     </tr>

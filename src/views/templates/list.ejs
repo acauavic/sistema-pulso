@@ -1,9 +1,9 @@
 <%- include('../partials/head') %>
 <div class="page-head">
-  <h1>Modelos de convite</h1>
-  <% if (can('templates.write')) { %><a class="btn primary" href="/modelos/novo">+ Novo modelo</a><% } %>
+  <div><span class="kicker">Convites · HTML</span><h1>Modelos de convite</h1></div>
+  <% if (can('templates.write')) { %><a class="btn primary" href="/modelos/novo"><%- icon('plus') %> Novo modelo</a><% } %>
 </div>
-<p class="muted">O HTML do convite que o convidado vê. Cole o seu modelo e use variáveis como <code>{{primeiro_nome}}</code> e <code>{{tema}}</code>.</p>
+<p class="lead">O HTML do convite que o convidado vê. Cole o seu modelo e use variáveis como <code>{{primeiro_nome}}</code> e <code>{{tema}}</code>.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Modelo</th><th>Assunto do e-mail</th><th>Convidados</th><th>Atualizado</th><th></th></tr></thead>
@@ -13,7 +13,7 @@
       <td><strong><%= t.name %></strong> <% if (t.is_default) { %><span class="badge b-green">Padrão</span><% } %></td>
       <td class="small"><%= t.subject %></td>
       <td><%= t.uses %></td>
-      <td class="nowrap"><%= fmt.formatDateTime(t.updated_at) %></td>
+      <td class="nowrap mono"><%= fmt.formatDateTime(t.updated_at) %></td>
       <td class="actions">
         <a class="btn sm" href="/modelos/<%= t.id %>/previa" target="_blank" rel="noopener">Prévia</a>
         <% if (can('templates.write')) { %>

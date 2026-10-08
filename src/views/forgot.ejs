@@ -1,6 +1,7 @@
 <%- include('partials/head') %>
 <div class="card auth-card">
-  <h1>Esqueci minha senha</h1>
+  <span class="kicker">Acesso</span>
+  <h1 style="margin-bottom:16px">Esqueci minha senha</h1>
   <% if (sent) { %>
     <div class="flash flash-ok">Se este e-mail estiver cadastrado, enviaremos um link para criar uma nova senha. Ele vale por 1 hora.</div>
     <p class="center small"><a href="/login">Voltar para o login</a></p>
@@ -8,7 +9,7 @@
     <p class="muted">Informe o e-mail da sua conta e enviaremos um link para redefinir a senha.</p>
     <form method="post" action="/esqueci-senha" class="stack">
       <label>E-mail<input type="email" name="email" autocomplete="username" required autofocus></label>
-      <button class="btn primary" type="submit">Enviar link</button>
+      <button class="btn primary lg" type="submit">Enviar link</button>
     </form>
     <p class="center small"><a href="/login">Voltar</a></p>
   <% } %>

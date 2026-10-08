@@ -24,20 +24,23 @@ function getTransport() {
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// Moldura simples e compatível com clientes de e-mail (tabelas + estilos inline).
+// Moldura de e-mail na marca Pulso (docs/manual-de-marca.md): cabeçalho preto com wordmark "pulso." e ponto lime,
+// corpo em bone, botão preto com ponto lime. Tabelas + estilos inline e fontes seguras (clientes de e-mail não carregam as da marca).
+const DISPLAY = "'Space Grotesk','Helvetica Neue',Arial,sans-serif";
+const MONO = "'JetBrains Mono',Menlo,Consolas,monospace";
 function layout({ title, bodyHtml, button, footer }) {
   const btn = button
-    ? `<p style="margin:28px 0"><a href="${esc(button.url)}" style="background:#6d28d9;color:#fff;text-decoration:none;padding:13px 26px;border-radius:8px;font-weight:600;display:inline-block">${esc(button.label)}</a></p>
-       <p style="font-size:12px;color:#6b7280;word-break:break-all">Se o botão não funcionar, copie este endereço no navegador:<br>${esc(button.url)}</p>`
+    ? `<p style="margin:28px 0"><a href="${esc(button.url)}" style="background:#0A0A0A;color:#FAFAFA;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:600;display:inline-block">${esc(button.label)} <span style="color:#C8FF42">&#9679;</span></a></p>
+       <p style="font-size:12px;color:#6B6B6B;word-break:break-all">Se o botão não funcionar, copie este endereço no navegador:<br>${esc(button.url)}</p>`
     : '';
-  return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif">
+  return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#F0EDE3;font-family:Arial,Helvetica,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:12px;overflow:hidden">
-<tr><td style="background:#1e1b4b;color:#fff;padding:18px 28px;font-size:18px;font-weight:700">${esc(config.podcastName)}</td></tr>
-<tr><td style="padding:28px;color:#111827;font-size:15px;line-height:1.6">
-<h1 style="font-size:20px;margin:0 0 16px">${esc(title)}</h1>${bodyHtml}${btn}
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:6px;overflow:hidden">
+<tr><td style="background:#0A0A0A;color:#FAFAFA;padding:20px 28px;font-family:${DISPLAY};font-size:26px;font-weight:700;letter-spacing:-0.06em">pulso<span style="color:#C8FF42">.</span></td></tr>
+<tr><td style="padding:28px;color:#0A0A0A;font-size:15px;line-height:1.6">
+<h1 style="font-family:${DISPLAY};font-size:24px;letter-spacing:-0.04em;line-height:1.15;margin:0 0 16px">${esc(title)}</h1>${bodyHtml}${btn}
 </td></tr>
-<tr><td style="padding:16px 28px;background:#f9fafb;color:#9ca3af;font-size:12px">${esc(footer || `Mensagem enviada por ${config.podcastName}.`)}</td></tr>
+<tr><td style="padding:16px 28px;background:#F4F2EC;color:#6B6B6B;font-family:${MONO};font-size:11px;letter-spacing:.08em;text-transform:uppercase">${esc(footer || `Mensagem enviada por ${config.podcastName}.`)}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -117,7 +120,7 @@ async function sendRsvpNotice({ to, guestName, accepted, message, url }) {
     subject: `${guestName} ${accepted ? 'aceitou' : 'recusou'} o convite`,
     html: layout({
       title: `${guestName} ${accepted ? 'aceitou' : 'recusou'} o convite`,
-      bodyHtml: message ? `<p style="margin:0 0 14px">Mensagem do convidado:</p><blockquote style="margin:0 0 14px;padding:8px 14px;border-left:3px solid #6d28d9;color:#374151">${esc(message)}</blockquote>` : '<p style="margin:0">Sem mensagem adicional.</p>',
+      bodyHtml: message ? `<p style="margin:0 0 14px">Mensagem do convidado:</p><blockquote style="margin:0 0 14px;padding:8px 14px;border-left:3px solid #2D1B4E;color:#4A4A4A">${esc(message)}</blockquote>` : '<p style="margin:0">Sem mensagem adicional.</p>',
       button: { label: 'Abrir no CRM', url },
     }),
   });
