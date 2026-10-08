@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const config = require('./config');
@@ -8,6 +9,7 @@ const { icon } = require('./utils/icons');
 
 // Cabeçalhos de segurança + CSP restritiva para o painel (sem scripts inline).
 function securityHeaders(req, res, next) {
+  res.locals.assetV = ASSET_VERSION;
   res.set({
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'SAMEORIGIN',
@@ -95,5 +97,15 @@ function verifyCsrf(req, res, next) {
 }
 
 const staticDir = path.join(__dirname, 'public');
+
+// Versão dos arquivos de /static (hash do conteúdo, calculado ao subir). Vai na URL (?v=…) para que o navegador
+// não use CSS/JS antigo do cache de 1h depois de um deploy.
+const ASSET_VERSION = (() => {
+  const h = crypto.createHash('sha1');
+  for (const f of ['app.css', 'app.js', 'theme.js']) {
+    try { h.update(fs.readFileSync(path.join(staticDir, f))); } catch { /* arquivo ausente: ignora */ }
+  }
+  return h.digest('hex').slice(0, 10);
+})();
 
 module.exports = { securityHeaders, originCheck, attachSession, requireAuth, requirePerm, verifyCsrf, staticDir };

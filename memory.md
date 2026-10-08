@@ -37,6 +37,9 @@
 
 ## Últimas Decisões
 
+- **Cache de /static (2026-10-08)**: depois do redesign, o navegador do usuário mostrou HTML novo com `app.css` antigo (cache de 1h do
+  `express.static`). Agora `head.ejs`/`foot.ejs` pedem `/static/*.css|js?v=<hash do conteúdo>` (`ASSET_VERSION` em `middleware.js`). Toda
+  referência nova a arquivo de `/static` que muda com frequência deve levar `?v=<%= assetV %>`.
 - **Identidade visual aplicada (2026-10-08)**: usuário enviou o Design System de interface e o Manual de Marca (HTML do designer). Painel
   refeito: sidebar em vez de topbar, wordmark `pulso.`, linha de pulso no login/estados vazios, saudação com serifa, KPIs em Space Grotesk,
   datas/contagens em mono, sem emoji. Fontes e ícones **dentro do repo** (CSP não muda; sem CDN). Criado `CLAUDE.md` (regras + imports dos docs).

@@ -7,8 +7,8 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0A0A0A">
   <title><%= title %> · <%= podcastName || 'Pulso' %></title>
-  <script src="/static/theme.js"></script>
-  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/theme.js?v=<%= assetV %>"></script>
+  <link rel="stylesheet" href="/static/app.css?v=<%= assetV %>">
 </head>
 <body>
 <% if (currentUser) {
