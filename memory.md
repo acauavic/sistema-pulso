@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Aviso e aceite da plateia**: texto das condições na seção "Como funciona" e no formulário, com checkbox obrigatório (cliente e servidor). Migração 029 guarda data e versão do aceite no pedido. Texto em `views/plateia/page.ejs`; mudou, suba `TERMS_VERSION`.
+
 - **Quadro sem rolagem horizontal por coluna**: `.cards` com coluna `minmax(0,1fr)`, `overflow-x: hidden` e `.kcard` com `min-width:0` + `overflow-wrap:anywhere` (@ longo de Instagram alargava o card e criava barra na coluna).
 
 - **Fotos no celular (plateia)**: `.pl-photo img` preenche a moldura 4:3 em posição absoluta (sem faixa roxa no iOS) e todas as molduras 4:3 usam `object-position: 50% 18%` (rosto no alto de fotos em pé). Hero da plateia no PC com menos respiro no topo (`clamp(72px, 7vw, 96px)`). Imagem de compartilhamento estava certa; o problema era do lado do WhatsApp.

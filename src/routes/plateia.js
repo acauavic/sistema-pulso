@@ -101,6 +101,7 @@ router.post('/plateia/inscricao', wrap(async (req, res) => {
   if (name.length < 5 || !name.includes(' ')) return res.status(400).json({ ok: false, field: 'name', error: 'Informe seu nome completo.' });
   const phone = audience.validatePhone(String(b.country || ''), b.phone);
   if (phone.error) return res.status(400).json({ ok: false, field: 'phone', error: phone.error });
+  if (b.terms !== true) return res.status(400).json({ ok: false, field: 'terms', error: 'Para continuar, aceite as condições da plateia.' });
   const lead = await audience.createLead({
     guest, name, phone, utm: audience.cleanUtm(b.utm), referrer: b.referrer, landingUrl: b.landing, visitorId: b.visitor_id, userAgent: req.get('user-agent'),
   });

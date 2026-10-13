@@ -108,6 +108,9 @@ function whatsappMessage({ name, guestName, date, time, priceCents, phoneDisplay
     `Gostaria de saber como seguir. Meu WhatsApp é ${phoneDisplay}.\nObrigado(a)!`;
 }
 
+// Versão do texto das condições da plateia (page.ejs). Mudou o texto, aumente a versão.
+const TERMS_VERSION = '2026-10';
+
 async function createLead({ guest, name, phone, utm, referrer, landingUrl, visitorId, userAgent }) {
   const s = await settings();
   const msg = whatsappMessage({ name, guestName: guest.name, date: dateLong(guest.proposed_at), time: timeShort(guest.proposed_at), priceCents: s.priceCents, phoneDisplay: phone.display });
@@ -116,14 +119,14 @@ async function createLead({ guest, name, phone, utm, referrer, landingUrl, visit
   let ref; let created = false; let leadId = null;
   if (dup) {
     ref = dup.ref;
-    await db.query('UPDATE plateia_leads SET name = $2, updated_at = now(), status = CASE WHEN status = \'desistiu\' THEN \'novo\' ELSE status END WHERE id = $1', [dup.id, name]);
+    await db.query('UPDATE plateia_leads SET name = $2, terms_accepted_at = now(), terms_version = $3, updated_at = now(), status = CASE WHEN status = \'desistiu\' THEN \'novo\' ELSE status END WHERE id = $1', [dup.id, name, TERMS_VERSION]);
   } else {
     ref = crypto.randomBytes(9).toString('base64url'); created = true;
     const { rows: [row] } = await db.query(
-      `INSERT INTO plateia_leads (ref, guest_id, guest_name, recording_at, name, phone, country, price_cents, utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid, referrer, landing_url, visitor_id, user_agent)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
+      `INSERT INTO plateia_leads (ref, guest_id, guest_name, recording_at, name, phone, country, price_cents, utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid, referrer, landing_url, visitor_id, user_agent, terms_accepted_at, terms_version)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19, now(), $20) RETURNING id`,
       [ref, guest.id, guest.name, guest.proposed_at, name, phone.e164, phone.country, s.priceCents, utm.utm_source, utm.utm_medium, utm.utm_campaign, utm.utm_term, utm.utm_content, utm.fbclid, utm.gclid,
-        clip(referrer, 300), clip(landingUrl, 500), cleanVisitor(visitorId), clip(userAgent, 300)]);
+        clip(referrer, 300), clip(landingUrl, 500), cleanVisitor(visitorId), clip(userAgent, 300), TERMS_VERSION]);
     leadId = row.id;
   }
   if (created) { // a mesma pessoa pedindo de novo não conta duas vezes no funil nem avisa de novo
@@ -196,5 +199,5 @@ async function setReceived(lead, paidOn) { // paidOn null = desfazer
 
 module.exports = {
   todayISO: () => require('./finance').todayISO(), confirmLead, releaseLead, setReceived,
-  settings, COUNTRIES, COUNTRY_BY_CODE, validatePhone, dateLong, timeShort, weekday, money, agenda, agendaGuest, cleanUtm, cleanVisitor, recordEvent, whatsappMessage, createLead, results, EVENT_TYPES, clip,
+  settings, COUNTRIES, COUNTRY_BY_CODE, validatePhone, dateLong, timeShort, weekday, money, agenda, agendaGuest, cleanUtm, cleanVisitor, recordEvent, whatsappMessage, createLead, TERMS_VERSION, results, EVENT_TYPES, clip,
 };

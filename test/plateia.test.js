@@ -60,6 +60,7 @@ describe('Pulso Podcast com Plateia', () => {
 
   it('compartilhamento e SEO: título, descrição, imagem e favicon', async () => {
     const t = (await anon.get('/plateia')).text;
+    assert.match(t, /Condições da plateia/); assert.match(t, /name="terms"/); assert.match(t, /sem aviso prévio/);
     assert.match(t, /<title>Pulso Podcast com Plateia: assista às gravações em São Paulo<\/title>/);
     assert.match(t, /<meta name="description" content="Assista de perto/);
     assert.match(t, /<meta property="og:image" content="http[^"]+\/static\/og-plateia\.jpg/);
@@ -107,20 +108,25 @@ describe('Pulso Podcast com Plateia', () => {
   });
 
   it('inscrição: valida, guarda UTMs, devolve o WhatsApp da produtora com a mensagem pronta e não duplica', async () => {
-    let r = await json('/plateia/inscricao', { guest_id: g1, name: 'Maria', country: 'BR', phone: '(11) 91234-5678' });
+    let r = await json('/plateia/inscricao', { guest_id: g1, name: 'Maria', country: 'BR', phone: '(11) 91234-5678', terms: true });
     assert.equal(r.status, 400); assert.equal((await r.json()).field, 'name');
     r = await json('/plateia/inscricao', { guest_id: g1, name: 'Maria da Silva', country: 'BR', phone: '123' });
     assert.equal(r.status, 400); assert.equal((await r.json()).field, 'phone');
-    assert.equal((await json('/plateia/inscricao', { guest_id: g3, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678' })).status, 404, 'fora da agenda');
-    assert.equal((await json('/plateia/inscricao', { guest_id: g5, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678' })).status, 404, 'já passou');
+    assert.equal((await json('/plateia/inscricao', { guest_id: g3, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678', terms: true })).status, 404, 'fora da agenda');
+    assert.equal((await json('/plateia/inscricao', { guest_id: g5, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678', terms: true })).status, 404, 'já passou');
     assert.equal((await q('SELECT 1 FROM plateia_leads')).length, 0);
 
     await as.gestao.act('/plateia/painel/ajustes', { active: '1', price: '197,00', duration: '1h30 a 2h', location: 'Estúdio do Pulso Podcast, Alphaville, SP', whatsapp: '+55 (11) 98888-7777' }, { from: '/plateia/painel' });
-    const body = { guest_id: g1, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678', visitor_id: 'visitante-123456', referrer: 'https://instagram.com/', landing: 'http://localhost/plateia?utm_source=instagram',
+    const body = { guest_id: g1, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678', terms: true, visitor_id: 'visitante-123456', referrer: 'https://instagram.com/', landing: 'http://localhost/plateia?utm_source=instagram',
       utm: { utm_source: 'instagram', utm_medium: 'story', utm_campaign: 'plateia-out', fbclid: 'abc' } };
+    r = await json('/plateia/inscricao', { ...body, terms: undefined });
+    assert.equal(r.status, 400); assert.equal((await r.json()).field, 'terms', 'sem aceitar as condições não grava');
+    assert.equal((await q('SELECT 1 FROM plateia_leads')).length, 0);
     r = await json('/plateia/inscricao', body);
     const j = await r.json();
     assert.equal(r.status, 200); assert.ok(j.ok && j.ref);
+    const acc = await one('SELECT terms_accepted_at, terms_version FROM plateia_leads ORDER BY id DESC LIMIT 1');
+    assert.ok(acc.terms_accepted_at && acc.terms_version, 'guarda quando e qual versão das condições foi aceita');
     const u = new URL(j.url);
     assert.equal(u.origin + u.pathname, 'https://wa.me/5511988887777');
     const msg = u.searchParams.get('text');
@@ -200,7 +206,7 @@ describe('Pulso Podcast com Plateia', () => {
     await as.gestao.act('/plateia/painel/ajustes', { price: '197,00', duration: '1h30 a 2h', location: 'Estúdio', whatsapp: '5511988887777' }, { from: '/plateia/painel' }); // sem "active": pausa
     r = await anon.get('/plateia');
     assert.match(r.text, /Novas datas serão divulgadas em breve/); assert.doesNotMatch(r.text, /Dra\. Ana Souza/);
-    assert.equal((await json('/plateia/inscricao', { guest_id: g1, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678' })).status, 403);
+    assert.equal((await json('/plateia/inscricao', { guest_id: g1, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678', terms: true })).status, 403);
     await send({});
     assert.match((await anon.get('/plateia')).text, /Dra\. Ana Souza/);
   });
@@ -230,7 +236,7 @@ describe('Pulso Podcast com Plateia', () => {
     const notes = await q("SELECT user_id, title FROM notifications WHERE type='plateia'");
     assert.ok(notes.length >= 1 && /Nova inscrição na plateia: Maria da Silva/.test(notes[0].title));
     const before = notes.length;
-    await json('/plateia/inscricao', { guest_id: g1, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678' });
+    await json('/plateia/inscricao', { guest_id: g1, name: 'Maria da Silva', country: 'BR', phone: '(11) 91234-5678', terms: true });
     assert.equal((await q("SELECT 1 FROM notifications WHERE type='plateia'")).length, before, 'pedido repetido não avisa de novo');
     await as.prod.act(`/plateia/painel/leads/${lead.id}`, { status: 'nao_selecionado' }, { from: '/plateia/painel' });
     assert.equal((await one('SELECT status FROM plateia_leads WHERE id=$1', [lead.id])).status, 'nao_selecionado');
@@ -268,7 +274,7 @@ describe('Pulso Podcast com Plateia', () => {
     await post('', { status: 'desistiu' });
     assert.equal((await one('SELECT status FROM fin_entries WHERE id=$1', [l.entry_id])).status, 'pago');
     // outra pessoa, ainda sem pagar: mudar a situação cancela a conta
-    const r = await (await json('/plateia/inscricao', { guest_id: g1, name: 'João Pereira Neto', country: 'BR', phone: '(21) 98765-4321' })).json();
+    const r = await (await json('/plateia/inscricao', { guest_id: g1, name: 'João Pereira Neto', country: 'BR', phone: '(21) 98765-4321', terms: true })).json();
     const l2 = await one('SELECT id FROM plateia_leads WHERE ref=$1', [r.ref]);
     await as.prod.act(`/plateia/painel/leads/${l2.id}/confirmar`, { amount: '197,00', paid: '1', paid_on: '2026-11-02' }, { from: '/plateia/painel' });
     const e2 = await one("SELECT * FROM fin_entries WHERE auto_key=$1", [`plateia-lead-${l2.id}`]);

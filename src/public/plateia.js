@@ -83,7 +83,8 @@
     track('form_open', { guest_id: current.id });
     fire('InitiateCheckout', 'begin_checkout', { content_name: current.name });
     dlg.querySelector('[data-episode]').textContent = `Episódio com ${current.name} · ${current.date}, às ${current.time}`;
-    ['name', 'phone', 'form'].forEach((k) => err(k, ''));
+    ['name', 'phone', 'terms', 'form'].forEach((k) => err(k, ''));
+    form.elements.terms.checked = false;
     show('form');
     dlg.showModal();
     form.elements.name.focus();
@@ -93,18 +94,19 @@
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    ['name', 'phone', 'form'].forEach((k) => err(k, ''));
+    ['name', 'phone', 'terms', 'form'].forEach((k) => err(k, ''));
     const name = form.elements.name.value.replace(/\s+/g, ' ').trim();
     let bad = false;
     if (name.length < 5 || !name.includes(' ')) { err('name', 'Informe seu nome completo.'); bad = true; }
     const pe = checkPhone(form.elements.country.value, form.elements.phone.value);
     if (pe) { err('phone', pe); bad = true; }
+    if (!form.elements.terms.checked) { err('terms', 'Para continuar, aceite as condições da plateia.'); bad = true; }
     if (bad || !current) return;
     const btn = form.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Enviando…';
     try {
       const res = await fetch('/plateia/inscricao', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guest_id: current.id, name, country: form.elements.country.value, phone: form.elements.phone.value, site: form.elements.site.value, visitor_id: visitor, utm, referrer, landing }),
+        body: JSON.stringify({ guest_id: current.id, name, country: form.elements.country.value, phone: form.elements.phone.value, terms: form.elements.terms.checked, site: form.elements.site.value, visitor_id: visitor, utm, referrer, landing }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) { err(json.field || 'form', json.error || 'Não foi possível enviar agora. Tente novamente.'); return; }

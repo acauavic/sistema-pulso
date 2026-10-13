@@ -84,6 +84,13 @@ a { color: inherit; }
 .pl-field input:focus, .pl-field select:focus { outline: none; border-color: var(--lime); box-shadow: 0 0 0 4px rgba(200, 255, 66, .15); }
 .pl-phone { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 8px; }
 .pl-err { color: var(--bad); font-size: 13px; min-height: 0; margin: 0; } .pl-err:empty { display: none; }
+.pl-terms { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 0 6px 6px 0; padding: 16px 18px; margin: 0 0 16px; }
+.pl-terms h3 { font: 500 12px "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.pl-terms p { font-size: 14px; color: var(--text-2); margin: 0; }
+.pl-accept { gap: 12px; }
+.pl-terms-short { font-size: 13px; color: var(--muted); margin: 0; }
+.pl-check { display: flex; align-items: flex-start; gap: 10px; color: var(--text); cursor: pointer; }
+.pl-check input { width: 20px; min-height: 20px; height: 20px; margin: 1px 0 0; padding: 0; flex: none; accent-color: var(--lime); }
 .pl-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 .pl-modal .pl-btn { width: 100%; }
 .pl-review { margin: 20px 0; display: grid; gap: 0; border-top: 1px solid var(--line); } .pl-review > div { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
