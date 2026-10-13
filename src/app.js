@@ -30,6 +30,7 @@ function createApp() {
 
   app.use(express.urlencoded({ extended: false, limit: '1mb' })); // CSV da importação vai no corpo do formulário
   app.use(express.json({ limit: '50kb' }));
+  app.use(require('./services/googleCalendar').kickOnWrite); // mudou algo no painel: o Google Agenda acompanha em segundos
   app.use(mw.originCheck);
   app.use(require('./services/plans').middleware); // nomes dos planos (Ouro/Diamond), editáveis na gestão, valem em todas as telas
 

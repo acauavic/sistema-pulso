@@ -46,7 +46,7 @@ const ACTIONS = {
   'plans.manage': { text: 'editar os planos de patrocínio (Ouro e Diamond)', where: 'Gestão > Planos de patrocínio' },
   'search.manage': { text: 'editar os atalhos da busca global', where: 'Gestão > Busca global' },
   'audit.read': { text: 'consultar os logs de auditoria', where: 'Gestão > Logs' },
-  'integrations.manage': { text: 'ver o status das integrações (e-mail, links curtos, armazenamento, IA, redes) e a saúde do sistema', where: 'Gestão > Integrações e Sistema' },
+  'integrations.manage': { text: 'ver o status das integrações (e-mail, links curtos, armazenamento, IA, redes, Google Agenda), escolher o que vai para o Google Agenda e a duração de cada tipo, e ver a saúde do sistema', where: 'Gestão > Integrações e Sistema' },
 };
 
 const roleLabels = (roles) => roles.map((r) => ROLES[r].label);

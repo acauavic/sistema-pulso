@@ -829,3 +829,6 @@ html[data-sidebar="collapsed"] .version-link { text-align: center; padding: 0; f
 .release-toast form { margin: 0; }
 :root[data-theme="light"] .release-toast { box-shadow: 0 8px 24px rgba(10, 10, 10, .08); border-left-color: var(--text); }
 @media (max-width: 860px) { .release-toast { left: 16px; right: 16px; top: 72px; width: auto; } .release-items li { grid-template-columns: 1fr; gap: 4px; } }
+
+.gcal-types { display: grid; gap: 4px; } .gcal-types li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.gcal-min { display: flex; align-items: center; gap: 6px; white-space: nowrap; } .gcal-min input { width: 72px; min-height: 32px; text-align: right; font-family: var(--f-mono); }

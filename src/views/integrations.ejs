@@ -33,8 +33,8 @@
     <ul class="plain small">
       <li>Agenda: <code><%= google.calendarId || '—' %></code></li>
       <li>Conta de serviço (compartilhe a agenda com este e-mail, com permissão para editar eventos): <code><%= google.serviceAccount || '—' %></code></li>
-      <li>Gravações no Google: <strong><%= google.synced %></strong><%= google.last ? ' · última atualização ' + fmt.formatDateTime(google.last) : '' %> · duração de cada evento: <%= google.minutes %> min</li>
-      <li>Vão para a agenda os convidados em <strong>Agendado</strong> com data; saem se mudarem de etapa. A rotina confere a cada 2 minutos.</li>
+      <li>Eventos no Google: <strong><%= google.synced %></strong><%= google.last ? ' · última atualização ' + fmt.formatDateTime(google.last) : '' %></li>
+      <li>Enviando: <strong><%= calTypes.filter(function (t) { return google.types[t.key].enabled; }).map(function (t) { return t.label; }).join(', ') || 'nada (tudo desligado)' %></strong>. A rotina confere a cada minuto e o painel atualiza o Google logo depois de qualquer alteração.</li>
     </ul>
     <% if (google.configured) { %>
     <form method="post" action="/integracoes/google" class="row">
@@ -42,7 +42,26 @@
       <button class="btn" type="submit" name="acao" value="testar">Testar conexão (somente leitura)</button>
       <button class="btn" type="submit" name="acao" value="sincronizar">Sincronizar agora</button>
     </form>
+    <button class="btn" type="button" data-modal-open="modal-google">O que vai para a agenda</button>
     <% } else { %><p class="small muted">Defina GOOGLE_CALENDAR_ID e a chave da conta de serviço no servidor (passo a passo no .env.example).</p><% } %>
   </section>
 </div>
+<% if (google.configured) { %>
+<dialog class="modal" id="modal-google" aria-labelledby="mg-h">
+  <form method="post" action="/integracoes/google/tipos" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mg-h">O que vai para o Google Agenda</h2>
+    <p class="small muted">Marque o que entra na agenda. Gravações, lembretes e posts têm horário, então pedem uma duração; o resto entra como evento de dia inteiro. Desmarcar tira da agenda o que já foi enviado.</p>
+    <ul class="plain gcal-types">
+      <% calTypes.forEach(function (t) { %>
+      <li>
+        <label class="check"><input type="checkbox" name="on_<%= t.key %>" value="on" <%= google.types[t.key].enabled ? 'checked' : '' %>> <%= t.label %></label>
+        <% if (timed.has(t.key)) { %><label class="gcal-min small muted">Duração <input type="number" name="min_<%= t.key %>" min="15" max="720" step="5" value="<%= google.types[t.key].minutes %>"> min</label><% } else { %><span class="small muted mono">dia inteiro</span><% } %>
+      </li>
+      <% }) %>
+    </ul>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <%- include('partials/foot') %>
