@@ -208,8 +208,8 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 .column { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px; min-height: 160px; transition: border-color var(--t) var(--ease); }
 .column header { display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 12px; }
 .count { font: 500 12px var(--f-mono); color: var(--muted); }
-.cards { display: grid; gap: 8px; min-height: 60px; } .column.over { border-color: var(--lime); border-style: dashed; }
-.kcard { display: grid; gap: 4px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 14px; color: var(--text); transition: border-color var(--t) var(--ease); }
+.cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-height: 60px; overflow-x: hidden; } .column.over { border-color: var(--lime); border-style: dashed; }
+.kcard { display: grid; min-width: 0; overflow-wrap: anywhere; gap: 4px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 14px; color: var(--text); transition: border-color var(--t) var(--ease); }
 .kcard:hover { border-color: var(--line-strong); text-decoration: none; color: var(--text); } .kcard.dragging { opacity: .4; }
 .kcard strong { font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: -.02em; }
 .kcard .meta { display: flex; gap: 10px; flex-wrap: wrap; font: 500 10px var(--f-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-top: 4px; }
@@ -801,7 +801,7 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
   .main:has(.board) > .container { flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; display: flex; flex-direction: column; }
   .main:has(.board) .board { flex: 1; min-height: 0; padding-bottom: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); overflow-x: scroll; overflow-y: hidden; }
   .main:has(.board) .column { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
-  .main:has(.board) .column .cards { flex: 1; min-height: 60px; overflow-y: auto; align-content: start; padding-right: 2px; }
+  .main:has(.board) .column .cards { flex: 1; min-height: 60px; overflow-y: auto; overflow-x: hidden; align-content: start; padding-right: 2px; }
 }
 @media (max-width: 860px) { .board .cards { max-height: 70dvh; overflow-y: auto; } }
 

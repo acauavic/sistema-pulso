@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Quadro sem rolagem horizontal por coluna**: `.cards` com coluna `minmax(0,1fr)`, `overflow-x: hidden` e `.kcard` com `min-width:0` + `overflow-wrap:anywhere` (@ longo de Instagram alargava o card e criava barra na coluna).
+
 - **Fotos no celular (plateia)**: `.pl-photo img` preenche a moldura 4:3 em posição absoluta (sem faixa roxa no iOS) e todas as molduras 4:3 usam `object-position: 50% 18%` (rosto no alto de fotos em pé). Hero da plateia no PC com menos respiro no topo (`clamp(72px, 7vw, 96px)`). Imagem de compartilhamento estava certa; o problema era do lado do WhatsApp.
 
 - **Menu recolhível, quadros em altura de tela e filtros do calendário num painel (2026-10-13)**: `html[data-sidebar="collapsed"]` (76px, só ícones; `theme.js` restaura de `localStorage['pulso-sidebar']`; `.nav` rola e o rodapé fica fixo: o menu em tela baixa empurrava a página). Quadros: `.main:has(.board)` vira coluna de 100dvh, `.board` com `grid-template-rows: minmax(0,1fr)`, `overflow-x: scroll` (barra de 14px via `::-webkit-scrollbar`; não misturar com `scrollbar-color`, que anula o webkit no Chrome) e `.cards` com `overflow-y: auto`. Calendário: `<details class="cal-filter" data-popover>` com o formulário (`f=1`); **`ROLE_DUTIES`**: "só os meus" soma o que é do perfil (gestão/superadmin: gravação, pagar, receber; produtora: lembrete e cobrança); novo tipo `cobranca` (plateia: `plateia_leads` + `fin_entries`, perm `audience.read`) e a conta da plateia não duplica com `receber`. "Cobranças" foi interpretado como o pagamento dos selecionados da plateia (a produtora confirma o valor e marca o recebimento); se for outra coisa, é só trocar a fonte `SOURCES.cobranca`.
