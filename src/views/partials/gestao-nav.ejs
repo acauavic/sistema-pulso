@@ -1,10 +1,11 @@
 <%# Abas do painel de gestão. Variável: active (chave da aba). %>
 <% var tabs = [
-  ['geral', '/gestao', 'Visão geral', ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'search.manage', 'integrations.manage', 'plans.manage']],
+  ['geral', '/gestao', 'Visão geral', ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage']],
   ['usuarios', '/usuarios', 'Usuários', ['users.read']],
   ['logs', '/auditoria', 'Logs', ['audit.read']],
   ['notificacoes', '/gestao/notificacoes', 'Notificações', ['notifications.manage']],
   ['rotinas', '/gestao/rotinas', 'Rotinas de tarefas', ['routines.manage']],
+  ['lembretes', '/gestao/lembretes', 'Lembretes da gravação', ['reminders.manage']],
   ['planos', '/gestao/patrocinios', 'Planos de patrocínio', ['plans.manage']],
   ['busca', '/gestao/busca', 'Busca global', ['search.manage']],
   ['integracoes', '/integracoes', 'Integrações', ['integrations.manage']],

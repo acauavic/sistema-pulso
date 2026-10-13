@@ -51,6 +51,9 @@
     sync();
   }
 
+  // formulário que abre outra aba (ex.: WhatsApp do lembrete): recarrega esta para mostrar o novo estado
+  document.querySelectorAll('form[data-reload-after]').forEach((f) => f.addEventListener('submit', () => setTimeout(() => window.location.reload(), 800)));
+
   // motivo da perda: "Outros" pede a descrição (formulário do convidado e janela "Marcar como perdido")
   document.querySelectorAll('[data-loss-select], [data-loss-radio]').forEach((input) => {
     const form = input.form;

@@ -54,6 +54,16 @@ router.get('/convite/:token', wrap(async (req, res) => {
 
 // Avisa o responsável (melhor esforço: falha de e-mail não atrapalha o convidado).
 async function notifyOwner(guest, accepted, message) {
+  try { // aviso no painel: quem cuida do convidado + quem a gestão escolheu (Gestão > Notificações, "Respostas ao convite")
+    await require('../services/notify').notify({
+      type: 'convite', users: [guest.owner_id], broadcast: true,
+      title: accepted ? `${guest.name} aceitou o convite` : `${guest.name} recusou o convite`,
+      body: accepted ? 'Foi para Em agendamento. Próximo passo: combinar a data da gravação.' : (message ? `Recado: “${message}”` : 'Foi para Perdido (motivo: Recusado).'),
+      url: `/convidados/${guest.id}`, entity: { type: 'guest', id: guest.id },
+    });
+  } catch (err) {
+    console.error('Falha ao avisar no painel:', err.message);
+  }
   if (!guest.owner_id) return;
   try {
     const { rows } = await db.query('SELECT email FROM users WHERE id = $1 AND active', [guest.owner_id]);

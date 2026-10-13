@@ -4,7 +4,7 @@
 <p class="lead">Vale para toda a equipe. Cada pessoa ainda pode silenciar tipos para si na página Notificações. Ninguém é avisado da própria ação.</p>
 <form method="post" action="/gestao/notificacoes" class="stack">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
-  <% Object.keys(types).forEach(function (k) { var s = settings[k] || { in_app: true, email: false, roles: [] }; var broad = k === 'agendamento' || k === 'rotina'; %>
+  <% Object.keys(types).forEach(function (k) { var s = settings[k] || { in_app: true, email: false, roles: [] }; var broad = ['agendamento', 'rotina', 'convite', 'lembrete', 'plateia'].indexOf(k) >= 0; %>
   <section class="card notif-setting">
     <div class="row spread"><h2><%= types[k].label %></h2><span class="handle muted"><%= week[k] || 0 %> nos últimos 7 dias</span></div>
     <p class="small muted"><%= types[k].hint %></p>

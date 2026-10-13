@@ -450,6 +450,10 @@ span.dot:not([data-dot]) { cursor: default; }
 /* notificações */
 .notif-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; align-items: start; }
 .filter-list { display: grid; gap: 2px; } .filter-list a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-field); color: var(--text-2); font-weight: 500; }
+.reminder-list { display: grid; gap: 4px; margin-top: 12px; }
+.reminder-list li { display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--r-field); }
+.reminder-list li.is-current { background: var(--raised); }
+.reminder-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .push-box { border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px; display: grid; gap: 8px; }
 .push-box h3 { display: flex; align-items: center; gap: 8px; margin: 0; } .push-box p { margin: 0; }
 .filter-list a:hover { background: var(--raised); text-decoration: none; } .filter-list a.on { background: var(--raised); color: var(--text); } .filter-list a.on .icon { color: var(--action); }

@@ -285,6 +285,15 @@ Dois serviços com a mesma imagem: **`pulso_gestao`** (`ROLE=web`, pode ter vár
 rotinas). Numa máquina só, um serviço com `ROLE=all` (padrão) também funciona. Depois do deploy, confira **Gestão > Sistema**.
 Na Brevo, o remetente (`BREVO_EMAIL`) e o domínio precisam estar validados (SPF/DKIM) para não cair em spam.
 
+## Lembretes da gravação e aviso de aceite
+
+- **Aceite do convite**: quando o convidado aceita (ou recusa) pelo link, vira notificação no painel (tipo "Respostas ao convite"): vai para quem cuida do convidado e para os perfis escolhidos em Gestão > Notificações (padrão: gestão, produtora e superadmin). O e-mail ao responsável continua.
+- **Lembretes** (`src/services/reminders.js`, tabela `guest_reminders`, migração `026`): com o convidado em **Agendado**, o sistema monta a agenda e, na hora de cada lembrete, avisa a produtora (tipo "Lembretes da gravação"; push também, se ligado). A mensagem fica pronta no card "Lembretes da gravação" da página do convidado, com **Enviar pelo WhatsApp** (abre a conversa com o texto e marca como enviado) e "Já enviei".
+  - **3 dias antes** (lembrar a data) · **1 dia antes** (confirmar que está tudo certo) · **no dia, de manhã** (com o endereço) · **3 horas antes** (saber se está tudo certo).
+  - Gravação cedo (antes de manhã + 3 h): sem lembretes no dia; o de 1 dia antes leva o endereço. Lembrete do dia e o de 3 horas a menos de 1h30 um do outro: fica só o de 3 horas, com o endereço.
+  - Remarcar refaz o ciclo; sair de Agendado cancela o que não foi enviado. Uma rotina (5 min) dispara os avisos, uma vez cada.
+  - **Gestão > Lembretes da gravação**: endereço do estúdio, horário da manhã (padrão 09:00) e os quatro textos, com `{primeiro_nome}`, `{nome}`, `{dia}`, `{data}`, `{hora}` e `{endereco}`.
+
 ## Alertas no navegador (Web Push)
 
 Em **Notificações > Alertas neste aparelho**, cada pessoa liga os alertas no navegador ou celular que está usando. Toda notificação

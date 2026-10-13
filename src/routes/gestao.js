@@ -10,7 +10,7 @@ const { clean } = require('../utils/format');
 const { wrap, isIntId, isUuid } = require('../utils/wrap');
 
 const router = express.Router();
-const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'search.manage', 'integrations.manage', 'plans.manage'].some((p) => can(req.user.role, p))
+const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage'].some((p) => can(req.user.role, p))
   ? next() : res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não acessa o painel de gestão.' }));
 
 router.get('/gestao', anyGestao, wrap(async (req, res) => {
@@ -40,6 +40,40 @@ router.post('/gestao/notificacoes', requirePerm('notifications.manage'), wrap(as
   await audit(req, 'notificacoes.configuradas', 'settings', null, {});
   await req.flash('ok', 'Configuração das notificações salva.');
   res.redirect('/gestao/notificacoes');
+}));
+
+// ---------------------------------------------------------------- lembretes da gravação
+const reminders = require('../services/reminders');
+const settingsSvc = require('../services/settings');
+const REMINDER_FIELDS = { endereco: 'lembrete_endereco', hora: 'lembrete_hora', d3: 'lembrete_msg_d3', d1: 'lembrete_msg_d1', dia: 'lembrete_msg_dia', h3: 'lembrete_msg_h3' };
+
+router.get('/gestao/lembretes', requirePerm('reminders.manage'), wrap(async (req, res) => {
+  const s = await reminders.settings();
+  // exemplo com a próxima gravação agendada (ou uma de mentira), para a gestão ver como a mensagem fica
+  const { rows: [next] } = await db.query("SELECT id, name, phone, proposed_at FROM guests WHERE status = 'agendado' AND proposed_at > now() ORDER BY proposed_at LIMIT 1");
+  const sample = next || { name: 'Dra. Maria Souza', proposed_at: new Date(Date.now() + 5 * 86400_000) };
+  const examples = Object.fromEntries(reminders.ORDER.map((k) => [k, reminders.message(k, sample, s)]));
+  res.render('gestao/reminders', { title: 'Lembretes da gravação', s, kinds: reminders.KINDS, order: reminders.ORDER, examples, sampleName: sample.name, openField: REMINDER_FIELDS[req.query.editar] ? req.query.editar : null });
+}));
+
+router.post('/gestao/lembretes', requirePerm('reminders.manage'), wrap(async (req, res) => {
+  const field = REMINDER_FIELDS[req.body.campo] ? req.body.campo : null;
+  if (!field) return res.redirect('/gestao/lembretes');
+  let value = String(req.body.valor || '').replace(/\r\n/g, '\n').trim();
+  if (field === 'hora' && !/^(0[6-9]|1[0-2]):[0-5]\d$/.test(value)) {
+    await req.flash('error', 'Horário dos lembretes: entre 06:00 e 12:59 (ex.: 09:00).');
+    return res.redirect('/gestao/lembretes?editar=hora');
+  }
+  if (['d3', 'd1', 'dia', 'h3'].includes(field) && !value) {
+    await req.flash('error', 'A mensagem não pode ficar vazia.');
+    return res.redirect(`/gestao/lembretes?editar=${field}`);
+  }
+  value = value.slice(0, field === 'endereco' ? 300 : 1500);
+  await settingsSvc.set(REMINDER_FIELDS[field], value);
+  if (field === 'hora') await reminders.resyncAll(); // novo horário: refaz a agenda de quem está agendado
+  await audit(req, 'lembretes.configurados', 'settings', null, { campo: field });
+  await req.flash('ok', 'Salvo.');
+  res.redirect('/gestao/lembretes');
 }));
 
 // ---------------------------------------------------------------- rotinas de tarefas

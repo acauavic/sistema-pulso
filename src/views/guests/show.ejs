@@ -170,6 +170,35 @@
       </div>
 
       <div class="stack-lg">
+      <% if (reminderList.length) { var R_STATE = { enviado: ['b-gray', 'enviado'], agora: ['b-amber', 'na hora'], agendado: ['b-gray', 'agendado'], passou: ['b-gray', 'não enviado'] }; %>
+      <section class="card" id="lembretes">
+        <h2>Lembretes da gravação</h2>
+        <p class="small muted">A produtora manda pelo WhatsApp. Na hora de cada um, o sistema avisa.</p>
+        <ul class="plain reminder-list">
+          <% reminderList.forEach(function (r) { %>
+          <li class="<%= r.current ? 'is-current' : '' %>">
+            <div class="reminder-head">
+              <span><strong><%= r.label %></strong> <span class="small muted">· <%= r.hint %><%= r.withAddress ? ' (com o endereço)' : '' %></span></span>
+              <span class="badge <%= R_STATE[r.state][0] %>"><%= R_STATE[r.state][1] %></span>
+            </div>
+            <span class="handle muted"><%= r.state === 'enviado' ? 'Enviado ' + fmt.formatDateTime(r.sentAt) + (r.sentBy ? ' · ' + r.sentBy : '') : fmt.formatDateTime(r.due) %></span>
+            <% if (r.current && canW) { %>
+            <details class="more"><summary>Ver mensagem</summary><p class="pre small"><%= r.text %></p></details>
+            <div class="row">
+              <% if (r.waUrl) { %>
+              <form method="post" action="/convidados/<%= guest.id %>/lembretes/<%= r.kind %>/whatsapp" target="_blank" class="inline" data-reload-after><%- csrfField %><button class="btn sm" type="submit"><%- icon('whatsapp', 14) %> Enviar pelo WhatsApp</button></form>
+              <% } else { %>
+              <button class="btn sm" type="button" data-copy="<%= r.text %>">Copiar mensagem</button>
+              <% } %>
+              <form method="post" action="/convidados/<%= guest.id %>/lembretes/<%= r.kind %>/enviado" class="inline"><%- csrfField %><button class="link small" type="submit">Já enviei</button></form>
+            </div>
+            <% if (!r.waUrl) { %><p class="small muted">Sem WhatsApp no cadastro: copie e mande por onde falar com <%= fmt.firstName(guest.name) %>.</p><% } %>
+            <% } %>
+          </li>
+          <% }) %>
+        </ul>
+      </section>
+      <% } %>
       <% if (['em_agendamento', 'agendado'].indexOf(guest.status) >= 0) { %>
       <section class="card" id="plateia">
         <div class="row spread"><h2>Podcast com plateia</h2><% if (plateia.leads && plateia.canSeeLeads) { %><a class="small" href="/plateia/painel?convidado=<%= guest.id %>"><span class="mono"><%= plateia.leads %></span> inscrição<%= plateia.leads === 1 ? '' : 'ões' %></a><% } %></div>

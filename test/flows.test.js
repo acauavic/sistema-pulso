@@ -395,6 +395,10 @@ describe('fluxos ponta a ponta', () => {
       const notice = lastMail('prod@t.com');
       assert.ok(notice, 'responsável avisado');
       assert.match(notice.subject, /aceitou/);
+      const { rows: inApp } = await h.db.query("SELECT user_id, title, body FROM notifications WHERE type = 'convite' AND entity_id = $1", [String(guestId)]);
+      assert.ok(inApp.length, 'aceite vira notificação no painel');
+      assert.match(inApp[0].title, /aceitou o convite/); assert.match(inApp[0].body, /combinar a data/);
+      assert.ok(inApp.some((n) => String(n.user_id) === String(produtora.id)), 'quem cuida do convidado recebe');
       assert.match((await c.get(`/convite/${token}`)).text, /presença está confirmada/);
       assert.match((await as.prod.get(`/convidados/${guestId}`)).text, /Aceitar o convite<\/dt>\s*<dd><strong[^>]*>1<\/strong>/);
     });

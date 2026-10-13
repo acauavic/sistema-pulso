@@ -1,5 +1,5 @@
 <%- include('../partials/head') %>
-<% var ICON = { tarefa: 'check-square', comentario: 'message-square', agendamento: 'calendar', rotina: 'settings' };
+<% var ICON = { tarefa: 'check-square', comentario: 'message-square', agendamento: 'calendar', rotina: 'settings', plateia: 'users', financeiro: 'wallet', convite: 'mail', lembrete: 'bell' };
    var totalUnread = Object.keys(unreadBy).reduce(function (n, k) { return n + unreadBy[k]; }, 0);
    var link = function (t, f) { var q = []; if (t) q.push('tipo=' + t); if (f) q.push('filtro=' + f); return '/notificacoes' + (q.length ? '?' + q.join('&') : ''); }; %>
 <div class="page-head">

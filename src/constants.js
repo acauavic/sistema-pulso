@@ -84,6 +84,8 @@ const NOTIFICATION_TYPES = {
   comentario: { label: 'Comentários', hint: 'Comentários em convidados, patrocinadores, episódios, cortes e tarefas de que você participa, e menções com @.' },
   agendamento: { label: 'Agendamentos concluídos', hint: 'Convidado com gravação agendada (data, estúdio, hosts e convidado confirmados).' },
   plateia: { label: 'Plateia', hint: 'Nova inscrição pedida pela página pública do Pulso Podcast com Plateia.' },
+  convite: { label: 'Respostas ao convite', hint: 'Convidado aceitou ou recusou o convite pelo link.' },
+  lembrete: { label: 'Lembretes da gravação', hint: 'Hora de mandar o lembrete ao convidado agendado: 3 dias, 1 dia, no dia e 3 horas antes.' },
   financeiro: { label: 'Financeiro', hint: 'Contas vencendo ou atrasadas e estoque que precisa ser reposto.' },
   rotina: { label: 'Rotinas do sistema', hint: 'Análise por IA pronta ou com erro, corte lido, publicação concluída, patrocinador respondeu o formulário.' },
 };

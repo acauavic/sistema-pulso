@@ -192,6 +192,63 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
     });
   });
 
+  describe('lembretes da gravação', () => {
+    const production = require('../src/services/production');
+    const reminders = require('../src/services/reminders');
+    let gid;
+    const rows = () => h.db.query('SELECT kind, sent_at, notified_at FROM guest_reminders WHERE guest_id = $1 ORDER BY due_at', [gid]).then((r) => r.rows);
+    const inDays = (n, hhmm) => { const d = new Date(Date.now() + n * 86400_000); return new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d)}T${hhmm}:00-03:00`); };
+
+    it('Agendado monta os quatro lembretes; na hora avisa a produção e quem cuida; o WhatsApp abre com a mensagem e marca como enviado', async () => {
+      await clear();
+      await h.db.query("UPDATE notification_settings SET in_app = true, roles = '{produtora}' WHERE type = 'lembrete'"); // o padrão da migração 026
+      gid = (await h.db.query(`INSERT INTO guests (name, instagram, profile, owner_id, status, phone, proposed_at, scheduled_studio, scheduled_hosts, scheduled_guest)
+        VALUES ('Dra. Lia Lembrete', 'lia.lembrete', 'medico', $1, 'agendado', '(11) 98888-7777', $2, true, true, true) RETURNING id`, [u.gestao.id, inDays(6, '16:00')])).rows[0].id;
+      await production.syncFromGuest(gid, u.gestao.id);
+      assert.deepEqual((await rows()).map((r) => r.kind), ['d3', 'd1', 'dia', 'h3']);
+      await h.db.query("UPDATE guest_reminders SET due_at = now() - interval '1 minute' WHERE guest_id = $1 AND kind = 'd3'", [gid]);
+      await reminders.tick();
+      await reminders.tick(); // de novo: não repete
+      const { rows: notes } = await h.db.query("SELECT user_id, title FROM notifications WHERE type = 'lembrete'");
+      assert.deepEqual(notes.map((n) => String(n.user_id)).sort(), [u.gestao.id, u.prod.id].map(String).sort(), 'responsável + produtora, uma vez');
+      assert.match(notes[0].title, /Lembrete de 3 dias antes: Dra\. Lia Lembrete/);
+
+      const page = (await as.prod.get(`/convidados/${gid}`)).text;
+      assert.match(page, /Lembretes da gravação/);
+      assert.match(page, /Enviar pelo WhatsApp/);
+      assert.match(page, /na hora/);
+      const csrf = await as.prod.csrf(`/convidados/${gid}`);
+      const r = await as.prod.post(`/convidados/${gid}/lembretes/d3/whatsapp`, { _csrf: csrf });
+      assert.equal(r.status, 303);
+      assert.match(r.location, /^https:\/\/wa\.me\/5511988887777\?text=Oi%2C%20Lia/);
+      assert.ok((await rows())[0].sent_at, 'marcado como enviado');
+      assert.equal((await as.editor.post(`/convidados/${gid}/lembretes/d1/enviado`, { _csrf: await as.editor.csrf('/') })).status, 403, 'editor de vídeo não mexe');
+    });
+
+    it('remarcar refaz o ciclo; sair de Agendado cancela o que não foi enviado', async () => {
+      await h.db.query('UPDATE guests SET proposed_at = $2 WHERE id = $1', [gid, inDays(8, '10:00')]);
+      await production.syncFromGuest(gid, u.gestao.id);
+      const after = await rows();
+      assert.deepEqual(after.map((r) => r.kind), ['d3', 'd1'], 'gravação cedo: sem lembretes no dia');
+      assert.ok(after.every((r) => !r.sent_at), 'a data nova começa do zero');
+      await h.db.query("UPDATE guests SET status = 'cancelado' WHERE id = $1", [gid]);
+      await production.syncFromGuest(gid, u.gestao.id);
+      assert.equal((await rows()).length, 0);
+    });
+
+    it('Gestão > Lembretes: só a gestão edita; horário inválido é recusado; mensagem aparece com exemplo', async () => {
+      assert.equal((await as.prod.get('/gestao/lembretes')).status, 403);
+      const page = await as.gestao.get('/gestao/lembretes');
+      assert.equal(page.status, 200); assert.match(page.text, /Endereço do estúdio/); assert.match(page.text, /Exemplo com/);
+      const bad = await as.gestao.act('/gestao/lembretes', { campo: 'hora', valor: '23:00' }, { from: '/gestao/lembretes' });
+      assert.match(bad.location, /editar=hora/);
+      await as.gestao.act('/gestao/lembretes', { campo: 'endereco', valor: 'Alameda Rio Negro, 500, Alphaville' }, { from: '/gestao/lembretes' });
+      assert.match((await as.gestao.get('/gestao/lembretes')).text, /Alameda Rio Negro, 500/);
+      await as.gestao.act('/gestao/lembretes', { campo: 'hora', valor: '08:30' }, { from: '/gestao/lembretes' });
+      assert.match((await as.gestao.get('/gestao/lembretes')).text, />08:30</);
+    });
+  });
+
   describe('agendamento concluído', () => {
     it('convidado agendado: avisa o responsável e a gestão uma vez (salvar de novo não repete)', async () => {
       await clear();

@@ -6,6 +6,7 @@ const { hashPassword, verifyPassword, passwordPolicyError } = require('../src/au
 const tpl = require('../src/services/inviteTemplate');
 const rules = require('../src/services/guestRules');
 const csv = require('../src/services/csvImport');
+const reminders = require('../src/services/reminders');
 const fmt = require('../src/utils/format');
 const { createLimiter } = require('../src/auth/rateLimit');
 const { keywordCandidates } = require('../src/services/yourls');
@@ -142,6 +143,25 @@ test('regras: pendências por etapa', () => {
   assert.deepEqual(rules.missingFor('agendado', { ...agenda, photo_key: 'x' }), []);
   assert.deepEqual(rules.agendaMissing(agenda), [], 'remarcar olha só a agenda, não a foto');
   assert.equal(rules.missingMessage('Agendado', ['a', 'b', 'c']), 'Para mover para Agendado falta: a, b e c.');
+});
+
+test('lembretes da gravação: 3 dias, 1 dia, no dia e 3 horas; gravação cedo e lembretes colados', () => {
+  const brt = (s) => new Date(`${s}:00-03:00`);
+  const at = (rec, o = {}) => reminders.plan(brt(rec), { morning: '09:00', now: new Date(0), ...o })
+    .map((i) => [i.kind, new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(i.due), i.withAddress]);
+  assert.deepEqual(at('2026-11-10T16:00'), [['d3', '2026-11-07 09:00', false], ['d1', '2026-11-09 09:00', false], ['dia', '2026-11-10 09:00', false], ['h3', '2026-11-10 13:00', false]]);
+  assert.deepEqual(at('2026-11-10T10:00'), [['d3', '2026-11-07 09:00', false], ['d1', '2026-11-09 09:00', true]], 'cedo: só até o dia anterior, com o endereço');
+  assert.deepEqual(at('2026-11-10T13:15'), [['d3', '2026-11-07 09:00', false], ['d1', '2026-11-09 09:00', false], ['h3', '2026-11-10 10:15', true]], 'colados: fica o de 3 horas');
+  assert.deepEqual(at('2026-11-10T14:00').map((x) => x[0]), ['d3', 'd1', 'dia', 'h3']);
+  assert.deepEqual(at('2026-11-10T16:00', { now: brt('2026-11-09T10:00') }).map((x) => x[0]), ['d1', 'dia', 'h3'], 'o de 3 dias passou; o de 1 dia ainda vale até a manhã do dia');
+  const s = { address: 'Rua X, 10', messages: { d3: 'Oi, {primeiro_nome}: {dia}, {data}, {hora}.', d1: 'Até amanhã às {hora}.', dia: '{endereco}', h3: 'Tudo certo?' } };
+  const g = { name: 'Dra. Ana Souza', proposed_at: brt('2026-11-10T16:30') };
+  assert.equal(reminders.message('d3', g, s), 'Oi, Ana: terça-feira, 10/11, 16h30.');
+  assert.equal(reminders.message('d1', g, s, { withAddress: true }), 'Até amanhã às 16h30.\n\nEndereço: Rua X, 10');
+  assert.equal(reminders.message('dia', g, s, { withAddress: true }), 'Rua X, 10', 'não repete o endereço');
+  assert.equal(reminders.whatsappNumber('(11) 98888-7777'), '5511988887777');
+  assert.equal(reminders.whatsappNumber('+55 11 98888 7777'), '5511988887777');
+  assert.equal(reminders.whatsappNumber(''), null);
 });
 
 test('regras: Instagram, perfil, gênero e URLs', () => {

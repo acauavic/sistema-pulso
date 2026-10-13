@@ -5,6 +5,7 @@ const config = require('../config');
 const mailer = require('../services/mailer');
 const guestsSvc = require('../services/guests');
 const production = require('../services/production');
+const reminders = require('../services/reminders');
 const rules = require('../services/guestRules');
 const tpl = require('../services/inviteTemplate');
 const { audit } = require('../services/audit');
@@ -183,7 +184,9 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const { rows: bookings } = await db.query('SELECT b.role, s.id, s.company FROM sponsor_bookings b JOIN sponsors s ON s.id = b.sponsor_id WHERE b.guest_id = $1 ORDER BY s.company', [guest.id]);
   const { rows: [linkedSponsor] } = guest.sponsor_id ? await db.query('SELECT id, company FROM sponsors WHERE id = $1', [guest.sponsor_id]) : { rows: [] };
   const { rows: [pl] } = await db.query("SELECT count(*)::int AS leads, count(*) FILTER (WHERE status = 'confirmado')::int AS confirmed FROM plateia_leads WHERE guest_id = $1", [guest.id]);
+  const reminderList = await reminders.forGuest(guest);
   res.render('guests/show', {
+    reminderList,
     plateia: { ...pl, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
     episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, pendingStage: isStatus(req.query.para) ? req.query.para : null, storageReady: config.storageConfigured, openModal: ['contato', 'agenda', 'email', 'perda', 'foto'].includes(req.query.abrir) ? req.query.abrir : null,
     title: guest.name, guest, events, clicks, comments: thread, linkedTasks: linkedTasks.rows, clickKinds: CLICK_KINDS, profileLabels: PROFILE_BY_KEY,
@@ -300,6 +303,7 @@ router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (
             loss_reason=$9, loss_note=$10, status=$8, updated_at=now() WHERE id=$1`,
     [guest.id, next.email, next.phone, next.proposed_at, next.scheduled_studio, next.scheduled_hosts, next.scheduled_guest, status,
       status === 'perdido' ? next.loss_reason : null, status === 'perdido' ? next.loss_note : null]);
+  if (status === guest.status) await require('../services/reminders').syncGuest(guest.id); // remarcou em Agendado: refaz os lembretes
   const moved = b.agenda === '1' && guest.proposed_at && next.proposed_at && guest.proposed_at.getTime() !== next.proposed_at.getTime();
   if (moved) await guestsSvc.addEvent(guest.id, req.user.id, 'agenda', `Gravação remarcada: ${fmtWhen(guest.proposed_at)} → ${fmtWhen(next.proposed_at)}`);
   else if (b.agenda === '1' && !guest.proposed_at) await guestsSvc.addEvent(guest.id, req.user.id, 'agenda', `Data da gravação: ${fmtWhen(next.proposed_at)}`);
@@ -317,6 +321,18 @@ router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (
   if (status === 'em_agendamento' && guest.status === 'agendado') await req.flash('error', 'Gravação remarcada. Falta confirmar a nova data com estúdio, hosts e convidado para voltar a Agendado.');
   else await req.flash('ok', status !== guest.status ? `Etapa: ${STATUS_BY_KEY[status].label}.` : 'Salvo.');
   res.redirect(`/convidados/${guest.id}`);
+}));
+
+// ---- lembretes da gravação: enviar pelo WhatsApp (marca como enviado e abre a conversa) ou marcar à mão ----
+router.post('/convidados/:id/lembretes/:kind/:acao(whatsapp|enviado)', requirePerm('guests.write'), wrap(async (req, res) => {
+  const guest = await findGuest(req.params.id);
+  if (!guest || !reminders.KINDS[req.params.kind]) return notFound(res);
+  const item = (await reminders.forGuest(guest)).find((r) => r.kind === req.params.kind);
+  if (!item) { await req.flash('error', 'Esse lembrete não vale mais (a gravação mudou ou já passou).'); return res.redirect(`/convidados/${guest.id}#lembretes`); }
+  await reminders.markSent(guest.id, item.kind, req.user);
+  if (req.params.acao === 'whatsapp' && item.waUrl) return res.redirect(303, item.waUrl);
+  await req.flash('ok', `Lembrete de ${item.label.toLowerCase()} marcado como enviado.`);
+  res.redirect(`/convidados/${guest.id}#lembretes`);
 }));
 
 // ---- anotação na linha do tempo ----

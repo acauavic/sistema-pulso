@@ -4,6 +4,11 @@ const db = require('../db/pool');
 const DEFAULTS = {
   block_insertion_in_exclusive: 'true',
   plateia_active: 'true', plateia_price_cents: '19700', plateia_duration: '1h30 a 2h', plateia_location: 'Estúdio do Pulso Podcast, Alphaville, SP',
+  lembrete_endereco: '', lembrete_hora: '09:00',
+  lembrete_msg_d3: 'Oi, {primeiro_nome}, tudo bem? Passando para lembrar da nossa conversa no Pulso Podcast: {dia}, {data}, às {hora}. Qualquer dúvida, é só chamar por aqui.',
+  lembrete_msg_d1: 'Oi, {primeiro_nome}! Está tudo certo para amanhã: gravação do Pulso Podcast às {hora}. Do nosso lado, estúdio e equipe prontos para te receber. Até amanhã.',
+  lembrete_msg_dia: 'Bom dia, {primeiro_nome}! Hoje é dia de Pulso. Te esperamos às {hora}.\n\nEndereço: {endereco}\n\nQualquer coisa no caminho, é só chamar por aqui.',
+  lembrete_msg_h3: 'Oi, {primeiro_nome}! Daqui a pouco, às {hora}, começamos a gravação. Está tudo certo por aí? Precisa de alguma coisa?',
   plateia_whatsapp: '', plateia_meta_pixel: '', plateia_ga4: '', plateia_hero_key: '', plateia_studio_key: '',
 };
 

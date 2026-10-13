@@ -53,6 +53,7 @@ const PERMISSIONS = {
   // painel de gestão
   'notifications.manage': ['superadmin', 'gestao'],     // configuração geral das notificações
   'routines.manage': ['superadmin', 'gestao'],          // rotinas de tarefas (vencimento padrão)
+  'reminders.manage': ['superadmin', 'gestao'],         // lembretes da gravação: endereço, horário e textos
   'plans.manage': ['superadmin', 'gestao'],             // planos de patrocínio (Ouro/Diamond): nome, preço e entregáveis
   'search.manage': ['superadmin', 'gestao'],            // atalhos e sugestões da busca global
   'audit.read': ['superadmin', 'gestao'],
