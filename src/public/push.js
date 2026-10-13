@@ -33,6 +33,18 @@
   const say = (text, tip = '') => { status.textContent = text; hint.textContent = tip; hint.hidden = !tip; };
   const show = (on) => { btnOn.hidden = on; btnOff.hidden = !on; btnTest.hidden = !on; };
 
+  // Falha do serviço de push do próprio navegador (não do painel): explica o que fazer em vez da mensagem crua.
+  const isBrave = Boolean(navigator.brave);
+  function explain(err) {
+    const msg = String(err?.message || '');
+    if (err?.name === 'AbortError' || /push service|registration failed/i.test(msg)) {
+      if (isBrave) return ['O Brave vem com o push desligado.', 'Abra brave://settings/privacy, ligue "Usar os serviços do Google para mensagens push", reinicie o navegador e tente de novo.'];
+      return ['O navegador não conseguiu falar com o serviço de alertas dele.', 'Use Chrome, Edge, Firefox ou Safari abertos direto (não dentro de outro aplicativo) e sem VPN ou bloqueador que impeça o push. Com a aba aberta, os avisos continuam aparecendo.'];
+    }
+    if (err?.name === 'NotAllowedError') return ['Alertas bloqueados neste navegador.', 'Libere as notificações nas configurações do site (cadeado ao lado do endereço) e recarregue a página.'];
+    return [msg || 'Não deu para ligar os alertas.'];
+  }
+
   async function render() {
     box.hidden = false;
     if (!pushSupported) {
@@ -55,7 +67,7 @@
       const sub = (await r.pushManager.getSubscription()) || await r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
       await post('/notificacoes/push/inscrever', { subscription: sub.toJSON() });
       await render();
-    } catch (err) { say(err.message || 'Não deu para ligar os alertas.'); } finally { btnOn.disabled = false; }
+    } catch (err) { say(...explain(err)); } finally { btnOn.disabled = false; }
   });
   btnOff.addEventListener('click', async () => {
     const sub = await currentSub();
