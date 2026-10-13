@@ -219,6 +219,6 @@ async function status() {
 }
 
 module.exports = {
-  sync, tick, ping, status, payload, eventId, credentials, settings, saveSettings, kick, kickOnWrite, kickDelay, TIMED, DEFAULT_MINUTES,
+  api, sync, tick, ping, status, payload, eventId, credentials, settings, saveSettings, kick, kickOnWrite, kickDelay, TIMED, DEFAULT_MINUTES,
   _reset: () => { cached = { token: null, until: 0 }; },
 };
