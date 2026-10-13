@@ -278,6 +278,11 @@
               <dd><strong class="mono"><%= clicks[k].total %></strong><% if (clicks[k].total) { %> <span class="handle muted">· último <%= fmt.formatDateTime(clicks[k].last) %></span><% } %></dd>
               <% }) %>
             </dl>
+            <% if (canW && ['agendado', 'gravado'].indexOf(guest.status) < 0 && (clicks.aceitar.total || guest.responded_at || guest.status !== 'prospect')) { %>
+            <form method="post" action="/convidados/<%= guest.id %>/zerar-aceite" class="inline" data-confirm="Zerar o aceite de <%= guest.name %>? O contador volta a zero, a resposta é apagada e <%= fmt.firstName(guest.name) %> volta para Prospecção.">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">Zerar aceite e voltar para Prospecção</button>
+            </form>
+            <% } %>
           </div>
         </div>
       <% } %>

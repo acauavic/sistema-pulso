@@ -4,6 +4,8 @@ const db = require('../db/pool');
 const comments = require('../services/comments');
 const responsible = require('../services/responsible');
 const push = require('../services/push');
+const reminders = require('../services/reminders');
+const { can } = require('../permissions');
 const notifySvc = require('../services/notify');
 const search = require('../services/search');
 const C = require('../constants');
@@ -57,8 +59,14 @@ router.get('/notificacoes', wrap(async (req, res) => {
   res.render('notifications/index', {
     title: 'Notificações', items, type, unread, types: C.NOTIFICATION_TYPES,
     unreadBy: Object.fromEntries(counts.rows.map((r) => [r.type, r.unread])), muted: mutes.rows.map((r) => r.type),
-    pushKey: push.publicKey(),
+    pushKey: push.publicKey(), tab: 'avisos', dueNow: (await reminders.queue()).now.length,
   });
+}));
+
+// ---- aba Lembretes da gravação: a fila de quem a produtora precisa avisar ----
+router.get('/notificacoes/lembretes', requirePerm('guests.read'), wrap(async (req, res) => {
+  const q = await reminders.queue();
+  res.render('notifications/reminders', { title: 'Lembretes da gravação', q, tab: 'lembretes', dueNow: q.now.length, canSend: can(req.user.role, 'guests.write'), canConfig: can(req.user.role, 'reminders.manage') });
 }));
 
 // ---- alertas neste aparelho (Web Push) ----

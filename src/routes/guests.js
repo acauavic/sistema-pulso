@@ -6,6 +6,7 @@ const mailer = require('../services/mailer');
 const guestsSvc = require('../services/guests');
 const production = require('../services/production');
 const reminders = require('../services/reminders');
+const bulk = require('../services/guestBulk');
 const rules = require('../services/guestRules');
 const tpl = require('../services/inviteTemplate');
 const { audit } = require('../services/audit');
@@ -121,7 +122,7 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   }
   if (owner) { params.push(owner); where.push(`g.owner_id = $${params.length}`); }
   if (status && view === 'lista') { params.push(status); where.push(`g.status = $${params.length}`); }
-  const [{ rows: guests }, { rows: owners }] = await Promise.all([
+  const [{ rows: guests }, { rows: owners }, { rows: sponsors }] = await Promise.all([
     db.query(
       `SELECT g.id, g.name, g.instagram, g.profile, g.company, g.job_title, g.topic, g.status, g.proposed_at, g.invite_sent_at, g.invite_viewed_at,
               g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason
@@ -129,9 +130,10 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY g.updated_at DESC LIMIT 500`, params),
     db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+    can(req.user.role, 'guests.write') && view === 'lista' ? db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)") : { rows: [] },
   ]);
   const columns = GUEST_STATUSES.map((s) => ({ ...s, guests: guests.filter((g) => g.status === s.key) }));
-  res.render('guests/index', { lossReasons: LOSS_REASONS, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
+  res.render('guests/index', { lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
 }));
 
 // ---- criar ----
@@ -140,6 +142,21 @@ router.get('/convidados/novo', requirePerm('guests.write'), wrap(async (req, res
     title: 'Novo convidado', guest: null, error: null, ...(await formOptions()),
     values: { owner_id: req.user.id, status: 'prospect', gender: 'm', is_plural: false, sponsor_id: isIntId(req.query.patrocinador) ? Number(req.query.patrocinador) : null, sponsor_relation: 'indicado' },
   });
+}));
+
+// ---- edição em massa (Lista): etapa, responsável, perfil, gênero e patrocinador. Antes de /convidados/:id ----
+router.post('/convidados/em-massa', requirePerm('guests.write'), wrap(async (req, res) => {
+  const back = '/convidados?view=lista';
+  const { ids, changes, error } = await bulk.parse(req.body);
+  if (error) { await req.flash('error', error); return res.redirect(back); }
+  const result = await bulk.apply({ ids, changes, user: req.user });
+  await audit(req, 'convidados.edicao_em_massa', 'guest', null, {
+    selecionados: ids.length, atualizados: result.updated, etapa_nao_mudou: result.stageSkipped.length,
+    mudancas: Object.keys(changes).filter((k) => !['owner_name', 'sponsor_name'].includes(k)),
+  });
+  const { text, tone } = bulk.summary(result);
+  await req.flash(tone, text);
+  res.redirect(back);
 }));
 
 router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) => {
@@ -323,16 +340,38 @@ router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (
   res.redirect(`/convidados/${guest.id}`);
 }));
 
+// ---- zerar o aceite: o convidado volta para Prospecção, o contador de aceites e a resposta são apagados ----
+// Serve para aceite por engano, clique de teste ou de quem se arrependeu. Quem já tem gravação marcada não passa por aqui.
+router.post('/convidados/:id/zerar-aceite', requirePerm('guests.write'), wrap(async (req, res) => {
+  const guest = await findGuest(req.params.id);
+  if (!guest) return notFound(res);
+  const back = `/convidados/${guest.id}`;
+  if (['agendado', 'gravado'].includes(guest.status)) {
+    await req.flash('error', `${guest.name} já tem gravação marcada (${STATUS_BY_KEY[guest.status].label}). Cancele a gravação antes de zerar o aceite.`);
+    return res.redirect(back);
+  }
+  const { rowCount: clicks } = await db.query("DELETE FROM invite_clicks WHERE guest_id = $1 AND kind = 'aceitar'", [guest.id]);
+  await db.query("UPDATE guests SET status = 'prospect', responded_at = NULL, rsvp_message = NULL, updated_at = now() WHERE id = $1", [guest.id]);
+  await guestsSvc.addEvent(guest.id, req.user.id, 'status',
+    `Aceite zerado por ${req.user.name}: ${clicks} clique(s) apagado(s)${guest.status !== 'prospect' ? `; etapa ${STATUS_BY_KEY[guest.status].label} → Prospecção` : ''}`);
+  await production.syncFromGuest(guest.id, req.user.id);
+  await audit(req, 'convidado.aceite_zerado', 'guest', guest.id, { de: guest.status, cliques: clicks });
+  await req.flash('ok', `Aceite zerado. ${firstName(guest.name)} voltou para Prospecção.`);
+  res.redirect(back);
+}));
+
 // ---- lembretes da gravação: enviar pelo WhatsApp (marca como enviado e abre a conversa) ou marcar à mão ----
+const backTo = (req, fallback) => { const v = String(req.body.voltar || ''); return /^\/(?!\/)[\w\-/?=&#.%]*$/.test(v) ? v : fallback; };
 router.post('/convidados/:id/lembretes/:kind/:acao(whatsapp|enviado)', requirePerm('guests.write'), wrap(async (req, res) => {
   const guest = await findGuest(req.params.id);
   if (!guest || !reminders.KINDS[req.params.kind]) return notFound(res);
+  const back = backTo(req, `/convidados/${guest.id}#lembretes`);
   const item = (await reminders.forGuest(guest)).find((r) => r.kind === req.params.kind);
-  if (!item) { await req.flash('error', 'Esse lembrete não vale mais (a gravação mudou ou já passou).'); return res.redirect(`/convidados/${guest.id}#lembretes`); }
+  if (!item) { await req.flash('error', 'Esse lembrete não vale mais (a gravação mudou ou já passou).'); return res.redirect(back); }
   await reminders.markSent(guest.id, item.kind, req.user);
   if (req.params.acao === 'whatsapp' && item.waUrl) return res.redirect(303, item.waUrl);
   await req.flash('ok', `Lembrete de ${item.label.toLowerCase()} marcado como enviado.`);
-  res.redirect(`/convidados/${guest.id}#lembretes`);
+  res.redirect(back);
 }));
 
 // ---- anotação na linha do tempo ----

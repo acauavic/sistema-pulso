@@ -103,16 +103,12 @@ async function resyncAll() {
   for (const r of rows) await syncGuest(r.id);
 }
 
-// Lembretes da página do convidado, com o plano atual (para saber qual leva o endereço e até quando vale).
-async function forGuest(guest) {
+// Monta os lembretes de um convidado a partir das linhas de guest_reminders (compartilhado pela página do convidado e pela fila).
+// Estados: enviado · agora (hora chegou e ainda vale) · agendado (vem aí) · passou (a hora do próximo chegou sem envio).
+function build(guest, rows, s, now = new Date()) {
   if (guest.status !== 'agendado' || !guest.proposed_at) return [];
-  const s = await settings();
-  const { rows } = await db.query(
-    `SELECT r.*, u.name AS sent_by_name FROM guest_reminders r LEFT JOIN users u ON u.id = r.sent_by
-      WHERE r.guest_id = $1 AND r.recording_at = $2`, [guest.id, guest.proposed_at]);
-  const byKind = Object.fromEntries(rows.map((r) => [r.kind, r]));
+  const byKind = Object.fromEntries(rows.filter((r) => r.recording_at.getTime() === guest.proposed_at.getTime()).map((r) => [r.kind, r]));
   const full = plan(guest.proposed_at, { morning: s.morning, now: new Date(0) }); // o plano inteiro, inclusive o que já passou
-  const now = new Date();
   const list = full.filter((it) => byKind[it.kind]).map((it) => {
     const r = byKind[it.kind];
     const state = r.sent_at ? 'enviado' : now >= it.until ? 'passou' : now >= r.due_at ? 'agora' : 'agendado';
@@ -121,6 +117,33 @@ async function forGuest(guest) {
   const current = list.find((it) => it.state === 'agora') || list.find((it) => it.state === 'agendado') || null;
   const phone = whatsappNumber(guest.phone);
   return list.map((it) => ({ ...it, current: it === current, waUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(it.text)}` : null }));
+}
+
+// Lembretes da página do convidado.
+async function forGuest(guest) {
+  if (guest.status !== 'agendado' || !guest.proposed_at) return [];
+  const { rows } = await db.query(
+    'SELECT r.*, u.name AS sent_by_name FROM guest_reminders r LEFT JOIN users u ON u.id = r.sent_by WHERE r.guest_id = $1', [guest.id]);
+  return build(guest, rows, await settings());
+}
+
+// Fila de Notificações > Lembretes: o que está na hora, o que vem aí (o próximo de cada convidado) e o que foi enviado há pouco.
+async function queue() {
+  const s = await settings();
+  const { rows: guests } = await db.query(
+    `SELECT g.id, g.name, g.phone, g.status, g.proposed_at, g.owner_id, u.name AS owner_name FROM guests g LEFT JOIN users u ON u.id = g.owner_id
+      WHERE g.status = 'agendado' AND g.proposed_at > now() ORDER BY g.proposed_at LIMIT 100`);
+  const { rows: all } = guests.length ? await db.query(
+    'SELECT r.*, u.name AS sent_by_name FROM guest_reminders r LEFT JOIN users u ON u.id = r.sent_by WHERE r.guest_id = ANY($1)', [guests.map((g) => g.id)]) : { rows: [] };
+  const items = guests.flatMap((g) => build(g, all.filter((r) => r.guest_id === g.id), s).map((it) => ({ ...it, guest: g })));
+  const { rows: recent } = await db.query(
+    `SELECT r.kind, r.sent_at, g.id AS guest_id, g.name, g.proposed_at, u.name AS sent_by_name FROM guest_reminders r JOIN guests g ON g.id = r.guest_id
+       LEFT JOIN users u ON u.id = r.sent_by WHERE r.sent_at > now() - interval '7 days' ORDER BY r.sent_at DESC LIMIT 20`);
+  return {
+    now: items.filter((it) => it.state === 'agora').sort((a, b) => a.due - b.due),
+    next: items.filter((it) => it.state === 'agendado' && it.current).sort((a, b) => a.due - b.due),
+    sent: recent.map((r) => ({ ...KINDS[r.kind], kind: r.kind, sentAt: r.sent_at, sentBy: r.sent_by_name, guest: { id: r.guest_id, name: r.name, proposed_at: r.proposed_at } })),
+  };
 }
 
 async function markSent(guestId, kind, user) {
@@ -144,11 +167,11 @@ async function tick() {
       type: 'lembrete', users: [r.owner_id], broadcast: true,
       title: `Lembrete de ${KINDS[r.kind].label.toLowerCase()}: ${r.name}`,
       body: `Gravação ${fmtPart(r.proposed_at, { weekday: 'short', day: '2-digit', month: '2-digit' })} às ${hourLabel(r.proposed_at)}. A mensagem está pronta na página do convidado.`,
-      url: `/convidados/${r.guest_id}#lembretes`, entity: { type: 'guest', id: r.guest_id }, dedupe: `lembrete-${r.id}`,
+      url: '/notificacoes/lembretes', entity: { type: 'guest', id: r.guest_id }, dedupe: `lembrete-${r.id}`,
     });
     await db.query('UPDATE guest_reminders SET notified_at = now() WHERE id = $1', [r.id]);
   }
   return { avisados: rows.length };
 }
 
-module.exports = { KINDS, ORDER, SETTING_KEYS, settings, plan, message, whatsappNumber, syncGuest, resyncAll, forGuest, markSent, tick, hourLabel };
+module.exports = { KINDS, ORDER, SETTING_KEYS, settings, plan, message, whatsappNumber, syncGuest, resyncAll, build, forGuest, queue, markSent, tick, hourLabel };

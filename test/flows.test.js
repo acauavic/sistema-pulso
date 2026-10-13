@@ -412,6 +412,32 @@ describe('fluxos ponta a ponta', () => {
       assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'em_agendamento');
     });
 
+    it('zerar o aceite: apaga os cliques e a resposta e volta para Prospecção; quem já tem gravação marcada não passa', async () => {
+      const zero = () => as.prod.act(`/convidados/${guestId}/zerar-aceite`, {}, { from: `/convidados/${guestId}` });
+      assert.equal((await as.editor.act(`/convidados/${guestId}/zerar-aceite`, {}, { from: '/convidados' })).status, 403, 'só quem edita convidados');
+      assert.match((await as.prod.get(`/convidados/${guestId}`)).text, /Zerar aceite e voltar para Prospecção/);
+
+      assert.equal((await zero()).status, 302);
+      const { rows: [g] } = await h.db.query('SELECT status, responded_at, rsvp_message, invite_token FROM guests WHERE id=$1', [guestId]);
+      assert.deepEqual([g.status, g.responded_at, g.rsvp_message], ['prospect', null, null]);
+      assert.equal(g.invite_token, token, 'o link do convite continua o mesmo');
+      assert.equal((await h.db.query("SELECT count(*)::int n FROM invite_clicks WHERE guest_id=$1 AND kind='aceitar'", [guestId])).rows[0].n, 0);
+      assert.match((await h.db.query("SELECT message FROM guest_events WHERE guest_id=$1 ORDER BY id DESC LIMIT 1", [guestId])).rows[0].message, /Aceite zerado por .*2 clique\(s\) apagado\(s\).*Em agendamento → Prospecção/);
+      assert.match((await as.gestao.get('/auditoria')).text, /convidado\.aceite_zerado/);
+      assert.doesNotMatch((await as.prod.get(`/convidados/${guestId}`)).text, /Zerar aceite e voltar/, 'sem aceite para zerar o botão some');
+      assert.doesNotMatch((await h.client(app.base).get(`/convite/${token}`)).text, /presença está confirmada/, 'o convite público volta a mostrar o formulário');
+
+      await h.db.query("UPDATE guests SET status = 'agendado', proposed_at = now() + interval '5 days', scheduled_studio = true, scheduled_hosts = true, scheduled_guest = true WHERE id = $1", [guestId]);
+      assert.equal((await zero()).status, 302);
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'agendado', 'gravação marcada: não zera');
+
+      // devolve o convidado ao estado que os próximos testes esperam: aceitou duas vezes
+      await h.db.query("UPDATE guests SET status = 'prospect', proposed_at = NULL, scheduled_studio = false, scheduled_hosts = false, scheduled_guest = false WHERE id = $1", [guestId]);
+      const c = h.client(app.base);
+      await c.get(`/convite/${token}/aceitar`); await c.get(`/convite/${token}/aceitar`);
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'em_agendamento');
+    });
+
     it('"Falar com a produção": redireciona ao WhatsApp, conta cada clique e registra o primeiro na linha do tempo', async () => {
       const c = h.client(app.base);
       const r = await c.get(`/convite/${token}/producao`);
@@ -627,6 +653,70 @@ describe('fluxos ponta a ponta', () => {
       } finally {
         await h.db.query("ALTER TABLE guests ALTER COLUMN photo_key SET DEFAULT 'teste/foto-convidado.jpg'");
       }
+    });
+
+    describe('edição em massa', () => {
+      let ids; let sponsorId;
+      const bulk = (fields) => as.prod.act('/convidados/em-massa', fields, { from: '/convidados?view=lista' });
+      const rowsOf = () => h.db.query('SELECT * FROM guests WHERE id = ANY($1) ORDER BY id', [ids]).then((r) => r.rows);
+      before(async () => {
+        const mk = async (name, ig, extra = {}) => (await h.db.query(
+          `INSERT INTO guests (name, instagram, profile, status, email, photo_key) VALUES ($1,$2,'medico','prospect',$3,$4) RETURNING id`,
+          [name, ig, extra.email ?? 'm@exemplo.com', 'photo' in extra ? extra.photo : 'teste/foto-convidado.jpg'])).rows[0].id;
+        ids = [await mk('Massa Um', 'massa.um'), await mk('Massa Dois', 'massa.dois'), await mk('Massa Sem Foto', 'massa.semfoto', { photo: null })];
+        sponsorId = (await h.db.query("INSERT INTO sponsors (company, stage) VALUES ('Marca Massa', 'ativo') RETURNING id")).rows[0].id;
+      });
+
+      it('a lista tem seleção e a janela só para quem edita convidados', async () => {
+        const page = (await as.prod.get('/convidados?view=lista')).text;
+        assert.match(page, /data-bulk-all/); assert.match(page, /id="modal-massa"/); assert.match(page, /Não alterar/);
+        assert.doesNotMatch(page, /<option value="agendado">/, 'Agendado e Gravado seguem um a um');
+        assert.doesNotMatch((await as.editor.get('/convidados?view=lista')).text, /data-bulk-all|modal-massa/);
+        assert.equal((await as.editor.act('/convidados/em-massa', { ids: String(ids[0]), gender: 'f' }, { from: '/convidados' })).status, 403);
+      });
+
+      it('muda responsável, perfil, gênero e patrocinador de todos; deixa em paz o que ficou em branco', async () => {
+        const owner = (await h.db.query("SELECT id FROM users WHERE email = 'gestao@t.com' OR email LIKE 'gest%' LIMIT 1")).rows[0] || { id: produtora.id };
+        const r = await bulk({ ids: ids.map(String), owner_id: owner.id, profile: 'influencer', gender: 'f', sponsor_id: String(sponsorId), sponsor_relation: 'representante' });
+        assert.equal(r.status, 302);
+        const rows = await rowsOf();
+        assert.ok(rows.every((g) => g.owner_id === owner.id && g.profile === 'influencer' && g.gender === 'f' && g.sponsor_id === sponsorId && g.sponsor_relation === 'representante'));
+        assert.ok(rows.every((g) => g.status === 'prospect'), 'etapa em branco não muda');
+        assert.match((await h.db.query('SELECT message FROM guest_events WHERE guest_id = $1 ORDER BY id DESC LIMIT 1', [ids[0]])).rows[0].message, /Edição em massa por .*responsável → .*perfil → Influencer.*gênero → feminino.*patrocinador → Marca Massa/);
+        assert.match((await as.gestao.get('/auditoria')).text, /convidados\.edicao_em_massa/);
+        const off = await bulk({ ids: ids.map(String), sponsor_id: 'nenhum', owner_id: 'nenhum' });
+        assert.equal(off.status, 302);
+        assert.ok((await rowsOf()).every((g) => g.sponsor_id === null && g.sponsor_relation === null && g.owner_id === null));
+      });
+
+      it('etapa: quem tem o que ela exige muda, quem não tem fica e é listado; Perdido pede o motivo', async () => {
+        const r = await bulk({ ids: ids.map(String), status: 'em_agendamento' });
+        assert.equal(r.status, 302);
+        let rows = await rowsOf();
+        assert.deepEqual(rows.map((g) => g.status), ['em_agendamento', 'em_agendamento', 'prospect'], 'sem foto não entra em Em agendamento');
+        const msg = (await as.prod.get('/convidados?view=lista')).text;
+        assert.match(msg, /2 convidados atualizados/); assert.match(msg, /A etapa não mudou para 1: Massa Sem Foto \(falta foto do convidado\)/);
+
+        assert.match((await bulk({ ids: ids.map(String), status: 'perdido' })).location, /\/convidados\?view=lista/);
+        assert.deepEqual((await rowsOf()).map((g) => g.status), ['em_agendamento', 'em_agendamento', 'prospect'], 'sem motivo, nada muda');
+        await bulk({ ids: ids.map(String), status: 'perdido', loss_reason: 'outros', loss_note: '' });
+        assert.ok((await rowsOf()).every((g) => g.status !== 'perdido'), 'Outros sem descrição não passa');
+        await bulk({ ids: ids.map(String), status: 'perdido', loss_reason: 'nunca_respondeu' });
+        rows = await rowsOf();
+        assert.ok(rows.every((g) => g.status === 'perdido' && g.loss_reason === 'nunca_respondeu'));
+        assert.match((await h.db.query("SELECT message FROM guest_events WHERE guest_id = $1 AND message LIKE 'Edição em massa%' ORDER BY id DESC LIMIT 1", [ids[0]])).rows[0].message, /Em agendamento → Perdido \(motivo: Nunca respondeu\)/);
+        await bulk({ ids: ids.map(String), status: 'prospect' });
+        assert.ok((await rowsOf()).every((g) => g.status === 'prospect' && g.loss_reason === null), 'sair de Perdido limpa o motivo');
+      });
+
+      it('recusa o que não vale: Agendado/Gravado em massa, nada marcado, nada escolhido, valores inválidos', async () => {
+        const before = JSON.stringify(await rowsOf());
+        for (const fields of [{ ids: ids.map(String), status: 'agendado' }, { ids: ids.map(String), status: 'gravado' }, { status: 'prospect' }, { ids: ids.map(String) },
+          { ids: ids.map(String), gender: 'x' }, { ids: ids.map(String), profile: 'astronauta' }, { ids: ids.map(String), owner_id: 'nao-e-uuid' }, { ids: ids.map(String), sponsor_id: '999999' }]) {
+          assert.equal((await bulk(fields)).status, 302);
+        }
+        assert.equal(JSON.stringify(await rowsOf()), before, 'nenhuma recusa mexe nos dados');
+      });
     });
 
     it('Perdido exige o motivo (Outros pede descrição); Cancelado não exige nada', async () => {

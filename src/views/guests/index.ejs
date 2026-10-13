@@ -54,13 +54,27 @@
   <% }) %>
 </div>
 <% } else { %>
+<% var canBulk = can('guests.write') && guests.length > 0; %>
+<% if (canBulk) { %>
+<div data-bulk>
+  <p class="small muted" data-bulk-hint>Marque os convidados para mudar etapa, responsável, perfil, gênero ou patrocinador de vários de uma vez.</p>
+  <div class="bulk-bar" data-bulk-bar hidden>
+    <strong><span data-bulk-count class="mono">0</span> selecionado(s)</strong>
+    <div class="row">
+      <button class="btn primary sm" type="button" data-modal-open="modal-massa">Editar em massa</button>
+      <button class="link small" type="button" data-bulk-clear>Limpar seleção</button>
+    </div>
+  </div>
+</div>
+<% } %>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Convidado</th><th>Perfil</th><th>Etapa</th><th>Gravação</th><th>Convite</th><th>Responsável</th></tr></thead>
+  <thead><tr><% if (canBulk) { %><th class="check-col"><input type="checkbox" data-bulk-all aria-label="Marcar todos os convidados da lista"></th><% } %><th>Convidado</th><th>Perfil</th><th>Etapa</th><th>Gravação</th><th>Convite</th><th>Responsável</th></tr></thead>
   <tbody>
-    <% if (!guests.length) { %><tr><td colspan="6"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum convidado por aqui ainda</strong><span>Cadastre o primeiro convidado ou ajuste os filtros.</span></div></td></tr><% } %>
+    <% if (!guests.length) { %><tr><td colspan="<%= canBulk ? 7 : 6 %>"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum convidado por aqui ainda</strong><span>Cadastre o primeiro convidado ou ajuste os filtros.</span></div></td></tr><% } %>
     <% guests.forEach(function (g) { %>
     <tr>
+      <% if (canBulk) { %><td class="check-col"><input type="checkbox" form="form-massa" name="ids" value="<%= g.id %>" data-bulk-pick aria-label="Marcar <%= g.name %>"></td><% } %>
       <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a><br><span class="muted small handle"><%= g.instagram ? '@' + g.instagram : '' %></span></td>
       <td><%= g.profile ? profileLabels[g.profile].label : '—' %></td>
       <td><span class="badge b-st-<%= g.status %>"><%= statuses.find(function (s) { return s.key === g.status; }).label %></span></td>
@@ -72,5 +86,56 @@
   </tbody>
 </table>
 </div>
+<% if (canBulk) { %>
+<dialog class="modal" id="modal-massa" aria-labelledby="m-massa-h">
+  <form method="post" action="/convidados/em-massa" id="form-massa" class="stack" data-bulk-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="m-massa-h">Editar <span data-bulk-count class="mono">0</span> convidado(s)</h2>
+    <p class="small muted">Só muda o que você escolher. Em branco, fica como está.</p>
+    <label>Etapa
+      <select name="status" data-bulk-status>
+        <option value="">Não alterar</option>
+        <% bulkStatuses.forEach(function (s) { %><option value="<%= s.key %>"><%= s.label %></option><% }) %>
+      </select>
+    </label>
+    <p class="small muted">Agendado e Gravado pedem os dados de cada convidado: mude um a um. Quem não tiver o que a etapa exige (contato, foto) fica onde está e aparece no resultado.</p>
+    <div class="stack" data-bulk-loss hidden>
+      <label>Motivo da perda
+        <select name="loss_reason" data-loss-select>
+          <option value="">Escolha o motivo</option>
+          <% Object.keys(lossReasons).forEach(function (k) { %><option value="<%= k %>"><%= lossReasons[k] %></option><% }) %>
+        </select>
+      </label>
+      <label data-loss-note hidden>Qual o motivo?<input type="text" name="loss_note" maxlength="500"></label>
+    </div>
+    <label>Responsável
+      <select name="owner_id">
+        <option value="">Não alterar</option>
+        <option value="nenhum">Sem responsável</option>
+        <% owners.forEach(function (o) { %><option value="<%= o.id %>"><%= o.name %></option><% }) %>
+      </select>
+    </label>
+    <div class="row-2">
+      <label>Perfil
+        <select name="profile"><option value="">Não alterar</option><% profiles.forEach(function (p) { %><option value="<%= p.key %>"><%= p.label %></option><% }) %></select>
+      </label>
+      <label>Gênero
+        <select name="gender"><option value="">Não alterar</option><% genders.forEach(function (gd) { %><option value="<%= gd[0] %>"><%= gd[1] %></option><% }) %></select>
+      </label>
+    </div>
+    <label>Patrocinador
+      <select name="sponsor_id" data-bulk-sponsor>
+        <option value="">Não alterar</option>
+        <option value="nenhum">Desvincular</option>
+        <% sponsors.forEach(function (s) { %><option value="<%= s.id %>"><%= s.company %></option><% }) %>
+      </select>
+    </label>
+    <label data-bulk-relation hidden>Quem são
+      <select name="sponsor_relation"><option value="indicado">Indicados pelo patrocinador</option><option value="representante">Pessoas do patrocinador</option></select>
+    </label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Aplicar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <% } %>
 <%- include('../partials/foot') %>

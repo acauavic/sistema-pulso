@@ -225,6 +225,26 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       assert.equal((await as.editor.post(`/convidados/${gid}/lembretes/d1/enviado`, { _csrf: await as.editor.csrf('/') })).status, 403, 'editor de vídeo não mexe');
     });
 
+    it('aba Lembretes em Notificações: fila do que está na hora, próximos e enviados; o envio volta para a aba', async () => {
+      await h.db.query("UPDATE guests SET status = 'agendado', proposed_at = $2, scheduled_studio = true, scheduled_hosts = true, scheduled_guest = true WHERE id = $1", [gid, inDays(6, '16:00')]);
+      await production.syncFromGuest(gid, u.gestao.id);
+      await h.db.query("UPDATE guest_reminders SET due_at = now() - interval '1 minute', sent_at = NULL WHERE guest_id = $1 AND kind = 'd3'", [gid]);
+      const page = await as.prod.get('/notificacoes/lembretes');
+      assert.equal(page.status, 200);
+      assert.match(page.text, /Na hora de mandar/); assert.match(page.text, /Dra\. Lia Lembrete/); assert.match(page.text, /3 dias antes/);
+      assert.match(page.text, /href="\/notificacoes\/lembretes"[^>]*aria-current="page"/);
+      assert.match((await as.prod.get('/notificacoes')).text, /Lembretes da gravação <span class="nav-count">1<\/span>/, 'a aba mostra quantos esperam');
+      assert.match(page.text, /name="voltar" value="\/notificacoes\/lembretes"/);
+      const sent = await as.prod.post(`/convidados/${gid}/lembretes/d3/enviado`, { _csrf: await as.prod.csrf('/notificacoes/lembretes'), voltar: '/notificacoes/lembretes' });
+      assert.equal(sent.location, '/notificacoes/lembretes');
+      const after = (await as.prod.get('/notificacoes/lembretes')).text;
+      assert.match(after, /Nenhum lembrete pendente/); assert.match(after, /Enviados nos últimos 7 dias/);
+      assert.equal((await as.editor.get('/notificacoes/lembretes')).status, 200, 'a equipe toda vê a fila');
+      assert.doesNotMatch((await as.editor.get('/notificacoes/lembretes')).text, /Enviar pelo WhatsApp/, 'mas só quem edita convidados envia');
+      const evil = await as.prod.post(`/convidados/${gid}/lembretes/d1/enviado`, { _csrf: await as.prod.csrf('/'), voltar: '//outro-site.com' });
+      assert.match(evil.location, /^\/convidados\//, 'voltar só aceita caminho do próprio painel');
+    });
+
     it('remarcar refaz o ciclo; sair de Agendado cancela o que não foi enviado', async () => {
       await h.db.query('UPDATE guests SET proposed_at = $2 WHERE id = $1', [gid, inDays(8, '10:00')]);
       await production.syncFromGuest(gid, u.gestao.id);

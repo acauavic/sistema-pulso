@@ -51,6 +51,37 @@
     sync();
   }
 
+  // edição em massa (Convidados > Lista): seleção, contador, e os campos que só aparecem quando fazem sentido
+  document.querySelectorAll('[data-bulk]').forEach((box) => {
+    const picks = () => [...document.querySelectorAll('input[data-bulk-pick]')];
+    const all = document.querySelector('[data-bulk-all]');
+    const sync = () => {
+      const n = picks().filter((b) => b.checked).length;
+      box.querySelector('[data-bulk-bar]').hidden = !n;
+      box.querySelector('[data-bulk-hint]').hidden = n > 0;
+      document.querySelectorAll('[data-bulk-count]').forEach((el) => { el.textContent = n; });
+      if (all) { all.checked = n > 0 && n === picks().length; all.indeterminate = n > 0 && n < picks().length; }
+    };
+    picks().forEach((b) => b.addEventListener('change', sync));
+    all?.addEventListener('change', () => { picks().forEach((b) => { b.checked = all.checked; }); sync(); });
+    box.querySelector('[data-bulk-clear]')?.addEventListener('click', () => { picks().forEach((b) => { b.checked = false; }); sync(); });
+    sync();
+  });
+  document.querySelectorAll('[data-bulk-form]').forEach((form) => {
+    const status = form.querySelector('[data-bulk-status]');
+    const loss = form.querySelector('[data-bulk-loss]');
+    const lossSelect = loss.querySelector('select');
+    status.addEventListener('change', () => {
+      const on = status.value === 'perdido';
+      loss.hidden = !on; lossSelect.required = on;
+      if (!on) { lossSelect.value = ''; lossSelect.dispatchEvent(new Event('change')); } // "Outros" some junto, sem deixar campo obrigatório escondido
+    });
+    const sponsor = form.querySelector('[data-bulk-sponsor]');
+    const relation = form.querySelector('[data-bulk-relation]');
+    sponsor.addEventListener('change', () => { relation.hidden = !/^\d+$/.test(sponsor.value); });
+    form.addEventListener('submit', (e) => { if (!document.querySelector('input[data-bulk-pick]:checked')) e.preventDefault(); });
+  });
+
   // formulário que abre outra aba (ex.: WhatsApp do lembrete): recarrega esta para mostrar o novo estado
   document.querySelectorAll('form[data-reload-after]').forEach((f) => f.addEventListener('submit', () => setTimeout(() => window.location.reload(), 800)));
 
