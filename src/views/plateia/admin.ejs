@@ -49,6 +49,22 @@
           <strong><%= l.name %></strong>
           <span class="small muted"><%= l.guest_name %><%= l.recording_at ? ' · ' + fmt.formatDate(l.recording_at) : '' %> · <%= l.utm_source ? l.utm_source + (l.utm_campaign ? ' / ' + l.utm_campaign : '') : 'direto' %></span>
           <% if (l.status === 'confirmado' && isExempt(l)) { %><span class="small"><span class="badge b-gray">isento</span></span><% } else if (l.status === 'confirmado' && l.amount_cents != null) { %><span class="small"><span class="badge <%= l.pay_status === 'pago' ? 'b-green' : 'b-amber' %>"><%= l.pay_status === 'pago' ? 'recebido ' + fmt.formatDayShort(l.pay_paid) : 'a receber até ' + fmt.formatDayShort(l.pay_due) %></span> <span class="mono"><%= fmtMoney(l.amount_cents) %></span></span><% } %>
+          <% if (l.link_status === 'pago') { %><span class="small muted mono">InfinitePay · <%= l.link_method === 'pix' ? 'Pix' : 'cartão' + (l.link_installments > 1 ? ' ' + l.link_installments + 'x' : '') %></span><% } %>
+          <% if (payLinks && ['novo', 'em_atendimento'].indexOf(l.status) >= 0) { %>
+          <details class="more">
+            <summary>Link de pagamento<% if (l.link_url) { %> · <span class="mono"><%= fmtMoney(l.link_amount) %></span><% } %></summary>
+            <% if (l.link_url) { var msg = 'Oi, ' + l.name.split(' ')[0] + '! Seu pedido para a plateia do Pulso Podcast com ' + l.guest_name + ' foi avaliado. O pagamento da vaga (' + fmtMoney(l.link_amount) + ') é por este link: ' + l.link_url + ' . Qualquer dúvida, é só chamar por aqui.'; %>
+            <p class="small mono raw"><%= l.link_url %></p>
+            <div class="row">
+              <button class="btn sm" type="button" data-copy="<%= l.link_url %>"><%- icon('copy', 14) %> Copiar</button>
+              <a class="btn sm" href="<%= waLink(l.phone) %>?text=<%= encodeURIComponent(msg) %>" target="_blank" rel="noopener noreferrer"><%- icon('whatsapp', 14) %> Enviar pelo WhatsApp</a>
+              <button class="btn sm ghost" type="button" data-fill-modal="modal-link" data-fill-mode="new" data-fill-action="/plateia/painel/leads/<%= l.id %>/link" data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.link_amount), voltar: here }) %>'>Alterar valor</button>
+            </div>
+            <% } else { %>
+            <form method="post" action="/plateia/painel/leads/<%= l.id %>/link" class="inline"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><button class="btn sm" type="submit">Gerar link de <%= fmtMoney(l.price_cents || s.priceCents) %></button></form>
+            <% } %>
+          </details>
+          <% } %>
         </div>
         <span class="fin-when mono small muted"><%= fmt.formatDateTime(l.created_at) %><%= l.whatsapp_opened_at ? '' : ' · não abriu o WhatsApp' %></span>
         <span class="fin-amt mono"><a href="<%= waLink(l.phone) %>" target="_blank" rel="noopener noreferrer"><%= l.phone %></a></span>
@@ -163,7 +179,17 @@
   <% } %>
 </div>
 
-<dialog class="modal" id="modal-confirmar" aria-labelledby="mcf-h">
+<dialog class="modal" id="modal-link" aria-labelledby="mlk-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %><input type="hidden" name="voltar" value="">
+    <h2 id="mlk-h">Valor do link de pagamento</h2>
+    <label>Pedido<input type="text" name="_label" readonly></label>
+    <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required autofocus></label>
+    <p class="small muted">Cria um link novo com este valor e ele passa a ser o link atual. Se a pessoa ainda pagar pelo anterior, o pagamento também é registrado.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar link</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<dialog class="modal" id="modal-confirmar" aria-labelledby="mcf-h"> aria-labelledby="mcf-h">
   <form method="post" action="" class="stack" data-fill-form data-when-form>
     <%- csrfField %><input type="hidden" name="voltar" value="">
     <h2 id="mcf-h">Confirmar participação</h2>

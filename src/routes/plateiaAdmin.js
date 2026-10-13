@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const db = require('../db/pool');
 const config = require('../config');
 const audience = require('../services/audience');
+const infinitePay = require('../services/infinitePay');
 const settingsSvc = require('../services/settings');
 const b2 = require('../services/b2');
 const { audit } = require('../services/audit');
@@ -43,7 +44,9 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
   if (guestFilter) { p.push(guestFilter); where.push(`l.guest_id = $${p.length}`); }
   if (statusFilter) { p.push(statusFilter); where.push(`l.status = $${p.length}`); }
   const [leads, results, s, upcoming, agenda] = await Promise.all([
-    db.query(`SELECT l.*, e.status AS pay_status, e.due_on AS pay_due, e.paid_on AS pay_paid FROM plateia_leads l LEFT JOIN fin_entries e ON e.id = l.entry_id AND e.status <> 'cancelado' ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY l.created_at DESC LIMIT 300`, p),
+    db.query(`SELECT l.*, e.status AS pay_status, e.due_on AS pay_due, e.paid_on AS pay_paid, k.url AS link_url, k.amount_cents AS link_amount, k.status AS link_status, k.capture_method AS link_method, k.installments AS link_installments
+       FROM plateia_leads l LEFT JOIN fin_entries e ON e.id = l.entry_id AND e.status <> 'cancelado'
+       LEFT JOIN LATERAL (SELECT * FROM plateia_pay_links WHERE lead_id = l.id ORDER BY (status = 'pago') DESC, id DESC LIMIT 1) k ON true ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY l.created_at DESC LIMIT 300`, p),
     audience.results(days), audience.settings(),
     db.query("SELECT id, name, proposed_at FROM guests WHERE id IN (SELECT guest_id FROM plateia_leads WHERE guest_id IS NOT NULL) ORDER BY proposed_at DESC NULLS LAST LIMIT 60"),
     audience.agenda(),
@@ -51,7 +54,7 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
   const { rows: [counts] } = await db.query("SELECT count(*) FILTER (WHERE status = 'novo')::int AS novos, count(*)::int AS total FROM plateia_leads");
   res.render('plateia/admin', {
     title: 'Plateia', leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
-    canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
+    canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
   });
 }));
 
@@ -67,6 +70,13 @@ router.post('/plateia/painel/leads/:id', requirePerm('audience.read'), wrap(asyn
   if (status === 'confirmado') { await req.flash('error', 'Para selecionar, use "Confirmar participação": ela pede o valor combinado.'); return res.redirect(to); }
   if (status && status !== lead.status) {
     await db.query('UPDATE plateia_leads SET status = $2, updated_at = now() WHERE id = $1', [lead.id, status]);
+    if (status === 'em_atendimento' && config.infinitepayConfigured && !(await infinitePay.currentLink(lead.id)) && lead.status !== 'confirmado') { // em avaliação: já nasce o link de pagamento
+      try {
+        const link = await infinitePay.createLink({ lead, amountCents: await infinitePay.defaultAmount(lead), userId: req.user.id });
+        await audit(req, 'plateia.link_criado', 'plateia_lead', lead.id, { valor: Number(link.amount_cents) });
+        await req.flash('ok', `Em avaliação. O link de pagamento de ${formatBRL(link.amount_cents)} está em "Link de pagamento" no pedido.`);
+      } catch (err) { await req.flash('error', `Situação atualizada, mas não consegui gerar o link de pagamento: ${err.message}`); }
+    }
     if (lead.status === 'confirmado') {
       const r = await audience.releaseLead(lead);
       await req.flash('ok', r.kept ? 'Situação atualizada. O pagamento já recebido continua nas contas do financeiro.' : 'Situação atualizada e a conta a receber foi cancelada.');
@@ -74,6 +84,24 @@ router.post('/plateia/painel/leads/:id', requirePerm('audience.read'), wrap(asyn
   }
   if (req.body.notes !== undefined) await db.query('UPDATE plateia_leads SET notes = $2, updated_at = now() WHERE id = $1', [lead.id, clean(req.body.notes, 1000) || null]);
   await audit(req, 'plateia.inscricao', 'plateia_lead', lead.id, { status });
+  res.redirect(to);
+}));
+
+// Link de pagamento (InfinitePay): gerar ou trocar o valor. Cria um link novo; o anterior deixa de ser o atual.
+router.post('/plateia/painel/leads/:id/link', requirePerm('audience.read'), wrap(async (req, res) => {
+  const lead = await findLead(req.params.id);
+  const to = flashBack(req);
+  if (!lead) return res.redirect('/plateia/painel');
+  if (!config.infinitepayConfigured) { await req.flash('error', 'A InfinitePay ainda não está configurada.'); return res.redirect(to); }
+  if (lead.status === 'confirmado' && (await db.query("SELECT 1 FROM plateia_pay_links WHERE lead_id = $1 AND status = 'pago'", [lead.id])).rowCount) { await req.flash('error', 'Este pedido já foi pago pelo link.'); return res.redirect(to); }
+  const raw = String(req.body.amount || '').trim();
+  const amount = raw ? parseBRL(raw) : await infinitePay.defaultAmount(lead);
+  if (amount == null || Number.isNaN(amount) || amount <= 0) { await req.flash('error', 'Informe o valor do link, por exemplo 197,00.'); return res.redirect(to); }
+  try {
+    const link = await infinitePay.createLink({ lead, amountCents: amount, userId: req.user.id });
+    await audit(req, 'plateia.link_criado', 'plateia_lead', lead.id, { valor: amount });
+    await req.flash('ok', `Link de ${formatBRL(link.amount_cents)} criado. Envie pelo WhatsApp ou copie.`);
+  } catch (err) { await req.flash('error', `Não consegui gerar o link: ${err.message}`); }
   res.redirect(to);
 }));
 

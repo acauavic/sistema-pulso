@@ -28,6 +28,18 @@
     </form>
   </section>
   <section class="card">
+    <h2>InfinitePay (link de pagamento da plateia)</h2>
+    <p><span class="badge <%= infinitepay.ok ? 'b-green' : 'b-red' %>"><%= infinitepay.ok ? 'Configurado' : 'Não configurado' %></span></p>
+    <ul class="plain small">
+      <li>InfiniteTag: <code><%= infinitepay.handle ? '$' + infinitepay.handle : '—' %></code></li>
+      <% if (infinitepay.ok) { %><li>Webhook (já vai em cada link, não precisa cadastrar): <code class="raw"><%= infinitepay.webhook.replace(/\/[^/]+$/, '/…') %></code></li><% } %>
+      <li>O link nasce quando a produtora coloca o pedido em <strong>Em avaliação</strong>, com o valor da página (dá para alterar). Quando a InfinitePay avisa o pagamento, o pedido vira Selecionado e entra como recebido no Financeiro.</li>
+    </ul>
+    <% if (infinitepay.ok) { %>
+    <form method="post" action="/integracoes/infinitepay"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" type="submit">Gerar link de teste (R$ 1,00)</button></form>
+    <% } else { %><p class="small muted">Defina INFINITEPAY_HANDLE no servidor e ative o "checkout externo" no app da InfinitePay.</p><% } %>
+  </section>
+  <section class="card">
     <h2>Google Agenda</h2>
     <p><span class="badge <%= google.configured && google.validKey ? 'b-green' : 'b-red' %>"><%= google.configured ? (google.validKey ? 'Configurado' : 'Chave inválida') : 'Não configurado' %></span></p>
     <ul class="plain small">

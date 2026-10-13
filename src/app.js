@@ -35,6 +35,7 @@ function createApp() {
   app.use(require('./services/plans').middleware); // nomes dos planos (Ouro/Diamond), editáveis na gestão, valem em todas as telas
 
   app.use(require('./routes/public')); // convite público: sem sessão nem CSRF (token secreto na URL)
+  app.use(require('./routes/infinitepay')); // webhook de pagamento da plateia e a página de "pagamento recebido" (sem login)
   app.use(require('./routes/plateia')); // Pulso Podcast com Plateia: página pública de inscrição (sem login)
   app.use(require('./routes/sponsorPublic')); // media kit, formulário e portal do patrocinador (idem)
 

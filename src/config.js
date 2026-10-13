@@ -73,6 +73,10 @@ const config = {
     eventMinutes: Math.max(15, Number(env.GOOGLE_EVENT_MINUTES) || 120),
   },
 
+  // InfinitePay (checkout): links de pagamento da plateia. Handle = InfiniteTag (sem o $). O endereço do webhook leva um segredo
+  // derivado do SESSION_SECRET (ou INFINITEPAY_WEBHOOK_SECRET). Sem o handle, a integração fica desligada.
+  infinitepay: { handle: String(env.INFINITEPAY_HANDLE || '').replace(/^\$/, '').trim(), webhookSecret: env.INFINITEPAY_WEBHOOK_SECRET || '' },
+
   yourls: {
     base: normalizeBase(env.YOURLS_LINK),
     key: env.YOURLS_KEY,
@@ -85,6 +89,7 @@ config.geminiConfigured = Boolean(config.gemini.key);
 config.groqConfigured = Boolean(config.groq.key);
 config.uploadPostConfigured = Boolean(config.uploadPost.key);
 config.googleConfigured = Boolean(config.google.calendarId && config.google.serviceAccount);
+config.infinitepayConfigured = Boolean(config.infinitepay.handle);
 config.yourlsConfigured = Boolean(config.yourls.base && config.yourls.key);
 
 function assertConfig() {

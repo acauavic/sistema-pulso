@@ -50,8 +50,24 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
     title: 'Integrações',
     smtp: { ok: config.mailConfigured, dry: config.mailDryRun, host: config.brevo.host, port: config.brevo.port, from: config.brevo.from },
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
+    infinitepay: { ok: config.infinitepayConfigured, handle: config.infinitepay.handle, webhook: config.infinitepayConfigured ? require('../services/infinitePay').webhookUrl() : '' },
     appBaseUrl: config.appBaseUrl,
   });
+}));
+
+// Link de teste de R$ 1,00 (só gera o link para conferir o handle; ninguém é cobrado se não pagar).
+router.post('/integracoes/infinitepay', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  try {
+    const ip = require('../services/infinitePay');
+    const { rows: [lead] } = await db.query("SELECT id, name, phone, guest_name, recording_at FROM plateia_leads ORDER BY id DESC LIMIT 1");
+    if (!lead) throw new Error('Ainda não há nenhum pedido na plateia para testar.');
+    const link = await ip.createLink({ lead, amountCents: 100, userId: req.user.id, description: 'Teste de integração Pulso (R$ 1,00)' });
+    await audit(req, 'integracao.teste_infinitepay', 'system', null, {});
+    await req.flash('ok', `A InfinitePay respondeu. Link de teste de R$ 1,00: ${link.url}`);
+  } catch (err) {
+    await req.flash('error', `InfinitePay: ${err.message}`);
+  }
+  res.redirect('/integracoes');
 }));
 
 router.post('/integracoes/google/tipos', requirePerm('integrations.manage'), wrap(async (req, res) => {

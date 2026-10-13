@@ -105,3 +105,6 @@ a { color: inherit; }
 
 .pl-lede-sm { font-size: clamp(16px, 1.8vw, 18px); margin: 20px 0 0; }
 .pl-section h2 + .pl-lede-sm { margin-bottom: 8px; }
+
+.pl-thanks { min-height: 100vh; display: grid; align-items: center; padding: 48px 0; } .pl-thanks .pl-wrap { display: grid; gap: 16px; justify-items: start; max-width: 640px; }
+.pl-thanks h1 { font: 700 clamp(40px, 8vw, 72px)/1 "Space Grotesk", sans-serif; letter-spacing: -.05em; margin: 0; }
