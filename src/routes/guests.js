@@ -363,15 +363,22 @@ router.post('/convidados/:id/zerar-aceite', requirePerm('guests.write'), wrap(as
 
 // ---- lembretes da gravação: enviar pelo WhatsApp (marca como enviado e abre a conversa) ou marcar à mão ----
 const backTo = (req, fallback) => { const v = String(req.body.voltar || ''); return /^\/(?!\/)[\w\-/?=&#.%]*$/.test(v) ? v : fallback; };
-router.post('/convidados/:id/lembretes/:kind/:acao(whatsapp|enviado)', requirePerm('guests.write'), wrap(async (req, res) => {
+// "enviado": primeira vez (clicar de novo não soma). "reenviado": mandou outra vez. O link do WhatsApp é um <a> comum (data-mark-sent):
+// o navegador abre a conversa sozinho e o registro vai em segundo plano por aqui (responde JSON). Sem JavaScript, o "Já enviei" é um formulário.
+router.post('/convidados/:id/lembretes/:kind/:acao(enviado|reenviado)', requirePerm('guests.write'), wrap(async (req, res) => {
   const guest = await findGuest(req.params.id);
-  if (!guest || !reminders.KINDS[req.params.kind]) return notFound(res);
+  if (!guest || !reminders.KINDS[req.params.kind]) return wantsJson(req) ? res.status(404).json({ ok: false }) : notFound(res);
   const back = backTo(req, `/convidados/${guest.id}#lembretes`);
   const item = (await reminders.forGuest(guest)).find((r) => r.kind === req.params.kind);
-  if (!item) { await req.flash('error', 'Esse lembrete não vale mais (a gravação mudou ou já passou).'); return res.redirect(back); }
-  await reminders.markSent(guest.id, item.kind, req.user);
-  if (req.params.acao === 'whatsapp' && item.waUrl) return res.redirect(303, item.waUrl);
-  await req.flash('ok', `Lembrete de ${item.label.toLowerCase()} marcado como enviado.`);
+  if (!item) {
+    if (wantsJson(req)) return res.status(409).json({ ok: false, error: 'Esse lembrete não vale mais (a gravação mudou ou já passou).' });
+    await req.flash('error', 'Esse lembrete não vale mais (a gravação mudou ou já passou).');
+    return res.redirect(back);
+  }
+  const again = req.params.acao === 'reenviado';
+  await reminders.markSent(guest.id, item.kind, req.user, { again });
+  if (wantsJson(req)) return res.json({ ok: true });
+  await req.flash('ok', `Lembrete de ${item.label.toLowerCase()} marcado como ${again ? 'reenviado' : 'enviado'}.`);
   res.redirect(back);
 }));
 

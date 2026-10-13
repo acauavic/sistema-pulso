@@ -82,8 +82,13 @@
     form.addEventListener('submit', (e) => { if (!document.querySelector('input[data-bulk-pick]:checked')) e.preventDefault(); });
   });
 
-  // formulário que abre outra aba (ex.: WhatsApp do lembrete): recarrega esta para mostrar o novo estado
-  document.querySelectorAll('form[data-reload-after]').forEach((f) => f.addEventListener('submit', () => setTimeout(() => window.location.reload(), 800)));
+  // link que abre outra aba e avisa o servidor (WhatsApp do lembrete): o <a> abre sozinho, sem depender de redirecionamento
+  // (a CSP do painel barra formulário que termina em outro site), e o registro de "enviado" vai em segundo plano.
+  document.querySelectorAll('a[data-mark-sent]').forEach((a) => a.addEventListener('click', () => {
+    const csrf = document.querySelector('meta[name="csrf"]')?.content || '';
+    fetch(a.dataset.markSent, { method: 'POST', keepalive: true, headers: { 'x-csrf-token': csrf, Accept: 'application/json' } }).catch(() => {});
+    setTimeout(() => window.location.reload(), 1200);
+  }));
 
   // motivo da perda: "Outros" pede a descrição (formulário do convidado e janela "Marcar como perdido")
   document.querySelectorAll('[data-loss-select], [data-loss-radio]').forEach((input) => {

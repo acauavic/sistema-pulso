@@ -71,9 +71,9 @@ function message(kind, guest, s, { withAddress = false } = {}) {
 
 // WhatsApp do convidado: só dígitos; número brasileiro sem DDI ganha o 55.
 function whatsappNumber(phone) {
-  const d = String(phone || '').replace(/\D/g, '');
-  if (!d) return null;
-  return d.length === 10 || d.length === 11 ? `55${d}` : d;
+  const d = String(phone || '').replace(/\D/g, '').replace(/^0+/, '');
+  const full = d.length === 10 || d.length === 11 ? `55${d}` : d;
+  return /^\d{12,15}$/.test(full) ? full : null; // fora disso não é um número que o WhatsApp aceite
 }
 
 // Acompanha a etapa e a data do convidado. Idempotente: chamado depois de qualquer mudança.
@@ -112,7 +112,7 @@ function build(guest, rows, s, now = new Date()) {
   const list = full.filter((it) => byKind[it.kind]).map((it) => {
     const r = byKind[it.kind];
     const state = r.sent_at ? 'enviado' : now >= it.until ? 'passou' : now >= r.due_at ? 'agora' : 'agendado';
-    return { ...it, ...KINDS[it.kind], id: r.id, due: r.due_at, sentAt: r.sent_at, sentBy: r.sent_by_name, state, text: message(it.kind, guest, s, it) };
+    return { ...it, ...KINDS[it.kind], id: r.id, due: r.due_at, sentAt: r.sent_at, sentBy: r.sent_by_name, sendCount: r.send_count, state, text: message(it.kind, guest, s, it) };
   });
   const current = list.find((it) => it.state === 'agora') || list.find((it) => it.state === 'agendado') || null;
   const phone = whatsappNumber(guest.phone);
@@ -136,22 +136,22 @@ async function queue() {
   const { rows: all } = guests.length ? await db.query(
     'SELECT r.*, u.name AS sent_by_name FROM guest_reminders r LEFT JOIN users u ON u.id = r.sent_by WHERE r.guest_id = ANY($1)', [guests.map((g) => g.id)]) : { rows: [] };
   const items = guests.flatMap((g) => build(g, all.filter((r) => r.guest_id === g.id), s).map((it) => ({ ...it, guest: g })));
-  const { rows: recent } = await db.query(
-    `SELECT r.kind, r.sent_at, g.id AS guest_id, g.name, g.proposed_at, u.name AS sent_by_name FROM guest_reminders r JOIN guests g ON g.id = r.guest_id
-       LEFT JOIN users u ON u.id = r.sent_by WHERE r.sent_at > now() - interval '7 days' ORDER BY r.sent_at DESC LIMIT 20`);
   return {
     now: items.filter((it) => it.state === 'agora').sort((a, b) => a.due - b.due),
     next: items.filter((it) => it.state === 'agendado' && it.current).sort((a, b) => a.due - b.due),
-    sent: recent.map((r) => ({ ...KINDS[r.kind], kind: r.kind, sentAt: r.sent_at, sentBy: r.sent_by_name, guest: { id: r.guest_id, name: r.name, proposed_at: r.proposed_at } })),
+    sent: items.filter((it) => it.state === 'enviado').sort((a, b) => b.sentAt - a.sentAt).slice(0, 30),
   };
 }
 
-async function markSent(guestId, kind, user) {
+// again=false: marca a primeira vez (clicar de novo não soma). again=true: reenvio, soma e atualiza quem e quando.
+async function markSent(guestId, kind, user, { again = false } = {}) {
+  const { rows: [before] } = await db.query('SELECT sent_at FROM guest_reminders WHERE guest_id = $1 AND kind = $2', [guestId, kind]);
+  if (!before) return null;
+  if (before.sent_at && !again) return before; // já marcado: o segundo clique no mesmo botão não vira reenvio
   const { rows: [r] } = await db.query(
-    `UPDATE guest_reminders SET sent_at = coalesce(sent_at, now()), sent_by = coalesce(sent_by, $3)
-      WHERE guest_id = $1 AND kind = $2 RETURNING *`, [guestId, kind, user.id]);
-  if (r) await require('./guests').addEvent(guestId, user.id, 'lembrete', `Lembrete enviado (${KINDS[kind].label})`);
-  return r || null;
+    `UPDATE guest_reminders SET sent_at = now(), sent_by = $3, send_count = send_count + 1 WHERE guest_id = $1 AND kind = $2 RETURNING *`, [guestId, kind, user.id]);
+  await require('./guests').addEvent(guestId, user.id, 'lembrete', `Lembrete ${before.sent_at ? 'reenviado' : 'enviado'} (${KINDS[kind].label})`);
+  return r;
 }
 
 // Rotina: chegou a hora de um lembrete ainda não enviado -> avisa quem cuida do convidado e a produção (uma vez).

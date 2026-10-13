@@ -1,0 +1,14 @@
+<%# Botões de um lembrete da gravação. Variáveis: it (lembrete montado), guestId, guestName, voltar (opcional: caminho para voltar depois do "Já enviei").
+    O WhatsApp é um link comum (abre sempre, sem depender de redirecionamento); o registro de "enviado" vai em segundo plano (data-mark-sent). %>
+<% var base = '/convidados/' + guestId + '/lembretes/' + it.kind; %>
+<div class="row">
+  <% if (it.state === 'enviado') { %>
+    <% if (it.waUrl) { %><a class="btn sm" href="<%= it.waUrl %>" target="_blank" rel="noopener noreferrer" data-mark-sent="<%= base %>/reenviado"><%- icon('whatsapp', 14) %> Reenviar pelo WhatsApp</a>
+    <% } else { %><button class="btn sm" type="button" data-copy="<%= it.text %>">Copiar mensagem</button><% } %>
+  <% } else { %>
+    <% if (it.waUrl) { %><a class="btn sm <%= it.state === 'agora' ? 'primary' : '' %>" href="<%= it.waUrl %>" target="_blank" rel="noopener noreferrer" data-mark-sent="<%= base %>/enviado"><%- icon('whatsapp', 14) %> <%= it.state === 'passou' ? 'Enviar mesmo assim' : 'Enviar pelo WhatsApp' %></a>
+    <% } else { %><button class="btn sm" type="button" data-copy="<%= it.text %>">Copiar mensagem</button><% } %>
+    <form method="post" action="<%= base %>/enviado" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><% if (typeof voltar !== 'undefined' && voltar) { %><input type="hidden" name="voltar" value="<%= voltar %>"><% } %><button class="link small" type="submit">Já enviei</button></form>
+  <% } %>
+</div>
+<% if (!it.waUrl) { %><p class="small muted">Sem um WhatsApp válido no cadastro de <%= fmt.firstName(guestName) %>: copie a mensagem e mande por onde vocês conversam.</p><% } %>

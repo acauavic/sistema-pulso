@@ -162,6 +162,11 @@ test('lembretes da gravação: 3 dias, 1 dia, no dia e 3 horas; gravação cedo 
   assert.equal(reminders.whatsappNumber('(11) 98888-7777'), '5511988887777');
   assert.equal(reminders.whatsappNumber('+55 11 98888 7777'), '5511988887777');
   assert.equal(reminders.whatsappNumber(''), null);
+  assert.equal(reminders.whatsappNumber('011 98888-7777'), '5511988887777', 'zero à esquerda do DDD sai');
+  assert.equal(reminders.whatsappNumber('+55 6781403000'), '556781403000', 'fixo com DDI');
+  assert.equal(reminders.whatsappNumber('11966006998 Esposa'), '5511966006998', 'texto junto do número é ignorado');
+  assert.equal(reminders.whatsappNumber('98888'), null, 'curto demais não é número de WhatsApp');
+  assert.equal(reminders.whatsappNumber('11 98888-7777 / 11 3333-4444'), null, 'dois números colados não valem: melhor copiar do que abrir a conversa errada');
 });
 
 test('guia de perfis do assistente: toda permissão tem descrição e cada perfil recebe o que pode e o que não pode', () => {

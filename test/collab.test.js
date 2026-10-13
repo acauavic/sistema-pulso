@@ -199,7 +199,7 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
     const production = require('../src/services/production');
     const reminders = require('../src/services/reminders');
     let gid;
-    const rows = () => h.db.query('SELECT kind, sent_at, notified_at FROM guest_reminders WHERE guest_id = $1 ORDER BY due_at', [gid]).then((r) => r.rows);
+    const rows = () => h.db.query('SELECT kind, sent_at, notified_at, send_count FROM guest_reminders WHERE guest_id = $1 ORDER BY due_at', [gid]).then((r) => r.rows);
     const inDays = (n, hhmm) => { const d = new Date(Date.now() + n * 86400_000); return new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d)}T${hhmm}:00-03:00`); };
 
     it('Agendado monta os quatro lembretes; na hora avisa a produção e quem cuida; o WhatsApp abre com a mensagem e marca como enviado', async () => {
@@ -220,12 +220,35 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       assert.match(page, /Lembretes da gravação/);
       assert.match(page, /Enviar pelo WhatsApp/);
       assert.match(page, /na hora/);
-      const csrf = await as.prod.csrf(`/convidados/${gid}`);
-      const r = await as.prod.post(`/convidados/${gid}/lembretes/d3/whatsapp`, { _csrf: csrf });
-      assert.equal(r.status, 303);
-      assert.match(r.location, /^https:\/\/wa\.me\/5511988887777\?text=Oi%2C%20Lia/);
-      assert.ok((await rows())[0].sent_at, 'marcado como enviado');
-      assert.equal((await as.editor.post(`/convidados/${gid}/lembretes/d1/enviado`, { _csrf: await as.editor.csrf('/') })).status, 403, 'editor de vídeo não mexe');
+      // o WhatsApp é um link comum para o wa.me, com a mensagem pronta (abre sempre); o registro vai em segundo plano
+      const link = page.match(/<a class="btn sm primary" href="(https:\/\/wa\.me\/5511988887777\?text=[^"]+)" target="_blank" rel="noopener noreferrer" data-mark-sent="(\/convidados\/\d+\/lembretes\/d3\/enviado)">/);
+      assert.ok(link, 'link do WhatsApp com a mensagem pronta');
+      assert.match(decodeURIComponent(link[1].replace(/&amp;/g, '&')), /Oi, Lia/);
+      assert.doesNotMatch(page, /<form[^>]*lembretes\/[^"]*\/whatsapp/, 'sem formulário que termina em redirecionamento (a CSP do painel barra)');
+      assert.equal((await rows())[0].sent_at, null, 'só abrir a página não marca nada');
+
+      const mark = async (who, kind, acao) => {
+        const csrf = await as[who].csrf('/notificacoes');
+        const res = await fetch(`${app.base}/convidados/${gid}/lembretes/${kind}/${acao}`, { method: 'POST', headers: { cookie: as[who].cookie(), accept: 'application/json', 'x-csrf-token': csrf } });
+        return { status: res.status, body: await res.json().catch(() => ({})) };
+      };
+      assert.deepEqual(await mark('prod', 'd3', 'enviado'), { status: 200, body: { ok: true } });
+      let d3 = (await rows())[0];
+      assert.ok(d3.sent_at, 'marcado como enviado'); assert.equal(d3.send_count, 1);
+      await mark('prod', 'd3', 'enviado');
+      assert.equal((await rows())[0].send_count, 1, 'clicar de novo no mesmo botão não vira reenvio');
+
+      const sentPage = (await as.prod.get(`/convidados/${gid}`)).text;
+      const again = sentPage.match(/<a class="btn sm" href="https:\/\/wa\.me\/5511988887777[^"]*" target="_blank" rel="noopener noreferrer" data-mark-sent="(\/convidados\/\d+\/lembretes\/d3\/reenviado)">[^<]*<svg[\s\S]*?Reenviar pelo WhatsApp/);
+      assert.ok(again, 'depois de enviado aparece o Reenviar');
+      assert.deepEqual(await mark('prod', 'd3', 'reenviado'), { status: 200, body: { ok: true } });
+      d3 = (await rows())[0];
+      assert.equal(d3.send_count, 2);
+      assert.match((await as.prod.get(`/convidados/${gid}`)).text, /Enviado 2× · último/);
+      const { rows: ev } = await h.db.query("SELECT message FROM guest_events WHERE guest_id = $1 AND type = 'lembrete' ORDER BY id", [gid]);
+      assert.deepEqual(ev.map((e) => e.message), ['Lembrete enviado (3 dias antes)', 'Lembrete reenviado (3 dias antes)']);
+      assert.equal((await mark('editor', 'd1', 'enviado')).status, 403, 'editor de vídeo não mexe');
+      assert.equal((await mark('prod', 'xx', 'enviado')).status, 404);
     });
 
     it('a rotina não avisa lembrete vencido: se a hora do próximo já passou, o anterior não vale mais', async () => {
@@ -252,7 +275,8 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       const sent = await as.prod.post(`/convidados/${gid}/lembretes/d3/enviado`, { _csrf: await as.prod.csrf('/notificacoes/lembretes'), voltar: '/notificacoes/lembretes' });
       assert.equal(sent.location, '/notificacoes/lembretes');
       const after = (await as.prod.get('/notificacoes/lembretes')).text;
-      assert.match(after, /Nenhum lembrete pendente/); assert.match(after, /Enviados nos últimos 7 dias/);
+      assert.match(after, /Nenhum lembrete pendente/); assert.match(after, /Já enviados/);
+      assert.match(after, /Reenviar pelo WhatsApp/, 'quem já recebeu pode receber de novo');
       assert.equal((await as.editor.get('/notificacoes/lembretes')).status, 200, 'a equipe toda vê a fila');
       assert.doesNotMatch((await as.editor.get('/notificacoes/lembretes')).text, /Enviar pelo WhatsApp/, 'mas só quem edita convidados envia');
       const evil = await as.prod.post(`/convidados/${gid}/lembretes/d1/enviado`, { _csrf: await as.prod.csrf('/'), voltar: '//outro-site.com' });

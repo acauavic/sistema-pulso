@@ -6,10 +6,6 @@
 <%- include('../partials/notif-tabs') %>
 <p class="lead">Quem está agendado precisa receber um lembrete 3 dias antes, 1 dia antes, no dia de manhã e 3 horas antes da gravação. Aqui estão os que pedem a sua mensagem agora.</p>
 
-<%
-  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
-  var voltar = '<input type="hidden" name="voltar" value="/notificacoes/lembretes">';
-%>
 
 <section class="stack top-gap">
   <h2>Na hora de mandar <% if (q.now.length) { %><span class="count"><%= q.now.length %></span><% } %></h2>
@@ -25,15 +21,7 @@
     </div>
     <p class="small muted"><%= it.hint %><%= it.withAddress ? ' (com o endereço)' : '' %></p>
     <details class="more"><summary>Ver mensagem</summary><p class="pre small"><%= it.text %></p></details>
-    <% if (canSend) { %>
-    <div class="row">
-      <% if (it.waUrl) { %>
-      <form method="post" action="/convidados/<%= it.guest.id %>/lembretes/<%= it.kind %>/whatsapp" target="_blank" class="inline" data-reload-after><%- csrfField %><%- voltar %><button class="btn sm primary" type="submit"><%- icon('whatsapp', 14) %> Enviar pelo WhatsApp</button></form>
-      <% } else { %><button class="btn sm" type="button" data-copy="<%= it.text %>">Copiar mensagem</button><% } %>
-      <form method="post" action="/convidados/<%= it.guest.id %>/lembretes/<%= it.kind %>/enviado" class="inline"><%- csrfField %><%- voltar %><button class="link small" type="submit">Já enviei</button></form>
-    </div>
-    <% if (!it.waUrl) { %><p class="small muted">Sem WhatsApp no cadastro de <%= fmt.firstName(it.guest.name) %>: copie e mande por onde vocês conversam.</p><% } %>
-    <% } %>
+    <% if (canSend) { %><%- include('../partials/reminder-actions', { it: it, guestId: it.guest.id, guestName: it.guest.name, voltar: '/notificacoes/lembretes' }) %><% } %>
   </article>
   <% }) %>
 </section>
@@ -58,12 +46,18 @@
 </section>
 
 <section class="stack top-gap">
-  <h2>Enviados nos últimos 7 dias</h2>
+  <h2>Já enviados</h2>
+  <p class="small muted">De quem ainda vai gravar. Dá para reenviar a mensagem se o convidado não respondeu.</p>
   <% if (!q.sent.length) { %><p class="muted small">Nada enviado ainda.</p><% } else { %>
   <ul class="plain reminder-sent">
     <% q.sent.forEach(function (it) { %>
-    <li><a href="/convidados/<%= it.guest.id %>#lembretes"><%= it.guest.name %></a> <span class="small muted">· <%= it.label.toLowerCase() %></span>
-      <span class="handle muted"> · <%= fmt.formatDateTime(it.sentAt) %><%= it.sentBy ? ' · ' + it.sentBy : '' %></span></li>
+    <li>
+      <div class="row spread">
+        <span><a href="/convidados/<%= it.guest.id %>#lembretes"><%= it.guest.name %></a> <span class="small muted">· <%= it.label.toLowerCase() %></span>
+          <span class="handle muted"> · <%= it.sendCount > 1 ? it.sendCount + '× · último ' : '' %><%= fmt.formatDateTime(it.sentAt) %><%= it.sentBy ? ' · ' + it.sentBy : '' %></span></span>
+        <% if (canSend) { %><%- include('../partials/reminder-actions', { it: it, guestId: it.guest.id, guestName: it.guest.name, voltar: '/notificacoes/lembretes' }) %><% } %>
+      </div>
+    </li>
     <% }) %>
   </ul>
   <% } %>
