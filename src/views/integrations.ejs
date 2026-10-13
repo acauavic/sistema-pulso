@@ -60,6 +60,8 @@
       </li>
       <% }) %>
     </ul>
+    <label class="check"><input type="checkbox" name="invite" value="on" <%= inviteOn ? 'checked' : '' %>> Enviar o convite da gravação ao e-mail do convidado</label>
+    <p class="small muted">O convidado recebe um e-mail com o convite (Gmail, Outlook e Apple Calendário mostram "Adicionar"). Remarcou, vai a nova data; cancelou, vai o aviso. Quem já está agendado hoje <strong>não</strong> recebe e-mail: só os próximos agendamentos e as remarcações. Precisa do e-mail no cadastro do convidado.</p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>

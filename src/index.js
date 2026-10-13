@@ -22,6 +22,7 @@ function registerRoutines() {
   scheduler.every('tarefas-vencendo', 15 * 60_000, () => require('./services/tasks').dueTick(), { delayMs: 20_000 });
   scheduler.every('lembretes', 5 * 60_000, () => require('./services/reminders').tick(), { delayMs: 30_000 });
   scheduler.every('google-agenda', 60_000, () => require('./services/googleCalendar').tick(), { delayMs: 40_000 });
+  scheduler.every('convite-agenda', 60_000, () => require('./services/calendarInvites').tick(), { delayMs: 50_000 });
   scheduler.every('automacoes', 5 * 60_000, () => require('./services/social').runRules(), { delayMs: 60_000 });
   scheduler.every('financeiro', 3600_000, () => require('./services/finance').tick(), { delayMs: 45_000 });
   scheduler.every('limpeza', 6 * 3600_000, async () => {

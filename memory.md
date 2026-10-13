@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Convite por e-mail (1.4.0)**: Google não convida pessoas com conta de serviço (precisaria de delegação de domínio), então `services/calendarInvites.js` manda e-mail da marca com `.ics` (`icalEvent` do nodemailer; REQUEST/CANCEL, UID `gravacao-<id>@podcastpulso.com`, SEQUENCE sobe a cada remarcação). Setting `gcal_invite` (padrão desligado); ao ligar, `seed()` registra os já agendados sem enviar (pedido do usuário). Tabela `guest_cal_invites` sem FK. Rotina `convite-agenda` + `kickOnWrite`.
+
 - **Google Agenda (1.3.0)**: conta de serviço + JWT RS256 por `crypto`; `services/googleCalendar.js` reaproveita `calendar.events()` (todos os tipos, 240 dias) e envia só os tipos ligados em Integrações (`app_settings.gcal_types`; só gravação por padrão; duração por tipo com horário: gravação/lembrete/post). Id do evento = `pulso`+hex(chave do item); tabela `gcal_events` (chave, tipo, dia, hash; sem FK). Remove quando o item some (só se o dia ainda não passou) ou o tipo é desligado; feito/gravado fica. `kickOnWrite` (middleware em todo POST bem-sucedido, debounce 3 s) + rotina a cada 1 min. Convidar pessoas por e-mail não (conta de serviço).
 
 - **Versões e Novidades (1.1.0)**: `package.json` + `src/releases.js` (topo = versão no ar; teste confere). `/novidades` lista o histórico e marca como visto; `users.release_seen` (migração 030) faz o aviso "Sistema atualizado" aparecer uma vez por versão e por pessoa (`partials/foot.ejs`, dispensa em `POST /novidades/visto`). Versão no rodapé do menu. Regra de lançar em CLAUDE.md/AGENTS.md.

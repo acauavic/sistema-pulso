@@ -47,9 +47,9 @@ function layout({ title, bodyHtml, button, footer }) {
 // Caixa de saída do modo MAIL_DRY_RUN (útil em dev e nos testes).
 const outbox = [];
 
-async function sendMail({ to, subject, html, text, replyTo }) {
+async function sendMail({ to, subject, html, text, replyTo, icalEvent }) {
   if (config.mailDryRun) {
-    outbox.push({ to, subject, html, replyTo });
+    outbox.push({ to, subject, html, replyTo, icalEvent });
     console.log(`[mail:dry-run] para=${to} assunto="${subject}"`);
     return `dry-run-${outbox.length}`;
   }
@@ -59,6 +59,7 @@ async function sendMail({ to, subject, html, text, replyTo }) {
     replyTo,
     subject,
     html,
+    icalEvent,
     text: text || html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
   });
   return info.messageId;
@@ -126,6 +127,23 @@ async function sendRsvpNotice({ to, guestName, accepted, message, url }) {
   });
 }
 
+// Convite de calendário da gravação (REQUEST) ou cancelamento (CANCEL), com o .ics no corpo para o e-mail mostrar "Adicionar ao calendário".
+async function sendCalendarInvite({ to, guestName, whenLabel, address, method, ics, update }) {
+  const cancel = method === 'CANCEL';
+  const first = String(guestName || '').split(/\s+/)[0] || 'tudo bem';
+  const body = cancel
+    ? `<p>Olá, ${esc(first)}. A gravação do dia <strong>${esc(whenLabel)}</strong> no ${esc(config.podcastName)} foi cancelada. O evento sai do seu calendário. Se quiser combinar outra data, é só responder esta mensagem.</p>`
+    : `<p>Olá, ${esc(first)}. ${update ? 'A data da sua gravação mudou.' : 'Sua gravação no ' + esc(config.podcastName) + ' está marcada.'}</p>
+<p style="font-family:${MONO};font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:16px 0 4px">${esc(whenLabel)}</p>
+${address ? `<p style="margin:0 0 16px">${esc(address)}</p>` : ''}
+<p>O convite está neste e-mail: use "Sim" ou "Adicionar ao calendário" para guardar a data${update ? ' (ele atualiza o evento anterior)' : ''}. Qualquer dúvida, é só responder esta mensagem. Obrigado por sentar à mesa.</p>`;
+  return sendMail({
+    to, subject: cancel ? `Gravação cancelada: ${whenLabel}` : `${update ? 'Nova data' : 'Convite'}: gravação no ${config.podcastName}, ${whenLabel}`,
+    html: layout({ title: cancel ? 'Gravação cancelada' : (update ? 'A data da gravação mudou' : 'Sua gravação está marcada'), bodyHtml: body }),
+    icalEvent: { method, content: ics, filename: 'convite-pulso.ics' },
+  });
+}
+
 async function sendSponsorNotice({ to, title, text, url }) {
   return sendMail({
     to,
@@ -143,4 +161,4 @@ async function sendNotification({ to, title, text, url }) {
   });
 }
 
-module.exports = { sendNotification, sendSponsorNotice, outbox, sendMail, verifyMail, sendUserInvite, sendPasswordReset, sendGuestInvite, sendRsvpNotice };
+module.exports = { sendCalendarInvite, sendNotification, sendSponsorNotice, outbox, sendMail, verifyMail, sendUserInvite, sendPasswordReset, sendGuestInvite, sendRsvpNotice };

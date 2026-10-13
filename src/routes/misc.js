@@ -45,6 +45,7 @@ router.get('/auditoria', requirePerm('audit.read'), wrap(async (req, res) => {
 router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, res) => {
   res.render('integrations', {
     google: { ...(await require('../services/googleCalendar').status()), types: await require('../services/googleCalendar').settings() },
+    inviteOn: await require('../services/calendarInvites').enabled(),
     calTypes: require('../services/calendar').TYPES, timed: require('../services/googleCalendar').TIMED,
     title: 'Integrações',
     smtp: { ok: config.mailConfigured, dry: config.mailDryRun, host: config.brevo.host, port: config.brevo.port, from: config.brevo.from },
@@ -56,7 +57,8 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
 router.post('/integracoes/google/tipos', requirePerm('integrations.manage'), wrap(async (req, res) => {
   const gcal = require('../services/googleCalendar');
   const saved = await gcal.saveSettings(req.body);
-  await audit(req, 'integracao.google_tipos', 'system', null, { ligados: Object.keys(saved).filter((k) => saved[k].enabled) });
+  await require('../services/calendarInvites').setEnabled(req.body.invite === 'on');
+  await audit(req, 'integracao.google_tipos', 'system', null, { ligados: Object.keys(saved).filter((k) => saved[k].enabled), convite_email: req.body.invite === 'on' });
   gcal.kick();
   await req.flash('ok', 'Pronto: a agenda do Google será ajustada em instantes.');
   res.redirect('/integracoes');

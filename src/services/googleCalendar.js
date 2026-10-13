@@ -194,15 +194,17 @@ async function tick() {
 const kickDelay = { ms: 3000 };
 let kickTimer = null;
 function kick() {
-  if (!config.googleConfigured || kickTimer) return;
+  if (kickTimer) return;
   kickTimer = setTimeout(() => {
     kickTimer = null;
-    require('./scheduler').runOnce('google-agenda', tick).catch((err) => console.error('google-agenda:', err.message));
+    const scheduler = require('./scheduler');
+    scheduler.runOnce('google-agenda', tick).catch((err) => console.error('google-agenda:', err.message));
+    scheduler.runOnce('convite-agenda', () => require('./calendarInvites').tick()).catch((err) => console.error('convite-agenda:', err.message));
   }, kickDelay.ms);
   if (kickTimer.unref) kickTimer.unref();
 }
 function kickOnWrite(req, res, next) {
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && config.googleConfigured) res.on('finish', () => { if (res.statusCode < 400) kick(); });
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) res.on('finish', () => { if (res.statusCode < 400) kick(); });
   next();
 }
 
