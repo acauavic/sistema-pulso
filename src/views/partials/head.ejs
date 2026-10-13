@@ -33,6 +33,7 @@
     <%- navItem('/', 'layout-dashboard', 'Painel', currentPath === '/') %>
     <a href="/notificacoes" class="<%= currentPath.startsWith('/notificacoes') ? 'active' : '' %>" data-nav-notifications><%- icon('bell') %><span>Notificações</span><span class="nav-count" data-unread <%= navCounts && navCounts.unread ? '' : 'hidden' %>><%= navCounts ? navCounts.unread : 0 %></span></a>
     <% if (can('tasks.read')) { %><a href="/tarefas" class="<%= currentPath.startsWith('/tarefas') ? 'active' : '' %>"><%- icon('check-square') %><span>Tarefas</span><% if (navCounts && navCounts.tasks) { %><span class="nav-count muted-count"><%= navCounts.tasks %></span><% } %></a><% } %>
+    <% if (can('calendar.read')) { %><%- navItem('/calendario', 'calendar-days', 'Calendário', currentPath.startsWith('/calendario')) %><% } %>
     <span class="kicker nav-group">Operação</span>
     <% if (can('guests.read')) { %><%- navItem('/convidados', 'mic', 'Convidados', currentPath.startsWith('/convidados')) %><% } %>
     <% if (can('sponsors.read')) { %><%- navItem('/patrocinadores', 'shield-check', 'Patrocinadores', currentPath.startsWith('/patrocinadores')) %><% } %>

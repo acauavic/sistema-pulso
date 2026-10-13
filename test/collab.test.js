@@ -251,6 +251,17 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       assert.equal((await mark('prod', 'xx', 'enviado')).status, 404);
     });
 
+    it('horário com fração de milissegundo (vindo de now() no banco) não derruba os lembretes', async () => {
+      await h.db.query("UPDATE guests SET status = 'agendado', proposed_at = now() + interval '6 days 1 hour' + interval '123 microseconds', scheduled_studio = true, scheduled_hosts = true, scheduled_guest = true WHERE id = $1", [gid]);
+      await production.syncFromGuest(gid, u.gestao.id);
+      await clear();
+      await h.db.query("UPDATE guest_reminders SET due_at = now() - interval '1 minute', notified_at = NULL, sent_at = NULL WHERE guest_id = $1 AND kind = 'd3'", [gid]);
+      await reminders.tick();
+      assert.equal((await h.db.query("SELECT count(*)::int n FROM notifications WHERE type = 'lembrete'")).rows[0].n > 0, true, 'a rotina enxerga o lembrete');
+      await h.db.query("UPDATE guests SET proposed_at = $2 WHERE id = $1", [gid, inDays(5, '16:00')]);
+      await production.syncFromGuest(gid, u.gestao.id);
+    });
+
     it('a rotina não avisa lembrete vencido: se a hora do próximo já passou, o anterior não vale mais', async () => {
       await h.db.query("UPDATE guests SET status = 'agendado', proposed_at = $2, scheduled_studio = true, scheduled_hosts = true, scheduled_guest = true WHERE id = $1", [gid, inDays(2, '16:00')]);
       await production.syncFromGuest(gid, u.gestao.id);

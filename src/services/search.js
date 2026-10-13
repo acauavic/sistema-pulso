@@ -32,6 +32,7 @@ const ACTIONS = [
   { id: 'minhas-tarefas', label: 'Minhas tarefas', keywords: 'tarefas minhas lista', url: '/tarefas', perm: 'tasks.read', group: 'Ir para' },
   { id: 'tarefas-hoje', label: 'Tarefas de hoje', keywords: 'hoje vencendo atrasadas prazo', url: '/tarefas?escopo=hoje', perm: 'tasks.read', group: 'Ir para' },
   { id: 'tarefas-quadro', label: 'Quadro de tarefas', keywords: 'kanban quadro tarefas', url: '/tarefas?visao=quadro', perm: 'tasks.read', group: 'Ir para' },
+  { id: 'calendario', label: 'Calendário: tudo que tem data', keywords: 'calendario agenda prazos datas semana mes gravacoes publicacoes pagamentos vencimentos', url: '/calendario', perm: 'calendar.read', group: 'Ir para' },
   { id: 'tarefas-calendario', label: 'Calendário de tarefas', keywords: 'calendario prazos vencimentos', url: '/tarefas?visao=calendario', perm: 'tasks.read', group: 'Ir para' },
   { id: 'todas-tarefas', label: 'Todas as tarefas', keywords: 'tarefas equipe todas', url: '/tarefas?escopo=todas', perm: 'tasks.read', group: 'Ir para' },
   { id: 'notificacoes', label: 'Notificações', keywords: 'avisos sino alertas', url: '/notificacoes', group: 'Ir para' },

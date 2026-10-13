@@ -45,6 +45,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - **Episódios (linha de produção)**: do convidado agendado até a publicação — material bruto no Backblaze, edição, revisão com comentários na minutagem, análise por IA, capas e posts com editor visual, cortes verticais e publicação nas redes. [Detalhes](#produção-de-episódios).
 - **Convite fixo**: gera link exclusivo + link curto no YOURLS, prévia, envio por e-mail (Brevo). Os botões do
   convite levam ao WhatsApp da produção **passando por um redirecionador próprio que conta os cliques**.
+- **Calendário**: tudo que tem data (tarefas, gravações, lembretes, publicações, contas, parcerias) com filtros e visualizações salvas. [Detalhes](#calendário).
 - **Auditoria** das ações sensíveis e tela de **Integrações** (status + testes seguros).
 
 ## Perfis e permissões
@@ -298,6 +299,16 @@ Na Brevo, o remetente (`BREVO_EMAIL`) e o domínio precisam estar validados (SPF
   - Remarcar refaz o ciclo; sair de Agendado cancela o que não foi enviado. Uma rotina (5 min) dispara os avisos, uma vez cada.
   - **Onde a produtora trabalha**: **Notificações > Lembretes da gravação** (aba ao lado de "Avisos", com o número dos que esperam). A fila mostra "Na hora de mandar" (mensagem pronta, botão do WhatsApp e "Já enviei"), "Próximos" (o próximo de cada convidado agendado) e "Enviados nos últimos 7 dias". A mesma mensagem aparece no card da página do convidado. A rotina não avisa lembrete vencido: se a hora do próximo já passou, o anterior perde a vez.
   - **Gestão > Lembretes da gravação**: endereço do estúdio, horário da manhã (padrão 09:00) e os quatro textos, com `{primeiro_nome}`, `{nome}`, `{dia}`, `{data}`, `{hora}` e `{endereco}`.
+
+## Calendário
+
+Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`src/services/calendar.js`, `src/routes/calendar.js`, `src/views/calendar/`).
+
+- **O que aparece** (cada tipo só para quem tem a permissão do assunto): **Gravações** (convidados em Agendado, Em agendamento "a confirmar" e já gravados; mais gravações só com os hosts), **Lembretes da gravação** (os 4 de cada agendado, com enviado/atrasado), **Tarefas** (pelo vencimento), **Publicação de episódios** (`aired_on`), **Posts nas redes** (agendados), **A receber** e **A pagar** (contas do Financeiro, com valor; só `finance.read`) e **Início e fim de parcerias** (patrocínio ganho ou ativo). Horários e dias em Brasília. Cada evento abre a página do item; o que está feito fica apagado e o que passou do prazo, em vermelho.
+- **Modos**: **Mês** (segunda a domingo; dia cheio vira "+N mais" e leva para a semana), **Semana** e **Lista** (30 dias, só os dias com evento). No celular a grade vira uma coluna só com os dias que têm evento.
+- **Filtros**: tipos (marcar e desmarcar), **responsável** (todos, só os meus ou uma pessoa; contas e outros itens sem responsável ficam de fora quando há responsável escolhido) e **ocultar concluídos**.
+- **Visualizações**: combinações salvas de modo, tipos, responsável e concluídos. Da casa: **Tudo**, **Meu trabalho** (semana, só os meus, sem concluídos), **Produção** e **Dinheiro** (só para quem vê o financeiro). Qualquer pessoa salva as suas ("Salvar esta visualização" aparece quando os filtros não batem com nenhuma); **Gestão e Superadmin** (`calendar.share`) também compartilham com a equipe e apagam as dos outros. A visualização da equipe abre para cada perfil já limitada ao que ele enxerga.
+- O **assistente de IA** consulta o calendário (`calendario`): "o que tenho esta semana?".
 
 ## Alertas no navegador (Web Push)
 

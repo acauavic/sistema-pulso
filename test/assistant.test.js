@@ -126,6 +126,21 @@ describe('assistente de IA', () => {
       assert.deepEqual(only, { sem_acesso_para_o_seu_perfil: ['financeiro'] });
     });
 
+    it('calendario: o que tem data nos próximos dias, só do que o perfil enxerga', async () => {
+      await h.db.query("INSERT INTO tasks (title, kind, status, assignee_id, due_on) VALUES ('Tarefa do calendário', 'geral', 'a_fazer', $1, CURRENT_DATE + 1)", [users.gestao.id]);
+      await h.db.query("INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, status) VALUES ('saida', 'estudio', 'Conta do calendário', 12000, CURRENT_DATE + 2, 'previsto')");
+      const r = await ask('gestao', 'calendario', { dias: 7 });
+      assert.ok(r.eventos.some((e) => e.titulo === 'Tarefa do calendário' && e.tipo === 'Tarefas'));
+      const conta = r.eventos.find((e) => e.titulo === 'Conta do calendário');
+      assert.ok(conta && conta.tipo === 'A pagar' && /R\$/.test(conta.valor), 'gestão vê as contas');
+      assert.equal(r.ver_tudo, '/calendario');
+      const mine = await ask('gestao', 'calendario', { dias: 7, so_meus: true });
+      assert.ok(mine.eventos.some((e) => e.titulo === 'Tarefa do calendário')); assert.ok(!mine.eventos.some((e) => e.titulo === 'Conta do calendário'), 'só os meus: conta não tem responsável');
+      const editor = await ask('editor', 'calendario', { dias: 7, tipos: ['pagar', 'tarefa'] });
+      assert.ok(!editor.eventos.some((e) => e.titulo === 'Conta do calendário'), 'editor de vídeo não vê contas, mesmo pedindo');
+      assert.ok(!editor.tipos_que_o_perfil_ve.includes('pagar'));
+    });
+
     it('lista_convidados: quem está na etapa, só os meus, e etapa inválida', async () => {
       const r = await ask('gestao', 'lista_convidados', { etapa: 'prospect' });
       assert.equal(r.total, 3); assert.equal(r.mostrando, 3);

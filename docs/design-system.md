@@ -68,13 +68,14 @@
 - **Tabela**: cabeçalho mono caixa alta muted; linha com hover `raised`; colunas de data/número em mono; ações à direita.
 - **Navegação**: barra lateral 248px com wordmark "pulso." no topo, itens com ícone Lucide + rótulo, ativo = fundo `raised` + ícone lime; rodapé com avatar/perfil, tema e sair. No mobile vira barra superior com menu.
 - **Foto do convidado**: moldura única **4:3** (raio 6), a mesma na página da plateia, no media kit, no portal do patrocinador e no painel (`.guest-photo`, `.cal-photo`, `.confirmed-avatar`). Nada de círculo para foto de convidado; círculo com iniciais só quando não há foto. O envio passa pelo recorte (`cropper.js`), que entrega 1200×900.
+- **Calendário geral**: evento = linha de uma linha (ícone Lucide do tipo + hora mono + título); cor só por estado: **gravação** em plum (`--st-agendado-*`), **lembrete** em âmbar, **atrasado** em vermelho, **concluído** apagado e riscado, **a confirmar** em tracejado; o resto, neutro (`raised`). Hoje = o único lime da grade. Visualizações = chips arredondados; "Salvar esta visualização" é o chip tracejado. No celular a grade vira lista dos dias com evento.
 - **Quadro (Kanban)**: coluna = `surface` com chip da etapa + contagem mono; card = `raised`, nome em display, meta em mono 10px.
 
 ## Telas de referência (no HTML original)
 
 - A) Painel da equipe (escuro) — saudação "Bom dia, Nome." + semana, KPIs, lista de episódios, próximas gravações, patrocínio ativo.
 - B) Gestão de episódios — quadro (claro). C) Portal do patrocinador (escuro + plum). D) Portal do convidado (mobile, claro). E) Produção no estúdio (mobile, escuro).
-- Módulos de navegação previstos: Painel · Episódios · Convidados · Gravações · Cortes e distribuição · Métricas · Patrocinadores · Financeiro e contratos · Configurações. **Hoje o sistema implementa Painel, Tarefas, Convidados, Patrocinadores, Episódios (produção, capas e posts, cortes), Social (publicações, ideias, insights e automações), Financeiro (contas, custos automáticos e estoque) e o Painel de gestão** (Usuários, Auditoria, Integrações); os demais módulos seguem este guia quando forem construídos.
+- Módulos de navegação previstos: Painel · Episódios · Convidados · Gravações · Cortes e distribuição · Métricas · Patrocinadores · Financeiro e contratos · Configurações. **Hoje o sistema implementa Painel, Tarefas, Calendário (tudo que tem data), Convidados, Patrocinadores, Episódios (produção, capas e posts, cortes), Social (publicações, ideias, insights e automações), Financeiro (contas, custos automáticos e estoque) e o Painel de gestão** (Usuários, Auditoria, Integrações); os demais módulos seguem este guia quando forem construídos.
 
 ## Checklist ao criar/alterar UI
 

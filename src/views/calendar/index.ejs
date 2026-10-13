@@ -1,0 +1,113 @@
+<%- include('../partials/head') %>
+<% var meta = Object.fromEntries(types.map(function (t) { return [t.key, t]; }));
+   ['receber', 'pagar', 'gravacao', 'lembrete', 'tarefa', 'episodio', 'post', 'patrocinio'].forEach(function (k) { if (!meta[k]) meta[k] = { icon: 'calendar' }; });
+   var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+   var MODE_ICON = { mes: 'calendar', semana: 'columns-3', lista: 'list' };
+   var dow = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']; %>
+<div class="page-head">
+  <div><span class="kicker">Tudo que tem data</span><h1>Calendário</h1></div>
+  <div class="seg" role="group" aria-label="Modo de exibição">
+    <% Object.keys(modes).forEach(function (m) { %><a class="<%= cfg.visao === m ? 'on' : '' %>" href="<%= href({ visao: m }) %>"><%- icon(MODE_ICON[m]) %> <%= modes[m] %></a><% }) %>
+  </div>
+</div>
+
+<nav class="cal-views" aria-label="Visualizações">
+  <% views.forEach(function (v) { %>
+  <a class="cal-chip <%= active && active.key === v.key ? 'on' : '' %>" href="<%= viewHref(v) %>" title="<%= v.hint %>"><%= v.name %><% if (v.kind === 'equipe') { %> <span class="mono small muted">equipe</span><% } %></a>
+  <% }) %>
+  <% if (!active) { %><button class="cal-chip save" type="button" data-modal-open="modal-salvar-visao"><%- icon('bookmark', 14) %> Salvar esta visualização</button><% } %>
+</nav>
+
+<form method="get" action="/calendario" class="cal-filters" aria-label="Filtros do calendário">
+  <input type="hidden" name="f" value="1"><input type="hidden" name="visao" value="<%= cfg.visao %>"><input type="hidden" name="data" value="<%= cfg.data %>">
+  <div class="cal-types">
+    <% types.forEach(function (t) { %>
+    <label class="cal-check"><input type="checkbox" name="tipos" value="<%= t.key %>" <%= cfg.tipos.indexOf(t.key) >= 0 ? 'checked' : '' %> data-autosubmit><span><%- icon(t.icon, 14) %> <%= t.label %></span></label>
+    <% }) %>
+  </div>
+  <label class="cal-resp">Responsável
+    <select name="resp" data-autosubmit>
+      <option value="todos" <%= cfg.resp === 'todos' ? 'selected' : '' %>>Todos</option>
+      <option value="eu" <%= cfg.resp === 'eu' ? 'selected' : '' %>>Só os meus</option>
+      <% people.forEach(function (p) { if (String(p.id) === String(currentUser.id)) return; %><option value="<%= p.id %>" <%= cfg.resp === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+    </select>
+  </label>
+  <label class="check"><input type="checkbox" name="ocultar" value="1" <%= cfg.ocultar ? 'checked' : '' %> data-autosubmit> Ocultar concluídos</label>
+  <noscript><button class="btn sm" type="submit">Aplicar</button></noscript>
+</form>
+<% if (cfg.owner) { %><p class="small muted">Com um responsável escolhido, contas a pagar e a receber ficam de fora: elas não têm responsável.</p><% } %>
+
+<div class="cal-head">
+  <a class="btn sm" href="<%= href({ data: win.prev }) %>" aria-label="Período anterior"><%- icon('chevron-left') %></a>
+  <h2 class="cal-title"><%= win.label %></h2>
+  <a class="btn sm" href="<%= href({ data: win.next }) %>" aria-label="Próximo período"><%- icon('chevron-right') %></a>
+  <a class="btn sm ghost" href="<%= href({ data: today }) %>">Hoje</a>
+  <span class="mono small muted cal-count"><%= list.length %> evento<%= list.length === 1 ? '' : 's' %></span>
+</div>
+
+<% if (!cfg.tipos.length) { %>
+<div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum tipo escolhido</strong><span>Marque o que você quer ver: tarefas, gravações, publicações, contas…</span></div>
+
+<% } else if (cfg.visao === 'mes') { %>
+<div class="calendar cal-month" role="grid" aria-label="Eventos por dia">
+  <% dow.forEach(function (d) { %><div class="cal-dow" role="columnheader"><%= d %></div><% }) %>
+  <% win.weeks.forEach(function (w) { w.forEach(function (d) { var evs = byDay[d.iso] || []; %>
+  <div class="cal-day <%= d.inMonth ? '' : 'out' %> <%= d.iso === today ? 'today' : '' %> <%= evs.length ? 'has-ev' : '' %>" role="gridcell">
+    <span class="cal-n mono"><%= d.day %></span><span class="cal-dl mono"><%= dayShort(d.iso) %></span>
+    <% evs.slice(0, 3).forEach(function (e) { %><%- include('_event', { e: e, meta: meta }) %><% }) %>
+    <% if (evs.length > 3) { %><a class="small muted cal-more" href="<%= href({ visao: 'semana', data: d.iso }) %>">+<%= evs.length - 3 %> mais</a><% } %>
+  </div>
+  <% }); }) %>
+</div>
+
+<% } else if (cfg.visao === 'semana') { %>
+<div class="calendar cal-week" role="grid" aria-label="Eventos da semana">
+  <% win.days.forEach(function (iso, i) { %><div class="cal-dow" role="columnheader"><%= dow[i] %> <%= Number(iso.slice(8)) %></div><% }) %>
+  <% win.days.forEach(function (iso) { var evs = byDay[iso] || []; %>
+  <div class="cal-day <%= iso === today ? 'today' : '' %> <%= evs.length ? 'has-ev' : '' %>" role="gridcell">
+    <span class="cal-n mono"><%= Number(iso.slice(8)) %></span><span class="cal-dl mono"><%= dayShort(iso) %></span>
+    <% evs.forEach(function (e) { %><%- include('_event', { e: e, meta: meta }) %><% }) %>
+  </div>
+  <% }); %>
+</div>
+
+<% } else { %>
+<% var days = Object.keys(byDay).sort(); %>
+<% if (!days.length) { %>
+<div class="empty"><%- include('../partials/pulse-line') %><strong>Nada com data neste período</strong><span>Tente outro período ou marque mais tipos nos filtros.</span></div>
+<% } %>
+<% days.forEach(function (iso) { %>
+<section class="cal-list-day <%= iso === today ? 'today' : '' %>">
+  <h3 class="mono"><%= dayLabel(iso) %><% if (iso === today) { %> <span class="badge b-st-publicado">hoje</span><% } %></h3>
+  <ul class="plain">
+    <% byDay[iso].forEach(function (e) { %>
+    <li class="<%= e.done ? 'is-done' : '' %> <%= e.late ? 'is-late' : '' %>">
+      <span class="mono cal-li-time"><%= e.time || '—' %></span>
+      <a class="cal-li-main" href="<%= e.url %>"><span class="cal-li-ic"><%- icon(meta[e.type].icon, 14) %></span><span><strong><%= e.title %></strong><% if (e.sub || e.who) { %><span class="small muted"><%= [e.sub, e.who].filter(Boolean).join(' · ') %></span><% } %></span></a>
+      <% if (e.amount) { %><span class="mono cal-li-amt"><%= e.amount %></span><% } %>
+    </li>
+    <% }) %>
+  </ul>
+</section>
+<% }) %>
+<% } %>
+
+<% if (deletable) { %>
+<form method="post" action="/calendario/visualizacoes/<%= deletable.id %>/excluir" class="top-gap" data-confirm="Excluir a visualização “<%= deletable.name %>”?">
+  <%- csrfField %><button class="link small" type="submit">Excluir a visualização “<%= deletable.name %>”</button>
+</form>
+<% } %>
+
+<dialog class="modal" id="modal-salvar-visao" aria-labelledby="m-visao-h">
+  <form method="post" action="/calendario/visualizacoes" class="stack">
+    <%- csrfField %>
+    <input type="hidden" name="visao" value="<%= cfg.visao %>"><input type="hidden" name="resp" value="<%= cfg.resp %>"><% if (cfg.ocultar) { %><input type="hidden" name="ocultar" value="1"><% } %>
+    <% cfg.tipos.forEach(function (k) { %><input type="hidden" name="tipos" value="<%= k %>"><% }) %>
+    <h2 id="m-visao-h">Salvar esta visualização</h2>
+    <p class="small muted">Guarda o modo (<%= modes[cfg.visao].toLowerCase() %>), os tipos marcados<%= cfg.resp === 'eu' ? ', “só os meus”' : '' %><%= cfg.ocultar ? ' e “ocultar concluídos”' : '' %>. Depois é só clicar no nome lá em cima.</p>
+    <label>Nome<input type="text" name="nome" maxlength="40" required placeholder="Ex.: Minha semana"></label>
+    <% if (canShare) { %><label class="check"><input type="checkbox" name="compartilhar" value="1"> Compartilhar com a equipe</label><% } %>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<%- include('../partials/foot') %>

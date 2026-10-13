@@ -209,6 +209,23 @@ const TOOLS = [
     },
   },
   {
+    perm: 'calendar.read',
+    decl: { name: 'calendario', description: 'Tudo que tem data nos próximos dias (ou numa data): tarefas, gravações, lembretes, publicações de episódios, posts, contas a pagar e a receber e parcerias, só do que o perfil enxerga. Use para "o que tenho hoje / esta semana / no mês". de (AAAA-MM-DD, padrão hoje), dias (padrão 7, máx. 45), tipos (lista de: gravacao, lembrete, tarefa, episodio, post, receber, pagar, patrocinio), so_meus (true para só o que é da pessoa).', parameters: { type: 'OBJECT', properties: { de: { type: 'STRING' }, dias: { type: 'NUMBER' }, tipos: { type: 'ARRAY', items: { type: 'STRING' } }, so_meus: { type: 'BOOLEAN' } } } },
+    async run({ de, dias = 7, tipos, so_meus: soMeus = false }, user) {
+      const cal = require('./calendar');
+      const from = cal.isISO(de) ? de : cal.todayISO();
+      const span = Math.min(45, Math.max(1, Number(dias) || 7));
+      const allowed = cal.allowedTypes(user).map((t) => t.key);
+      const want = Array.isArray(tipos) && tipos.length ? tipos.filter((k) => allowed.includes(k)) : allowed;
+      const list = await cal.events({ user, from, to: cal.addDays(from, span - 1), types: want, owner: soMeus ? user.id : null });
+      return {
+        periodo: `${from} a ${cal.addDays(from, span - 1)}`, total: list.length, tipos_que_o_perfil_ve: allowed,
+        eventos: list.slice(0, 40).map((e) => ({ dia: cal.dayShort(e.day), hora: e.time || undefined, tipo: cal.TYPE_BY_KEY[e.type].label, titulo: e.title, detalhe: e.sub || undefined, responsavel: e.who || undefined, valor: e.amount || undefined, estado: e.done ? 'concluído' : e.late ? 'atrasado' : e.tentative ? 'a confirmar' : undefined, link: e.url })),
+        ver_tudo: '/calendario',
+      };
+    },
+  },
+  {
     perm: 'guests.read',
     decl: { name: 'lista_convidados', description: 'Lista os convidados de uma etapa do CRM (nomes, responsável, gravação). Use depois de "numeros" quando a pessoa quiser ver quem são. responsavel: "eu" ou parte do nome de quem cuida.', parameters: { type: 'OBJECT', properties: { etapa: { type: 'STRING', enum: C.GUEST_STATUSES.map((s) => s.key) }, responsavel: { type: 'STRING' }, limite: { type: 'NUMBER' } }, required: ['etapa'] } },
     async run({ etapa, responsavel, limite = 20 }, user) {
@@ -293,6 +310,7 @@ function systemPrompt(user, page) {
     '- Social: publicações, novo post (a produtora pede e a gestão aprova), ideias por episódio, insights e automações de comentários e directs. Patrocinador: Prospecção, Em negociação, Ganho (formulário de cadastro), Ativo (portal e entregas). Tarefas têm lista, quadro e calendário. Plateia: página pública de inscrição, com agenda gerada dos convidados agendados.',
     '- Alertas: cada pessoa liga os alertas do navegador em Notificações > Avisos > Alertas neste aparelho (no iPhone, só com o painel na Tela de Início).',
     guide.promptSection(user.role),
+    'Calendário (menu Calendário): reúne tudo que tem data, com filtros por tipo e por responsável e visualizações salvas (pessoais ou da equipe). Para "o que tenho hoje, esta semana ou neste mês", use a ferramenta calendario e cite o link /calendario.',
     'Números: para "quantos", "quanto está parado", "como está o funil", use a ferramenta numeros (e lista_convidados para dizer quem são). Cite o número exato que veio, com o link. Se o assunto aparecer em sem_acesso_para_o_seu_perfil, diga que o perfil da pessoa não vê isso e quem vê.',
     'Cadastro: se a pessoa pedir para cadastrar um convidado, use criar_convidado. Nome, Instagram e perfil são obrigatórios: pergunte o que faltar antes de chamar. Depois confirme o que foi criado e diga o próximo passo.',
     'Para criar tarefa, use criar_tarefa apenas quando a pessoa pedir; confirme o que foi criado. Você só cria tarefas e convidados novos (em Prospecção). Não muda etapas, não publica, não edita e não apaga nada: explique onde a pessoa faz isso no painel, pelo perfil dela.',

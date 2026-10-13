@@ -34,6 +34,8 @@ const ACTIONS = {
   'stock.write': { text: 'cadastrar itens e ajustar o estoque', where: 'Financeiro > Estoque' },
   'audience.read': { text: 'ver as inscrições da plateia e atender os pedidos', where: 'Plateia' },
   'audience.manage': { text: 'ajustar a página da plateia: preço, WhatsApp, local, imagens e rastreamento', where: 'Plateia > Ajustes' },
+  'calendar.read': { text: 'ver o calendário com tudo que tem data (tarefas, gravações, lembretes, publicações, contas e parcerias, conforme o que o perfil enxerga) e salvar visualizações próprias', where: 'Calendário' },
+  'calendar.share': { text: 'compartilhar uma visualização do calendário com a equipe e apagar as dos outros', where: 'Calendário > Salvar visualização' },
   'tasks.read': { text: 'ver tarefas', where: 'Tarefas' },
   'tasks.write': { text: 'criar tarefas e mexer nas que criou ou que são dela', where: 'Tarefas' },
   'tasks.manage': { text: 'mexer em qualquer tarefa e reatribuir', where: 'Tarefas' },

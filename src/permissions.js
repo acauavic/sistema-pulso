@@ -46,6 +46,9 @@ const PERMISSIONS = {
   'audience.read': ['superadmin', 'gestao', 'produtora'], // ver inscrições, resultados e atender
   'audience.manage': ['superadmin', 'gestao'],            // preço, WhatsApp, local, imagens e rastreamento da página
   // tarefas e colaboração (todo mundo trabalha com as próprias; a gestão mexe nas de todos)
+  // calendário: tudo que tem data (cada tipo de evento só aparece para quem tem a permissão do assunto)
+  'calendar.read': ALL,
+  'calendar.share': ['superadmin', 'gestao'], // compartilhar uma visualização com a equipe e apagar as dos outros
   'tasks.read': ALL,
   'tasks.write': ALL,                                   // criar e mexer nas tarefas que criou ou que são suas
   'tasks.manage': ['superadmin', 'gestao', 'produtora'], // mexer em qualquer tarefa e reatribuir
