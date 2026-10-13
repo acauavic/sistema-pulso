@@ -90,6 +90,35 @@
     setTimeout(() => window.location.reload(), 1200);
   }));
 
+  // "Marcar todos" / "Desmarcar todos" dentro de um painel de filtros
+  document.querySelectorAll('[data-check-all], [data-check-none]').forEach((b) => b.addEventListener('click', () => {
+    const name = b.dataset.checkAll || b.dataset.checkNone;
+    b.closest('form').querySelectorAll(`input[type=checkbox][name="${name}"]`).forEach((c) => { c.checked = b.hasAttribute('data-check-all'); });
+  }));
+  // painéis que abrem sob um botão (<details data-popover>): fecham ao clicar fora ou com Esc
+  const popovers = () => document.querySelectorAll('details[data-popover][open]');
+  document.addEventListener('click', (e) => popovers().forEach((d) => { if (!d.contains(e.target)) d.open = false; }));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') popovers().forEach((d) => { d.open = false; d.querySelector('summary')?.focus(); }); });
+
+  // menu lateral recolhível: a escolha fica guardada neste navegador (theme.js aplica antes da pintura)
+  document.querySelectorAll('[data-sidebar-collapse]').forEach((btn) => {
+    const root = document.documentElement;
+    const sync = () => {
+      const collapsed = root.dataset.sidebar === 'collapsed';
+      const label = collapsed ? 'Expandir o menu' : 'Recolher o menu';
+      btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false'); btn.setAttribute('aria-label', label); btn.title = label;
+    };
+    btn.addEventListener('click', () => {
+      const collapsed = root.dataset.sidebar === 'collapsed';
+      if (collapsed) delete root.dataset.sidebar; else root.dataset.sidebar = 'collapsed';
+      try { localStorage.setItem('pulso-sidebar', collapsed ? 'open' : 'collapsed'); } catch { /* sem storage: vale só nesta página */ }
+      sync();
+    });
+    sync();
+  });
+  // com o menu recolhido só aparecem os ícones: o nome vai na dica de cada item
+  document.querySelectorAll('.nav a').forEach((a) => { if (!a.title) { const t = a.querySelector('span:not(.nav-count)'); if (t) a.title = t.textContent.trim(); } });
+
   // motivo da perda: "Outros" pede a descrição (formulário do convidado e janela "Marcar como perdido")
   document.querySelectorAll('[data-loss-select], [data-loss-radio]').forEach((input) => {
     const form = input.form;

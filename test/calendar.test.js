@@ -27,6 +27,8 @@ describe('calendário: tudo que tem data, filtros por perfil e visualizações',
     await q("INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, status) VALUES ('entrada', 'plateia', 'Plateia do Zé', 19700, '2030-03-10', 'previsto'), ('saida', 'estudio', 'Estúdio sinal', 35000, '2030-03-10', 'previsto')");
     await q("INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, status, cancel_reason) VALUES ('saida', 'estudio', 'Conta cancelada', 100, '2030-03-10', 'cancelado', 'usuario')");
     await q("INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, status, paid_on) VALUES ('saida', 'estudio', 'Conta paga', 5000, '2030-03-11', 'pago', '2030-03-11')");
+    const { rows: [pe] } = await q("INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, status, source) VALUES ('entrada', 'plateia', 'Plateia: Maria Plateia', 19700, '2030-03-14', 'previsto', 'plateia') RETURNING id");
+    await q("INSERT INTO plateia_leads (ref, guest_name, name, phone, guest_id, amount_cents, entry_id, status) VALUES ('ref-cal', 'Dra. Cal', 'Maria Plateia', '5511999990000', $1, 19700, $2, 'confirmado')", [g.id, pe.id]);
     await q("INSERT INTO sponsors (company, stage, starts_on, ends_on, owner_id) VALUES ('Marca Cal', 'ativo', '2030-03-01', '2030-03-31', $1), ('Marca Fora', 'prospect', '2030-03-02', '2030-03-30', $1)", [u.gestao.id]);
     await q("INSERT INTO episode_publications (episode_id, title, platforms, scheduled_at, status, created_by) VALUES ($1, 'Post Cal', '{instagram,youtube}', '2030-03-18 10:00-03', 'agendado', $2)", [ep.id, u.prod.id]);
   });
@@ -78,28 +80,63 @@ describe('calendário: tudo que tem data, filtros por perfil e visualizações',
 
     it('cada perfil só recebe os tipos do assunto que enxerga', async () => {
       const typesOf = async (user) => [...new Set((await ev(user)).map((e) => e.type))].sort();
-      assert.deepEqual(await typesOf(u.admin), ['episodio', 'gravacao', 'lembrete', 'patrocinio', 'pagar', 'post', 'receber', 'tarefa'].sort());
-      assert.deepEqual(await typesOf(u.gestao), ['episodio', 'gravacao', 'lembrete', 'patrocinio', 'pagar', 'post', 'receber', 'tarefa'].sort());
+      assert.deepEqual(await typesOf(u.admin), ['cobranca', 'episodio', 'gravacao', 'lembrete', 'patrocinio', 'pagar', 'post', 'receber', 'tarefa'].sort());
+      assert.deepEqual(await typesOf(u.gestao), ['cobranca', 'episodio', 'gravacao', 'lembrete', 'patrocinio', 'pagar', 'post', 'receber', 'tarefa'].sort());
       assert.ok(!(await typesOf(u.prod)).some((t) => ['pagar', 'receber'].includes(t)), 'produtora não vê o financeiro');
-      assert.ok((await typesOf(u.prod)).includes('post'));
+      assert.ok((await typesOf(u.prod)).includes('post') && (await typesOf(u.prod)).includes('cobranca'), 'mas cobra a plateia');
       const editor = await typesOf(u.editor);
-      assert.ok(!editor.some((t) => ['pagar', 'receber', 'post'].includes(t)), 'editor de vídeo não vê financeiro nem redes');
+      assert.ok(!editor.some((t) => ['pagar', 'receber', 'post', 'cobranca'].includes(t)), 'editor de vídeo não vê financeiro, redes nem plateia');
       assert.deepEqual(editor, ['episodio', 'gravacao', 'lembrete', 'patrocinio', 'tarefa']);
       const forced = await ev(u.editor, { types: ['pagar', 'receber', 'post', 'tarefa'] });
       assert.deepEqual([...new Set(forced.map((e) => e.type))], ['tarefa'], 'pedir um tipo proibido não adianta');
     });
 
-    it('filtros: tipos escolhidos, só os meus (contas não têm responsável) e ocultar concluídos', async () => {
+    it('filtros: tipos escolhidos e ocultar concluídos', async () => {
       assert.deepEqual([...new Set((await ev(u.admin, { types: ['gravacao', 'tarefa'] })).map((e) => e.type))].sort(), ['gravacao', 'tarefa']);
-      const mine = await ev(u.prod, { owner: u.prod.id });
-      assert.ok(mine.length && mine.every((e) => e.whoId === u.prod.id), 'só o que é da Paula');
-      assert.ok(!titles(mine).includes('Tarefa do Edu')); assert.ok(titles(mine).includes('Tarefa da Paula'));
-      const adminMine = await ev(u.admin, { owner: u.gestao.id });
-      assert.ok(!adminMine.some((e) => ['pagar', 'receber'].includes(e.type)), 'com responsável escolhido, contas ficam de fora');
-      assert.deepEqual(titles(adminMine, 'patrocinio').sort(), ['Fim da parceria: Marca Cal', 'Início da parceria: Marca Cal']);
       const open = await ev(u.admin, { hideDone: true });
       assert.ok(!titles(open).includes('Tarefa feita') && !titles(open).includes('Conta paga'));
       assert.ok(titles(open).includes('Tarefa da Paula'));
+    });
+
+    it('"só os meus" = o que é da pessoa + o que é do perfil dela: gestão grava, paga e recebe; produtora lembra e cobra', async () => {
+      const all = (t) => t.map((e) => `${e.type}:${e.title}`);
+      // gestão: todas as gravações (de qualquer convidado), contas a pagar e a receber; não os lembretes nem as cobranças da produtora
+      const g = all(await ev(u.gestao, { owner: u.gestao.id }));
+      for (const t of ['gravacao:Gravação: Dra. Cal', 'gravacao:Gravação: Noite Cal', 'gravacao:Gravação: Em Ag', 'pagar:Estúdio sinal', 'receber:Plateia do Zé', 'receber:Plateia: Maria Plateia']) assert.ok(g.includes(t), `gestão deveria ver ${t}`);
+      assert.ok(!g.some((x) => x.startsWith('lembrete:') || x.startsWith('cobranca:')), 'lembretes e cobranças não são do perfil da gestão');
+      assert.ok(!g.includes('tarefa:Tarefa da Paula') && !g.includes('tarefa:Tarefa do Edu'), 'tarefa dos outros não entra');
+      assert.ok(g.includes('patrocinio:Fim da parceria: Marca Cal'), 'o que está no nome da pessoa também entra (parceria da gestão)');
+      // o superadmin tem os mesmos deveres da gestão
+      assert.ok(all(await ev(u.admin, { owner: u.admin.id })).includes('pagar:Estúdio sinal'));
+      // produtora: todos os lembretes e cobranças + o que é dela; nada de dinheiro e só as gravações dos convidados dela
+      const p = all(await ev(u.prod, { owner: u.prod.id }));
+      assert.equal(p.filter((x) => x.startsWith('lembrete:')).length, 4);
+      assert.ok(p.includes('cobranca:Cobrar Maria Plateia'));
+      assert.ok(p.includes('gravacao:Gravação: Dra. Cal') && p.includes('gravacao:Gravação: Noite Cal') && !p.includes('gravacao:Gravação: Em Ag'), 'gravação só dos convidados dela');
+      assert.ok(p.includes('tarefa:Tarefa da Paula') && !p.includes('tarefa:Tarefa do Edu'));
+      assert.ok(!p.some((x) => x.startsWith('pagar:') || x.startsWith('receber:')));
+      // editor de vídeo não tem deveres de perfil: só o que está no nome dele
+      const e = all(await ev(u.editor, { owner: u.editor.id }));
+      assert.deepEqual(e.sort(), ['episodio:EP.777 Episódio Cal', 'tarefa:Tarefa do Edu']);
+      // escolher uma pessoa vale o perfil dela
+      const viaGestao = all(await ev(u.admin, { owner: u.gestao.id }));
+      assert.ok(viaGestao.includes('pagar:Estúdio sinal') && viaGestao.includes('gravacao:Gravação: Dra. Cal'));
+      const viaProd = all(await ev(u.admin, { owner: u.prod.id }));
+      assert.ok(viaProd.includes('cobranca:Cobrar Maria Plateia') && viaProd.includes('lembrete:' + viaProd.find((x) => x.startsWith('lembrete:')).slice(9)) && !viaProd.some((x) => x.startsWith('pagar:')));
+    });
+
+    it('a cobrança da plateia aparece uma vez: como cobrança, ou como a receber se o tipo cobrança estiver desmarcado', async () => {
+      const both = await ev(u.admin);
+      assert.deepEqual(both.filter((e) => /Maria Plateia/.test(e.title)).map((e) => e.type), ['cobranca']);
+      const c = both.find((e) => e.type === 'cobranca');
+      assert.deepEqual([c.title, c.day, c.done, c.sub], ['Cobrar Maria Plateia', '2030-03-14', false, 'plateia']);
+      assert.equal(c.amount.replace(/\s/g, ' '), '+R$ 197,00'); assert.match(c.url, /^\/plateia\/painel\?convidado=\d+$/);
+      const onlyReceber = await ev(u.admin, { types: ['receber'] });
+      assert.deepEqual(onlyReceber.map((e) => e.title).sort(), ['Plateia do Zé', 'Plateia: Maria Plateia']);
+      assert.deepEqual((await ev(u.prod, { types: ['cobranca', 'receber'] })).map((e) => e.type), ['cobranca'], 'a produtora cobra, mas não vê o financeiro');
+      await h.db.query("UPDATE fin_entries SET status = 'pago', paid_on = '2030-03-14' WHERE description = 'Plateia: Maria Plateia'");
+      assert.equal((await ev(u.prod, { types: ['cobranca'] }))[0].done, true, 'recebeu: cobrança concluída');
+      await h.db.query("UPDATE fin_entries SET status = 'previsto', paid_on = NULL WHERE description = 'Plateia: Maria Plateia'");
     });
 
     it('atrasado: tarefa, conta e lembrete que passaram do dia sem ser feitos', async () => {
@@ -113,6 +150,11 @@ describe('calendário: tudo que tem data, filtros por perfil e visualizações',
   describe('a página', () => {
     it('mês, semana e lista mostram os eventos e respeitam o perfil', async () => {
       const mes = (await as.admin.get('/calendario?f=1&visao=mes&data=2030-03-15&resp=todos&tipos=gravacao&tipos=tarefa&tipos=receber')).text;
+      assert.match(mes, /<details class="cal-filter" data-popover>/, 'os filtros ficam atrás de um botão');
+      assert.match(mes, /<summary class="btn sm">[\s\S]*?Filtros <span class="nav-count">1<\/span>/);
+      assert.match(mes, /<legend>Mostrar<\/legend>/); assert.match(mes, /data-check-all="tipos"/); assert.match(mes, /type="submit">Aplicar</);
+      assert.equal((mes.match(/type="checkbox" name="tipos" value="/g) || []).length, 9, 'um item por tipo que o superadmin enxerga');
+      assert.doesNotMatch((await as.admin.get('/calendario')).text, /Filtros <span class="nav-count">/, 'sem filtro, sem contador');
       assert.match(mes, /Março de 2030/); assert.match(mes, /Gravação: Dra\. Cal/); assert.match(mes, /\+R\$\s197,00/);
       assert.match(mes, /\+1 mais/, 'dia lotado (4 tarefas) mostra 3 e vira "+1 mais"'); assert.match(mes, /href="\/calendario\?f=1&amp;visao=semana[^"]*data=2030-03-25/);
       assert.match(mes, /class="cal-ev ev-gravacao is-tentative"/);
@@ -130,8 +172,14 @@ describe('calendário: tudo que tem data, filtros por perfil e visualizações',
       const r = await as.prod.get('/calendario?data=2030-02-31&visao=banana&v=nao-existe');
       assert.equal(r.status, 200); assert.match(r.text, new RegExp(cal.range('mes', cal.todayISO()).label));
       const mine = (await as.prod.get('/calendario?v=meu')).text;
-      assert.match(mine, /contas a pagar e a receber ficam de fora/);
       assert.match(mine, /class="cal-chip on"[^>]*>Meu trabalho/);
+      assert.match(mine, /“Só os meus” inclui o que é do seu perfil \(Produtora\): Lembretes da gravação, Cobranças da plateia\./);
+      assert.match(mine, /Filtros <span class="nav-count">3<\/span>/, 'o botão conta o que está filtrado: tipos, responsável e concluídos');
+      assert.match(mine, /Só os meus · Sem concluídos/);
+      const gestaoMine = (await as.gestao.get('/calendario?v=meu')).text;
+      assert.match(gestaoMine, /inclui o que é do seu perfil \(Gestão\): Gravações, A receber, A pagar\./);
+      assert.doesNotMatch((await as.editor.get('/calendario?v=meu')).text, /inclui o que é do seu perfil/, 'editor de vídeo não tem deveres de perfil');
+      assert.match((await as.admin.get(`/calendario?f=1&visao=semana&resp=${u.prod.id}&tipos=lembrete`)).text, /Além do que é de Paula Produtora, entra o que é do perfil Produtora: Lembretes da gravação, Cobranças da plateia\./);
       const prodViews = (await as.prod.get('/calendario')).text;
       assert.doesNotMatch(prodViews, />Dinheiro</, 'a visualização Dinheiro some para quem não vê o financeiro');
       assert.match((await as.gestao.get('/calendario')).text, />Dinheiro</);

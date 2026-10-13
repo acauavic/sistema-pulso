@@ -3,5 +3,6 @@
   try {
     var t = localStorage.getItem('pulso-theme');
     if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
-  } catch (e) { /* storage bloqueado: segue no escuro */ }
+    if (localStorage.getItem('pulso-sidebar') === 'collapsed') document.documentElement.dataset.sidebar = 'collapsed'; // menu lateral recolhido
+  } catch (e) { /* storage bloqueado: segue no escuro, menu aberto */ }
 })();

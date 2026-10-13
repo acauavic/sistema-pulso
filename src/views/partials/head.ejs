@@ -26,7 +26,10 @@
      const adminOpen = can('users.read') || can('audit.read') || can('integrations.manage') || can('notifications.manage') || can('routines.manage') || can('search.manage'); %>
 <div class="app">
 <aside class="sidebar" data-sidebar>
-  <a class="wordmark" href="/" aria-label="pulso. — início">pulso<span class="dot">.</span></a>
+  <div class="sidebar-top">
+    <a class="wordmark" href="/" aria-label="pulso. — início"><span class="wm-p">p</span><span class="wm-rest">ulso</span><span class="dot">.</span></a>
+    <button class="icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-label="Recolher o menu" title="Recolher o menu" aria-pressed="false"><%- icon('panel-left', 18) %></button>
+  </div>
   <button class="icon-btn sidebar-toggle" type="button" data-nav-toggle aria-label="Abrir menu"><%- icon('menu', 20) %></button>
   <button class="search-trigger" type="button" data-palette-open aria-label="Buscar (Ctrl+K)"><%- icon('search') %><span>Buscar…</span><kbd>Ctrl K</kbd></button>
   <nav class="nav" aria-label="Principal">

@@ -4,7 +4,7 @@ const db = require('../db/pool');
 const cal = require('../services/calendar');
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
-const { can } = require('../permissions');
+const { can, ROLES } = require('../permissions');
 const { wrap, isIntId } = require('../utils/wrap');
 
 const router = express.Router();
@@ -33,8 +33,21 @@ router.get('/calendario', requirePerm('calendar.read'), wrap(async (req, res) =>
   const byDay = {};
   for (const e of list) (byDay[e.day] = byDay[e.day] || []).push(e);
   const active = views.find((v) => cal.sameConfig(v.config, cfg)) || null;
+  const types = cal.allowedTypes(user);
+  const typeKeys = types.map((t) => t.key);
+  const person = cfg.owner ? people.find((p) => String(p.id) === String(cfg.owner)) : null;
+  const ownerRole = cfg.owner ? (cfg.owner === user.id ? user.role : (await db.query('SELECT role FROM users WHERE id = $1', [cfg.owner])).rows[0]?.role) : null;
+  const duties = (role) => cal.dutiesOf(role).filter((t) => typeKeys.includes(t.key)).map((t) => t.label);
+  const shown = types.filter((t) => cfg.tipos.includes(t.key)).map((t) => t.label);
+  const summary = [
+    cfg.tipos.length === typeKeys.length ? 'Todos os tipos' : !shown.length ? 'Nenhum tipo' : shown.length > 3 ? `${shown.slice(0, 3).join(', ')} e mais ${shown.length - 3}` : shown.join(', '),
+    cfg.resp === 'eu' ? 'Só os meus' : person ? `De ${person.name}` : null, cfg.ocultar ? 'Sem concluídos' : null,
+  ].filter(Boolean).join(' · ');
   res.render('calendar/index', {
-    title: 'Calendário', cfg, win, byDay, list, views, active, people, types: cal.allowedTypes(user), modes: cal.MODES, today: cal.todayISO(),
+    filterCount: (cfg.tipos.length !== typeKeys.length ? 1 : 0) + (cfg.resp !== 'todos' ? 1 : 0) + (cfg.ocultar ? 1 : 0), filterSummary: summary,
+    myDuties: duties(user.role), myRoleLabel: ROLES[user.role].label,
+    ownerInfo: cfg.owner && cfg.owner !== user.id && ownerRole ? { name: person ? person.name : 'essa pessoa', roleLabel: ROLES[ownerRole].label, duties: duties(ownerRole) } : null,
+    title: 'Calendário', cfg, win, byDay, list, views, active, people, types, modes: cal.MODES, today: cal.todayISO(),
     href: hrefFor(cfg), viewHref: (v) => `/calendario?v=${v.key}&data=${cfg.data}`, dayLabel: cal.dayLabel, dayShort: cal.dayShort, canShare: can(user.role, 'calendar.share'),
     deletable: active && active.kind !== 'casa' && (active.ownerId === user.id || can(user.role, 'calendar.share')) ? active : null,
   });

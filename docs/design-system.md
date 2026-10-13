@@ -66,10 +66,11 @@
 - **Métrica**: rótulo mono caixa alta + valor em Space Grotesk 40 + delta mono (▲ lime, ▼ vermelho, neutro muted). `.stat`.
 - **Feedback**: `.flash` com filete lateral (lime ok / vermelho erro). Estado vazio: linha de pulso plana + título + frase útil (`partials/pulse-line.ejs`, classe `.empty`).
 - **Tabela**: cabeçalho mono caixa alta muted; linha com hover `raised`; colunas de data/número em mono; ações à direita.
+- **Menu recolhível**: no computador o botão do topo leva a barra lateral a **76px, só ícones** (nome na dica, "p." no lugar do logo, contadores viram um ponto no canto do ícone); a escolha persiste (`localStorage`). Só a lista de itens rola; rodapé fixo.
 - **Navegação**: barra lateral 248px com wordmark "pulso." no topo, itens com ícone Lucide + rótulo, ativo = fundo `raised` + ícone lime; rodapé com avatar/perfil, tema e sair. No mobile vira barra superior com menu.
 - **Foto do convidado**: moldura única **4:3** (raio 6), a mesma na página da plateia, no media kit, no portal do patrocinador e no painel (`.guest-photo`, `.cal-photo`, `.confirmed-avatar`). Nada de círculo para foto de convidado; círculo com iniciais só quando não há foto. O envio passa pelo recorte (`cropper.js`), que entrega 1200×900.
-- **Calendário geral**: evento = linha de uma linha (ícone Lucide do tipo + hora mono + título); cor só por estado: **gravação** em plum (`--st-agendado-*`), **lembrete** em âmbar, **atrasado** em vermelho, **concluído** apagado e riscado, **a confirmar** em tracejado; o resto, neutro (`raised`). Hoje = o único lime da grade. Visualizações = chips arredondados; "Salvar esta visualização" é o chip tracejado. No celular a grade vira lista dos dias com evento.
-- **Quadro (Kanban)**: coluna = `surface` com chip da etapa + contagem mono; card = `raised`, nome em display, meta em mono 10px.
+- **Calendário geral**: evento = linha de uma linha (ícone Lucide do tipo + hora mono + título); cor só por estado: **gravação** em plum (`--st-agendado-*`), **lembrete** em âmbar, **atrasado** em vermelho, **concluído** apagado e riscado, **a confirmar** em tracejado; o resto, neutro (`raised`). Hoje = o único lime da grade. Os filtros ficam atrás de um botão **Filtros** (contador + resumo) que abre um painel; visualizações = chips arredondados; "Salvar esta visualização" é o chip tracejado. No celular a grade vira lista dos dias com evento.
+- **Quadro (Kanban)**: ocupa a altura da tela; **barra horizontal no pé da tela, grossa e visível**; **cada coluna rola na vertical sozinha**. Coluna = `surface` com chip da etapa + contagem mono; card = `raised`, nome em display, meta em mono 10px.
 
 ## Telas de referência (no HTML original)
 

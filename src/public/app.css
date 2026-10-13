@@ -87,7 +87,7 @@ strong { font-weight: 600; }
 .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 24px; padding: 24px 16px; background: var(--bg); border-right: 1px solid var(--line); }
 .sidebar .wordmark { padding: 0 10px; font-size: 26px; }
 .sidebar .sidebar-toggle { display: none; }
-.nav { display: grid; gap: 2px; align-content: start; flex: 1; }
+.nav { display: grid; gap: 2px; align-content: start; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; } /* em tela baixa só a lista rola; usuário e "Sair" ficam à vista */
 .nav a { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: var(--r-field); color: var(--text-2); font-weight: 500; transition: background var(--t) var(--ease), color var(--t) var(--ease); }
 .nav a:hover { background: var(--raised); color: var(--text); text-decoration: none; }
 .nav a.active { background: var(--raised); color: var(--text); }
@@ -760,3 +760,59 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
 .tabs-wrap > .pane > p.small.muted:first-child { margin: 0 0 16px; }
 .seg + .stat-grid, .row + .stat-grid.top-gap { margin-top: 20px; }
 .conv-list { margin: 0; }
+
+/* ============ menu lateral recolhível (só no computador; no celular o menu já é a barra de cima) ============ */
+.sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sidebar-collapse { padding: 6px; } .sidebar-collapse .icon { transition: transform var(--t) var(--ease); }
+.wordmark .wm-p, .wordmark .wm-rest { display: inline; }
+.app { transition: grid-template-columns var(--t) var(--ease); }
+@media (max-width: 860px) { .sidebar-collapse { display: none; } }
+@media (min-width: 861px) {
+  html[data-sidebar="collapsed"] { --sidebar: 76px; }
+  html[data-sidebar="collapsed"] .sidebar { padding: 20px 10px; }
+  html[data-sidebar="collapsed"] .sidebar-top { flex-direction: column; gap: 10px; }
+  html[data-sidebar="collapsed"] .sidebar .wordmark { padding: 0; }
+  html[data-sidebar="collapsed"] .wordmark .wm-rest { display: none; }
+  html[data-sidebar="collapsed"] .sidebar-collapse .icon { transform: scaleX(-1); }
+  html[data-sidebar="collapsed"] .search-trigger { justify-content: center; padding: 9px 0; }
+  html[data-sidebar="collapsed"] .search-trigger span, html[data-sidebar="collapsed"] .search-trigger kbd { display: none; }
+  html[data-sidebar="collapsed"] .nav a { position: relative; justify-content: center; padding: 10px 0; }
+  html[data-sidebar="collapsed"] .nav a > span:not(.nav-count) { display: none; }
+  html[data-sidebar="collapsed"] .nav a .nav-count { position: absolute; top: 1px; right: 4px; min-width: 16px; margin: 0; padding: 0 4px; font-size: 10px; line-height: 16px; }
+  html[data-sidebar="collapsed"] .nav-group { height: 1px; margin: 10px 8px; padding: 0; overflow: hidden; font-size: 0; background: var(--line); }
+  html[data-sidebar="collapsed"] .who { justify-content: center; padding: 6px 0; } html[data-sidebar="collapsed"] .who-txt { display: none; }
+  html[data-sidebar="collapsed"] .foot-actions { flex-direction: column; align-items: center; padding: 0; }
+  html[data-sidebar="collapsed"] .foot-actions .icon-btn > span:not(.theme-moon):not(.theme-sun) { display: none; }
+}
+
+/* ============ quadros (Kanban): ocupam a altura da tela, a barra horizontal fica no pé da tela e cada coluna rola sozinha ============ */
+.board { scrollbar-gutter: stable; }
+.board::-webkit-scrollbar { height: 14px; width: 14px; }
+.board::-webkit-scrollbar-track { background: var(--surface); border-radius: var(--r-full); }
+.board::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 34%, transparent); border: 3px solid var(--surface); border-radius: var(--r-full); }
+.board::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text) 58%, transparent); }
+.cards::-webkit-scrollbar { width: 10px; }
+.cards::-webkit-scrollbar-track { background: transparent; }
+.cards::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 24%, transparent); border: 2px solid transparent; background-clip: padding-box; border-radius: var(--r-full); }
+.cards::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text) 46%, transparent); background-clip: padding-box; }
+@supports not selector(::-webkit-scrollbar) { .board, .cards { scrollbar-width: auto; scrollbar-color: color-mix(in srgb, var(--text) 40%, transparent) var(--surface); } }
+@media (min-width: 861px) {
+  .main:has(.board) { height: 100vh; height: 100dvh; padding-bottom: 10px; display: flex; flex-direction: column; overflow: hidden; }
+  .main:has(.board) > .container { flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; display: flex; flex-direction: column; }
+  .main:has(.board) .board { flex: 1; min-height: 0; padding-bottom: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); overflow-x: scroll; overflow-y: hidden; }
+  .main:has(.board) .column { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
+  .main:has(.board) .column .cards { flex: 1; min-height: 60px; overflow-y: auto; align-content: start; padding-right: 2px; }
+}
+@media (max-width: 860px) { .board .cards { max-height: 70dvh; overflow-y: auto; } }
+
+/* ============ calendário: botão de filtros com painel ============ */
+.cal-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
+.cal-filter { position: relative; } .cal-filter > summary { list-style: none; cursor: pointer; } .cal-filter > summary::-webkit-details-marker { display: none; }
+.cal-filter[open] > summary { background: var(--raised); border-color: var(--text-2); }
+.cal-filter-panel { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(440px, calc(100vw - 32px)); display: grid; gap: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-card); }
+:root[data-theme="light"] .cal-filter-panel { box-shadow: 0 8px 24px rgba(10, 10, 10, .08); }
+.cal-filter-panel fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; } .cal-filter-panel legend { padding: 0; margin-bottom: 6px; font: 500 11px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.cal-filter-panel .cal-types { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-filter-bulk { display: flex; gap: 12px; }
+.cal-filter-actions { display: flex; align-items: center; gap: 12px; padding-top: 4px; border-top: 1px solid var(--line); }
+.cal-summary { max-width: 100%; }

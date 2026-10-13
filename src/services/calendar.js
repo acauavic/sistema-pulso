@@ -14,6 +14,7 @@ const MAX_PER_TYPE = 500;
 const TYPES = [
   { key: 'gravacao', label: 'Gravações', icon: 'mic', perm: 'guests.read', hasOwner: true },
   { key: 'lembrete', label: 'Lembretes da gravação', icon: 'bell', perm: 'guests.read', hasOwner: true },
+  { key: 'cobranca', label: 'Cobranças da plateia', icon: 'users', perm: 'audience.read', hasOwner: false },
   { key: 'tarefa', label: 'Tarefas', icon: 'check-square', perm: 'tasks.read', hasOwner: true },
   { key: 'episodio', label: 'Publicação de episódios', icon: 'film', perm: 'episodes.read', hasOwner: true },
   { key: 'post', label: 'Posts nas redes', icon: 'share-2', perm: 'social.read', hasOwner: true },
@@ -25,6 +26,14 @@ const TYPE_BY_KEY = Object.fromEntries(TYPES.map((t) => [t.key, t]));
 const MODES = { mes: 'Mês', semana: 'Semana', lista: 'Lista' };
 
 const allowedTypes = (user) => TYPES.filter((t) => can(user.role, t.perm));
+
+// O que é do PERFIL (não de uma pessoa): entra em "só os meus" de quem tem o perfil, mesmo sem responsável cadastrado.
+// Gravar, pagar e receber são da gestão e do superadmin; lembretes da gravação e cobranças da plateia, da produtora.
+const ROLE_DUTIES = {
+  gravacao: ['superadmin', 'gestao'], pagar: ['superadmin', 'gestao'], receber: ['superadmin', 'gestao'],
+  lembrete: ['produtora'], cobranca: ['produtora'],
+};
+const dutiesOf = (role) => TYPES.filter((t) => (ROLE_DUTIES[t.key] || []).includes(role));
 
 // ---------------------------------------------------------------- datas (texto AAAA-MM-DD, sem fuso no meio)
 const todayISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
@@ -140,6 +149,18 @@ const SOURCES = {
     }));
   },
 
+  // Cobranças da plateia: pagamento combinado com quem foi selecionado (a produtora confirma o valor e marca o recebimento)
+  async cobranca({ from, to }, today) {
+    const { rows } = await db.query(
+      `SELECT l.id, l.name, l.guest_id, l.entry_id, e.amount_cents, e.status, to_char(e.due_on, 'YYYY-MM-DD') AS day
+         FROM plateia_leads l JOIN fin_entries e ON e.id = l.entry_id AND e.status <> 'cancelado'
+        WHERE e.due_on BETWEEN $1::date AND $2::date ORDER BY e.due_on, l.id LIMIT ${MAX_PER_TYPE}`, [from, to]);
+    return rows.map((l) => ({
+      type: 'cobranca', id: `cobranca-${l.id}`, entryId: l.entry_id, title: `Cobrar ${l.name}`, sub: `plateia${l.status === 'pago' ? ' · pago' : ''}`, amount: `+${fmt.formatBRL(l.amount_cents)}`,
+      day: l.day, time: null, url: l.guest_id ? `/plateia/painel?convidado=${l.guest_id}` : '/plateia/painel', done: l.status === 'pago', late: l.status === 'previsto' && l.day < today,
+    }));
+  },
+
   async financeiro({ from, to }, today, kinds) {
     const dirs = [kinds.has('receber') && 'entrada', kinds.has('pagar') && 'saida'].filter(Boolean);
     if (!dirs.length) return [];
@@ -149,7 +170,7 @@ const SOURCES = {
     return rows.map((e) => {
       const incoming = e.direction === 'entrada';
       return {
-        type: incoming ? 'receber' : 'pagar', id: `fin-${e.id}`, title: e.description, sub: `${incoming ? 'a receber' : 'a pagar'}${e.status === 'pago' ? ' · pago' : ''}`,
+        type: incoming ? 'receber' : 'pagar', id: `fin-${e.id}`, entryId: e.id, title: e.description, sub: `${incoming ? 'a receber' : 'a pagar'}${e.status === 'pago' ? ' · pago' : ''}`,
         amount: `${incoming ? '+' : '−'}${fmt.formatBRL(e.amount_cents)}`, day: e.day, time: null,
         url: `/financeiro/lancamentos?escopo=${incoming ? 'receber' : 'pagar'}&q=${encodeURIComponent(e.description.slice(0, 60))}`, done: e.status === 'pago', late: e.status === 'previsto' && e.day < today,
       };
@@ -171,17 +192,29 @@ const SOURCES = {
   },
 };
 
-// owner: id de quem responde (só os tipos que têm responsável entram; contas não têm). hideDone: tira o que já foi feito.
+// owner: id de quem responde. Entram os itens dessa pessoa (tipos com responsável) e os que são do PERFIL dela (ROLE_DUTIES):
+// a gestão responde por todas as gravações, contas a pagar e a receber; a produtora, por todos os lembretes e cobranças.
+// hideDone: tira o que já foi feito.
 async function events({ user, from, to, types, owner = null, hideDone = false }) {
   const allowed = new Set(allowedTypes(user).map((t) => t.key));
   let wanted = new Set(types.filter((k) => allowed.has(k)));
-  if (owner) wanted = new Set([...wanted].filter((k) => TYPE_BY_KEY[k].hasOwner));
+  const ownerFor = {}; // tipo -> id para filtrar (ausente = sem filtro de pessoa)
+  if (owner) {
+    let role = owner === user.id ? user.role : null;
+    if (!role) ({ rows: [{ role } = {}] } = await db.query('SELECT role FROM users WHERE id = $1 AND active', [owner]));
+    const duty = new Set(dutiesOf(role).map((t) => t.key));
+    wanted = new Set([...wanted].filter((k) => duty.has(k) || TYPE_BY_KEY[k].hasOwner));
+    for (const k of wanted) if (!duty.has(k)) ownerFor[k] = owner;
+  }
   const today = todayISO();
-  const args = { from, to, owner };
   const jobs = [];
-  for (const k of ['tarefa', 'gravacao', 'lembrete', 'episodio', 'post', 'patrocinio']) if (wanted.has(k)) jobs.push(SOURCES[k](args, today));
-  if (wanted.has('receber') || wanted.has('pagar')) jobs.push(SOURCES.financeiro(args, today, wanted));
+  for (const k of ['tarefa', 'gravacao', 'lembrete', 'episodio', 'post', 'patrocinio', 'cobranca']) if (wanted.has(k)) jobs.push(SOURCES[k]({ from, to, owner: ownerFor[k] || null }, today));
+  if (wanted.has('receber') || wanted.has('pagar')) jobs.push(SOURCES.financeiro({ from, to }, today, wanted));
   let list = (await Promise.all(jobs)).flat();
+  if (wanted.has('cobranca')) { // a conta da plateia aparece uma vez só: como cobrança
+    const charged = new Set(list.filter((e) => e.type === 'cobranca').map((e) => e.entryId));
+    list = list.filter((e) => !(e.type === 'receber' && charged.has(e.entryId)));
+  }
   if (hideDone) list = list.filter((e) => !e.done);
   const order = Object.fromEntries(TYPES.map((t, i) => [t.key, i]));
   list.sort((a, b) => a.day.localeCompare(b.day) || (a.time || '~').localeCompare(b.time || '~') || order[a.type] - order[b.type] || a.title.localeCompare(b.title, 'pt-BR'));
@@ -192,9 +225,9 @@ async function events({ user, from, to, types, owner = null, hideDone = false })
 // Config: { visao: 'mes'|'semana'|'lista', tipos: [chaves], resp: 'todos'|'eu'|<uuid>, ocultar: bool }
 const BUILTIN = [
   { key: 'tudo', name: 'Tudo', hint: 'Todos os tipos, de todo mundo', config: { visao: 'mes', tipos: TYPES.map((t) => t.key), resp: 'todos', ocultar: false } },
-  { key: 'meu', name: 'Meu trabalho', hint: 'O que é meu: tarefas, gravações e lembretes da semana', config: { visao: 'semana', tipos: ['tarefa', 'gravacao', 'lembrete'], resp: 'eu', ocultar: true } },
+  { key: 'meu', name: 'Meu trabalho', hint: 'O que é meu e do meu perfil, da semana, sem o que já foi feito', config: { visao: 'semana', tipos: ['tarefa', 'gravacao', 'lembrete', 'cobranca', 'pagar', 'receber'], resp: 'eu', ocultar: true } },
   { key: 'producao', name: 'Produção', hint: 'Gravações, publicações e posts', config: { visao: 'mes', tipos: ['gravacao', 'episodio', 'post', 'tarefa'], resp: 'todos', ocultar: false } },
-  { key: 'dinheiro', name: 'Dinheiro', hint: 'Contas a pagar e a receber e as parcerias', perm: 'finance.read', config: { visao: 'lista', tipos: ['receber', 'pagar', 'patrocinio'], resp: 'todos', ocultar: false } },
+  { key: 'dinheiro', name: 'Dinheiro', hint: 'Contas a pagar e a receber, cobranças e as parcerias', perm: 'finance.read', config: { visao: 'lista', tipos: ['receber', 'pagar', 'cobranca', 'patrocinio'], resp: 'todos', ocultar: false } },
 ];
 
 const sortedTypes = (list) => TYPES.map((t) => t.key).filter((k) => list.includes(k));
@@ -261,4 +294,4 @@ async function deleteView({ user, id }) {
   return { ok: true };
 }
 
-module.exports = { TYPES, TYPE_BY_KEY, MODES, BUILTIN, allowedTypes, todayISO, isISO, addDays, range, dayLabel, dayShort, events, cleanConfig, sameConfig, views, resolve, saveView, deleteView };
+module.exports = { TYPES, TYPE_BY_KEY, MODES, BUILTIN, ROLE_DUTIES, dutiesOf, allowedTypes, todayISO, isISO, addDays, range, dayLabel, dayShort, events, cleanConfig, sameConfig, views, resolve, saveView, deleteView };

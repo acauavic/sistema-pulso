@@ -135,7 +135,8 @@ describe('assistente de IA', () => {
       assert.ok(conta && conta.tipo === 'A pagar' && /R\$/.test(conta.valor), 'gestão vê as contas');
       assert.equal(r.ver_tudo, '/calendario');
       const mine = await ask('gestao', 'calendario', { dias: 7, so_meus: true });
-      assert.ok(mine.eventos.some((e) => e.titulo === 'Tarefa do calendário')); assert.ok(!mine.eventos.some((e) => e.titulo === 'Conta do calendário'), 'só os meus: conta não tem responsável');
+      assert.ok(mine.eventos.some((e) => e.titulo === 'Tarefa do calendário'));
+      assert.ok(mine.eventos.some((e) => e.titulo === 'Conta do calendário'), 'pagar é do perfil da gestão: entra em "só os meus"');
       const editor = await ask('editor', 'calendario', { dias: 7, tipos: ['pagar', 'tarefa'] });
       assert.ok(!editor.eventos.some((e) => e.titulo === 'Conta do calendário'), 'editor de vídeo não vê contas, mesmo pedindo');
       assert.ok(!editor.tipos_que_o_perfil_ve.includes('pagar'));

@@ -18,24 +18,35 @@
   <% if (!active) { %><button class="cal-chip save" type="button" data-modal-open="modal-salvar-visao"><%- icon('bookmark', 14) %> Salvar esta visualização</button><% } %>
 </nav>
 
-<form method="get" action="/calendario" class="cal-filters" aria-label="Filtros do calendário">
-  <input type="hidden" name="f" value="1"><input type="hidden" name="visao" value="<%= cfg.visao %>"><input type="hidden" name="data" value="<%= cfg.data %>">
-  <div class="cal-types">
-    <% types.forEach(function (t) { %>
-    <label class="cal-check"><input type="checkbox" name="tipos" value="<%= t.key %>" <%= cfg.tipos.indexOf(t.key) >= 0 ? 'checked' : '' %> data-autosubmit><span><%- icon(t.icon, 14) %> <%= t.label %></span></label>
-    <% }) %>
-  </div>
-  <label class="cal-resp">Responsável
-    <select name="resp" data-autosubmit>
-      <option value="todos" <%= cfg.resp === 'todos' ? 'selected' : '' %>>Todos</option>
-      <option value="eu" <%= cfg.resp === 'eu' ? 'selected' : '' %>>Só os meus</option>
-      <% people.forEach(function (p) { if (String(p.id) === String(currentUser.id)) return; %><option value="<%= p.id %>" <%= cfg.resp === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
-    </select>
-  </label>
-  <label class="check"><input type="checkbox" name="ocultar" value="1" <%= cfg.ocultar ? 'checked' : '' %> data-autosubmit> Ocultar concluídos</label>
-  <noscript><button class="btn sm" type="submit">Aplicar</button></noscript>
-</form>
-<% if (cfg.owner) { %><p class="small muted">Com um responsável escolhido, contas a pagar e a receber ficam de fora: elas não têm responsável.</p><% } %>
+<div class="cal-toolbar">
+  <details class="cal-filter" data-popover>
+    <summary class="btn sm"><%- icon('sliders-horizontal', 14) %> Filtros<% if (filterCount) { %> <span class="nav-count"><%= filterCount %></span><% } %></summary>
+    <form method="get" action="/calendario" class="cal-filter-panel" aria-label="Filtros do calendário">
+      <input type="hidden" name="f" value="1"><input type="hidden" name="visao" value="<%= cfg.visao %>"><input type="hidden" name="data" value="<%= cfg.data %>">
+      <fieldset>
+        <legend>Mostrar</legend>
+        <div class="cal-types">
+          <% types.forEach(function (t) { %>
+          <label class="cal-check"><input type="checkbox" name="tipos" value="<%= t.key %>" <%= cfg.tipos.indexOf(t.key) >= 0 ? 'checked' : '' %>><span><%- icon(t.icon, 14) %> <%= t.label %></span></label>
+          <% }) %>
+        </div>
+        <div class="cal-filter-bulk"><button class="link small" type="button" data-check-all="tipos">Marcar todos</button><button class="link small" type="button" data-check-none="tipos">Desmarcar todos</button></div>
+      </fieldset>
+      <label>Responsável
+        <select name="resp">
+          <option value="todos" <%= cfg.resp === 'todos' ? 'selected' : '' %>>Todos</option>
+          <option value="eu" <%= cfg.resp === 'eu' ? 'selected' : '' %>>Só os meus</option>
+          <% people.forEach(function (p) { if (String(p.id) === String(currentUser.id)) return; %><option value="<%= p.id %>" <%= cfg.resp === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+        </select>
+      </label>
+      <% if (myDuties.length) { %><p class="small muted">“Só os meus” inclui o que é do seu perfil (<%= myRoleLabel %>): <%= myDuties.join(', ') %>.</p><% } %>
+      <label class="check"><input type="checkbox" name="ocultar" value="1" <%= cfg.ocultar ? 'checked' : '' %>> Ocultar concluídos</label>
+      <div class="cal-filter-actions"><button class="btn primary sm" type="submit">Aplicar</button><a class="link small" href="/calendario?v=tudo&visao=<%= cfg.visao %>&data=<%= cfg.data %>">Limpar filtros</a></div>
+    </form>
+  </details>
+  <span class="small muted cal-summary"><%= filterSummary %></span>
+</div>
+<% if (ownerInfo && ownerInfo.duties.length) { %><p class="small muted">Além do que é de <%= ownerInfo.name %>, entra o que é do perfil <%= ownerInfo.roleLabel %>: <%= ownerInfo.duties.join(', ') %>.</p><% } %>
 
 <div class="cal-head">
   <a class="btn sm" href="<%= href({ data: win.prev }) %>" aria-label="Período anterior"><%- icon('chevron-left') %></a>
