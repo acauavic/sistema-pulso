@@ -11,6 +11,15 @@ DIR="${DIR:-/opt/pulso}"
 
 [ "$(id -u)" -eq 0 ] || { echo "Rode como root."; exit 1; }
 
+command -v curl >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null; }
+
+# VPS pequena: o build do Node precisa de memória. Sem swap e com menos de 3 GB, cria 2 GB de swap.
+if [ "$(swapon --show | wc -l)" -eq 0 ] && [ "$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)" -lt 3000 ]; then
+  echo ">> Criando 2 GB de swap…"
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo ">> Instalando Docker…"
   curl -fsSL https://get.docker.com | sh
@@ -27,7 +36,11 @@ fi
 cd "$DIR/deploy"
 
 if [ ! -f .env ]; then
-  read -rp "Domínio do painel (ex.: gestao.seudominio.com — o DNS já deve apontar para este servidor): " DOMINIO
+  IP="$(curl -fsS4 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
+  PADRAO="$(echo "$IP" | tr . -).sslip.io"
+  echo "Domínio do painel. Se já tem um (ex.: gestao.seudominio.com), o DNS dele precisa apontar para $IP."
+  read -rp "Sem domínio ainda? Só aperte Enter para usar $PADRAO (funciona com HTTPS na hora): " DOMINIO
+  DOMINIO="${DOMINIO:-$PADRAO}"
   read -rp "E-mail do primeiro superadmin: " ADMIN_EMAIL
   read -rp "Nome do superadmin: " ADMIN_NOME
   gen() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "$1"; }
@@ -79,7 +92,14 @@ if [ -f .primeiro-admin ]; then
   rm -f .primeiro-admin
 fi
 
+# Backup diário do banco (03:30), guardando os últimos 14 dias em /opt/pulso-backups.
+mkdir -p /opt/pulso-backups && chmod 700 /opt/pulso-backups
+cat > /etc/cron.d/pulso-backup <<CRON
+30 3 * * * root cd $DIR/deploy && docker compose exec -T postgres pg_dump -U pulso -d pulso | gzip > /opt/pulso-backups/pulso-\$(date +\%F).sql.gz && find /opt/pulso-backups -name 'pulso-*.sql.gz' -mtime +14 -delete
+CRON
+
 echo
 echo "Pronto. Painel: https://$(grep '^DOMINIO=' .env | cut -d= -f2)"
 echo "Segredos e integrações: $DIR/deploy/.env (depois de editar, rode: cd $DIR/deploy && docker compose up -d)"
+echo "Backup diário do banco: /opt/pulso-backups (14 dias)."
 echo "Atualizar para uma versão nova: cd $DIR && git pull && cd deploy && docker compose up -d --build"

@@ -33,6 +33,11 @@ services:
 
   worker:
     <<: *app
+    depends_on: # sobe depois do painel: é o painel que aplica as migrações
+      postgres:
+        condition: service_healthy
+      web:
+        condition: service_healthy
     environment:
       ROLE: worker
       PORT: "3101"

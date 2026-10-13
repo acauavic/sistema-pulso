@@ -260,7 +260,7 @@ e-mail em dry-run — nada externo é chamado), página pública, rastreio de cl
 
 ## Deploy numa VPS única (Docker Compose + Caddy)
 
-`deploy/instalar.sh` instala o Docker, baixa o código, gera `SESSION_SECRET` e a senha do Postgres, pergunta o domínio e o e-mail do superadmin e sobe Postgres + painel (web) + fila/rotinas (worker) + Caddy com HTTPS automático (`deploy/docker-compose.yml`). **O domínio precisa apontar (DNS tipo A) para o IP do servidor antes**; sem HTTPS o login não funciona em produção (cookie Secure). Segredos e integrações ficam em `deploy/.env` no servidor (nunca no git). Atualizar: `cd /opt/pulso && git pull && cd deploy && docker compose up -d --build`.
+`deploy/instalar.sh` instala o Docker, baixa o código, gera `SESSION_SECRET` e a senha do Postgres, pergunta o domínio e o e-mail do superadmin e sobe Postgres + painel (web) + fila/rotinas (worker) + Caddy com HTTPS automático (`deploy/docker-compose.yml`). **O domínio precisa apontar (DNS tipo A) para o IP do servidor antes**; sem domínio, basta apertar Enter e o script usa `<ip-com-tracos>.sslip.io`, que já tem HTTPS. Sem HTTPS o login não funciona em produção (cookie Secure). O script também cria 2 GB de swap em VPS pequena e agenda backup diário do banco em `/opt/pulso-backups` (14 dias). Segredos e integrações ficam em `deploy/.env` no servidor (nunca no git). Atualizar: `cd /opt/pulso && git pull && cd deploy && docker compose up -d --build`.
 
 ## Deploy (Docker Swarm + Traefik)
 
