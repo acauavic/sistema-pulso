@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Push no Opera (2026-10-13)**: Opera suporta Web Push (42+), mas versões 118+ têm defeito no registro no FCM ("AbortError: Registration failed - push service error"; corrigido em 129 estável/131 dev segundo o fórum da Opera). `push.js`: descarta inscrição com outra chave, tenta de novo uma vez no AbortError, mensagem própria (atualizar Opera / opera://settings/reset) e botão "Tentar de novo"; com permissão dada, vale o alerta com a aba aberta.
+
 - **Foto obrigatória (2026-10-13)**: `guestRules` exige `photo_key` em em_agendamento e agendado (`PHOTO`; `contactMissing`/`agendaMissing` separados: remarcar olha só a agenda). Só foto faltando → `?abrir=foto&para=<etapa>` (janela `modal-foto` com `form[data-after-upload]` que o `app.js` envia depois do upload). Formulário: `pendingStage` (salva o resto, mantém a etapa); cadastro novo → convite_enviado. Exceções: RSVP público e CSV. Nos testes, `resetDb` põe DEFAULT de foto em `guests.photo_key`. Card da plateia: sem preço, com @ do Instagram (`pl-ig`, ícone `instagram` adicionado).
 
 - **Importação = serviço (2026-10-13)**: `services/guestImport.js` (`analyse`, `importGuests`) usado pela rota e por `src/scripts/importGuests.js` (prévia; `--gravar` grava e registra auditoria). Colunas `observações` e `título do episódio`. Base inicial veio do ClickUp (lista "CRM Pulso"): ganho→Gravado/Publicado (playlist do YouTube), follow up/contato inicial→Convite enviado, pendentes→Prospecção, agendamento→Em agendamento, agendado→Agendado, perdido→Perdido/nunca_respondeu.

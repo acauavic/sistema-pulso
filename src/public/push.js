@@ -39,7 +39,8 @@
   function explain(err) {
     const msg = String(err?.message || '');
     if (err?.name === 'AbortError' || /push service|registration failed/i.test(msg)) {
-      if (isOpera) return ['O Opera para computador não tem o serviço de alertas (push) que o painel usa.', 'Para receber alertas com o painel fechado, ative pelo Chrome, Edge, Firefox ou Safari, ou pelo celular. No Opera, com a aba aberta, os avisos continuam aparecendo.'];
+      // defeito conhecido do Opera (118+): o registro no serviço de push do Google falha; corrigido em versões mais novas
+      if (isOpera) return ['O Opera recusou o registro dos alertas (defeito conhecido de algumas versões do Opera, não do painel). Com a aba aberta, os avisos continuam chegando.', 'Atualize o Opera (menu > Atualização e recuperação), reinicie e toque em Tentar de novo. Se continuar, em opera://settings/reset use "Restaurar configurações" (não apaga favoritos nem senhas).'];
       if (isBrave) return ['O Brave vem com o push desligado.', 'Abra brave://settings/privacy, ligue "Usar os serviços do Google para mensagens push", reinicie o navegador e tente de novo.'];
       return ['O navegador não conseguiu falar com o serviço de alertas dele.', 'Use Chrome, Edge, Firefox ou Safari abertos direto (não dentro de outro aplicativo) e sem VPN ou bloqueador que impeça o push. Com a aba aberta, os avisos continuam aparecendo.'];
     }
@@ -57,7 +58,28 @@
     if (!key) { show(false); btnOn.hidden = true; return say('Alertas com o painel fechado ainda não estão configurados no servidor.'); }
     const sub = await currentSub();
     show(Boolean(sub));
+    btnOn.textContent = 'Ativar alertas';
     say(sub ? 'Ligados neste aparelho. Os avisos chegam mesmo com o painel fechado.' : 'Desligados neste aparelho.');
+  }
+
+  const sameKey = (sub) => {
+    const k = sub?.options?.applicationServerKey;
+    if (!k) return true; // navegador não informa: confia
+    const a = new Uint8Array(k); const b = b64ToBytes(key);
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  };
+  // Inscreve; inscrição antiga (outra chave ou registro quebrado) é descartada e tenta uma vez de novo.
+  async function subscribe(r) {
+    let sub = await r.pushManager.getSubscription();
+    if (sub && sameKey(sub)) return sub;
+    if (sub) await sub.unsubscribe().catch(() => {});
+    const opts = { userVisibleOnly: true, applicationServerKey: b64ToBytes(key) };
+    try { return await r.pushManager.subscribe(opts); } catch (err) {
+      if (err?.name !== 'AbortError') throw err;
+      sub = await r.pushManager.getSubscription(); if (sub) await sub.unsubscribe().catch(() => {});
+      await new Promise((ok) => { setTimeout(ok, 1500); });
+      return r.pushManager.subscribe(opts);
+    }
   }
 
   btnOn.addEventListener('click', async () => {
@@ -66,10 +88,14 @@
       if (await Notification.requestPermission() !== 'granted') return render();
       const r = await reg; if (!r) throw new Error('Não consegui preparar o navegador. Recarregue a página.');
       await navigator.serviceWorker.ready;
-      const sub = (await r.pushManager.getSubscription()) || await r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+      const sub = await subscribe(r);
       await post('/notificacoes/push/inscrever', { subscription: sub.toJSON() });
       await render();
-    } catch (err) { say(...explain(err)); } finally { btnOn.disabled = false; }
+    } catch (err) {
+      say(...explain(err));
+      // a permissão foi dada: com a aba aberta o alerta do sistema funciona (reserva); deixa tentar de novo
+      if (Notification.permission === 'granted') btnOn.textContent = 'Tentar de novo';
+    } finally { btnOn.disabled = false; }
   });
   btnOff.addEventListener('click', async () => {
     const sub = await currentSub();
