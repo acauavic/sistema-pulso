@@ -44,7 +44,8 @@ async function createLink({ lead, amountCents, userId = null, description }) {
     handle: config.infinitepay.handle, order_nsu: orderNsu,
     items: [{ quantity: 1, price: amountCents, description: description || `Plateia Pulso Podcast: ${lead.guest_name}${lead.recording_at ? ` (${dateShort(lead.recording_at)})` : ''}` }],
     redirect_url: `${config.appBaseUrl}/plateia/pagamento-concluido`, webhook_url: webhookUrl(),
-    customer: { name: lead.name, phone_number: lead.phone },
+    // Sem `customer` de propósito: com o telefone preenchido o checkout pede confirmar o número por WhatsApp/SMS, e quem paga nem sempre é
+    // quem se inscreveu. Sem ele, a pessoa informa o próprio contato. O pedido é identificado pelo order_nsu, não pelos dados dela.
   };
   const r = await post('/links', body);
   if (!r.ok || r.json.success === false) throw new Error(r.json.message || `a InfinitePay respondeu HTTP ${r.status}`);

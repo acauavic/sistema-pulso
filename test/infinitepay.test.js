@@ -50,7 +50,7 @@ describe('InfinitePay: link de pagamento da plateia e confirmação por webhook'
     const b = fake.links[0];
     assert.equal(b.handle, 'pulso-teste'); assert.deepEqual(b.items.map((i) => [i.quantity, i.price]), [[1, 19700]]);
     assert.match(b.order_nsu, new RegExp(`^pl${leadId}-[0-9a-f]{10}$`)); assert.match(b.webhook_url, /\/webhooks\/infinitepay\/[0-9a-f]{32}$/);
-    assert.match(b.redirect_url, /\/plateia\/pagamento-concluido$/); assert.deepEqual([b.customer.name, b.customer.phone_number], ['Maria da Silva', '+5511912345678']);
+    assert.match(b.redirect_url, /\/plateia\/pagamento-concluido$/); assert.equal(b.customer, undefined, 'sem dados da pessoa: o checkout não pede confirmar o telefone dela'); assert.equal(b.address, undefined);
     const page = (await prod.get('/plateia/painel')).text;
     assert.match(page, /Link de pagamento/); assert.match(page, /checkout\.infinitepay\.io\/pulso\?lenc=/); assert.match(page, /Enviar pelo WhatsApp/);
 

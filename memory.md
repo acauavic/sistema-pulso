@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Link InfinitePay sem `customer`/`address`**: com `customer.phone_number` o checkout pede confirmar o número por WhatsApp/SMS (e pode disparar SMS para o número). Não enviamos nada da pessoa; o checkout tem as etapas Contato > Entrega > Pagamento por conta da InfinitePay (configuração da conta, não da API). `POST /links` devolve `{ url }` (confirmado com o handle health-scale).
+
 - **InfinitePay na plateia (1.5.0)**: link de pagamento criado ao ir para Em avaliação (`services/infinitePay.js`; `plateia_pay_links`, vários por pedido, o último aberto é o atual). A API não tem chave nem assina o webhook: endereço com segredo + `payment_check` antes de aceitar; dedupe por `transaction_nsu`. Webhook confirma → `audience.confirmLead` (pago hoje) + aviso. Resposta de `POST /links` não é documentada: `extractUrl` procura o https de checkout (conferir com o handle real). Desligado sem `INFINITEPAY_HANDLE`; o merchant precisa ter o checkout externo ativo (a API devolve `external_checkout_not_enabled`).
 
 - **Convite por e-mail (1.4.0)**: Google não convida pessoas com conta de serviço (precisaria de delegação de domínio), então `services/calendarInvites.js` manda e-mail da marca com `.ics` (`icalEvent` do nodemailer; REQUEST/CANCEL, UID `gravacao-<id>@podcastpulso.com`, SEQUENCE sobe a cada remarcação). Setting `gcal_invite` (padrão desligado); ao ligar, `seed()` registra os já agendados sem enviar (pedido do usuário). Tabela `guest_cal_invites` sem FK. Rotina `convite-agenda` + `kickOnWrite`.
