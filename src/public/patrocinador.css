@@ -242,7 +242,7 @@
   .cal-date{font-family:'JetBrains Mono',monospace; font-size:14px; font-variant-numeric:tabular-nums;}
   .cal-ep{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gray-500);}
   .cal-topic.has-photo{display:flex; align-items:center; gap:14px;}
-  .cal-photo{width:72px; aspect-ratio:4/3; object-fit:cover; border-radius:6px; flex-shrink:0; background:var(--plum);} /* moldura padrão 4:3 */
+  .cal-photo{width:72px; aspect-ratio:4/3; object-fit:cover; object-position:50% 18%; border-radius:6px; flex-shrink:0; background:var(--plum);} /* moldura padrão 4:3 */
   .cal-topic strong{
     font-family:'Space Grotesk',sans-serif;
     font-weight:600; font-size:16px; display:block; margin-bottom:3px;
@@ -279,7 +279,7 @@
     font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px;
     flex-shrink:0;
   }
-  .guest-photo{width:84px; aspect-ratio:4/3; object-fit:cover; border-radius:6px; flex-shrink:0; background:var(--plum);} /* moldura padrão 4:3 */
+  .guest-photo{width:84px; aspect-ratio:4/3; object-fit:cover; object-position:50% 18%; border-radius:6px; flex-shrink:0; background:var(--plum);} /* moldura padrão 4:3 */
   .guest-name{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; letter-spacing:-0.01em;}
   .guest-cat{font-size:13px; color:var(--gray-500); margin-top:3px;}
   .guest-toggle{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--black); white-space:nowrap; display:flex; align-items:center; gap:6px;}

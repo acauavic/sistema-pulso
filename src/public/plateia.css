@@ -30,7 +30,7 @@ a { color: inherit; }
 .pl-btn:hover { transform: translateY(-1px); box-shadow: 0 0 0 4px rgba(200, 255, 66, .15); }
 .pl-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .pl-btn[disabled] { background: var(--raised); color: var(--muted); cursor: not-allowed; transform: none; box-shadow: none; }
-.pl-hero { position: relative; overflow: hidden; padding: clamp(72px, 14vw, 168px) 0 0; }
+.pl-hero { position: relative; overflow: hidden; padding: clamp(72px, 7vw, 96px) 0 0; }
 .pl-hero-video { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: var(--bg); }
 .pl-hero-video video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; pointer-events: none; user-select: none; }
 .pl-hero-video::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, rgba(10, 10, 10, .92) 0%, rgba(10, 10, 10, .72) 46%, rgba(10, 10, 10, .42) 72%, rgba(10, 10, 10, .72) 100%), linear-gradient(0deg, var(--bg) 0%, rgba(10, 10, 10, .15) 38%, transparent 60%); }
@@ -51,8 +51,8 @@ a { color: inherit; }
 .pl-cards { list-style: none; padding: 0; margin: 48px 0 0; display: grid; gap: 24px; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); }
 .pl-card { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .pl-card.is-off { opacity: .65; }
-.pl-photo { aspect-ratio: 4 / 3; background: var(--plum); display: grid; place-items: center; overflow: hidden; }
-.pl-photo img { width: 100%; height: 100%; object-fit: cover; }
+.pl-photo { position: relative; aspect-ratio: 4 / 3; background: var(--plum); display: grid; place-items: center; overflow: hidden; }
+.pl-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
 .pl-photo span { font: 700 72px "Space Grotesk", sans-serif; letter-spacing: -.06em; color: var(--lime); }
 .pl-card-body { display: flex; flex-direction: column; gap: 8px; padding: 26px 24px 24px; flex: 1; }
 .pl-tag { font: 500 11px "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
