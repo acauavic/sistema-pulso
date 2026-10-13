@@ -1,0 +1,430 @@
+<%- include('../partials/head') %>
+<%
+  var epNo = ep.number ? 'EP.' + String(ep.number).padStart(3, '0') : 'EP.—';
+  var fileBase = '/episodios/' + ep.id + '/arquivos/';
+  var rawFiles = files.filter(function (f) { return f.kind !== 'editado'; });
+  var editedFiles = files.filter(function (f) { return f.kind === 'editado'; });
+  var editedDone = editedFiles.filter(function (f) { return f.status === 'pronto'; });
+  var itemsFor = function (gate) { return checklist.filter(function (i) { return i.gate === gate; }); };
+  var tickable = perm.manage || perm.edit || perm.review;
+  var inProduction = ['disponivel_edicao', 'em_edicao', 'em_revisao', 'em_finalizacao', 'pronto_publicar', 'publicado'].indexOf(ep.status) >= 0;
+  var openComments = comments.filter(function (c) { return !c.resolved; });
+  var kindOptions = Object.keys(C.EPISODE_FILE_KINDS).filter(function (k) { return k !== 'editado'; });
+  var rawTotal = rawFiles.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0);
+  var rawByKind = {}; rawFiles.forEach(function (f) { rawByKind[f.kind] = (rawByKind[f.kind] || 0) + 1; });
+  var tabsBtn = function (t) { return '<button type="button" role="tab" data-tab-btn="' + t.key + '" aria-controls="pane-' + t.key + '">' + t.label + (t.badge ? ' <span class="count">' + t.badge + '</span>' : '') + '</button>'; };
+%>
+<div class="page-head">
+  <div>
+    <span class="kicker"><%= epNo %> · gravado <%= fmt.formatDay(ep.recorded_on) %><%= ep.aired_on ? ' · vai ao ar ' + fmt.formatDay(ep.aired_on) : '' %></span>
+    <h1><%= ep.title %> <span class="badge b-st-<%= ep.status %>"><%= C.EPISODE_STATUSES[ep.status] %></span></h1>
+    <p class="muted top-gap"><%= ep.guest_name ? ep.guest_name : (sponsors.length ? 'Só os hosts · ' + sponsors.map(function (s) { return s.company; }).join(', ') : 'Só os hosts') %><%= ep.editor_name ? ' · editor: ' + ep.editor_name : '' %></p>
+  </div>
+  <div class="row">
+    <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
+    <a class="btn" href="/conteudo?episodio=<%= ep.id %>"><%- icon('layers') %> Conteúdo<%= content.total ? ' (' + content.total + ')' : '' %></a>
+    <% if (ep.guest_id) { %><a class="btn" href="/convidados/<%= ep.guest_id %>"><%- icon('mic') %> Convidado</a><% } %>
+    <% if (perm.write) { %><a class="btn" href="/episodios/<%= ep.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
+  </div>
+</div>
+
+<ol class="stepper s7" aria-label="Etapas da produção">
+  <% C.EPISODE_STAGES.forEach(function (s, i) { %>
+  <li class="<%= i < stageIndex ? 'done' : (i === stageIndex ? 'now' : '') %>"><span class="step-n mono"><%= String(i + 1).padStart(2, '0') %></span><span class="step-l"><%= s.label %></span></li>
+  <% }) %>
+</ol>
+
+<section class="card moves" id="etapa">
+  <span class="kicker">Próximo passo</span>
+  <div class="move-list">
+    <% if (!moves.length) { %><p class="muted">Este episódio está no fim da linha de produção.</p><% } %>
+    <% moves.forEach(function (m) { %>
+    <div class="move">
+      <form method="post" action="/episodios/<%= ep.id %>/etapa" class="inline">
+        <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="to" value="<%= m.to %>">
+        <button class="btn <%= m.tone %>" type="submit" <%= m.allowed ? '' : 'disabled' %>><%= m.label %></button>
+      </form>
+      <% if (!m.allowed) { %><span class="small muted">Seu perfil não faz este passo.</span>
+      <% } else if (m.missing.length) { %><span class="small blocked"><%- icon('info', 14) %> Antes: <%= m.missing.join(' · ') %></span><% } %>
+    </div>
+    <% }) %>
+  </div>
+</section>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="<%= defaultTab %>">
+  <div class="tabbar" role="tablist" aria-label="Seções do episódio">
+    <% tabs.forEach(function (t) { %><%- tabsBtn(t) %><% }) %>
+  </div>
+
+  <!-- ================= RESUMO ================= -->
+  <div class="pane" id="pane-resumo" data-pane-id="resumo">
+    <div class="grid-2 align-start">
+      <div class="stack-lg">
+        <section class="card" id="visao">
+          <h2>Visão geral</h2>
+          <dl class="kv">
+            <dt>Gravado em</dt><dd class="handle"><%= fmt.formatDay(ep.recorded_on) %></dd>
+            <dt>Veiculação</dt><dd class="handle"><%= fmt.formatDay(ep.aired_on) %></dd>
+            <dt>Convidado</dt><dd><%= ep.guest_name || '—' %><%= ep.guest_instagram ? ' · @' + ep.guest_instagram : '' %></dd>
+            <% if (ep.guest_positioning) { %><dt>Posicionamento</dt><dd class="pre"><%= ep.guest_positioning %></dd><% } %>
+            <dt>Editor</dt>
+            <dd>
+              <%- include('../partials/dot', { type: 'episode', id: ep.id, user: ep.editor_id ? { id: ep.editor_id, name: ep.editor_name } : null, editable: perm.manage, label: true }) %>
+            </dd>
+            <% if (ep.review_round) { %><dt>Revisões</dt><dd class="handle"><%= ep.review_round %></dd><% } %>
+            <dt>Patrocínio</dt>
+            <dd class="sponsor-line">
+              <% sponsors.forEach(function (sp) { var miss = [!sp.moldura && 'moldura', !sp.qrcode && 'QR Code'].filter(Boolean); %>
+              <a class="chip-link" href="/patrocinadores/<%= sp.id %>" title="<%= (sp.role === 'exclusivo' ? 'Episódio exclusivo' : 'Inserção') + (miss.length ? ' · falta ' + miss.join(' e ') : '') %>"><strong><%= sp.company %></strong> <span class="mono"><%= sp.role === 'exclusivo' ? 'EXCL.' : 'INS.' %></span><% if (miss.length) { %> <span class="warn" aria-label="Faltam arquivos"><%- icon('triangle-alert', 12) %></span><% } %></a>
+              <% }) %>
+              <% if (perm.manage) { %><button class="link small" type="button" data-modal-open="modal-patrocinio"><%= sponsors.length ? 'trocar' : 'vincular patrocinador' %></button><% } else if (!sponsors.length) { %><span class="muted">—</span><% } %>
+            </dd>
+          </dl>
+          <% if (sponsors.length) { %>
+          <details class="top-gap" id="patrocinadores">
+            <summary>Material e restrições dos patrocinadores</summary>
+            <% sponsors.forEach(function (s) { %>
+            <div class="sponsor-box">
+              <strong><%= s.company %></strong>
+              <ul class="plain small asset-links">
+                <% if (s.logo) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.logo.id %>?baixar=1"><%- icon('arrow-right', 14) %> Logo (PNG)</a></li><% } %>
+                <% if (s.moldura) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.moldura.id %>?baixar=1"><%- icon('arrow-right', 14) %> Moldura</a></li><% } else { %><li class="muted">Moldura ainda não enviada</li><% } %>
+                <% if (s.qrcode) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.qrcode.id %>?baixar=1"><%- icon('arrow-right', 14) %> QR Code</a><%= s.qr_link ? ' → ' + s.qr_link : '' %></li><% } else { %><li class="muted">QR Code ainda não enviado</li><% } %>
+              </ul>
+              <% if (s.slogan) { %><p class="small"><span class="muted">Slogan:</span> <%= s.slogan %></p><% } %>
+              <% if (s.offer) { %><p class="small pre"><span class="muted">Oferta:</span> <%= s.offer %></p><% } %>
+              <% if (s.restrictions) { %><p class="small pre restrict"><span class="muted">Não comunicar:</span> <%= s.restrictions %></p><% } %>
+            </div>
+            <% }) %>
+          </details>
+          <% } %>
+          <div class="row spread top-gap">
+            <h3>Observações para o editor</h3>
+            <% if (perm.manage) { %><button class="btn sm" type="button" data-modal-open="modal-obs"><%- icon('pencil') %> <%= ep.editor_notes ? 'Editar' : 'Escrever' %></button><% } %>
+          </div>
+          <p class="pre<%= ep.editor_notes ? '' : ' muted small' %>"><%= ep.editor_notes || 'Nada por enquanto.' %></p>
+        </section>
+
+      </div>
+
+      <div class="stack-lg">
+      <section class="card" id="tarefas">
+        <div class="row spread">
+          <h2>Tarefas<%= tasks.length ? ' (' + tasks.filter(function (t) { return t.status === 'feito'; }).length + '/' + tasks.length + ')' : '' %></h2>
+          <% if (perm.manage) { %><button class="btn sm" type="button" data-modal-open="modal-task-new"><%- icon('plus') %> Nova tarefa</button><% } %>
+        </div>
+        <% if (!tasks.length) { %><p class="muted">Sem tarefas.</p><% } %>
+        <ul class="plain task-list">
+          <% tasks.forEach(function (t) { %>
+          <li class="task-row <%= t.status === 'feito' ? 'done' : '' %>">
+            <form method="post" action="/episodios/<%= ep.id %>/tarefas/<%= t.id %>" class="task-quick">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kind" value="<%= t.kind %>"><input type="hidden" name="notes" value="<%= t.notes || '' %>">
+              <input type="hidden" name="assignee_id" value="<%= t.assignee_id || '' %>"><input type="hidden" name="due_on" value="<%= fmt.toInputDate(t.due_on) %>">
+              <span class="task-title"><%= t.title %></span>
+              <select name="status" aria-label="Status de <%= t.title %>" data-status-select <%= tickable ? '' : 'disabled' %>>
+                <% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= t.status === k ? 'selected' : '' %>><%= C.TASK_STATUSES[k] %></option><% }) %>
+              </select>
+            </form>
+            <span class="task-meta small muted">
+              <%- include('../partials/dot', { type: 'task', id: t.id, user: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null, editable: perm.manage, label: true }) %><%= t.due_on ? ' · prazo ' + fmt.formatDayShort(t.due_on) : '' %><%= t.status === 'bloqueada' ? ' · bloqueada: ' + t.block_reason : '' %><%= t.notes ? ' · ' + t.notes : '' %>
+            </span>
+            <span class="row task-actions">
+              <% if (t.kind === 'cortes') { %><a class="small" href="/conteudo?episodio=<%= ep.id %>">abrir Conteúdo</a><% } %>
+            <a class="small" href="/tarefas/<%= t.id %>">abrir</a>
+            <% if (tickable) { %><button type="button" class="link small" data-modal-open="modal-task-edit"
+              data-task='<%= JSON.stringify({ id: t.id, title: t.title, kind: t.kind, status: t.status, assignee_id: t.assignee_id || "", due_on: fmt.toInputDate(t.due_on), notes: t.notes || "", block_reason: t.block_reason || "" }) %>'>detalhes</button><% } %>
+            </span>
+          </li>
+          <% }) %>
+        </ul>
+      </section>
+      <%- include('../partials/comments', { type: 'episode', id: ep.id, items: epComments, back: '/episodios/' + ep.id }) %>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MATERIAL ================= -->
+  <% if (tabs.some(function (t) { return t.key === 'material'; })) { %>
+  <div class="pane" id="pane-material" data-pane-id="material" hidden>
+    <div class="grid-2 align-start">
+      <section class="card" id="material">
+        <div class="row spread">
+          <h2>Material bruto</h2>
+          <% if (rawFiles.length) { %><span class="handle muted"><%= rawFiles.length %> arquivo<%= rawFiles.length > 1 ? 's' : '' %> · <%= fmt.formatBytes(rawTotal) %></span><% } %>
+        </div>
+        <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
+        <% var rawUploader = function () { %>
+        <div class="uploader" data-uploader data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-edited="0" data-hash="material">
+          <div class="row">
+            <select data-kind aria-label="Tipo de material"><% kindOptions.forEach(function (k) { %><option value="<%= k %>"><%= C.EPISODE_FILE_KINDS[k] %></option><% }) %></select>
+            <input type="text" data-label placeholder="Rótulo (ex.: Câmera 1)" maxlength="80" aria-label="Rótulo">
+          </div>
+          <input type="file" multiple data-files>
+          <button class="btn" type="button" data-start><%- icon('arrow-right') %> Enviar arquivos</button>
+          <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+        </div>
+        <% }; %>
+        <% if (!rawFiles.length) { %>
+          <p class="small muted">Vídeos de cada câmera, áudios, bastidores e fotografias. Vão para um armazenamento privado e ficam disponíveis para o editor.</p>
+          <% if (perm.upload && storageReady) { %><% rawUploader() %><% } else { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
+        <% } else { %>
+          <p class="small muted"><%= kindOptions.filter(function (k) { return rawByKind[k]; }).map(function (k) { return rawByKind[k] + ' ' + C.EPISODE_FILE_KINDS[k].toLowerCase(); }).join(' · ') %></p>
+          <ul class="plain file-list file-compact">
+            <% rawFiles.forEach(function (f) { %>
+            <li>
+              <span>
+                <span class="badge b-gray"><%= C.EPISODE_FILE_KINDS[f.kind] %></span>
+                <%= f.label ? f.label + ' · ' : '' %><span class="mono small"><%= f.filename %></span>
+                <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %></span>
+                <% if (f.status === 'enviando') { %><span class="badge b-amber">enviando</span><% } %>
+              </span>
+              <span class="row">
+                <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
+                <% if (perm.upload) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo do armazenamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">remover</button></form><% } %>
+              </span>
+            </li>
+            <% }) %>
+          </ul>
+          <% if (perm.upload && storageReady) { %><details class="top-gap"><summary>Enviar mais material</summary><% rawUploader() %></details><% } %>
+        <% } %>
+      </section>
+
+      <div class="stack-lg">
+        <section class="card" id="edicao">
+          <div class="row spread"><h2>Vídeo editado</h2><% if (editedDone.length) { %><span class="badge b-st-em_edicao">v<%= editedDone[0].version %></span><% } %></div>
+          <% if (!inProduction) { %><p class="muted">A edição começa quando o material for liberado para o editor.</p><% } else { %>
+          <p class="small muted">O vídeo do episódio é <strong>horizontal</strong> (16:9). Vídeos verticais são cortes e vão em <a href="/conteudo">Conteúdo</a>.</p>
+          <% var editedUploader = function (label) { %>
+          <div class="uploader" data-uploader data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-edited="1" data-hash="edicao">
+            <input type="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
+            <button class="btn" type="button" data-start><%- icon('arrow-right') %> <%= label %></button>
+            <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+          </div>
+          <% }; %>
+          <% if (!editedFiles.length) { %>
+            <% if (perm.edit && storageReady) { %><% editedUploader('Enviar vídeo editado') %><% } else { %><p class="muted">Nenhuma versão enviada ainda.</p><% } %>
+          <% } else { %>
+          <ul class="plain file-list file-compact">
+            <% editedFiles.forEach(function (f, i) { %>
+            <li class="<%= i > 0 ? 'older' : '' %>">
+              <span><span class="badge b-st-em_edicao">v<%= f.version %></span> <span class="mono small"><%= f.filename %></span> <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDateTime(f.created_at) %><%= f.uploader ? ' · ' + f.uploader : '' %></span><% if (f.status === 'enviando') { %> <span class="badge b-amber">enviando</span><% } %></span>
+              <span class="row">
+                <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
+                <% if (perm.edit) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover esta versão?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">remover</button></form><% } %>
+              </span>
+            </li>
+            <% }) %>
+          </ul>
+          <% if (perm.edit && storageReady) { %><details class="top-gap"><summary>Enviar nova versão</summary><% editedUploader('Enviar nova versão') %></details><% } %>
+          <% } %>
+          <% } %>
+        </section>
+
+        <% if (openComments.length && ['em_edicao', 'disponivel_edicao'].indexOf(ep.status) >= 0) { %>
+        <section class="card" id="ajustes">
+          <h2>Ajustes pedidos na revisão (<%= openComments.length %>)</h2>
+          <ul class="plain comment-list">
+            <% openComments.forEach(function (c) { %>
+            <li class="comment"><div class="row"><% if (c.at_ms != null) { %><span class="handle"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></span><% } else { %><span class="badge b-gray">geral</span><% } %><span class="small muted"><%= c.author_name || '—' %></span></div><p class="pre"><%= c.body %></p></li>
+            <% }) %>
+          </ul>
+        </section>
+        <% } %>
+
+        <% if (inProduction) { %>
+        <section class="card" id="checklists">
+          <h2>Checklist antes da revisão</h2>
+          <%- include('_checklist', { items: itemsFor('revisao'), gate: 'revisao', tickable: tickable }) %>
+        </section>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- ================= REVISÃO (só enquanto o episódio está em revisão) ================= -->
+  <% if (tabs.some(function (t) { return t.key === 'revisao'; })) { %>
+  <div class="pane" id="pane-revisao" data-pane-id="revisao" hidden>
+    <section class="card" id="revisao">
+      <h2>Revisão</h2>
+      <% if (!latestEdited) { %><p class="muted">Quando o editor enviar o vídeo, ele aparece aqui para a gestão assistir e comentar na minutagem.</p><% } else { %>
+      <p class="small muted">Versão <strong>v<%= latestEdited.version %></strong> · <%= latestEdited.filename %></p>
+      <div class="review" data-review data-csrf="<%= csrf %>" data-url="/episodios/<%= ep.id %>/comentarios" data-file="<%= latestEdited.id %>">
+        <video controls preload="metadata" playsinline src="<%= fileBase + latestEdited.id %>/ver#t=0.1" data-video></video>
+        <div class="review-timeline" data-timeline aria-label="Comentários na linha do tempo do vídeo"></div>
+        <% if (tickable) { %>
+        <form class="stack top-gap" data-comment-form>
+          <textarea name="body" rows="2" maxlength="2000" placeholder="Comente neste ponto do vídeo…" required aria-label="Comentário"></textarea>
+          <div class="row">
+            <span class="handle muted">no ponto <strong data-now>0:00</strong></span>
+            <button class="btn primary" type="submit">Comentar neste ponto</button>
+            <button class="btn" type="button" data-general>Comentário geral</button>
+          </div>
+        </form>
+        <% } %>
+      </div>
+      <% } %>
+      <ul class="plain comment-list top-gap">
+        <% comments.forEach(function (c) { %>
+        <li class="comment <%= c.resolved ? 'resolved' : '' %>" data-at="<%= c.at_ms == null ? '' : c.at_ms %>" data-id="<%= c.id %>">
+          <div class="row">
+            <% if (c.at_ms != null) { %><button type="button" class="seek handle" data-seek="<%= c.at_ms %>"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></button><% } else { %><span class="badge b-gray">geral</span><% } %>
+            <span class="small muted"><%= c.author_name || '—' %> · <%= fmt.formatDateTime(c.created_at) %></span>
+          </div>
+          <p class="pre"><%= c.body %></p>
+          <div class="row small">
+            <% if (tickable) { %><button type="button" class="link" data-resolve="<%= c.resolved ? '0' : '1' %>" data-comment="<%= c.id %>"><%= c.resolved ? 'reabrir' : 'marcar como resolvido' %></button><% } %>
+            <form method="post" action="/episodios/<%= ep.id %>/comentarios/<%= c.id %>/excluir" class="inline" data-confirm="Apagar este comentário?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">apagar</button></form>
+          </div>
+        </li>
+        <% }) %>
+        <% if (!comments.length) { %><li class="muted">Sem comentários.</li><% } %>
+      </ul>
+    </section>
+  </div>
+  <% } %>
+
+  <!-- ================= FINALIZAÇÃO ================= -->
+  <% if (tabs.some(function (t) { return t.key === 'finalizacao'; })) { %>
+  <div class="pane" id="pane-finalizacao" data-pane-id="finalizacao" hidden>
+    <%- include('_finalizacao', { itemsFor: itemsFor, tickable: tickable }) %>
+  </div>
+  <% } %>
+
+  <!-- ================= HISTÓRICO ================= -->
+  <% if (finData) { %>
+  <!-- ================= FINANCEIRO ================= -->
+  <div class="pane" id="pane-financeiro" data-pane-id="financeiro" hidden>
+    <section class="card" id="financeiro">
+      <div class="row spread">
+        <h2>Financeiro do episódio</h2>
+        <% if (can('finance.write')) { %><button class="btn" type="button" data-modal-open="modal-novo"><%- icon('plus') %> Lançar custo</button><% } %>
+      </div>
+      <dl class="kv">
+        <dt>Custo total</dt><dd class="mono"><strong><%= money(finData.total) %></strong> <span class="muted">· pago <%= money(finData.paid) %></span></dd>
+        <dt>Gravação</dt><dd><span class="mono"><%= ep.recording_minutes ? Math.floor(ep.recording_minutes / 60) + ' h ' + String(ep.recording_minutes % 60).padStart(2, '0') + ' min' : 'não registrada' %></span><span class="muted"><%= ep.recording_minutes ? '' : ' · o estúdio usa ' + finData.settings.studio_minutes + ' min até alguém registrar' %></span>
+          <% if (perm.write) { %> <button class="link small" type="button" data-modal-open="modal-duracao"><%= ep.recording_minutes ? 'Mudar' : 'Registrar duração' %></button><% } %></dd>
+        <% if (finData.stockCost) { %><dt>Material usado</dt><dd class="mono"><%= money(finData.stockCost) %> <span class="muted">· do estoque, já pago na compra</span></dd><% } %>
+      </dl>
+      <% if (!finData.entries.length) { %><p class="muted small top-gap">Nenhuma conta ligada a este episódio ainda. O estúdio e os custos automáticos aparecem aqui quando o episódio é gravado.</p><% } %>
+      <ul class="plain plan-list fin-list top-gap">
+        <% finData.entries.forEach(function (e) { %><%- include('../finance/_row', { e: e, here: here }) %><% }) %>
+      </ul>
+      <% if (finData.stock.length) { %>
+      <h3 class="top-gap">Saiu do estoque</h3>
+      <ul class="plain plan-list">
+        <% finData.stock.forEach(function (m) { %><li><div class="plan-list-main"><span><%= m.name %></span></div><span class="mono"><%= String(m.qty).replace('.', ',') %> <%= m.unit %></span><span></span></li><% }) %>
+      </ul>
+      <% } %>
+    </section>
+  </div>
+  <% } %>
+
+  <div class="pane" id="pane-historico" data-pane-id="historico" hidden>
+    <div class="grid-2 align-start">
+      <section class="card" id="historico">
+        <h2>Linha do tempo</h2>
+        <ol class="timeline">
+          <% events.forEach(function (e) { %>
+          <li class="ev ev-<%= e.type %>"><div class="ev-msg"><%= e.message %></div><div class="ev-meta small muted"><%= fmt.formatDateTime(e.created_at) %><%= e.user_name ? ' · ' + e.user_name : '' %></div></li>
+          <% }) %>
+        </ol>
+      </section>
+      <section class="card">
+        <h2>Comentários da revisão<%= comments.length ? ' (' + comments.length + ')' : '' %></h2>
+        <% if (!comments.length) { %><p class="muted">Nenhum comentário.</p><% } %>
+        <ul class="plain comment-list">
+          <% comments.forEach(function (c) { %>
+          <li class="comment <%= c.resolved ? 'resolved' : '' %>">
+            <div class="row"><% if (c.at_ms != null) { %><span class="handle"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></span><% } else { %><span class="badge b-gray">geral</span><% } %>
+              <span class="small muted"><%= c.author_name || '—' %> · <%= fmt.formatDateTime(c.created_at) %></span><% if (c.resolved) { %><span class="badge b-green">resolvido</span><% } %></div>
+            <p class="pre"><%= c.body %></p>
+          </li>
+          <% }) %>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAIS DE TAREFA ================= -->
+<% if (perm.manage) { %>
+<dialog class="modal" id="modal-task-new" aria-labelledby="mt-new-h">
+  <form method="post" action="/episodios/<%= ep.id %>/tarefas" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mt-new-h">Nova tarefa</h2>
+    <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="Ex.: conteúdo extra: reação do convidado"></label>
+    <div class="row">
+      <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
+      <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></label>
+      <label>Prazo<input type="date" name="due_on"></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar tarefa</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (tickable) { %>
+<dialog class="modal" id="modal-task-edit" aria-labelledby="mt-edit-h">
+  <form method="post" action="" class="stack" data-task-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kind" data-f="kind">
+    <h2 id="mt-edit-h" data-f-text="title">Tarefa</h2>
+    <div class="row">
+      <label>Status<select name="status" data-f="status"><% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_STATUSES[k] %></option><% }) %></select></label>
+      <label>Responsável<select name="assignee_id" data-f="assignee_id" <%= perm.manage ? '' : 'disabled' %>><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></label>
+      <label>Prazo<input type="date" name="due_on" data-f="due_on" <%= perm.manage ? '' : 'disabled' %>></label>
+    </div>
+    <label>Motivo do bloqueio <small class="muted">(se o status for Bloqueada)</small><input type="text" name="block_reason" maxlength="500" data-f="block_reason"></label>
+    <label>Observação<textarea name="notes" rows="3" maxlength="1000" data-f="notes"></textarea></label>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Fechar</button>
+      <% if (perm.manage) { %><button class="link small danger" type="submit" data-task-remove formaction="" formnovalidate>remover tarefa</button><% } %>
+    </div>
+  </form>
+</dialog>
+<% } %>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<% if (perm.manage) { %>
+<dialog class="modal modal-wide" id="modal-obs" aria-labelledby="mo-h">
+  <form method="post" action="/episodios/<%= ep.id %>/observacoes" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mo-h">Observações para o editor</h2>
+    <textarea name="editor_notes" rows="7" maxlength="5000" aria-label="Observações para o editor" placeholder="O que o editor precisa saber: trechos a evitar, pedidos do convidado, ritmo, referências…"><%= ep.editor_notes || '' %></textarea>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (perm.manage) { %>
+<dialog class="modal" id="modal-patrocinio" aria-labelledby="mp-h">
+  <form method="post" action="/episodios/<%= ep.id %>/patrocinadores" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mp-h">Patrocínio do episódio</h2>
+    <p class="small muted">Escolha o papel de cada patrocinador neste episódio. "Fora" tira o vínculo.</p>
+    <ul class="plain ep-pick">
+      <% allSponsors.forEach(function (sp) { var cur = (sponsors.find(function (x) { return x.id === sp.id; }) || {}).role || ''; %>
+      <li><span><%= sp.company %></span>
+        <select name="role_<%= sp.id %>" aria-label="Papel de <%= sp.company %>"><option value="">Fora</option><option value="insercao" <%= cur === 'insercao' ? 'selected' : '' %>>Inserção</option><option value="exclusivo" <%= cur === 'exclusivo' ? 'selected' : '' %>>Exclusivo</option></select></li>
+      <% }) %>
+      <% if (!allSponsors.length) { %><li class="muted">Nenhum patrocinador cadastrado ainda.</li><% } %>
+    </ul>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (finData) { %>
+<%- include('../finance/_entry-modals', { episodes: [{ id: ep.id, number: ep.number, title: ep.title }], sponsors: allSponsors, suppliers: [], episodePre: ep.id }) %>
+<% if (perm.write) { %>
+<dialog class="modal" id="modal-duracao" aria-labelledby="md2-h">
+  <form method="post" action="/episodios/<%= ep.id %>/duracao" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="md2-h">Duração da gravação</h2>
+    <div class="grid-2 tight">
+      <label>Horas<input type="number" name="hours" min="0" max="24" value="<%= ep.recording_minutes ? Math.floor(ep.recording_minutes / 60) : 1 %>"></label>
+      <label>Minutos<input type="number" name="minutes" min="0" max="59" value="<%= ep.recording_minutes ? ep.recording_minutes % 60 : 0 %>"></label>
+    </div>
+    <p class="small muted">O saldo do estúdio é refeito: <span class="mono"><%= money(finData.settings.studio_hour_cents) %></span> por hora, menos o sinal. Se o saldo já foi pago, a diferença vira hora extra.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% } %>
+<%- include('../partials/foot') %>

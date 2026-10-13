@@ -1,0 +1,29 @@
+<%# Perguntas do briefing (usado no formulário da equipe). Variáveis: brief, goals. %>
+<label>Página de divulgação <small class="muted">(link de uma página nossa para divulgar; pode ficar para depois)</small>
+  <input type="url" name="landing_url" value="<%= brief.landing_url || '' %>" maxlength="500" placeholder="https://…">
+</label>
+<label>Brinde ou benefício nessa página <small class="muted">(se houver)</small>
+  <textarea name="landing_perk" rows="2" maxlength="1000"><%= brief.landing_perk || '' %></textarea>
+</label>
+<label>Oferta ou ação especial para quem vier pelo podcast <small class="muted">(consultoria, diagnóstico, brinde, desconto, convite para evento…)</small>
+  <textarea name="offer" rows="3" maxlength="3000"><%= brief.offer || '' %></textarea>
+</label>
+<label>Como apresentar a empresa <small class="muted">(texto institucional, apresentação ou mensagem que já usam)</small>
+  <textarea name="presentation" rows="4" maxlength="6000"><%= brief.presentation || '' %></textarea>
+</label>
+<label>Principais pontos a destacar <small class="muted">(produto/serviço, diferencial, público, cases, resultados…)</small>
+  <textarea name="key_points" rows="4" maxlength="4000"><%= brief.key_points || '' %></textarea>
+</label>
+<label>Restrições de comunicação <small class="muted">(o que não pode ser dito ou prometido)</small>
+  <textarea name="restrictions" rows="3" maxlength="3000"><%= brief.restrictions || '' %></textarea>
+</label>
+<label>Slogan ou frase-chave<input type="text" name="slogan" value="<%= brief.slogan || '' %>" maxlength="200"></label>
+<div class="grid-2 tight">
+  <label>Principal objetivo do patrocínio
+    <select name="goal">
+      <option value="">—</option>
+      <% Object.keys(goals).forEach(function (k) { %><option value="<%= k %>" <%= brief.goal === k ? 'selected' : '' %>><%= goals[k] %></option><% }) %>
+    </select>
+  </label>
+  <label>Se for outro, qual?<input type="text" name="goal_other" value="<%= brief.goal_other || '' %>" maxlength="500"></label>
+</div>

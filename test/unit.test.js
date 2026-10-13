@@ -4,6 +4,8 @@ require('./helpers');
 const { can, canManageUser, assignableRoles, PERMISSIONS, ROLES } = require('../src/permissions');
 const { hashPassword, verifyPassword, passwordPolicyError } = require('../src/auth/password');
 const tpl = require('../src/services/inviteTemplate');
+const rules = require('../src/services/guestRules');
+const csv = require('../src/services/csvImport');
 const fmt = require('../src/utils/format');
 const { createLimiter } = require('../src/auth/rateLimit');
 const { keywordCandidates } = require('../src/services/yourls');
@@ -75,15 +77,21 @@ test('utils: slugify, firstName, isEmail', () => {
   assert.equal(fmt.isEmail('a b@c.com'), false);
 });
 
-test('rate limit: bloqueia após o máximo e libera com reset', () => {
-  const l = createLimiter({ max: 2, windowMs: 1000 });
-  assert.equal(l.hit('k'), true);
-  assert.equal(l.hit('k'), true);
-  assert.equal(l.hit('k'), false);
-  assert.equal(l.blocked('k'), true);
-  l.reset('k');
-  assert.equal(l.blocked('k'), false);
-  assert.equal(l.hit('k'), true);
+test('rate limit (no Postgres, vale para todas as réplicas): bloqueia após o máximo e libera com reset', async () => {
+  const h = require('./helpers');
+  await h.resetDb();
+  const l = createLimiter({ name: 'teste', max: 2, windowMs: 60_000 });
+  const outro = createLimiter({ name: 'outro', max: 2, windowMs: 60_000 });
+  assert.equal(await l.hit('k'), true);
+  assert.equal(await l.hit('k'), true);
+  assert.equal(await l.hit('k'), false);
+  assert.equal(await l.blocked('k'), true);
+  assert.equal(await outro.blocked('k'), false, 'cada limitador conta separado');
+  await l.reset('k');
+  assert.equal(await l.blocked('k'), false);
+  assert.equal(await l.hit('k'), true);
+  assert.throws(() => createLimiter({ max: 1, windowMs: 1 }), /nome/);
+  await h.db.close();
 });
 
 test('YOURLS: keywords seguem a convenção dos links manuais (nome curto, depois nome+sobrenome)', () => {
@@ -101,4 +109,126 @@ test('modelo: guest_json é seguro dentro de <script>', () => {
   assert.equal(tpl.buildVariables({ name: 'A', gender: 'f' }).genero, 'f');
 });
 
+test('modelo: bloco de resposta só tem a recusa; reflete estado e convite encerrado', () => {
+  assert.match(tpl.responseBlock('/x', { state: 'recusado' }), /não poderá participar/);
+  const open = tpl.responseBlock('/x');
+  assert.match(open, /value="recusado"/);
+  assert.doesNotMatch(open, /value="aceito"/, 'aceitar é pelo botão do WhatsApp');
+});
+
+test('modelo: links dos botões vêm de buildVariables e viram # na prévia', () => {
+  const v = tpl.buildVariables({ name: 'A' }, { links: { aceitar: '/convite/t/aceitar', producao: '/convite/t/producao' } });
+  assert.equal(v.link_aceitar, '/convite/t/aceitar');
+  assert.equal(v.link_producao, '/convite/t/producao');
+  assert.equal(tpl.buildVariables({ name: 'A' }).link_aceitar, '#');
+  assert.match(tpl.inviteHtml(), /\{\{link_aceitar\}\}/);
+});
+
+test('regras: pendências por etapa', () => {
+  const none = {};
+  assert.deepEqual(rules.missingFor('prospect', none), []);
+  assert.deepEqual(rules.missingFor('recusou', none), []);
+  assert.deepEqual(rules.missingFor('gravado', none), []);
+  assert.equal(rules.missingFor('em_agendamento', none).length, 1);
+  assert.deepEqual(rules.missingFor('em_agendamento', { phone: '1' }), []);
+  assert.deepEqual(rules.missingFor('em_agendamento', { email: 'a@b.co' }), []);
+  assert.equal(rules.missingFor('agendado', none).length, 4);
+  assert.deepEqual(rules.missingFor('agendado', { proposed_at: new Date(), scheduled_studio: true, scheduled_hosts: true, scheduled_guest: true }), []);
+  assert.equal(rules.missingMessage('Agendado', ['a', 'b', 'c']), 'Para mover para Agendado falta: a, b e c.');
+});
+
+test('regras: Instagram, perfil, gênero e URLs', () => {
+  assert.equal(rules.normalizeInstagram('@Maria.Souza'), 'maria.souza');
+  assert.equal(rules.normalizeInstagram('https://www.instagram.com/maria_s/?igsh=1'), 'maria_s');
+  assert.equal(rules.normalizeInstagram('instagram.com/maria/'), 'maria');
+  assert.equal(rules.normalizeInstagram('com espaço'), null);
+  assert.equal(rules.normalizeInstagram(''), null);
+  assert.equal(rules.normalizeInstagram('a'.repeat(31)), null);
+  for (const [input, key] of [['Médico', 'medico'], ['médica', 'medico'], ['INFLUENCER', 'influencer'], ['Influenciadora', 'influencer'], ['Empresário', 'empresario'],
+    ['empresária', 'empresario'], ['Profissional da saúde', 'profissional_saude'], ['profissional de saude', 'profissional_saude'], ['medico', 'medico']]) {
+    assert.equal(rules.normalizeProfile(input), key, input);
+  }
+  assert.equal(rules.normalizeProfile('astronauta'), null);
+  assert.equal(rules.normalizeProfile(''), null);
+  assert.equal(rules.normalizeGender('Feminino'), 'f');
+  assert.equal(rules.normalizeGender(''), 'm');
+  assert.equal(rules.normalizeGender('talvez'), null);
+  assert.equal(rules.normalizeUrl('youtu.be/abc', rules.YOUTUBE_HOSTS).value, 'https://youtu.be/abc');
+  assert.equal(rules.normalizeUrl('https://www.youtube.com/watch?v=1', rules.YOUTUBE_HOSTS).value, 'https://www.youtube.com/watch?v=1');
+  assert.ok(rules.normalizeUrl('https://youtube.com.evil.com/x', rules.YOUTUBE_HOSTS).error);
+  assert.ok(rules.normalizeUrl('javascript:alert(1)', rules.SPOTIFY_HOSTS).error);
+  assert.deepEqual(rules.normalizeUrl('', rules.SPOTIFY_HOSTS), { value: null });
+});
+
+test('csv: separadores, aspas, quebra de linha dentro do campo, BOM e linhas em branco', () => {
+  assert.deepEqual(csv.parseCsv('a;b;c\n1;2;3\n'), [['a', 'b', 'c'], ['1', '2', '3']]);
+  assert.deepEqual(csv.parseCsv('a,b\r\n"x, y","he said ""hi"""\r\n\r\n'), [['a', 'b'], ['x, y', 'he said "hi"']]);
+  assert.deepEqual(csv.parseCsv('﻿a\tb\n1\t2'), [['a', 'b'], ['1', '2']]);
+  assert.deepEqual(csv.parseCsv('a;b\n"linha 1\nlinha 2";z'), [['a', 'b'], ['linha 1\nlinha 2', 'z']]);
+  assert.deepEqual(csv.parseCsv(''), []);
+});
+
+test('csv: cabeçalhos com acento/variações são reconhecidos e a validação é linha a linha', () => {
+  const { rows, headerError } = csv.parseGuests('Nome Completo;@Instagram;Celular;Tipo de perfil;E-mail;Motivo\nAna;@ana;11 9;médica;a@b.co;porque\n;@x;;médico;;');
+  assert.equal(headerError, null);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0].errors, []);
+  assert.deepEqual(rows[0].data, { name: 'Ana', instagram: 'ana', profile: 'medico', email: 'a@b.co', gender: 'm', phone: '11 9', invite_reason: 'porque' });
+  assert.equal(rows[0].line, 2);
+  assert.deepEqual(rows[1].errors, ['nome ausente']);
+  assert.match(csv.parseGuests('nome;perfil\nA;médico').headerError, /instagram/);
+});
+
 test.after(async () => { await require('../src/db/pool').close(); });
+
+test('urls: esquemas estranhos são recusados, "site sem https" e localhost com porta passam', () => {
+  for (const bad of ['ftp://x', 'javascript:alert(1)', 'data:text/html,<b>x', 'file:///etc/passwd', 'mailto:a@b.co']) assert.ok(rules.normalizeUrl(bad).error, bad);
+  assert.equal(rules.normalizeUrl('aurora.com.br').value, 'https://aurora.com.br/');
+  assert.equal(rules.normalizeUrl('http://aurora.com.br/x').value, 'http://aurora.com.br/x');
+  assert.equal(rules.normalizeUrl('localhost:3000').value, 'https://localhost:3000/');
+});
+
+test('valores em reais: parseBRL e formatBRL', () => {
+  assert.equal(fmt.parseBRL('15.000,00'), 1500000);
+  assert.equal(fmt.parseBRL('15000'), 1500000);
+  assert.equal(fmt.parseBRL('R$ 6.000,5'), 600050);
+  assert.equal(fmt.parseBRL('6.000'), 600000);
+  assert.equal(fmt.parseBRL(''), null);
+  assert.ok(Number.isNaN(fmt.parseBRL('abc')));
+  assert.ok(Number.isNaN(fmt.parseBRL('1,2,3')));
+  assert.match(fmt.formatBRL(1500000), /R\$\s15\.000,00/);
+  assert.equal(fmt.formatBRL(null), '—');
+});
+
+test('datas sem hora: parse, formatação e dia por extenso (sem deslocar por fuso)', () => {
+  assert.equal(fmt.parseInputDate('2026-10-23'), '2026-10-23');
+  assert.ok(Number.isNaN(fmt.parseInputDate('2026-02-30')));
+  assert.equal(fmt.parseInputDate(''), null);
+  assert.equal(fmt.formatDay('2026-10-23'), '23/10/2026');
+  assert.equal(fmt.formatDay(new Date(2026, 9, 23)), '23/10/2026');
+  assert.equal(fmt.formatDayShort('2026-10-23'), '23/10');
+  assert.equal(fmt.formatDayLong('2026-10-23'), '23 de outubro de 2026');
+  assert.equal(fmt.formatDayLong(null), '');
+});
+
+test('backblaze: assinatura SigV4 confere com o exemplo oficial da AWS e a codificação segue o padrão', () => {
+  const b2 = require('../src/services/b2');
+  const r = b2.signRequest({
+    method: 'GET', host: 'examplebucket.s3.amazonaws.com', path: '/test.txt', headers: { range: 'bytes=0-9' },
+    payloadHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    accessKey: 'AKIAIOSFODNN7EXAMPLE', secretKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', region: 'us-east-1', amzDate: '20130524T000000Z',
+  });
+  assert.equal(r.signature, 'f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41');
+  assert.match(r.authorization, /^AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE\/20130524\/us-east-1\/s3\/aws4_request, SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, Signature=/);
+  assert.equal(b2.uriEncode("café (1)!'*"), 'caf%C3%A9%20%281%29%21%27%2A');
+});
+
+test('relativeDays conta dias no calendário de Brasília', () => {
+  const now = new Date('2026-10-08T23:30:00-03:00');
+  assert.equal(fmt.relativeDays(new Date('2026-10-08T08:00:00-03:00'), now), 'hoje');
+  assert.equal(fmt.relativeDays(new Date('2026-10-09T00:10:00-03:00'), now), 'amanhã', 'virou o dia em Brasília');
+  assert.equal(fmt.relativeDays(new Date('2026-10-13T15:00:00-03:00'), now), 'em 5 dias');
+  assert.equal(fmt.relativeDays(new Date('2026-10-07T15:00:00-03:00'), now), 'ontem');
+  assert.equal(fmt.relativeDays(new Date('2026-10-01T15:00:00-03:00'), now), 'há 7 dias');
+  assert.equal(fmt.relativeDays(null, now), '');
+});

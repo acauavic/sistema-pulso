@@ -14,10 +14,19 @@
   <% cards.forEach(function (c) { %>
     <a class="stat" href="/convidados?view=lista&status=<%= c.key %>">
       <span class="stat-label"><%= c.label %></span>
-      <span class="stat-n <%= c.key === 'confirmado' && c.n ? 'hl' : '' %>"><%= c.n %></span>
+      <span class="stat-n <%= c.key === 'em_agendamento' && c.n ? 'hl' : '' %>"><%= c.n %></span>
     </a>
   <% }) %>
 </section>
+
+<% if (money) { %>
+<a class="card money-strip" href="/financeiro">
+  <span class="kicker">Financeiro</span>
+  <span><span class="mono"><%= fmt.formatBRL(money.out7) %></span> a pagar nos próximos 7 dias</span>
+  <span class="<%= money.late ? 'err' : 'muted' %>"><%= money.late ? money.late + ' conta' + (money.late === 1 ? '' : 's') + ' atrasada' + (money.late === 1 ? '' : 's') : 'nada atrasado' %></span>
+  <span class="<%= money.toBuy ? 'warn' : 'muted' %>"><%= money.toBuy ? money.toBuy + ' item' + (money.toBuy === 1 ? '' : 'ns') + ' de estoque para repor' : 'estoque em dia' %></span>
+</a>
+<% } %>
 
 <div class="grid-2 tight">
   <section class="card">
@@ -26,7 +35,7 @@
       <div class="empty">
         <%- include('partials/pulse-line') %>
         <strong>Nenhuma gravação marcada</strong>
-        <span>Confirme um convidado com data futura e ele aparece aqui.</span>
+        <span>Quando um convidado entra em Agendado, a gravação aparece aqui.</span>
       </div>
     <% } %>
     <ul class="plain upcoming">

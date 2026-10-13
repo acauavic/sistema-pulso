@@ -1,0 +1,56 @@
+<%- include('../partials/head') %>
+<% var ICON = { tarefa: 'check-square', comentario: 'message-square', agendamento: 'calendar', rotina: 'settings' };
+   var totalUnread = Object.keys(unreadBy).reduce(function (n, k) { return n + unreadBy[k]; }, 0);
+   var link = function (t, f) { var q = []; if (t) q.push('tipo=' + t); if (f) q.push('filtro=' + f); return '/notificacoes' + (q.length ? '?' + q.join('&') : ''); }; %>
+<div class="page-head">
+  <div><span class="kicker">Avisos para você</span><h1>Notificações</h1></div>
+  <div class="row">
+    <% if (totalUnread) { %>
+    <form method="post" action="/notificacoes/lidas" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><% if (type) { %><input type="hidden" name="tipo" value="<%= type %>"><% } %><input type="hidden" name="voltar" value="<%= link(type, unread ? 'nao-lidas' : '') %>"><button class="btn" type="submit"><%- icon('check') %> Marcar <%= type ? 'estas' : 'todas' %> como lidas</button></form>
+    <% } %>
+  </div>
+</div>
+
+<div class="notif-layout">
+  <aside class="notif-filters">
+    <nav class="filter-list" aria-label="Tipos">
+      <a href="<%= link(null, unread ? 'nao-lidas' : '') %>" class="<%= !type ? 'on' : '' %>"><%- icon('bell') %><span>Todas</span><% if (totalUnread) { %><span class="nav-count"><%= totalUnread %></span><% } %></a>
+      <% Object.keys(types).forEach(function (k) { %>
+      <a href="<%= link(k, unread ? 'nao-lidas' : '') %>" class="<%= type === k ? 'on' : '' %>"><%- icon(ICON[k]) %><span><%= types[k].label %></span><% if (unreadBy[k]) { %><span class="nav-count"><%= unreadBy[k] %></span><% } %><% if (muted.indexOf(k) >= 0) { %><span class="badge b-gray">silenciado</span><% } %></a>
+      <% }) %>
+    </nav>
+    <div class="seg top-gap"><a class="<%= !unread ? 'on' : '' %>" href="<%= link(type, '') %>">Todas</a><a class="<%= unread ? 'on' : '' %>" href="<%= link(type, 'nao-lidas') %>">Não lidas</a></div>
+
+    <details class="top-gap">
+      <summary>Minhas preferências</summary>
+      <form method="post" action="/notificacoes/preferencias" class="stack top-gap">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <p class="small muted">Marque o que você não quer receber. A gestão define o que vale para todos em Gestão &gt; Notificações.</p>
+        <% Object.keys(types).forEach(function (k) { %>
+        <label class="check"><input type="checkbox" name="silenciar" value="<%= k %>" <%= muted.indexOf(k) >= 0 ? 'checked' : '' %>> Silenciar <%= types[k].label.toLowerCase() %></label>
+        <% }) %>
+        <div><button class="btn sm" type="submit">Salvar preferências</button></div>
+      </form>
+    </details>
+  </aside>
+
+  <section class="card notif-list-card">
+    <% if (!items.length) { %>
+    <div class="empty"><%- include('../partials/pulse-line') %><p><strong><%= unread ? 'Tudo lido.' : 'Nenhuma notificação.' %></strong></p><p class="muted small">Tarefas, comentários, agendamentos e rotinas do sistema aparecem aqui.</p></div>
+    <% } %>
+    <ul class="plain notif-list">
+      <% items.forEach(function (n) { %>
+      <li class="notif <%= n.read_at ? '' : 'unread' %> nt-<%= n.type %>">
+        <span class="notif-ic"><%- icon(ICON[n.type]) %></span>
+        <a class="notif-main" href="/notificacoes/<%= n.id %>/abrir">
+          <strong><%= n.title %></strong>
+          <% if (n.body) { %><span class="small muted"><%= n.body %></span><% } %>
+          <span class="handle muted"><%= types[n.type].label %> · <%= fmt.formatDateTime(n.created_at) %></span>
+        </a>
+        <% if (!n.read_at) { %><form method="post" action="/notificacoes/<%= n.id %>/lida" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= link(type, unread ? 'nao-lidas' : '') %>"><button class="link small" type="submit" title="Marcar como lida">lida</button></form><% } %>
+      </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+<%- include('../partials/foot') %>

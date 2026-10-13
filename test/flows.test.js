@@ -9,12 +9,13 @@ const as = {}; // clientes logados por perfil
 
 const lastMail = (to) => [...h.mailer.outbox].reverse().find((m) => !to || m.to === to);
 const linkIn = (mail, re) => mail.html.match(re)?.[0];
+// campos mínimos de um convidado válido (nome, Instagram e perfil são obrigatórios)
+const min = (o = {}) => ({ instagram: '@pulso.teste', profile: 'medico', ...o });
+const JSON_HEADERS = (csrf) => ({ accept: 'application/json', 'x-csrf-token': csrf });
 
 describe('fluxos ponta a ponta', () => {
   before(async () => {
     await h.resetDb();
-    await h.db.query('UPDATE invite_templates SET is_default = false');
-    await h.db.query("UPDATE invite_templates SET is_default = true WHERE name LIKE 'Convite simples%'");
     app = await h.startServer();
     admin = await h.createUser({ name: 'Ana Admin', email: 'admin@t.com', role: 'superadmin' });
     gestao = await h.createUser({ name: 'Gil Gestão', email: 'gestao@t.com', role: 'gestao' });
@@ -228,10 +229,10 @@ describe('fluxos ponta a ponta', () => {
     let guestId; let token; let shortUrl;
 
     it('produtora cadastra convidado; editor de vídeo só enxerga', async () => {
-      const r = await as.prod.act('/convidados', {
+      const r = await as.prod.act('/convidados', min({
         name: 'Maria <b>Souza</b>', email: 'maria@conv.com', company: 'Estúdio X', topic: 'Marcas & histórias',
         proposed_at: '2026-12-10T15:00', owner_id: produtora.id, status: 'prospect',
-      }, { from: '/convidados/novo' });
+      }), { from: '/convidados/novo' });
       assert.equal(r.status, 302);
       guestId = r.location.split('/').pop();
       assert.match(guestId, /^\d+$/);
@@ -252,10 +253,15 @@ describe('fluxos ponta a ponta', () => {
     });
 
     it('valida formulário', async () => {
-      assert.equal((await as.prod.act('/convidados', { name: 'A' }, { from: '/convidados/novo' })).status, 400);
-      assert.equal((await as.prod.act('/convidados', { name: 'Ok Nome', email: 'ruim' }, { from: '/convidados/novo' })).status, 400);
-      assert.equal((await as.prod.act('/convidados', { name: 'Ok Nome', proposed_at: 'ontem' }, { from: '/convidados/novo' })).status, 400);
-      assert.equal((await as.prod.act('/convidados', { name: 'Ok Nome', owner_id: '00000000-0000-4000-8000-000000000000' }, { from: '/convidados/novo' })).status, 400);
+      const bad = (fields) => as.prod.act('/convidados', fields, { from: '/convidados/novo' });
+      assert.equal((await bad(min({ name: 'A' }))).status, 400);
+      assert.equal((await bad(min({ name: 'Ok Nome', email: 'ruim' }))).status, 400);
+      assert.equal((await bad(min({ name: 'Ok Nome', proposed_at: 'ontem' }))).status, 400);
+      assert.equal((await bad(min({ name: 'Ok Nome', owner_id: '00000000-0000-4000-8000-000000000000' }))).status, 400);
+      assert.match((await bad({ name: 'Ok Nome', profile: 'medico' })).text, /Instagram/, 'Instagram é obrigatório');
+      assert.match((await bad({ name: 'Ok Nome', instagram: '@ok' })).text, /perfil/, 'perfil é obrigatório');
+      assert.equal((await bad({ name: 'Ok Nome', instagram: '@com espaço', profile: 'medico' })).status, 400);
+      assert.equal((await bad(min({ name: 'Ok Nome', profile: 'astronauta' }))).status, 400);
     });
 
     it('gera link do convite: token + link curto no YOURLS (com retry de keyword ocupada)', async () => {
@@ -298,7 +304,7 @@ describe('fluxos ponta a ponta', () => {
       const real = global.fetch;
       global.fetch = async (u, o) => (String(u).startsWith('https://yourls.test') ? Response.json({ status: 'fail', message: 'Please log in', statusCode: 403 }) : real(u, o));
       try {
-        const r = await as.prod.act('/convidados', { name: 'Sem Curto', owner_id: produtora.id }, { from: '/convidados/novo' });
+        const r = await as.prod.act('/convidados', min({ name: 'Sem Curto', owner_id: produtora.id }), { from: '/convidados/novo' });
         const id = r.location.split('/').pop();
         const gen = await as.prod.act(`/convidados/${id}/convite`, {}, { from: `/convidados/${id}` });
         assert.equal(gen.status, 302);
@@ -311,14 +317,15 @@ describe('fluxos ponta a ponta', () => {
       }
     });
 
-    it('página pública: renderiza o modelo, escapa dados, aplica CSP sem script e não é indexável', async () => {
+    it('página pública: renderiza o convite fixo, escapa dados, aplica CSP e não é indexável', async () => {
       const c = h.client(app.base);
       const r = await c.get(`/convite/${token}`, { ua: 'WhatsApp/2.23' }); // robô: não conta como visualização
       assert.equal(r.status, 200);
-      assert.match(r.text, /Olá, Maria!/);
-      assert.match(r.text, /Marcas &amp; histórias/);
-      assert.match(r.text, /quinta-feira, 10 de dezembro de 2026/);
-      assert.match(r.text, /Paula Produtora/);
+      assert.match(r.text, /const G = \{"nome":"Maria \\u003cb\\u003eSouza/, 'nome entra como JSON seguro');
+      assert.doesNotMatch(r.text, /<b>Souza<\/b>/);
+      assert.match(r.text, new RegExp(`href="/convite/${token}/aceitar"`), 'botão aceitar passa pelo rastreio');
+      assert.match(r.text, new RegExp(`href="/convite/${token}/producao"`), 'botão produção passa pelo rastreio');
+      assert.doesNotMatch(r.text, /href="https:\/\/wa\.me/, 'nenhum botão vai direto ao WhatsApp');
       assert.match(r.text, new RegExp(`action="/convite/${token}/responder"`));
       assert.doesNotMatch(r.text, /\{\{/);
       const csp = r.headers.get('content-security-policy');
@@ -335,7 +342,8 @@ describe('fluxos ponta a ponta', () => {
       for (const t of ['x', 'a'.repeat(24), "' OR 1=1 --", '../../etc/passwd']) {
         assert.equal((await c.get(`/convite/${encodeURIComponent(t)}`)).status, 404, t);
       }
-      assert.equal((await c.post(`/convite/${'a'.repeat(24)}/responder`, { resposta: 'aceito' })).status, 404);
+      assert.equal((await c.post(`/convite/${'a'.repeat(24)}/responder`, { resposta: 'recusado' })).status, 404);
+      for (const sub of ['aceitar', 'producao']) assert.equal((await c.get(`/convite/${'a'.repeat(24)}/${sub}`)).status, 404, sub);
     });
 
     it('"visto" ignora robôs de preview (WhatsApp) e conta o primeiro acesso humano', async () => {
@@ -367,51 +375,114 @@ describe('fluxos ponta a ponta', () => {
       assert.ok(g.invite_sent_at);
     });
 
-    it('convidado aceita: etapa vira "confirmado", responsável é avisado, página mostra confirmação', async () => {
+    it('clicar em "Aceitar": conta o clique, vira "Em agendamento", avisa o responsável e leva ao WhatsApp', async () => {
       h.mailer.outbox.length = 0;
       const c = h.client(app.base);
-      const r = await c.post(`/convite/${token}/responder`, { resposta: 'aceito', mensagem: 'Combinado! <3' });
-      assert.equal(r.status, 302);
-      const { rows: [g] } = await h.db.query('SELECT status, rsvp_message, responded_at FROM guests WHERE id=$1', [guestId]);
-      assert.equal(g.status, 'confirmado');
-      assert.equal(g.rsvp_message, 'Combinado! <3');
+      const r = await c.get(`/convite/${token}/aceitar`);
+      assert.equal(r.status, 200);
+      assert.match(r.text, /Convite aceito/);
+      assert.match(r.text, /Maria/);
+      const refresh = r.text.match(/<meta http-equiv="refresh" content="3;url=([^"]+)">/);
+      assert.ok(refresh, 'redireciona sozinho');
+      assert.match(refresh[1], /^https:\/\/wa\.me\/5512991053852\?text=Ol%C3%A1/);
+      assert.match(r.text, /Abrir o WhatsApp agora/, 'link manual de reserva');
+      assert.match(r.headers.get('content-security-policy'), /sandbox/);
+
+      const { rows: [g] } = await h.db.query('SELECT status, responded_at FROM guests WHERE id=$1', [guestId]);
+      assert.equal(g.status, 'em_agendamento');
       assert.ok(g.responded_at);
+      assert.equal((await h.db.query("SELECT count(*)::int n FROM invite_clicks WHERE guest_id=$1 AND kind='aceitar'", [guestId])).rows[0].n, 1);
       const notice = lastMail('prod@t.com');
       assert.ok(notice, 'responsável avisado');
       assert.match(notice.subject, /aceitou/);
-      assert.match(notice.html, /Combinado! &lt;3/);
       assert.match((await c.get(`/convite/${token}`)).text, /presença está confirmada/);
+      assert.match((await as.prod.get(`/convidados/${guestId}`)).text, /Aceitar o convite<\/dt>\s*<dd><strong[^>]*>1<\/strong>/);
     });
 
-    it('resposta inválida é ignorada; convidado pode mudar de ideia; convite encerrado não aceita resposta', async () => {
+    it('clicar de novo em "Aceitar" conta o clique mas não repete a mudança de etapa nem o e-mail', async () => {
+      h.mailer.outbox.length = 0;
+      const c = h.client(app.base);
+      assert.equal((await c.get(`/convite/${token}/aceitar`)).status, 200);
+      assert.equal((await h.db.query("SELECT count(*)::int n FROM invite_clicks WHERE guest_id=$1 AND kind='aceitar'", [guestId])).rows[0].n, 2);
+      assert.equal(h.mailer.outbox.length, 0, 'sem novo aviso');
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'em_agendamento');
+    });
+
+    it('"Falar com a produção": redireciona ao WhatsApp, conta cada clique e registra o primeiro na linha do tempo', async () => {
+      const c = h.client(app.base);
+      const r = await c.get(`/convite/${token}/producao`);
+      assert.equal(r.status, 302);
+      assert.match(r.location, /^https:\/\/wa\.me\/5512991053852\?text=Ol%C3%A1.*produ%C3%A7%C3%A3o/);
+      await c.get(`/convite/${token}/producao`);
+      assert.equal((await h.db.query("SELECT count(*)::int n FROM invite_clicks WHERE guest_id=$1 AND kind='producao'", [guestId])).rows[0].n, 2);
+      assert.equal((await h.db.query("SELECT count(*)::int n FROM guest_events WHERE guest_id=$1 AND message LIKE '%Falar com a produção%'", [guestId])).rows[0].n, 1);
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'em_agendamento', 'não muda etapa');
+    });
+
+    it('robôs de pré-visualização (WhatsApp, Facebook) seguem o redirecionamento sem contar nem mudar etapa', async () => {
+      const r = await as.prod.act('/convidados', min({ name: 'Bia Robô', owner_id: produtora.id }), { from: '/convidados/novo' });
+      const id = r.location.split('/').pop();
+      await as.prod.act(`/convidados/${id}/convite`, {}, { from: `/convidados/${id}` });
+      const { rows: [g] } = await h.db.query('SELECT invite_token FROM guests WHERE id=$1', [id]);
+      const c = h.client(app.base);
+      for (const [path, ua] of [['aceitar', 'WhatsApp/2.23'], ['aceitar', 'facebookexternalhit/1.1'], ['producao', 'Slackbot-LinkExpanding 1.0']]) {
+        const res = await c.get(`/convite/${g.invite_token}/${path}`, { ua });
+        assert.equal(res.status, 302, `${path} ${ua}`);
+        assert.match(res.location, /^https:\/\/wa\.me\//);
+      }
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM invite_clicks WHERE guest_id=$1', [id])).rows[0].n, 0);
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [id])).rows[0].status, 'prospect');
+    });
+
+    it('formulário só aceita recusa; convidado pode mudar de ideia; convite encerrado não aceita resposta', async () => {
       const c = h.client(app.base);
       await c.post(`/convite/${token}/responder`, { resposta: 'hackeado' });
-      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'confirmado');
+      await c.post(`/convite/${token}/responder`, { resposta: 'aceito' }); // aceitar agora é só pelo botão
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'em_agendamento');
       await c.post(`/convite/${token}/responder`, { resposta: 'recusado', mensagem: 'Surgiu um imprevisto' });
-      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'recusou');
+      const { rows: [g] } = await h.db.query('SELECT status, rsvp_message FROM guests WHERE id=$1', [guestId]);
+      assert.equal(g.status, 'recusou');
+      assert.equal(g.rsvp_message, 'Surgiu um imprevisto');
+      assert.match((await c.get(`/convite/${token}`)).text, /não poderá participar/);
+
+      await c.get(`/convite/${token}/aceitar`); // mudou de ideia: recusou -> em agendamento
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'em_agendamento');
 
       await as.prod.act(`/convidados/${guestId}/status`, { status: 'gravado' }, { from: '/convidados' });
-      await c.post(`/convite/${token}/responder`, { resposta: 'aceito' });
+      await c.post(`/convite/${token}/responder`, { resposta: 'recusado' });
       assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'gravado', 'gravado não volta por RSVP');
+      await c.get(`/convite/${token}/aceitar`);
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'gravado', 'nem pelo botão');
       const page = (await c.get(`/convite/${token}`)).text;
       assert.match(page, /não está mais aberto/);
       assert.doesNotMatch(page, /<form/);
     });
 
-    it('arrastar no quadro (JSON) muda a etapa e registra na linha do tempo', async () => {
+    it('arrastar no quadro (JSON) muda a etapa; sem os dados exigidos devolve 422 com o caminho para completar', async () => {
       const csrf = await as.prod.csrf('/convidados');
-      const r = await as.prod.post(`/convidados/${guestId}/status`, { status: 'publicado' },
-        { headers: { accept: 'application/json', 'x-csrf-token': csrf } });
-      assert.equal(r.status, 200);
-      assert.deepEqual(JSON.parse(r.text), { ok: true });
-      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'publicado');
-      const bad = await as.prod.post(`/convidados/${guestId}/status`, { status: 'inventada' }, { headers: { accept: 'application/json', 'x-csrf-token': csrf } });
-      assert.equal(bad.status, 400);
-      const semCsrf = await as.prod.post(`/convidados/${guestId}/status`, { status: 'gravado' }, { headers: { accept: 'application/json' } });
-      assert.equal(semCsrf.status, 403);
+      const move = (status, headers = JSON_HEADERS(csrf)) => as.prod.post(`/convidados/${guestId}/status`, { status }, { headers });
+
+      await h.db.query('UPDATE guests SET scheduled_studio=false, scheduled_hosts=false, scheduled_guest=false WHERE id=$1', [guestId]);
+      const blocked = await move('agendado');
+      assert.equal(blocked.status, 422);
+      const info = JSON.parse(blocked.text);
+      assert.equal(info.ok, false);
+      assert.ok(info.missing.includes('confirmação de agenda no Estúdio'));
+      assert.equal(info.editUrl, `/convidados/${guestId}?abrir=agenda`, 'abre a janela da agenda');
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'gravado', 'continua onde estava');
+      assert.equal((await move('publicado')).status, 400, 'Publicado não é etapa do convidado (o que se publica é o episódio)');
+
+      await as.prod.act(`/convidados/${guestId}/avancar`, { para: 'gravado', agenda: '1', proposed_at: '2026-09-10T10:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' }, { from: `/convidados/${guestId}` });
+      assert.deepEqual(JSON.parse((await move('agendado')).text), { ok: true }, 'agenda confirmada: arrastar passa');
+      assert.equal((await move('gravado')).status, 200);
+
+      assert.equal((await move('inventada')).status, 400);
+      assert.equal((await move('gravado', { accept: 'application/json' })).status, 403, 'sem CSRF');
       const board = await as.prod.get('/convidados');
       assert.equal(board.status, 200);
       assert.match(board.text, /data-board/);
+      for (const key of ['em_agendamento', 'agendado']) assert.match(board.text, new RegExp(`data-status="${key}"`), `coluna ${key}`);
+      assert.doesNotMatch(board.text, /data-status="confirmado"/);
       assert.equal((await as.prod.get('/convidados?view=lista&status=publicado&q=maria')).status, 200);
     });
 
@@ -424,61 +495,275 @@ describe('fluxos ponta a ponta', () => {
     });
 
     it('IDs malformados viram 404, não erro 500', async () => {
-      for (const p of ['/convidados/abc', '/convidados/99999999', '/usuarios/xyz/editar', '/modelos/abc/editar']) {
+      for (const p of ['/convidados/abc', '/convidados/99999999', '/usuarios/xyz/editar', '/modelos']) {
         assert.equal((await as.admin.get(p)).status, 404, p);
       }
     });
   });
 
-  describe('modelos de convite', () => {
-    it('lista, pré-visualiza com dados fictícios e edita o HTML', async () => {
-      const list = await as.gestao.get('/modelos');
-      assert.equal(list.status, 200);
-      assert.match(list.text, /Convite Pulso/);
-      assert.match(list.text, /Convite simples/);
-      const { rows: [t] } = await h.db.query('SELECT id FROM invite_templates LIMIT 1');
-      const prev = await as.prod.get(`/modelos/${t.id}/previa`);
-      assert.equal(prev.status, 200);
-      assert.match(prev.text, /Maria/);
-      assert.match(prev.headers.get('content-security-policy'), /frame-ancestors 'self'/);
+  describe('CRM: campos por etapa e regras para avançar', () => {
+    let id;
+    const guest = () => h.db.query('SELECT * FROM guests WHERE id=$1', [id]).then((r) => r.rows[0]);
+    const edit = (fields) => as.prod.act(`/convidados/${id}`, min({ name: 'Rita Regras', ...fields }), { from: `/convidados/${id}/editar` });
+    const move = async (status) => {
+      const csrf = await as.prod.csrf('/convidados');
+      return as.prod.post(`/convidados/${id}/status`, { status }, { headers: JSON_HEADERS(csrf) });
+    };
 
-      const html = '<html><body><h1>Oi {{primeiro_nome}}</h1><p>{{tema}}</p>{{bloco_resposta}}</body></html>';
-      const r = await as.gestao.act(`/modelos/${t.id}`, { name: 'Meu modelo', subject: 'Convite {{podcast}}', html_body: html }, { from: '/modelos' });
+    it('cadastro inicial: nome, Instagram e perfil; Instagram é normalizado; WhatsApp, e-mail e motivo são opcionais', async () => {
+      const r = await as.prod.act('/convidados', {
+        name: 'Rita Regras', instagram: 'https://www.instagram.com/Rita.Regras/?igsh=abc', profile: 'Profissional da saúde',
+        invite_reason: 'Referência em nutrição esportiva', owner_id: produtora.id,
+      }, { from: '/convidados/novo' });
       assert.equal(r.status, 302);
-      assert.match((await as.prod.get(`/modelos/${t.id}/previa`)).text, /<h1>Oi Maria<\/h1>/);
+      id = r.location.split('/').pop();
+      const g = await guest();
+      assert.equal(g.instagram, 'rita.regras');
+      assert.equal(g.profile, 'profissional_saude');
+      assert.equal(g.invite_reason, 'Referência em nutrição esportiva');
+      assert.equal(g.status, 'prospect');
+      assert.equal(g.email, null);
+      assert.equal(g.phone, null);
+      const page = (await as.prod.get(`/convidados/${id}`)).text;
+      assert.match(page, /@rita\.regras/);
+      assert.match(page, /Profissional da saúde/);
     });
 
-    it('produtora vê mas não edita; valida campos; avisa quando falta {{bloco_resposta}}', async () => {
-      const { rows: [t] } = await h.db.query('SELECT id FROM invite_templates LIMIT 1');
-      assert.equal((await as.prod.get('/modelos')).status, 200);
-      assert.equal((await as.prod.get(`/modelos/${t.id}/editar`)).status, 403);
-      assert.equal((await as.prod.act('/modelos', { name: 'x', subject: 'y', html_body: '<p>oi</p>' })).status, 403);
-      assert.equal((await as.gestao.act('/modelos', { name: 'Sem html', subject: 'a', html_body: '' }, { from: '/modelos/novo' })).status, 400);
-      assert.equal((await as.gestao.act('/modelos', { name: 'Gigante', subject: 'a', html_body: 'x'.repeat(200_001) }, { from: '/modelos/novo' })).status, 400);
-      const r = await as.gestao.act('/modelos', { name: 'Sem botões', subject: 'Oi', html_body: '<html><body>Convite sem botões de resposta</body></html>' }, { from: '/modelos/novo' });
-      assert.equal(r.status, 302);
-      assert.match((await as.gestao.get('/modelos')).text, /bloco_resposta/);
+    it('as etapas do funil são as novas (sem "Confirmado")', async () => {
+      const page = (await as.prod.get(`/convidados/${id}`)).text;
+      const modal = page.match(/id="modal-etapa"[\s\S]*?<\/dialog>/)[0];
+      const options = [...modal.matchAll(/name="status" value="([a-z_]+)"/g)].map((m) => m[1]);
+      assert.match(modal, /data-stage-confirm disabled/, 'só habilita ao escolher outra etapa');
+      assert.match(page, /badge-btn[^>]*data-modal-open="modal-etapa"/, 'a etapa no topo abre a janela');
+      assert.doesNotMatch(page, /Outras ações/);
+      assert.deepEqual(options, ['prospect', 'convite_enviado', 'em_agendamento', 'agendado', 'gravado', 'recusou', 'cancelado']);
     });
 
-    it('padrão não pode ser excluído; trocar padrão funciona; convidado usa o modelo escolhido', async () => {
-      const { rows } = await h.db.query('SELECT id, name, is_default FROM invite_templates ORDER BY id');
-      const def = rows.find((x) => x.is_default);
-      const other = rows.find((x) => x.name === 'Sem botões');
-      await as.gestao.act(`/modelos/${def.id}/excluir`, {}, { from: '/modelos' });
-      assert.equal((await h.db.query('SELECT 1 FROM invite_templates WHERE id=$1', [def.id])).rowCount, 1);
+    it('Em agendamento exige e-mail e/ou WhatsApp', async () => {
+      const blocked = await move('em_agendamento');
+      assert.equal(blocked.status, 422);
+      assert.match(JSON.parse(blocked.text).error, /e-mail e\/ou WhatsApp/);
+      assert.equal((await edit({ status: 'em_agendamento' })).status, 400, 'o formulário também respeita a regra');
+      assert.equal((await edit({ status: 'em_agendamento', phone: '(12) 99999-0000' })).status, 302, 'só WhatsApp basta');
+      assert.equal((await guest()).status, 'em_agendamento');
+      await edit({ status: 'prospect', phone: '' });
+      assert.equal((await edit({ status: 'em_agendamento', email: 'rita@exemplo.com' })).status, 302, 'só e-mail basta');
+    });
 
-      const g = await as.prod.act('/convidados', { name: 'Com Modelo', template_id: String(other.id), owner_id: produtora.id }, { from: '/convidados/novo' });
-      const id = g.location.split('/').pop();
-      await as.prod.act(`/convidados/${id}/convite`, {}, { from: `/convidados/${id}` });
-      const tk = (await h.db.query('SELECT invite_token FROM guests WHERE id=$1', [id])).rows[0].invite_token;
-      assert.match((await h.client(app.base).get(`/convite/${tk}`)).text, /Convite sem botões/);
+    it('Agendado exige data e a confirmação de Estúdio, hosts e convidado', async () => {
+      const err = async (fields) => (await edit({ email: 'rita@exemplo.com', status: 'agendado', ...fields })).text;
+      assert.match(await err({}), /data e hora da gravação, confirmação de agenda no Estúdio, confirmação de agenda com os hosts e confirmação de agenda com o convidado/);
+      assert.match(await err({ proposed_at: '2026-12-10T15:00', scheduled_studio: '1', scheduled_hosts: '1' }), /falta: confirmação de agenda com o convidado/);
+      assert.match(await err({ scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' }), /falta: data e hora da gravação/);
+      const ok = await edit({ email: 'rita@exemplo.com', status: 'agendado', proposed_at: '2026-12-10T15:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' });
+      assert.equal(ok.status, 302);
+      const g = await guest();
+      assert.equal(g.status, 'agendado');
+      assert.deepEqual([g.scheduled_studio, g.scheduled_hosts, g.scheduled_guest], [true, true, true]);
+      const shown = (await as.prod.get(`/convidados/${id}`)).text;
+      assert.match(shown, /Gravação marcada/);
+      assert.match(shown, /Confirmada com estúdio, hosts e convidado/);
+      assert.match((await as.gestao.get('/')).text, /Rita Regras/, 'aparece em "Próximas gravações"');
+    });
 
-      await as.gestao.act(`/modelos/${other.id}/padrao`, {}, { from: '/modelos' });
-      assert.equal((await h.db.query('SELECT count(*)::int n FROM invite_templates WHERE is_default')).rows[0].n, 1);
-      await as.gestao.act(`/modelos/${other.id}/excluir`, {}, { from: '/modelos' }); // agora padrão: continua
-      assert.equal((await h.db.query('SELECT 1 FROM invite_templates WHERE id=$1', [other.id])).rowCount, 1);
-      await as.gestao.act(`/modelos/${def.id}/excluir`, {}, { from: '/modelos' });
-      assert.equal((await h.db.query('SELECT 1 FROM invite_templates WHERE id=$1', [def.id])).rowCount, 0);
+    it('arrastar para Agendado: com dados completos passa; sem eles, 422', async () => {
+      await edit({ email: 'rita@exemplo.com', status: 'gravado' }); // salvar sem as confirmações zera as marcações
+      assert.equal((await move('agendado')).status, 422);
+      await edit({ email: 'rita@exemplo.com', status: 'agendado', proposed_at: '2026-12-10T15:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' });
+      await move('prospect');
+      assert.equal((await move('agendado')).status, 200);
+    });
+
+    it('o convidado termina em Gravado: não existe Publicado para o convidado', async () => {
+      assert.equal((await edit({ email: 'rita@exemplo.com', status: 'publicado' })).status, 302, 'etapa desconhecida vira Prospecção');
+      assert.equal((await guest()).status, 'prospect');
+      assert.equal((await move('publicado')).status, 400);
+      const form = (await as.prod.get(`/convidados/${id}/editar`)).text;
+      assert.doesNotMatch(form, /name="youtube_url"/, 'links de publicação são do episódio');
+    });
+
+    it('Recusou e Cancelado não exigem nada', async () => {
+      assert.equal((await move('recusou')).status, 200);
+      assert.equal((await move('cancelado')).status, 200);
+      assert.equal((await move('prospect')).status, 200);
+    });
+
+    it('próximo passo guiado: contato, agenda com as três confirmações, remarcar e marcar como gravado', async () => {
+      const step = (fields) => as.prod.act(`/convidados/${id}/avancar`, fields, { from: `/convidados/${id}` });
+      await h.db.query('DELETE FROM episodes WHERE guest_id=$1', [id]); // testes anteriores já o levaram a Gravado
+      await edit({ status: 'convite_enviado', email: '', phone: '' });
+      let page = (await as.prod.get(`/convidados/${id}`)).text;
+      assert.match(page, /Aguardando resposta/);
+      assert.match(page, /data-modal-open="modal-contato"/, 'sem contato, "Aceitou" pede o contato numa janela');
+
+      let r = await step({ para: 'em_agendamento', email: '', phone: '' });
+      assert.match(r.location, /\?abrir=contato/);
+      assert.equal((await guest()).status, 'convite_enviado');
+      assert.match((await step({ para: 'em_agendamento', email: 'nao-e-email' })).location, /\?abrir=contato/);
+      await step({ para: 'em_agendamento', email: 'rita@exemplo.com', phone: '' });
+      assert.equal((await guest()).status, 'em_agendamento');
+      assert.match((await as.prod.get(`/convidados/${id}`)).text, /Definir data da gravação/);
+
+      // data sem todas as confirmações: fica salva como proposta
+      r = await step({ para: 'agendado', agenda: '1', proposed_at: '2026-12-10T15:00', scheduled_studio: '1' });
+      assert.match(r.location, /\?abrir=agenda/);
+      let g = await guest();
+      assert.equal(g.status, 'em_agendamento');
+      assert.equal(g.proposed_at.toISOString(), '2026-12-10T18:00:00.000Z');
+      assert.deepEqual([g.scheduled_studio, g.scheduled_hosts, g.scheduled_guest], [true, false, false]);
+      page = (await as.prod.get(`/convidados/${id}?abrir=agenda`)).text;
+      assert.match(page, /Falta confirmar com: hosts, convidado/);
+      assert.match(page, /id="modal-agenda"[^>]*data-open-on-load/);
+      assert.match((await step({ para: 'agendado', agenda: '1', proposed_at: '' })).location, /\?abrir=agenda/, 'sem data não salva');
+
+      await step({ para: 'agendado', agenda: '1', proposed_at: '2026-12-10T15:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' });
+      g = await guest();
+      assert.equal(g.status, 'agendado');
+      page = (await as.prod.get(`/convidados/${id}`)).text;
+      assert.match(page, /Gravação marcada/);
+      assert.match(page, /Já aparece na agenda/);
+
+      // remarcar sem reconfirmar: volta para Em agendamento e registra na linha do tempo
+      await step({ para: 'agendado', agenda: '1', proposed_at: '2026-12-12T10:00', scheduled_studio: '1' });
+      g = await guest();
+      assert.equal(g.status, 'em_agendamento');
+      assert.equal(g.proposed_at.toISOString(), '2026-12-12T13:00:00.000Z');
+      const { rows: evs } = await h.db.query("SELECT message FROM guest_events WHERE guest_id=$1 AND type='agenda' ORDER BY id DESC", [id]);
+      assert.match(evs[0].message, /Gravação remarcada: 10\/12\/2026.* → 12\/12\/2026/);
+      await step({ para: 'agendado', agenda: '1', proposed_at: '2026-12-12T10:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' });
+      assert.equal((await guest()).status, 'agendado');
+
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM episodes WHERE guest_id=$1', [id])).rows[0].n, 0, 'agendado ainda não é episódio');
+      await step({ para: 'gravado' });
+      g = await guest();
+      assert.equal(g.status, 'gravado');
+      assert.equal(g.email, 'rita@exemplo.com', 'campos fora da janela não mudam');
+      const { rows: [ep2] } = await h.db.query('SELECT id FROM episodes WHERE guest_id=$1', [id]);
+      assert.ok(ep2, 'gravado faz o episódio nascer');
+      page = (await as.prod.get(`/convidados/${id}`)).text;
+      assert.match(page, /Conversa gravada/);
+      assert.match(page, new RegExp(`href="/episodios/${ep2.id}"`));
+      assert.equal((await as.editor.act(`/convidados/${id}/avancar`, { para: 'cancelado' }, { from: `/convidados/${id}` })).status, 403);
+      await h.db.query('DELETE FROM episodes WHERE id=$1', [ep2.id]);
+      await edit({ email: 'rita@exemplo.com', status: 'prospect' });
+    });
+
+    it('formulário mostra só os campos da etapa e traz a dica da regra', async () => {
+      const hiddenOf = (html, marker) => new RegExp(`data-stages="${marker}" hidden`).test(html);
+      let html = (await as.prod.get(`/convidados/${id}/editar`)).text;
+      assert.ok(hiddenOf(html, 'em_agendamento agendado gravado'), 'prospect esconde a gravação');
+      html = (await as.prod.get(`/convidados/${id}/editar?para=agendado`)).text;
+      assert.ok(!hiddenOf(html, 'em_agendamento agendado gravado'), 'agendado mostra a data da gravação');
+      assert.match(html, /data-agenda-dialog/, 'confirmações ficam na janela que abre ao preencher a data');
+      assert.match(html, /name="scheduled_studio"/);
+      assert.match(html, /<option value="agendado" selected>/, '?para= já seleciona a etapa');
+      assert.match(html, /Para mover para Agendado falta: data e hora da gravação/);
+      assert.match(html, /data-hint-for="agendado" >/, 'dica da etapa visível');
+      assert.match(html, /data-hint-for="em_agendamento" hidden>/, 'dica de outra etapa escondida');
+    });
+
+    it('editor de vídeo não altera etapa nem importa', async () => {
+      assert.equal((await as.editor.act(`/convidados/${id}/status`, { status: 'recusou' }, { from: '/convidados' })).status, 403);
+      assert.equal((await as.editor.get('/convidados/importar')).status, 403);
+    });
+  });
+
+  describe('importação de convidados por CSV', () => {
+    const preview = (csv) => as.prod.act('/convidados/importar/previa', { csv }, { from: '/convidados/importar' });
+    const commit = (csv) => as.prod.act('/convidados/importar', { csv }, { from: '/convidados/importar' });
+    const count = () => h.db.query('SELECT count(*)::int n FROM guests').then((r) => r.rows[0].n);
+
+    it('tela e modelo para baixar', async () => {
+      const page = await as.prod.get('/convidados/importar');
+      assert.equal(page.status, 200);
+      assert.match(page.text, /Importar por CSV/);
+      assert.match((await as.prod.get('/convidados')).text, /Importar CSV/);
+      const model = await as.prod.get('/convidados/importar/modelo.csv');
+      assert.equal(model.status, 200);
+      assert.match(model.headers.get('content-type'), /text\/csv/);
+      assert.match(model.text, /nome;instagram;whatsapp;perfil;email;motivo do convite/);
+    });
+
+    it('prévia aponta erros e duplicados e não grava nada', async () => {
+      await h.db.query("INSERT INTO guests (name, instagram, profile) VALUES ('Já Existe', 'jaexiste', 'medico')");
+      const before = await count();
+      const csv = [
+        'Nome;Instagram;WhatsApp;Perfil;E-mail;Motivo do convite',
+        'Ana Lima;@ana.lima;(12) 98888-7777;Médica;ana@exemplo.com;Referência em dermatologia',
+        'Bruno Dias;bruno_dias;;Influenciador;;',
+        ';@semnome;;médico;;',
+        'Carla Reis;@carla.reis;;astronauta;;',
+        'Duda Melo;;;empresária;;',
+        'Edu Pires;@edu.pires;;médico;email-ruim;',
+        'Fábio Cruz;@JaExiste;;médico;;',
+        'Gabi Nunes;@ana.lima;;médico;;',
+      ].join('\r\n');
+      const r = await preview(csv);
+      assert.equal(r.status, 200);
+      assert.equal(await count(), before, 'prévia não grava');
+      const t = r.text;
+      assert.match(t, /2 prontos · 6 ignorados · 8 linhas/);
+      assert.match(t, /nome ausente/);
+      assert.match(t, /perfil “astronauta” não reconhecido/);
+      assert.match(t, /Instagram ausente/);
+      assert.match(t, /e-mail inválido/);
+      assert.match(t, /@jaexiste já cadastrado \(Já Existe\)/);
+      assert.match(t, /@ana\.lima repetido no arquivo/);
+      assert.match(t, /Importar 2 convidado\(s\)/);
+    });
+
+    it('confirmar grava só as linhas válidas, em Prospecção, com responsável, histórico e auditoria', async () => {
+      const before = await count();
+      const csv = [
+        '﻿nome,instagram,whatsapp,perfil,email,motivo do convite',
+        '"Souza, Maria",@maria.s,"(12) 99999-0000","Profissional de saúde",maria@exemplo.com,"Fala de ""saúde mental"""',
+        'Bruno Dias,https://instagram.com/bruno_dias,,Influenciador,,',
+        'Linha Ruim,,,,,',
+      ].join('\n');
+      const r = await commit(csv);
+      assert.equal(r.status, 302);
+      assert.equal(r.location, '/convidados');
+      assert.equal(await count(), before + 2);
+      const { rows: [m] } = await h.db.query("SELECT * FROM guests WHERE instagram = 'maria.s'");
+      assert.equal(m.name, 'Souza, Maria');
+      assert.equal(m.profile, 'profissional_saude');
+      assert.equal(m.phone, '(12) 99999-0000');
+      assert.equal(m.email, 'maria@exemplo.com');
+      assert.equal(m.invite_reason, 'Fala de "saúde mental"');
+      assert.equal(m.status, 'prospect');
+      assert.equal(m.owner_id, produtora.id);
+      assert.equal(m.gender, 'm');
+      const { rows: [b] } = await h.db.query("SELECT profile FROM guests WHERE instagram = 'bruno_dias'");
+      assert.equal(b.profile, 'influencer');
+      assert.equal((await h.db.query("SELECT count(*)::int n FROM guest_events WHERE guest_id=$1 AND message LIKE 'Importado por CSV%'", [m.id])).rows[0].n, 1);
+      assert.match((await as.gestao.get('/auditoria')).text, /convidados\.importados/);
+
+      const again = await commit(csv); // mesma planilha de novo: tudo duplicado, nada entra
+      assert.equal(again.status, 400);
+      assert.equal(await count(), before + 2);
+    });
+
+    it('cabeçalho sem as colunas obrigatórias e arquivo vazio são recusados com mensagem clara', async () => {
+      const bad = await preview('nome;whatsapp\nAna;1');
+      assert.equal(bad.status, 400);
+      assert.match(bad.text, /Faltam colunas obrigatórias no cabeçalho: instagram, perfil/);
+      assert.equal((await preview('')).status, 400);
+      assert.equal((await commit('nome;instagram;perfil')).status, 400, 'só cabeçalho: nada para importar');
+    });
+
+    it('limite de linhas e gênero opcional', async () => {
+      const many = ['nome;instagram;perfil', ...Array.from({ length: 501 }, (_, i) => `P${i} Teste;p${i};médico`)].join('\n');
+      assert.match((await preview(many)).text, /mais de 500 convidados/);
+      const r = await commit('nome;instagram;perfil;genero\nLara Gênero;@lara.g;médica;feminino');
+      assert.equal(r.status, 302);
+      assert.equal((await h.db.query("SELECT gender FROM guests WHERE instagram='lara.g'")).rows[0].gender, 'f');
+      assert.match((await preview('nome;instagram;perfil;genero\nX Y;@xy;médico;talvez')).text, /gênero inválido/);
+    });
+
+    it('HTML na planilha é escapado na prévia', async () => {
+      const r = await preview('nome;instagram;perfil\n<img src=x onerror=alert(1)>;@xss.teste;médico');
+      assert.doesNotMatch(r.text, /<img src=x/);
+      assert.match(r.text, /&lt;img src=x onerror=alert\(1\)&gt;/);
     });
   });
 
@@ -528,14 +813,12 @@ describe('fluxos ponta a ponta', () => {
     });
   });
 
-  describe('modelo Pulso (o convite real, com JS, gênero e dupla)', () => {
-    let pulsoId;
-    before(async () => { // os testes de modelos acima editaram/apagaram os modelos de fábrica: recria
-      await h.db.query('DELETE FROM invite_templates');
-      await require('../src/db/seed').seedDefaultTemplate();
-    });
+  describe('convite fixo do Pulso (com JS, gênero e dupla)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const templateHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'templates', 'convite-pulso.html'), 'utf8');
     const guestFlow = async (fields) => {
-      const r = await as.prod.act('/convidados', { owner_id: produtora.id, template_id: String(pulsoId), ...fields }, { from: '/convidados/novo' });
+      const r = await as.prod.act('/convidados', min({ owner_id: produtora.id, ...fields }), { from: '/convidados/novo' });
       assert.equal(r.status, 302, JSON.stringify(fields));
       const id = r.location.split('/').pop();
       await as.prod.act(`/convidados/${id}/convite`, {}, { from: `/convidados/${id}` });
@@ -543,14 +826,17 @@ describe('fluxos ponta a ponta', () => {
       return { id, token: g.invite_token, page: await h.client(app.base).get(`/convite/${g.invite_token}`, { ua: 'WhatsApp/2.23' }) };
     };
 
-    it('o modelo padrão do repositório é o convite Pulso e não depende mais de ?nome= na URL', async () => {
-      const { rows } = await h.db.query("SELECT id, html_body FROM invite_templates WHERE name LIKE 'Convite Pulso%'");
-      assert.equal(rows.length, 1);
-      pulsoId = rows[0].id;
-      assert.doesNotMatch(rows[0].html_body, /URLSearchParams/);
-      assert.doesNotMatch(rows[0].html_body, /data:image\/jpeg;base64/, 'imagens saíram do HTML');
-      assert.match(rows[0].html_body, /\{\{guest_json\}\}/);
-      assert.match(rows[0].html_body, /\{\{bloco_resposta\}\}/);
+    it('o modelo é um arquivo do repositório, sem tela de modelos, sem ?nome= e com os botões apontando para o rastreio', async () => {
+      assert.doesNotMatch(templateHtml, /URLSearchParams/);
+      assert.doesNotMatch(templateHtml, /data:image\/jpeg;base64/, 'imagens saíram do HTML');
+      assert.doesNotMatch(templateHtml, /wa\.me/, 'WhatsApp só pelo redirecionador');
+      assert.match(templateHtml, /\{\{guest_json\}\}/);
+      assert.match(templateHtml, /\{\{bloco_resposta\}\}/);
+      assert.equal((templateHtml.match(/\{\{link_aceitar\}\}/g) || []).length, 2);
+      assert.equal((templateHtml.match(/\{\{link_producao\}\}/g) || []).length, 1);
+      for (const p of ['/modelos', '/modelos/novo']) assert.equal((await as.admin.get(p)).status, 404, p);
+      assert.doesNotMatch((await as.admin.get('/convidados')).text, /Modelos de convite/);
+      assert.equal((await h.db.query("SELECT to_regclass('invite_templates') AS t")).rows[0].t, null, 'tabela de modelos removida');
     });
 
     it('injeta nome, gênero e dupla como JSON; mantém intro/JS; imagens estáticas existem', async () => {
@@ -566,38 +852,47 @@ describe('fluxos ponta a ponta', () => {
 
       const img = f.page.text.match(/\/static\/convite\/img-\d+\.jpg/g);
       assert.ok(img && img.length >= 9, 'referencia as 9 imagens extraídas');
-      for (const path of new Set(img)) {
-        const r = await fetch(app.base + path);
-        assert.equal(r.status, 200, path);
+      for (const imgPath of new Set(img)) {
+        const r = await fetch(app.base + imgPath);
+        assert.equal(r.status, 200, imgPath);
         assert.equal(r.headers.get('content-type'), 'image/jpeg');
       }
     });
 
     it('nome malicioso não escapa do <script> nem injeta HTML (guest_json é seguro)', async () => {
-      const evil = '</script><img src=x onerror=alert(1)> \u2028 "q" \\';
+      const evil = '</script><img src=x onerror=alert(1)>   "q" \\';
       const f = await guestFlow({ name: evil });
       const m = f.page.text.match(/const G = (\{.*\});/);
       assert.ok(m, 'bloco G presente');
       assert.doesNotMatch(m[1], /<|>/, 'sem < ou > crus dentro do script');
       assert.equal(JSON.parse(m[1]).nome, evil, 'o valor original é preservado ao interpretar o JSON');
-      assert.equal((f.page.text.match(/<\/script>/g) || []).length, (await h.db.query("SELECT html_body FROM invite_templates WHERE id=$1", [pulsoId])).rows[0].html_body.match(/<\/script>/g).length, 'mesmo número de </script> do modelo');
+      assert.equal((f.page.text.match(/<\/script>/g) || []).length, templateHtml.match(/<\/script>/g).length, 'mesmo número de </script> do modelo');
     });
 
-    it('formulário do convite vem de origem null (sandbox): o POST do convidado é aceito; outros POSTs com origin null não', async () => {
+    it('formulário de recusa vem de origem null (sandbox): é aceito; outros POSTs com origin null não', async () => {
       const f = await guestFlow({ name: 'Origem Nula' });
       const c = h.client(app.base);
-      const ok = await c.post(`/convite/${f.token}/responder`, { resposta: 'aceito' }, { headers: { origin: 'null' } });
+      const ok = await c.post(`/convite/${f.token}/responder`, { resposta: 'recusado' }, { headers: { origin: 'null' } });
       assert.equal(ok.status, 302);
-      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [f.id])).rows[0].status, 'confirmado');
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [f.id])).rows[0].status, 'recusou');
       const csrf = await as.prod.csrf('/perfil');
       assert.equal((await as.prod.post('/perfil', { _csrf: csrf, name: 'X Y' }, { headers: { origin: 'null' } })).status, 403);
+    });
+
+    it('prévia no painel não tem links ativos (não conta clique nem muda etapa)', async () => {
+      const f = await guestFlow({ name: 'Previa Teste' });
+      const prev = await as.prod.get(`/convidados/${f.id}/previa`);
+      assert.equal(prev.status, 200);
+      assert.doesNotMatch(prev.text, /\/aceitar|\/producao/);
+      assert.match(prev.text, /href="#"/);
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM invite_clicks WHERE guest_id=$1', [f.id])).rows[0].n, 0);
     });
 
     it('formulário de convidado salva gênero/dupla e mostra no detalhe', async () => {
       const f = await guestFlow({ name: 'Duo Teste', gender: 'f', is_plural: '1' });
       const { rows: [g] } = await h.db.query('SELECT gender, is_plural FROM guests WHERE id=$1', [f.id]);
       assert.deepEqual(g, { gender: 'f', is_plural: true });
-      assert.match((await as.prod.get(`/convidados/${f.id}`)).text, /Dupla · Feminino/);
+      assert.match((await as.prod.get(`/convidados/${f.id}`)).text, /trata como <strong>convidadas<\/strong>/);
       assert.match((await as.prod.get(`/convidados/${f.id}/editar`)).text, /name="is_plural" value="1" checked/);
     });
   });

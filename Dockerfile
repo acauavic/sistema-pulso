@@ -2,6 +2,9 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# FFmpeg: quadros, áudio para transcrição e cortes verticais (src/services/media.js)
+RUN apk add --no-cache ffmpeg
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 

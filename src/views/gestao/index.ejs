@@ -1,0 +1,13 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker">Configurações e acompanhamento</span><h1>Painel de gestão</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'geral' }) %>
+<div class="gestao-grid">
+  <% if (can('users.read')) { %><a class="card gestao-card" href="/usuarios"><%- icon('users', 20) %><h2>Usuários</h2><p class="stat-line"><span class="mono"><%= stats.users.active %></span> ativos<%= stats.users.pending ? ' · ' + stats.users.pending + ' aguardando senha' : '' %></p><p class="small muted">Quem acessa o painel e com qual perfil.</p></a><% } %>
+  <% if (can('audit.read')) { %><a class="card gestao-card" href="/auditoria"><%- icon('scroll-text', 20) %><h2>Logs</h2><p class="stat-line"><span class="mono"><%= stats.audit %></span> ações nas últimas 24 h</p><p class="small muted">Auditoria: quem fez o quê e quando.</p></a><% } %>
+  <% if (can('notifications.manage')) { %><a class="card gestao-card" href="/gestao/notificacoes"><%- icon('bell', 20) %><h2>Notificações</h2><p class="stat-line">Tarefas · comentários · agendamentos · rotinas</p><p class="small muted">O que vai para o painel, o que vai por e-mail e quem recebe os avisos gerais.</p></a><% } %>
+  <% if (can('routines.manage')) { %><a class="card gestao-card" href="/gestao/rotinas"><%- icon('check-square', 20) %><h2>Rotinas de tarefas</h2><p class="stat-line"><span class="mono"><%= stats.routines %></span> rotinas ativas</p><p class="small muted">Tarefas que nascem sozinhas na produção, com vencimento padrão.</p></a><% } %>
+  <% if (can('search.manage')) { %><a class="card gestao-card" href="/gestao/busca"><%- icon('search', 20) %><h2>Busca global</h2><p class="stat-line"><span class="mono"><%= stats.shortcuts %></span> atalhos da equipe<%= stats.tips ? ' · ' : '' %><% if (stats.tips) { %><span class="warn"><%= stats.tips %> sugest<%= stats.tips > 1 ? 'ões' : 'ão' %></span><% } %></p><p class="small muted">Atalhos do Ctrl+K e o que o sistema sugere incluir conforme cresce.</p></a><% } %>
+  <% if (can('plans.manage')) { %><a class="card gestao-card" href="/gestao/patrocinios"><%- icon('shield-check', 20) %><h2>Planos de patrocínio</h2><p class="stat-line">Ouro e Diamond</p><p class="small muted">Nome, valor e entregáveis: valem no media kit e no portal.</p></a><% } %>
+  <% if (can('integrations.manage')) { %><a class="card gestao-card" href="/integracoes"><%- icon('plug', 20) %><h2>Integrações</h2><p class="stat-line">E-mail, links curtos, armazenamento, IA e redes</p><p class="small muted">Status e testes seguros.</p></a><% } %>
+</div>
+<%- include('../partials/foot') %>

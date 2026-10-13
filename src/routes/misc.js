@@ -7,6 +7,7 @@ const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
 const { GUEST_STATUSES } = require('../constants');
 const { wrap } = require('../utils/wrap');
+const { can } = require('../permissions');
 
 const router = express.Router();
 
@@ -14,14 +15,22 @@ router.get('/', wrap(async (req, res) => {
   const [counts, upcoming, recent, mine] = await Promise.all([
     db.query('SELECT status, count(*)::int AS n FROM guests GROUP BY status'),
     db.query(`SELECT id, name, topic, proposed_at FROM guests
-               WHERE status = 'confirmado' AND proposed_at >= now() ORDER BY proposed_at LIMIT 6`),
+               WHERE status = 'agendado' AND proposed_at >= now() ORDER BY proposed_at LIMIT 6`),
     db.query(`SELECT e.type, e.message, e.created_at, g.id AS guest_id, g.name AS guest_name, u.name AS user_name
                 FROM guest_events e JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.user_id
                ORDER BY e.created_at DESC, e.id DESC LIMIT 10`),
     db.query(`SELECT count(*)::int AS n FROM guests WHERE owner_id = $1 AND status IN ('prospect','convite_enviado')`, [req.user.id]),
   ]);
   const byStatus = Object.fromEntries(counts.rows.map((r) => [r.status, r.n]));
+  let money = null;
+  if (can(req.user.role, 'finance.read')) {
+    const fin = require('../services/finance');
+    const [c, stock, { rows: [week] }] = await Promise.all([fin.counts(), fin.stockItems(), db.query(
+      "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on <= CURRENT_DATE + 7), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'")]);
+    money = { late: c.atrasados, out7: Number(week.out7), toBuy: stock.filter((i) => i.active && ['comprar', 'acabou'].includes(i.state)).length };
+  }
   res.render('dashboard', {
+    money,
     title: 'Início', cards: GUEST_STATUSES.map((s) => ({ ...s, n: byStatus[s.key] || 0 })),
     upcoming: upcoming.rows, recent: recent.rows, myOpen: mine.rows[0].n,
   });

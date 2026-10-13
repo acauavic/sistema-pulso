@@ -1,0 +1,72 @@
+<%- include('../partials/head') %>
+<%
+  var dateVal = function (v) { return typeof v === 'string' ? v : fmt.toInputDate(v); };
+  var moneyVal = function () {
+    if (typeof values.value === 'string') return values.value;
+    return values.value_cents == null ? '' : (Number(values.value_cents) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+%>
+<div class="page-head"><div><span class="kicker">Patrocinadores · CRM</span><h1><%= sponsor ? 'Editar patrocinador' : 'Novo patrocinador' %></h1></div></div>
+<div class="card form-card wide">
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <% if (notice) { %><div class="flash flash-error"><%= notice %> Complete abaixo e salve.</div><% } %>
+  <form method="post" action="<%= sponsor ? '/patrocinadores/' + sponsor.id : '/patrocinadores' %>" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+    <h2 class="form-section">Empresa</h2>
+    <div class="grid-2 tight">
+      <label>Nome da empresa *<input type="text" name="company" value="<%= values.company || '' %>" maxlength="150" required autofocus></label>
+      <label>Site da empresa<input type="text" name="website" value="<%= values.website || '' %>" maxlength="300" placeholder="https://…"></label>
+      <label>Tipo de patrocinador *
+        <select name="kind" required>
+          <option value="">Escolha…</option>
+          <% Object.keys(kinds).forEach(function (k) { %><option value="<%= k %>" <%= values.kind === k ? 'selected' : '' %>><%= kinds[k] %></option><% }) %>
+        </select>
+      </label>
+      <label>Patrocínio (cota)
+        <select name="tier">
+          <option value="">—</option>
+          <% Object.keys(tiers).forEach(function (k) { %><option value="<%= k %>" <%= values.tier === k ? 'selected' : '' %>><%= tiers[k] %></option><% }) %>
+        </select>
+      </label>
+      <label>Valor (R$)<input type="text" name="value" value="<%= moneyVal() %>" inputmode="decimal" placeholder="15.000,00"></label>
+    </div>
+
+    <h2 class="form-section">Responsável na empresa</h2>
+    <div class="grid-2 tight">
+      <label>Nome<input type="text" name="contact_name" value="<%= values.contact_name || '' %>" maxlength="150"></label>
+      <label>WhatsApp<input type="text" name="contact_phone" value="<%= values.contact_phone || '' %>" maxlength="40"></label>
+      <label>E-mail<input type="email" name="contact_email" value="<%= values.contact_email || '' %>" maxlength="254"></label>
+    </div>
+
+    <h2 class="form-section">Acompanhamento</h2>
+    <div class="grid-2 tight">
+      <label>Etapa
+        <select name="stage" data-stage-select>
+          <% stages.forEach(function (s) { %><option value="<%= s.key %>" <%= values.stage === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
+        </select>
+      </label>
+      <label>Quem cuida na nossa equipe
+        <select name="owner_id">
+          <option value="">— ninguém —</option>
+          <% owners.forEach(function (o) { %><option value="<%= o.id %>" <%= values.owner_id === o.id ? 'selected' : '' %>><%= o.name %></option><% }) %>
+        </select>
+      </label>
+    </div>
+    <div class="grid-2 tight" data-stages="ganho ativo inativo" <%= ['ganho', 'ativo', 'inativo'].indexOf(values.stage) >= 0 ? '' : 'hidden' %>>
+      <label>Pagamento confirmado em<input type="date" name="paid_at" value="<%= dateVal(values.paid_at) %>"></label>
+      <span></span>
+      <label>Vigência: início<input type="date" name="starts_on" value="<%= dateVal(values.starts_on) %>"></label>
+      <label>Vigência: fim<input type="date" name="ends_on" value="<%= dateVal(values.ends_on) %>"></label>
+    </div>
+    <% Object.keys(stageHints).forEach(function (key) { %>
+    <p class="stage-hint small" data-hint-for="<%= key %>" <%= values.stage === key ? '' : 'hidden' %>><%- icon('info', 14) %> <%= stageHints[key] %></p>
+    <% }) %>
+    <label>Observações internas<textarea name="notes" rows="3" maxlength="4000"><%= values.notes || '' %></textarea></label>
+    <div class="row">
+      <button class="btn primary" type="submit">Salvar</button>
+      <a class="btn" href="<%= sponsor ? '/patrocinadores/' + sponsor.id : '/patrocinadores' %>">Cancelar</a>
+    </div>
+  </form>
+</div>
+<%- include('../partials/foot') %>

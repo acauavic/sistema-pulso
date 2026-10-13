@@ -1,0 +1,77 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">CRM · Funil de patrocinadores</span><h1>Patrocinadores</h1></div>
+  <div class="row">
+    <div class="seg">
+      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/patrocinadores?view=quadro&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>"><%- icon('columns-3') %> Quadro</a>
+      <a class="<%= view === 'lista' ? 'on' : '' %>" href="/patrocinadores?view=lista&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>"><%- icon('list') %> Lista</a>
+    </div>
+    <% if (can('sponsors.write')) { %><a class="btn primary" href="/patrocinadores/novo"><%- icon('plus') %> Novo patrocinador</a><% } %>
+  </div>
+</div>
+
+<form method="get" action="/patrocinadores" class="filters">
+  <input type="hidden" name="view" value="<%= view %>">
+  <input type="search" name="q" value="<%= q %>" placeholder="Buscar empresa, responsável ou e-mail">
+  <select name="owner">
+    <option value="">Todos da equipe</option>
+    <option value="eu" <%= ownerFilter === 'eu' ? 'selected' : '' %>>Só os meus</option>
+    <% owners.forEach(function (o) { %><option value="<%= o.id %>" <%= ownerFilter === o.id ? 'selected' : '' %>><%= o.name %></option><% }) %>
+  </select>
+  <% if (view === 'lista') { %>
+  <select name="stage">
+    <option value="">Todas as etapas</option>
+    <% stages.forEach(function (s) { %><option value="<%= s.key %>" <%= stage === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
+  </select>
+  <% } %>
+  <button class="btn" type="submit">Filtrar</button>
+</form>
+
+<% if (view === 'quadro') { %>
+<div class="board" data-board data-base="/patrocinadores" data-status-path="etapa" data-can-move="<%= can('sponsors.write') ? '1' : '0' %>">
+  <% columns.forEach(function (col) { %>
+  <section class="column" data-status="<%= col.key %>">
+    <header><span class="badge b-st-<%= col.key %>"><%= col.label %></span><span class="count"><%= col.items.length %></span></header>
+    <% if (col.total) { %><p class="column-total handle muted"><%= fmt.formatBRL(col.total) %></p><% } %>
+    <div class="cards" data-dropzone>
+      <% col.items.forEach(function (s) { %>
+      <a class="kcard" href="/patrocinadores/<%= s.id %>" data-item-id="<%= s.id %>" draggable="<%= can('sponsors.write') ? 'true' : 'false' %>">
+        <strong><%= s.company %></strong>
+        <% if (s.contact_name) { %><span class="muted small"><%= s.contact_name %></span><% } %>
+        <span class="meta small muted">
+          <% if (s.tier) { %><span><%= tiers[s.tier] %></span><% } %>
+          <% if (s.kind) { %><span><%= kinds[s.kind] %></span><% } %>
+          <% if (s.value_cents != null) { %><span><%= fmt.formatBRL(s.value_cents) %></span><% } %>
+          <% if (s.form && s.form.complete) { %><span><%- icon('circle-check', 12) %>briefing</span>
+          <% } else if (s.form && s.form.pending) { %><span class="warn" title="Perguntas que o patrocinador deixou para responder depois: <%= s.form.pendingTitles.join(', ') %>"><%- icon('clock', 12) %><%= s.form.pending %> pendência<%= s.form.pending > 1 ? 's' : '' %></span>
+          <% } else if (s.form && s.form.answered) { %><span><%- icon('clock', 12) %>briefing <%= s.form.answered %>/<%= s.form.total %></span><% } %>
+        </span>
+        <span class="card-foot"><%- include('../partials/dot', { type: 'sponsor', id: s.id, user: s.owner_id ? { id: s.owner_id, name: s.owner_name } : null, editable: can('sponsors.write'), inLink: true }) %></span>
+      </a>
+      <% }) %>
+    </div>
+  </section>
+  <% }) %>
+</div>
+<% } else { %>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Empresa</th><th>Responsável</th><th>Tipo</th><th>Cota</th><th class="num">Valor</th><th>Etapa</th><th>Equipe</th></tr></thead>
+  <tbody>
+    <% if (!sponsors.length) { %><tr><td colspan="7"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum patrocinador por aqui ainda</strong><span>Cadastre o primeiro ou ajuste os filtros.</span></div></td></tr><% } %>
+    <% sponsors.forEach(function (s) { %>
+    <tr>
+      <td><a href="/patrocinadores/<%= s.id %>"><strong><%= s.company %></strong></a></td>
+      <td><%= s.contact_name || '—' %></td>
+      <td><%= s.kind ? kinds[s.kind] : '—' %></td>
+      <td><%= s.tier ? tiers[s.tier] : '—' %></td>
+      <td class="num mono"><%= fmt.formatBRL(s.value_cents) %></td>
+      <td><span class="badge b-st-<%= s.stage %>"><%= stages.find(function (x) { return x.key === s.stage; }).label %></span></td>
+      <td><%- include('../partials/dot', { type: 'sponsor', id: s.id, user: s.owner_id ? { id: s.owner_id, name: s.owner_name } : null, editable: can('sponsors.write'), label: true }) %></td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+<%- include('../partials/foot') %>

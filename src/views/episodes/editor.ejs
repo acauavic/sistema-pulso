@@ -1,0 +1,103 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker"><%= cover.clip_id ? 'Corte' : 'Episódio' %> · <%= ep && ep.number ? 'EP.' + String(ep.number).padStart(3, '0') : (ep && ep.title ? ep.title : (cover.clip_id ? 'sem episódio ainda' : '')) %></span><h1><%= kindLabel %></h1></div>
+  <div class="row">
+    <a class="btn ghost" href="<%= backUrl %>"><%- icon('arrow-left') %> <%= backLabel %></a>
+    <% siblings.length > 1 && siblings.forEach(function (s) { %><a class="btn sm <%= s.id === cover.id ? 'on' : '' %>" href="/capas/<%= s.id %>/editar"><%= s.position + 1 %></a><% }) %>
+  </div>
+</div>
+
+<div class="editor" data-editor>
+  <section class="stage-wrap">
+    <div class="stage" data-stage>
+      <canvas data-canvas aria-label="Prévia da imagem"></canvas>
+      <canvas data-overlay class="overlay" aria-hidden="true"></canvas>
+    </div>
+    <div class="row small muted stage-hint">
+      <span>Arraste o texto para mover; puxe o canto para mudar a largura; setas movem (Shift = mais rápido); Delete apaga.</span>
+    </div>
+    <div class="lint" data-lint aria-live="polite"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button type="button" class="on" data-tab="layers" role="tab">Camadas</button>
+      <button type="button" data-tab="bg" role="tab">Fundo</button>
+      <button type="button" data-tab="zones" role="tab">Zonas</button>
+    </div>
+
+    <div data-pane="layers">
+      <ul class="plain layer-list" data-layer-list></ul>
+      <div class="row">
+        <button type="button" class="btn sm" data-add="text">+ Texto</button>
+        <button type="button" class="btn sm" data-add="wordmark">+ Logotipo</button>
+        <button type="button" class="btn sm" data-add="line">+ Linha lime</button>
+        <button type="button" class="btn sm danger" data-delete>Excluir camada</button>
+      </div>
+      <div class="props" data-props hidden>
+        <label>Texto<textarea data-p="text" rows="3"></textarea></label>
+        <div class="grid-2 tight">
+          <label>Fonte
+            <select data-p="family">
+              <option value="Space Grotesk">Space Grotesk (títulos)</option>
+              <option value="Instrument Serif">Instrument Serif (voz)</option>
+              <option value="Inter">Inter (texto)</option>
+              <option value="JetBrains Mono">JetBrains Mono (dados)</option>
+            </select>
+          </label>
+          <label>Alinhamento
+            <select data-p="align"><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select>
+          </label>
+        </div>
+        <label>Tamanho <span class="handle muted" data-out="size"></span><input type="range" data-p="size" min="20" max="320" step="1"></label>
+        <label>Entrelinha <span class="handle muted" data-out="lineHeight"></span><input type="range" data-p="lineHeight" min="0.85" max="1.6" step="0.01"></label>
+        <label>Espaçamento <span class="handle muted" data-out="tracking"></span><input type="range" data-p="tracking" min="-0.08" max="0.2" step="0.005"></label>
+        <label>Sombra <span class="handle muted" data-out="shadow"></span><input type="range" data-p="shadow" min="0" max="1" step="0.05"></label>
+        <div><span class="small muted">Cor</span><div class="swatches" data-swatches></div></div>
+        <div class="row">
+          <label class="check"><input type="checkbox" data-p="upper"> Caixa alta</label>
+          <label class="check"><input type="checkbox" data-p="italic"> Itálico</label>
+          <label class="check"><input type="checkbox" data-p="highlight"> Última linha em lime</label>
+        </div>
+        <div class="grid-2 tight">
+          <label>Largura da caixa<input type="number" data-p="w" min="60" max="2400" step="4"></label>
+          <label>Posição X / Y<span class="row"><input type="number" data-p="x" step="2"><input type="number" data-p="y" step="2"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div data-pane="bg" hidden>
+      <div data-bg-panels></div>
+      <label>Zoom <span class="handle muted" data-out="zoom"></span><input type="range" data-bg="zoom" min="1" max="2.4" step="0.01"></label>
+      <label>Posição horizontal<input type="range" data-bg="cx" min="0" max="1" step="0.005"></label>
+      <label>Posição vertical<input type="range" data-bg="cy" min="0" max="1" step="0.005"></label>
+      <label>Escurecer tudo <span class="handle muted" data-out="dim"></span><input type="range" data-bg="dim" min="0" max="0.6" step="0.01"></label>
+      <label>Faixa de contraste <span class="handle muted" data-out="scrim"></span><input type="range" data-bg="scrim" min="0" max="1" step="0.02"></label>
+      <p class="small muted">Trocar o quadro refaz as zonas de rosto e legenda. Escolha o quadro:</p>
+      <div class="frame-grid small-frames" data-frame-picker></div>
+      <p class="small muted top-gap">Ou use uma imagem sua como fundo (JPG, PNG ou WebP, até 12 MB). A IA tenta achar os rostos; se não conseguir, o editor avisa.</p>
+      <label class="btn sm">Enviar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-upload hidden></label>
+      <p class="small" data-upload-msg></p>
+    </div>
+
+    <div data-pane="zones" hidden>
+      <label class="check"><input type="checkbox" data-zone="safe" checked> Zona segura do formato</label>
+      <label class="check"><input type="checkbox" data-zone="faces" checked> Rostos</label>
+      <label class="check"><input type="checkbox" data-zone="blocks" checked> Legendas já queimadas no vídeo</label>
+      <label class="check"><input type="checkbox" data-zone="avoid" checked> Áreas cobertas pela plataforma</label>
+      <label class="check" data-zone-crop hidden><input type="checkbox" data-zone="crop" checked> Recorte 3:4 da grade do Instagram</label>
+      <p class="small muted">A conferência abaixo da imagem avisa na hora se um texto cobre rosto ou legenda, sai da zona segura ou fica pequeno demais. Ao salvar, o servidor confere de novo, inclusive o contraste.</p>
+    </div>
+
+    <div class="row editor-actions">
+      <button type="button" class="btn primary" data-save>Salvar imagem</button>
+      <button type="button" class="btn" data-undo>Desfazer</button>
+      <a class="btn" href="/episodios/<%= ep.id %>/capas/<%= cover.id %>/imagem?baixar=1">Baixar</a>
+      <span class="small" data-status role="status"></span>
+    </div>
+  </aside>
+</div>
+<script type="application/json" id="editor-data"><%- JSON.stringify(editorData).replace(/</g, '\\u003c') %></script>
+<script src="/static/design/engine.js?v=<%= assetV %>"></script>
+<script src="/static/editor.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

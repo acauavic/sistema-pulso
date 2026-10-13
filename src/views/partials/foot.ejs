@@ -1,4 +1,35 @@
-<% if (currentUser) { %></div></main></div><% } else { %></div></div><% } %>
+<% if (currentUser) { %></div></main></div>
+<dialog class="palette" data-palette aria-label="Busca global">
+  <div class="palette-box">
+    <div class="palette-input"><%- icon('search') %><input type="search" placeholder="Buscar convidado, episódio, tarefa… ou digite uma ação" autocomplete="off" spellcheck="false" data-palette-input aria-label="Buscar"><kbd>Esc</kbd></div>
+    <div class="palette-results" data-palette-results role="listbox"></div>
+    <div class="palette-foot small muted"><span>↑ ↓ para navegar · Enter abre</span><a href="/gestao/busca" data-palette-tips hidden></a></div>
+  </div>
+</dialog>
+<div class="toasts" data-toasts aria-live="polite"></div>
+<button class="assist-fab" type="button" data-assist-open aria-label="Abrir o assistente" aria-expanded="false"><%- icon('sparkles', 20) %><span class="assist-dot" aria-hidden="true"></span></button>
+<section class="assist" data-assist hidden aria-label="Assistente" data-user="<%= fmt.firstName(currentUser.name) %>">
+  <header class="assist-head">
+    <div class="assist-titles"><strong>Assistente</strong><span class="kicker" data-assist-title>Nova conversa</span></div>
+    <div class="assist-tools">
+      <button class="icon-btn" type="button" data-assist-history aria-label="Conversas anteriores" title="Conversas anteriores"><%- icon('clock') %></button>
+      <button class="icon-btn" type="button" data-assist-new aria-label="Nova conversa" title="Nova conversa"><%- icon('plus') %></button>
+      <button class="icon-btn" type="button" data-assist-close aria-label="Fechar" title="Fechar"><%- icon('x') %></button>
+    </div>
+  </header>
+  <div class="assist-list" data-assist-list hidden></div>
+  <div class="assist-msgs" data-assist-msgs aria-live="polite"></div>
+  <form class="assist-form" data-assist-form>
+    <label class="sr-only" for="assist-input">Pergunta</label>
+    <textarea id="assist-input" rows="1" maxlength="4000" placeholder="Pergunte algo ou grave um áudio" data-assist-input></textarea>
+    <button class="icon-btn assist-mic" type="button" data-assist-mic aria-label="Gravar pergunta por voz" title="Gravar por voz"><%- icon('mic') %></button>
+    <button class="btn primary sm" type="submit" data-assist-send aria-label="Enviar"><%- icon('send') %></button>
+  </form>
+</section>
+<script type="application/json" id="team-users"><%- JSON.stringify((teamUsers || []).map(function (u) { return { id: u.id, name: u.name, ini: fmt.initials(u.name) }; })).replace(/</g, '\\u003c') %></script>
+<script src="/static/collab.js?v=<%= assetV %>" defer></script>
+<script src="/static/assistant.js?v=<%= assetV %>" defer></script>
+<% } else { %></div></div><% } %>
 <script src="/static/app.js?v=<%= assetV %>" defer></script>
 </body>
 </html>

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= title %></title>
+<meta name="description" content="Viva a experiência de estar perto de grandes nomes da saúde: assista presencialmente às gravações do Pulso Podcast, conheça os bastidores e solicite sua participação.">
+<link rel="canonical" href="<%= canonical %>">
+<meta property="og:title" content="<%= title %>">
+<meta property="og:description" content="Participe presencialmente das gravações do Pulso Podcast e conheça os bastidores.">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="stylesheet" href="/static/plateia.css?v=<%= assetV %>">
+</head>
+<body data-plateia data-meta-pixel="<%= s.metaPixel %>" data-ga4="<%= s.ga4 %>" data-price="<%= price %>" data-duration="<%= s.duration %>" data-location="<%= s.location %>">
+<header class="pl-top">
+  <a class="pl-wordmark" href="/plateia" aria-label="pulso. — Pulso Podcast com Plateia">pulso<span>.</span></a>
+  <a class="pl-toplink" href="#agenda" data-track="agenda_click">Agenda</a>
+</header>
+
+<main>
+  <section class="pl-hero" id="topo">
+    <div class="pl-hero-video" aria-hidden="true">
+      <video autoplay muted loop playsinline disablepictureinpicture preload="auto" tabindex="-1"<% if (hasHero) { %> poster="/plateia/imagem/hero"<% } %>>
+        <source src="<%= videoUrl %>" type="video/webm">
+      </video>
+    </div>
+    <div class="pl-wrap pl-hero-in">
+      <span class="pl-kicker">Pulso Podcast com Plateia · vagas limitadas</span>
+      <h1>Uma plateia pequena para conversas grandes.</h1>
+      <p class="pl-lede">Cada gravação do Pulso recebe poucas pessoas, escolhidas pela produção por afinidade com o convidado e com o tema. Peça para participar, conte quem você é e, se houver encaixe, você viverá a conversa a poucos metros de quem move a saúde.</p>
+      <a class="pl-btn" href="#agenda" data-track="agenda_click">Ver as próximas gravações</a>
+    </div>
+    <%- include('../partials/pulse-line') %>
+  </section>
+
+  <section class="pl-section" id="experiencia">
+    <div class="pl-wrap">
+      <span class="pl-kicker">Como funciona</span>
+      <h2>Não é para qualquer plateia. É para quem tem a ver com a conversa.</h2>
+      <p class="pl-lede pl-lede-sm">Pedir participação não garante a vaga. A produção avalia cada pedido e monta a plateia de cada episódio pensando no convidado: quem pode contribuir, perguntar e aproveitar aquele encontro.</p>
+      <ol class="pl-steps">
+        <li><span class="pl-n">01</span><div><h3>Seleção pela produção</h3><p>Você pede participação em uma gravação. A produção avalia o encaixe com o convidado e o tema e responde pelo WhatsApp.</p></div></li>
+        <li><span class="pl-n">02</span><div><h3>Recepção inicial</h3><p>Acolhimento dos participantes selecionados antes do início da gravação.</p></div></li>
+        <li><span class="pl-n">03</span><div><h3>Gravação presencial</h3><p>Oportunidade de acompanhar de perto a produção do episódio e a participação do convidado.</p></div></li>
+        <li><span class="pl-n">04</span><div><h3>Bastidores e conteúdos</h3><p>Momentos de interação e produção de conteúdos com o convidado, conforme a dinâmica de cada gravação.</p></div></li>
+        <li><span class="pl-n">05</span><div><h3>Coffee break</h3><p>Um momento para aproveitar a recepção e interagir com os demais participantes.</p></div></li>
+        <li><span class="pl-n">06</span><div><h3>Experiência presencial</h3><p>Contato com o ambiente do podcast e com os bastidores de uma produção profissional.</p></div></li>
+      </ol>
+      <dl class="pl-facts">
+        <div><dt>Duração estimada</dt><dd><%= s.duration %></dd></div>
+        <div><dt>Investimento</dt><dd><%= price %> <span>por participante selecionado</span></dd></div>
+      </dl>
+      <p class="pl-note">O valor é combinado com a produção apenas se o seu pedido for selecionado. Nenhuma cobrança é feita por esta página.</p>
+    </div>
+  </section>
+
+  <section class="pl-section pl-agenda" id="agenda">
+    <div class="pl-wrap">
+      <span class="pl-kicker">Agenda de gravações</span>
+      <h2>Escolha o convidado que tem a ver com você.</h2>
+      <p class="pl-lede pl-lede-sm">Vagas limitadas por gravação. Cada pedido é avaliado pela produção.</p>
+      <% if (!agenda.length) { %>
+      <div class="pl-empty"><%- include('../partials/pulse-line') %><p><strong>Novas datas serão divulgadas em breve.</strong></p><p>Volte em alguns dias: as próximas gravações com plateia são divulgadas aqui.</p></div>
+      <% } %>
+      <ul class="pl-cards">
+        <% agenda.forEach(function (g) { var initials = g.name.split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0]; }).join('').toUpperCase(); %>
+        <li class="pl-card <%= g.status !== 'disponivel' ? 'is-off' : '' %>" data-guest-card="<%= g.id %>">
+          <div class="pl-photo"><% if (g.hasPhoto) { %><img src="/plateia/foto/<%= g.id %>" alt="<%= g.name %>" loading="lazy" width="480" height="480"><% } else { %><span aria-hidden="true"><%= initials %></span><% } %></div>
+          <div class="pl-card-body">
+            <span class="pl-tag">Plateia selecionada</span>
+            <h3><%= g.name %></h3>
+            <% if (g.role) { %><p class="pl-role"><%= g.role %></p><% } %>
+            <% if (g.topic) { %><p class="pl-topic"><strong>Tema:</strong> <%= g.topic %></p><% } %>
+            <ul class="pl-meta">
+              <li><%- icon('calendar', 16) %><span><span class="pl-cap"><%= g.weekday %></span>, <%= g.date %></span></li>
+              <li><%- icon('clock', 16) %><span>Horário previsto: <%= g.time %></span></li>
+              <li><%- icon('map-pin', 16) %><span><%= s.location %></span></li>
+            </ul>
+            <p class="pl-price">Investimento: <strong><%= price %></strong> <span>por participante selecionado</span></p>
+            <% if (g.status === 'disponivel') { %>
+            <button class="pl-btn" type="button" data-signup="<%= g.id %>" data-name="<%= g.name %>" data-date="<%= g.date %>" data-time="<%= g.time %>">Pedir para participar</button>
+            <% } else { %>
+            <button class="pl-btn" type="button" disabled><%= g.status === 'lotado' ? 'Gravação lotada' : 'Inscrições encerradas' %></button>
+            <% } %>
+          </div>
+        </li>
+        <% }) %>
+      </ul>
+    </div>
+  </section>
+
+  <section class="pl-section" id="local">
+    <div class="pl-wrap pl-local">
+      <div>
+        <span class="pl-kicker">Localização</span>
+        <h2>Onde a experiência acontece?</h2>
+        <p>As gravações acontecem no estúdio oficial do Pulso Podcast, em Alphaville, São Paulo.</p>
+        <p>O endereço completo é enviado apenas aos participantes selecionados.</p>
+      </div>
+      <% if (hasStudio) { %><img class="pl-studio" src="/plateia/imagem/estudio" alt="Estúdio do Pulso Podcast" loading="lazy" width="800" height="600"><% } %>
+    </div>
+  </section>
+
+  <section class="pl-section" id="duvidas">
+    <div class="pl-wrap pl-faq">
+      <span class="pl-kicker">Perguntas frequentes</span>
+      <h2>Antes de se inscrever</h2>
+      <% faq.forEach(function (f) { %>
+      <details><summary><%= f[0] %></summary><p><%= f[1] %></p></details>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="pl-section pl-final">
+    <div class="pl-wrap">
+      <h2>Seu lugar na conversa começa por um pedido.</h2>
+      <p class="pl-lede">Escolha o convidado que tem a ver com você e peça para participar. A produção seleciona a plateia de cada gravação e responde a cada pedido.</p>
+      <a class="pl-btn" href="#agenda" data-track="agenda_click">Explorar agenda de gravações</a>
+    </div>
+  </section>
+</main>
+
+<footer class="pl-foot"><span class="pl-wordmark">pulso<span>.</span></span><span>As conversas que estão movimentando a saúde.</span></footer>
+
+<dialog class="pl-modal" id="pl-modal" aria-labelledby="pl-modal-h">
+  <button class="pl-close" type="button" data-close aria-label="Fechar">&times;</button>
+  <div data-step="form">
+    <span class="pl-kicker" id="pl-modal-kicker">Pedido de participação</span>
+    <h2 id="pl-modal-h">Quem é você?</h2>
+    <p class="pl-sub" data-episode></p>
+    <form id="pl-form" novalidate>
+      <label class="pl-field">Nome completo
+        <input type="text" name="name" autocomplete="name" maxlength="120" required>
+        <small class="pl-err" data-err="name"></small>
+      </label>
+      <div class="pl-field">
+        <label for="pl-phone">WhatsApp</label>
+        <div class="pl-phone">
+          <select name="country" aria-label="País" autocomplete="country">
+            <% countries.forEach(function (c) { %><option value="<%= c.code %>" <%= c.code === 'BR' ? 'selected' : '' %>><%= c.name %> (+<%= c.dial %>)</option><% }) %>
+          </select>
+          <input type="tel" id="pl-phone" name="phone" inputmode="tel" autocomplete="tel-national" required placeholder="(11) 91234-5678">
+        </div>
+        <small class="pl-err" data-err="phone"></small>
+      </div>
+      <input type="text" name="site" class="pl-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <p class="pl-err pl-err-main" data-err="form" role="alert"></p>
+      <button class="pl-btn" type="submit">Revisar pedido</button>
+    </form>
+  </div>
+  <div data-step="review" hidden>
+    <span class="pl-kicker">Revisão</span>
+    <h2>Você está pedindo uma vaga na plateia de:</h2>
+    <dl class="pl-review">
+      <div><dt>Convidado</dt><dd data-r="guest"></dd></div>
+      <div><dt>Data</dt><dd data-r="date"></dd></div>
+      <div><dt>Horário</dt><dd data-r="time"></dd></div>
+      <div><dt>Investimento (se selecionado)</dt><dd data-r="price"></dd></div>
+      <div><dt>Duração estimada</dt><dd data-r="duration"></dd></div>
+    </dl>
+    <p class="pl-warn">Pedir participação não confirma a sua vaga. A plateia é selecionada pela produção, por afinidade com o convidado e o tema. Ao continuar, você fala com a nossa produtora pelo WhatsApp, que avalia o seu pedido e responde com os próximos passos.</p>
+    <a class="pl-btn" data-whatsapp href="#" rel="noopener"><%- icon('whatsapp', 18) %> Continuar pelo WhatsApp</a>
+    <p class="pl-sub" data-nowa hidden>Recebemos o seu pedido. A produção avalia o encaixe e responde pelo WhatsApp informado.</p>
+  </div>
+</dialog>
+
+<script type="application/json" id="pl-data"><%- JSON.stringify({ countries: countries.map(function (c) { return { code: c.code, dial: c.dial, min: c.min, max: c.max }; }) }).replace(/</g, '\\u003c') %></script>
+<script src="/static/plateia.js?v=<%= assetV %>" defer></script>
+</body>
+</html>

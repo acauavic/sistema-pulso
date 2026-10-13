@@ -1,0 +1,1052 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Media Kit Pulso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --lime:#C8FF42;
+    --black:#0A0A0A;
+    --white:#FAFAFA;
+    --charcoal:#1F1F1F;
+    --plum:#2D1B4E;
+    --bone:#F0EDE3;
+    --gray-500:#6B6B6B;
+    --gray-300:#B5B5B5;
+    --gray-100:#ECECEC;
+  }
+  *{margin:0;padding:0;box-sizing:border-box; min-width:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'Inter',-apple-system,sans-serif;
+    background:var(--black);
+    color:var(--white);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  .display{font-family:'Space Grotesk',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;}
+  img{max-width:100%;display:block;}
+  h1,h2,h3{text-wrap:balance;}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+
+  /* ================= DECK / SLIDES ================= */
+  #deck{
+    display:flex;
+    height:100dvh;
+    width:100dvw;
+    overflow-x:auto;
+    overflow-y:hidden;
+    scroll-snap-type:x mandatory;
+    scroll-behavior:smooth;
+    -webkit-overflow-scrolling:touch;
+  }
+  #deck::-webkit-scrollbar{display:none;}
+  #deck{scrollbar-width:none;}
+
+  .slide{
+    min-width:100vw;
+    width:100vw;
+    height:100dvh;
+    flex-shrink:0;
+    scroll-snap-align:start;
+    scroll-snap-stop:always;
+    position:relative;
+    overflow-x:hidden;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    justify-content:safe center; /* se o conteúdo não couber, ancora no topo em vez de cortar o início (bug clássico de centralização em flex com overflow) */
+    padding:84px clamp(24px,6vw,90px) 64px;
+  }
+  .slide-content{max-width:1180px; margin:0 auto; width:100%;}
+  .slide.bone{background:var(--bone); color:var(--black);}
+  .slide.lime{background:var(--lime); color:var(--black);}
+  .slide.plum{background:var(--plum); color:var(--white);}
+  .slide.black{background:var(--black); color:var(--white);}
+  .slide.white{background:var(--white); color:var(--black);}
+  .slide.tight{padding-top:68px; padding-bottom:28px;}
+
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.24em;
+    text-transform:uppercase;
+    color:var(--lime);
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:26px;
+  }
+  .slide.lime .eyebrow, .slide.bone .eyebrow, .slide.white .eyebrow{color:var(--charcoal);}
+  .eyebrow .num{opacity:0.55;}
+  .eyebrow::after{
+    content:'';
+    flex:1;
+    height:1px;
+    background:currentColor;
+    opacity:0.18;
+  }
+
+  .slide-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:clamp(28px,4.2vw,58px);
+    line-height:1.05;
+    letter-spacing:-0.03em;
+    margin-bottom:24px;
+    max-width:18ch;
+  }
+  .slide-lede{
+    font-size:clamp(15px,1.5vw,20px);
+    line-height:1.55;
+    max-width:62ch;
+    color:inherit;
+    opacity:0.86;
+    margin-bottom:8px;
+  }
+  .slide.black .slide-lede, .slide.plum .slide-lede{opacity:0.72;}
+
+  /* ================ NAV CHROME ================ */
+  #topline{position:fixed; top:0; left:0; right:0; height:3px; background:rgba(255,255,255,0.12); z-index:60;}
+  #topline-fill{height:100%; width:0%; background:var(--lime); transition:width 0.25s ease;}
+  #brandmark{
+    position:fixed; top:calc(26px + env(safe-area-inset-top)); left:calc(clamp(24px,6vw,90px) + env(safe-area-inset-left)); z-index:55;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; letter-spacing:-0.03em;
+    color:var(--white); mix-blend-mode:difference; pointer-events:auto; text-decoration:none;
+  }
+  #brandmark span{color:var(--lime);}
+  #counter{
+    position:fixed; top:calc(26px + env(safe-area-inset-top)); right:calc(clamp(24px,6vw,90px) + env(safe-area-inset-right)); z-index:55;
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.15em;
+    color:var(--white); mix-blend-mode:difference;
+  }
+  #navrail{
+    position:fixed; bottom:calc(24px + env(safe-area-inset-bottom)); left:0; right:0; z-index:55;
+    display:flex; align-items:center; justify-content:center; gap:18px; pointer-events:none;
+  }
+  .navbtn{
+    pointer-events:auto; width:46px; height:46px; border-radius:50%;
+    border:1px solid rgba(255,255,255,0.35); background:rgba(10,10,10,0.35);
+    backdrop-filter:blur(6px); color:var(--white); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:16px; transition:background 0.2s, border-color 0.2s, transform 0.15s;
+    mix-blend-mode:difference;
+  }
+  .navbtn:hover{border-color:var(--lime); transform:translateY(-1px);}
+  .navbtn:focus-visible{outline:2px solid var(--lime); outline-offset:2px;}
+  .navbtn:disabled{opacity:0.3; cursor:default; transform:none;}
+  #navhint{
+    position:fixed; bottom:calc(30px + env(safe-area-inset-bottom)); left:calc(clamp(24px,6vw,90px) + env(safe-area-inset-left)); z-index:55;
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--white); opacity:0.55; mix-blend-mode:difference; display:flex; align-items:center; gap:8px;
+  }
+  @media (max-width:860px){ #navhint{display:none;} }
+
+  /* ================ REUSABLE BLOCKS ================ */
+  .tag{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 14px; display:inline-block;}
+  .tag.on-dark{background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18);}
+  .tag.on-light{background:rgba(10,10,10,0.06); border:1px solid rgba(10,10,10,0.14);}
+  .tag.lime-fill{background:var(--lime); color:var(--black);}
+  .tag.black-fill{background:var(--black); color:var(--lime);}
+
+  .stat{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(30px,4vw,50px); letter-spacing:-0.03em; line-height:1;}
+  .stat-label{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; opacity:0.6; margin-top:8px;}
+
+  .btn{
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; letter-spacing:-0.01em;
+    padding:16px 30px; text-decoration:none; display:inline-flex; align-items:center; gap:10px;
+    cursor:pointer; border:none; transition:transform 0.18s ease;
+  }
+  .btn:hover{transform:translateY(-2px);}
+  .btn.lime-fill{background:var(--lime); color:var(--black);}
+  .btn.black-fill{background:var(--black); color:var(--white);}
+  .btn.outline{background:transparent; border:1.5px solid currentColor;}
+
+  /* ---- placeholder de imagem (reutilizável) ---- */
+  .img-slot{
+    position:relative;
+    background:
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 10px, transparent 10px 20px),
+      linear-gradient(200deg,#1b1b1b,#0a0a0a);
+    border:1.5px dashed rgba(255,255,255,0.28);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    text-align:center; overflow:hidden;
+  }
+  .img-slot .plus{font-size:22px; color:rgba(255,255,255,0.4); font-family:'Space Grotesk',sans-serif; font-weight:600;}
+  .img-slot .cap{font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.45); padding:0 10px;}
+  .white .img-slot, .bone .img-slot{
+    background:
+      repeating-linear-gradient(135deg, rgba(10,10,10,0.04) 0 10px, transparent 10px 20px),
+      var(--gray-100);
+    border-color:rgba(10,10,10,0.22);
+  }
+  .white .img-slot .plus, .bone .img-slot .plus{color:rgba(10,10,10,0.35);}
+  .white .img-slot .cap, .bone .img-slot .cap{color:rgba(10,10,10,0.45);}
+  /* ---- slot preenchido com foto real ---- */
+  .img-slot.has-photo{background:var(--charcoal); border-style:solid; border-color:rgba(255,255,255,0.12);}
+  .white .img-slot.has-photo, .bone .img-slot.has-photo{border-color:rgba(10,10,10,0.12);}
+  .img-slot.has-photo img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center top;}
+  .host-avatar.has-photo img{object-position:center 22%;}
+  .struct-photo.has-photo img{object-position:center 38%;}
+
+  /* ---- 16 nomes confirmados ---- */
+  .confirmed-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:34px 20px; margin-top:40px;}
+  .confirmed-card{display:flex; flex-direction:column; align-items:center; text-align:center; gap:11px;}
+  .confirmed-avatar{width:104px; height:104px; border-radius:50%; flex-shrink:0;}
+  .confirmed-avatar.img-slot{border-radius:50%; gap:2px;}
+  .confirmed-avatar .plus{font-size:15px;}
+  .confirmed-avatar .cap{font-size:8px; letter-spacing:0.06em;}
+  .confirmed-name{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; letter-spacing:-0.01em; line-height:1.25;}
+  .confirmed-handle{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--gray-500);}
+  .confirmed-followers{display:flex; align-items:baseline; gap:5px; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.05em; text-transform:uppercase; color:rgba(10,10,10,0.32); margin-top:2px;}
+  .confirmed-followers .num{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; letter-spacing:-0.01em; color:rgba(10,10,10,0.55);}
+  .confirmed-month{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--gray-500); margin:28px 0 -6px;}
+  @media(max-width:900px){.confirmed-grid{grid-template-columns:repeat(3,1fr);}}
+  @media(max-width:600px){.confirmed-grid{grid-template-columns:repeat(2,1fr); gap:26px 14px;}}
+
+  /* ---- 01 opening ---- */
+  .opening{display:flex; flex-direction:column; align-items:flex-start; height:100%; justify-content:center; position:relative; z-index:3;}
+  .opening-word{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(60px,14vw,200px);
+    line-height:0.86; letter-spacing:-0.05em; color:var(--white);
+  }
+  .opening-word span{color:var(--lime);}
+  .opening-tag{font-family:'JetBrains Mono',monospace; font-size:clamp(11px,1.6vw,15px); letter-spacing:0.3em; text-transform:uppercase; color:var(--gray-300); margin:22px 0 30px;}
+  .opening-pitch{
+    font-size:clamp(18px,2.2vw,28px); max-width:20ch; color:var(--white);
+    font-family:'Space Grotesk',sans-serif; font-weight:500; letter-spacing:-0.01em; line-height:1.3; margin-bottom:32px;
+  }
+  .pillrow{display:flex; gap:10px; flex-wrap:wrap;}
+
+  /* ---- vídeo de fundo (tela de abertura) ---- */
+  /* <video> nativo, mudo, em loop, sem controles — cobre a tela (object-fit:cover)
+     e tem pointer-events:none, então não é clicável nem selecionável. */
+  .hero-video{
+    position:absolute; inset:0; z-index:0; overflow:hidden; background:var(--black);
+  }
+  .hero-video video{
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; object-position:center;
+    pointer-events:none; -webkit-user-select:none; user-select:none;
+  }
+  .hero-video-scrim{
+    position:absolute; inset:0; z-index:1;
+    background:
+      linear-gradient(100deg, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.62) 42%, rgba(10,10,10,0.4) 68%, rgba(10,10,10,0.72) 100%),
+      linear-gradient(0deg, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0.15) 38%, transparent 60%);
+  }
+  @media (prefers-reduced-motion: reduce){
+    .hero-video{ display:none; }
+  }
+
+  .opening-frame{
+    position:absolute; inset:0; z-index:2;
+    background:
+      radial-gradient(circle at 82% 18%, rgba(200,255,66,0.14), transparent 45%),
+      radial-gradient(circle at 8% 90%, rgba(45,27,78,0.55), transparent 50%);
+    pointer-events:none;
+  }
+  /* ---- 02 o pulso ---- */
+  .connects-row{display:flex; flex-wrap:wrap; gap:10px; margin:8px 0 40px;}
+  .topics-row{display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:19px;}
+  .topics-row .sep{opacity:0.35; font-family:'Inter',sans-serif; font-weight:300;}
+
+  /* ---- 03 plataforma ---- */
+  .fronts-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:1px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); margin:40px 0 36px;}
+  .front{background:var(--black); padding:28px 20px; display:flex; flex-direction:column; gap:12px;}
+  .front-icon{font-size:24px;}
+  .front h4{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; letter-spacing:-0.01em;}
+  .front p{font-size:12.5px; line-height:1.5; color:var(--gray-300);}
+  @media (max-width:900px){ .fronts-grid{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:480px){ .fronts-grid{grid-template-columns:1fr;} }
+
+  /* ---- 04 galeria de convidados ---- */
+  .gallery-wrap{margin-top:6px;}
+  .gallery{
+    position:relative;
+    height:min(46vh,440px);
+    border:1px solid rgba(255,255,255,0.12);
+    overflow:hidden;
+    background:var(--charcoal);
+  }
+  .gallery-slide{
+    position:absolute; inset:0;
+    opacity:0; visibility:hidden;
+    transition:opacity 0.7s ease;
+    display:grid; grid-template-columns:1fr 1fr; gap:1px;
+    background:rgba(255,255,255,0.12);
+  }
+  .gallery-slide.active{opacity:1; visibility:visible;}
+  .guest-card{position:relative; display:flex; flex-direction:column; overflow:hidden; background:var(--charcoal);}
+  .gallery-photo{
+    flex:1; position:relative;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    background:
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.045) 0 12px, transparent 12px 24px),
+      radial-gradient(circle at 50% 32%, rgba(200,255,66,0.12), transparent 55%),
+      linear-gradient(200deg,#1c1c1c,#0a0a0a);
+  }
+  .gallery-photo.has-photo{background:var(--charcoal);}
+  .gallery-photo img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 22%; transform:scale(1); transition:transform 0.6s ease;}
+  .gallery-slide.active .gallery-photo img{animation:galleryZoom 2.4s ease-out forwards;}
+  @keyframes galleryZoom{ from{transform:scale(1.1);} to{transform:scale(1);} }
+  .gallery-photo .plus{font-size:24px; color:rgba(255,255,255,0.35);}
+  .gallery-photo .cap{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(255,255,255,0.4); padding:0 12px; text-align:center;}
+  .gallery-scrim{
+    position:absolute; left:0; right:0; bottom:0; height:72%;
+    background:linear-gradient(to top, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.8) 38%, transparent 100%);
+    display:flex; flex-direction:column; justify-content:flex-end;
+    padding:22px 24px 24px;
+    pointer-events:none;
+  }
+  .gallery-index{
+    position:absolute; top:16px; left:18px;
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; color:rgba(255,255,255,0.55);
+  }
+  .gallery-audience{
+    display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
+    align-self:flex-start;
+    margin-bottom:12px;
+  }
+  .gallery-audience-num{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(30px,3.6vw,42px);
+    letter-spacing:-0.03em; line-height:1; color:var(--lime);
+  }
+  .gallery-audience-label{
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.68);
+  }
+  .gallery-name{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(20px,2.3vw,29px); letter-spacing:-0.02em; color:var(--white); margin-bottom:6px;}
+  .gallery-cred{
+    font-size:12.5px; line-height:1.45; color:rgba(255,255,255,0.75); margin-bottom:10px;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .gallery-link{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--white); text-decoration:none; border-bottom:1px solid rgba(255,255,255,0.6); padding-bottom:2px; align-self:flex-start;
+    pointer-events:auto;
+  }
+  .gallery-dots{display:flex; gap:4px; justify-content:center; margin-top:16px; flex-wrap:wrap;}
+  .gallery-dot{
+    width:30px; height:26px; background-color:rgba(255,255,255,0.28); background-clip:content-box;
+    padding:11.5px 2px; border:none; cursor:pointer;
+    transition:background-color 0.2s;
+  }
+  .gallery-dot:focus-visible{outline:2px solid var(--lime); outline-offset:2px;}
+  .gallery-dot.active{background-color:var(--lime);}
+  .white .gallery-dot, .bone .gallery-dot{ background-color:rgba(10,10,10,0.18); }
+  .white .gallery-dot.active, .bone .gallery-dot.active{ background-color:var(--lime); }
+  .gallery-foot{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:10px; flex-wrap:wrap;}
+
+  /* ---- 05 audiência + conteúdo multiplicado + onde/quando ---- */
+  .split3{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); margin-top:20px;}
+  .split3 > div{background:var(--black); padding:20px 22px; display:flex; flex-direction:column;}
+  .split3 .col-label{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--lime); margin-bottom:12px;}
+  .formula-row{display:flex; flex-direction:column; gap:5px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; margin-bottom:12px;}
+  .formula-row .plus{color:var(--lime); font-weight:400; font-size:12px; padding-left:2px; line-height:1;}
+  .formula-item{background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); padding:8px 14px; font-size:13px;}
+  .case-card{background:var(--lime); color:var(--black); padding:14px 18px; margin-top:auto;}
+  .case-card .stat{font-size:clamp(22px,2.6vw,30px);}
+  .funnel-chain{display:flex; flex-direction:column; gap:5px; font-family:'JetBrains Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:12px;}
+  .funnel-chain .node{background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); padding:7px 12px;}
+  .funnel-chain .arrow{color:var(--lime); font-size:11px; padding-left:2px; line-height:1;}
+  .mini-stats{display:flex; gap:1px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); margin-top:auto;}
+  .mini-stats > div{flex:1; background:var(--charcoal); padding:12px 14px;}
+  .mini-stats .stat{font-size:20px;}
+  .schedule-chip{background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.14); padding:14px 16px; margin-bottom:12px;}
+  .schedule-chip .time{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:22px; color:var(--lime); letter-spacing:-0.02em; margin-bottom:5px;}
+  .schedule-chip p{font-size:12.5px; color:var(--gray-300); line-height:1.45;}
+  .platform-row{display:flex; flex-wrap:wrap; gap:8px; margin-top:auto;}
+  .platform-row .tag{font-size:11px;}
+  @media (max-width:900px){ .split3{grid-template-columns:1fr;} .split3 .case-card, .split3 .mini-stats, .split3 .platform-row{margin-top:0;} }
+
+  /* ---- 07/08 nossa audiência ---- */
+  .split-bar{display:flex; height:54px; border:1px solid rgba(10,10,10,0.15); margin:32px 0 26px; overflow:hidden;}
+  .split-bar div{display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.06em;}
+  .split-b2b{background:var(--black); color:var(--lime); width:70%;}
+  .split-b2c{background:var(--bone); color:var(--charcoal); width:30%;}
+  .pub-list{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:26px;}
+
+  /* ---- 08/09 social stats ---- */
+  .social-layout{display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center;}
+  .social-hero-stat{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(46px,6.5vw,80px); letter-spacing:-0.04em; line-height:1; margin-bottom:8px;}
+  .gender-bar{display:flex; height:14px; border-radius:99px; overflow:hidden; margin:18px 0 10px; max-width:340px;}
+  .age-bars{display:flex; flex-direction:column; gap:10px; max-width:340px;}
+  .age-row{display:grid; grid-template-columns:70px 1fr 46px; align-items:center; gap:12px; font-family:'JetBrains Mono',monospace; font-size:12px;}
+  .age-track{height:8px; background:rgba(255,255,255,0.1); position:relative;}
+  .age-fill{height:100%; background:var(--lime);}
+  .white .age-track{background:rgba(10,10,10,0.1);}
+  @media (max-width:900px){ .social-layout{grid-template-columns:1fr;} }
+
+  /* ---- 10 escala (timeline) ---- */
+  .flow-line{position:relative; display:flex; justify-content:space-between; margin:48px 0 12px; padding:0 6px;}
+  .flow-line::before{content:''; position:absolute; top:13px; left:6px; right:6px; height:1px; background:rgba(255,255,255,0.18);}
+  .flow-node{position:relative; display:flex; flex-direction:column; align-items:center; gap:14px; width:19%; text-align:center;}
+  .flow-dot{width:26px; height:26px; border-radius:50%; background:var(--black); border:2px solid var(--lime); color:var(--lime); font-family:'JetBrains Mono',monospace; font-size:11px; display:flex; align-items:center; justify-content:center; z-index:1;}
+  .flow-node span{font-family:'JetBrains Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--gray-300); line-height:1.4;}
+  @media (max-width:760px){ .flow-line{flex-direction:column; align-items:flex-start; gap:22px; padding-left:16px;} .flow-line::before{top:6px; bottom:6px; left:12px; right:auto; width:1px; height:auto;} .flow-node{flex-direction:row; width:auto; text-align:left;} }
+
+  /* ---- 11 hosts ---- */
+  .host-duo{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); margin-top:32px;}
+  .host-panel{background:var(--charcoal); display:flex; flex-direction:column; padding:28px 30px 30px;}
+  .host-panel.alt{background:var(--plum);}
+  .host-top{display:flex; align-items:flex-start; gap:18px; margin-bottom:18px;}
+  .host-avatar{width:clamp(80px,9vw,104px); height:clamp(80px,9vw,104px); flex-shrink:0;}
+  .host-heading{flex:1; min-width:0; padding-top:2px;}
+  .host-panel .name{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:23px; letter-spacing:-0.03em; margin-bottom:8px;}
+  .host-panel .focus{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.05em; color:var(--lime); text-transform:uppercase; line-height:1.65;}
+  .host-panel p{font-size:13.5px; line-height:1.6; color:var(--gray-300);}
+  @media (max-width:800px){ .host-duo{grid-template-columns:1fr;} }
+
+  /* ---- 12 estrutura ---- */
+  .struct-layout{display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center; margin-top:8px;}
+  .struct-photo{height:min(40vh,380px);}
+  .struct-list{display:flex; flex-direction:column; gap:0;}
+  .struct-list li{list-style:none; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.1); font-size:14.5px;}
+  .struct-list li:last-child{border-bottom:none;}
+  @media (max-width:900px){ .struct-layout{grid-template-columns:1fr;} .struct-photo{height:220px;} }
+
+  /* ---- 13 por que marca ---- */
+  .dims-row{display:flex; align-items:center; flex-wrap:wrap; gap:14px; margin:36px 0;}
+  .dims-row .dim{background:var(--black); color:var(--lime); font-family:'Space Grotesk',sans-serif; font-weight:600; padding:18px 24px; font-size:16px;}
+  .dims-row .plus{font-size:18px; color:var(--charcoal); opacity:0.4;}
+
+  /* ---- 14 por que agora ---- */
+  #s13{padding-top:60px; padding-bottom:110px;}
+  .now-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); margin:24px 0 20px;}
+  .now-item{background:var(--black); padding:20px 22px;}
+  .now-item .n{font-family:'JetBrains Mono',monospace; color:var(--lime); font-size:11.5px; margin-bottom:14px;}
+  .now-item h4{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:17px; margin-bottom:9px;}
+  .now-item p{font-size:13px; line-height:1.5; color:var(--gray-300);}
+  .impact-line{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:clamp(14px,1.55vw,19px); letter-spacing:-0.02em; line-height:1.3; max-width:none;}
+  .impact-line .accent{background:var(--lime); color:var(--black); padding:2px 10px; white-space:nowrap;}
+  @media (max-width:800px){ .now-grid{grid-template-columns:1fr;} }
+
+  /* ---- 15/16 planos ---- */
+  .plan-badge{display:inline-flex; align-items:center; gap:12px; margin-bottom:22px;}
+  .plan-badge-name{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; background:var(--lime); color:var(--black); padding:9px 18px;}
+  .plan-badge-tag{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--gray-300);}
+  .plan-head{display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap; margin-bottom:32px; padding-bottom:24px; border-bottom:1px solid rgba(255,255,255,0.12);}
+  .plan-price{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(30px,4.4vw,52px); letter-spacing:-0.04em; color:var(--lime); white-space:nowrap;}
+  .plan-price .unit{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gray-300); letter-spacing:0.1em; text-transform:uppercase; display:block; margin-top:6px;}
+  .deliver-list{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1);}
+  .deliver-item{background:var(--black); padding:18px 20px; display:flex; flex-direction:column; gap:6px;}
+  .deliver-item h4{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14.5px; display:flex; align-items:center; gap:9px;}
+  .deliver-item h4::before{content:"✓"; color:var(--lime); font-weight:700; flex-shrink:0;}
+  .deliver-item p{font-size:12.5px; line-height:1.45; color:var(--gray-300); padding-left:22px;}
+  .deliver-item.diamond-inherit{background:var(--lime);}
+  .deliver-item.diamond-inherit h4{color:var(--black);}
+  .deliver-item.diamond-inherit h4::before{color:var(--black);}
+  .deliver-item.diamond-inherit p{color:rgba(10,10,10,0.7);}
+  @media (max-width:700px){ .deliver-list{grid-template-columns:1fr;} }
+
+  .choice-label{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.04em; color:var(--gray-300);
+    margin:24px 0 10px;
+  }
+  .choice-badge{
+    background:transparent; border:1px solid var(--lime); color:var(--lime);
+    font-weight:700; letter-spacing:0.08em; text-transform:uppercase; font-size:11px;
+    padding:5px 10px;
+  }
+  .choice-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px;}
+  .choice-item{
+    background:rgba(255,255,255,0.05); border:1px dashed rgba(255,255,255,0.28);
+    padding:16px 18px; display:flex; flex-direction:column; gap:6px;
+  }
+  .choice-item h4{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px; display:flex; align-items:center; gap:9px; color:var(--white);}
+  .choice-item h4::before{content:"○"; color:var(--lime); font-weight:700; flex-shrink:0;}
+  .choice-item p{font-size:12px; line-height:1.4; color:var(--gray-300); padding-left:22px;}
+  @media (max-width:700px){ .choice-grid{grid-template-columns:1fr;} }
+
+  .note-box{border-left:3px solid var(--lime); padding:12px 16px; font-size:12.5px; color:var(--gray-300); line-height:1.5; margin-top:16px; background:rgba(255,255,255,0.03);}
+
+  /* ---- 17 episódio especial ---- */
+  .include-grid{display:flex; flex-wrap:wrap; gap:9px; margin:32px 0;}
+  .include-grid .tag{font-size:11.5px;}
+
+  /* ---- 18 ativações ---- */
+  .activation-list{display:flex; flex-direction:column; gap:1px; background:rgba(10,10,10,0.08); border:1px solid rgba(10,10,10,0.08); margin:32px 0 24px;}
+  .activation-item{background:var(--white); padding:18px 24px; font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:15px;}
+
+  /* ---- 19 comparativo ---- */
+  .compare-wrap{overflow-x:auto; margin-top:28px; -webkit-overflow-scrolling:touch;}
+  table.compare{border-collapse:collapse; width:100%; min-width:600px;}
+  table.compare th, table.compare td{text-align:left; padding:8px 18px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:13.5px;}
+  table.compare th{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--gray-300); font-weight:500;}
+  table.compare td.feat{font-family:'Space Grotesk',sans-serif; font-weight:500; color:var(--white);}
+  table.compare td.yes{color:var(--lime); font-family:'JetBrains Mono',monospace;}
+  table.compare th.plan-col{color:var(--lime); font-size:12px;}
+
+  /* ---- 20 valor ---- */
+  .value-list{display:flex; flex-direction:column; gap:0; margin-top:32px; max-width:44ch;}
+  .value-list div{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:clamp(18px,2.2vw,25px); letter-spacing:-0.01em; padding:14px 0; border-bottom:1px solid rgba(10,10,10,0.12);}
+  .value-list div:last-child{border-bottom:none;}
+
+  /* ---- 21 timeline ---- */
+  .timeline-stats{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); margin-top:20px;}
+  .timeline-stats > div{background:var(--black); padding:22px 18px;}
+  @media (max-width:800px){ .timeline-stats{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:420px){ .timeline-stats{grid-template-columns:1fr;} }
+
+  /* ---- 22 closing ---- */
+  .closing-words{font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:clamp(17px,1.9vw,23px); display:flex; flex-wrap:wrap; gap:9px 15px; margin:8px 0 36px;}
+  .closing-words span{opacity:0.55;}
+  .closing-cta{display:flex; gap:14px; flex-wrap:wrap; margin-top:16px;}
+
+  /* ================================================================
+     MODO CELULAR / TABLET — em telas estreitas ou em tablets no modo
+     retrato, a experiência deixa de ser um deck horizontal (swipe) e
+     vira uma rolagem vertical normal, uma seção embaixo da outra.
+     680px deixava tablets em retrato (iPad ~768/810/820px) presos no
+     deck horizontal com grades de 2-3 colunas espremidas — por isso o
+     limiar sobe para 860px, cobrindo esses aparelhos também.
+  ================================================================ */
+  @media (max-width:860px){
+    #topline, #navrail, #navhint, #counter{ display:none; }
+    #brandmark{
+      position:fixed; top:calc(16px + env(safe-area-inset-top)); left:calc(18px + env(safe-area-inset-left)); font-size:16px;
+      mix-blend-mode:normal; color:var(--white);
+      background:rgba(10,10,10,0.55); backdrop-filter:blur(6px);
+      padding:8px 12px;
+    }
+    #deck{
+      display:block;
+      height:auto;
+      width:100%;
+      overflow-x:hidden;
+      overflow-y:visible;
+      scroll-snap-type:none;
+    }
+    .slide{
+      min-width:0; width:100%; height:auto; min-height:0;
+      scroll-snap-align:none;
+      padding:64px 24px calc(48px + env(safe-area-inset-bottom));
+      overflow-y:visible;
+    }
+    .slide.tight{padding-top:64px; padding-bottom:40px;}
+    .slide-title{max-width:none; font-size:clamp(24px,7vw,34px); margin-bottom:18px;}
+    .slide-lede{font-size:15px; max-width:none;}
+    .eyebrow{font-size:10.5px; letter-spacing:0.16em; margin-bottom:18px;}
+
+    #s01{ min-height:100dvh; }
+    .opening{justify-content:flex-start; padding-top:36px;}
+    .opening-word{font-size:clamp(52px,18vw,84px);}
+    .opening-pitch{font-size:19px; max-width:none;}
+
+    .gallery{height:62vh; min-height:400px;}
+    .gallery-name{font-size:19px;}
+    .gallery-cred{font-size:12px;}
+
+    .impact-line{max-width:none;}
+    .impact-line .accent{white-space:normal;}
+    #s13{padding:64px 24px calc(48px + env(safe-area-inset-bottom));}
+
+    .split3{grid-template-columns:1fr;}
+    .fronts-grid, .now-grid, .host-duo, .struct-layout, .social-layout, .timeline-stats, .deliver-list{ grid-template-columns:1fr; }
+    .struct-photo{height:200px;}
+    .host-avatar{width:78px; height:78px;}
+    .host-panel{padding:22px 22px 24px;}
+
+    table.compare{min-width:520px;}
+
+    .flow-line{flex-direction:column; align-items:flex-start; gap:20px; padding-left:14px; margin:36px 0 8px;}
+    .flow-line::before{top:6px; bottom:6px; left:12px; right:auto; width:1px; height:auto;}
+    .flow-node{flex-direction:row; width:auto; text-align:left; gap:14px;}
+
+    .plan-head{flex-direction:column; align-items:flex-start; gap:14px;}
+    .plan-price{font-size:38px;}
+
+    .closing-cta .btn{width:100%; justify-content:center;}
+  }
+
+  /* galeria de convidados: empilha em 1 coluna (2 cards, 1 por linha) em telas bem estreitas */
+  @media (max-width:700px){
+    .gallery{height:661px; min-height:0;}
+    .gallery-slide{grid-template-columns:1fr;}
+    .guest-card{height:330px;}
+    .gallery-name{font-size:21px;}
+  }
+</style>
+
+<div id="topline"><div id="topline-fill"></div></div>
+<a href="#s01" id="brandmark" onclick="event.preventDefault(); goTo(0);">pulso<span>.</span></a>
+<div id="counter" class="mono"><span id="counter-current">01</span> / <span id="counter-total">21</span></div>
+
+<div id="deck">
+
+  <!-- 01 — EXPERIÊNCIA DE ABERTURA -->
+  <section class="slide black" id="s01">
+    <div class="hero-video" aria-hidden="true">
+      <video autoplay muted loop playsinline disablepictureinpicture preload="auto" tabindex="-1">
+        <source src="https://s3.acauamedia.com/pulso-podcast/episodios/paola/Site%20Pulso.webm" type="video/webm">
+      </video>
+      <div class="hero-video-scrim"></div>
+    </div>
+    <div class="opening-frame"></div>
+    <div class="opening">
+      <div class="opening-word">pulso<span>.</span></div>
+      <div class="opening-tag">Media Kit Digital · 2026</div>
+      <p class="opening-pitch">As conversas que estão movimentando a saúde.</p>
+      <div class="pillrow">
+        <span class="tag on-dark">Saúde</span>
+        <span class="tag on-dark">Inovação</span>
+        <span class="tag on-dark">Empreendedorismo</span>
+        <span class="tag on-dark">Negócios</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 — O PULSO -->
+  <section class="slide bone" id="s02">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">02</span> O Pulso</div>
+      <h2 class="slide-title">A saúde precisa de melhores conversas.</h2>
+      <p class="slide-lede">
+        O Pulso nasceu de uma ideia simples: para ajudar a transformar a saúde no Brasil, é preciso
+        aproximar quem faz, quem empreende, quem comunica e quem utiliza a saúde. Em cada episódio,
+        colocamos profissionais da saúde, empresários, influenciadores, especialistas e pessoas que
+        estão construindo novas possibilidades para o setor em uma conversa simples, direta e relevante.
+      </p>
+      <p class="mono" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gray-500); margin:32px 0 12px;">O Pulso conecta</p>
+      <div class="connects-row">
+        <span class="tag on-light">Profissionais da saúde</span>
+        <span class="tag on-light">Empresários</span>
+        <span class="tag on-light">Influenciadores</span>
+        <span class="tag on-light">Especialistas</span>
+        <span class="tag on-light">Pacientes</span>
+      </div>
+      <p class="mono" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gray-500); margin-bottom:14px;">Conversamos sobre</p>
+      <div class="topics-row">
+        <span>Saúde</span><span class="sep">·</span><span>Inovação</span><span class="sep">·</span><span>Empreendedorismo</span><span class="sep">·</span><span>Negócios</span><span class="sep">·</span><span>Transformação</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 — QUEM JÁ SENTOU À MESA -->
+<section class="slide white tight" id="s03">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">03</span> Quem já sentou à mesa</div>
+      <h2 class="slide-title" style="margin-bottom:16px;">Grandes nomes. Grandes audiências. Uma mesma mesa.</h2>
+      <div class="gallery-wrap">
+        <div class="gallery" id="gallery">
+          <!-- gerado via JS a partir de GUESTS -->
+        </div>
+        <div class="gallery-foot">
+          <div class="gallery-dots" id="galleryDots"></div>
+          <div style="display:flex; align-items:center; gap:16px;">
+            <span class="tag lime-fill" style="font-size:11.5px;">E isso é apenas o começo.</span>
+            <span class="mono" style="font-size:11.5px; color:var(--gray-500);">14 episó1mdios até set/2026 · 1 novo por semana</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 — NOMES CONFIRMADOS -->
+<section class="slide bone" id="s04">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">04</span> Nomes confirmados</div>
+      <h2 class="slide-title">Quem já está na agenda.</h2>
+      <p class="slide-lede">Convidados confirmados para os próximos episódios do Pulso — a lista cresce a cada semana.</p>
+      {{ agenda_html }}
+    </div>
+  </section>
+
+  <!-- 05 — NOSSA AUDIÊNCIA -->
+<section class="slide white" id="s05">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">05</span> Nossa audiência</div>
+      <h2 class="slide-title">Uma audiência conectada ao mercado da saúde.</h2>
+      <p class="mono" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gray-500); margin-bottom:10px;">Perfil estimado</p>
+      <div class="split-bar">
+        <div class="split-b2b">~70% B2B</div>
+        <div class="split-b2c">~30% B2C</div>
+      </div>
+      <p class="mono" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gray-500); margin-bottom:12px;">Principais públicos</p>
+      <div class="pub-list">
+        <span class="tag on-light">Médicos</span>
+        <span class="tag on-light">Donos de clínicas</span>
+        <span class="tag on-light">Empresários</span>
+        <span class="tag on-light">Profissionais da saúde</span>
+        <span class="tag on-light">Pacientes</span>
+        <span class="tag on-light">Poder de compra médio e alto</span>
+      </div>
+      <p class="slide-lede" style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; opacity:1;">
+        O Pulso conversa simultaneamente com quem presta a saúde, quem administra a saúde,
+        quem transforma a saúde e quem consome a saúde.
+      </p>
+    </div>
+  </section>
+
+  <!-- 06 — INSTAGRAM -->
+<section class="slide black" id="s06">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">06</span> Instagram</div>
+      <h2 class="slide-title">A primeira fase foi construída organicamente.</h2>
+      <div class="social-layout">
+        <div>
+          <div class="social-hero-stat">+2<span style="color:var(--lime);">M</span></div>
+          <div class="stat-label" style="margin-bottom:26px;">visualizações</div>
+          <div class="mono" style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-300); margin-bottom:8px;">Gênero</div>
+          <div class="gender-bar">
+            <div style="width:79%; background:var(--lime);"></div>
+            <div style="width:21%; background:var(--charcoal);"></div>
+          </div>
+          <div class="mono" style="font-size:11px; color:var(--gray-300);">79% mulheres · 20% homens</div>
+        </div>
+        <div>
+          <div class="mono" style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-300); margin-bottom:14px;">Principais faixas etárias</div>
+          <div class="age-bars">
+            <div class="age-row"><span>45–54</span><div class="age-track"><div class="age-fill" style="width:100%;"></div></div><span>1º</span></div>
+            <div class="age-row"><span>35–44</span><div class="age-track"><div class="age-fill" style="width:78%;"></div></div><span>2º</span></div>
+            <div class="age-row"><span>25–34</span><div class="age-track"><div class="age-fill" style="width:56%;"></div></div><span>3º</span></div>
+            <div class="age-row"><span>55–64</span><div class="age-track"><div class="age-fill" style="width:34%;"></div></div><span>4º</span></div>
+          </div>
+          <p style="margin-top:20px; font-size:12.5px; color:var(--gray-300);">Maioria da audiência no Brasil.</p>
+        </div>
+      </div>
+      <p class="slide-lede" style="margin-top:32px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:17px; opacity:1; color:var(--lime);">
+        Todo esse crescimento inicial foi construído organicamente.
+      </p>
+    </div>
+  </section>
+
+  <!-- 07 — YOUTUBE -->
+<section class="slide white" id="s07">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">07</span> YouTube</div>
+      <h2 class="slide-title">O conteúdo completo encontra uma audiência diferente.</h2>
+      <div class="social-layout">
+        <div>
+          <div class="social-hero-stat" style="color:var(--black);">+30<span style="color:var(--charcoal); opacity:0.4;">K</span></div>
+          <div class="stat-label" style="color:var(--gray-500); margin-bottom:26px;">visualizações</div>
+          <div class="mono" style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-500); margin-bottom:8px;">Origem</div>
+          <div class="tag on-light">91% da audiência no Brasil</div>
+        </div>
+        <div>
+          <div class="mono" style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-500); margin-bottom:14px;">Principais faixas etárias</div>
+          <div class="age-bars">
+            <div class="age-row"><span>25–34</span><div class="age-track"><div class="age-fill" style="width:100%; background:var(--black);"></div></div><span>1º</span></div>
+            <div class="age-row"><span>35–44</span><div class="age-track"><div class="age-fill" style="width:72%; background:var(--black);"></div></div><span>2º</span></div>
+          </div>
+          <p style="margin-top:20px; font-size:12.5px; color:var(--gray-500);">Maioria da audiência masculina.</p>
+        </div>
+      </div>
+      <p class="slide-lede" style="margin-top:32px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:17px; opacity:1;">
+        O Pulso distribui a mesma conversa para diferentes perfis de audiência e diferentes plataformas.
+      </p>
+    </div>
+  </section>
+
+  <!-- 08 — DUAS PERSPECTIVAS. UMA CONVERSA. -->
+<section class="slide black" id="s08">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">08</span> Duas perspectivas. Uma conversa.</div>
+      <h2 class="slide-title">Acauã + Ane.</h2>
+      <div class="host-duo">
+        <div class="host-panel">
+          <div class="host-top">
+          <div class="img-slot host-avatar has-photo"><img src="/static/kit/img-01.jpg" alt="Acauã Victor"></div>
+            <div class="host-heading">
+              <div class="name">Acauã Victor</div>
+              <div class="focus">Negócios · Empreendedorismo · Inovação · Comportamento · Perguntas provocativas</div>
+            </div>
+          </div>
+          <p>Uma perspectiva mais ampla sobre negócios, transformação, mercado e os temas que geram debate.</p>
+        </div>
+        <div class="host-panel alt">
+          <div class="host-top">
+          <div class="img-slot host-avatar has-photo"><img src="/static/kit/img-02.jpg" alt="Dra. Ane Karoline"></div>
+            <div class="host-heading">
+              <div class="name">Dra. Ane Karoline</div>
+              <div class="focus">Medicina · Saúde · Perspectiva técnica · Experiência clínica</div>
+            </div>
+          </div>
+          <p>Uma visão técnica e profissional para aprofundar as discussões relacionadas à saúde.</p>
+        </div>
+      </div>
+      <p class="slide-lede" style="margin-top:24px;">Juntos: uma conversa que consegue transitar entre o técnico, o humano, o empresarial e o provocativo.</p>
+    </div>
+  </section>
+
+  <!-- 09 — POR QUE ENTRAR AGORA? -->
+<section class="slide black" id="s09">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">09</span> Por que entrar agora?</div>
+      <h2 class="slide-title">O melhor momento para entrar em uma mídia é antes dela se tornar cara.</h2>
+      <p class="slide-lede">O Pulso ainda está em sua primeira fase. Mas já nasceu conectado a nomes relevantes da saúde, dos negócios e da influência.</p>
+      <div class="now-grid">
+        <div class="now-item"><div class="n">01 — ACESSO</div><h4>Autoridade emprestada</h4><p>Sua marca passa a estar associada a pessoas que já possuem autoridade e audiência.</p></div>
+        <div class="now-item"><div class="n">02 — CRESCIMENTO</div><h4>Entrada antecipada</h4><p>Você entra enquanto a plataforma ainda está construindo sua audiência e ampliando sua distribuição.</p></div>
+        <div class="now-item"><div class="n">03 — LONG TAIL</div><h4>Conteúdo que permanece</h4><p>O episódio permanece. Os cortes permanecem. Os convidados continuam crescendo — e o conteúdo continua sendo descoberto.</p></div>
+      </div>
+      <p class="impact-line">Você não está apenas comprando a audiência de hoje. <span class="accent">Está entrando antes da próxima fase de crescimento.</span></p>
+    </div>
+  </section>
+
+  <!-- 10 — PATROCÍNIO OURO -->
+<section class="slide black" id="s10">
+    <div class="slide-content">
+      {{ slide_ouro_html }}
+    </div>
+  </section>
+
+  <!-- 11 — PATROCÍNIO DIAMOND -->
+<section class="slide plum" id="s11">
+    <div class="slide-content">
+      {{ slide_diamond_html }}
+    </div>
+  </section>
+
+  <!-- 12 — EPISÓDIO ESPECIAL DIAMOND -->
+<section class="slide black" id="s12">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">12</span> Episódio especial Diamond</div>
+      <h2 class="slide-title">Não é uma inserção publicitária. É um ativo de conteúdo.</h2>
+      <p class="slide-lede">O episódio especial recebe o mesmo tratamento editorial e de distribuição dos demais conteúdos do Pulso.</p>
+      <div class="include-grid">
+        <span class="tag on-dark">Episódio completo</span>
+        <span class="tag on-dark">YouTube</span>
+        <span class="tag on-dark">Spotify</span>
+        <span class="tag on-dark">Cortes para redes sociais</span>
+        <span class="tag on-dark">Bastidores</span>
+        <span class="tag on-dark">Divulgação no Instagram</span>
+        <span class="tag on-dark">TikTok</span>
+        <span class="tag on-dark">Marcações do patrocinador</span>
+        <span class="tag on-dark">Distribuição dos conteúdos derivados</span>
+      </div>
+      <p class="slide-lede" style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; opacity:1; color:var(--lime);">
+        Uma conversa transformada em um ecossistema completo de conteúdo.
+      </p>
+    </div>
+  </section>
+
+  <!-- 13 — ATIVAÇÕES DE MARCA -->
+<section class="slide white" id="s13">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">13</span> Ativações de marca</div>
+      <h2 class="slide-title">Sua marca pode fazer parte da experiência.</h2>
+      <p class="slide-lede">Dependendo do formato e do alinhamento editorial, o Pulso pode desenvolver ativações como:</p>
+      <div class="activation-list">
+        <div class="activation-item">Produto em cena — objeto ou elemento visual da marca</div>
+        <div class="activation-item">Material entregue ao convidado</div>
+        <div class="activation-item">Demonstração de produto</div>
+        <div class="activation-item">Integração contextual durante a conversa</div>
+        <div class="activation-item">Ativação dentro do episódio especial</div>
+      </div>
+      <p style="font-size:13px; color:var(--gray-500); max-width:56ch;">
+        <strong style="color:var(--black);">Diretriz:</strong> toda ativação será desenvolvida de forma a preservar a experiência do convidado, a qualidade do conteúdo e a linha editorial do Pulso.
+      </p>
+    </div>
+  </section>
+
+  <!-- 14 — COMPARATIVO DOS PLANOS -->
+<section class="slide black" id="s14">
+    <div class="slide-content">
+      <div class="eyebrow" style="margin-bottom:18px;"><span class="num">14</span> Comparativo dos planos</div>
+      <h2 class="slide-title" style="margin-bottom:14px;">Ouro e Diamond, lado a lado.</h2>
+      <div class="compare-wrap" style="margin-top:16px;">
+        {{ compare_html }}
+      </div>
+    </div>
+  </section>
+
+  <!-- 15 — O VALOR DA PARCERIA -->
+<section class="slide bone" id="s15">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">15</span> O valor da parceria</div>
+      <h2 class="slide-title">Mais do que exposição.</h2>
+      <p class="slide-lede">O patrocínio do Pulso representa a associação da empresa a uma plataforma de conteúdo dedicada a discutir o presente e o futuro da saúde.</p>
+      <p class="mono" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gray-500); margin-top:8px;">Uma parceria construída para colocar a marca</p>
+      <div class="value-list">
+        <div>Dentro das conversas.</div>
+        <div>Perto das pessoas.</div>
+        <div>Ao lado de nomes relevantes.</div>
+        <div>Presente em múltiplos formatos.</div>
+        <div>Associada à transformação do setor.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16 — ENCERRAMENTO -->
+<section class="slide lime" id="s16">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">16</span> Encerramento</div>
+      <h2 class="slide-title">Quem estará ao nosso lado enquanto essa conversa cresce?</h2>
+      <p class="slide-lede">O Pulso está construindo uma plataforma para conectar as pessoas que estão transformando a saúde no Brasil.</p>
+      <div class="closing-words">
+        <span>Saúde.</span><span>Inovação.</span><span>Empreendedorismo.</span><span>Negócios.</span><span>Pessoas.</span>
+      </div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:22px; letter-spacing:-0.02em; margin-bottom:6px;">pulso<span style="color:var(--black); opacity:0.4;">.</span></div>
+      <p class="mono" style="font-size:12px; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">As conversas que estão movimentando a saúde.</p>
+      <div class="closing-cta">
+        <a class="btn black-fill" href="{{link_quero}}" target="_blank" rel="noopener">Quero ser patrocinador →</a>
+        <a class="btn outline" href="{{link_equipe}}" target="_blank" rel="noopener">Falar com a equipe</a>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div id="navrail">
+  <button class="navbtn" id="prevBtn" aria-label="Slide anterior" onclick="step(-1)">←</button>
+  <button class="navbtn" id="nextBtn" aria-label="Próximo slide" onclick="step(1)">→</button>
+</div>
+<div id="navhint" class="mono">Use as setas ou role horizontalmente</div>
+
+<script>
+  var GUESTS = [
+    { name:"Guto Galamba", photo:"/static/kit/img-03.jpg", audience:"+3,6M", credential:"Empresário, comunicador e influenciador ligado ao universo da saúde, comportamento e negócios.", handle:null },
+    { name:"Dra. Tamiris Mariano", photo:"/static/kit/img-04.jpg", audience:"+2,2M", credential:"Médica e criadora de conteúdo com forte presença digital na área da saúde.", handle:null },
+    { name:"Dr. Márcio Martins", photo:"/static/kit/img-05.jpg", audience:"+1M", credential:"Médico, empresário e referência digital no universo de saúde, performance e empreendedorismo médico.", handle:"dr.marciom" },
+    { name:"Ben Zruel", photo:"/static/kit/img-06.jpg", audience:"+348K", credential:"Empresário, especialista e produtor de conteúdo com forte presença no ambiente digital.", handle:"benzruel" },
+    { name:"Dra. Rachel Furtado", photo:"/static/kit/img-07.jpg", audience:"+166K", credential:"Profissional da saúde e criadora de conteúdo com presença relevante no ambiente digital.", handle:null },
+    { name:"Fillipe Holzer", photo:"/static/kit/img-08.jpg", audience:"+109K", credential:"Empresário e profissional com trajetória ligada a negócios, inovação e empreendedorismo.", handle:null },
+    { name:"Dr. Rafael Pelosi", photo:"/static/kit/img-09.jpg", audience:"—", credential:"Médico — biografia e dados a confirmar.", handle:null },
+    { name:"Matheus · Illumi.ai", photo:"/static/kit/img-10.jpg", audience:"+65K", credential:"CEO e fundador, empresário de Goiânia atuante em educação, prestação de serviços e inteligência artificial, com expansão para a saúde.", handle:"illumi.ai" }
+  ];
+
+  function instagramHref(g){
+    if (g.handle) return "https://www.instagram.com/" + g.handle;
+    return "https://www.instagram.com/explore/search/keyword/?q=" + encodeURIComponent(g.name);
+  }
+
+  // ---- monta a galeria automática do slide 04 (carrossel, 2 convidados por página) ----
+  var galleryEl = document.getElementById("gallery");
+  var dotsEl = document.getElementById("galleryDots");
+  var GUESTS_PER_PAGE = 2;
+  var GUEST_PAGES = [];
+  for (var gp = 0; gp < GUESTS.length; gp += GUESTS_PER_PAGE) GUEST_PAGES.push(GUESTS.slice(gp, gp + GUESTS_PER_PAGE));
+
+  function guestCardHTML(g, indexInTotal){
+    return '<div class="guest-card">' +
+      '<div class="gallery-photo' + (g.photo ? ' has-photo' : '') + '">' +
+        (g.photo
+          ? '<img src="' + g.photo + '" alt="' + g.name + '">'
+          : '<span class="plus mono">+</span><span class="cap">foto — ' + g.name + '</span>') +
+      '</div>' +
+      '<div class="gallery-scrim">' +
+        '<div class="gallery-audience"><span class="gallery-audience-num">' + g.audience + '</span><span class="gallery-audience-label">seguidores no Instagram</span></div>' +
+        '<div class="gallery-name">' + g.name + '</div>' +
+        '<p class="gallery-cred">' + g.credential + '</p>' +
+        '<a class="gallery-link" href="' + instagramHref(g) + '" target="_blank" rel="noopener">Instagram →</a>' +
+      '</div>' +
+      '<div class="gallery-index mono">' + String(indexInTotal+1).padStart(2,"0") + ' / ' + String(GUESTS.length).padStart(2,"0") + '</div>' +
+    '</div>';
+  }
+
+  galleryEl.innerHTML = GUEST_PAGES.map(function(pageGuests, p){
+    return '<div class="gallery-slide' + (p === 0 ? " active" : "") + '" data-i="' + p + '">' +
+      pageGuests.map(function(g, gi){ return guestCardHTML(g, p * GUESTS_PER_PAGE + gi); }).join("") +
+    '</div>';
+  }).join("");
+  dotsEl.innerHTML = GUEST_PAGES.map(function(pageGuests, p){
+    var label = pageGuests.map(function(g){ return g.name; }).join(" · ");
+    return '<button class="gallery-dot' + (p === 0 ? " active" : "") + '" data-i="' + p + '" aria-label="' + label + '"></button>';
+  }).join("");
+
+  var gallerySlides = Array.prototype.slice.call(galleryEl.querySelectorAll(".gallery-slide"));
+  var galleryDots = Array.prototype.slice.call(dotsEl.querySelectorAll(".gallery-dot"));
+  var galleryIndex = 0;
+  var galleryTimer = null;
+
+  function showGuest(i){
+    galleryIndex = (i + GUEST_PAGES.length) % GUEST_PAGES.length;
+    gallerySlides.forEach(function(s, idx){ s.classList.toggle("active", idx === galleryIndex); });
+    galleryDots.forEach(function(d, idx){ d.classList.toggle("active", idx === galleryIndex); });
+  }
+  function startGallery(){
+    stopGallery();
+    galleryTimer = setInterval(function(){ showGuest(galleryIndex + 1); }, 2200);
+  }
+  function stopGallery(){
+    if (galleryTimer) clearInterval(galleryTimer);
+    galleryTimer = null;
+  }
+  galleryDots.forEach(function(d){
+    d.addEventListener("click", function(){
+      showGuest(Number(d.getAttribute("data-i")));
+      startGallery();
+    });
+  });
+  galleryEl.addEventListener("mouseenter", stopGallery);
+  galleryEl.addEventListener("mouseleave", startGallery);
+
+  // só roda a galeria automática enquanto o slide 04 está visível
+  var s04 = document.getElementById("s04");
+  if ("IntersectionObserver" in window){
+    new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ e.isIntersecting ? startGallery() : stopGallery(); });
+    }, { threshold:0.6 }).observe(s04);
+  } else {
+    startGallery();
+  }
+
+  // ================= NAVEGAÇÃO DO DECK =================
+  var mobileQuery = window.matchMedia("(max-width:860px)");
+  function isMobile(){ return mobileQuery.matches; }
+
+  var deck = document.getElementById("deck");
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var total = slides.length;
+  document.getElementById("counter-total").textContent = String(total).padStart(2,"0");
+
+  var current = 0;
+  var prevBtn = document.getElementById("prevBtn");
+  var nextBtn = document.getElementById("nextBtn");
+  var fill = document.getElementById("topline-fill");
+  var counterEl = document.getElementById("counter-current");
+
+  function updateChrome(){
+    counterEl.textContent = String(current+1).padStart(2,"0");
+    fill.style.width = ((current) / (total-1) * 100) + "%";
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total-1;
+  }
+
+  function goTo(i){
+    i = Math.max(0, Math.min(total-1, i));
+    current = i;
+    slides[i].scrollIntoView({ behavior:"smooth", inline:"start", block:"nearest" });
+    updateChrome();
+  }
+  function step(dir){ goTo(current+dir); }
+  window.goTo = goTo;
+
+  window.addEventListener("keydown", function(e){
+    if (isMobile()) return; // no mobile, as setas fazem o scroll normal do navegador
+    if (e.key === "ArrowRight" || e.key === "PageDown"){ e.preventDefault(); step(1); }
+    else if (e.key === "ArrowLeft" || e.key === "PageUp"){ e.preventDefault(); step(-1); }
+  });
+
+  var wheelLock = false;
+  deck.addEventListener("wheel", function(e){
+    if (isMobile()) return; // no mobile é rolagem vertical normal
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    if (wheelLock) return;
+    wheelLock = true;
+    step(e.deltaY > 0 ? 1 : -1);
+    setTimeout(function(){ wheelLock = false; }, 550);
+  }, { passive:false });
+
+  var scrollTimeout;
+  deck.addEventListener("scroll", function(){
+    if (isMobile()) return;
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(function(){
+      var idx = Math.round(deck.scrollLeft / window.innerWidth);
+      idx = Math.max(0, Math.min(total-1, idx));
+      if (idx !== current){ current = idx; updateChrome(); }
+    }, 80);
+  }, { passive:true });
+
+  updateChrome();
+</script>

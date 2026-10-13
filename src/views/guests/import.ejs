@@ -1,0 +1,62 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Convidados · CRM</span><h1>Importar por CSV</h1></div>
+  <a class="btn ghost" href="/convidados"><%- icon('arrow-left') %> Voltar</a>
+</div>
+<p class="lead">Cada linha vira um convidado em Prospecção, com você como responsável. Obrigatórios: <strong>nome</strong>, <strong>instagram</strong> e <strong>perfil</strong>
+  (médico, influencer, empresário ou profissional da saúde). Opcionais: <strong>whatsapp</strong>, <strong>email</strong>, <strong>motivo do convite</strong> e <strong>genero</strong> (m/f, padrão m).
+  Até <%= maxRows %> linhas. O restante do cadastro se completa depois, no próprio convidado.</p>
+
+<div class="card form-card wide">
+  <% if (headerError) { %><div class="flash flash-error"><%= headerError %></div><% } %>
+  <form method="post" action="/convidados/importar/previa" class="stack" data-csv-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label>Arquivo CSV <small class="muted">(Excel ou Google Planilhas: Salvar como CSV; separador vírgula ou ponto e vírgula)</small>
+      <input type="file" accept=".csv,text/csv,text/plain" data-csv-file>
+    </label>
+    <label>Ou cole o conteúdo aqui
+      <textarea name="csv" rows="8" class="code" spellcheck="false" data-csv-text placeholder="nome;instagram;whatsapp;perfil;email;motivo do convite"><%= csvText %></textarea>
+    </label>
+    <div class="row">
+      <button class="btn primary" type="submit">Ver prévia</button>
+      <a class="btn" href="/convidados/importar/modelo.csv"><%- icon('file-text') %> Baixar modelo</a>
+    </div>
+  </form>
+</div>
+
+<% if (result) { %>
+<section class="card top-gap" id="previa">
+  <h2>Prévia</h2>
+  <p class="mono muted"><%= result.ok %> prontos · <%= result.rows.length - result.ok %> ignorados · <%= result.rows.length %> linhas</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th class="num">Linha</th><th>Nome</th><th>Instagram</th><th>Perfil</th><th>Contato</th><th>Situação</th></tr></thead>
+    <tbody>
+      <% result.rows.forEach(function (r) { %>
+      <tr>
+        <td class="mono num"><%= r.line %></td>
+        <td><%= r.data.name || '—' %></td>
+        <td class="handle"><%= r.data.instagram ? '@' + r.data.instagram : '—' %></td>
+        <td><%= r.data.profile ? profileLabels[r.data.profile].label : '—' %></td>
+        <td class="small"><%= [r.data.phone, r.data.email].filter(Boolean).join(' · ') || '—' %></td>
+        <td>
+          <% if (r.errors.length) { %><span class="badge b-red">Erro</span> <span class="small"><%= r.errors.join('; ') %></span>
+          <% } else if (r.duplicate) { %><span class="badge b-amber">Duplicado</span> <span class="small"><%= r.duplicate %></span>
+          <% } else { %><span class="badge b-green">Pronto</span><% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  </div>
+  <% if (result.ok) { %>
+  <form method="post" action="/convidados/importar" class="row top-gap">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="csv" value="<%= csvText %>">
+    <button class="btn primary" type="submit">Importar <%= result.ok %> convidado(s)</button>
+    <span class="small muted">Linhas com erro ou duplicadas ficam de fora.</span>
+  </form>
+  <% } else { %><p class="muted top-gap">Nenhuma linha pronta. Corrija o arquivo e gere a prévia de novo.</p><% } %>
+</section>
+<% } %>
+<%- include('../partials/foot') %>

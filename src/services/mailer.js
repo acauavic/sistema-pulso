@@ -126,4 +126,21 @@ async function sendRsvpNotice({ to, guestName, accepted, message, url }) {
   });
 }
 
-module.exports = { outbox, sendMail, verifyMail, sendUserInvite, sendPasswordReset, sendGuestInvite, sendRsvpNotice };
+async function sendSponsorNotice({ to, title, text, url }) {
+  return sendMail({
+    to,
+    subject: title,
+    html: layout({ title, bodyHtml: `<p style="margin:0">${esc(text)}</p>`, button: { label: 'Abrir no CRM', url } }),
+  });
+}
+
+// Aviso de notificação do painel (quando a gestão liga o e-mail para aquele tipo).
+async function sendNotification({ to, title, text, url }) {
+  return sendMail({
+    to,
+    subject: title,
+    html: layout({ title, bodyHtml: `<p style="margin:0">${esc(text || '')}</p>`, button: url ? { label: 'Abrir no painel', url } : null }),
+  });
+}
+
+module.exports = { sendNotification, sendSponsorNotice, outbox, sendMail, verifyMail, sendUserInvite, sendPasswordReset, sendGuestInvite, sendRsvpNotice };

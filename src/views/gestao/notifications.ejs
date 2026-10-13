@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker">Gestão</span><h1>Notificações</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'notificacoes' }) %>
+<p class="lead">Vale para toda a equipe. Cada pessoa ainda pode silenciar tipos para si na página Notificações. Ninguém é avisado da própria ação.</p>
+<form method="post" action="/gestao/notificacoes" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <% Object.keys(types).forEach(function (k) { var s = settings[k] || { in_app: true, email: false, roles: [] }; var broad = k === 'agendamento' || k === 'rotina'; %>
+  <section class="card notif-setting">
+    <div class="row spread"><h2><%= types[k].label %></h2><span class="handle muted"><%= week[k] || 0 %> nos últimos 7 dias</span></div>
+    <p class="small muted"><%= types[k].hint %></p>
+    <div class="row">
+      <label class="check"><input type="checkbox" name="<%= k %>_in_app" value="1" <%= s.in_app ? 'checked' : '' %>> No painel (sino)</label>
+      <label class="check"><input type="checkbox" name="<%= k %>_email" value="1" <%= s.email ? 'checked' : '' %>> Também por e-mail</label>
+    </div>
+    <fieldset class="roles-pick">
+      <legend><%= broad ? 'Quem recebe este aviso geral (além do responsável pelo item)' : 'Também avisar sempre estes perfis (opcional; o responsável e quem participa já recebem)' %></legend>
+      <% Object.keys(roles).forEach(function (r) { %><label class="check"><input type="checkbox" name="<%= k %>_roles" value="<%= r %>" <%= (s.roles || []).indexOf(r) >= 0 ? 'checked' : '' %>> <%= roles[r].label %></label><% }) %>
+    </fieldset>
+  </section>
+  <% }) %>
+  <div><button class="btn primary" type="submit">Salvar configuração</button></div>
+</form>
+<%- include('../partials/foot') %>

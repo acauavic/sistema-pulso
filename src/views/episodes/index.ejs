@@ -1,0 +1,69 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Produção</span><h1>Episódios</h1></div>
+  <div class="row">
+    <div class="seg">
+      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/episodios?view=quadro<%= mine ? '&editor=eu' : '' %>"><%- icon('columns-3') %> Quadro</a>
+      <a class="<%= view === 'lista' ? 'on' : '' %>" href="/episodios?view=lista<%= mine ? '&editor=eu' : '' %>"><%- icon('list') %> Lista</a>
+    </div>
+    <a class="btn <%= mine ? 'on' : '' %>" href="/episodios?view=<%= view %><%= mine ? '' : '&editor=eu' %>"><%- icon('user') %> <%= mine ? 'Todos' : 'Só os meus' %></a>
+    <% if (can('production.checklists')) { %><a class="btn" href="/episodios/checklists"><%- icon('check') %> Checklists</a><% } %>
+    <% if (can('episodes.write')) { %><a class="btn primary" href="/episodios/novo"><%- icon('plus') %> Registrar episódio gravado</a><% } %>
+  </div>
+</div>
+<p class="lead">O episódio nasce quando a conversa é <strong>gravada</strong> (o convidado vai para Gravado) e segue até <strong>Publicado</strong>. Antes disso, a gravação marcada fica na agenda do convidado.</p>
+
+<% var card = function (e) { %>
+<% }; %>
+<% if (view === 'quadro') { %>
+<div class="board board-wide">
+  <% columns.forEach(function (col) { %>
+  <section class="column" data-status="<%= col.key %>">
+    <header><span class="badge b-st-<%= col.key %>"><%= col.label %></span><span class="count"><%= col.items.length %></span></header>
+    <div class="cards">
+      <% col.items.forEach(function (e) { %>
+      <a class="kcard" href="/episodios/<%= e.id %>">
+        <span class="handle muted"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'EP.—' %> · <%= fmt.formatDayShort(e.aired_on) %></span>
+        <strong><%= e.title %></strong>
+        <% if (e.guest_name) { %><span class="muted small"><%= e.guest_name %></span><% } %>
+        <span class="meta small muted">
+          <% if (e.sponsors) { %><span><%- icon('shield-check', 12) %><%= e.sponsors %></span><% } %>
+          <% if (e.files) { %><span><%- icon('file-text', 12) %><%= e.files %></span><% } %>
+          <% if (e.tasks) { %><span><%- icon('check', 12) %><%= e.tasks_done %>/<%= e.tasks %></span><% } %>
+          <% if (e.open_comments) { %><span class="warn"><%- icon('message-square', 12) %><%= e.open_comments %></span><% } %>
+        </span>
+        <span class="card-foot"><%- include('../partials/dot', { type: 'episode', id: e.id, user: e.editor_id ? { id: e.editor_id, name: e.editor_name } : null, editable: can('production.manage'), inLink: true }) %></span>
+      </a>
+      <% }) %>
+    </div>
+  </section>
+  <% }) %>
+</div>
+<% } else { %>
+<div class="table-wrap">
+<table>
+  <thead><tr><th class="num">EP.</th><th>Título</th><th>Convidado</th><th>Veiculação</th><th>Etapa</th><th>Editor</th><th class="num">Patroc.</th><th></th></tr></thead>
+  <tbody>
+    <% if (!episodes.length) { %><tr><td colspan="8"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum episódio por aqui</strong><span>Quando um convidado ficar Agendado, o episódio aparece sozinho.</span></div></td></tr><% } %>
+    <% episodes.forEach(function (e) { %>
+    <tr>
+      <td class="num mono"><%= e.number ? String(e.number).padStart(3, '0') : '—' %></td>
+      <td><a href="/episodios/<%= e.id %>"><strong><%= e.title %></strong></a></td>
+      <td><%= e.guest_name || '—' %></td>
+      <td class="mono nowrap"><%= fmt.formatDay(e.aired_on) %></td>
+      <td><span class="badge b-st-<%= e.status %>"><%= statuses[e.status] %></span></td>
+      <td><%- include('../partials/dot', { type: 'episode', id: e.id, user: e.editor_id ? { id: e.editor_id, name: e.editor_name } : null, editable: can('production.manage'), label: true }) %></td>
+      <td class="num mono"><%= e.sponsors %></td>
+      <td class="actions">
+        <a class="btn sm" href="/episodios/<%= e.id %>">Abrir</a>
+        <% if (can('episodes.delete')) { %>
+        <form method="post" action="/episodios/<%= e.id %>/excluir" class="inline" data-confirm="Excluir o episódio “<%= e.title %>” e todos os arquivos dele? Esta ação não pode ser desfeita."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm danger" type="submit">Excluir</button></form>
+        <% } %>
+      </td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+<%- include('../partials/foot') %>

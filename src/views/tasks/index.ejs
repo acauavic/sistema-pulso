@@ -1,0 +1,96 @@
+<%- include('../partials/head') %>
+<%
+  var here = '/tarefas?escopo=' + scope + '&visao=' + view + (q ? '&q=' + encodeURIComponent(q) : '') + (cal ? '&mes=' + cal.ym : '');
+  var url = function (o) { var s = Object.assign({ escopo: scope, visao: view, q: q, mes: cal ? cal.ym : '' }, o); var parts = []; Object.keys(s).forEach(function (k) { if (s[k]) parts.push(k + '=' + encodeURIComponent(s[k])); }); return '/tarefas?' + parts.join('&'); };
+  var bucket = function (t) { var d = isoOf(t.due_on); if (t.status === 'feito') return 'feitas'; if (!d) return 'semprazo'; if (d < today) return 'atrasadas'; if (d === today) return 'hoje'; return 'proximas'; };
+  var BUCKETS = [['atrasadas', 'Atrasadas'], ['hoje', 'Para hoje'], ['proximas', 'Próximas'], ['semprazo', 'Sem prazo'], ['feitas', 'Feitas']];
+  var empty = { minhas: 'Nenhuma tarefa sua em aberto.', hoje: 'Nada vence hoje para você.', todas: 'Nenhuma tarefa ainda.' };
+%>
+<div class="page-head">
+  <div><span class="kicker">Gestão de tarefas</span><h1><%= scopes[scope] %></h1></div>
+  <div class="row">
+    <div class="seg" role="tablist" aria-label="Visualização">
+      <a class="<%= view === 'lista' ? 'on' : '' %>" href="<%= url({ visao: 'lista', mes: '' }) %>"><%- icon('list') %> Lista</a>
+      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="<%= url({ visao: 'quadro', mes: '' }) %>"><%- icon('columns-3') %> Quadro</a>
+      <a class="<%= view === 'calendario' ? 'on' : '' %>" href="<%= url({ visao: 'calendario' }) %>"><%- icon('calendar') %> Calendário</a>
+    </div>
+    <% if (can('tasks.write')) { %><button class="btn primary" type="button" data-modal-open="modal-task-new"><%- icon('plus') %> Nova tarefa</button><% } %>
+  </div>
+</div>
+
+<div class="task-toolbar">
+  <nav class="tabbar compact" aria-label="Escopo">
+    <% Object.keys(scopes).forEach(function (k) { %><a class="<%= scope === k ? 'on' : '' %>" href="<%= url({ escopo: k }) %>"><%= scopes[k] %> <span class="count"><%= counts[k] %></span></a><% }) %>
+  </nav>
+  <form method="get" action="/tarefas" class="task-search">
+    <input type="hidden" name="escopo" value="<%= scope %>"><input type="hidden" name="visao" value="<%= view %>"><% if (cal) { %><input type="hidden" name="mes" value="<%= cal.ym %>"><% } %>
+    <input type="search" name="q" value="<%= q %>" placeholder="Filtrar tarefas" aria-label="Filtrar tarefas">
+  </form>
+</div>
+
+<% if (view === 'lista') { %>
+  <% if (!items.length) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong><%= empty[scope] %></strong></p><p class="muted small">Crie uma tarefa ou veja as da equipe em "Todas".</p></div><% } %>
+  <% BUCKETS.forEach(function (b) { var list = items.filter(function (t) { return bucket(t) === b[0]; }); if (!list.length) return; %>
+  <section class="task-section">
+    <h2 class="task-section-h <%= b[0] === 'atrasadas' ? 'err' : '' %>"><%= b[1] %> <span class="count"><%= list.length %></span></h2>
+    <ul class="plain task-table">
+      <% list.forEach(function (t) { var edit = canEdit(t); var due = isoOf(t.due_on); %>
+      <li class="tt-row st-<%= t.status %>">
+        <form method="post" action="/tarefas/<%= t.id %>/status" class="tt-status">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= here %>">
+          <select name="status" aria-label="Status de <%= t.title %>" data-status-select <%= edit ? '' : 'disabled' %>>
+            <% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= t.status === k ? 'selected' : '' %>><%= C.TASK_STATUSES[k] %></option><% }) %>
+          </select>
+        </form>
+        <div class="tt-main">
+          <a href="/tarefas/<%= t.id %>" class="tt-title"><%= t.title %></a>
+          <span class="small muted">
+            <% if (t.episode_id) { %><a href="/episodios/<%= t.episode_id %>"><%= t.episode_number ? 'EP.' + String(t.episode_number).padStart(3, '0') + ' · ' : '' %><%= t.episode_title %></a><% } %>
+            <% if (t.guest_id) { %><a href="/convidados/<%= t.guest_id %>"><%= t.guest_name %></a><% } %>
+            <% if (t.sponsor_id) { %><a href="/patrocinadores/<%= t.sponsor_id %>"><%= t.sponsor_name %></a><% } %>
+            <% if (t.status === 'bloqueada') { %><span class="err"><%- icon('lock', 12) %> <%= t.block_reason %></span><% } %>
+          </span>
+        </div>
+        <span class="handle tt-due <%= due && due < today && t.status !== 'feito' ? 'err' : '' %>"><%= due ? fmt.formatDayShort(t.due_on) : '—' %></span>
+        <span class="handle muted"><%= t.comments ? t.comments + ' coment.' : '' %></span>
+        <%- include('../partials/dot', { type: 'task', id: t.id, user: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null, editable: edit }) %>
+      </li>
+      <% }) %>
+    </ul>
+  </section>
+  <% }) %>
+<% } else if (view === 'quadro') { %>
+  <div class="board task-board" data-task-board>
+    <% Object.keys(C.TASK_STATUSES).forEach(function (k) { var list = items.filter(function (t) { return t.status === k; }); %>
+    <section class="column" data-status-col="<%= k %>">
+      <header><span class="badge tb-<%= k %>"><%= C.TASK_STATUSES[k] %></span><span class="count" data-count><%= list.length %></span></header>
+      <div class="cards" data-cards>
+        <% list.forEach(function (t) { %><%- include('_card', { t: t }) %><% }) %>
+      </div>
+      <% if (k === 'bloqueada') { %><p class="small muted col-hint">Arraste para cá e diga o motivo.</p><% } %>
+    </section>
+    <% }) %>
+  </div>
+<% } else { %>
+  <div class="cal-head">
+    <a class="btn sm" href="<%= url({ mes: cal.prev }) %>" aria-label="Mês anterior"><%- icon('chevron-left') %></a>
+    <h2 class="cal-title"><%= cal.label %></h2>
+    <a class="btn sm" href="<%= url({ mes: cal.next }) %>" aria-label="Próximo mês"><%- icon('chevron-right') %></a>
+    <a class="btn sm ghost" href="<%= url({ mes: today.slice(0, 7) }) %>">Hoje</a>
+  </div>
+  <div class="calendar" role="grid" aria-label="Tarefas por dia de vencimento">
+    <% ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'].forEach(function (d) { %><div class="cal-dow" role="columnheader"><%= d %></div><% }) %>
+    <% cal.weeks.forEach(function (w) { w.forEach(function (d) { var list = items.filter(function (t) { return isoOf(t.due_on) === d.iso; }); %>
+    <div class="cal-day <%= d.inMonth ? '' : 'out' %> <%= d.iso === today ? 'today' : '' %>" role="gridcell">
+      <span class="cal-n mono"><%= d.day %></span>
+      <% list.slice(0, 4).forEach(function (t) { %><a class="cal-task st-<%= t.status %> <%= d.iso < today && t.status !== 'feito' ? 'late' : '' %>" href="/tarefas/<%= t.id %>" title="<%= t.title %><%= t.assignee_name ? ' · ' + t.assignee_name : '' %>"><%= t.title %></a><% }) %>
+      <% if (list.length > 4) { %><span class="small muted">+<%= list.length - 4 %></span><% } %>
+    </div>
+    <% }); }) %>
+  </div>
+  <p class="small muted top-gap">O calendário mostra as tarefas pelo dia em que vencem. Tarefas sem prazo aparecem na lista.</p>
+<% } %>
+
+<% if (can('tasks.write')) { %><%- include('_new', { back: here }) %><% } %>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>
