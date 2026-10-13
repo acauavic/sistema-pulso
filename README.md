@@ -124,10 +124,13 @@ O número da produção vem de `PRODUCAO_WHATSAPP`.
 ## Importação por CSV
 
 **Convidados → Importar CSV** (baixe o modelo na própria tela). Colunas: `nome`, `instagram`, `perfil` (obrigatórias) e
-`whatsapp`, `email`, `motivo do convite`, `genero` (opcionais; gênero padrão masculino). Aceita `;` `,` ou tab, aspas e UTF-8
+`whatsapp`, `email`, `motivo do convite`, `genero`, `status` e `data da gravação` (opcionais; gênero padrão masculino). Aceita `;` `,` ou tab, aspas e UTF-8
 com/sem BOM, até 500 linhas. O perfil aceita variações (médica, influenciador, empresária, profissional de saúde…).
+**Status** (ou `etapa`): Prospecção (padrão), Convite enviado, Em agendamento (pede e-mail ou WhatsApp), Agendado, Recusou ou Cancelado.
+**Data da gravação**: `25/11/2026 14:30` no horário de Brasília (a hora pode vir numa coluna `hora`). **Agendado** exige data e hora futuras
+e entra com estúdio, hosts e convidado confirmados (aparece na agenda e avisa a equipe). Gravado não entra por planilha: o episódio nasce pela página do convidado.
 Primeiro mostra uma **prévia** (pronto / erro / duplicado — Instagram ou e-mail já cadastrado ou repetido no arquivo);
-ao confirmar, só as linhas prontas viram convidados em Prospecção, com você como responsável.
+ao confirmar, só as linhas prontas viram convidados, com você como responsável.
 
 ## Central de patrocinadores
 

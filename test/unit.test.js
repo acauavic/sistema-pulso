@@ -173,10 +173,56 @@ test('csv: cabeçalhos com acento/variações são reconhecidos e a validação 
   assert.equal(headerError, null);
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0].errors, []);
-  assert.deepEqual(rows[0].data, { name: 'Ana', instagram: 'ana', profile: 'medico', email: 'a@b.co', gender: 'm', phone: '11 9', invite_reason: 'porque' });
+  assert.deepEqual(rows[0].data, { name: 'Ana', instagram: 'ana', profile: 'medico', email: 'a@b.co', gender: 'm', status: 'prospect', proposed_at: null, phone: '11 9', invite_reason: 'porque' });
   assert.equal(rows[0].line, 2);
   assert.deepEqual(rows[1].errors, ['nome ausente']);
   assert.match(csv.parseGuests('nome;perfil\nA;médico').headerError, /instagram/);
+});
+
+test('csv: coluna de status (etapa) opcional com as regras de cada etapa', () => {
+  const { rows } = csv.parseGuests([
+    'nome;instagram;perfil;whatsapp;Etapa',
+    'A1;@a1;médico;;Convite enviado',
+    'A2;@a2;médico;11 9;em agendamento',
+    'A3;@a3;médico;;Em agendamento',
+    'A4;@a4;médico;;RECUSADO',
+    'A5;@a5;médico;;cancelado',
+    'A6;@a6;médico;;Agendado',
+    'A7;@a7;médico;;gravado',
+    'A8;@a8;médico;;astronauta',
+    'A9;@a9;médico;;',
+  ].join('\n'));
+  assert.deepEqual(rows.map((r) => r.data.status), ['convite_enviado', 'em_agendamento', 'em_agendamento', 'recusou', 'cancelado', 'agendado', 'gravado', null, 'prospect']);
+  assert.deepEqual(rows.map((r) => r.errors.length), [0, 0, 1, 0, 0, 1, 1, 1, 0]);
+  assert.match(rows[2].errors[0], /Em agendamento pede e-mail ou WhatsApp/);
+  assert.match(rows[5].errors[0], /Agendado pede data e hora da gravação/);
+  assert.match(rows[6].errors[0], /Gravado não entra por planilha/);
+  assert.match(rows[7].errors[0], /status “astronauta” não reconhecido/);
+});
+
+test('csv: data e hora da gravação (Brasília) e Agendado', () => {
+  const at = (d, t) => rules.parseRecordingAt(d, t);
+  assert.equal(at('25/11/2026 14:30').value.toISOString(), '2026-11-25T17:30:00.000Z');
+  assert.equal(at('25/11/26', '14h').value.toISOString(), '2026-11-25T17:00:00.000Z');
+  assert.equal(at('2026-11-25 às 9h30').value.toISOString(), '2026-11-25T12:30:00.000Z');
+  assert.equal(at('25/11/2026 14:30:00').value.toISOString(), '2026-11-25T17:30:00.000Z');
+  assert.deepEqual(at('', ''), { value: null });
+  assert.match(at('25/11/2026').error, /falta a hora/);
+  assert.match(at('31/02/2027 10:00').error, /inválida/);
+  assert.match(at('25/11/2026 25:00').error, /inválida/);
+  assert.match(at('amanhã').error, /inválida/);
+  const { rows } = csv.parseGuests([
+    'nome;instagram;perfil;status;data da gravação;hora',
+    'B1;@b1;médico;Agendado;25/11/2099;14:30',
+    'B2;@b2;médico;Agendado;01/01/2020;10:00',
+    'B3;@b3;médico;;10/12/2099;9h',
+  ].join('\n'));
+  assert.deepEqual(rows[0].errors, []);
+  assert.equal(rows[0].data.status, 'agendado');
+  assert.equal(rows[0].data.proposed_at.toISOString(), '2099-11-25T17:30:00.000Z');
+  assert.match(rows[1].errors[0], /já passou/);
+  assert.deepEqual(rows[2].errors, []);
+  assert.equal(rows[2].data.status, 'prospect');
 });
 
 test.after(async () => { await require('../src/db/pool').close(); });

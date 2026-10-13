@@ -1,6 +1,6 @@
 // Regras do funil de convidados: o que precisa estar preenchido para entrar em cada etapa
 // e normalização/validação dos campos que o cadastro e a importação CSV compartilham.
-const { PROFILES } = require('../constants');
+const { PROFILES, GUEST_STATUSES } = require('../constants');
 
 // Etapa -> pendências. Cada regra devolve a lista (vazia = pode entrar).
 const REQUIREMENTS = {
@@ -61,6 +61,42 @@ function normalizeGender(value) {
   return null;
 }
 
+const STATUS_ALIASES = {
+  prospect: ['prospeccao', 'prospect', 'prospectar', 'lead', 'nao convidado'],
+  convite_enviado: ['convite enviado', 'convite_enviado', 'convidado', 'convite', 'enviado', 'aguardando resposta'],
+  em_agendamento: ['em agendamento', 'em_agendamento', 'agendando', 'aceitou', 'aceito'],
+  agendado: ['agendado', 'agendada', 'marcado', 'marcada'],
+  gravado: ['gravado', 'gravada'],
+  recusou: ['recusou', 'recusado', 'recusada', 'nao aceitou'],
+  cancelado: ['cancelado', 'cancelada', 'desistiu', 'desistencia'],
+};
+
+// "Convite enviado", "convite_enviado", "Recusado"… -> chave da etapa; vazio -> '' ; desconhecido -> null.
+function normalizeStatus(value) {
+  const n = normText(value).replace(/\s+/g, ' ');
+  if (!n) return '';
+  for (const s of GUEST_STATUSES) if (normText(s.label) === n || s.key === n) return s.key;
+  for (const [key, list] of Object.entries(STATUS_ALIASES)) if (list.includes(n)) return key;
+  return null;
+}
+
+// Data e hora da gravação vindas de planilha, no horário de Brasília (-03:00 fixo, sem horário de verão desde 2019).
+// Data: 25/10/2026, 25/10/26 ou 2026-10-25. Hora: 14:30, 14h30 ou 14h, na mesma célula ou numa coluna própria.
+// Devolve { value: Date|null } ou { error: 'mensagem' }.
+function parseRecordingAt(dateCell, timeCell = '') {
+  const raw = `${String(dateCell || '').trim()} ${String(timeCell || '').trim()}`.trim().toLowerCase();
+  if (!raw) return { value: null };
+  const m = raw.match(/^(?:(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})|(\d{4})-(\d{2})-(\d{2}))(?:[ t]+(?:as|às)?\s*(\d{1,2})(?::|h)?(\d{2})?h?(?::\d{2})?)?$/);
+  if (!m) return { error: 'data/hora da gravação inválida (use 25/10/2026 14:30)' };
+  const [day, month, year] = m[1] ? [m[1], m[2], m[3].length === 2 ? `20${m[3]}` : m[3]] : [m[6], m[5], m[4]];
+  if (m[7] === undefined) return { error: 'falta a hora da gravação' };
+  const pad = (n) => String(n).padStart(2, '0');
+  const iso = `${year}-${pad(month)}-${pad(day)}T${pad(m[7])}:${m[8] || '00'}`;
+  const d = new Date(`${iso}:00-03:00`);
+  const back = Number.isNaN(d.getTime()) ? '' : new Date(d.getTime() - 3 * 3600 * 1000).toISOString().slice(0, 16);
+  return back === iso ? { value: d } : { error: 'data/hora da gravação inválida (use 25/10/2026 14:30)' };
+}
+
 // Aceita só http(s); `hosts` restringe o domínio (youtube.com/youtu.be, spotify.com/spotify.link).
 function normalizeUrl(value, hosts) {
   const raw = String(value || '').trim();
@@ -79,6 +115,6 @@ const YOUTUBE_HOSTS = ['youtube.com', 'youtu.be'];
 const SPOTIFY_HOSTS = ['spotify.com', 'spotify.link'];
 
 module.exports = {
-  missingFor, missingMessage, STAGE_HINTS, normalizeInstagram, normalizeProfile, normalizeGender, normalizeUrl,
+  missingFor, missingMessage, STAGE_HINTS, normalizeInstagram, normalizeProfile, normalizeGender, normalizeStatus, parseRecordingAt, normalizeUrl,
   YOUTUBE_HOSTS, SPOTIFY_HOSTS, normText,
 };

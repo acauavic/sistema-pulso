@@ -46,7 +46,7 @@
   `src/services/guestRules.js` (**única fonte**: formulário, `/status` e arrastar usam a mesma; falha = 422 + `editUrl`).
   Formulário mostra campos por etapa (`data-stages`, `app.js`); a data da gravação abre a janela de confirmação (`[data-agenda]`).
   **Páginas guiadas** (convidado e patrocinador): stepper + cartão "Próximo passo" por etapa + janelas que pedem só o que falta
-  (`POST /convidados/:id/avancar`, `POST /patrocinadores/:id/avancar`; 422 do quadro aponta para `?abrir=<janela>`). Importação CSV em `services/csvImport.js` + `routes/guestImport.js`.
+  (`POST /convidados/:id/avancar`, `POST /patrocinadores/:id/avancar`; 422 do quadro aponta para `?abrir=<janela>`). Importação CSV em `services/csvImport.js` + `routes/guestImport.js` (colunas opcionais `status` e `data da gravação`/`hora`; etapas permitidas em `IMPORT_STATUSES`).
 - **Convite**: token secreto → página pública `/convite/:token` (**modelo fixo** `src/templates/convite-pulso.html`; não há
   mais tela/tabela de modelos) → link curto no YOURLS (keyword = nome curto) → envio por e-mail Brevo. Botões do WhatsApp
   passam pelo **redirecionador interno**: `GET /convite/:token/aceitar` (conta clique em `invite_clicks`, move
@@ -95,6 +95,8 @@
 - **Pegadinha**: rotas públicas do patrocinador com fetch precisam estar na lista de `Origin: null` em `originCheck` (já incluí `resposta|concluir`).
 
 ## Últimas Decisões
+
+- **CSV de convidados com etapa e data (2026-10-13)**: colunas opcionais `status` (aliases etapa/situação/fase; aceita rótulo ou chave, `normalizeStatus`) e `data da gravação` (+ `hora` opcional; `parseRecordingAt`, Brasília -03:00, `dd/mm/aaaa hh:mm`, `aaaa-mm-dd`, `14h30`). Entra em Prospecção, Convite enviado, Em agendamento (pede e-mail/WhatsApp), **Agendado** (pede data/hora futura e entra com as três confirmações = true: a planilha afirma que está fechado), Recusou, Cancelado. **Gravado não entra** (faria nascer episódio). Depois do COMMIT roda `production.syncFromGuest` por convidado, igual ao cadastro manual (Agendado avisa a equipe e gera custos do estúdio). Histórico registra etapa e data.
 
 - **Plateia: confirmar com valor** (migração 023): `POST /plateia/painel/leads/:id/confirmar` (audience.read) grava `amount_cents`, cria `fin_entries` (entrada, categoria `plateia`, source `plateia`, `auto_key plateia-lead-<id>`) e liga em `plateia_leads.entry_id`; `/recebido` marca/desfaz o recebimento; sair de Selecionado cancela a conta não recebida. Selecionar por `/leads/:id` com status confirmado é recusado.
 

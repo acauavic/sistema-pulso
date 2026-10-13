@@ -681,7 +681,7 @@ describe('fluxos ponta a ponta', () => {
       const model = await as.prod.get('/convidados/importar/modelo.csv');
       assert.equal(model.status, 200);
       assert.match(model.headers.get('content-type'), /text\/csv/);
-      assert.match(model.text, /nome;instagram;whatsapp;perfil;email;motivo do convite/);
+      assert.match(model.text, /nome;instagram;whatsapp;perfil;email;motivo do convite;status;data da gravação/);
     });
 
     it('prévia aponta erros e duplicados e não grava nada', async () => {
@@ -741,6 +741,19 @@ describe('fluxos ponta a ponta', () => {
       const again = await commit(csv); // mesma planilha de novo: tudo duplicado, nada entra
       assert.equal(again.status, 400);
       assert.equal(await count(), before + 2);
+    });
+
+    it('status da planilha define a etapa e fica no histórico', async () => {
+      const r = await commit('nome;instagram;perfil;email;status;data da gravação\nSt Um;@st.um;médico;um@exemplo.com;Em agendamento;\nSt Dois;@st.dois;médico;;Recusou;\nSt Tres;@st.tres;médico;;Gravado;\nSt Quatro;@st.quatro;médico;;Agendado;25/11/2099 14:30');
+      assert.equal(r.status, 302);
+      const { rows } = await h.db.query("SELECT instagram, status FROM guests WHERE instagram LIKE 'st.%' ORDER BY instagram");
+      assert.deepEqual(rows.map((g) => [g.instagram, g.status]), [['st.dois', 'recusou'], ['st.quatro', 'agendado'], ['st.um', 'em_agendamento']]);
+      const { rows: [ag] } = await h.db.query("SELECT * FROM guests WHERE instagram = 'st.quatro'");
+      assert.equal(ag.proposed_at.toISOString(), '2099-11-25T17:30:00.000Z');
+      assert.ok(ag.scheduled_studio && ag.scheduled_hosts && ag.scheduled_guest, 'agendado entra confirmado');
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM episodes WHERE guest_id = $1', [ag.id])).rows[0].n, 0, 'agendado não cria episódio');
+      const { rows: [ev] } = await h.db.query("SELECT e.message FROM guest_events e JOIN guests g ON g.id = e.guest_id WHERE g.instagram = 'st.um'");
+      assert.match(ev.message, /Importado por CSV .*\(etapa: Em agendamento\)/);
     });
 
     it('cabeçalho sem as colunas obrigatórias e arquivo vazio são recusados com mensagem clara', async () => {

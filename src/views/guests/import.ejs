@@ -3,9 +3,16 @@
   <div><span class="kicker">Convidados · CRM</span><h1>Importar por CSV</h1></div>
   <a class="btn ghost" href="/convidados"><%- icon('arrow-left') %> Voltar</a>
 </div>
-<p class="lead">Cada linha vira um convidado em Prospecção, com você como responsável. Obrigatórios: <strong>nome</strong>, <strong>instagram</strong> e <strong>perfil</strong>
-  (médico, influencer, empresário ou profissional da saúde). Opcionais: <strong>whatsapp</strong>, <strong>email</strong>, <strong>motivo do convite</strong> e <strong>genero</strong> (m/f, padrão m).
-  Até <%= maxRows %> linhas. O restante do cadastro se completa depois, no próprio convidado.</p>
+<p class="lead">Cada linha vira um convidado, com você como responsável. Use o modelo: só <strong>nome</strong>, <strong>instagram</strong> e <strong>perfil</strong> são obrigatórios. Até <%= maxRows %> linhas.</p>
+<details class="more">
+  <summary>Colunas e regras</summary>
+  <ul class="small">
+    <li><strong>perfil</strong>: médico, influencer, empresário ou profissional da saúde.</li>
+    <li><strong>whatsapp</strong>, <strong>email</strong>, <strong>motivo do convite</strong>, <strong>genero</strong> (m/f, padrão m): opcionais.</li>
+    <li><strong>status</strong>: <%= importStatuses.join(', ') %>. Vazio = Prospecção. Em agendamento pede e-mail ou WhatsApp.</li>
+    <li><strong>data da gravação</strong>: 25/11/2026 14:30, horário de Brasília (a hora pode vir numa coluna <strong>hora</strong>). Agendado pede data e hora futuras e entra com estúdio, hosts e convidado confirmados.</li>
+  </ul>
+</details>
 
 <div class="card form-card wide">
   <% if (headerError) { %><div class="flash flash-error"><%= headerError %></div><% } %>
@@ -15,7 +22,7 @@
       <input type="file" accept=".csv,text/csv,text/plain" data-csv-file>
     </label>
     <label>Ou cole o conteúdo aqui
-      <textarea name="csv" rows="8" class="code" spellcheck="false" data-csv-text placeholder="nome;instagram;whatsapp;perfil;email;motivo do convite"><%= csvText %></textarea>
+      <textarea name="csv" rows="8" class="code" spellcheck="false" data-csv-text placeholder="nome;instagram;whatsapp;perfil;email;motivo do convite;status;data da gravação"><%= csvText %></textarea>
     </label>
     <div class="row">
       <button class="btn primary" type="submit">Ver prévia</button>
@@ -30,7 +37,7 @@
   <p class="mono muted"><%= result.ok %> prontos · <%= result.rows.length - result.ok %> ignorados · <%= result.rows.length %> linhas</p>
   <div class="table-wrap">
   <table>
-    <thead><tr><th class="num">Linha</th><th>Nome</th><th>Instagram</th><th>Perfil</th><th>Contato</th><th>Situação</th></tr></thead>
+    <thead><tr><th class="num">Linha</th><th>Nome</th><th>Instagram</th><th>Perfil</th><th>Etapa</th><th>Contato</th><th>Situação</th></tr></thead>
     <tbody>
       <% result.rows.forEach(function (r) { %>
       <tr>
@@ -38,6 +45,7 @@
         <td><%= r.data.name || '—' %></td>
         <td class="handle"><%= r.data.instagram ? '@' + r.data.instagram : '—' %></td>
         <td><%= r.data.profile ? profileLabels[r.data.profile].label : '—' %></td>
+        <td class="mono small"><%= r.data.status ? statusInfo[r.data.status].label : '—' %><% if (r.data.proposed_at) { %><br><span class="muted"><%= fmt.formatDateTime(r.data.proposed_at) %></span><% } %></td>
         <td class="small"><%= [r.data.phone, r.data.email].filter(Boolean).join(' · ') || '—' %></td>
         <td>
           <% if (r.errors.length) { %><span class="badge b-red">Erro</span> <span class="small"><%= r.errors.join('; ') %></span>

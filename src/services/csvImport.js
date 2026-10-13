@@ -3,8 +3,13 @@
 const db = require('../db/pool');
 const rules = require('./guestRules');
 const { clean, isEmail } = require('../utils/format');
+const { STATUS_BY_KEY } = require('../constants');
 
 const MAX_ROWS = 500;
+// Etapas que a planilha pode trazer. Agendado pede data e hora da gravação e entra com estúdio, hosts e convidado
+// confirmados (quem marca "Agendado" na planilha está dizendo que a data está fechada). Gravado faz nascer o episódio:
+// fica para a página do convidado.
+const IMPORT_STATUSES = ['prospect', 'convite_enviado', 'em_agendamento', 'agendado', 'recusou', 'cancelado'];
 
 // Lê CSV (RFC 4180: aspas, aspas duplicadas, quebras de linha dentro de campo). Separador detectado: ; , ou tab.
 function parseCsv(input) {
@@ -41,6 +46,9 @@ const ALIASES = {
   email: ['email', 'emailopcional', 'mail'],
   invite_reason: ['motivo', 'motivodoconvite', 'motivoconvite', 'porque'],
   gender: ['genero', 'sexo'],
+  status: ['status', 'etapa', 'situacao', 'fase', 'etapadofunil'],
+  recording_at: ['dataehoradagravacao', 'datadagravacao', 'datagravacao', 'gravacao', 'data', 'datahora', 'dataehora', 'agendamento', 'dataagendada'],
+  recording_time: ['horadagravacao', 'horagravacao', 'hora', 'horario'],
 };
 const REQUIRED = { name: 'nome', instagram: 'instagram', profile: 'perfil' };
 
@@ -71,13 +79,22 @@ function parseGuests(input) {
     if (!profile) errors.push(get('profile') ? `perfil “${get('profile')}” não reconhecido` : 'perfil ausente');
     if (email && !isEmail(email)) errors.push('e-mail inválido');
     if (gender === null) errors.push('gênero inválido (use m ou f)');
+    const status = rules.normalizeStatus(get('status')) || (get('status') ? null : 'prospect');
+    const phone = clean(get('phone'), 40);
+    if (!status) errors.push(`status “${get('status')}” não reconhecido`);
+    else if (!IMPORT_STATUSES.includes(status)) errors.push(`${STATUS_BY_KEY[status].label} não entra por planilha (use Agendado)`);
+    else if (status === 'em_agendamento' && rules.missingFor(status, { email, phone }).length) errors.push('Em agendamento pede e-mail ou WhatsApp');
+    const when = rules.parseRecordingAt(get('recording_at'), get('recording_time'));
+    if (when.error) errors.push(when.error);
+    else if (status === 'agendado' && !when.value) errors.push('Agendado pede data e hora da gravação');
+    else if (status === 'agendado' && when.value < new Date()) errors.push('a data da gravação já passou');
     return {
       line: i + 2,
       errors,
       duplicate: null,
       data: {
-        name, instagram, profile, email, gender: gender || 'm',
-        phone: clean(get('phone'), 40), invite_reason: clean(get('invite_reason'), 1000),
+        name, instagram, profile, email, gender: gender || 'm', status: status || null, proposed_at: when.value || null,
+        phone, invite_reason: clean(get('invite_reason'), 1000),
       },
     };
   });
@@ -108,8 +125,8 @@ async function markDuplicates(rows) {
   return rows;
 }
 
-const TEMPLATE_CSV = '﻿nome;instagram;whatsapp;perfil;email;motivo do convite\r\n' +
-  'Maria Souza;@maria.souza;(12) 99999-0000;médico;maria@exemplo.com;Referência em saúde da mulher\r\n' +
-  'João Lima;@joaolima;;influencer;;Fala com um público jovem sobre autocuidado\r\n';
+const TEMPLATE_CSV = '﻿nome;instagram;whatsapp;perfil;email;motivo do convite;status;data da gravação\r\n' +
+  'Maria Souza;@maria.souza;(12) 99999-0000;médico;maria@exemplo.com;Referência em saúde da mulher;Agendado;25/11/2026 14:30\r\n' +
+  'João Lima;@joaolima;;influencer;;Fala com um público jovem sobre autocuidado;;\r\n';
 
-module.exports = { parseCsv, parseGuests, markDuplicates, TEMPLATE_CSV, MAX_ROWS };
+module.exports = { parseCsv, parseGuests, markDuplicates, TEMPLATE_CSV, MAX_ROWS, IMPORT_STATUSES };
