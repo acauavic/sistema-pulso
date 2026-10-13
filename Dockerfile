@@ -6,7 +6,8 @@ WORKDIR /app
 RUN apk add --no-cache ffmpeg
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# O npm às vezes escolhe o binário "gnu" em vez do "musl" no Alpine (canvas); --libc=musl força o certo e a checagem abaixo derruba o build se faltar
+RUN npm ci --omit=dev --libc=musl && node -e "require(\"@napi-rs/canvas\")"
 
 COPY src ./src
 
