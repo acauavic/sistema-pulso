@@ -65,6 +65,14 @@ const config = {
     subject: env.VAPID_SUBJECT || 'mailto:contato@podcastpulso.com',
   },
 
+  // Google Agenda: as gravações agendadas vão para o calendário do Pulso Podcast. Conta de serviço (JSON em uma linha ou em base64)
+  // com acesso de edição ao calendário. Sem as duas variáveis, a integração fica desligada.
+  google: {
+    calendarId: env.GOOGLE_CALENDAR_ID || '',
+    serviceAccount: env.GOOGLE_SERVICE_ACCOUNT_B64 || env.GOOGLE_SERVICE_ACCOUNT_JSON || '',
+    eventMinutes: Math.max(15, Number(env.GOOGLE_EVENT_MINUTES) || 120),
+  },
+
   yourls: {
     base: normalizeBase(env.YOURLS_LINK),
     key: env.YOURLS_KEY,
@@ -76,6 +84,7 @@ config.storageConfigured = Boolean(config.b2.keyId && config.b2.appKey && config
 config.geminiConfigured = Boolean(config.gemini.key);
 config.groqConfigured = Boolean(config.groq.key);
 config.uploadPostConfigured = Boolean(config.uploadPost.key);
+config.googleConfigured = Boolean(config.google.calendarId && config.google.serviceAccount);
 config.yourlsConfigured = Boolean(config.yourls.base && config.yourls.key);
 
 function assertConfig() {

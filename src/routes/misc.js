@@ -42,14 +42,33 @@ router.get('/auditoria', requirePerm('audit.read'), wrap(async (req, res) => {
 }));
 
 // ---- integrações: status + testes seguros (sem expor segredos) ----
-router.get('/integracoes', requirePerm('integrations.manage'), (req, res) => {
+router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, res) => {
   res.render('integrations', {
+    google: await require('../services/googleCalendar').status(),
     title: 'Integrações',
     smtp: { ok: config.mailConfigured, dry: config.mailDryRun, host: config.brevo.host, port: config.brevo.port, from: config.brevo.from },
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
     appBaseUrl: config.appBaseUrl,
   });
-});
+}));
+
+router.post('/integracoes/google', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const gcal = require('../services/googleCalendar');
+  try {
+    if (req.body.acao === 'sincronizar') {
+      const r = await gcal.sync();
+      await audit(req, 'integracao.google_sync', 'system', null, { ...r, errors: r.errors.length });
+      const txt = `Google Agenda: ${r.created} criado(s), ${r.updated} atualizado(s), ${r.removed} removido(s), ${r.unchanged} sem mudança.`;
+      await req.flash(r.errors.length ? 'error' : 'ok', r.errors.length ? `${txt} Falhas: ${r.errors.slice(0, 3).join(' | ')}` : txt);
+    } else {
+      const r = await gcal.ping();
+      await req.flash('ok', `Google Agenda respondeu. A conta de serviço ${r.serviceAccount} consegue acessar a agenda.`);
+    }
+  } catch (err) {
+    await req.flash('error', err.message);
+  }
+  res.redirect('/integracoes');
+}));
 
 router.post('/integracoes/yourls', requirePerm('integrations.manage'), wrap(async (req, res) => {
   try {

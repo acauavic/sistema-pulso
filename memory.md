@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Google Agenda (1.2.0)**: conta de serviço + JWT RS256 por `crypto` (sem dependência nova), `services/googleCalendar.js`; só Agendado com data vai ao calendário (Gravado/Publicado mantém, outras etapas e convidado apagado removem). Id fixo `pulsog<id>` + tabela `gcal_events` (hash evita reenvio; sem FK para limpar órfãos). Rotina a cada 2 min; botões em Integrações. Depende de `GOOGLE_CALENDAR_ID` e `GOOGLE_SERVICE_ACCOUNT_B64|JSON` (desligada sem elas). Sem convidar pessoas por e-mail (conta de serviço não convida sem delegação de domínio).
+
 - **Versões e Novidades (1.1.0)**: `package.json` + `src/releases.js` (topo = versão no ar; teste confere). `/novidades` lista o histórico e marca como visto; `users.release_seen` (migração 030) faz o aviso "Sistema atualizado" aparecer uma vez por versão e por pessoa (`partials/foot.ejs`, dispensa em `POST /novidades/visto`). Versão no rodapé do menu. Regra de lançar em CLAUDE.md/AGENTS.md.
 
 - **Isenção na plateia**: em "Confirmar participação" o pagamento ganhou a opção **Isento (sem cobrança)**: confirma com valor 0, sem conta a receber (cancela a prevista, se houver) e o pedido mostra o selo "isento". Texto das condições terminou em "Nesses casos o valor será devolvido." (`TERMS_VERSION` 2026-10b).

@@ -27,5 +27,22 @@
       <button class="btn" type="submit">Testar conexão (somente leitura)</button>
     </form>
   </section>
+  <section class="card">
+    <h2>Google Agenda</h2>
+    <p><span class="badge <%= google.configured && google.validKey ? 'b-green' : 'b-red' %>"><%= google.configured ? (google.validKey ? 'Configurado' : 'Chave inválida') : 'Não configurado' %></span></p>
+    <ul class="plain small">
+      <li>Agenda: <code><%= google.calendarId || '—' %></code></li>
+      <li>Conta de serviço (compartilhe a agenda com este e-mail, com permissão para editar eventos): <code><%= google.serviceAccount || '—' %></code></li>
+      <li>Gravações no Google: <strong><%= google.synced %></strong><%= google.last ? ' · última atualização ' + fmt.formatDateTime(google.last) : '' %> · duração de cada evento: <%= google.minutes %> min</li>
+      <li>Vão para a agenda os convidados em <strong>Agendado</strong> com data; saem se mudarem de etapa. A rotina confere a cada 2 minutos.</li>
+    </ul>
+    <% if (google.configured) { %>
+    <form method="post" action="/integracoes/google" class="row">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn" type="submit" name="acao" value="testar">Testar conexão (somente leitura)</button>
+      <button class="btn" type="submit" name="acao" value="sincronizar">Sincronizar agora</button>
+    </form>
+    <% } else { %><p class="small muted">Defina GOOGLE_CALENDAR_ID e a chave da conta de serviço no servidor (passo a passo no .env.example).</p><% } %>
+  </section>
 </div>
 <%- include('partials/foot') %>
