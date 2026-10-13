@@ -131,7 +131,8 @@ com/sem BOM, até 500 linhas. O perfil aceita variações (médica, influenciado
 **Data da gravação**: `25/11/2026 14:30` no horário de Brasília (a hora pode vir numa coluna `hora`). **Agendado** exige data e hora futuras
 e entra com estúdio, hosts e convidado confirmados (aparece na agenda e avisa a equipe). **Gravado** e **Publicado** trazem o histórico: pedem a data da gravação (só o dia basta, não pode ser futura) e criam o episódio já na etapa (Gravado ou Publicado), **sem tarefas, custos automáticos nem avisos**. Opcionais: `episódio` (número; sem ele, continua a numeração na ordem das datas de gravação; número já usado vira duplicado), `youtube`, `spotify` e `publicado em`.
 Primeiro mostra uma **prévia** (pronto / erro / duplicado — Instagram ou e-mail já cadastrado ou repetido no arquivo);
-ao confirmar, só as linhas prontas viram convidados, com você como responsável.
+ao confirmar, só as linhas prontas viram convidados, com você como responsável. Colunas extras: `observações` (vai para as observações do convidado) e `título do episódio` (histórico).
+Pelo terminal (mesmas regras, prévia sem `--gravar`): `node src/scripts/importGuests.js arquivo.csv email@quem.importa [--gravar]` (no servidor: `docker compose exec -T web node src/scripts/importGuests.js - email --gravar < arquivo.csv`).
 
 ## Central de patrocinadores
 

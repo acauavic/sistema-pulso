@@ -56,6 +56,8 @@ const ALIASES = {
   episode_number: ['episodio', 'numerodoepisodio', 'numeroepisodio', 'ep', 'epnumero', 'numero'],
   youtube: ['youtube', 'linkyoutube', 'linkdoyoutube'],
   spotify: ['spotify', 'linkspotify', 'linkdospotify'],
+  notes: ['observacoes', 'observacao', 'obs', 'notas', 'anotacoes', 'notes'],
+  episode_title: ['titulodoepisodio', 'tituloepisodio', 'titulo', 'title'],
   aired_on: ['publicadoem', 'datadepublicacao', 'datapublicacao', 'publicacao', 'dataderelease'],
 };
 const REQUIRED = { name: 'nome', instagram: 'instagram', profile: 'perfil' };
@@ -122,7 +124,7 @@ function parseGuests(input) {
       const aired = get('aired_on') ? rules.parseRecordingAt(get('aired_on'), '', { dateOnly: true }) : { value: null };
       if (aired.error) errors.push('data de publicação inválida (use 25/10/2026)');
       if (!published && (yt.value || sp.value || aired.value)) errors.push('tem link ou data de publicação: use o status Publicado');
-      episode = { number, status: published ? 'publicado' : 'gravado', youtube_url: yt.value || null, spotify_url: sp.value || null, aired_at: aired.value || null };
+      episode = { number, title: clean(get('episode_title'), 200) || null, status: published ? 'publicado' : 'gravado', youtube_url: yt.value || null, spotify_url: sp.value || null, aired_at: aired.value || null };
     } else if (get('episode_number') || get('youtube') || get('spotify')) {
       errors.push('número do episódio e links só valem para Gravado ou Publicado');
     }
@@ -132,7 +134,7 @@ function parseGuests(input) {
       duplicate: null,
       data: {
         name, instagram, profile, email, gender: gender || 'm', status: status || null, proposed_at: when.value || null, loss_reason: lossReason, loss_note: lossNote, episode,
-        phone, invite_reason: clean(get('invite_reason'), 1000),
+        phone, invite_reason: clean(get('invite_reason'), 1000), notes: clean(get('notes'), 4000) || null,
       },
     };
   });

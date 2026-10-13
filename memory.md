@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Importação = serviço (2026-10-13)**: `services/guestImport.js` (`analyse`, `importGuests`) usado pela rota e por `src/scripts/importGuests.js` (prévia; `--gravar` grava e registra auditoria). Colunas `observações` e `título do episódio`. Base inicial veio do ClickUp (lista "CRM Pulso"): ganho→Gravado/Publicado (playlist do YouTube), follow up/contato inicial→Convite enviado, pendentes→Prospecção, agendamento→Em agendamento, agendado→Agendado, perdido→Perdido/nunca_respondeu.
+
 - **Perdido com motivo (migração 025, 2026-10-13)**: etapa `recusou` virou `perdido` (dados migrados com motivo `recusado`). `loss_reason` (`LOSS_REASONS` em constants: recusado, sem_agenda, nunca_respondeu, parou_de_responder, conflito_de_interesse, outros) + `loss_note`. CHECK `guests_perdido_motivo_check` exige motivo (e nota em outros); trigger `guests_clear_loss` limpa ao sair de Perdido. Regra em `guestRules` (formulário, `/status` 422 → `?abrir=perda`, `/avancar` com `perda=1`). RSVP público: convidado não escolhe motivo, vira perdido/recusado com o recado em `loss_note`.
 - **CSV: histórico Gravado/Publicado (2026-10-13)**: status `Publicado` = convidado gravado + episódio publicado. Data da gravação obrigatória (só o dia → 12:00 Brasília; futura recusa). Colunas `episódio` (número; sem ele, max+1 pela ordem da data; `LOCK TABLE episodes`), `youtube`, `spotify`, `publicado em`. `createHistoryEpisode` em `routes/guestImport.js` insere direto, **sem** rotinas de tarefas, financeiro nem avisos; número já usado = duplicado na prévia.
 

@@ -177,7 +177,7 @@ test('csv: cabeçalhos com acento/variações são reconhecidos e a validação 
   assert.equal(headerError, null);
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0].errors, []);
-  assert.deepEqual(rows[0].data, { name: 'Ana', instagram: 'ana', profile: 'medico', email: 'a@b.co', gender: 'm', status: 'prospect', proposed_at: null, loss_reason: null, loss_note: null, episode: null, phone: '11 9', invite_reason: 'porque' });
+  assert.deepEqual(rows[0].data, { name: 'Ana', instagram: 'ana', profile: 'medico', email: 'a@b.co', gender: 'm', status: 'prospect', proposed_at: null, loss_reason: null, loss_note: null, episode: null, phone: '11 9', invite_reason: 'porque', notes: null });
   assert.equal(rows[0].line, 2);
   assert.deepEqual(rows[1].errors, ['nome ausente']);
   assert.match(csv.parseGuests('nome;perfil\nA;médico').headerError, /instagram/);
@@ -218,7 +218,7 @@ test('csv: histórico (Gravado e Publicado) com episódio, links e data só com 
   assert.deepEqual(rows[0].errors, []);
   assert.equal(rows[0].data.status, 'gravado');
   assert.deepEqual({ ...rows[0].data.episode, aired_at: rows[0].data.episode.aired_at.toISOString() },
-    { number: 3, status: 'publicado', youtube_url: 'https://youtu.be/abc', spotify_url: 'https://open.spotify.com/episode/x', aired_at: '2026-03-20T15:00:00.000Z' });
+    { number: 3, title: null, status: 'publicado', youtube_url: 'https://youtu.be/abc', spotify_url: 'https://open.spotify.com/episode/x', aired_at: '2026-03-20T15:00:00.000Z' });
   assert.equal(rows[0].data.proposed_at.toISOString(), '2026-03-10T15:00:00.000Z', 'só o dia vira meio-dia em Brasília');
   assert.deepEqual(rows[1].errors, []); assert.equal(rows[1].data.episode.status, 'gravado'); assert.equal(rows[1].data.episode.number, null);
   assert.match(rows[2].errors[0], /Gravado pede a data da gravação/);
