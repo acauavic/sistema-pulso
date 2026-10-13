@@ -93,7 +93,7 @@ async function handleWebhook(payload) {
       const r = await audience.confirmLead(lead, { amountCents: amount, dueOn: today, paidOn: today }, null);
       if (r.error) note = ` (${r.error})`;
     }
-    require('./notify').notify({
+    await require('./notify').notify({
       type: 'plateia', broadcast: true, title: `Pagamento recebido: ${lead.name}`,
       body: `${lead.guest_name} · ${(amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} pelo link da InfinitePay${note}`,
       url: `/plateia/painel?convidado=${lead.guest_id || ''}`, dedupe: `plateia-pago-${link.id}`,
