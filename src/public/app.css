@@ -450,6 +450,8 @@ span.dot:not([data-dot]) { cursor: default; }
 /* notificações */
 .notif-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; align-items: start; }
 .filter-list { display: grid; gap: 2px; } .filter-list a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-field); color: var(--text-2); font-weight: 500; }
+.push-box { border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px; display: grid; gap: 8px; }
+.push-box h3 { display: flex; align-items: center; gap: 8px; margin: 0; } .push-box p { margin: 0; }
 .filter-list a:hover { background: var(--raised); text-decoration: none; } .filter-list a.on { background: var(--raised); color: var(--text); } .filter-list a.on .icon { color: var(--action); }
 .notif-list { display: grid; } .notif { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: start; padding: 12px 4px; border-bottom: 1px solid var(--line); }
 .notif:last-child { border-bottom: 0; }

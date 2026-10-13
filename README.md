@@ -184,7 +184,7 @@ Menu **Financeiro** (gestão e superadmin; a produtora vê só o **Estoque**). C
 
 Página **pública** `/plateia` (sem login, indexável) para o público pedir para assistir às gravações. Código: `src/routes/plateia.js` (público), `src/routes/plateiaAdmin.js` (interno), `src/services/audience.js`, `src/views/plateia/`, `src/public/plateia.{css,js}`, migração `021_plateia.sql`.
 
-- **Compartilhamento e SEO**: título, descrição, Open Graph e Twitter Card definidos em `routes/plateia.js`; imagem `src/public/og-plateia.jpg` (1200×630, gerada a partir da foto do estúdio do media kit).
+- **Compartilhamento e SEO**: título, descrição, Open Graph e Twitter Card definidos em `routes/plateia.js`; imagem `src/public/og-plateia.jpg` (1200×630, foto da mesa do estúdio).
 - **Agenda automática**: sai dos convidados em **Agendado**, com data futura e "Aberto para plateia" marcado (padrão). No card do convidado (quando Agendado/Em agendamento) há a caixa "Aberto para plateia" para tirá-lo e o seletor de vagas (Disponível, Lotado, Inscrições encerradas). A foto do convidado é enviada no mesmo card (PNG/JPEG/WebP, até 5 MB; só é pública enquanto ele está na agenda). Tema = campo "Temas" do convidado.
 - **Plateia escolhida, não aberta**: a copy deixa claro que pedir participação **não garante a vaga**; a produção seleciona a plateia de cada gravação por afinidade com o convidado e o tema (vagas limitadas, tom de exclusividade sem urgência falsa). Situações do pedido: Novo pedido, Em avaliação, Selecionado, Não selecionado, Desistiu.
 - **Fluxo**: escolher o episódio → nome completo + WhatsApp (país, validação por país; BR com DDD) → revisão (convidado, data, horário, R$ se selecionado, duração + aviso de que **não confirma a vaga**) → "Continuar pelo WhatsApp" abre `wa.me/<produtora>` com a mensagem pronta. O pedido vira um **lead** já na etapa de revisão e **avisa a equipe** (notificação "Plateia"); quem não abrir o WhatsApp aparece como "não abriu o WhatsApp"; a mesma pessoa no mesmo episódio não duplica nem avisa de novo. Nada é cobrado nem confirmado pela página. O fundo do topo é o vídeo do media kit.
@@ -280,6 +280,18 @@ Padrão da VPS (Docker Swarm + Traefik). Em linhas gerais:
 Dois serviços com a mesma imagem: **`pulso_gestao`** (`ROLE=web`, pode ter várias réplicas) e **`pulso_worker`** (`ROLE=worker`: fila e
 rotinas). Numa máquina só, um serviço com `ROLE=all` (padrão) também funciona. Depois do deploy, confira **Gestão > Sistema**.
 Na Brevo, o remetente (`BREVO_EMAIL`) e o domínio precisam estar validados (SPF/DKIM) para não cair em spam.
+
+## Alertas no navegador (Web Push)
+
+Em **Notificações > Alertas neste aparelho**, cada pessoa liga os alertas no navegador ou celular que está usando. Toda notificação
+nova (as mesmas do sino, respeitando o que a pessoa silenciou) também vai para os aparelhos dela pela fila (`push_notificacao`),
+**mesmo com o painel fechado**. Com o painel aberto e em primeiro plano, vale só o aviso flutuante (sem alerta duplicado).
+Sem push no aparelho, mas com alertas permitidos, a aba aberta em segundo plano também mostra o alerta do sistema.
+
+- Código: `src/services/push.js`, `src/public/push.js`, service worker `src/public/sw.js` (servido em `/sw.js`), manifesto `/manifest.webmanifest`, migração `024_push.sql`.
+- Chaves: `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (o `deploy/instalar.sh` gera; ou `npx web-push generate-vapid-keys`). Sem elas, o bloco avisa que não está configurado. Trocar as chaves desliga os aparelhos já inscritos.
+- **iPhone/iPad**: só funciona com o painel adicionado à Tela de Início (Compartilhar > Adicionar à Tela de Início) e aberto por lá (iOS 16.4+).
+- Aparelho que o serviço de push diz não existir mais (404/410) é removido sozinho.
 
 ## Arquitetura: processos, fila, rotinas e avisos
 

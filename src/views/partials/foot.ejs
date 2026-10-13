@@ -29,6 +29,7 @@
 <script type="application/json" id="team-users"><%- JSON.stringify((teamUsers || []).map(function (u) { return { id: u.id, name: u.name, ini: fmt.initials(u.name) }; })).replace(/</g, '\\u003c') %></script>
 <script src="/static/collab.js?v=<%= assetV %>" defer></script>
 <script src="/static/assistant.js?v=<%= assetV %>" defer></script>
+<script src="/static/push.js?v=<%= assetV %>" defer></script>
 <% } else { %></div></div><% } %>
 <script src="/static/app.js?v=<%= assetV %>" defer></script>
 </body>

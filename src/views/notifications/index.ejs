@@ -21,6 +21,17 @@
     </nav>
     <div class="seg top-gap"><a class="<%= !unread ? 'on' : '' %>" href="<%= link(type, '') %>">Todas</a><a class="<%= unread ? 'on' : '' %>" href="<%= link(type, 'nao-lidas') %>">Não lidas</a></div>
 
+    <section class="push-box top-gap" data-push data-push-key="<%= pushKey %>" hidden>
+      <h3 class="small"><%- icon('bell') %> Alertas neste aparelho</h3>
+      <p class="small muted" data-push-status></p>
+      <p class="small muted" data-push-hint hidden></p>
+      <div class="row">
+        <button class="btn sm" type="button" data-push-on>Ativar alertas</button>
+        <button class="btn sm ghost" type="button" data-push-test hidden>Enviar teste</button>
+        <button class="link small" type="button" data-push-off hidden>Desativar</button>
+      </div>
+    </section>
+
     <details class="top-gap">
       <summary>Minhas preferências</summary>
       <form method="post" action="/notificacoes/preferencias" class="stack top-gap">

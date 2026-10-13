@@ -185,6 +185,7 @@
       let n; try { n = JSON.parse(e.data); } catch { return; }
       if (badge) setUnread(Number(badge.textContent || 0) + 1);
       window.pulsoToast({ title: n.title, body: n.body, url: n.url });
+      window.pulsoBrowserAlert?.(n); // aba em segundo plano: alerta do sistema (push.js)
     });
   }
   setInterval(refresh, 120_000);

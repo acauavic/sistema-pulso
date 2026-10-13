@@ -85,6 +85,14 @@ for _ in $(seq 1 40); do
   sleep 3
 done
 
+# Chaves do Web Push (alertas com o painel fechado): geradas uma vez e guardadas no .env.
+if ! grep -q '^VAPID_PUBLIC_KEY=.\+' .env; then
+  echo ">> Gerando as chaves dos alertas (Web Push)…"
+  sed -i '/^VAPID_/d' .env
+  docker compose exec -T web node -e "const k=require('web-push').generateVAPIDKeys();console.log('VAPID_PUBLIC_KEY='+k.publicKey+'\nVAPID_PRIVATE_KEY='+k.privateKey+'\nVAPID_SUBJECT=mailto:contato@podcastpulso.com')" >> .env
+  docker compose up -d >/dev/null
+fi
+
 if [ -f .primeiro-admin ]; then
   IFS='|' read -r EMAIL NOME < .primeiro-admin
   echo ">> Criando o superadmin ($EMAIL). Um link para definir a senha é gerado (ou enviado por e-mail, se o SMTP estiver configurado)."

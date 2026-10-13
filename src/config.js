@@ -58,6 +58,13 @@ const config = {
   // Upload-Post: publica nas redes. SEM UPLOAD_POST_LIVE=true nada é enviado (o painel monta e valida o pedido e marca como "simulado").
   uploadPost: { key: env.UPLOAD_POST_KEY, user: env.UPLOAD_POST_USER || 'default', live: String(env.UPLOAD_POST_LIVE).toLowerCase() === 'true', base: 'https://api.upload-post.com' },
 
+  // Web Push (alertas com o painel fechado). Gere o par com `npx web-push generate-vapid-keys`.
+  push: {
+    publicKey: env.VAPID_PUBLIC_KEY || '',
+    privateKey: env.VAPID_PRIVATE_KEY || '',
+    subject: env.VAPID_SUBJECT || 'mailto:contato@podcastpulso.com',
+  },
+
   yourls: {
     base: normalizeBase(env.YOURLS_LINK),
     key: env.YOURLS_KEY,

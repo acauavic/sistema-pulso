@@ -49,6 +49,7 @@ async function notify({ type, users = [], broadcast = false, title, body = null,
     if (cfg.email && u.email) await jobs.enqueue('email_notificacao', { refId: n.id, maxAttempts: 5 });
   }
   // aviso na hora para quem está com o painel aberto (badge + aviso flutuante)
+  for (const n of created.filter((x) => !x.read_at)) await require('./push').queue(n); // aparelhos com o painel fechado
   for (const n of created.filter((x) => !x.read_at)) await realtime.publish([n.user_id], { type: 'notification', id: n.id, kind: n.type, title: n.title, body: n.body, url: n.url ? `/notificacoes/${n.id}/abrir` : null });
   return created;
 }

@@ -3,6 +3,7 @@ const express = require('express');
 const db = require('../db/pool');
 const comments = require('../services/comments');
 const responsible = require('../services/responsible');
+const push = require('../services/push');
 const notifySvc = require('../services/notify');
 const search = require('../services/search');
 const C = require('../constants');
@@ -56,7 +57,27 @@ router.get('/notificacoes', wrap(async (req, res) => {
   res.render('notifications/index', {
     title: 'Notificações', items, type, unread, types: C.NOTIFICATION_TYPES,
     unreadBy: Object.fromEntries(counts.rows.map((r) => [r.type, r.unread])), muted: mutes.rows.map((r) => r.type),
+    pushKey: push.publicKey(),
   });
+}));
+
+// ---- alertas neste aparelho (Web Push) ----
+router.post('/notificacoes/push/inscrever', wrap(async (req, res) => {
+  if (!push.configured()) return res.status(503).json({ ok: false, error: 'Alertas com o painel fechado ainda não estão configurados no servidor.' });
+  const row = await push.subscribe(req.user.id, req.body.subscription, req.get('user-agent'));
+  if (!row) return res.status(400).json({ ok: false, error: 'Inscrição inválida.' });
+  res.json({ ok: true });
+}));
+
+router.post('/notificacoes/push/sair', wrap(async (req, res) => {
+  await push.unsubscribe(req.user.id, req.body.endpoint);
+  res.json({ ok: true });
+}));
+
+router.post('/notificacoes/push/teste', wrap(async (req, res) => {
+  const r = await push.sendToUser(req.user.id, { id: `teste-${Date.now()}`, title: 'Alertas ligados', body: 'É assim que os avisos do Pulso chegam neste aparelho.', url: '/notificacoes', tag: 'teste' });
+  if (!r.sent) return res.status(422).json({ ok: false, error: 'Nenhum aparelho recebeu. Ative os alertas de novo neste aparelho.' });
+  res.json({ ok: true, sent: r.sent });
 }));
 
 // avisos em tempo real (Server-Sent Events)

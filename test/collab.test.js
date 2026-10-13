@@ -143,6 +143,55 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
     });
   });
 
+  describe('alertas no navegador (Web Push)', () => {
+    const json = async (who, path, body) => {
+      const csrf = await as[who].csrf('/notificacoes');
+      const r = await fetch(app.base + path, { method: 'POST', headers: { cookie: as[who].cookie(), 'content-type': 'application/json', accept: 'application/json', 'x-csrf-token': csrf }, body: JSON.stringify(body) });
+      return { status: r.status, body: await r.json().catch(() => ({})) };
+    };
+    const ecdh = require('node:crypto').createECDH('prime256v1'); ecdh.generateKeys();
+    const sub = (n) => ({ endpoint: `https://push.exemplo.test/envio/${n}`, keys: { p256dh: ecdh.getPublicKey('base64url'), auth: 'c2VncmVkby1kZS0xNmI' } });
+
+    it('service worker na raiz, manifesto e o bloco na página de notificações', async () => {
+      const sw = await as.editor.get('/sw.js');
+      assert.equal(sw.status, 200); assert.match(sw.headers.get('content-type'), /javascript/); assert.match(sw.text, /showNotification/);
+      const mf = await as.editor.get('/manifest.webmanifest');
+      assert.equal(mf.status, 200); assert.equal(JSON.parse(mf.text).short_name, 'Pulso');
+      assert.match((await as.editor.get('/notificacoes')).text, /data-push data-push-key=""/);
+    });
+
+    it('sem chaves VAPID o servidor recusa a inscrição com mensagem clara', async () => {
+      const r = await json('editor', '/notificacoes/push/inscrever', { subscription: sub(1) });
+      assert.equal(r.status, 503); assert.match(r.body.error, /não estão configurados/);
+    });
+
+    it('com chaves: inscreve (só https e chaves válidas), notificação nova entra na fila, sair remove', async () => {
+      const keys = require('web-push').generateVAPIDKeys();
+      Object.assign(h.config.push, { publicKey: keys.publicKey, privateKey: keys.privateKey });
+      try {
+        assert.match((await as.editor.get('/notificacoes')).text, new RegExp(`data-push-key="${keys.publicKey}"`));
+        assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: { ...sub(2), endpoint: 'http://inseguro.test/x' } })).status, 400);
+        assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: { endpoint: 'https://a.test/x', keys: { p256dh: '<script>', auth: 'x' } } })).status, 400);
+        assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: sub(2) })).status, 200);
+        assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: sub(2) })).status, 200, 'repetir não duplica');
+        assert.equal((await h.db.query('SELECT count(*)::int n FROM push_subscriptions WHERE user_id = $1', [u.editor.id])).rows[0].n, 1);
+
+        await h.db.query("DELETE FROM jobs WHERE kind = 'push_notificacao'");
+        const created = await notifySvc.notify({ type: 'tarefa', users: [u.editor.id, u.prod.id], title: 'Tarefa com alerta', url: '/tarefas' });
+        const n = created.find((x) => String(x.user_id) === String(u.editor.id));
+        const { rows: queued } = await h.db.query("SELECT ref_id FROM jobs WHERE kind = 'push_notificacao'");
+        assert.deepEqual(queued.map((j) => String(j.ref_id)), [String(n.id)], 'só quem tem aparelho inscrito entra na fila');
+
+        assert.equal((await json('editor', '/notificacoes/push/sair', { endpoint: sub(2).endpoint })).status, 200);
+        assert.equal((await h.db.query('SELECT count(*)::int n FROM push_subscriptions WHERE user_id = $1', [u.editor.id])).rows[0].n, 0);
+        const t = await json('editor', '/notificacoes/push/teste', {});
+        assert.equal(t.status, 422); assert.match(t.body.error, /Nenhum aparelho/);
+      } finally {
+        Object.assign(h.config.push, { publicKey: '', privateKey: '' });
+      }
+    });
+  });
+
   describe('agendamento concluído', () => {
     it('convidado agendado: avisa o responsável e a gestão uma vez (salvar de novo não repete)', async () => {
       await clear();

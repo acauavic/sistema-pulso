@@ -43,6 +43,7 @@ async function main() {
   require('./services/clips');
   require('./services/social');
   require('./services/notify');
+  require('./services/push'); // registra o trabalho 'push_notificacao'
 
   let server = null;
   let scheduler = null;
