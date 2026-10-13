@@ -35,9 +35,11 @@
 
   // Falha do serviço de push do próprio navegador (não do painel): explica o que fazer em vez da mensagem crua.
   const isBrave = Boolean(navigator.brave);
+  const isOpera = /\bOPR\/|Opera/.test(navigator.userAgent);
   function explain(err) {
     const msg = String(err?.message || '');
     if (err?.name === 'AbortError' || /push service|registration failed/i.test(msg)) {
+      if (isOpera) return ['O Opera para computador não tem o serviço de alertas (push) que o painel usa.', 'Para receber alertas com o painel fechado, ative pelo Chrome, Edge, Firefox ou Safari, ou pelo celular. No Opera, com a aba aberta, os avisos continuam aparecendo.'];
       if (isBrave) return ['O Brave vem com o push desligado.', 'Abra brave://settings/privacy, ligue "Usar os serviços do Google para mensagens push", reinicie o navegador e tente de novo.'];
       return ['O navegador não conseguiu falar com o serviço de alertas dele.', 'Use Chrome, Edge, Firefox ou Safari abertos direto (não dentro de outro aplicativo) e sem VPN ou bloqueador que impeça o push. Com a aba aberta, os avisos continuam aparecendo.'];
     }
