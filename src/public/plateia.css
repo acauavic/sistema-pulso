@@ -58,7 +58,9 @@ a { color: inherit; }
 .pl-tag { font: 500 11px "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .pl-role { color: var(--text-2); margin: 0; font-size: 14px; }
 .pl-topic { margin: 6px 0 0; }
-.pl-meta { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 8px; }
+.pl-ig { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font: 500 13px "JetBrains Mono", monospace; color: var(--text-2); text-decoration: none; }
+.pl-ig:hover { color: var(--text); }
+.pl-meta { list-style: none; padding: 0; margin: 12px 0 20px; display: grid; gap: 8px; }
 .pl-meta li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: start; font-size: 15px; } .pl-meta svg { margin-top: 4px; color: var(--lime); }
 .pl-cap { display: inline-block; } .pl-cap::first-letter { text-transform: uppercase; }
 .pl-price { margin: 8px 0 16px; color: var(--text-2); font-size: 14px; } .pl-price strong { color: var(--text); font: 600 18px "Space Grotesk", sans-serif; }

@@ -39,6 +39,7 @@ describe('Pulso Podcast com Plateia', () => {
   });
 
   it('a página pública abre sem login, é indexável e lista só as gravações certas, em ordem', async () => {
+    await q("UPDATE guests SET instagram = 'dra.anasouza' WHERE id = $1", [g1]);
     const r = await anon.get('/plateia');
     assert.equal(r.status, 200);
     assert.doesNotMatch(r.headers.get('x-robots-tag') || '', /noindex/);
@@ -52,6 +53,9 @@ describe('Pulso Podcast com Plateia', () => {
     assert.match(r.text, /R\$ 197/); assert.match(r.text, /1h30 a 2h/);
     assert.match(r.text, /Pedir para participar/); assert.match(r.text, /Pedir participação não garante a vaga/);
     assert.doesNotMatch(r.text, /<script>|onclick=/);
+    assert.doesNotMatch(r.text, /class="pl-price"/, 'o valor fica no topo e na inscrição, não em cada card');
+    const ig = r.text.match(/class="pl-ig" href="([^"]+)"/);
+    assert.ok(ig, 'card com o Instagram do convidado'); assert.equal(ig[1], 'https://www.instagram.com/dra.anasouza/');
   });
 
   it('compartilhamento e SEO: título, descrição, imagem e favicon', async () => {

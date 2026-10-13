@@ -85,6 +85,7 @@
           <div class="pl-card-body">
             <span class="pl-tag">Plateia selecionada</span>
             <h3><%= g.name %></h3>
+            <% if (g.instagram) { %><a class="pl-ig" href="https://www.instagram.com/<%= encodeURIComponent(g.instagram) %>/" target="_blank" rel="noopener noreferrer"><%- icon('instagram', 16) %>@<%= g.instagram %></a><% } %>
             <% if (g.role) { %><p class="pl-role"><%= g.role %></p><% } %>
             <% if (g.topic) { %><p class="pl-topic"><strong>Tema:</strong> <%= g.topic %></p><% } %>
             <ul class="pl-meta">
@@ -92,7 +93,6 @@
               <li><%- icon('clock', 16) %><span>Horário previsto: <%= g.time %></span></li>
               <li><%- icon('map-pin', 16) %><span><%= s.location %></span></li>
             </ul>
-            <p class="pl-price">Investimento: <strong><%= price %></strong> <span>por participante selecionado</span></p>
             <% if (g.status === 'disponivel') { %>
             <button class="pl-btn" type="button" data-signup="<%= g.id %>" data-name="<%= g.name %>" data-date="<%= g.date %>" data-time="<%= g.time %>">Pedir para participar</button>
             <% } else { %>

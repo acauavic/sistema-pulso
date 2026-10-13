@@ -133,11 +133,14 @@ test('regras: pendências por etapa', () => {
   assert.deepEqual(rules.missingFor('perdido', { loss_reason: 'outros', loss_note: 'Mudou de área' }), []);
   assert.deepEqual(rules.missingFor('perdido', { loss_reason: 'nunca_respondeu' }), []);
   assert.deepEqual(rules.missingFor('gravado', none), []);
-  assert.equal(rules.missingFor('em_agendamento', none).length, 1);
-  assert.deepEqual(rules.missingFor('em_agendamento', { phone: '1' }), []);
-  assert.deepEqual(rules.missingFor('em_agendamento', { email: 'a@b.co' }), []);
-  assert.equal(rules.missingFor('agendado', none).length, 4);
-  assert.deepEqual(rules.missingFor('agendado', { proposed_at: new Date(), scheduled_studio: true, scheduled_hosts: true, scheduled_guest: true }), []);
+  assert.equal(rules.missingFor('em_agendamento', none).length, 2);
+  assert.deepEqual(rules.missingFor('em_agendamento', { phone: '1' }), ['foto do convidado'], 'Em agendamento pede a foto');
+  assert.deepEqual(rules.missingFor('em_agendamento', { email: 'a@b.co', photo_key: 'x' }), []);
+  assert.equal(rules.missingFor('agendado', none).length, 5);
+  const agenda = { proposed_at: new Date(), scheduled_studio: true, scheduled_hosts: true, scheduled_guest: true };
+  assert.deepEqual(rules.missingFor('agendado', agenda), ['foto do convidado'], 'Agendado pede a foto');
+  assert.deepEqual(rules.missingFor('agendado', { ...agenda, photo_key: 'x' }), []);
+  assert.deepEqual(rules.agendaMissing(agenda), [], 'remarcar olha só a agenda, não a foto');
   assert.equal(rules.missingMessage('Agendado', ['a', 'b', 'c']), 'Para mover para Agendado falta: a, b e c.');
 });
 

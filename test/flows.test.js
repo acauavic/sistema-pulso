@@ -585,6 +585,46 @@ describe('fluxos ponta a ponta', () => {
       assert.doesNotMatch(form, /name="youtube_url"/, 'links de publicação são do episódio');
     });
 
+    it('Em agendamento e Agendado exigem a foto; a janela da foto termina a mudança', async () => {
+      await edit({ email: 'rita@exemplo.com', status: 'convite_enviado' });
+      await h.db.query('UPDATE guests SET photo_key = NULL WHERE id = $1', [id]);
+      const r = await move('em_agendamento');
+      assert.equal(r.status, 422);
+      assert.match(JSON.parse(r.text).error, /falta: foto do convidado/);
+      assert.match(JSON.parse(r.text).editUrl, /\?abrir=foto&para=em_agendamento$/);
+      const step = await as.prod.act(`/convidados/${id}/avancar`, { para: 'em_agendamento' }, { from: `/convidados/${id}` });
+      assert.match(step.location, /\?abrir=foto&para=em_agendamento/);
+      const page = (await as.prod.get(`/convidados/${id}?abrir=foto&para=em_agendamento`)).text;
+      assert.match(page, /id="modal-foto"[^>]*data-open-on-load/);
+      assert.match(page, /data-after-upload><input type="hidden" name="_csrf" value="[^"]+"><input type="hidden" name="para" value="em_agendamento">/);
+      // formulário: salva os outros dados, mantém a etapa e manda para a foto
+      const saved = await edit({ email: 'rita@exemplo.com', status: 'em_agendamento', topic: 'Sono' });
+      assert.match(saved.location, /\?abrir=foto&para=em_agendamento/);
+      let g = await guest();
+      assert.deepEqual([g.status, g.topic], ['convite_enviado', 'Sono']);
+      await h.db.query("UPDATE guests SET photo_key = 'convidados/1/foto.jpg' WHERE id = $1", [id]); // enviou a foto
+      await as.prod.act(`/convidados/${id}/avancar`, { para: 'em_agendamento' }, { from: `/convidados/${id}` });
+      g = await guest();
+      assert.equal(g.status, 'em_agendamento');
+      await h.db.query('UPDATE guests SET photo_key = NULL WHERE id = $1', [id]);
+      assert.equal((await edit({ email: 'rita@exemplo.com', status: 'em_agendamento', topic: 'Sono e foco' })).location, `/convidados/${id}`, 'quem já está na etapa edita sem ser barrado');
+      await h.db.query("UPDATE guests SET photo_key = 'teste/foto-convidado.jpg', status = 'prospect' WHERE id = $1", [id]);
+    });
+
+    it('cadastro novo direto em Agendado sem foto entra em Convite enviado e abre a janela da foto', async () => {
+      await h.db.query('ALTER TABLE guests ALTER COLUMN photo_key DROP DEFAULT');
+      try {
+        const r = await as.prod.act('/convidados', min({ name: 'Nova Sem Foto', instagram: '@nova.semfoto', profile: 'medico', email: 'nova@exemplo.com', status: 'agendado',
+          proposed_at: '2099-12-10T15:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' }), { from: '/convidados/novo' });
+        assert.match(r.location, /\?abrir=foto&para=agendado$/);
+        const { rows: [g] } = await h.db.query("SELECT status, proposed_at FROM guests WHERE instagram = 'nova.semfoto'");
+        assert.equal(g.status, 'convite_enviado');
+        assert.ok(g.proposed_at, 'a agenda digitada fica salva');
+      } finally {
+        await h.db.query("ALTER TABLE guests ALTER COLUMN photo_key SET DEFAULT 'teste/foto-convidado.jpg'");
+      }
+    });
+
     it('Perdido exige o motivo (Outros pede descrição); Cancelado não exige nada', async () => {
       const r = await move('perdido');
       assert.equal(r.status, 422);

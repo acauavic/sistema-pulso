@@ -325,7 +325,9 @@
         const res = await fetch(input.dataset.base + slot, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-csrf-token': input.dataset.csrf, Accept: 'application/json' }, body: file });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok) { window.alert(json.error || 'Não foi possível enviar a imagem.'); return; }
-        window.location.reload();
+        // janela da foto aberta para mudar de etapa: com a foto enviada, a mudança continua sozinha
+        const after = input.closest('[data-image-scope]')?.querySelector('form[data-after-upload]');
+        if (after) after.submit(); else window.location.reload();
       } catch { window.alert('Sem conexão. Tente de novo.'); }
     });
   });

@@ -66,13 +66,13 @@ const money = (cents) => `R$ ${Math.round(cents / 100).toLocaleString('pt-BR')}`
 
 // ---------------------------------------------------------------- agenda
 // Sai sozinha dos convidados: confirmados (Agendado), com data futura e não desmarcados da plateia.
-const AGENDA_SQL = `SELECT id, name, job_title, company, topic, proposed_at, audience_status, (photo_key IS NOT NULL) AS has_photo
+const AGENDA_SQL = `SELECT id, name, instagram, job_title, company, topic, proposed_at, audience_status, (photo_key IS NOT NULL) AS has_photo
                       FROM guests WHERE status = 'agendado' AND audience_enabled AND proposed_at > now() ORDER BY proposed_at, id`;
 
 async function agenda() {
   const { rows } = await db.query(AGENDA_SQL);
   return rows.map((g) => ({
-    id: g.id, name: g.name, role: [g.job_title, g.company].filter(Boolean).join(' · '), topic: g.topic, status: g.audience_status, hasPhoto: g.has_photo,
+    id: g.id, name: g.name, role: [g.job_title, g.company].filter(Boolean).join(' · '), topic: g.topic, instagram: g.instagram, status: g.audience_status, hasPhoto: g.has_photo,
     at: g.proposed_at, date: dateLong(g.proposed_at), time: timeShort(g.proposed_at), weekday: weekday(g.proposed_at),
   }));
 }

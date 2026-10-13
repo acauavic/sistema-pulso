@@ -156,6 +156,8 @@ async function fetchYourlsOrReal(url, opts) {
 async function resetDb() {
   await db.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await migrate();
+  // Em agendamento/Agendado exigem foto: nos testes todo convidado nasce com uma (os testes da regra apagam a foto).
+  await db.query("ALTER TABLE guests ALTER COLUMN photo_key SET DEFAULT 'teste/foto-convidado.jpg'");
   mailer.outbox.length = 0;
   b2Store.clear();
   b2Multipart.clear();

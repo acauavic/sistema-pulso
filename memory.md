@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Foto obrigatória (2026-10-13)**: `guestRules` exige `photo_key` em em_agendamento e agendado (`PHOTO`; `contactMissing`/`agendaMissing` separados: remarcar olha só a agenda). Só foto faltando → `?abrir=foto&para=<etapa>` (janela `modal-foto` com `form[data-after-upload]` que o `app.js` envia depois do upload). Formulário: `pendingStage` (salva o resto, mantém a etapa); cadastro novo → convite_enviado. Exceções: RSVP público e CSV. Nos testes, `resetDb` põe DEFAULT de foto em `guests.photo_key`. Card da plateia: sem preço, com @ do Instagram (`pl-ig`, ícone `instagram` adicionado).
+
 - **Importação = serviço (2026-10-13)**: `services/guestImport.js` (`analyse`, `importGuests`) usado pela rota e por `src/scripts/importGuests.js` (prévia; `--gravar` grava e registra auditoria). Colunas `observações` e `título do episódio`. Base inicial veio do ClickUp (lista "CRM Pulso"): ganho→Gravado/Publicado (playlist do YouTube), follow up/contato inicial→Convite enviado, pendentes→Prospecção, agendamento→Em agendamento, agendado→Agendado, perdido→Perdido/nunca_respondeu.
 
 - **Perdido com motivo (migração 025, 2026-10-13)**: etapa `recusou` virou `perdido` (dados migrados com motivo `recusado`). `loss_reason` (`LOSS_REASONS` em constants: recusado, sem_agenda, nunca_respondeu, parou_de_responder, conflito_de_interesse, outros) + `loss_note`. CHECK `guests_perdido_motivo_check` exige motivo (e nota em outros); trigger `guests_clear_loss` limpa ao sair de Perdido. Regra em `guestRules` (formulário, `/status` 422 → `?abrir=perda`, `/avancar` com `perda=1`). RSVP público: convidado não escolhe motivo, vira perdido/recusado com o recado em `loss_note`.

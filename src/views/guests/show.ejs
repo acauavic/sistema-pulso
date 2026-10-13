@@ -184,12 +184,14 @@
         <% } else { %><p class="small"><%= guest.audience_enabled ? 'Aberto para plateia' : 'Fora da plateia' %></p><% } %>
         <p class="small muted"><%= guest.audience_enabled ? (guest.status === 'agendado' && guest.proposed_at && new Date(guest.proposed_at) > new Date() ? 'Aparece na agenda pública da plateia.' : 'Entra na agenda pública quando a gravação estiver Agendada, com data futura.') : 'Fora da agenda pública da plateia.' %></p>
         <% if (canW) { %>
+        <div data-image-scope>
         <div class="row top-gap">
           <% if (guest.photo_key) { %><img class="guest-thumb" src="/convidados/<%= guest.id %>/foto" alt="" width="48" height="48" loading="lazy"><% } %>
           <button class="btn sm" type="button" data-image-pick="" <%= plateia.storageReady ? '' : 'disabled' %>><%- icon('upload', 14) %> <%= guest.photo_key ? 'Trocar foto' : 'Enviar foto' %></button>
           <span class="small muted"><%= guest.photo_key ? '' : 'A página pública usa a foto do convidado.' %></span>
         </div>
         <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/foto">
+        </div>
         <% } %>
       </section>
       <% } %>
@@ -286,7 +288,20 @@
 </dialog>
 <% } %>
 
-<% if (canW) { %>
+<% if (canW) { var photoFor = pendingStage && ['em_agendamento', 'agendado'].indexOf(pendingStage) >= 0 ? pendingStage : null; %>
+<dialog class="modal" id="modal-foto" aria-labelledby="m-foto-h" <%= openOnLoad('foto') %> data-image-scope>
+  <div class="stack">
+    <h2 id="m-foto-h">Foto <%= guest.gender === 'f' ? 'da convidada' : 'do convidado' %></h2>
+    <p class="small muted"><%= photoFor ? 'Para ir para ' + statuses.find(function (s) { return s.key === photoFor; }).label + ', envie a foto de ' + fmt.firstName(guest.name) + '. Ela aparece na agenda da plateia e para os patrocinadores.' : 'A foto aparece na agenda da plateia e para os patrocinadores.' %></p>
+    <% if (guest.photo_key) { %><img class="guest-thumb" src="/convidados/<%= guest.id %>/foto" alt="" width="48" height="48"><% } %>
+    <% if (!storageReady) { %><p class="small warn">O armazenamento de arquivos (Backblaze) não está configurado no servidor: não dá para enviar fotos.</p><% } %>
+    <p class="small muted">PNG, JPEG ou WebP, até 5 MB. De preferência quadrada.</p>
+    <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/foto">
+    <% if (photoFor) { %><form method="post" action="/convidados/<%= guest.id %>/avancar" hidden data-after-upload><%- csrfField %><%- hidden('para', photoFor) %></form><% } %>
+    <div class="row modal-actions"><button class="btn primary" type="button" data-image-pick="" <%= storageReady ? '' : 'disabled' %>><%- icon('upload', 14) %> <%= guest.photo_key ? 'Trocar foto' : 'Enviar foto' %></button><button class="btn ghost" type="button" data-modal-close>Agora não</button></div>
+  </div>
+</dialog>
+
 <dialog class="modal" id="modal-perda" aria-labelledby="m-perda-h" <%= openOnLoad('perda') %>>
   <form method="post" action="/convidados/<%= guest.id %>/avancar" class="stack">
     <%- csrfField %><%- hidden('para', 'perdido') %><%- hidden('perda', '1') %>

@@ -38,8 +38,10 @@ async function formOptions() {
 
 const formView = (res, status, locals) => res.status(status).render('guests/form', locals);
 
-// Lê e valida o formulário. Devolve { values, error }.
-async function parseGuestForm(body) {
+// Lê e valida o formulário. Devolve { values, error, pendingStage }.
+// O formulário não envia foto: se só ela falta para a etapa escolhida, salva o resto sem mudar a etapa (pendingStage)
+// e a página do convidado abre a janela da foto, que termina a mudança. No cadastro novo, quem confere é a rota.
+async function parseGuestForm(body, guest = null) {
   const values = {
     name: clean(body.name, 150),
     email: clean(body.email, 254).toLowerCase(),
@@ -69,6 +71,7 @@ async function parseGuestForm(body) {
   if (!values.sponsor_id) values.sponsor_relation = null;
   else if (!values.sponsor_relation) values.sponsor_relation = 'indicado';
   let error = null;
+  let pendingStage = null;
   if (values.name.length < 2) error = 'Informe o nome do convidado.';
   else if (!values.instagram) error = 'Informe o Instagram do convidado (ex.: @maria.souza).';
   else if (!values.profile) error = 'Escolha o perfil do convidado.';
@@ -83,10 +86,13 @@ async function parseGuestForm(body) {
     if (!rowCount) error = 'Patrocinador inválido.';
   }
   if (!error) {
-    const missing = rules.missingFor(values.status, values);
-    if (missing.length) error = rules.missingMessage(STATUS_BY_KEY[values.status].label, missing);
+    // quem já está na etapa não é barrado ao editar outros dados
+    const photo_key = !guest || guest.status === values.status ? 'ok' : guest.photo_key;
+    const missing = rules.missingFor(values.status, { ...values, photo_key });
+    if (missing.length && missing.every((m) => m === rules.PHOTO)) { pendingStage = values.status; values.status = guest.status; }
+    else if (missing.length) error = rules.missingMessage(STATUS_BY_KEY[values.status].label, missing);
   }
-  return { values, error };
+  return { values, error, pendingStage };
 }
 
 // O formulário reexibe o que foi digitado (inclusive o que não passou na validação).
@@ -142,11 +148,18 @@ router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) =>
   }
   const { rows: [guest] } = await db.query(
     `INSERT INTO guests (${COLUMNS.join(', ')}, created_by)
-     VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}) RETURNING id`,
+     VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}) RETURNING id, photo_key`,
     [...columnValues(values), req.user.id]);
+  // cadastro novo direto em Em agendamento/Agendado: sem foto, entra em Convite enviado e a janela da foto termina a mudança
+  const pendingStage = rules.missingFor(values.status, { ...values, photo_key: guest.photo_key }).includes(rules.PHOTO) ? values.status : null;
+  if (pendingStage) await db.query("UPDATE guests SET status = 'convite_enviado' WHERE id = $1", [guest.id]);
   await guestsSvc.addEvent(guest.id, req.user.id, 'criado', `Convidado cadastrado por ${req.user.name}`);
   await production.syncFromGuest(guest.id, req.user.id); // já cadastrado como Gravado: o episódio nasce
   await audit(req, 'convidado.criado', 'guest', guest.id, { name: values.name });
+  if (pendingStage) {
+    await req.flash('error', `Convidado cadastrado. Para ir para ${STATUS_BY_KEY[pendingStage].label}, envie a foto.`);
+    return res.redirect(`/convidados/${guest.id}?abrir=foto&para=${pendingStage}`);
+  }
   await req.flash('ok', 'Convidado cadastrado. Agora é só gerar o link do convite.');
   res.redirect(`/convidados/${guest.id}`);
 }));
@@ -172,7 +185,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const { rows: [pl] } = await db.query("SELECT count(*)::int AS leads, count(*) FILTER (WHERE status = 'confirmado')::int AS confirmed FROM plateia_leads WHERE guest_id = $1", [guest.id]);
   res.render('guests/show', {
     plateia: { ...pl, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
-    episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, openModal: ['contato', 'agenda', 'email', 'perda'].includes(req.query.abrir) ? req.query.abrir : null,
+    episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, pendingStage: isStatus(req.query.para) ? req.query.para : null, storageReady: config.storageConfigured, openModal: ['contato', 'agenda', 'email', 'perda', 'foto'].includes(req.query.abrir) ? req.query.abrir : null,
     title: guest.name, guest, events, clicks, comments: thread, linkedTasks: linkedTasks.rows, clickKinds: CLICK_KINDS, profileLabels: PROFILE_BY_KEY,
     statuses: GUEST_STATUSES, statusInfo: STATUS_BY_KEY[guest.status],
     longUrl: guest.invite_token ? guestsSvc.longInviteUrl(guest.invite_token) : null,
@@ -194,7 +207,7 @@ router.get('/convidados/:id/editar', requirePerm('guests.write'), wrap(async (re
 router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res) => {
   const guest = await findGuest(req.params.id);
   if (!guest) return notFound(res);
-  const { values, error } = await parseGuestForm(req.body);
+  const { values, error, pendingStage } = await parseGuestForm(req.body, guest);
   if (error) {
     return formView(res, 400, { title: `Editar ${guest.name}`, guest, error, values: echoValues(req.body, values), ...(await formOptions()) });
   }
@@ -209,12 +222,20 @@ router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res
   }
   await production.syncFromGuest(guest.id, req.user.id);
   await audit(req, 'convidado.editado', 'guest', guest.id);
+  if (pendingStage) {
+    await req.flash('error', `Salvo. Para ir para ${STATUS_BY_KEY[pendingStage].label}, envie a foto.`);
+    return res.redirect(`/convidados/${guest.id}?abrir=foto&para=${pendingStage}`);
+  }
   await req.flash('ok', 'Convidado atualizado.');
   res.redirect(`/convidados/${guest.id}`);
 }));
 
-// Etapa que exige dados -> janela da página do convidado que pede só esses dados.
+// Etapa que exige dados -> janela da página do convidado que pede só esses dados. Se só falta a foto, a janela da foto
+// (que, depois do envio, termina a mudança de etapa).
 const STEP_MODAL = { em_agendamento: 'contato', agendado: 'agenda', perdido: 'perda' };
+const stepUrl = (id, target, missing) => (missing.length && missing.every((m) => m === rules.PHOTO)
+  ? `/convidados/${id}?abrir=foto&para=${target}`
+  : STEP_MODAL[target] ? `/convidados/${id}?abrir=${STEP_MODAL[target]}` : `/convidados/${id}/editar?para=${target}`);
 
 // ---- mudar etapa (formulário ou arrastar no quadro) ----
 router.post('/convidados/:id/status', requirePerm('guests.write'), wrap(async (req, res) => {
@@ -225,7 +246,7 @@ router.post('/convidados/:id/status', requirePerm('guests.write'), wrap(async (r
   const missing = target === guest.status ? [] : rules.missingFor(target, guest);
   if (missing.length) {
     const message = rules.missingMessage(STATUS_BY_KEY[target].label, missing);
-    const editUrl = STEP_MODAL[target] ? `/convidados/${guest.id}?abrir=${STEP_MODAL[target]}` : `/convidados/${guest.id}/editar?para=${target}`;
+    const editUrl = stepUrl(guest.id, target, missing);
     if (wantsJson(req)) return res.status(422).json({ ok: false, error: message, missing, editUrl });
     await req.flash('error', message);
     return res.redirect(editUrl);
@@ -272,7 +293,7 @@ router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (
   const missing = target === guest.status ? [] : rules.missingFor(target, next);
   if (target !== guest.status && !missing.length) status = target;
   // a agenda caiu (remarcou sem as três confirmações): volta para Em agendamento
-  if (status === 'agendado' && rules.missingFor('agendado', next).length) status = 'em_agendamento';
+  if (status === 'agendado' && rules.agendaMissing(next).length) status = 'em_agendamento';
 
   await db.query(
     `UPDATE guests SET email=$2, phone=$3, proposed_at=$4, scheduled_studio=$5, scheduled_hosts=$6, scheduled_guest=$7,
@@ -291,7 +312,7 @@ router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (
   }
   if (missing.length) {
     await req.flash('error', `Salvo. ${rules.missingMessage(STATUS_BY_KEY[target].label, missing)}`);
-    return res.redirect(backUrl);
+    return res.redirect(stepUrl(guest.id, target, missing));
   }
   if (status === 'em_agendamento' && guest.status === 'agendado') await req.flash('error', 'Gravação remarcada. Falta confirmar a nova data com estúdio, hosts e convidado para voltar a Agendado.');
   else await req.flash('ok', status !== guest.status ? `Etapa: ${STATUS_BY_KEY[status].label}.` : 'Salvo.');

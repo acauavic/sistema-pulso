@@ -2,23 +2,30 @@
 // e normalização/validação dos campos que o cadastro e a importação CSV compartilham.
 const { PROFILES, GUEST_STATUSES, LOSS_REASONS } = require('../constants');
 
+// A partir de Em agendamento o convidado aparece para fora (agenda, plateia, patrocinadores): precisa de foto.
+const PHOTO = 'foto do convidado';
+const contactMissing = (g) => (g.email || g.phone ? [] : ['e-mail e/ou WhatsApp do convidado']);
+// Só a agenda (data + três confirmações): remarcar sem confirmar derruba de Agendado para Em agendamento.
+const agendaMissing = (g) => [
+  !g.proposed_at && 'data e hora da gravação',
+  !g.scheduled_studio && 'confirmação de agenda no Estúdio',
+  !g.scheduled_hosts && 'confirmação de agenda com os hosts',
+  !g.scheduled_guest && 'confirmação de agenda com o convidado',
+].filter(Boolean);
+const photoMissing = (g) => (g.photo_key ? [] : [PHOTO]);
+
 // Etapa -> pendências. Cada regra devolve a lista (vazia = pode entrar).
 const REQUIREMENTS = {
-  em_agendamento: (g) => (g.email || g.phone ? [] : ['e-mail e/ou WhatsApp do convidado']),
+  em_agendamento: (g) => [...contactMissing(g), ...photoMissing(g)],
   perdido: (g) => (!g.loss_reason ? ['o motivo da perda'] : g.loss_reason === 'outros' && !String(g.loss_note || '').trim() ? ['a descrição do motivo (Outros)'] : []),
-  agendado: (g) => [
-    !g.proposed_at && 'data e hora da gravação',
-    !g.scheduled_studio && 'confirmação de agenda no Estúdio',
-    !g.scheduled_hosts && 'confirmação de agenda com os hosts',
-    !g.scheduled_guest && 'confirmação de agenda com o convidado',
-  ].filter(Boolean),
+  agendado: (g) => [...agendaMissing(g), ...photoMissing(g)],
 };
 
 // Texto curto exibido no formulário conforme a etapa escolhida.
 const STAGE_HINTS = {
-  em_agendamento: 'Para entrar em Em agendamento: e-mail e/ou WhatsApp do convidado.',
+  em_agendamento: 'Para entrar em Em agendamento: e-mail e/ou WhatsApp e a foto do convidado (enviada na página dele).',
   perdido: 'Para entrar em Perdido: o motivo da perda (em Outros, descreva).',
-  agendado: 'Para entrar em Agendado: data e hora da gravação e a confirmação no Estúdio, com os hosts e com o convidado.',
+  agendado: 'Para entrar em Agendado: data e hora da gravação, a confirmação no Estúdio, com os hosts e com o convidado, e a foto do convidado.',
 };
 
 const missingFor = (status, guest) => (REQUIREMENTS[status] ? REQUIREMENTS[status](guest) : []);
@@ -134,6 +141,6 @@ const YOUTUBE_HOSTS = ['youtube.com', 'youtu.be'];
 const SPOTIFY_HOSTS = ['spotify.com', 'spotify.link'];
 
 module.exports = {
-  missingFor, missingMessage, STAGE_HINTS, normalizeInstagram, normalizeProfile, normalizeGender, normalizeStatus, normalizeLossReason, parseRecordingAt, normalizeUrl,
+  missingFor, missingMessage, STAGE_HINTS, PHOTO, contactMissing, agendaMissing, normalizeInstagram, normalizeProfile, normalizeGender, normalizeStatus, normalizeLossReason, parseRecordingAt, normalizeUrl,
   YOUTUBE_HOSTS, SPOTIFY_HOSTS, normText,
 };

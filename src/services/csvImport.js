@@ -94,7 +94,8 @@ function parseGuests(input) {
     const phone = clean(get('phone'), 40);
     if (!status) errors.push(`status “${get('status')}” não reconhecido`);
     else if (!IMPORT_STATUSES.includes(status)) errors.push(`${STATUS_BY_KEY[status].label} não entra por planilha (use Agendado)`);
-    else if (status === 'em_agendamento' && rules.missingFor(status, { email, phone }).length) errors.push('Em agendamento pede e-mail ou WhatsApp');
+    // a foto não vem na planilha: quem entra em Em agendamento/Agendado por aqui envia a foto depois, na página do convidado
+    else if (status === 'em_agendamento' && rules.contactMissing({ email, phone }).length) errors.push('Em agendamento pede e-mail ou WhatsApp');
     // Perdido: motivo da coluna "motivo da perda" (texto que não é uma das opções vira "Outros" com a descrição);
     // status "Recusou"/"Recusado" já diz o motivo.
     const lossCell = clean(get('loss_reason'), 500);
