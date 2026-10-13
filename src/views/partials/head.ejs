@@ -7,8 +7,15 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0A0A0A">
   <title><%= title %> · <%= podcastName || 'Pulso' %></title>
-  <script src="/static/theme.js"></script>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="/static/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Pulso">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <script src="/static/theme.js?v=<%= assetV %>"></script>
+  <link rel="stylesheet" href="/static/app.css?v=<%= assetV %>">
 </head>
 <body>
 <% if (currentUser) {
@@ -16,24 +23,32 @@
      const navItem = function (href, iconName, label, active) {
        return '<a href="' + href + '" class="' + (active ? 'active' : '') + '"' + (active ? ' aria-current="page"' : '') + '>' + icon(iconName) + '<span>' + label + '</span></a>';
      };
-     const adminOpen = can('users.read') || can('audit.read') || can('integrations.manage'); %>
+     const adminOpen = can('users.read') || can('audit.read') || can('integrations.manage') || can('notifications.manage') || can('routines.manage') || can('search.manage'); %>
 <div class="app">
 <aside class="sidebar" data-sidebar>
   <a class="wordmark" href="/" aria-label="pulso. — início">pulso<span class="dot">.</span></a>
   <button class="icon-btn sidebar-toggle" type="button" data-nav-toggle aria-label="Abrir menu"><%- icon('menu', 20) %></button>
+  <button class="search-trigger" type="button" data-palette-open aria-label="Buscar (Ctrl+K)"><%- icon('search') %><span>Buscar…</span><kbd>Ctrl K</kbd></button>
   <nav class="nav" aria-label="Principal">
     <%- navItem('/', 'layout-dashboard', 'Painel', currentPath === '/') %>
+    <a href="/notificacoes" class="<%= currentPath.startsWith('/notificacoes') ? 'active' : '' %>" data-nav-notifications><%- icon('bell') %><span>Notificações</span><span class="nav-count" data-unread <%= navCounts && navCounts.unread ? '' : 'hidden' %>><%= navCounts ? navCounts.unread : 0 %></span></a>
+    <% if (can('tasks.read')) { %><a href="/tarefas" class="<%= currentPath.startsWith('/tarefas') ? 'active' : '' %>"><%- icon('check-square') %><span>Tarefas</span><% if (navCounts && navCounts.tasks) { %><span class="nav-count muted-count"><%= navCounts.tasks %></span><% } %></a><% } %>
+    <% if (can('calendar.read')) { %><%- navItem('/calendario', 'calendar-days', 'Calendário', currentPath.startsWith('/calendario')) %><% } %>
+    <span class="kicker nav-group">Operação</span>
     <% if (can('guests.read')) { %><%- navItem('/convidados', 'mic', 'Convidados', currentPath.startsWith('/convidados')) %><% } %>
-    <% if (can('templates.read')) { %><%- navItem('/modelos', 'file-text', 'Modelos de convite', currentPath.startsWith('/modelos')) %><% } %>
-    <% if (adminOpen) { %><span class="kicker nav-group">Sistema</span><% } %>
-    <% if (can('users.read')) { %><%- navItem('/usuarios', 'users', 'Usuários', currentPath.startsWith('/usuarios')) %><% } %>
-    <% if (can('audit.read')) { %><%- navItem('/auditoria', 'scroll-text', 'Auditoria', currentPath.startsWith('/auditoria')) %><% } %>
-    <% if (can('integrations.manage')) { %><%- navItem('/integracoes', 'plug', 'Integrações', currentPath.startsWith('/integracoes')) %><% } %>
+    <% if (can('sponsors.read')) { %><%- navItem('/patrocinadores', 'shield-check', 'Patrocinadores', currentPath.startsWith('/patrocinadores')) %><% } %>
+    <% if (can('episodes.read')) { %><%- navItem('/episodios', 'calendar', 'Episódios', currentPath.startsWith('/episodios')) %><% } %>
+    <% if (can('episodes.read')) { %><%- navItem('/conteudo', 'film', 'Conteúdo', currentPath.startsWith('/conteudo') || currentPath.startsWith('/cortes') || currentPath.startsWith('/capas')) %><% } %>
+    <% if (can('social.read')) { %><a href="<%= navCounts && navCounts.reviews ? '/social/publicacoes?status=revisao' : '/social' %>" class="<%= currentPath.startsWith('/social') ? 'active' : '' %>"><%- icon('share-2') %><span>Social</span><% if (navCounts && navCounts.reviews) { %><span class="nav-count" title="Posts esperando sua aprovação"><%= navCounts.reviews %></span><% } %></a><% } %>
+    <% if (can('audience.read')) { %><%- navItem('/plateia/painel', 'users', 'Plateia', currentPath.startsWith('/plateia')) %><% } %>
+    <% if (can('finance.read') || can('stock.read')) { %><%- navItem(can('finance.read') ? '/financeiro' : '/financeiro/estoque', 'wallet', 'Financeiro', currentPath.startsWith('/financeiro')) %><% } %>
+    <% if (adminOpen) { %><span class="kicker nav-group">Gestão</span>
+    <%- navItem('/gestao', 'settings', 'Painel de gestão', currentPath.startsWith('/gestao') || currentPath.startsWith('/usuarios') || currentPath.startsWith('/auditoria') || currentPath.startsWith('/integracoes')) %><% } %>
   </nav>
   <div class="sidebar-foot">
     <a class="who" href="/perfil" title="Meu perfil">
       <span class="avatar"><%= initials %></span>
-      <span class="who-txt"><strong><%= currentUser.name %></strong><span class="kicker" style="margin:0"><%= ROLES[currentUser.role].label %></span></span>
+      <span class="who-txt"><strong><%= currentUser.name %></strong><span class="kicker m-0"><%= ROLES[currentUser.role].label %></span></span>
     </a>
     <div class="foot-actions">
       <button class="icon-btn" type="button" data-theme-toggle aria-label="Alternar tema claro/escuro"><span class="theme-moon"><%- icon('moon') %></span><span class="theme-sun"><%- icon('sun') %></span><span>Tema</span></button>

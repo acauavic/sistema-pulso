@@ -1,0 +1,30 @@
+<%# Comentários de um item. Variáveis: type, id, items, back (endereço para voltar). Menção: @Nome avisa a pessoa. %>
+<% var names = (teamUsers || []).map(function (u) { return u.name; }); %>
+<section class="card comments" id="comentarios">
+  <h2>Comentários<%= items.length ? ' (' + items.length + ')' : '' %></h2>
+  <% if (!items.length) { %><p class="muted small">Ninguém comentou ainda. Use @ para chamar alguém da equipe: a pessoa recebe uma notificação.</p><% } %>
+  <ul class="plain comment-thread">
+    <% items.forEach(function (c) { %>
+    <li class="cmt" id="comentario-<%= c.id %>">
+      <span class="avatar sm"><%= fmt.initials(c.author_name) %></span>
+      <div class="cmt-body">
+        <div class="cmt-head"><strong><%= c.author_name || 'Alguém que saiu da equipe' %></strong><span class="handle muted"><%= fmt.formatDateTime(c.created_at) %></span></div>
+        <div class="cmt-text"><%- fmt.commentHtml(c.body, names) %></div>
+        <% if (currentUser && (String(c.author_id) === String(currentUser.id) || can('tasks.manage'))) { %>
+        <form method="post" action="/comentarios/<%= c.id %>/excluir" class="inline" data-confirm="Apagar este comentário?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= back %>#comentarios"><button class="link small" type="submit">apagar</button></form>
+        <% } %>
+      </div>
+    </li>
+    <% }) %>
+  </ul>
+  <% if (can('comments.write')) { %>
+  <form method="post" action="/comentarios" class="comment-form" data-comment-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= type %>"><input type="hidden" name="id" value="<%= id %>"><input type="hidden" name="voltar" value="<%= back %>#comentarios">
+    <div class="mention-wrap">
+      <textarea name="texto" rows="3" maxlength="4000" required placeholder="Escreva um comentário… use @ para mencionar alguém" aria-label="Comentário" data-mention></textarea>
+      <ul class="mention-list" data-mention-list hidden role="listbox"></ul>
+    </div>
+    <div class="row"><button class="btn" type="submit"><%- icon('send', 14) %> Comentar</button><span class="small muted">Ctrl+Enter envia</span></div>
+  </form>
+  <% } %>
+</section>

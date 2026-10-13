@@ -1,6 +1,7 @@
 <%- include('partials/head') %>
-<div class="page-head"><div><span class="kicker">Sistema · Registro</span><h1>Auditoria</h1></div></div>
-<p class="lead">Últimas 300 ações registradas no sistema.</p>
+<div class="page-head"><div><span class="kicker">Gestão · Registro</span><h1>Logs</h1></div></div>
+<%- include('partials/gestao-nav', { active: 'logs' }) %>
+<p class="lead">Auditoria: as últimas 300 ações registradas no sistema (quem, o quê, quando e de onde).</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Alvo</th><th>Detalhes</th><th>IP</th></tr></thead>

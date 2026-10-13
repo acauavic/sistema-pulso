@@ -12,6 +12,7 @@ Doc pra humano: `README.md`. Memória pra IA (estado + decisões): `memory.md`.
 - **Design e marca são lei.** Toda tela, componente, e-mail ou texto novo segue `docs/design-system.md` (tokens, componentes, checklist) e
   `docs/manual-de-marca.md` (logo, cores, tipografia, tom de voz). Originais do designer em `docs/referencias/`. Em dúvida, o design system vence;
   se algo precisar divergir, avise o usuário antes e registre a decisão no `memory.md`.
+- **Experiência primeiro ("o copo fica na cozinha").** Antes de criar ou mexer em tela, descreva a jornada (quem, quando, próximo passo) e, depois de pronta, **percorra no navegador** (desktop e celular). Mostre só o que a pessoa precisa agora: edição eventual vira botão + janela, listas mostram resumo, muito conteúdo vira abas, campo só aparece quando faz sentido. Detalhes e checklist em `docs/design-system.md` ("Experiência e jornada").
 - **Tokens, não cores soltas.** Estilo só em `src/public/app.css` usando as variáveis (`--bg`, `--surface`, `--action`…). Sem hex solto em view nova,
   sem `style=` inline (a CSP do painel é `'self'`), sem CDN/Google Fonts (fontes e ícones Lucide ficam no repo).
 - **Lime é ação (um por área), dados em mono, plum é externo, serifa só para "voz".** Sem emoji na interface; ícones via `icon('nome')`.

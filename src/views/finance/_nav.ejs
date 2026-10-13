@@ -1,0 +1,10 @@
+<%# Abas do Financeiro. Variáveis: active (resumo | lancamentos | estoque | regras), counts (opcional). %>
+<% var ftabs = [
+  ['resumo', '/financeiro', 'Resumo', 'finance.read', null],
+  ['lancamentos', '/financeiro/lancamentos', 'Contas', 'finance.read', counts ? counts.pagar + counts.receber : null],
+  ['estoque', '/financeiro/estoque', 'Estoque', 'stock.read', null],
+  ['regras', '/financeiro/regras', 'Custos automáticos', 'finance.read', null],
+]; %>
+<nav class="subnav" aria-label="Financeiro">
+  <% ftabs.forEach(function (t) { if (!can(t[3])) return; %><a href="<%= t[1] %>" class="<%= active === t[0] ? 'on' : '' %>"<%- active === t[0] ? ' aria-current="page"' : '' %>><%= t[2] %><% if (t[4]) { %> <span class="count"><%= t[4] %></span><% } %></a><% }) %>
+</nav>

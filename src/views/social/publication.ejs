@@ -1,0 +1,118 @@
+<%- include('../partials/head') %>
+<%
+  var badge = { revisao: 'b-amber', recusado: 'b-red', publicado: 'b-green', parcial: 'b-amber', agendado: 'b-st-agendado', erro: 'b-red', simulado: 'b-gray', enviando: 'b-amber' };
+  var images = pub.cover_ids && pub.cover_ids.length ? pub.cover_ids : (pub.cover_id ? [pub.cover_id] : []);
+  var label = function (k) { return platforms[k] ? (pub.media === 'video' && pub.clip_id && platforms[k].clipLabel ? platforms[k].clipLabel : platforms[k].label) : k; };
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var pending = ['revisao', 'recusado'].indexOf(pub.status) >= 0;
+  var canEdit = (canPublish && ['agendado', 'publicado', 'parcial', 'simulado', 'revisao', 'recusado'].indexOf(pub.status) >= 0) || (mine && pending);
+%>
+<div class="page-head">
+  <div>
+    <span class="kicker">Social · <%= MEDIA[pub.media] %></span>
+    <h1><%= pub.title %> <span class="badge <%= badge[pub.status] %>"><%= statusLabel[pub.status] %></span></h1>
+    <p class="muted top-gap"><a href="/episodios/<%= pub.episode_id %>"><%= pub.episode_number ? 'EP.' + String(pub.episode_number).padStart(3, '0') + ' · ' : '' %><%= pub.episode_title %></a><% if (pub.clip_id) { %> · <a href="/cortes/<%= pub.clip_id %>"><%= pub.clip_title || 'corte' %></a><% } %></p>
+  </div>
+  <div class="row"><a class="btn ghost" href="/social/publicacoes"><%- icon('arrow-left') %> Publicações</a></div>
+</div>
+<% if (!live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: nada sai para as redes enquanto <span class="mono">UPLOAD_POST_LIVE</span> estiver desligado.</span></p><% } %>
+
+<% if (pending) { %>
+<section class="card next-step">
+  <span class="kicker">Revisão da gestão</span>
+  <% if (pub.status === 'revisao') { %>
+    <h2><%= canPublish ? 'Aprovar este post?' : 'Esperando a gestão' %></h2>
+    <p class="muted"><%= pub.created_by_name || 'Alguém da equipe' %> pediu para publicar em <%= pub.platforms.map(label).join(', ') %><%= pub.scheduled_at ? ', ' + fmt.formatDateTime(pub.scheduled_at) : ', assim que aprovado' %>.<%= !canPublish ? ' Você recebe um aviso quando for aprovado ou devolvido.' : '' %></p>
+    <% if (canPublish) { %>
+    <div class="next-actions">
+      <form method="post" action="/social/publicacoes/<%= pub.id %>/aprovar" class="inline"><%- csrfField %><button class="btn primary" type="submit"><%- icon('check') %> <%= pub.scheduled_at && new Date(pub.scheduled_at) > new Date() ? 'Aprovar e agendar' : 'Aprovar e publicar' %></button></form>
+      <button class="btn" type="button" data-modal-open="modal-devolver">Devolver com ajustes</button>
+    </div>
+    <% } %>
+  <% } else { %>
+    <h2>Devolvido</h2>
+    <p class="quote-note"><strong><%= pub.review_note %></strong></p>
+    <p class="small muted"><%= mine ? 'Ajuste o texto abaixo e reenvie.' : 'Esperando quem pediu ajustar.' %></p>
+  <% } %>
+  <% if (mine || canPublish) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/cancelar" class="inline" data-confirm="Retirar este pedido de publicação?"><%- csrfField %><button class="link small" type="submit">Retirar pedido</button></form><% } %>
+</section>
+<% if (canPublish && pub.status === 'revisao') { %>
+<dialog class="modal" id="modal-devolver" aria-labelledby="m-dev-h">
+  <form method="post" action="/social/publicacoes/<%= pub.id %>/recusar" class="stack">
+    <%- csrfField %>
+    <h2 id="m-dev-h">Devolver com ajustes</h2>
+    <p class="small muted">A nota vai para <%= pub.created_by_name || 'quem pediu' %>, que ajusta e reenvia.</p>
+    <label>O que precisa mudar<textarea name="note" rows="4" maxlength="1000" required></textarea></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Devolver</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% } %>
+
+<div class="grid-2 align-start top-gap">
+  <div class="stack-lg">
+    <section class="card">
+      <h2><%= pending ? 'Pedido' : 'Onde saiu' %></h2>
+      <dl class="kv">
+        <dt><%= pub.status === 'agendado' ? 'Agendado para' : 'Enviado em' %></dt><dd class="mono"><%= fmt.formatDateTime(pub.status === 'agendado' ? pub.scheduled_at : pub.created_at) %></dd>
+        <% if (pub.edited_at) { %><dt>Editado em</dt><dd class="mono"><%= fmt.formatDateTime(pub.edited_at) %></dd><% } %>
+        <dt>Por</dt><dd><%= pub.created_by_name || '—' %></dd>
+      </dl>
+      <ul class="plain results top-gap">
+        <% pub.platforms.forEach(function (k) { var r = (pub.results || []).find(function (x) { return x.platform === k; }) || {}; %>
+        <li>
+          <strong><%= label(k) %></strong>
+          <span class="badge <%= r.ok ? (r.simulated ? 'b-gray' : 'b-green') : (r.error ? 'b-red' : 'b-amber') %>"><%= r.simulated ? 'Simulado' : r.ok ? 'No ar' : r.error ? 'Erro' : (pub.status === 'agendado' ? 'Agendado' : pending ? 'Não enviado' : 'Aguardando') %></span>
+          <% if (r.url) { %><a class="small" href="<%= r.url %>" target="_blank" rel="noopener noreferrer">abrir <%- icon('external-link', 14) %></a><% } %>
+          <% if (r.error) { %><span class="small bad-text"><%= r.error %></span><% } %>
+        </li>
+        <% }) %>
+      </ul>
+      <% if (pub.error) { %><p class="flash flash-error top-gap"><%= pub.error %></p><% } %>
+      <div class="row top-gap">
+        <% if (pub.status === 'enviando') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/atualizar" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw') %> Atualizar andamento</button></form><% } %>
+        <% if (canPublish && pub.status === 'erro') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline"><%- csrfField %><button class="btn sm" type="submit">Tentar de novo</button></form><% } %>
+        <% if (canPublish && pub.status === 'agendado') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><%- csrfField %><button class="btn sm ghost" type="submit">Cancelar agendamento</button></form><% } %>
+      </div>
+    </section>
+    <% if (images.length) { %>
+    <section class="card">
+      <h2><%= images.length > 1 ? 'Imagens' : 'Imagem' %></h2>
+      <div class="pub-media"><% images.forEach(function (id) { %><img src="/capas/<%= id %>/imagem" alt="Imagem da publicação" loading="lazy"><% }) %></div>
+    </section>
+    <% } %>
+  </div>
+
+  <section class="card">
+    <div class="row spread">
+      <h2>Texto</h2>
+      <% if (canEdit) { %><button class="btn sm" type="button" data-modal-open="modal-texto"><%- icon('pencil') %> Editar texto</button><% } %>
+    </div>
+    <p class="small muted"><%= pub.media === 'video' ? 'Título' : 'Título interno' %></p>
+    <p><strong><%= pub.title %></strong></p>
+    <p class="small muted top-gap"><%= pub.media === 'video' ? 'Descrição / legenda' : 'Legenda' %></p>
+    <p class="pre"><%= pub.description || 'Sem legenda.' %></p>
+    <% if (canEdit && ['agendado', 'revisao', 'recusado'].indexOf(pub.status) < 0) { %>
+      <% if (editable.length) { %><p class="small muted top-gap">Ao editar, a mudança vai para: <%= editable.map(label).join(', ') %>.</p><% } %>
+      <% if (notEditable.length) { %><p class="small warn"><%= notEditable.map(label).join(', ') %> não <%= notEditable.length > 1 ? 'deixam' : 'deixa' %> editar um post publicado pela API: lá é pelo app da rede.</p><% } %>
+    <% } %>
+  </section>
+</div>
+<% if (canEdit) { %>
+<dialog class="modal modal-wide" id="modal-texto" aria-labelledby="mt-h">
+  <form method="post" action="/social/publicacoes/<%= pub.id %>" class="stack">
+    <%- csrfField %>
+    <h2 id="mt-h">Editar texto</h2>
+    <% if (['agendado', 'revisao', 'recusado'].indexOf(pub.status) >= 0) { %><p class="small muted">Ainda não saiu: dá para mudar o texto e o horário.</p><% } %>
+    <label><%= pub.media === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" value="<%= pub.title %>" maxlength="300"></label>
+    <label><%= pub.media === 'video' ? 'Descrição / legenda' : 'Legenda' %><textarea name="description" rows="7" maxlength="5000"><%= pub.description || '' %></textarea></label>
+    <% if (['agendado', 'revisao', 'recusado'].indexOf(pub.status) >= 0) { %><label>Publicar em <small class="muted">(vazio = assim que aprovado)</small><input type="datetime-local" name="agendar" value="<%= fmt.toInputValue(pub.scheduled_at) %>"></label><% } %>
+    <div class="row modal-actions">
+      <% if (pub.status === 'recusado' && mine) { %><button class="btn primary" type="submit" name="reenviar" value="1">Salvar e reenviar para revisão</button><button class="btn ghost" type="submit">Só salvar</button>
+      <% } else { %><button class="btn primary" type="submit">Salvar</button><% } %>
+      <button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+    </div>
+  </form>
+</dialog>
+<% } %>
+<%- include('../partials/foot') %>

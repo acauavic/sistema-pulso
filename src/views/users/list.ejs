@@ -1,8 +1,9 @@
 <%- include('../partials/head') %>
 <div class="page-head">
-  <div><span class="kicker">Sistema · Acesso</span><h1>Usuários</h1></div>
+  <div><span class="kicker">Gestão · Acesso</span><h1>Usuários</h1></div>
   <% if (can('users.write')) { %><a class="btn primary" href="/usuarios/novo"><%- icon('user-plus') %> Novo usuário</a><% } %>
 </div>
+<%- include('../partials/gestao-nav', { active: 'usuarios' }) %>
 
 <form method="get" action="/usuarios" class="filters">
   <input type="search" name="q" value="<%= q %>" placeholder="Buscar por nome ou e-mail">
@@ -40,20 +41,25 @@
       <td class="actions">
         <% if (manageable) { %>
           <a class="btn sm" href="/usuarios/<%= u.id %>/editar">Editar</a>
+          <details class="row-menu">
+            <summary class="btn sm ghost" aria-label="Mais ações para <%= u.name %>">Mais</summary>
+            <div class="row-menu-list">
           <% if (u.active) { %>
-            <form method="post" action="/usuarios/<%= u.id %>/reenviar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%= u.has_password ? 'Enviar nova senha' : 'Reenviar acesso' %></button></form>
+            <form method="post" action="/usuarios/<%= u.id %>/reenviar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= u.has_password ? 'Enviar nova senha' : 'Reenviar acesso' %></button></form>
           <% } %>
           <% if (!isSelf) { %>
             <form method="post" action="/usuarios/<%= u.id %>/status" class="inline" <% if (u.active) { %>data-confirm="Desativar <%= u.name %>? A pessoa será desconectada."<% } %>>
               <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="active" value="<%= u.active ? 'false' : 'true' %>">
-              <button class="btn sm" type="submit"><%= u.active ? 'Desativar' : 'Reativar' %></button>
+              <button class="link" type="submit"><%= u.active ? 'Desativar' : 'Reativar' %></button>
             </form>
             <% if (can('users.delete')) { %>
             <form method="post" action="/usuarios/<%= u.id %>/excluir" class="inline" data-confirm="Excluir <%= u.name %> definitivamente? Esta ação não pode ser desfeita.">
-              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm danger" type="submit">Excluir</button>
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link danger-link" type="submit">Excluir</button>
             </form>
             <% } %>
           <% } %>
+            </div>
+          </details>
         <% } %>
       </td>
     </tr>

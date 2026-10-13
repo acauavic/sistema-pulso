@@ -1,0 +1,486 @@
+<%- include('../partials/head') %>
+<%
+  var canWrite = can('sponsors.write');
+  var afterWon = ['ganho', 'ativo', 'inativo'].indexOf(sponsor.stage) >= 0;
+  var FUNNEL = ['prospect', 'negociacao', 'ganho', 'ativo'];
+  var idx = sponsor.stage === 'inativo' ? 4 : FUNNEL.indexOf(sponsor.stage);
+  var fileBase = '/patrocinadores/' + sponsor.id + '/arquivos/';
+  var logo = files.find(function (f) { return f.kind === 'logo'; });
+  var audios = files.filter(function (f) { return f.kind === 'audio'; });
+  var otherFiles = files.filter(function (f) { return f.kind !== 'audio' && f.kind !== 'logo'; });
+  var questions = [
+    ['offer', 'Oferta ou ação especial'], ['presentation', 'Como apresentar a empresa'], ['key_points', 'Principais pontos'],
+    ['restrictions', 'Restrições de comunicação'], ['slogan', 'Slogan'],
+  ];
+  var hasBrief = brief && (brief.offer || brief.presentation || brief.key_points || brief.restrictions || brief.slogan || brief.goal || brief.landing_url || brief.landing_perk);
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var advance = function (to, label, tone, confirm) {
+    return '<form method="post" action="/patrocinadores/' + sponsor.id + '/avancar" class="inline"' + (confirm ? ' data-confirm="' + confirm.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"' : '') + '>' + csrfField +
+      '<input type="hidden" name="para" value="' + to + '"><button class="btn ' + (tone || '') + '" type="submit">' + label + '</button></form>';
+  };
+  var openOnLoad = function (name) { return openModal === name ? 'data-open-on-load' : ''; };
+  var moneyVal = sponsor.value_cents == null ? '' : (Number(sponsor.value_cents) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var formLine = formState.complete ? 'Formulário respondido' : (formState.answered || formState.pending ? formState.answered + ' de ' + formState.total + ' respondidas' + (formState.pending ? ' · ' + formState.pending + ' pendente' + (formState.pending > 1 ? 's' : '') : '') : 'Formulário ainda não respondido');
+  var tabs = [{ key: 'resumo', label: 'Resumo' }];
+  if (afterWon || hasBrief) tabs.push({ key: 'briefing', label: 'Briefing', badge: afterWon && formState.answered < formState.total ? formState.answered + '/' + formState.total : '' });
+  if (afterWon) tabs.push({ key: 'entregas', label: 'Entregas', badge: deliverables.length || '' });
+  tabs.push({ key: 'links', label: 'Links' });
+  tabs.push({ key: 'historico', label: 'Histórico', badge: events.length });
+%>
+<div class="page-head">
+  <div>
+    <span class="kicker">Patrocinador<%= sponsor.kind ? ' · ' + C.SPONSOR_KINDS[sponsor.kind] : '' %></span>
+    <h1><%= sponsor.company %>
+      <% if (canWrite) { %><button class="badge badge-btn b-st-<%= sponsor.stage %>" type="button" data-modal-open="modal-etapa" aria-label="Mudar a etapa (agora: <%= stageInfo.label %>)" title="Mudar a etapa"><%= stageInfo.label %> <%- icon('chevron-down', 12) %></button>
+      <% } else { %><span class="badge b-st-<%= sponsor.stage %>"><%= stageInfo.label %></span><% } %></h1>
+    <p class="muted top-gap"><%= [sponsor.tier ? C.SPONSOR_TIERS[sponsor.tier] : '', sponsor.value_cents != null ? fmt.formatBRL(sponsor.value_cents) : '', sponsor.contact_name].filter(Boolean).join(' · ') %></p>
+  </div>
+  <div class="row">
+    <a class="btn ghost" href="/patrocinadores"><%- icon('arrow-left') %> Voltar</a>
+    <% if (canWrite) { %><a class="btn" href="/patrocinadores/<%= sponsor.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
+    <% if (can('sponsors.delete')) { %>
+    <form method="post" action="/patrocinadores/<%= sponsor.id %>/excluir" class="inline" data-confirm="Excluir <%= sponsor.company %>, os arquivos e todo o histórico? Esta ação não pode ser desfeita.">
+      <%- csrfField %><button class="btn danger" type="submit"><%- icon('trash-2') %> Excluir</button>
+    </form>
+    <% } %>
+  </div>
+</div>
+
+<ol class="stepper s4" aria-label="Etapas do patrocinador">
+  <% FUNNEL.forEach(function (k, i) { %>
+  <li class="<%= idx < 0 ? '' : (i < idx ? 'done' : (i === idx ? 'now' : '')) %>"><span class="step-n mono"><%= String(i + 1).padStart(2, '0') %></span><span class="step-l"><%= C.SPONSOR_STAGE_BY_KEY[k].label %></span></li>
+  <% }) %>
+</ol>
+
+<section class="card next-step" id="proximo">
+  <span class="kicker">Próximo passo</span>
+
+  <% if (sponsor.stage === 'prospect') { %>
+    <h2>Apresentar o Pulso</h2>
+    <% if (!links) { %>
+      <p class="muted">Gere os links do patrocinador e mande o media kit. Ao abrir, a empresa entra direto, sem criar conta.</p>
+      <% if (canWrite) { %><div class="next-actions"><form method="post" action="/patrocinadores/<%= sponsor.id %>/links" class="inline"><%- csrfField %><button class="btn primary" type="submit"><%- icon('link') %> Gerar links</button></form></div><% } %>
+    <% } else { %>
+      <p class="muted mono-line"><span>MEDIA KIT <%= sponsor.kit_viewed_at ? 'VISTO ' + fmt.formatDateTime(sponsor.kit_viewed_at) : 'AINDA NÃO ABERTO' %></span><% if (clicks.quero.total) { %><span>QUERO SER PATROCINADOR · <%= clicks.quero.total %></span><% } %></p>
+      <div class="next-actions">
+        <button class="btn primary" type="button" data-copy="<%= links.kit %>">Copiar link do media kit</button>
+        <% if (canWrite) { %><%- advance('negociacao', 'Mostrou interesse', '') %><%- advance('perdido', 'Não fechou', 'ghost', 'Marcar ' + sponsor.company + ' como Perdido?') %><% } %>
+      </div>
+    <% } %>
+
+  <% } else if (sponsor.stage === 'negociacao') { %>
+    <h2>Fechar o patrocínio</h2>
+    <p class="muted">Quando fechar, registre a cota, o valor e o responsável na empresa. O formulário de cadastro é liberado em seguida.</p>
+    <% if (canWrite) { %>
+    <div class="next-actions">
+      <button class="btn primary" type="button" data-modal-open="modal-ganho">Fechou</button>
+      <% if (links) { %><button class="btn" type="button" data-copy="<%= links.kit %>">Copiar media kit</button><% } %>
+      <%- advance('perdido', 'Não fechou', 'ghost', 'Marcar ' + sponsor.company + ' como Perdido?') %>
+    </div>
+    <% } %>
+
+  <% } else if (sponsor.stage === 'ganho') { %>
+    <h2>Cadastro e pagamento</h2>
+    <div class="form-progress" aria-label="Andamento do formulário">
+      <ol class="fp-steps">
+        <% formQuestions.forEach(function (q) { %><li class="fp-<%= formState.states[q.key] %>" title="<%= q.title %>"><span><%= q.short %></span></li><% }) %>
+      </ol>
+      <p class="small <%= formState.pending ? 'warn' : 'muted' %>"><%= formLine %><%= formState.pending ? ': ' + formState.pendingTitles.join(', ') : '' %></p>
+    </div>
+    <p class="small muted">Pagamento: <span class="handle"><%= sponsor.paid_at ? 'confirmado em ' + fmt.formatDay(sponsor.paid_at) : 'ainda não confirmado' %></span>. Com o pagamento, o patrocínio fica Ativo e o portal é liberado.</p>
+    <div class="next-actions">
+      <% if (!formState.complete && links) { %>
+        <button class="btn primary" type="button" data-copy="<%= links.form %>">Copiar link do formulário</button>
+        <% if (canWrite) { %><button class="btn" type="button" data-modal-open="modal-ativo">Pagamento confirmado</button><% } %>
+      <% } else if (!links && canWrite) { %>
+        <form method="post" action="/patrocinadores/<%= sponsor.id %>/links" class="inline"><%- csrfField %><button class="btn primary" type="submit"><%- icon('link') %> Gerar link do formulário</button></form>
+        <button class="btn" type="button" data-modal-open="modal-ativo">Pagamento confirmado</button>
+      <% } else if (canWrite) { %>
+        <button class="btn primary" type="button" data-modal-open="modal-ativo">Pagamento confirmado</button>
+      <% } %>
+    </div>
+
+  <% } else if (sponsor.stage === 'ativo') { %>
+    <h2>Patrocínio em andamento</h2>
+    <p class="muted mono-line"><span>VIGÊNCIA <%= sponsor.starts_on || sponsor.ends_on ? fmt.formatDay(sponsor.starts_on) + ' A ' + fmt.formatDay(sponsor.ends_on) : 'NÃO DEFINIDA' %></span><span><%= deliverables.filter(function (d) { return d.status === 'concluido'; }).length %>/<%= deliverables.length %> ENTREGÁVEIS CONCLUÍDOS</span></p>
+    <div class="next-actions">
+      <% if (links) { %><button class="btn" type="button" data-copy="<%= links.portal %>">Copiar link do portal</button><% } %>
+      <a class="btn" href="#entregas">Ver entregas</a>
+      <% if (canWrite) { %><%- advance('inativo', 'Encerrar patrocínio', 'ghost', 'Encerrar o patrocínio de ' + sponsor.company + '?') %><% } %>
+    </div>
+
+  <% } else if (sponsor.stage === 'inativo') { %>
+    <h2>Patrocínio encerrado</h2>
+    <p class="muted">O histórico, o briefing e as entregas continuam aqui.</p>
+    <% if (canWrite) { %><div class="next-actions"><%- advance('ativo', 'Reativar', '') %></div><% } %>
+
+  <% } else { %>
+    <h2>Não fechou</h2>
+    <p class="muted">Se a conversa voltar, retome a negociação daqui.</p>
+    <% if (canWrite) { %><div class="next-actions"><%- advance('negociacao', 'Retomar negociação', '') %></div><% } %>
+  <% } %>
+
+</section>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="resumo">
+  <div class="tabbar" role="tablist" aria-label="Seções do patrocinador">
+    <% tabs.forEach(function (t) { %><button type="button" role="tab" data-tab-btn="<%= t.key %>" aria-controls="pane-<%= t.key %>"><%= t.label %><% if (t.badge) { %> <span class="count"><%= t.badge %></span><% } %></button><% }) %>
+  </div>
+
+  <!-- ================= RESUMO ================= -->
+  <div class="pane" id="pane-resumo" data-pane-id="resumo">
+    <div class="grid-2 align-start">
+      <div class="stack-lg">
+        <section class="card" id="dados">
+          <h2>Dados</h2>
+          <dl class="kv">
+            <dt>Quem cuida</dt><dd><%- include('../partials/dot', { type: 'sponsor', id: sponsor.id, user: sponsor.owner_id ? { id: sponsor.owner_id, name: sponsor.owner_name } : null, editable: canWrite, label: true }) %></dd>
+            <% if (sponsor.website) { %><dt>Site</dt><dd><a href="<%= sponsor.website %>" target="_blank" rel="noopener noreferrer"><%= sponsor.website %></a></dd><% } %>
+            <% if (sponsor.contact_name) { %><dt>Responsável</dt><dd><%= sponsor.contact_name %></dd><% } %>
+            <% if (sponsor.contact_phone) { %><dt>WhatsApp</dt><dd class="handle"><%= sponsor.contact_phone %></dd><% } %>
+            <% if (sponsor.contact_email) { %><dt>E-mail</dt><dd><%= sponsor.contact_email %></dd><% } %>
+            <% if (sponsor.tier) { %><dt>Cota</dt><dd><%= C.SPONSOR_TIERS[sponsor.tier] %></dd><% } %>
+            <% if (sponsor.value_cents != null) { %><dt>Valor</dt><dd class="handle"><%= fmt.formatBRL(sponsor.value_cents) %></dd><% } %>
+            <% if (afterWon) { %>
+            <dt>Pagamento</dt><dd class="handle"><%= fmt.formatDay(sponsor.paid_at) %></dd>
+            <dt>Vigência</dt><dd class="handle"><%= sponsor.starts_on || sponsor.ends_on ? fmt.formatDay(sponsor.starts_on) + ' a ' + fmt.formatDay(sponsor.ends_on) : '—' %></dd>
+            <% } %>
+            <% if (sponsor.notes) { %><dt>Observações</dt><dd class="pre"><%= sponsor.notes %></dd><% } %>
+          </dl>
+          <% var gaps = [!sponsor.contact_name && 'responsável', !(sponsor.contact_email || sponsor.contact_phone) && 'contato', !sponsor.website && 'site'].filter(Boolean); %>
+          <% if (canWrite && gaps.length) { %><p class="small muted top-gap">Sem <%= gaps.join(', ') %>. <a href="/patrocinadores/<%= sponsor.id %>/editar">Completar cadastro</a></p><% } %>
+        </section>
+        <% if (finSummary && sponsor.value_cents != null) { %>
+        <section class="card" id="financeiro">
+          <div class="row spread">
+            <div><h2>Pagamento</h2><p class="small muted">Recebido <span class="mono"><%= money(finSummary.received) %></span> de <span class="mono"><%= money(sponsor.value_cents) %></span></p></div>
+            <% if (can('finance.write') && Number(sponsor.value_cents) > finSummary.received) { %><button class="btn sm" type="button" data-modal-open="modal-pgto"><%- icon('wallet', 14) %> <%= finSummary.entries.some(function (e) { return e.status === 'previsto'; }) ? 'Refazer parcelas' : 'Combinar pagamento' %></button><% } %>
+          </div>
+          <% if (!finSummary.entries.length) { %><p class="muted small top-gap">Ainda sem pagamento combinado. Diga se é à vista ou parcelado e as parcelas entram em <a href="/financeiro/lancamentos?escopo=receber">Contas a receber</a>.</p><% } %>
+          <ul class="plain plan-list fin-list top-gap"><% finSummary.entries.forEach(function (e) { %><%- include('../finance/_row', { e: e, here: here }) %><% }) %></ul>
+        </section>
+        <% } %>
+        <section class="card" id="convidados">
+          <div class="row spread"><h2>Convidados do patrocínio</h2><% if (can('guests.write')) { %><a class="btn sm" href="/convidados/novo?patrocinador=<%= sponsor.id %>"><%- icon('user-plus') %> Indicar convidado</a><% } %></div>
+          <% if (!guestLinks.length) { %><p class="muted small">Ninguém do patrocinador ou indicado por ele ainda. Quem senta à mesa num episódio patrocinado pode ser alguém da empresa, alguém indicado por ela ou só os hosts.</p><% } %>
+          <ul class="plain mini-tasks"><% guestLinks.forEach(function (g) { %><li><a href="/convidados/<%= g.id %>"><%= g.name %></a><span class="handle muted"><%= g.sponsor_relation === 'representante' ? 'da empresa' : 'indicado' %> · <%= guestStatuses[g.status].label %></span></li><% }) %></ul>
+        </section>
+      </div>
+
+      <div class="stack-lg">
+        <section class="card" id="tarefas">
+          <div class="row spread"><h2>Tarefas<%= linkedTasks.length ? ' (' + linkedTasks.length + ')' : '' %></h2><% if (can('tasks.write')) { %><a class="btn sm" href="/tarefas?nova=1&patrocinador=<%= sponsor.id %>"><%- icon('plus') %> Nova tarefa</a><% } %></div>
+          <% if (!linkedTasks.length) { %><p class="muted small">Nenhuma tarefa ligada a este patrocinador.</p><% } %>
+          <ul class="plain mini-tasks"><% linkedTasks.forEach(function (t) { %><li class="st-<%= t.status %>"><a href="/tarefas/<%= t.id %>"><%= t.title %></a><span class="handle muted"><%= C.TASK_STATUSES[t.status] %><%= t.due_on ? ' · ' + fmt.formatDayShort(t.due_on) : '' %><%= t.assignee_name ? ' · ' + t.assignee_name : '' %></span></li><% }) %></ul>
+        </section>
+        <%- include('../partials/comments', { type: 'sponsor', id: sponsor.id, items: comments, back: '/patrocinadores/' + sponsor.id }) %>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= BRIEFING ================= -->
+  <% if (afterWon || hasBrief) { %>
+  <div class="pane" id="pane-briefing" data-pane-id="briefing">
+    <section class="card" id="briefing">
+      <div class="row spread"><h2>Briefing do patrocinador</h2><% if (canWrite) { %><a class="btn sm" href="/patrocinadores/<%= sponsor.id %>/briefing"><%- icon('pencil') %> Editar briefing</a><% } %></div>
+      <% if (afterWon) { %>
+      <div class="form-progress" aria-label="Andamento do formulário">
+        <ol class="fp-steps">
+          <% formQuestions.forEach(function (q) { %><li class="fp-<%= formState.states[q.key] %>" title="<%= q.title %>: <%= { respondida: 'respondida', nao_se_aplica: 'não se aplica', pendente: 'pendente (deixou para depois)', aberta: 'ainda não respondeu' }[formState.states[q.key]] %>"><span><%= q.short %></span></li><% }) %>
+        </ol>
+        <p class="small <%= formState.pending ? 'warn' : 'muted' %>"><%= formState.answered %> de <%= formState.total %> respondidas<%= formState.pending ? ' · pendente' + (formState.pending > 1 ? 's' : '') + ': ' + formState.pendingTitles.join(', ') : '' %><%= formState.open ? ' · ainda não vistas: ' + formState.unfinished.filter(function (t) { return formState.pendingTitles.indexOf(t) < 0; }).join(', ') : '' %></p>
+      </div>
+      <% } %>
+      <% if (!hasBrief && !logo && !audios.length) { %>
+        <p class="muted"><%= formState.pending ? 'Respondeu parte do formulário e deixou o resto como pendência.' : (sponsor.brief_completed_at ? 'Respondeu sem preencher os campos.' : 'Ainda não respondeu o formulário.') %></p>
+      <% } %>
+      <dl class="kv">
+        <% if (logo) { %><dt>Logo</dt><dd><img class="logo-preview" src="<%= fileBase + logo.id %>" alt="Logo de <%= sponsor.company %>"> <a class="small" href="<%= fileBase + logo.id %>?baixar=1">baixar</a></dd><% } %>
+        <% if (brief.landing_url) { %><dt>Página</dt><dd><a href="<%= brief.landing_url %>" target="_blank" rel="noopener noreferrer"><%= brief.landing_url %></a></dd><% } %>
+        <% if (brief.landing_perk) { %><dt>Brinde da página</dt><dd class="pre"><%= brief.landing_perk %></dd><% } %>
+        <% questions.forEach(function (q) { if (brief[q[0]]) { %><dt><%= q[1] %></dt><dd class="pre"><%= brief[q[0]] %></dd><% } }) %>
+        <% if (brief.goal) { %><dt>Objetivo</dt><dd><%= C.SPONSOR_GOALS[brief.goal] %><%= brief.goal_other ? ': ' + brief.goal_other : '' %></dd><% } %>
+      </dl>
+      <% if (audios.length) { %>
+      <h3 class="top-gap">Gravações de voz</h3>
+      <ul class="plain audio-list">
+        <% audios.forEach(function (a) { %>
+        <li>
+          <span class="small muted"><%= (questions.find(function (q) { return q[0] === a.field; }) || [0, a.field])[1] %> · <%= fmt.formatDateTime(a.created_at) %></span>
+          <audio controls preload="none" src="<%= fileBase + a.id %>"></audio>
+          <% if (a.transcript) { %><details><summary class="small">Transcrição original</summary><p class="pre small"><%= a.transcript %></p></details><% } %>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+    </section>
+  </div>
+  <% } %>
+
+  <!-- ================= ENTREGAS ================= -->
+  <% if (afterWon) { %>
+  <%
+    var jsonAttr = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
+    var delivData = function (d) { return jsonAttr({ title: d.label, description: d.text || '', quantity: d.qty || '', status: d.status, link_url: d.link_url || '', notes: d.notes || '', customized: d.customized ? '1' : '', fromPlan: d.fromPlan ? '1' : '' }); };
+    var linkedEps = episodes.filter(function (e) { return roleByEpisode[e.id]; });
+    var booked = agenda.filter(function (g) { return g.role; });
+  %>
+  <div class="pane" id="pane-entregas" data-pane-id="entregas">
+    <div class="grid-2 align-start">
+      <div class="stack-lg">
+        <section class="card" id="entregaveis">
+          <div class="row spread">
+            <h2>Entregáveis <span class="mono muted"><%= deliverables.length %></span></h2>
+            <% if (canWrite) { %><button class="btn sm" type="button" data-fill-modal="modal-deliv" data-fill-mode="new" data-fill='{"status":"pendente"}' data-fill-action="/patrocinadores/<%= sponsor.id %>/entregaveis"><%- icon('plus') %> Criar só para este</button><% } %>
+          </div>
+          <% var plan = planInfo.find(function (p) { return p.key === sponsor.tier; }); %>
+          <p class="small muted"><% if (plan) { %>Plano <strong><%= C.SPONSOR_TIERS[sponsor.tier] %></strong>: a lista acompanha o plano. Para mudar um item só deste patrocinador, abra Editar.<% } else { %>Sem cota definida. Escolha Ouro ou Diamond em Editar para trazer os entregáveis do plano.<% } %></p>
+          <% if (!deliverables.length) { %><p class="muted">Nenhum entregável ainda.</p><% } %>
+          <ul class="plain plan-list">
+            <% deliverables.forEach(function (d) { %>
+            <li>
+              <div class="plan-list-main">
+                <strong><%= d.label %><%= d.qty ? ' · ' + d.qty : '' %></strong>
+                <span class="small muted"><%= d.text || '' %><%= d.customized ? ' · personalizado' : (!d.fromPlan ? ' · só deste patrocinador' : '') %></span>
+                <% if (d.link_url) { %><a class="small" href="<%= d.link_url %>" target="_blank" rel="noopener noreferrer"><%- icon('external-link', 12) %> link</a><% } %>
+              </div>
+              <% if (canWrite) { %>
+              <form method="post" action="/patrocinadores/<%= sponsor.id %>/entregaveis/<%= d.id %>" class="inline">
+                <%- csrfField %><input type="hidden" name="status_only" value="1">
+                <select name="status" aria-label="Status de <%= d.label %>" data-autosubmit><% Object.keys(C.DELIVERABLE_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= d.status === k ? 'selected' : '' %>><%= C.DELIVERABLE_STATUSES[k] %></option><% }) %></select>
+              </form>
+              <span class="plan-list-tools"><button class="btn sm ghost" type="button" data-fill-modal="modal-deliv" data-fill-mode="edit" data-fill='<%- delivData(d) %>' data-fill-action="/patrocinadores/<%= sponsor.id %>/entregaveis/<%= d.id %>" data-fill-remove="/patrocinadores/<%= sponsor.id %>/entregaveis/<%= d.id %>/excluir">Editar</button></span>
+              <% } else { %><span class="badge b-gray"><%= C.DELIVERABLE_STATUSES[d.status] %></span><span></span><% } %>
+            </li>
+            <% }) %>
+          </ul>
+          <% if (canWrite && sponsor.tier) { %>
+          <form method="post" action="/patrocinadores/<%= sponsor.id %>/plano" class="inline top-gap" data-confirm="Reaplicar o plano <%= C.SPONSOR_TIERS[sponsor.tier] %>? Entregáveis do plano que foram retirados voltam; os personalizados ficam."><%- csrfField %><button class="link small" type="submit">Reaplicar o plano</button></form>
+          <% } %>
+        </section>
+
+        <section class="card" id="arquivos">
+          <div class="row spread">
+            <h2>Arquivos <span class="mono muted"><%= otherFiles.length %></span></h2>
+            <% if (canWrite && storageReady) { %><button class="btn sm" type="button" data-modal-open="modal-arquivo"><%- icon('upload') %> Enviar arquivo</button><% } %>
+          </div>
+          <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
+          <% if (!otherFiles.length) { %><p class="muted small">Nenhum arquivo enviado. Moldura e QR Code enviados aparecem no portal do patrocinador.</p><% } %>
+          <ul class="plain file-list">
+            <% otherFiles.forEach(function (f) { %>
+            <li>
+              <span><span class="badge b-gray"><%= f.kind %></span> <a href="<%= fileBase + f.id %>?baixar=1"><%= f.filename || ('arquivo-' + f.id) %></a> <span class="handle muted">· <%= fmt.formatDateTime(f.created_at) %></span></span>
+              <% if (canWrite) { %>
+              <form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo?"><%- csrfField %><button class="link small" type="submit">remover</button></form>
+              <% } %>
+            </li>
+            <% }) %>
+          </ul>
+        </section>
+      </div>
+
+      <section class="card" id="episodios">
+        <div class="row spread">
+          <h2>Gravações e episódios</h2>
+          <% if (canWrite && (agenda.length || episodes.length)) { %><button class="btn sm" type="button" data-modal-open="modal-episodios">Gerenciar</button><% } %>
+        </div>
+        <% if (!booked.length && !linkedEps.length) { %><p class="muted small">Nenhuma gravação reservada nem episódio ligado a este patrocinador.</p><% } %>
+        <ul class="plain plan-list">
+          <% booked.forEach(function (g) { %><li><div class="plan-list-main"><strong><%= g.name %></strong><span class="small muted mono"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : 'DATA A DEFINIR' %> · GRAVAÇÃO RESERVADA</span></div><span class="badge b-gray"><%= g.role === 'exclusivo' ? 'Exclusivo' : 'Inserção' %></span><span></span></li><% }) %>
+          <% linkedEps.forEach(function (e) { %><li><div class="plan-list-main"><a href="/episodios/<%= e.id %>"><strong><%= e.title %></strong></a><span class="small muted mono"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= C.EPISODE_STATUSES[e.status].toUpperCase() %></span></div><span class="badge b-gray"><%= roleByEpisode[e.id] === 'exclusivo' ? 'Exclusivo' : 'Inserção' %></span><span></span></li><% }) %>
+        </ul>
+        <% if (can('episodes.write')) { %><p class="small top-gap"><a href="/episodios/novo?patrocinador=<%= sponsor.id %>">Registrar episódio gravado só com os hosts</a></p><% } %>
+      </section>
+    </div>
+  </div>
+
+  <% if (canWrite) { %>
+  <dialog class="modal modal-wide" id="modal-deliv" aria-labelledby="md-h">
+    <form method="post" action="" class="stack" data-fill-form>
+      <%- csrfField %>
+      <h2 id="md-h"><span data-mode="edit">Editar entregável</span><span data-mode="new" hidden>Entregável só deste patrocinador</span></h2>
+      <label>Nome<input type="text" name="title" maxlength="120" required></label>
+      <label>Descrição <small class="muted">(aparece no portal do patrocinador)</small><textarea name="description" rows="2" maxlength="500"></textarea></label>
+      <div class="grid-2 tight">
+        <label>Quantidade<input type="number" name="quantity" min="1" max="999"></label>
+        <label>Status<select name="status"><% Object.keys(C.DELIVERABLE_STATUSES).forEach(function (k) { %><option value="<%= k %>"><%= C.DELIVERABLE_STATUSES[k] %></option><% }) %></select></label>
+      </div>
+      <label>Link da entrega <small class="muted">(no QR Code: o destino)</small><input type="url" name="link_url" maxlength="500" placeholder="https://"></label>
+      <label>Observação<input type="text" name="notes" maxlength="500"></label>
+      <label data-mode="new" hidden>Tipo <small class="muted">(só se for moldura, QR Code…; senão deixe "Personalizado")</small>
+        <select name="kind"><option value="">Personalizado</option><% Object.keys(C.DELIVERABLE_KINDS).forEach(function (k) { %><option value="<%= k %>"><%= C.DELIVERABLE_KINDS[k] %></option><% }) %></select>
+      </label>
+      <div class="row modal-actions">
+        <button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+        <button class="link small" type="submit" name="restaurar" value="1" data-if="customized" hidden>Voltar ao padrão do plano</button>
+        <button class="link small danger-link push-right" type="submit" data-fill-remove-btn data-mode="edit" formnovalidate>Remover</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal modal-wide" id="modal-episodios" aria-labelledby="me-h">
+    <form method="post" action="/patrocinadores/<%= sponsor.id %>/episodios" class="stack">
+      <%- csrfField %>
+      <h2 id="me-h">Gravações e episódios</h2>
+      <p class="small muted">Reserve gravações marcadas (entram na agenda do portal); ao gravar, a reserva vira o episódio. "Fora" tira o vínculo.</p>
+      <div class="stage-pick">
+        <% if (agenda.length) { %><h3>Agenda</h3>
+        <ul class="plain ep-pick">
+          <% agenda.forEach(function (g) { %>
+          <li><span><span class="handle muted"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : 'data a definir' %></span> <%= g.name %> <span class="badge b-st-<%= g.status %>"><%= guestStatuses[g.status].label %></span></span>
+            <select name="booking_<%= g.id %>" aria-label="Reserva da gravação com <%= g.name %>"><option value="">Fora</option><option value="insercao" <%= g.role === 'insercao' ? 'selected' : '' %>>Inserção</option><option value="exclusivo" <%= g.role === 'exclusivo' ? 'selected' : '' %>>Exclusivo</option></select></li>
+          <% }) %>
+        </ul><% } %>
+        <% if (episodes.length) { %><h3>Episódios gravados</h3>
+        <ul class="plain ep-pick">
+          <% episodes.forEach(function (e) { %>
+          <li><span><span class="handle muted"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : '—' %></span> <%= e.title %></span>
+            <select name="role_<%= e.id %>" aria-label="Papel no episódio <%= e.title %>"><option value="">Fora</option><option value="insercao" <%= roleByEpisode[e.id] === 'insercao' ? 'selected' : '' %>>Inserção</option><option value="exclusivo" <%= roleByEpisode[e.id] === 'exclusivo' ? 'selected' : '' %>>Exclusivo</option></select></li>
+          <% }) %>
+        </ul><% } %>
+      </div>
+      <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <% if (storageReady) { %>
+  <dialog class="modal" id="modal-arquivo" aria-labelledby="ma-h">
+    <div class="stack" data-upload data-url="/patrocinadores/<%= sponsor.id %>/arquivo">
+      <h2 id="ma-h">Enviar arquivo</h2>
+      <label>Tipo<select data-upload-kind><option value="moldura">Moldura</option><option value="qrcode">QR Code</option><option value="material">Outro material</option></select></label>
+      <label>Arquivo<input type="file" data-upload-file></label>
+      <span class="small" data-upload-status role="status"></span>
+      <div class="row modal-actions"><button class="btn primary" type="button" data-upload-send>Enviar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </div>
+  </dialog>
+  <% } %>
+  <% } %>
+  <% } %>
+
+  <!-- ================= LINKS ================= -->
+  <div class="pane" id="pane-links" data-pane-id="links">
+    <section class="card" id="links">
+      <h2>Links do patrocinador</h2>
+      <% if (!links) { %>
+        <p class="muted">Magic links reutilizáveis: ao abrir, o patrocinador entra direto (sem criar conta) e pode voltar pelo mesmo link quando quiser. Abrem o media kit, o formulário de cadastro (depois de Ganho) e o portal (quando Ativo). Gerar novos links derruba os acessos abertos.</p>
+        <% if (canWrite) { %>
+        <form method="post" action="/patrocinadores/<%= sponsor.id %>/links"><%- csrfField %><button class="btn" type="submit"><%- icon('link') %> Gerar links</button></form>
+        <% } %>
+      <% } else { %>
+        <% var rows = [
+          ['Media kit', links.kit, sponsor.kit_viewed_at ? 'visto em ' + fmt.formatDateTime(sponsor.kit_viewed_at) : 'ainda não aberto'],
+          ['Formulário de cadastro', links.form, afterWon ? formLine.toLowerCase() : 'libera em Ganho'],
+          ['Portal do patrocinador', links.portal, sponsor.stage === 'ativo' || sponsor.stage === 'inativo' ? 'aberto' : 'libera em Ativo'],
+        ]; %>
+        <p class="small muted">Magic links reutilizáveis: abrir o link dá acesso direto, sem criar conta. Gerar novos links encerra os acessos abertos.</p>
+        <% rows.forEach(function (r) { %>
+        <label class="copy-field"><%= r[0] %> <small class="muted">· <%= r[2] %></small>
+          <div class="row">
+            <input type="text" readonly value="<%= r[1] %>" class="grow" data-select-on-focus>
+            <button class="btn" type="button" data-copy="<%= r[1] %>">Copiar</button>
+            <a class="btn" href="<%= r[1] %>" target="_blank" rel="noopener" aria-label="Abrir <%= r[0] %>"><%- icon('external-link') %></a>
+          </div>
+        </label>
+        <% }) %>
+        <ul class="plain small">
+          <li>Media kit · “Quero ser patrocinador”: <strong><%= clicks.quero.total %></strong> · “Falar com a equipe”: <strong><%= clicks.equipe.total %></strong></li>
+        </ul>
+        <% if (canWrite) { %>
+        <form method="post" action="/patrocinadores/<%= sponsor.id %>/links" class="inline" data-confirm="Gerar novos links? Os atuais (media kit, formulário e portal) deixarão de funcionar e os acessos abertos serão encerrados.">
+          <%- csrfField %><input type="hidden" name="regenerar" value="1"><button class="btn ghost" type="submit">Gerar novos links</button>
+        </form>
+        <% } %>
+      <% } %>
+    </section>
+  </div>
+
+  <!-- ================= HISTÓRICO ================= -->
+  <div class="pane" id="pane-historico" data-pane-id="historico">
+    <section class="card" id="timeline">
+      <h2>Linha do tempo</h2>
+      <p class="small muted">Movimentos automáticos (etapas, links, cliques, formulário). Para falar com a equipe, use os comentários.</p>
+      <ol class="timeline">
+        <% events.forEach(function (e) { %>
+        <li class="ev ev-<%= e.type %>">
+          <div class="ev-msg"><%= e.message %></div>
+          <div class="ev-meta small muted"><%= fmt.formatDateTime(e.created_at) %><%= e.user_name ? ' · ' + e.user_name : '' %></div>
+        </li>
+        <% }) %>
+      </ol>
+    </section>
+  </div>
+</div>
+
+<% if (canWrite) { %>
+<dialog class="modal" id="modal-etapa" aria-labelledby="m-etapa-h">
+  <form method="post" action="/patrocinadores/<%= sponsor.id %>/etapa" class="stack">
+    <%- csrfField %>
+    <h2 id="m-etapa-h">Mudar a etapa</h2>
+    <p class="small muted">Hoje: <strong><%= stageInfo.label %></strong>. Ganho e Ativo pedem dados; se faltar algo, abrimos a janela certa.</p>
+    <div class="stage-pick" role="radiogroup" aria-label="Nova etapa">
+      <% stages.forEach(function (st) { %>
+      <label class="choice"><input type="radio" name="status" value="<%= st.key %>" <%= sponsor.stage === st.key ? 'checked' : '' %> data-current="<%= sponsor.stage === st.key ? '1' : '' %>"><span><strong><%= st.label %></strong><small class="muted"><%= st.hint %></small></span></label>
+      <% }) %>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit" data-stage-confirm disabled>Confirmar mudança</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (canWrite) { %>
+<dialog class="modal" id="modal-ganho" aria-labelledby="m-ganho-h" <%= openOnLoad('ganho') %>>
+  <form method="post" action="/patrocinadores/<%= sponsor.id %>/avancar" class="stack">
+    <%- csrfField %><input type="hidden" name="para" value="ganho">
+    <h2 id="m-ganho-h">Fechou o patrocínio</h2>
+    <p class="small muted">Confirme as condições e quem responde pela empresa. Com isso, o formulário de cadastro é liberado.</p>
+    <div class="grid-2 tight">
+      <label>Cota
+        <select name="tier" required>
+          <option value="">Escolha…</option>
+          <% Object.keys(C.SPONSOR_TIERS).forEach(function (k) { %><option value="<%= k %>" <%= sponsor.tier === k ? 'selected' : '' %>><%= C.SPONSOR_TIERS[k] %></option><% }) %>
+        </select>
+      </label>
+      <label>Valor (R$)<input type="text" name="value" value="<%= moneyVal %>" inputmode="decimal" placeholder="15.000,00" required></label>
+      <label>Responsável na empresa<input type="text" name="contact_name" value="<%= sponsor.contact_name || '' %>" maxlength="150" required></label>
+      <label>WhatsApp<input type="text" name="contact_phone" value="<%= sponsor.contact_phone || '' %>" maxlength="40"></label>
+      <label>E-mail<input type="email" name="contact_email" value="<%= sponsor.contact_email || '' %>" maxlength="254"></label>
+    </div>
+    <p class="small muted">Precisa de e-mail ou WhatsApp para mandar o formulário.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Marcar como Ganho</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="modal-ativo" aria-labelledby="m-ativo-h" <%= openOnLoad('ativo') %>>
+  <form method="post" action="/patrocinadores/<%= sponsor.id %>/avancar" class="stack">
+    <%- csrfField %><input type="hidden" name="para" value="ativo">
+    <h2 id="m-ativo-h">Pagamento confirmado</h2>
+    <p class="small muted">Com o pagamento, o patrocínio fica Ativo e o portal do patrocinador é liberado.<%= !formState.complete ? ' O formulário ainda tem perguntas em aberto; dá para seguir e cobrar depois.' : '' %></p>
+    <div class="grid-2 tight">
+      <label>Pago em<input type="date" name="paid_at" value="<%= fmt.toInputDate(sponsor.paid_at) %>" required></label>
+      <span></span>
+      <label>Vigência: início<input type="date" name="starts_on" value="<%= fmt.toInputDate(sponsor.starts_on) %>"></label>
+      <label>Vigência: fim<input type="date" name="ends_on" value="<%= fmt.toInputDate(sponsor.ends_on) %>"></label>
+      <% if (!sponsor.tier) { %><label>Cota<select name="tier" required><option value="">Escolha…</option><% Object.keys(C.SPONSOR_TIERS).forEach(function (k) { %><option value="<%= k %>"><%= C.SPONSOR_TIERS[k] %></option><% }) %></select></label><% } %>
+      <% if (sponsor.value_cents == null) { %><label>Valor (R$)<input type="text" name="value" inputmode="decimal" placeholder="15.000,00" required></label><% } %>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Ativar patrocínio</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (finSummary && sponsor.value_cents != null) { %>
+<%- include('../finance/_entry-modals', { episodes: [], sponsors: [{ id: sponsor.id, company: sponsor.company }], suppliers: [] }) %>
+<% if (can('finance.write')) { %>
+<dialog class="modal" id="modal-pgto" aria-labelledby="mpg-h">
+  <form method="post" action="/patrocinadores/<%= sponsor.id %>/pagamento" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mpg-h">Combinar pagamento</h2>
+    <p class="small muted">Falta receber <span class="mono"><%= money(Number(sponsor.value_cents) - finSummary.received) %></span>. As parcelas abertas são refeitas; o que já foi recebido fica.</p>
+    <div class="grid-2 tight">
+      <label>Parcelas <small class="muted">(1 = à vista)</small><input type="number" name="installments" min="1" max="24" value="1" required></label>
+      <label>Primeiro vencimento<input type="date" name="first_due" value="<%= today %>" required></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Lançar parcelas</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% } %>
+<%- include('../partials/foot') %>

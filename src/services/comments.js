@@ -1,0 +1,71 @@
+// Comentários em convidados, patrocinadores, episódios, cortes e tarefas. Menção com @Nome avisa a pessoa;
+// quem é responsável pelo item e quem já comentou também recebe a notificação.
+const db = require('../db/pool');
+const { notify } = require('./notify');
+const { can } = require('../permissions');
+
+// Cada tipo de item: como achar, quem é o responsável, o título e o endereço, e quem pode ver.
+const ENTITIES = {
+  guest: { perm: 'guests.read', label: 'convidado', load: (id) => q1('SELECT id, name AS title, owner_id AS responsible FROM guests WHERE id = $1', [id]), url: (id) => `/convidados/${id}#comentarios` },
+  sponsor: { perm: 'sponsors.read', label: 'patrocinador', load: (id) => q1('SELECT id, company AS title, owner_id AS responsible FROM sponsors WHERE id = $1', [id]), url: (id) => `/patrocinadores/${id}#comentarios` },
+  episode: { perm: 'episodes.read', label: 'episódio', load: (id) => q1("SELECT id, coalesce('EP.' || lpad(number::text, 3, '0') || ' · ', '') || title AS title, editor_id AS responsible FROM episodes WHERE id = $1", [id]), url: (id) => `/episodios/${id}#comentarios` },
+  clip: { perm: 'episodes.read', label: 'corte', load: (id) => q1('SELECT id, title, created_by AS responsible FROM episode_clips WHERE id = $1', [id]), url: (id) => `/cortes/${id}#comentarios` },
+  task: { perm: 'tasks.read', label: 'tarefa', load: (id) => q1('SELECT id, title, assignee_id AS responsible, created_by AS creator FROM tasks WHERE id = $1', [id]), url: (id) => `/tarefas/${id}#comentarios` },
+};
+async function q1(sql, params) { const { rows } = await db.query(sql, params); return rows[0] || null; }
+
+const isEntity = (type) => Object.prototype.hasOwnProperty.call(ENTITIES, type);
+const canSee = (role, type) => isEntity(type) && can(role, ENTITIES[type].perm);
+
+// @Nome: procura os nomes das pessoas ativas no texto (o nome completo ou o primeiro nome, se for único).
+async function findMentions(body) {
+  if (!body.includes('@')) return [];
+  const { rows: users } = await db.query('SELECT id, name FROM users WHERE active');
+  const text = body.toLocaleLowerCase('pt-BR');
+  const firsts = {};
+  for (const u of users) { const f = u.name.split(/\s+/)[0].toLocaleLowerCase('pt-BR'); firsts[f] = (firsts[f] || 0) + 1; }
+  const hit = (needle) => { const i = text.indexOf(`@${needle}`); if (i < 0) return false; const after = text[i + needle.length + 1]; return !after || !/[\p{L}\p{N}]/u.test(after); };
+  return users.filter((u) => {
+    const full = u.name.toLocaleLowerCase('pt-BR'); const first = full.split(/\s+/)[0];
+    return hit(full) || (firsts[first] === 1 && hit(first));
+  }).map((u) => u.id);
+}
+
+async function list(type, id) {
+  const { rows } = await db.query(
+    `SELECT c.*, u.name AS author_name FROM comments c LEFT JOIN users u ON u.id = c.author_id
+      WHERE c.entity_type = $1 AND c.entity_id = $2 ORDER BY c.created_at, c.id`, [type, id]);
+  return rows;
+}
+
+async function add({ type, id, author, body }) {
+  if (!isEntity(type)) return { error: 'Tipo de item desconhecido.' };
+  if (!canSee(author.role, type)) return { error: 'Sem acesso a este item.', status: 403 };
+  const text = String(body || '').replace(/\r/g, '').trim().slice(0, 4000);
+  if (!text) return { error: 'Escreva o comentário.' };
+  const entity = await ENTITIES[type].load(id);
+  if (!entity) return { error: 'Item não encontrado.', status: 404 };
+  const mentions = await findMentions(text);
+  const { rows: [comment] } = await db.query(
+    'INSERT INTO comments (entity_type, entity_id, author_id, body, mentions) VALUES ($1,$2,$3,$4,$5) RETURNING *', [type, entity.id, author.id, text, mentions]);
+  const { rows: before } = await db.query('SELECT DISTINCT author_id FROM comments WHERE entity_type = $1 AND entity_id = $2 AND id <> $3 AND author_id IS NOT NULL', [type, entity.id, comment.id]);
+  const def = ENTITIES[type];
+  const url = def.url(entity.id);
+  const preview = text.length > 160 ? `${text.slice(0, 157)}…` : text;
+  // quem foi mencionado recebe "mencionou você"; os outros (responsável, quem criou, quem já comentou) recebem "comentou"
+  await notify({ type: 'comentario', users: mentions, title: `${author.name} mencionou você em ${def.label}: ${entity.title}`, body: preview, url, actorId: author.id, entity: { type, id: entity.id }, dedupe: `comment-${comment.id}` });
+  const others = [entity.responsible, entity.creator, ...before.map((r) => r.author_id)].filter((u) => u && !mentions.includes(u));
+  await notify({ type: 'comentario', users: others, title: `${author.name} comentou em ${def.label}: ${entity.title}`, body: preview, url, actorId: author.id, entity: { type, id: entity.id }, dedupe: `comment-${comment.id}` });
+  return { comment: { ...comment, author_name: author.name } };
+}
+
+// Apaga: quem escreveu, ou a gestão.
+async function remove(commentId, user) {
+  const { rows: [c] } = await db.query('SELECT * FROM comments WHERE id = $1', [commentId]);
+  if (!c) return { error: 'Comentário não encontrado.', status: 404 };
+  if (String(c.author_id) !== String(user.id) && !can(user.role, 'tasks.manage')) return { error: 'Só quem escreveu pode apagar.', status: 403 };
+  await db.query('DELETE FROM comments WHERE id = $1', [c.id]);
+  return { ok: true, comment: c };
+}
+
+module.exports = { ENTITIES, isEntity, canSee, findMentions, list, add, remove };

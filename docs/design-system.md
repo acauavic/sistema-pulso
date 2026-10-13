@@ -12,6 +12,20 @@
 - **Serifa só para gente.** Instrument Serif itálico aparece em boas-vindas, frases de convidados e mensagens pessoais. Nunca em controles.
 - Sem emoji na interface. Ícones são **Lucide**, traço 2px, 16px no desktop e 20px no mobile (`icon('nome')` em `src/utils/icons.js`).
 
+## Experiência e jornada (regra de criação — vale antes de qualquer tela nova ou alterada)
+
+**O copo fica na cozinha.** Só mostre uma ferramenta quando a pessoa precisa dela, no ponto da jornada em que ela precisa. Ninguém vê o copo no banheiro: só vai à cozinha buscar quando tem sede.
+
+- **Antes de escrever a tela, descreva a jornada** em uma linha: quem é a pessoa, em que momento chega aqui, o que quer fazer e qual é o próximo passo natural. Depois da tela pronta, **abra no navegador (desktop e celular) e percorra essa jornada**; se precisar rolar, ler ou ignorar muita coisa para achar o que quer, a tela não está pronta.
+- **Uma ação principal por tela** (o botão lime). O resto é secundário, discreto ou fica escondido.
+- **Formulário nunca vem aberto "por via das dúvidas".** O que é de edição eventual (nome, textos, configurações) mostra primeiro o **valor atual, legível**, com um botão **Editar** que abre uma **janela (modal)** só com aqueles campos. Criar algo novo também é um botão + janela.
+- **Listas mostram resumo, não formulário por linha.** Cada item: título, dados em mono, status e um botão de editar/ações. Editar abre janela. Nada de uma linha com 5 campos e 2 botões repetida 10 vezes.
+- **Muito conteúdo = abas ou seções que abrem** (`data-tabs`, `<details>`): uma coisa por vez (ex.: Ouro | Diamond, e não um embaixo do outro).
+- **Condicional pelo momento:** campo ou bloco só aparece quando faz sentido (data preenchida pede confirmação; etapa pede só os dados que faltam; "personalizado" só depois de pedir para personalizar).
+- **Ações destrutivas e raras** (excluir, regenerar, reaplicar) ficam pequenas e longe da ação principal, sempre com confirmação.
+- **Estado vazio ensina o primeiro passo**; estado preenchido some com a explicação.
+- **Teste de contagem:** mais de ~6 campos, ou mais de 2 botões visíveis ao mesmo tempo no mesmo bloco, é sinal para esconder em janela, aba ou condicional.
+
 ## Temas
 
 - **Escuro (padrão — equipe e patrocinador)**, **claro (opcional — convidado e relatórios)**. O painel tem botão "Tema" (guarda em `localStorage`, `src/public/theme.js`).
@@ -28,7 +42,7 @@
 - **PUBLICADO** (único lime): `#2A3311`/`#C8FF42` · `#C8FF42`/`#0A0A0A`
 - **CANCELADO**: `#2E1614`/`#FF7A6B` · `#FBE3E0`/`#9E2A1E`
 - Chip: raio 2, mono 11px, caixa alta, tracking .12em. Classes `.badge` + `.b-st-*` / `.b-green` (publicado/ativo) / `.b-amber` / `.b-red` / `.b-gray`.
-- **Etapas do convidado → chip** (CRM, `src/constants.js`): prospect → PAUTA · convite_enviado → AGENDADO (plum: convidado vê) · confirmado → GRAVADO · gravado → EM EDIÇÃO (pós-produção) · publicado → PUBLICADO · recusou/cancelado → CANCELADO.
+- **Etapas do convidado → chip** (CRM, `src/constants.js`): prospect → PAUTA · convite_enviado → AGENDADO (plum: convidado vê) · em_agendamento → EM EDIÇÃO (âmbar, em andamento) · agendado → AGENDADO (plum: data combinada com o convidado) · gravado → GRAVADO · publicado → PUBLICADO · perdido/cancelado → CANCELADO.
 
 ## Tipografia
 
@@ -53,16 +67,19 @@
 - **Feedback**: `.flash` com filete lateral (lime ok / vermelho erro). Estado vazio: linha de pulso plana + título + frase útil (`partials/pulse-line.ejs`, classe `.empty`).
 - **Tabela**: cabeçalho mono caixa alta muted; linha com hover `raised`; colunas de data/número em mono; ações à direita.
 - **Navegação**: barra lateral 248px com wordmark "pulso." no topo, itens com ícone Lucide + rótulo, ativo = fundo `raised` + ícone lime; rodapé com avatar/perfil, tema e sair. No mobile vira barra superior com menu.
+- **Foto do convidado**: moldura única **4:3** (raio 6), a mesma na página da plateia, no media kit, no portal do patrocinador e no painel (`.guest-photo`, `.cal-photo`, `.confirmed-avatar`). Nada de círculo para foto de convidado; círculo com iniciais só quando não há foto. O envio passa pelo recorte (`cropper.js`), que entrega 1200×900.
+- **Calendário geral**: evento = linha de uma linha (ícone Lucide do tipo + hora mono + título); cor só por estado: **gravação** em plum (`--st-agendado-*`), **lembrete** em âmbar, **atrasado** em vermelho, **concluído** apagado e riscado, **a confirmar** em tracejado; o resto, neutro (`raised`). Hoje = o único lime da grade. Visualizações = chips arredondados; "Salvar esta visualização" é o chip tracejado. No celular a grade vira lista dos dias com evento.
 - **Quadro (Kanban)**: coluna = `surface` com chip da etapa + contagem mono; card = `raised`, nome em display, meta em mono 10px.
 
 ## Telas de referência (no HTML original)
 
 - A) Painel da equipe (escuro) — saudação "Bom dia, Nome." + semana, KPIs, lista de episódios, próximas gravações, patrocínio ativo.
 - B) Gestão de episódios — quadro (claro). C) Portal do patrocinador (escuro + plum). D) Portal do convidado (mobile, claro). E) Produção no estúdio (mobile, escuro).
-- Módulos de navegação previstos: Painel · Episódios · Convidados · Gravações · Cortes e distribuição · Métricas · Patrocinadores · Financeiro e contratos · Configurações. **Hoje o sistema implementa só Painel, Convidados, Modelos de convite e a área "Sistema"** (Usuários, Auditoria, Integrações); os demais módulos seguem este guia quando forem construídos.
+- Módulos de navegação previstos: Painel · Episódios · Convidados · Gravações · Cortes e distribuição · Métricas · Patrocinadores · Financeiro e contratos · Configurações. **Hoje o sistema implementa Painel, Tarefas, Calendário (tudo que tem data), Convidados, Patrocinadores, Episódios (produção, capas e posts, cortes), Social (publicações, ideias, insights e automações), Financeiro (contas, custos automáticos e estoque) e o Painel de gestão** (Usuários, Auditoria, Integrações); os demais módulos seguem este guia quando forem construídos.
 
 ## Checklist ao criar/alterar UI
 
+- **Jornada**: escrevi quem/quando/próximo passo e percorri a tela no navegador (desktop e celular)? Só aparece o que a pessoa precisa agora (copo na cozinha)? Edição eventual está em janela, e não em formulário aberto?
 - Usa só tokens do `app.css` e as classes existentes? Dados/datas/contagens em mono? Só um elemento lime na área?
 - Lime não virou decoração? Plum só em algo que o externo vê? Serifa só em "voz"?
 - Sem emoji; ícone Lucide via `icon()`; estados vazio/erro/foco tratados; funciona no claro e no mobile.

@@ -1,0 +1,80 @@
+<%- include('../partials/head') %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var stBadge = { enviado: 'b-green', simulado: 'b-gray', erro: 'b-red', ignorado: 'b-gray' };
+  var stLabel = { enviado: 'Enviado', simulado: 'Simulado', erro: 'Erro', ignorado: 'Sem palavra-chave' };
+%>
+<div class="page-head">
+  <div>
+    <span class="kicker">Social · Automação</span>
+    <h1><%= rule.name %> <span class="badge <%= rule.active ? 'b-green' : 'b-gray' %>"><%= rule.active ? (live ? 'Ativa' : 'Ativa · teste') : 'Pausada' %></span></h1>
+    <p class="muted top-gap"><%= triggers[rule.trigger] %><%= rule.trigger === 'comentario' ? ' no ' + platforms[rule.platform].label : ' no Instagram' %><%= rule.active_since && rule.active ? ' · responde o que chegou desde ' + fmt.formatDateTime(rule.active_since) : '' %></p>
+  </div>
+  <div class="row"><a class="btn ghost" href="/social/automacoes"><%- icon('arrow-left') %> Automações</a></div>
+</div>
+<% if (!live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: a automação lê comentários e directs de verdade, mas só registra o que responderia. Nada é enviado enquanto <span class="mono">UPLOAD_POST_LIVE</span> estiver desligado.</span></p><% } %>
+<% if (rule.last_error) { %><p class="flash flash-error">Última leitura falhou: <%= rule.last_error %></p><% } %>
+
+<section class="card next-step">
+  <span class="kicker">Próximo passo</span>
+  <% if (!rule.active) { %>
+    <h2>Pausada</h2>
+    <p class="muted">Revise a mensagem abaixo. Ao ativar, ela passa a responder o que chegar a partir de agora (o que já existe não recebe resposta).</p>
+    <% if (canAutomate) { %>
+    <form method="post" action="/social/automacoes/<%= rule.id %>/ativar" class="stack">
+      <%- csrfField %>
+      <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que esta automação responde pessoas de verdade<%= live ? '' : ' (no modo de teste, só registra)' %></label>
+      <div class="next-actions"><button class="btn primary" type="submit"><%- icon('play') %> Ativar</button></div>
+    </form>
+    <% } %>
+  <% } else { %>
+    <h2>Rodando a cada 5 minutos</h2>
+    <p class="mono-line muted"><span><%= events.filter(function (e) { return e.status === 'enviado' || e.status === 'simulado'; }).length %> RESPOSTAS RECENTES</span><span><%= rule.last_run_at ? 'ÚLTIMA LEITURA ' + fmt.formatDateTime(rule.last_run_at) : 'AINDA NÃO RODOU' %></span></p>
+    <% if (canAutomate) { %>
+    <div class="next-actions">
+      <form method="post" action="/social/automacoes/<%= rule.id %>/rodar" class="inline"><%- csrfField %><button class="btn" type="submit"><%- icon('refresh-cw') %> Rodar agora</button></form>
+      <form method="post" action="/social/automacoes/<%= rule.id %>/pausar" class="inline"><%- csrfField %><button class="btn ghost" type="submit"><%- icon('pause') %> Pausar</button></form>
+    </div>
+    <% } %>
+  <% } %>
+</section>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="atividade">
+  <div class="tabbar" role="tablist" aria-label="Seções da automação">
+    <button type="button" role="tab" data-tab-btn="atividade" aria-controls="pane-atividade">Atividade <span class="count"><%= events.length %></span></button>
+    <button type="button" role="tab" data-tab-btn="configurar" aria-controls="pane-configurar">Configurar</button>
+  </div>
+  <div class="pane" id="pane-atividade" data-pane-id="atividade">
+    <% if (!events.length) { %>
+    <div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nada respondido ainda.</strong></p><p class="muted small">Cada comentário ou mensagem que a automação vê aparece aqui, com o que ela respondeu.</p></div>
+    <% } else { %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Quando</th><th>Quem</th><th>Mensagem</th><th>Resposta</th><th>Status</th></tr></thead>
+        <tbody>
+          <% events.forEach(function (e) { %>
+          <tr>
+            <td class="mono nowrap"><%= fmt.formatDateTime(e.created_at) %></td>
+            <td class="handle"><%= e.author ? '@' + e.author : '—' %></td>
+            <td class="small"><%= e.text %></td>
+            <td class="small muted"><%= e.reply || '—' %><% if (e.error) { %><div class="bad-text"><%= e.error %></div><% } %></td>
+            <td><span class="badge <%= stBadge[e.status] %>"><%= stLabel[e.status] %></span></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+  <div class="pane" id="pane-configurar" data-pane-id="configurar">
+    <section class="card">
+      <% if (canAutomate) { %>
+        <%- include('_rule_form', { r: rule, action: '/social/automacoes/' + rule.id, submit: 'Salvar', cancel: false }) %>
+        <form method="post" action="/social/automacoes/<%= rule.id %>/excluir" class="top-gap" data-confirm="Excluir esta automação e o histórico dela?"><%- csrfField %><button class="btn sm danger" type="submit"><%- icon('trash-2') %> Excluir automação</button></form>
+      <% } else { %>
+        <dl class="kv"><dt>Palavras</dt><dd><%= rule.keywords.join(', ') || 'qualquer mensagem' %></dd><dt>Direct</dt><dd class="pre"><%= rule.message %></dd><% if (rule.reply_text) { %><dt>Resposta</dt><dd class="pre"><%= rule.reply_text %></dd><% } %></dl>
+      <% } %>
+    </section>
+  </div>
+</div>
+<%- include('../partials/foot') %>

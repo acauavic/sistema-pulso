@@ -1,0 +1,84 @@
+<%# Janela com os textos de publicação (YouTube, Spotify, capítulos, thumbnail). Variáveis: ep, meta, frames, perm, csrf, L, fmt %>
+<% var sug = (meta && meta.suggestions) || {}; var canWriteMeta = perm.review || perm.manage; var ro = canWriteMeta ? '' : 'readonly'; %>
+<dialog class="modal modal-xl" id="modal-textos" aria-labelledby="mtx-h">
+  <form method="post" action="/episodios/<%= ep.id %>/metadados" class="stack" data-meta>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mtx-h">Textos de publicação</h2>
+    <div class="tabs-wrap" data-tabs data-local data-default="yt">
+      <div class="tabbar" role="tablist" aria-label="Plataformas">
+        <button type="button" role="tab" data-tab-btn="yt" aria-controls="tx-yt">YouTube</button>
+        <button type="button" role="tab" data-tab-btn="sp" aria-controls="tx-sp">Spotify</button>
+        <button type="button" role="tab" data-tab-btn="ch" aria-controls="tx-ch">Capítulos</button>
+        <button type="button" role="tab" data-tab-btn="th" aria-controls="tx-th">Thumbnail</button>
+      </div>
+
+      <div class="pane stack" id="tx-yt" data-pane-id="yt">
+        <% if (sug.youtube_titles && sug.youtube_titles.length) { %>
+        <div class="suggest-list" role="group" aria-label="Sugestões de título">
+          <span class="small muted">Sugestões da IA (clique para usar)</span>
+          <% sug.youtube_titles.forEach(function (t) { %>
+          <button type="button" class="suggest" data-fill="yt_title" data-value="<%= t.texto %>"><span><%= t.texto %></span><small class="muted"><%= t.texto.length %> caracteres · <%= t.angulo %></small></button>
+          <% }) %>
+        </div>
+        <% } %>
+        <label>Título <small class="counter" data-counter-for="yt_title" data-max="<%= L.LIMITS.youtube.title.max %>" data-ideal="<%= L.LIMITS.youtube.title.ideal %>"></small>
+          <input type="text" name="yt_title" value="<%= (meta && meta.yt_title) || '' %>" maxlength="<%= L.LIMITS.youtube.title.max %>" <%= ro %>>
+        </label>
+        <label>Descrição <small class="counter" data-counter-for="yt_description" data-max-bytes="<%= L.LIMITS.youtube.descriptionBytes %>"></small>
+          <textarea name="yt_description" rows="12" <%= ro %>><%= (meta && meta.yt_description) || '' %></textarea>
+        </label>
+        <label>Tags <small class="counter" data-counter-for="yt_tags" data-max="<%= L.LIMITS.youtube.tagsChars %>"></small>
+          <input type="text" name="yt_tags" value="<%= (meta && meta.yt_tags) || '' %>" <%= ro %>>
+        </label>
+      </div>
+
+      <div class="pane stack" id="tx-sp" data-pane-id="sp" hidden>
+        <label>Título <small class="counter" data-counter-for="sp_title" data-max="<%= L.LIMITS.spotify.title.max %>" data-ideal="<%= L.LIMITS.spotify.title.ideal %>"></small>
+          <input type="text" name="sp_title" value="<%= (meta && meta.sp_title) || '' %>" maxlength="<%= L.LIMITS.spotify.title.max %>" <%= ro %>>
+        </label>
+        <label>Descrição <small class="counter" data-counter-for="sp_description" data-max="<%= L.LIMITS.spotify.description %>"></small>
+          <textarea name="sp_description" rows="10" <%= ro %>><%= (meta && meta.sp_description) || '' %></textarea>
+        </label>
+      </div>
+
+      <div class="pane stack" id="tx-ch" data-pane-id="ch" hidden>
+        <label>Um por linha, "0:00 Título" <small class="muted">(o primeiro em 0:00; mínimo de 3; título abaixo de 40 caracteres)</small>
+          <textarea name="chapters" rows="10" <%= ro %>><%= (meta && meta.chapters) || '' %></textarea>
+        </label>
+      </div>
+
+      <div class="pane stack" id="tx-th" data-pane-id="th" hidden>
+        <% if (sug.thumbnail_texts && sug.thumbnail_texts.length) { %>
+        <div class="suggest-list" role="group" aria-label="Sugestões de texto da thumbnail">
+          <span class="small muted">Sugestões da IA (clique para usar)</span>
+          <% sug.thumbnail_texts.forEach(function (t) { %>
+          <button type="button" class="suggest" data-fill="thumb_text" data-value="<%= t.texto %>"><span><%= t.lines && t.lines.lines ? t.lines.lines.join(' / ') : t.texto %></span><small class="muted"><%= t.angulo %></small></button>
+          <% }) %>
+        </div>
+        <% } %>
+        <label>Texto da thumbnail <small class="counter" data-counter-for="thumb_text" data-max="<%= L.LIMITS.thumbnailText.maxChars %>"></small>
+          <input type="text" name="thumb_text" value="<%= (meta && meta.thumb_text) || '' %>" maxlength="40" <%= ro %>>
+        </label>
+        <% if (frames.length) { %>
+        <fieldset class="frame-pick">
+          <legend>Quadro de fundo (os de nota mais alta primeiro)</legend>
+          <div class="frame-grid">
+            <% frames.forEach(function (f) { var a = f.analysis || {}; %>
+            <label class="frame <%= meta && meta.thumb_frame_id === f.id ? 'on' : '' %>">
+              <input type="radio" name="thumb_frame_id" value="<%= f.id %>" <%= meta && meta.thumb_frame_id === f.id ? 'checked' : '' %> <%= canWriteMeta ? '' : 'disabled' %>>
+              <img src="/episodios/<%= ep.id %>/quadros/<%= f.id %>" alt="Quadro em <%= fmt.formatClock(f.at_ms) %>" loading="lazy">
+              <span class="handle"><%= fmt.formatClock(f.at_ms) %> · nota <%= f.score != null ? Number(f.score).toFixed(1) : '—' %></span>
+              <span class="small muted"><%= (a.rostos || []).length %> rosto(s)<%= a.texto_queimado ? ' · legenda no quadro' : '' %><%= a.olhos_abertos === false ? ' · olhos fechados' : '' %></span>
+            </label>
+            <% }) %>
+          </div>
+        </fieldset>
+        <% } %>
+      </div>
+    </div>
+    <div class="row modal-actions">
+      <% if (canWriteMeta) { %><button class="btn primary" type="submit">Salvar textos</button><% } %>
+      <button class="btn ghost" type="button" data-modal-close><%= canWriteMeta ? 'Cancelar' : 'Fechar' %></button>
+    </div>
+  </form>
+</dialog>

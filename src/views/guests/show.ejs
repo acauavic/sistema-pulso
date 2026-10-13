@@ -1,13 +1,38 @@
 <%- include('../partials/head') %>
+<%
+  var C_TASK = { a_fazer: 'A fazer', fazendo: 'Fazendo', feito: 'Feito', bloqueada: 'Bloqueada' };
+  var canW = can('guests.write');
+  var canInv = can('guests.invite');
+  var FUNNEL = ['prospect', 'convite_enviado', 'em_agendamento', 'agendado', 'gravado'];
+  var idx = FUNNEL.indexOf(guest.status);
+  var closed = idx < 0;
+  var inviteUrl = guest.short_url || longUrl;
+  var canEmail = canInv && guest.email && mailReady;
+  var epNo = episode && episode.number ? 'EP.' + String(episode.number).padStart(3, '0') : 'Episódio';
+  var agendaMissing = [!guest.scheduled_studio && 'estúdio', !guest.scheduled_hosts && 'hosts', !guest.scheduled_guest && 'convidado'].filter(Boolean);
+  var showInvite = guest.invite_token || idx <= 2;
+  var future = guest.proposed_at && new Date(guest.proposed_at).getTime() > Date.now();
+  var whenUpper = function (d) { return fmt.formatLong(d).replace(' de ' + new Date(d).getFullYear(), '').toUpperCase(); };
+  var hidden = function (name, value) { return '<input type="hidden" name="' + name + '" value="' + value + '">'; };
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var advance = function (to, label, tone, confirm) {
+    return '<form method="post" action="/convidados/' + guest.id + '/avancar" class="inline"' + (confirm ? ' data-confirm="' + confirm.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"' : '') + '>' + csrfField + hidden('para', to) +
+      '<button class="btn ' + (tone || '') + '" type="submit">' + label + '</button></form>';
+  };
+  var openOnLoad = function (name) { return openModal === name ? 'data-open-on-load' : ''; };
+%>
 <div class="page-head">
   <div>
-    <span class="kicker">Convidado</span>
-    <h1><%= guest.name %> <span class="badge b-st-<%= guest.status %>"><%= statusInfo.label %></span></h1>
-    <p class="muted" style="margin-top:8px"><%= [guest.job_title, guest.company].filter(Boolean).join(' · ') %></p>
+    <span class="kicker">Convidado<%= guest.instagram ? ' · @' + guest.instagram : '' %></span>
+    <h1><%= guest.name %>
+      <% if (canW) { %><button class="badge badge-btn b-st-<%= guest.status %>" type="button" data-modal-open="modal-etapa" aria-label="Mudar a etapa (agora: <%= statusInfo.label %>)" title="Mudar a etapa"><%= statusInfo.label %> <%- icon('chevron-down', 12) %></button>
+      <% } else { %><span class="badge b-st-<%= guest.status %>"><%= statusInfo.label %></span><% } %></h1>
+    <p class="muted top-gap"><%= [guest.profile ? profileLabels[guest.profile].label : '', guest.job_title, guest.company].filter(Boolean).join(' · ') %></p>
   </div>
   <div class="row">
     <a class="btn ghost" href="/convidados"><%- icon('arrow-left') %> Voltar</a>
-    <% if (can('guests.write')) { %><a class="btn" href="/convidados/<%= guest.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
+    <% if (episode) { %><a class="btn" href="/episodios/<%= episode.id %>"><%- icon('film') %> <%= epNo %></a><% } %>
+    <% if (canW) { %><a class="btn" href="/convidados/<%= guest.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
     <% if (can('guests.delete')) { %>
     <form method="post" action="/convidados/<%= guest.id %>/excluir" class="inline" data-confirm="Excluir <%= guest.name %> e todo o histórico? Esta ação não pode ser desfeita.">
       <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn danger" type="submit"><%- icon('trash-2') %> Excluir</button>
@@ -16,42 +41,251 @@
   </div>
 </div>
 
-<div class="grid-2 align-start">
-  <div class="stack-lg">
-    <section class="card">
-      <h2>Dados</h2>
-      <dl class="kv">
-        <dt>E-mail</dt><dd><%= guest.email || '—' %></dd>
-        <dt>Tratamento</dt><dd><%= guest.is_plural ? 'Dupla · ' : '' %><%= guest.gender === 'f' ? 'Feminino' : 'Masculino' %></dd>
-        <dt>WhatsApp</dt><dd><%= guest.phone || '—' %></dd>
-        <dt>Instagram</dt><dd><%= guest.instagram ? '@' + guest.instagram : '—' %></dd>
-        <dt>Tema</dt><dd><%= guest.topic || '—' %></dd>
-        <dt>Gravação</dt><dd><%= guest.proposed_at ? fmt.formatLong(guest.proposed_at) : '—' %></dd>
-        <dt>Responsável</dt><dd><%= guest.owner_name || '—' %></dd>
-        <% if (guest.bio) { %><dt>Bio</dt><dd class="pre"><%= guest.bio %></dd><% } %>
-        <% if (guest.notes) { %><dt>Observações</dt><dd class="pre"><%= guest.notes %></dd><% } %>
-        <% if (guest.rsvp_message) { %><dt>Recado do convidado</dt><dd class="quote pre"><%= guest.rsvp_message %></dd><% } %>
-      </dl>
-      <% if (can('guests.write')) { %>
-      <form method="post" action="/convidados/<%= guest.id %>/status" class="row top-gap">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <select name="status">
-          <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= guest.status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
-        </select>
-        <button class="btn" type="submit">Mover de etapa</button>
-      </form>
+<ol class="stepper s5" aria-label="Etapas do convidado">
+  <% FUNNEL.forEach(function (k, i) { %>
+  <li class="<%= closed ? '' : (i < idx ? 'done' : (i === idx ? 'now' : '')) %>"><span class="step-n mono"><%= String(i + 1).padStart(2, '0') %></span><span class="step-l"><%= statuses.find(function (s) { return s.key === k; }).label %></span></li>
+  <% }) %>
+</ol>
+
+<section class="card next-step" id="proximo">
+  <span class="kicker">Próximo passo</span>
+
+  <% if (guest.status === 'prospect') { %>
+    <% if (!guest.invite_token) { %>
+      <h2>Convidar <%= fmt.firstName(guest.name) %></h2>
+      <p class="muted">Gere o link do convite: uma página com os dados da conversa, para mandar por e-mail ou WhatsApp.</p>
+      <% if (canInv) { %>
+      <div class="next-actions">
+        <form method="post" action="/convidados/<%= guest.id %>/convite" class="inline"><%- csrfField %><button class="btn primary" type="submit"><%- icon('link') %> Gerar link do convite</button></form>
+      </div>
+      <% } %>
+    <% } else { %>
+      <h2>Enviar o convite</h2>
+      <p class="muted">O link está pronto. Mande por e-mail daqui ou copie para o WhatsApp.<%= !guest.email ? ' Sem e-mail cadastrado: dá para enviar só pelo WhatsApp.' : '' %></p>
+      <div class="next-actions">
+        <% if (canEmail) { %><button class="btn primary" type="button" data-modal-open="modal-email"><%- icon('mail') %> Enviar por e-mail</button><% } %>
+        <button class="btn" type="button" data-copy="<%= inviteUrl %>">Copiar link</button>
+        <% if (canW) { %><%- advance('convite_enviado', 'Já enviei pelo WhatsApp', canEmail ? 'ghost' : '') %><% } %>
+      </div>
+    <% } %>
+
+  <% } else if (guest.status === 'convite_enviado') { %>
+    <h2>Aguardando resposta</h2>
+    <p class="muted mono-line">
+      <span>ENVIADO <%= guest.invite_sent_at ? fmt.formatDateTime(guest.invite_sent_at) : '—' %></span>
+      <span><%= guest.invite_viewed_at ? 'ABERTO ' + fmt.formatDateTime(guest.invite_viewed_at) : 'AINDA NÃO ABRIU' %></span>
+    </p>
+    <p class="small muted">Quando <%= fmt.firstName(guest.name) %> responder pelo convite, a etapa muda sozinha. Se a resposta veio por outro canal, registre aqui.</p>
+    <% if (canW) { %>
+    <div class="next-actions">
+      <% if (guest.email || guest.phone) { %><%- advance('em_agendamento', 'Aceitou o convite', 'primary') %>
+      <% } else { %><button class="btn primary" type="button" data-modal-open="modal-contato">Aceitou o convite</button><% } %>
+      <% if (canEmail) { %><button class="btn" type="button" data-modal-open="modal-email"><%- icon('mail') %> Reenviar</button><% } else if (inviteUrl) { %><button class="btn" type="button" data-copy="<%= inviteUrl %>">Copiar link</button><% } %>
+      <button class="btn ghost" type="button" data-modal-open="modal-perda">Marcar como perdido</button>
+    </div>
+    <% } %>
+
+  <% } else if (guest.status === 'em_agendamento') { %>
+    <h2>Marcar a gravação</h2>
+    <% if (guest.proposed_at) { %>
+      <p class="big-date mono"><%= whenUpper(guest.proposed_at) %></p>
+      <p class="small warn">Data proposta. Falta confirmar com: <%= agendaMissing.join(', ') %>.</p>
+    <% } else { %>
+      <p class="muted"><%= fmt.firstName(guest.name) %> aceitou. Combine a data e confirme com o estúdio, os hosts e <%= guest.gender === 'f' ? 'a convidada' : 'o convidado' %>.</p>
+    <% } %>
+    <% if (canW) { %>
+    <div class="next-actions">
+      <button class="btn primary" type="button" data-modal-open="modal-agenda"><%- icon('calendar') %> <%= guest.proposed_at ? 'Confirmar a data' : 'Definir data da gravação' %></button>
+      <%- advance('cancelado', 'Cancelar', 'ghost', 'Cancelar a participação de ' + guest.name + '?') %>
+    </div>
+    <% } %>
+
+  <% } else if (guest.status === 'agendado') { %>
+    <h2>Gravação marcada</h2>
+    <p class="big-date mono"><%= whenUpper(guest.proposed_at) %> <span class="rel"><%= fmt.relativeDays(guest.proposed_at) %></span></p>
+    <p class="small muted">Confirmada com estúdio, hosts e <%= guest.gender === 'f' ? 'convidada' : 'convidado' %>. Já aparece na agenda (media kit e portal dos patrocinadores). O episódio nasce quando a conversa for gravada.</p>
+    <% if (bookings.length) { %><p class="small muted">Reservada por: <% bookings.forEach(function (b, i) { %><%= i ? ', ' : '' %><a href="/patrocinadores/<%= b.id %>"><%= b.company %></a> (<%= b.role === 'exclusivo' ? 'exclusivo' : 'inserção' %>)<% }) %></p><% } %>
+    <% if (canW) { %>
+    <div class="next-actions">
+      <%- advance('gravado', 'Marcar como gravado', 'primary', future ? 'A gravação está marcada para ' + fmt.formatDateTime(guest.proposed_at) + '. Marcar como gravado mesmo assim?' : null) %>
+      <button class="btn" type="button" data-modal-open="modal-agenda">Remarcar</button>
+      <%- advance('cancelado', 'Cancelar gravação', 'ghost', 'Cancelar a gravação com ' + guest.name + '?') %>
+    </div>
+    <% } %>
+
+  <% } else if (guest.status === 'gravado') { %>
+    <% var aired = episode && episode.status === 'publicado'; %>
+    <h2><%= aired ? 'No ar' : 'Conversa gravada' %></h2>
+    <p class="muted"><%= aired ? 'Obrigado por sentar à mesa. Os links ficam aqui para compartilhar com ' + (guest.gender === 'f' ? 'a convidada' : 'o convidado') + '.' : 'A parte do convidado terminou. Daqui em diante é o episódio: edição, revisão e publicação.' %></p>
+    <% if (episode && !aired) { %><p class="mono-line muted"><span><%= epNo %> · <%= (episodeStages[episode.status] || '').toUpperCase() %></span></p><% } %>
+    <div class="next-actions">
+      <% if (episode) { %><a class="btn <%= aired ? '' : 'primary' %>" href="/episodios/<%= episode.id %>"><%- icon('film') %> Abrir <%= epNo %></a><% } %>
+      <% if (aired && episode.youtube_url) { %><a class="btn" href="<%= episode.youtube_url %>" target="_blank" rel="noopener noreferrer"><%- icon('external-link') %> YouTube</a><% } %>
+      <% if (aired && episode.spotify_url) { %><a class="btn" href="<%= episode.spotify_url %>" target="_blank" rel="noopener noreferrer"><%- icon('external-link') %> Spotify</a><% } %>
+    </div>
+
+  <% } else { %>
+    <% if (guest.status === 'perdido') { %>
+    <h2>Perdido</h2>
+    <p class="mono-line muted"><span>MOTIVO: <%= (lossReasons[guest.loss_reason] || '—').toUpperCase() %></span></p>
+    <% if (guest.loss_note) { %><p class="quote pre"><%= guest.loss_note %></p><% } %>
+    <% } else { %>
+    <h2>Participação cancelada</h2>
+    <% if (guest.rsvp_message) { %><p class="quote pre"><%= guest.rsvp_message %></p><% } %>
+    <% } %>
+    <% if (canW) { %><div class="next-actions"><%- advance('prospect', 'Retomar contato', '') %></div><% } %>
+  <% } %>
+
+</section>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="resumo">
+  <div class="tabbar" role="tablist" aria-label="Seções do convidado">
+    <button type="button" role="tab" data-tab-btn="resumo" aria-controls="pane-resumo">Resumo</button>
+    <% if (showInvite) { %><button type="button" role="tab" data-tab-btn="convite" aria-controls="pane-convite">Convite</button><% } %>
+    <button type="button" role="tab" data-tab-btn="historico" aria-controls="pane-historico">Histórico <span class="count"><%= events.length %></span></button>
+  </div>
+
+  <div class="pane" id="pane-resumo" data-pane-id="resumo">
+    <div class="grid-2 align-start">
+      <div class="stack-lg">
+        <section class="card" id="sobre">
+          <h2>Sobre</h2>
+          <dl class="kv">
+            <dt>Responsável</dt><dd><%- include('../partials/dot', { type: 'guest', id: guest.id, user: guest.owner_id ? { id: guest.owner_id, name: guest.owner_name } : null, editable: canW, label: true }) %></dd>
+            <% if (guest.phone) { %><dt>WhatsApp</dt><dd class="handle"><%= guest.phone %></dd><% } %>
+            <% if (guest.email) { %><dt>E-mail</dt><dd><%= guest.email %></dd><% } %>
+            <% if (guest.invite_reason) { %><dt>Motivo do convite</dt><dd class="pre"><%= guest.invite_reason %></dd><% } %>
+            <% if (guest.positioning) { %><dt>Posicionamento</dt><dd class="pre"><%= guest.positioning %></dd><% } %>
+            <% if (guest.topic) { %><dt>Temas</dt><dd class="pre"><%= guest.topic %></dd><% } %>
+            <% if (guest.bio) { %><dt>Biografia</dt><dd class="pre"><%= guest.bio %></dd><% } %>
+            <% if (linkedSponsor) { %><dt>Patrocinador</dt><dd><a href="/patrocinadores/<%= linkedSponsor.id %>"><%= linkedSponsor.company %></a> <span class="muted small">· <%= guest.sponsor_relation === 'representante' ? 'pessoa do patrocinador' : 'indicado pelo patrocinador' %></span></dd><% } %>
+            <% if (guest.proposed_at && idx >= 4) { %><dt>Gravação</dt><dd class="mono"><%= fmt.formatDateTime(guest.proposed_at) %></dd><% } %>
+            <% if (guest.notes) { %><dt>Observações</dt><dd class="pre"><%= guest.notes %></dd><% } %>
+            <% if (guest.rsvp_message && !closed) { %><dt>Recado</dt><dd class="quote pre"><%= guest.rsvp_message %></dd><% } %>
+          </dl>
+          <% var gaps = [!guest.phone && !guest.email && 'contato', !guest.positioning && 'posicionamento', !guest.topic && 'temas', !guest.bio && 'biografia'].filter(Boolean); %>
+          <% if (canW && gaps.length) { %><p class="small muted top-gap">Sem <%= gaps.join(', ') %>. <a href="/convidados/<%= guest.id %>/editar">Completar cadastro</a></p><% } %>
+        </section>
+        <%- include('../partials/comments', { type: 'guest', id: guest.id, items: comments, back: '/convidados/' + guest.id }) %>
+      </div>
+
+      <div class="stack-lg">
+      <% if (reminderList.length) { var R_STATE = { enviado: ['b-gray', 'enviado'], agora: ['b-amber', 'na hora'], agendado: ['b-gray', 'agendado'], passou: ['b-gray', 'não enviado'] }; %>
+      <section class="card" id="lembretes">
+        <h2>Lembretes da gravação</h2>
+        <p class="small muted">A produtora manda pelo WhatsApp. Na hora de cada um, o sistema avisa.</p>
+        <ul class="plain reminder-list">
+          <% reminderList.forEach(function (r) { %>
+          <li class="<%= r.current ? 'is-current' : '' %>">
+            <div class="reminder-head">
+              <span><strong><%= r.label %></strong> <span class="small muted">· <%= r.hint %><%= r.withAddress ? ' (com o endereço)' : '' %></span></span>
+              <span class="badge <%= R_STATE[r.state][0] %>"><%= R_STATE[r.state][1] %></span>
+            </div>
+            <span class="handle muted"><%= r.state === 'enviado' ? 'Enviado ' + (r.sendCount > 1 ? r.sendCount + '× · último ' : '') + fmt.formatDateTime(r.sentAt) + (r.sentBy ? ' · ' + r.sentBy : '') : fmt.formatDateTime(r.due) %></span>
+            <% if (canW && (r.current || r.state === 'enviado' || r.state === 'passou')) { %>
+            <details class="more"><summary>Ver mensagem</summary><p class="pre small"><%= r.text %></p></details>
+            <%- include('../partials/reminder-actions', { it: r, guestId: guest.id, guestName: guest.name }) %>
+            <% } %>
+          </li>
+          <% }) %>
+        </ul>
+      </section>
+      <% } %>
+      <% if (['em_agendamento', 'agendado'].indexOf(guest.status) >= 0) { %>
+      <section class="card" id="plateia">
+        <div class="row spread"><h2>Podcast com plateia</h2><% if (plateia.leads && plateia.canSeeLeads) { %><a class="small" href="/plateia/painel?convidado=<%= guest.id %>"><span class="mono"><%= plateia.leads %></span> inscrição<%= plateia.leads === 1 ? '' : 'ões' %></a><% } %></div>
+        <% if (canW) { %>
+        <form method="post" action="/convidados/<%= guest.id %>/plateia" class="stack">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="enabled" value="0">
+          <label class="check"><input type="checkbox" name="enabled" value="1" <%= guest.audience_enabled ? 'checked' : '' %> data-autosubmit> Aberto para plateia</label>
+          <% if (guest.audience_enabled) { %>
+          <label>Vagas<select name="status" data-autosubmit><% [['disponivel', 'Disponível'], ['lotado', 'Lotado'], ['encerrado', 'Inscrições encerradas']].forEach(function (o) { %><option value="<%= o[0] %>" <%= guest.audience_status === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %></select></label>
+          <% } else { %><input type="hidden" name="status" value="<%= guest.audience_status %>"><% } %>
+        </form>
+        <% } else { %><p class="small"><%= guest.audience_enabled ? 'Aberto para plateia' : 'Fora da plateia' %></p><% } %>
+        <p class="small muted"><%= guest.audience_enabled ? (guest.status === 'agendado' && guest.proposed_at && new Date(guest.proposed_at) > new Date() ? 'Aparece na agenda pública da plateia.' : 'Entra na agenda pública quando a gravação estiver Agendada, com data futura.') : 'Fora da agenda pública da plateia.' %></p>
+        <% if (canW) { %>
+        <div data-image-scope>
+        <div class="row top-gap">
+          <% if (guest.photo_key) { %><img class="guest-photo" src="/convidados/<%= guest.id %>/foto" alt="Foto <%= guest.gender === 'f' ? 'da convidada' : 'do convidado' %> na moldura padrão" width="96" height="72" loading="lazy"><% } %>
+          <button class="btn sm" type="button" data-image-pick="" <%= plateia.storageReady ? '' : 'disabled' %>><%- icon('upload', 14) %> <%= guest.photo_key ? 'Trocar foto' : 'Enviar foto' %></button>
+          <span class="small muted"><%= guest.photo_key ? '' : 'A página pública usa a foto do convidado.' %></span>
+        </div>
+        <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-crop="<%= photoFrame.ratio %>" data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/foto">
+        </div>
+        <% } %>
+      </section>
+      <% } %>
+      <section class="card" id="tarefas">
+        <div class="row spread"><h2>Tarefas<%= linkedTasks.length ? ' (' + linkedTasks.length + ')' : '' %></h2><% if (can('tasks.write')) { %><a class="btn sm" href="/tarefas?nova=1&convidado=<%= guest.id %>"><%- icon('plus') %> Nova tarefa</a><% } %></div>
+        <% if (!linkedTasks.length) { %><p class="muted small">Nenhuma tarefa ligada a este convidado.</p><% } %>
+        <ul class="plain mini-tasks"><% linkedTasks.forEach(function (t) { %><li class="st-<%= t.status %>"><a href="/tarefas/<%= t.id %>"><%= t.title %></a><span class="handle muted"><%= C_TASK[t.status] %><%= t.due_on ? ' · ' + fmt.formatDayShort(t.due_on) : '' %><%= t.assignee_name ? ' · ' + t.assignee_name : '' %></span></li><% }) %></ul>
+      </section>
+      </div>
+    </div>
+  </div>
+
+  <% if (showInvite) { %>
+  <div class="pane" id="pane-convite" data-pane-id="convite">
+    <section class="card" id="convite">
+      <% if (!guest.invite_token) { %>
+        <h2>Convite</h2>
+        <p class="muted">Ainda não há link. Ao gerar, criamos uma página exclusiva do convite com os dados deste convidado<%= yourlsReady ? ' e um link curto' : '' %>.</p>
+      <% } else { %>
+        <div class="grid-2 align-start">
+          <div class="stack">
+            <h2>Link do convite</h2>
+            <label class="copy-field">Link curto (para enviar)
+              <div class="row">
+                <input type="text" readonly value="<%= inviteUrl %>" class="grow" data-select-on-focus>
+                <button class="btn" type="button" data-copy="<%= inviteUrl %>">Copiar</button>
+              </div>
+            </label>
+            <% if (!guest.short_url) { %>
+              <p class="small muted">Sem link curto (encurtador indisponível). Este é o link completo.</p>
+              <% if (canInv && yourlsReady) { %><form method="post" action="/convidados/<%= guest.id %>/convite" class="inline"><%- csrfField %><button class="link small" type="submit">Tentar encurtar de novo</button></form><% } %>
+            <% } else { %>
+              <p class="small muted">Link completo: <a href="<%= longUrl %>" target="_blank" rel="noopener"><%= longUrl %></a></p>
+            <% } %>
+            <p class="small muted">O convite trata como <strong><%= guest.is_plural ? (guest.gender === 'f' ? 'convidadas' : 'convidados') : (guest.gender === 'f' ? 'convidada' : 'convidado') %></strong>. Ajuste em Editar.</p>
+            <div class="row">
+              <a class="btn" href="/convidados/<%= guest.id %>/previa" target="_blank" rel="noopener"><%- icon('eye') %> Ver convite</a>
+              <% if (canEmail) { %><button class="btn" type="button" data-modal-open="modal-email"><%- icon('mail') %> <%= guest.invite_sent_at ? 'Reenviar' : 'Enviar' %> por e-mail</button><% } %>
+              <% if (canInv) { %>
+              <form method="post" action="/convidados/<%= guest.id %>/convite" class="inline" data-confirm="Gerar um novo link? O link atual deixará de funcionar.">
+                <%- csrfField %><input type="hidden" name="regenerar" value="1"><button class="btn ghost" type="submit">Gerar novo link</button>
+              </form>
+              <% } %>
+            </div>
+          </div>
+          <div class="stack">
+            <h2>Acompanhamento</h2>
+            <dl class="kv">
+              <dt>Gerado</dt><dd class="handle"><%= fmt.formatDateTime(guest.invite_generated_at) %></dd>
+              <dt>Enviado</dt><dd class="handle"><%= guest.invite_sent_at ? fmt.formatDateTime(guest.invite_sent_at) : 'ainda não' %></dd>
+              <dt>Aberto</dt><dd class="handle"><%= guest.invite_viewed_at ? fmt.formatDateTime(guest.invite_viewed_at) : 'ainda não' %></dd>
+              <dt>Resposta</dt><dd class="handle"><%= guest.responded_at ? fmt.formatDateTime(guest.responded_at) + ' · ' + (guest.status === 'perdido' && guest.loss_reason === 'recusado' ? 'recusou' : idx >= 2 ? 'aceitou' : 'respondeu') : 'sem resposta' %></dd>
+              <% Object.keys(clickKinds).forEach(function (k) { %>
+              <dt><%= clickKinds[k] %></dt>
+              <dd><strong class="mono"><%= clicks[k].total %></strong><% if (clicks[k].total) { %> <span class="handle muted">· último <%= fmt.formatDateTime(clicks[k].last) %></span><% } %></dd>
+              <% }) %>
+            </dl>
+            <% if (canW && ['agendado', 'gravado'].indexOf(guest.status) < 0 && (clicks.aceitar.total || guest.responded_at || ['em_agendamento', 'perdido', 'cancelado'].indexOf(guest.status) >= 0)) { %>
+            <form method="post" action="/convidados/<%= guest.id %>/zerar-aceite" class="inline" data-confirm="Zerar o aceite de <%= guest.name %>? O contador volta a zero, a resposta é apagada e <%= fmt.firstName(guest.name) %> volta para Prospecção.">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">Zerar aceite e voltar para Prospecção</button>
+            </form>
+            <% } %>
+          </div>
+        </div>
       <% } %>
     </section>
+  </div>
+  <% } %>
 
+  <div class="pane" id="pane-historico" data-pane-id="historico">
     <section class="card" id="timeline">
       <h2>Linha do tempo</h2>
-      <% if (can('guests.write')) { %>
-      <form method="post" action="/convidados/<%= guest.id %>/nota" class="row">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <input type="text" name="nota" maxlength="1000" placeholder="Anotar contato, ligação, combinado…" class="grow">
-        <button class="btn" type="submit">Anotar</button>
-      </form>
-      <% } %>
+      <p class="small muted">Movimentos automáticos (etapas, convite, cliques). Para falar com a equipe, use os comentários.</p>
       <ol class="timeline">
         <% events.forEach(function (e) { %>
         <li class="ev ev-<%= e.type %>">
@@ -62,64 +296,99 @@
       </ol>
     </section>
   </div>
-
-  <section class="card" id="convite">
-    <h2>Convite</h2>
-    <% if (!guest.invite_token) { %>
-      <p class="muted">Ainda não há link. Ao gerar, criamos uma página exclusiva do convite com os dados deste convidado<%= yourlsReady ? ' e um link curto' : '' %>.</p>
-      <% if (can('guests.invite')) { %>
-      <form method="post" action="/convidados/<%= guest.id %>/convite">
-        <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn primary" type="submit"><%- icon('link') %> Gerar link do convite</button>
-      </form>
-      <% } %>
-    <% } else { %>
-      <label class="copy-field">Link curto (para enviar)
-        <div class="row">
-          <input type="text" readonly value="<%= guest.short_url || longUrl %>" class="grow" data-select-on-focus>
-          <button class="btn" type="button" data-copy="<%= guest.short_url || longUrl %>">Copiar</button>
-        </div>
-      </label>
-      <% if (!guest.short_url) { %>
-        <p class="small muted">Sem link curto (encurtador indisponível). Este é o link completo.
-          <% if (can('guests.invite') && yourlsReady) { %>
-          <form method="post" action="/convidados/<%= guest.id %>/convite" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">Tentar encurtar de novo</button></form>
-          <% } %></p>
-      <% } else { %>
-        <p class="small muted">Link completo: <a href="<%= longUrl %>" target="_blank" rel="noopener"><%= longUrl %></a></p>
-      <% } %>
-      <ul class="plain small">
-        <li>Gerado: <%= fmt.formatDateTime(guest.invite_generated_at) %></li>
-        <li>Enviado por e-mail: <%= guest.invite_sent_at ? fmt.formatDateTime(guest.invite_sent_at) : 'ainda não' %></li>
-        <li>Aberto pelo convidado: <%= guest.invite_viewed_at ? fmt.formatDateTime(guest.invite_viewed_at) : 'ainda não' %></li>
-        <li>Resposta: <%= guest.responded_at ? fmt.formatDateTime(guest.responded_at) + ' — ' + (guest.status === 'confirmado' ? 'aceitou' : guest.status === 'recusou' ? 'recusou' : 'respondeu') : 'sem resposta' %></li>
-      </ul>
-      <div class="row">
-        <a class="btn" href="/convidados/<%= guest.id %>/previa" target="_blank" rel="noopener"><%- icon('eye') %> Ver convite</a>
-        <% if (can('guests.invite')) { %>
-        <form method="post" action="/convidados/<%= guest.id %>/convite" class="inline" data-confirm="Gerar um novo link? O link atual deixará de funcionar.">
-          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="regenerar" value="1"><button class="btn" type="submit">Gerar novo link</button>
-        </form>
-        <% } %>
-      </div>
-
-      <% if (can('guests.invite')) { %>
-      <hr>
-      <h3>Enviar por e-mail</h3>
-      <% if (!guest.email) { %>
-        <p class="muted small">Cadastre o e-mail do convidado (em Editar) para enviar por aqui. Você também pode copiar o link e mandar pelo WhatsApp.</p>
-      <% } else if (!mailReady) { %>
-        <p class="muted small">SMTP não configurado neste servidor.</p>
-      <% } else { %>
-      <form method="post" action="/convidados/<%= guest.id %>/enviar" class="stack">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <p class="small muted">Para: <strong><%= guest.email %></strong></p>
-        <label>Assunto<input type="text" name="assunto" maxlength="200" placeholder="(usa o assunto do modelo)"></label>
-        <label>Mensagem<textarea name="mensagem" rows="7" maxlength="2000"><%= defaultMessage %></textarea></label>
-        <button class="btn primary" type="submit"><%= guest.invite_sent_at ? 'Reenviar convite' : 'Enviar convite' %></button>
-      </form>
-      <% } %>
-      <% } %>
-    <% } %>
-  </section>
 </div>
+
+<% if (canW) { %>
+<dialog class="modal" id="modal-etapa" aria-labelledby="m-etapa-h">
+  <form method="post" action="/convidados/<%= guest.id %>/status" class="stack">
+    <%- csrfField %>
+    <h2 id="m-etapa-h">Mudar a etapa</h2>
+    <p class="small muted">Hoje: <strong><%= statusInfo.label %></strong>. Algumas etapas pedem dados; se faltar algo, abrimos a janela certa.</p>
+    <div class="stage-pick" role="radiogroup" aria-label="Nova etapa">
+      <% statuses.forEach(function (st) { %>
+      <label class="choice"><input type="radio" name="status" value="<%= st.key %>" <%= guest.status === st.key ? 'checked' : '' %> data-current="<%= guest.status === st.key ? '1' : '' %>"><span><strong><%= st.label %></strong><small class="muted"><%= st.hint %></small></span></label>
+      <% }) %>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit" data-stage-confirm disabled>Confirmar mudança</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<% if (canW) { %><%- include('../partials/photo-cropper') %><% } %>
+<% if (canW) { var photoFor = pendingStage && ['em_agendamento', 'agendado'].indexOf(pendingStage) >= 0 ? pendingStage : null; %>
+<dialog class="modal" id="modal-foto" aria-labelledby="m-foto-h" <%= openOnLoad('foto') %> data-image-scope>
+  <div class="stack">
+    <h2 id="m-foto-h">Foto <%= guest.gender === 'f' ? 'da convidada' : 'do convidado' %></h2>
+    <p class="small muted"><%= photoFor ? 'Para ir para ' + statuses.find(function (s) { return s.key === photoFor; }).label + ', envie a foto de ' + fmt.firstName(guest.name) + '. Ela aparece na agenda da plateia e para os patrocinadores.' : 'A foto aparece na agenda da plateia e para os patrocinadores.' %></p>
+    <% if (guest.photo_key) { %><img class="guest-photo md" src="/convidados/<%= guest.id %>/foto" alt="Foto atual" width="200" height="150"><% } %>
+    <% if (!storageReady) { %><p class="small warn">O armazenamento de arquivos (Backblaze) não está configurado no servidor: não dá para enviar fotos.</p><% } %>
+    <p class="small muted">PNG, JPEG ou WebP. Na próxima tela você enquadra a foto na moldura <span class="mono"><%= photoFrame.ratio %></span> (a mesma da plateia, do media kit e do portal).</p>
+    <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-crop="<%= photoFrame.ratio %>" data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/foto">
+    <% if (photoFor) { %><form method="post" action="/convidados/<%= guest.id %>/avancar" hidden data-after-upload><%- csrfField %><%- hidden('para', photoFor) %></form><% } %>
+    <div class="row modal-actions"><button class="btn primary" type="button" data-image-pick="" <%= storageReady ? '' : 'disabled' %>><%- icon('upload', 14) %> <%= guest.photo_key ? 'Trocar foto' : 'Enviar foto' %></button><button class="btn ghost" type="button" data-modal-close>Agora não</button></div>
+  </div>
+</dialog>
+
+<dialog class="modal" id="modal-perda" aria-labelledby="m-perda-h" <%= openOnLoad('perda') %>>
+  <form method="post" action="/convidados/<%= guest.id %>/avancar" class="stack">
+    <%- csrfField %><%- hidden('para', 'perdido') %><%- hidden('perda', '1') %>
+    <h2 id="m-perda-h">Marcar <%= fmt.firstName(guest.name) %> como perdido</h2>
+    <p class="small muted">O motivo fica no histórico e ajuda a entender onde os convites param.</p>
+    <div class="stage-pick" role="radiogroup" aria-label="Motivo da perda">
+      <% Object.keys(lossReasons).forEach(function (k) { %>
+      <label class="choice"><input type="radio" name="loss_reason" value="<%= k %>" required <%= guest.loss_reason === k ? 'checked' : '' %> data-loss-radio><span><strong><%= lossReasons[k] %></strong></span></label>
+      <% }) %>
+    </div>
+    <label data-loss-note <%= guest.loss_reason === 'outros' ? '' : 'hidden' %>>Qual o motivo?<input type="text" name="loss_note" maxlength="500" value="<%= guest.loss_note || '' %>"></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Marcar como perdido</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<% if (canEmail) { %>
+<dialog class="modal" id="modal-email" aria-labelledby="m-email-h" <%= openOnLoad('email') %>>
+  <form method="post" action="/convidados/<%= guest.id %>/enviar" class="stack">
+    <%- csrfField %>
+    <h2 id="m-email-h"><%= guest.invite_sent_at ? 'Reenviar convite' : 'Enviar convite' %></h2>
+    <p class="small muted">Para <strong><%= guest.email %></strong>. O e-mail leva o botão para o convite<%= guest.status === 'prospect' ? '; ao enviar, a etapa vira Convite enviado' : '' %>.</p>
+    <label>Assunto<input type="text" name="assunto" maxlength="200" placeholder="(usa o assunto padrão)"></label>
+    <label>Mensagem<textarea name="mensagem" rows="7" maxlength="2000"><%= defaultMessage %></textarea></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Enviar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<% if (canW) { %>
+<dialog class="modal" id="modal-contato" aria-labelledby="m-contato-h" <%= openOnLoad('contato') %>>
+  <form method="post" action="/convidados/<%= guest.id %>/avancar" class="stack">
+    <%- csrfField %><%- hidden('para', 'em_agendamento') %>
+    <h2 id="m-contato-h">Aceitou o convite</h2>
+    <p class="small muted">Para combinar a data, precisamos de pelo menos um contato.</p>
+    <div class="grid-2 tight">
+      <label>WhatsApp<input type="text" name="phone" value="<%= guest.phone || '' %>" maxlength="40"></label>
+      <label>E-mail<input type="email" name="email" value="<%= guest.email || '' %>" maxlength="254"></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar e seguir</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="modal-agenda" aria-labelledby="m-agenda-h" <%= openOnLoad('agenda') %>>
+  <% var resched = guest.status === 'agendado'; %>
+  <form method="post" action="/convidados/<%= guest.id %>/avancar" class="stack">
+    <%- csrfField %><%- hidden('para', 'agendado') %><%- hidden('agenda', '1') %>
+    <h2 id="m-agenda-h"><%= resched ? 'Remarcar a gravação' : 'Data da gravação' %></h2>
+    <p class="small muted"><%= resched ? 'Nova data, nova confirmação: marque de novo quem já confirmou. Sem as três, o convidado volta para Em agendamento.' : 'Com as três confirmações o convidado vai para Agendado e o episódio entra na produção. Sem elas, a data fica salva como proposta.' %></p>
+    <label>Data e hora<input type="datetime-local" name="proposed_at" value="<%= fmt.toInputValue(guest.proposed_at) %>" required></label>
+    <fieldset class="stack confirm-list">
+      <legend>Data acertada com</legend>
+      <label class="check"><input type="checkbox" name="scheduled_studio" value="1" <%= !resched && guest.scheduled_studio ? 'checked' : '' %>> Estúdio</label>
+      <label class="check"><input type="checkbox" name="scheduled_hosts" value="1" <%= !resched && guest.scheduled_hosts ? 'checked' : '' %>> Hosts</label>
+      <label class="check"><input type="checkbox" name="scheduled_guest" value="1" <%= !resched && guest.scheduled_guest ? 'checked' : '' %>> <%= guest.gender === 'f' ? 'Convidada' : 'Convidado' %></label>
+    </fieldset>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar agenda</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<% } %>
+<% if (canW) { %><script src="/static/cropper.js?v=<%= assetV %>" defer></script><% } %>
 <%- include('../partials/foot') %>

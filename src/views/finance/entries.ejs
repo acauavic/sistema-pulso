@@ -1,0 +1,57 @@
+<%- include('../partials/head') %>
+<%
+  var url = function (o) { var s = Object.assign({ escopo: scope, mes: month, q: q, cat: category }, o); var parts = []; Object.keys(s).forEach(function (k) { if (s[k]) parts.push(k + '=' + encodeURIComponent(s[k])); }); return '/financeiro/lancamentos' + (parts.length ? '?' + parts.join('&') : ''); };
+  var weekEnd = fin.addDays(today, 7);
+  var bucket = function (e) { if (e.due_on < today) return 'atrasados'; if (e.due_on <= weekEnd) return 'semana'; return 'depois'; };
+  var BUCKETS = [['atrasados', 'Atrasados'], ['semana', 'Próximos 7 dias'], ['depois', 'Mais adiante']];
+  var total = scope === 'receber' ? totals.in : totals.out;
+  var nextMonth = fin.shiftMonth(month, 1), prevMonth = fin.shiftMonth(month, -1);
+%>
+<div class="page-head">
+  <div><span class="kicker">Financeiro</span><h1>Contas</h1></div>
+  <% if (can('finance.write')) { %><button class="btn primary" type="button" data-modal-open="modal-novo"><%- icon('plus') %> Novo lançamento</button><% } %>
+</div>
+<%- include('_nav', { active: 'lancamentos', counts: counts }) %>
+
+<div class="task-toolbar">
+  <nav class="tabbar compact" aria-label="Tipo de conta">
+    <a class="<%= scope === 'pagar' ? 'on' : '' %>" href="<%= url({ escopo: 'pagar', mes: '' }) %>">A pagar <span class="count"><%= counts.pagar %></span></a>
+    <a class="<%= scope === 'receber' ? 'on' : '' %>" href="<%= url({ escopo: 'receber', mes: '' }) %>">A receber <span class="count"><%= counts.receber %></span></a>
+    <a class="<%= scope === 'historico' ? 'on' : '' %>" href="<%= url({ escopo: 'historico' }) %>">Histórico</a>
+  </nav>
+  <form method="get" action="/financeiro/lancamentos" class="task-search fin-filter">
+    <input type="hidden" name="escopo" value="<%= scope %>"><% if (scope === 'historico') { %><input type="hidden" name="mes" value="<%= month %>"><% } %>
+    <input type="search" name="q" value="<%= q %>" placeholder="Buscar" aria-label="Buscar lançamentos">
+    <select name="cat" aria-label="Categoria" data-autosubmit>
+      <option value="">Todas as categorias</option>
+      <% Object.keys(C.FIN_CATEGORIES).forEach(function (k) { %><option value="<%= k %>" <%= category === k ? 'selected' : '' %>><%= C.FIN_CATEGORIES[k] %></option><% }) %>
+    </select>
+  </form>
+</div>
+
+<% if (scope === 'historico') { %>
+<div class="row spread month-nav">
+  <div class="row"><a class="icon-btn" href="<%= url({ mes: prevMonth }) %>" aria-label="Mês anterior"><%- icon('chevron-left') %></a><strong class="mono"><%= fin.monthLabel(month) %></strong><a class="icon-btn" href="<%= url({ mes: nextMonth }) %>" aria-label="Próximo mês"><%- icon('chevron-right') %></a></div>
+  <span class="small muted">Entrou <span class="mono"><%= money(totals.in) %></span> · saiu <span class="mono"><%= money(totals.out) %></span> · <a href="/financeiro/exportar.csv?mes=<%= month %>"><%- icon('download', 14) %> Exportar planilha</a></span>
+</div>
+<% } else if (items.length) { %>
+<p class="small muted">Em aberto: <span class="mono"><%= money(total) %></span> · <%= items.length %> lançamento<%= items.length === 1 ? '' : 's' %></p>
+<% } %>
+
+<% if (!items.length) { %>
+<div class="empty card"><%- include('../partials/pulse-line') %>
+  <p><strong><%= scope === 'historico' ? 'Nada movimentado neste mês' : scope === 'pagar' ? 'Nenhuma conta a pagar' : 'Nada a receber' %></strong></p>
+  <p class="muted small"><%= scope === 'receber' ? 'Combine o pagamento do patrocinador na página dele e as parcelas aparecem aqui.' : scope === 'pagar' ? 'Os custos do estúdio nascem sozinhos quando a gravação é agendada.' : 'Use as setas para ver outros meses.' %></p></div>
+<% } %>
+
+<% if (scope === 'historico') { %>
+  <ul class="plain plan-list fin-list card"><% items.forEach(function (e) { %><%- include('_row', { e: e, here: here }) %><% }) %></ul>
+<% } else { BUCKETS.forEach(function (b) { var list = items.filter(function (e) { return bucket(e) === b[0]; }); if (!list.length) return; %>
+  <section class="task-section">
+    <h2 class="task-section-h <%= b[0] === 'atrasados' ? 'err' : '' %>"><%= b[1] %> <span class="count"><%= list.length %></span></h2>
+    <ul class="plain plan-list fin-list card"><% list.forEach(function (e) { %><%- include('_row', { e: e, here: here }) %><% }) %></ul>
+  </section>
+<% }); } %>
+
+<%- include('_entry-modals', { episodes: episodes, sponsors: sponsors, suppliers: suppliers }) %>
+<%- include('../partials/foot') %>

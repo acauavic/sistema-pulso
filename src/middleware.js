@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const config = require('./config');
@@ -8,13 +9,15 @@ const { icon } = require('./utils/icons');
 
 // Cabeçalhos de segurança + CSP restritiva para o painel (sem scripts inline).
 function securityHeaders(req, res, next) {
+  res.locals.assetV = ASSET_VERSION;
+  if (config.isProd) res.set('Strict-Transport-Security', 'max-age=31536000'); // atrás do Traefik com HTTPS: o navegador não volta ao http
   res.set({
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'SAMEORIGIN',
     'Referrer-Policy': 'same-origin',
     'Cache-Control': 'no-store',
     'Content-Security-Policy':
-      "default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; " +
+      "default-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: https://*.backblazeb2.com; style-src 'self'; script-src 'self'; connect-src 'self'; " +
       "frame-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'",
   });
   next();
@@ -25,13 +28,35 @@ function originCheck(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   // A página pública do convite roda em sandbox (Origin: null) e é protegida pelo token secreto da URL.
   if (/^\/convite\/[^/]+\/responder$/.test(req.path)) return next();
+  // Páginas do patrocinador mandam Referrer-Policy: no-referrer, e por isso o navegador envia "Origin: null" no POST do
+  // formulário. Essas rotas têm token CSRF próprio (sessão do patrocinador), então aceitam null (e só null ou o próprio host).
+  const allowNull = /^\/patrocinador\/(cadastro|logo|audio|resposta|concluir)$/.test(req.path);
   const origin = req.get('origin');
   if (origin && origin !== 'null') {
     let host;
     try { host = new URL(origin).host; } catch { host = null; }
     if (host !== req.get('host') && origin !== config.appBaseUrl) return res.status(403).send('Origem não permitida.');
-  } else if (origin === 'null') {
+  } else if (origin === 'null' && !allowNull) {
     return res.status(403).send('Origem não permitida.');
+  }
+  return next();
+}
+
+// Dados do menu nas páginas do painel: notificações não lidas, minhas tarefas abertas e a lista de pessoas (para a "bolinha" de responsável).
+async function navData(req, res, next) {
+  if (!req.user || req.method !== 'GET' || /json|event-stream/.test(req.get('accept') || '')) return next();
+  try {
+    const db = require('./db/pool');
+    const [counts, users] = await Promise.all([
+      db.query(`SELECT (SELECT count(*)::int FROM notifications WHERE user_id = $1 AND read_at IS NULL) AS unread,
+                       (SELECT count(*)::int FROM tasks WHERE assignee_id = $1 AND status <> 'feito') AS tasks,
+                       CASE WHEN $2 THEN (SELECT count(*)::int FROM episode_publications WHERE status = 'revisao') ELSE 0 END AS reviews`, [req.user.id, can(req.user.role, 'social.publish')]),
+      db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+    ]);
+    res.locals.navCounts = counts.rows[0];
+    res.locals.teamUsers = users.rows;
+  } catch (err) {
+    console.error('menu:', err.message);
   }
   return next();
 }
@@ -54,6 +79,8 @@ async function attachSession(req, res, next) {
     res.locals.icon = icon;
     res.locals.podcastName = config.podcastName;
     res.locals.currentPath = req.path;
+    res.locals.navCounts = null;
+    res.locals.teamUsers = [];
 
     req.flash = async (type, message) => {
       if (req.session) await sessions.setFlash(req.session.tokenHash, type, message);
@@ -96,4 +123,14 @@ function verifyCsrf(req, res, next) {
 
 const staticDir = path.join(__dirname, 'public');
 
-module.exports = { securityHeaders, originCheck, attachSession, requireAuth, requirePerm, verifyCsrf, staticDir };
+// Versão dos arquivos de /static (hash do conteúdo, calculado ao subir). Vai na URL (?v=…) para que o navegador
+// não use CSS/JS antigo do cache de 1h depois de um deploy.
+const ASSET_VERSION = (() => {
+  const h = crypto.createHash('sha1');
+  for (const f of ['app.css', 'app.js', 'theme.js', 'patrocinador.css', 'brief.js', 'producao.js', 'editor.js', 'design/engine.js', 'collab.js', 'social.js', 'assistant.js', 'plateia.css', 'plateia.js']) {
+    try { h.update(fs.readFileSync(path.join(staticDir, f))); } catch { /* arquivo ausente: ignora */ }
+  }
+  return h.digest('hex').slice(0, 10);
+})();
+
+module.exports = { securityHeaders, originCheck, attachSession, navData, requireAuth, requirePerm, verifyCsrf, staticDir };

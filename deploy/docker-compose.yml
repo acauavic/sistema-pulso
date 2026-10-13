@@ -1,0 +1,66 @@
+# Pulso Gestão numa VPS só: Postgres + painel (web) + fila/rotinas (worker) + Caddy (HTTPS automático).
+# Use com deploy/instalar.sh (gera o .env e sobe tudo). Segredos ficam em deploy/.env (ignorado pelo git).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pulso
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: pulso
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulso -d pulso"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web: &app
+    build:
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      ROLE: web
+      PORT: "3100"
+      TZ: America/Sao_Paulo
+      PODCAST_DATABASE_URL: postgresql://pulso:${POSTGRES_PASSWORD}@postgres:5432/pulso
+      AUTO_MIGRATE: "true"
+
+  worker:
+    <<: *app
+    depends_on: # sobe depois do painel: é o painel que aplica as migrações
+      postgres:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    environment:
+      ROLE: worker
+      PORT: "3101"
+      TZ: America/Sao_Paulo
+      PODCAST_DATABASE_URL: postgresql://pulso:${POSTGRES_PASSWORD}@postgres:5432/pulso
+      AUTO_MIGRATE: "false"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
