@@ -160,6 +160,7 @@ async function tick() {
     `SELECT r.id, r.kind, g.id AS guest_id, g.name, g.owner_id, g.proposed_at FROM guest_reminders r JOIN guests g ON g.id = r.guest_id
       WHERE r.due_at <= now() AND r.notified_at IS NULL AND r.sent_at IS NULL
         AND g.status = 'agendado' AND g.proposed_at = r.recording_at AND g.proposed_at > now()
+        AND NOT EXISTS (SELECT 1 FROM guest_reminders n WHERE n.guest_id = r.guest_id AND n.recording_at = r.recording_at AND n.due_at > r.due_at AND n.due_at <= now())
       ORDER BY r.due_at LIMIT 200`);
   const notify = require('./notify');
   for (const r of rows) {

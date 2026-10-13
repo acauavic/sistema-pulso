@@ -150,7 +150,7 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       return { status: r.status, body: await r.json().catch(() => ({})) };
     };
     const ecdh = require('node:crypto').createECDH('prime256v1'); ecdh.generateKeys();
-    const sub = (n) => ({ endpoint: `https://push.exemplo.test/envio/${n}`, keys: { p256dh: ecdh.getPublicKey('base64url'), auth: 'c2VncmVkby1kZS0xNmI' } });
+    const sub = (n) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/envio-${n}`, keys: { p256dh: ecdh.getPublicKey('base64url'), auth: 'c2VncmVkby1kZS0xNmI' } });
 
     it('service worker na raiz, manifesto e o bloco na página de notificações', async () => {
       const sw = await as.editor.get('/sw.js');
@@ -171,6 +171,9 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       try {
         assert.match((await as.editor.get('/notificacoes')).text, new RegExp(`data-push-key="${keys.publicKey}"`));
         assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: { ...sub(2), endpoint: 'http://inseguro.test/x' } })).status, 400);
+        for (const bad of ['https://169.254.169.254/latest', 'https://localhost/x', 'https://servico-interno.local/x', 'https://fcm.googleapis.com.evil.test/x', 'https://fcm.googleapis.com:8443/x', 'https://user@fcm.googleapis.com/x']) {
+          assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: { ...sub(2), endpoint: bad } })).status, 400, `endereço recusado: ${bad}`);
+        }
         assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: { endpoint: 'https://a.test/x', keys: { p256dh: '<script>', auth: 'x' } } })).status, 400);
         assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: sub(2) })).status, 200);
         assert.equal((await json('editor', '/notificacoes/push/inscrever', { subscription: sub(2) })).status, 200, 'repetir não duplica');
@@ -223,6 +226,17 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       assert.match(r.location, /^https:\/\/wa\.me\/5511988887777\?text=Oi%2C%20Lia/);
       assert.ok((await rows())[0].sent_at, 'marcado como enviado');
       assert.equal((await as.editor.post(`/convidados/${gid}/lembretes/d1/enviado`, { _csrf: await as.editor.csrf('/') })).status, 403, 'editor de vídeo não mexe');
+    });
+
+    it('a rotina não avisa lembrete vencido: se a hora do próximo já passou, o anterior não vale mais', async () => {
+      await h.db.query("UPDATE guests SET status = 'agendado', proposed_at = $2, scheduled_studio = true, scheduled_hosts = true, scheduled_guest = true WHERE id = $1", [gid, inDays(2, '16:00')]);
+      await production.syncFromGuest(gid, u.gestao.id);
+      await h.db.query("UPDATE guest_reminders SET notified_at = NULL, sent_at = NULL, due_at = CASE kind WHEN 'd3' THEN now() - interval '30 hours' WHEN 'd1' THEN now() - interval '2 hours' ELSE due_at END WHERE guest_id = $1", [gid]);
+      await clear();
+      await reminders.tick();
+      const { rows } = await h.db.query("SELECT title FROM notifications WHERE type = 'lembrete'");
+      assert.ok(rows.length && rows.every((n) => /1 dia antes/.test(n.title)), 'só o de 1 dia antes, o de 3 dias já perdeu a vez');
+      assert.equal((await h.db.query("SELECT notified_at FROM guest_reminders WHERE guest_id = $1 AND kind = 'd3'", [gid])).rows[0].notified_at, null);
     });
 
     it('aba Lembretes em Notificações: fila do que está na hora, próximos e enviados; o envio volta para a aba', async () => {

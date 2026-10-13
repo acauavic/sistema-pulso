@@ -76,6 +76,8 @@ Opcionais na criação: WhatsApp, e-mail e motivo do convite. O resto se complet
 - **Em agendamento** exige **e-mail e/ou WhatsApp**.
 - **Agendado** exige **data e hora da gravação** + confirmação de agenda no **Estúdio**, com os **hosts** e com o **convidado**.
 - **Em agendamento** e **Agendado** exigem a **foto do convidado** (ela vai para a agenda da plateia e para os patrocinadores). Se só falta a foto, abre a janela "Foto do convidado" (`?abrir=foto&para=<etapa>`); depois do envio a mudança de etapa termina sozinha. No formulário, o resto é salvo e a etapa espera a foto; cadastro novo direto nessas etapas entra em Convite enviado até a foto. Exceções: quem aceita pelo convite público e a importação por CSV (a foto vem depois). Precisa do Backblaze configurado.
+- **Edição em massa** (Convidados > Lista, só `guests.write`): marque os convidados e use "Editar em massa" para mudar **etapa, responsável, perfil, gênero e patrocinador** (campo em branco = não alterar; patrocinador pede ainda "indicados" ou "pessoas do patrocinador"). Código em `src/services/guestBulk.js`. Cada convidado passa pelas regras de uma edição individual: quem não tem o que a etapa exige (foto, contato, motivo da perda) **não muda de etapa** e aparece no resultado; o resto da mudança vale. **Agendado e Gravado não vão em massa** (pedem a agenda e criam episódio). Perdido pede o motivo para todos. Máximo de 200 por vez; cada convidado ganha uma linha no histórico e a ação vai para a auditoria; quem ganha convidados recebe um aviso só.
+- **Zerar aceite** (aba Convite do convidado): apaga o contador de cliques em "Aceitar", a resposta e o recado, e devolve o convidado para **Prospecção** (o link do convite continua o mesmo). Vale para Convite enviado, Em agendamento, Perdido e Cancelado; quem já está Agendado ou Gravado não passa (cancele a gravação antes). Fica no histórico e na auditoria (`convidado.aceite_zerado`).
 - **Perdido** exige o **motivo da perda**: Recusado, Sem agenda próxima, Nunca respondeu, Parou de responder, Conflito de interesse ou Outros (com descrição). O banco não aceita Perdido sem motivo, e sair de Perdido apaga o motivo antigo. O cartão do quadro mostra o motivo.
 - Prospecção, Convite enviado, Gravado e Cancelado não exigem nada. (Os links do YouTube e do Spotify são do episódio.)
 
@@ -292,6 +294,7 @@ Na Brevo, o remetente (`BREVO_EMAIL`) e o domínio precisam estar validados (SPF
   - **3 dias antes** (lembrar a data) · **1 dia antes** (confirmar que está tudo certo) · **no dia, de manhã** (com o endereço) · **3 horas antes** (saber se está tudo certo).
   - Gravação cedo (antes de manhã + 3 h): sem lembretes no dia; o de 1 dia antes leva o endereço. Lembrete do dia e o de 3 horas a menos de 1h30 um do outro: fica só o de 3 horas, com o endereço.
   - Remarcar refaz o ciclo; sair de Agendado cancela o que não foi enviado. Uma rotina (5 min) dispara os avisos, uma vez cada.
+  - **Onde a produtora trabalha**: **Notificações > Lembretes da gravação** (aba ao lado de "Avisos", com o número dos que esperam). A fila mostra "Na hora de mandar" (mensagem pronta, botão do WhatsApp e "Já enviei"), "Próximos" (o próximo de cada convidado agendado) e "Enviados nos últimos 7 dias". A mesma mensagem aparece no card da página do convidado. A rotina não avisa lembrete vencido: se a hora do próximo já passou, o anterior perde a vez.
   - **Gestão > Lembretes da gravação**: endereço do estúdio, horário da manhã (padrão 09:00) e os quatro textos, com `{primeiro_nome}`, `{nome}`, `{dia}`, `{data}`, `{hora}` e `{endereco}`.
 
 ## Alertas no navegador (Web Push)
@@ -326,7 +329,10 @@ Detalhes e decisões em [`docs/relatorio-arquitetura-2026-10.md`](docs/relatorio
 Botão flutuante em todas as páginas (`src/services/assistant.js`, `src/routes/assistant.js`, `src/public/assistant.js`).
 Conversa por **texto ou voz** (grava até 2 min; Groq Whisper transcreve), com **histórico por pessoa** (abrir, continuar, apagar).
 Consulta o painel por ferramentas que **respeitam o perfil** (busca, tarefas, agenda, episódios, convidado, patrocinador, redes) e
-responde com links internos. Só cria **tarefa** quando pedido; não publica, não move etapa e não apaga. Usa o Gemini
+responde com links internos.
+- **Números**: a ferramenta `numeros` conta o que o perfil pode ver (convidados por etapa e por motivo de perda, sem responsável, sem foto; patrocinadores, episódios, tarefas, redes, plateia e financeiro). O que o perfil não vê vem em `sem_acesso_para_o_seu_perfil` e o assistente diz quem vê. `lista_convidados` mostra quem está em cada etapa.
+- **Cadastro**: `criar_convidado` (só `guests.write`) cadastra em Prospecção, com a pessoa como responsável, validando Instagram, perfil e duplicidade; pergunta o que faltar (nome, Instagram e perfil). Também cria **tarefa** quando pedido. Não publica, não muda etapa, não edita e não apaga.
+- **Instrução por perfil**: o prompt leva o que o perfil da pessoa pode fazer, o que não pode e quem pode (`src/services/assistantGuide.js`, derivado de `src/permissions.js`). Permissão nova sem descrição ali derruba os testes. Usa o Gemini
 (`GEMINI_KEY`); limite de 40 perguntas a cada 10 min por pessoa.
 
 ## Segurança

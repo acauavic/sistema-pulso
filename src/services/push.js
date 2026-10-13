@@ -15,6 +15,10 @@ function ensureVapid() {
 }
 
 const B64URL = /^[A-Za-z0-9_-]+=*$/;
+// O servidor chama o endereço que o navegador informa: só aceitamos os serviços de push dos navegadores (Chrome, Edge, Firefox,
+// Safari, Opera e Brave usam o do Google), para ninguém apontar o servidor para um endereço interno.
+const PUSH_HOSTS = ['fcm.googleapis.com', 'android.googleapis.com', 'updates.push.services.mozilla.com', 'push.services.mozilla.com', 'web.push.apple.com', 'push.apple.com', 'notify.windows.com'];
+const allowedHost = (host) => PUSH_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
 
 // Guarda (ou move para esta pessoa) a inscrição do aparelho. Devolve null se os dados não parecem uma inscrição válida.
 async function subscribe(userId, sub, userAgent = '') {
@@ -23,7 +27,7 @@ async function subscribe(userId, sub, userAgent = '') {
   const auth = String(sub?.keys?.auth || '');
   let url;
   try { url = new URL(endpoint); } catch { return null; }
-  if (url.protocol !== 'https:' || endpoint.length > 1000 || !B64URL.test(p256dh) || !B64URL.test(auth) || p256dh.length > 200 || auth.length > 100) return null;
+  if (url.protocol !== 'https:' || url.port || url.username || !allowedHost(url.hostname.toLowerCase()) || endpoint.length > 1000 || !B64URL.test(p256dh) || !B64URL.test(auth) || p256dh.length > 200 || auth.length > 100) return null;
   const { rows: [row] } = await db.query(
     `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent) VALUES ($1,$2,$3,$4,$5)
      ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,

@@ -164,6 +164,19 @@ test('lembretes da gravação: 3 dias, 1 dia, no dia e 3 horas; gravação cedo 
   assert.equal(reminders.whatsappNumber(''), null);
 });
 
+test('guia de perfis do assistente: toda permissão tem descrição e cada perfil recebe o que pode e o que não pode', () => {
+  const guide = require('../src/services/assistantGuide');
+  const { PERMISSIONS: perms } = require('../src/permissions');
+  for (const perm of Object.keys(perms)) assert.ok(guide.ACTIONS[perm]?.text, `permissão ${perm} sem descrição em assistantGuide.js`);
+  for (const perm of Object.keys(guide.ACTIONS)) assert.ok(perms[perm], `descrição de permissão que não existe mais: ${perm}`);
+  const editor = guide.guide('editor_video');
+  assert.ok(editor.can.some((a) => a.perm === 'production.edit')); assert.ok(editor.cannot.some((a) => a.perm === 'guests.write'));
+  assert.deepEqual(editor.cannot.find((a) => a.perm === 'users.delete').whoCan, ['Superadmin']);
+  const admin = guide.guide('superadmin');
+  assert.equal(admin.cannot.length, 0, 'superadmin faz tudo');
+  assert.equal(admin.can.length + editor.can.length + editor.cannot.length - admin.can.length, Object.keys(perms).length);
+});
+
 test('regras: Instagram, perfil, gênero e URLs', () => {
   assert.equal(rules.normalizeInstagram('@Maria.Souza'), 'maria.souza');
   assert.equal(rules.normalizeInstagram('https://www.instagram.com/maria_s/?igsh=1'), 'maria_s');
