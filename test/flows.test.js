@@ -440,13 +440,16 @@ describe('fluxos ponta a ponta', () => {
       await c.post(`/convite/${token}/responder`, { resposta: 'aceito' }); // aceitar agora é só pelo botão
       assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'em_agendamento');
       await c.post(`/convite/${token}/responder`, { resposta: 'recusado', mensagem: 'Surgiu um imprevisto' });
-      const { rows: [g] } = await h.db.query('SELECT status, rsvp_message FROM guests WHERE id=$1', [guestId]);
-      assert.equal(g.status, 'recusou');
+      const { rows: [g] } = await h.db.query('SELECT status, rsvp_message, loss_reason, loss_note FROM guests WHERE id=$1', [guestId]);
+      assert.equal(g.status, 'perdido');
+      assert.equal(g.loss_reason, 'recusado', 'o convidado não escolhe motivo: recusar pelo convite já é "Recusado"');
+      assert.equal(g.loss_note, 'Surgiu um imprevisto');
       assert.equal(g.rsvp_message, 'Surgiu um imprevisto');
       assert.match((await c.get(`/convite/${token}`)).text, /não poderá participar/);
 
-      await c.get(`/convite/${token}/aceitar`); // mudou de ideia: recusou -> em agendamento
-      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [guestId])).rows[0].status, 'em_agendamento');
+      await c.get(`/convite/${token}/aceitar`); // mudou de ideia: perdido -> em agendamento (o motivo sai)
+      const back = (await h.db.query('SELECT status, loss_reason FROM guests WHERE id=$1', [guestId])).rows[0];
+      assert.deepEqual([back.status, back.loss_reason], ['em_agendamento', null]);
 
       await as.prod.act(`/convidados/${guestId}/status`, { status: 'gravado' }, { from: '/convidados' });
       await c.post(`/convite/${token}/responder`, { resposta: 'recusado' });
@@ -536,7 +539,7 @@ describe('fluxos ponta a ponta', () => {
       assert.match(modal, /data-stage-confirm disabled/, 'só habilita ao escolher outra etapa');
       assert.match(page, /badge-btn[^>]*data-modal-open="modal-etapa"/, 'a etapa no topo abre a janela');
       assert.doesNotMatch(page, /Outras ações/);
-      assert.deepEqual(options, ['prospect', 'convite_enviado', 'em_agendamento', 'agendado', 'gravado', 'recusou', 'cancelado']);
+      assert.deepEqual(options, ['prospect', 'convite_enviado', 'em_agendamento', 'agendado', 'gravado', 'perdido', 'cancelado']);
     });
 
     it('Em agendamento exige e-mail e/ou WhatsApp', async () => {
@@ -582,10 +585,31 @@ describe('fluxos ponta a ponta', () => {
       assert.doesNotMatch(form, /name="youtube_url"/, 'links de publicação são do episódio');
     });
 
-    it('Recusou e Cancelado não exigem nada', async () => {
-      assert.equal((await move('recusou')).status, 200);
+    it('Perdido exige o motivo (Outros pede descrição); Cancelado não exige nada', async () => {
+      const r = await move('perdido');
+      assert.equal(r.status, 422);
+      assert.match(JSON.parse(r.text).editUrl, /\?abrir=perda$/, 'arrastar sem motivo abre a janela do motivo');
+      const step = (fields) => as.prod.act(`/convidados/${id}/avancar`, { para: 'perdido', perda: '1', ...fields }, { from: `/convidados/${id}` });
+      assert.match((await step({})).location, /\?abrir=perda/);
+      assert.match((await step({ loss_reason: 'outros', loss_note: '' })).location, /\?abrir=perda/);
+      assert.notEqual((await guest()).status, 'perdido');
+      await step({ loss_reason: 'sem_agenda' });
+      let g = await guest();
+      assert.deepEqual([g.status, g.loss_reason], ['perdido', 'sem_agenda']);
+      const { rows: [ev] } = await h.db.query("SELECT message FROM guest_events WHERE guest_id=$1 AND type='status' ORDER BY id DESC LIMIT 1", [id]);
+      assert.match(ev.message, /→ Perdido \(motivo: Sem agenda próxima\)/);
+      const page = (await as.prod.get(`/convidados/${id}`)).text;
+      assert.match(page, /MOTIVO: SEM AGENDA PRÓXIMA/);
+      assert.match((await as.prod.get('/convidados')).text, /Sem agenda próxima/, 'o quadro mostra o motivo no cartão');
+      await edit({ email: 'rita@exemplo.com', status: 'perdido', loss_reason: 'outros', loss_note: 'Mudou de área' });
+      g = await guest();
+      assert.deepEqual([g.loss_reason, g.loss_note], ['outros', 'Mudou de área']);
+      assert.equal((await edit({ email: 'rita@exemplo.com', status: 'perdido', loss_reason: '' })).status, 400, 'formulário também exige o motivo');
       assert.equal((await move('cancelado')).status, 200);
+      g = await guest();
+      assert.deepEqual([g.status, g.loss_reason, g.loss_note], ['cancelado', null, null], 'sair de Perdido limpa o motivo');
       assert.equal((await move('prospect')).status, 200);
+      await assert.rejects(h.db.query("UPDATE guests SET status = 'perdido' WHERE id = $1", [id]), /guests_perdido_motivo_check/, 'o banco não aceita Perdido sem motivo');
     });
 
     it('próximo passo guiado: contato, agenda com as três confirmações, remarcar e marcar como gravado', async () => {
@@ -663,7 +687,7 @@ describe('fluxos ponta a ponta', () => {
     });
 
     it('editor de vídeo não altera etapa nem importa', async () => {
-      assert.equal((await as.editor.act(`/convidados/${id}/status`, { status: 'recusou' }, { from: '/convidados' })).status, 403);
+      assert.equal((await as.editor.act(`/convidados/${id}/status`, { status: 'perdido' }, { from: '/convidados' })).status, 403);
       assert.equal((await as.editor.get('/convidados/importar')).status, 403);
     });
   });
@@ -747,13 +771,43 @@ describe('fluxos ponta a ponta', () => {
       const r = await commit('nome;instagram;perfil;email;status;data da gravação\nSt Um;@st.um;médico;um@exemplo.com;Em agendamento;\nSt Dois;@st.dois;médico;;Recusou;\nSt Tres;@st.tres;médico;;Gravado;\nSt Quatro;@st.quatro;médico;;Agendado;25/11/2099 14:30');
       assert.equal(r.status, 302);
       const { rows } = await h.db.query("SELECT instagram, status FROM guests WHERE instagram LIKE 'st.%' ORDER BY instagram");
-      assert.deepEqual(rows.map((g) => [g.instagram, g.status]), [['st.dois', 'recusou'], ['st.quatro', 'agendado'], ['st.um', 'em_agendamento']]);
+      assert.deepEqual(rows.map((g) => [g.instagram, g.status]), [['st.dois', 'perdido'], ['st.quatro', 'agendado'], ['st.um', 'em_agendamento']]);
       const { rows: [ag] } = await h.db.query("SELECT * FROM guests WHERE instagram = 'st.quatro'");
       assert.equal(ag.proposed_at.toISOString(), '2099-11-25T17:30:00.000Z');
       assert.ok(ag.scheduled_studio && ag.scheduled_hosts && ag.scheduled_guest, 'agendado entra confirmado');
       assert.equal((await h.db.query('SELECT count(*)::int n FROM episodes WHERE guest_id = $1', [ag.id])).rows[0].n, 0, 'agendado não cria episódio');
       const { rows: [ev] } = await h.db.query("SELECT e.message FROM guest_events e JOIN guests g ON g.id = e.guest_id WHERE g.instagram = 'st.um'");
       assert.match(ev.message, /Importado por CSV .*\(etapa: Em agendamento\)/);
+    });
+
+    it('histórico: Gravado e Publicado criam o episódio na etapa certa, numerado, sem tarefas nem custos', async () => {
+      await h.db.query('DELETE FROM episodes');
+      await h.db.query("INSERT INTO episodes (number, title, status) VALUES (2, 'Já existia', 'publicado')");
+      const tasksBefore = (await h.db.query('SELECT count(*)::int n FROM tasks')).rows[0].n;
+      const finBefore = (await h.db.query('SELECT count(*)::int n FROM fin_entries')).rows[0].n;
+      const file = [
+        'nome;instagram;perfil;status;data da gravação;episódio;youtube;publicado em',
+        'Hist Um;@hist.um;médico;Publicado;05/02/2026;1;https://youtu.be/um;12/02/2026',
+        'Hist Tres;@hist.tres;médico;Publicado;20/03/2026;;;',
+        'Hist Dois;@hist.dois;médico;Gravado;01/03/2026;;;',
+        'Hist Rep;@hist.rep;médico;Publicado;01/01/2026;2;;',
+      ].join('\n');
+      const pv = await preview(file);
+      assert.match(pv.text, /EP\.002 já existe \(Já existia\)/);
+      assert.match(pv.text, /3 prontos/);
+      const r = await commit(file);
+      assert.equal(r.status, 302);
+      const { rows } = await h.db.query("SELECT g.instagram, g.status AS gs, e.number, e.status, e.recorded_on::text, e.aired_on::text, e.youtube_url FROM guests g JOIN episodes e ON e.guest_id = g.id WHERE g.instagram LIKE 'hist.%' ORDER BY e.number");
+      assert.deepEqual(rows.map((x) => [x.instagram, x.gs, x.number, x.status, x.recorded_on]), [
+        ['hist.um', 'gravado', 1, 'publicado', '2026-02-05'],
+        ['hist.dois', 'gravado', 3, 'gravado', '2026-03-01'],
+        ['hist.tres', 'gravado', 4, 'publicado', '2026-03-20'],
+      ], 'sem número: continua depois do maior, na ordem da data de gravação');
+      assert.equal(rows[0].aired_on, '2026-02-12'); assert.equal(rows[0].youtube_url, 'https://youtu.be/um');
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM tasks')).rows[0].n, tasksBefore, 'histórico não cria tarefas');
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM fin_entries')).rows[0].n, finBefore, 'nem custos');
+      const { rows: [ev] } = await h.db.query("SELECT message FROM episode_events ev JOIN episodes e ON e.id = ev.episode_id WHERE e.number = 1");
+      assert.match(ev.message, /Episódio do histórico importado por CSV/);
     });
 
     it('cabeçalho sem as colunas obrigatórias e arquivo vazio são recusados com mensagem clara', async () => {
@@ -887,7 +941,7 @@ describe('fluxos ponta a ponta', () => {
       const c = h.client(app.base);
       const ok = await c.post(`/convite/${f.token}/responder`, { resposta: 'recusado' }, { headers: { origin: 'null' } });
       assert.equal(ok.status, 302);
-      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [f.id])).rows[0].status, 'recusou');
+      assert.equal((await h.db.query('SELECT status FROM guests WHERE id=$1', [f.id])).rows[0].status, 'perdido');
       const csrf = await as.prod.csrf('/perfil');
       assert.equal((await as.prod.post('/perfil', { _csrf: csrf, name: 'X Y' }, { headers: { origin: 'null' } })).status, 403);
     });

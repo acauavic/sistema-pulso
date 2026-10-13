@@ -15,7 +15,7 @@
   cookie, CSRF, auditoria. Travas: ninguém muda/desativa/exclui a si mesmo; sobra sempre 1 superadmin ativo;
   só superadmin mexe em superadmin; só superadmin exclui usuário.
 - **Convidado x episódio**: convidado = pessoa, funil prospect → convite_enviado → em_agendamento → agendado → **gravado (fim)**
-  (+ recusou/cancelado; **não existe mais publicado no convidado**, links são do episódio). Agendado = **agenda** (media kit
+  (+ perdido/cancelado; **não existe mais publicado no convidado**, links são do episódio). Agendado = **agenda** (media kit
   `kitAgendaHtml`, reservas `sponsor_bookings`, portal). **Episódio nasce gravado** (`production.createEpisode`, chamado por
   `syncFromGuest` quando o convidado vira gravado, ou por "Registrar episódio gravado" com origem convidado/novo convidado/só hosts +
   patrocinador). Etapas do episódio: gravado → … → publicado (sem planejado/agendado). `episodes.recorded_on` = data da gravação.
@@ -50,7 +50,7 @@
 - **Convite**: token secreto → página pública `/convite/:token` (**modelo fixo** `src/templates/convite-pulso.html`; não há
   mais tela/tabela de modelos) → link curto no YOURLS (keyword = nome curto) → envio por e-mail Brevo. Botões do WhatsApp
   passam pelo **redirecionador interno**: `GET /convite/:token/aceitar` (conta clique em `invite_clicks`, move
-  prospect/convite_enviado/recusou → em_agendamento, avisa o responsável, mostra "Convite aceito" e faz meta-refresh 3 s p/ `wa.me`)
+  prospect/convite_enviado/perdido → em_agendamento, avisa o responsável, mostra "Convite aceito" e faz meta-refresh 3 s p/ `wa.me`)
   e `/producao` (conta e redireciona). Robôs de preview (BOT_RE) só são redirecionados. O formulário na página ficou só com a
   recusa (`POST /convite/:token/responder`). Destino: `PRODUCAO_WHATSAPP`. Página pública roda em **CSP sandbox**.
 - **Integrações**: Brevo SMTP (`BREVO_SERVER/PORT/USER/CHAVE_SMTP/EMAIL`, porta 587 STARTTLS) e YOURLS
@@ -95,6 +95,9 @@
 - **Pegadinha**: rotas públicas do patrocinador com fetch precisam estar na lista de `Origin: null` em `originCheck` (já incluí `resposta|concluir`).
 
 ## Últimas Decisões
+
+- **Perdido com motivo (migração 025, 2026-10-13)**: etapa `recusou` virou `perdido` (dados migrados com motivo `recusado`). `loss_reason` (`LOSS_REASONS` em constants: recusado, sem_agenda, nunca_respondeu, parou_de_responder, conflito_de_interesse, outros) + `loss_note`. CHECK `guests_perdido_motivo_check` exige motivo (e nota em outros); trigger `guests_clear_loss` limpa ao sair de Perdido. Regra em `guestRules` (formulário, `/status` 422 → `?abrir=perda`, `/avancar` com `perda=1`). RSVP público: convidado não escolhe motivo, vira perdido/recusado com o recado em `loss_note`.
+- **CSV: histórico Gravado/Publicado (2026-10-13)**: status `Publicado` = convidado gravado + episódio publicado. Data da gravação obrigatória (só o dia → 12:00 Brasília; futura recusa). Colunas `episódio` (número; sem ele, max+1 pela ordem da data; `LOCK TABLE episodes`), `youtube`, `spotify`, `publicado em`. `createHistoryEpisode` em `routes/guestImport.js` insere direto, **sem** rotinas de tarefas, financeiro nem avisos; número já usado = duplicado na prévia.
 
 - **Web Push (2026-10-13)**: tabela `push_subscriptions` (migração 024, endpoint único, `failures`); `services/push.js` (lib `web-push`, VAPID do ambiente, `ensureVapid` preguiçoso); `notify()` enfileira `push_notificacao` só para quem tem aparelho; o job pula notificação já lida e apaga inscrição 404/410. SW em `/sw.js` (raiz, sem cache de páginas) não mostra se há janela focada (exceto teste). `public/push.js`: bloco "Alertas neste aparelho" em Notificações + reserva via `showNotification` quando a aba está oculta e não há push. Manifesto + metas Apple para iOS (push só instalado na Tela de Início). `instalar.sh` gera as chaves no `.env`.
 

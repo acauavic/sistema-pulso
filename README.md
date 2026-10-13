@@ -38,7 +38,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
   (só superadmin), busca e filtros. Travas: ninguém muda o próprio perfil, desativa ou exclui a si
   mesmo; sempre sobra um superadmin ativo; só superadmin mexe em superadmin.
 - **Convidados (CRM)**: quadro com arrastar-e-soltar entre etapas (Prospecção → Convite enviado →
-  Em agendamento → Agendado → Gravado → Publicado, mais Recusou/Cancelado), visão em lista, filtros por
+  Em agendamento → Agendado → Gravado → Publicado, mais Perdido/Cancelado), visão em lista, filtros por
   responsável, linha do tempo com anotações e histórico automático. [Cadastro e regras](#etapas-do-convidado-e-regras-para-avançar).
 - **Importação por CSV**: planilha com nome, Instagram e perfil (+ opcionais), com prévia de erros e duplicados.
 - **Central de patrocinadores**: CRM em quadro (Prospecção → Em negociação → Ganho → Ativo, mais Inativo/Perdido), media kit, formulário de cadastro com voz e portal do patrocinador, tudo por **magic link reutilizável** (sem criar conta). [Detalhes](#central-de-patrocinadores).
@@ -75,7 +75,8 @@ Opcionais na criação: WhatsApp, e-mail e motivo do convite. O resto se complet
 
 - **Em agendamento** exige **e-mail e/ou WhatsApp**.
 - **Agendado** exige **data e hora da gravação** + confirmação de agenda no **Estúdio**, com os **hosts** e com o **convidado**.
-- Prospecção, Convite enviado, Gravado, Recusou e Cancelado não exigem nada. (Os links do YouTube e do Spotify são do episódio.)
+- **Perdido** exige o **motivo da perda**: Recusado, Sem agenda próxima, Nunca respondeu, Parou de responder, Conflito de interesse ou Outros (com descrição). O banco não aceita Perdido sem motivo, e sair de Perdido apaga o motivo antigo. O cartão do quadro mostra o motivo.
+- Prospecção, Convite enviado, Gravado e Cancelado não exigem nada. (Os links do YouTube e do Spotify são do episódio.)
 
 As regras valem no formulário, no seletor "Mover de etapa" e ao arrastar no quadro. Regras em `src/services/guestRules.js`.
 
@@ -83,12 +84,12 @@ As regras valem no formulário, no seletor "Mover de etapa" e ao arrastar no qua
 que mostra só o que importa na etapa atual, com um botão principal:
 
 - **Prospecção**: gerar o link do convite → enviar por e-mail (janela com assunto e mensagem) ou copiar para o WhatsApp.
-- **Convite enviado**: quando foi enviado e aberto; **Aceitou o convite** (se não houver contato, uma janela pede e-mail ou WhatsApp), reenviar, recusou.
+- **Convite enviado**: quando foi enviado e aberto; **Aceitou o convite** (se não houver contato, uma janela pede e-mail ou WhatsApp), reenviar e **Marcar como perdido** (janela com o motivo).
 - **Em agendamento**: **Definir data da gravação** abre uma janela com a data e a confirmação com **estúdio, hosts e convidado**.
   Com as três, vai para Agendado (e o episódio nasce); sem elas, a data fica salva como proposta e o cartão mostra quem falta.
 - **Agendado**: a data em destaque com a contagem ("em 5 dias"), link do episódio, **Marcar como gravado**, **Remarcar**
   (nova data pede nova confirmação; sem as três, volta para Em agendamento e a linha do tempo registra a remarcação) e cancelar.
-- **Gravado** (fim do convidado): a etapa do episódio e o link para ele; quando o episódio vai ao ar, os links. **Recusou/Cancelado**: retomar contato.
+- **Gravado** (fim do convidado): a etapa do episódio e o link para ele; quando o episódio vai ao ar, os links. **Perdido** (com o motivo) e **Cancelado**: retomar contato.
 
 O resto fica em abas (**Resumo** com dados preenchidos, comentários e tarefas; **Convite** com link, cliques e prévia; **Histórico**).
 Mudar a etapa à mão e excluir ficam em "Outras ações". Os botões passam por `POST /convidados/:id/avancar`, que salva só os
@@ -112,7 +113,7 @@ No **formulário**, os campos aparecem conforme a etapa (data da gravação a pa
    muda o convidado para **Em agendamento**, avisa o responsável por e-mail e mostra a página
    "Convite aceito, te levando para o WhatsApp…", que redireciona em 3 s para o WhatsApp da produção com mensagem pronta.
 5. **Falar com a produção** aponta para `/convite/<token>/producao`: conta o clique e redireciona direto.
-6. Quem não puder participar usa o formulário "Não vai poder participar?" (recado opcional): etapa **Recusou** e aviso ao responsável.
+6. Quem não puder participar usa o formulário "Não vai poder participar?" (recado opcional): etapa **Perdido** com motivo **Recusado** (o convidado não escolhe motivo; o recado fica como descrição) e aviso ao responsável.
 7. **Gerar novo link** invalida o anterior (o token antigo passa a dar 404).
 
 **Por que o rastreio é interno e não o YOURLS:** o YOURLS só conta cliques que passam por ele e não sabe quem clicou;
@@ -126,9 +127,9 @@ O número da produção vem de `PRODUCAO_WHATSAPP`.
 **Convidados → Importar CSV** (baixe o modelo na própria tela). Colunas: `nome`, `instagram`, `perfil` (obrigatórias) e
 `whatsapp`, `email`, `motivo do convite`, `genero`, `status` e `data da gravação` (opcionais; gênero padrão masculino). Aceita `;` `,` ou tab, aspas e UTF-8
 com/sem BOM, até 500 linhas. O perfil aceita variações (médica, influenciador, empresária, profissional de saúde…).
-**Status** (ou `etapa`): Prospecção (padrão), Convite enviado, Em agendamento (pede e-mail ou WhatsApp), Agendado, Recusou ou Cancelado.
+**Status** (ou `etapa`): Prospecção (padrão), Convite enviado, Em agendamento (pede e-mail ou WhatsApp), Agendado, Gravado, Publicado, Perdido (pede a coluna `motivo da perda`; texto livre vira Outros; status "Recusou" já entra como Perdido/Recusado) ou Cancelado.
 **Data da gravação**: `25/11/2026 14:30` no horário de Brasília (a hora pode vir numa coluna `hora`). **Agendado** exige data e hora futuras
-e entra com estúdio, hosts e convidado confirmados (aparece na agenda e avisa a equipe). Gravado não entra por planilha: o episódio nasce pela página do convidado.
+e entra com estúdio, hosts e convidado confirmados (aparece na agenda e avisa a equipe). **Gravado** e **Publicado** trazem o histórico: pedem a data da gravação (só o dia basta, não pode ser futura) e criam o episódio já na etapa (Gravado ou Publicado), **sem tarefas, custos automáticos nem avisos**. Opcionais: `episódio` (número; sem ele, continua a numeração na ordem das datas de gravação; número já usado vira duplicado), `youtube`, `spotify` e `publicado em`.
 Primeiro mostra uma **prévia** (pronto / erro / duplicado — Instagram ou e-mail já cadastrado ou repetido no arquivo);
 ao confirmar, só as linhas prontas viram convidados, com você como responsável.
 

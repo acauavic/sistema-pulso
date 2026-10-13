@@ -165,7 +165,7 @@ async function syncFromGuest(guestId, userId = null) {
   const { rows: [guest] } = await db.query('SELECT * FROM guests WHERE id = $1', [guestId]);
   if (!guest) return null;
   let { rows: [ep] } = await db.query('SELECT * FROM episodes WHERE guest_id = $1', [guestId]);
-  if (!ep && guest.sponsor_id && !['recusou', 'cancelado'].includes(guest.status)) {
+  if (!ep && guest.sponsor_id && !['perdido', 'cancelado'].includes(guest.status)) {
     await db.query("INSERT INTO sponsor_bookings (sponsor_id, guest_id, role) VALUES ($1, $2, 'exclusivo') ON CONFLICT DO NOTHING", [guest.sponsor_id, guest.id]);
   }
   if (!ep) { try { await require('./finance').syncGuest(guestId); } catch (err) { console.error('Financeiro (convidado):', err.message); } }

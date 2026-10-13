@@ -85,10 +85,10 @@ const TOOLS = [
       if (!g) return { erro: 'Convidado não encontrado.' };
       const next = {
         prospect: g.invite_token ? 'Enviar o convite (e-mail ou WhatsApp).' : 'Gerar o link do convite.',
-        convite_enviado: 'Esperar a resposta ou registrar que aceitou/recusou.',
+        convite_enviado: 'Esperar a resposta ou registrar que aceitou ou marcar como perdido (com o motivo).',
         em_agendamento: g.proposed_at ? 'Confirmar a data com estúdio, hosts e convidado.' : 'Definir a data da gravação.',
         agendado: 'Gravar e marcar como gravado (aí nasce o episódio).', gravado: 'A parte do convidado acabou; o resto é o episódio.',
-        recusou: 'Retomar contato, se fizer sentido.', cancelado: 'Retomar contato, se fizer sentido.',
+        perdido: 'Retomar contato, se fizer sentido.', cancelado: 'Retomar contato, se fizer sentido.',
       }[g.status];
       return {
         convidado: g.name, instagram: g.instagram ? `@${g.instagram}` : null, etapa: C.STATUS_BY_KEY[g.status].label, responsavel: g.owner_name,

@@ -67,7 +67,7 @@ const ORIGINS = ['convidado', 'novo_convidado', 'hosts'];
 const formLocals = async (extra) => {
   const [guests, sponsors] = await Promise.all([
     db.query(`SELECT g.id, g.name, g.status, g.sponsor_id FROM guests g WHERE NOT EXISTS (SELECT 1 FROM episodes e WHERE e.guest_id = g.id)
-               AND g.status NOT IN ('recusou', 'cancelado') ORDER BY (g.status = 'agendado') DESC, lower(g.name) LIMIT 1000`),
+               AND g.status NOT IN ('perdido', 'cancelado') ORDER BY (g.status = 'agendado') DESC, lower(g.name) LIMIT 1000`),
     db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)"),
   ]);
   return { statuses: C.EPISODE_STATUSES, guests: guests.rows, sponsors: sponsors.rows, profiles: C.PROFILES, kinds: C.SPONSOR_KINDS, guestStatuses: C.STATUS_BY_KEY, ...extra };

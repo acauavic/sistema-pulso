@@ -9,7 +9,11 @@ const rules = require('../services/guestRules');
 const tpl = require('../services/inviteTemplate');
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
-const { GUEST_STATUSES, STATUS_BY_KEY, isStatus, PROFILES, PROFILE_BY_KEY, CLICK_KINDS } = require('../constants');
+const { GUEST_STATUSES, STATUS_BY_KEY, isStatus, PROFILES, PROFILE_BY_KEY, CLICK_KINDS, LOSS_REASONS } = require('../constants');
+
+// Texto do histórico ao mudar de etapa (Perdido leva o motivo).
+const stageMessage = (from, to, g) => `Etapa: ${STATUS_BY_KEY[from].label} → ${STATUS_BY_KEY[to].label}${to === 'perdido' && g.loss_reason ? ` (motivo: ${LOSS_REASONS[g.loss_reason]}${g.loss_note ? `: “${g.loss_note}”` : ''})` : ''}`;
+const lossFields = (b) => ({ loss_reason: Object.prototype.hasOwnProperty.call(LOSS_REASONS, b.loss_reason) ? b.loss_reason : null, loss_note: clean(b.loss_note, 500) || null });
 const { wrap, isUuid, isIntId } = require('../utils/wrap');
 const { clean, isEmail, parseInputDateTime, firstName } = require('../utils/format');
 
@@ -29,7 +33,7 @@ async function findGuest(id) {
 async function formOptions() {
   const users = await db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)');
   const sponsors = await db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)");
-  return { owners: users.rows, sponsors: sponsors.rows, statuses: GUEST_STATUSES, profiles: PROFILES, stageHints: rules.STAGE_HINTS };
+  return { owners: users.rows, sponsors: sponsors.rows, statuses: GUEST_STATUSES, profiles: PROFILES, stageHints: rules.STAGE_HINTS, lossReasons: LOSS_REASONS };
 }
 
 const formView = (res, status, locals) => res.status(status).render('guests/form', locals);
@@ -59,7 +63,9 @@ async function parseGuestForm(body) {
     scheduled_guest: flag(body.scheduled_guest),
     sponsor_id: isIntId(body.sponsor_id) ? Number(body.sponsor_id) : null,
     sponsor_relation: ['representante', 'indicado'].includes(body.sponsor_relation) ? body.sponsor_relation : null,
+    ...lossFields(body),
   };
+  if (values.status !== 'perdido') { values.loss_reason = null; values.loss_note = null; }
   if (!values.sponsor_id) values.sponsor_relation = null;
   else if (!values.sponsor_relation) values.sponsor_relation = 'indicado';
   let error = null;
@@ -90,8 +96,8 @@ const echoValues = (body, values) => ({
 
 const COLUMNS = ['name', 'email', 'phone', 'instagram', 'profile', 'invite_reason', 'company', 'job_title', 'positioning', 'topic', 'bio',
   'notes', 'proposed_at', 'owner_id', 'status', 'gender', 'is_plural', 'scheduled_studio', 'scheduled_hosts', 'scheduled_guest',
-  'sponsor_id', 'sponsor_relation'];
-const NULLABLE = new Set(['email', 'phone', 'invite_reason', 'company', 'job_title', 'positioning', 'topic', 'bio', 'notes']);
+  'sponsor_id', 'sponsor_relation', 'loss_reason', 'loss_note'];
+const NULLABLE = new Set(['email', 'phone', 'invite_reason', 'company', 'job_title', 'positioning', 'topic', 'bio', 'notes', 'loss_reason', 'loss_note']);
 const columnValues = (values) => COLUMNS.map((c) => (NULLABLE.has(c) ? values[c] || null : values[c]));
 
 // ---- quadro / lista ----
@@ -111,14 +117,14 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   const [{ rows: guests }, { rows: owners }] = await Promise.all([
     db.query(
       `SELECT g.id, g.name, g.instagram, g.profile, g.company, g.job_title, g.topic, g.status, g.proposed_at, g.invite_sent_at, g.invite_viewed_at,
-              g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at
+              g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason
          FROM guests g LEFT JOIN users u ON u.id = g.owner_id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY g.updated_at DESC LIMIT 500`, params),
     db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
   ]);
   const columns = GUEST_STATUSES.map((s) => ({ ...s, guests: guests.filter((g) => g.status === s.key) }));
-  res.render('guests/index', { title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
+  res.render('guests/index', { lossReasons: LOSS_REASONS, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
 }));
 
 // ---- criar ----
@@ -166,7 +172,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const { rows: [pl] } = await db.query("SELECT count(*)::int AS leads, count(*) FILTER (WHERE status = 'confirmado')::int AS confirmed FROM plateia_leads WHERE guest_id = $1", [guest.id]);
   res.render('guests/show', {
     plateia: { ...pl, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
-    episode: episode.rows[0] || null, openModal: ['contato', 'agenda', 'email'].includes(req.query.abrir) ? req.query.abrir : null,
+    episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, openModal: ['contato', 'agenda', 'email', 'perda'].includes(req.query.abrir) ? req.query.abrir : null,
     title: guest.name, guest, events, clicks, comments: thread, linkedTasks: linkedTasks.rows, clickKinds: CLICK_KINDS, profileLabels: PROFILE_BY_KEY,
     statuses: GUEST_STATUSES, statusInfo: STATUS_BY_KEY[guest.status],
     longUrl: guest.invite_token ? guestsSvc.longInviteUrl(guest.invite_token) : null,
@@ -196,7 +202,7 @@ router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res
     `UPDATE guests SET ${COLUMNS.map((c, i) => `${c}=$${i + 2}`).join(', ')}, updated_at=now() WHERE id=$1`,
     [guest.id, ...columnValues(values)]);
   if (values.status !== guest.status) {
-    await guestsSvc.addEvent(guest.id, req.user.id, 'status', `Etapa: ${STATUS_BY_KEY[guest.status].label} → ${STATUS_BY_KEY[values.status].label}`);
+    await guestsSvc.addEvent(guest.id, req.user.id, 'status', stageMessage(guest.status, values.status, values));
   }
   if (guest.sponsor_id && guest.sponsor_id !== values.sponsor_id) { // trocou/tirou o patrocinador: a reserva automática sai
     await db.query('DELETE FROM sponsor_bookings WHERE guest_id = $1 AND sponsor_id = $2', [guest.id, guest.sponsor_id]);
@@ -208,7 +214,7 @@ router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res
 }));
 
 // Etapa que exige dados -> janela da página do convidado que pede só esses dados.
-const STEP_MODAL = { em_agendamento: 'contato', agendado: 'agenda' };
+const STEP_MODAL = { em_agendamento: 'contato', agendado: 'agenda', perdido: 'perda' };
 
 // ---- mudar etapa (formulário ou arrastar no quadro) ----
 router.post('/convidados/:id/status', requirePerm('guests.write'), wrap(async (req, res) => {
@@ -226,7 +232,7 @@ router.post('/convidados/:id/status', requirePerm('guests.write'), wrap(async (r
   }
   if (target !== guest.status) {
     await db.query('UPDATE guests SET status = $2, updated_at = now() WHERE id = $1', [guest.id, target]);
-    await guestsSvc.addEvent(guest.id, req.user.id, 'status', `Etapa: ${STATUS_BY_KEY[guest.status].label} → ${STATUS_BY_KEY[target].label}`);
+    await guestsSvc.addEvent(guest.id, req.user.id, 'status', stageMessage(guest.status, target, guest));
     await production.syncFromGuest(guest.id, req.user.id);
     await audit(req, 'convidado.etapa', 'guest', guest.id, { de: guest.status, para: target });
   }
@@ -236,7 +242,7 @@ router.post('/convidados/:id/status', requirePerm('guests.write'), wrap(async (r
 }));
 
 // ---- próximo passo guiado: salva só os campos da janela e, se der, muda a etapa ----
-// Campos aceitos: contato (email/phone) e agenda (proposed_at + confirmações, com agenda=1).
+// Campos aceitos: contato (email/phone), agenda (proposed_at + confirmações, com agenda=1) e perda (loss_reason/loss_note, com perda=1).
 // Remarcar (nova data) exige confirmar de novo; sem as três confirmações o convidado volta para Em agendamento.
 const fmtWhen = (d) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(d);
 
@@ -257,6 +263,7 @@ router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (
     next.scheduled_hosts = flag(b.scheduled_hosts);
     next.scheduled_guest = flag(b.scheduled_guest);
   }
+  if (b.perda === '1') Object.assign(next, lossFields(b));
   const modal = STEP_MODAL[target];
   const backUrl = `/convidados/${guest.id}${modal && target !== guest.status ? `?abrir=${modal}` : ''}`;
   if (error) { await req.flash('error', error); return res.redirect(backUrl); }
@@ -269,13 +276,14 @@ router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (
 
   await db.query(
     `UPDATE guests SET email=$2, phone=$3, proposed_at=$4, scheduled_studio=$5, scheduled_hosts=$6, scheduled_guest=$7,
-            status=$8, updated_at=now() WHERE id=$1`,
-    [guest.id, next.email, next.phone, next.proposed_at, next.scheduled_studio, next.scheduled_hosts, next.scheduled_guest, status]);
+            loss_reason=$9, loss_note=$10, status=$8, updated_at=now() WHERE id=$1`,
+    [guest.id, next.email, next.phone, next.proposed_at, next.scheduled_studio, next.scheduled_hosts, next.scheduled_guest, status,
+      status === 'perdido' ? next.loss_reason : null, status === 'perdido' ? next.loss_note : null]);
   const moved = b.agenda === '1' && guest.proposed_at && next.proposed_at && guest.proposed_at.getTime() !== next.proposed_at.getTime();
   if (moved) await guestsSvc.addEvent(guest.id, req.user.id, 'agenda', `Gravação remarcada: ${fmtWhen(guest.proposed_at)} → ${fmtWhen(next.proposed_at)}`);
   else if (b.agenda === '1' && !guest.proposed_at) await guestsSvc.addEvent(guest.id, req.user.id, 'agenda', `Data da gravação: ${fmtWhen(next.proposed_at)}`);
   if (status !== guest.status) {
-    await guestsSvc.addEvent(guest.id, req.user.id, 'status', `Etapa: ${STATUS_BY_KEY[guest.status].label} → ${STATUS_BY_KEY[status].label}`);
+    await guestsSvc.addEvent(guest.id, req.user.id, 'status', stageMessage(guest.status, status, next));
     await production.syncFromGuest(guest.id, req.user.id);
     await audit(req, 'convidado.etapa', 'guest', guest.id, { de: guest.status, para: status });
   } else {

@@ -1,10 +1,11 @@
 // Regras do funil de convidados: o que precisa estar preenchido para entrar em cada etapa
 // e normalização/validação dos campos que o cadastro e a importação CSV compartilham.
-const { PROFILES, GUEST_STATUSES } = require('../constants');
+const { PROFILES, GUEST_STATUSES, LOSS_REASONS } = require('../constants');
 
 // Etapa -> pendências. Cada regra devolve a lista (vazia = pode entrar).
 const REQUIREMENTS = {
   em_agendamento: (g) => (g.email || g.phone ? [] : ['e-mail e/ou WhatsApp do convidado']),
+  perdido: (g) => (!g.loss_reason ? ['o motivo da perda'] : g.loss_reason === 'outros' && !String(g.loss_note || '').trim() ? ['a descrição do motivo (Outros)'] : []),
   agendado: (g) => [
     !g.proposed_at && 'data e hora da gravação',
     !g.scheduled_studio && 'confirmação de agenda no Estúdio',
@@ -16,6 +17,7 @@ const REQUIREMENTS = {
 // Texto curto exibido no formulário conforme a etapa escolhida.
 const STAGE_HINTS = {
   em_agendamento: 'Para entrar em Em agendamento: e-mail e/ou WhatsApp do convidado.',
+  perdido: 'Para entrar em Perdido: o motivo da perda (em Outros, descreva).',
   agendado: 'Para entrar em Agendado: data e hora da gravação e a confirmação no Estúdio, com os hosts e com o convidado.',
 };
 
@@ -67,7 +69,7 @@ const STATUS_ALIASES = {
   em_agendamento: ['em agendamento', 'em_agendamento', 'agendando', 'aceitou', 'aceito'],
   agendado: ['agendado', 'agendada', 'marcado', 'marcada'],
   gravado: ['gravado', 'gravada'],
-  recusou: ['recusou', 'recusado', 'recusada', 'nao aceitou'],
+  perdido: ['perdido', 'perdida', 'perda', 'recusou', 'recusado', 'recusada', 'nao aceitou'],
   cancelado: ['cancelado', 'cancelada', 'desistiu', 'desistencia'],
 };
 
@@ -82,19 +84,36 @@ function normalizeStatus(value) {
 
 // Data e hora da gravação vindas de planilha, no horário de Brasília (-03:00 fixo, sem horário de verão desde 2019).
 // Data: 25/10/2026, 25/10/26 ou 2026-10-25. Hora: 14:30, 14h30 ou 14h, na mesma célula ou numa coluna própria.
-// Devolve { value: Date|null } ou { error: 'mensagem' }.
-function parseRecordingAt(dateCell, timeCell = '') {
+// Devolve { value: Date|null } ou { error: 'mensagem' }. dateOnly: aceita só o dia (gravação antiga; vira meio-dia).
+function parseRecordingAt(dateCell, timeCell = '', { dateOnly = false } = {}) {
   const raw = `${String(dateCell || '').trim()} ${String(timeCell || '').trim()}`.trim().toLowerCase();
   if (!raw) return { value: null };
   const m = raw.match(/^(?:(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})|(\d{4})-(\d{2})-(\d{2}))(?:[ t]+(?:as|às)?\s*(\d{1,2})(?::|h)?(\d{2})?h?(?::\d{2})?)?$/);
   if (!m) return { error: 'data/hora da gravação inválida (use 25/10/2026 14:30)' };
   const [day, month, year] = m[1] ? [m[1], m[2], m[3].length === 2 ? `20${m[3]}` : m[3]] : [m[6], m[5], m[4]];
-  if (m[7] === undefined) return { error: 'falta a hora da gravação' };
+  if (m[7] === undefined && !dateOnly) return { error: 'falta a hora da gravação' };
   const pad = (n) => String(n).padStart(2, '0');
-  const iso = `${year}-${pad(month)}-${pad(day)}T${pad(m[7])}:${m[8] || '00'}`;
+  const iso = `${year}-${pad(month)}-${pad(day)}T${pad(m[7] ?? 12)}:${m[8] || '00'}`;
   const d = new Date(`${iso}:00-03:00`);
   const back = Number.isNaN(d.getTime()) ? '' : new Date(d.getTime() - 3 * 3600 * 1000).toISOString().slice(0, 16);
   return back === iso ? { value: d } : { error: 'data/hora da gravação inválida (use 25/10/2026 14:30)' };
+}
+
+const LOSS_ALIASES = {
+  recusado: ['recusado', 'recusada', 'recusou', 'nao aceitou', 'recusou o convite'],
+  sem_agenda: ['sem agenda', 'sem agenda proxima', 'agenda', 'sem data'],
+  nunca_respondeu: ['nunca respondeu', 'sem resposta', 'nao respondeu'],
+  parou_de_responder: ['parou de responder', 'sumiu', 'ghosting'],
+  conflito_de_interesse: ['conflito de interesse', 'conflito'],
+  outros: ['outros', 'outro', 'outro motivo'],
+};
+// Motivo da perda vindo de texto livre (CSV): rótulo, chave ou variação conhecida -> chave; vazio/desconhecido -> null.
+function normalizeLossReason(value) {
+  const n = normText(value).replace(/[_\s]+/g, ' ');
+  if (!n) return null;
+  for (const [key, label] of Object.entries(LOSS_REASONS)) if (normText(label) === n || key.replace(/_/g, ' ') === n) return key;
+  for (const [key, list] of Object.entries(LOSS_ALIASES)) if (list.includes(n)) return key;
+  return null;
 }
 
 // Aceita só http(s); `hosts` restringe o domínio (youtube.com/youtu.be, spotify.com/spotify.link).
@@ -115,6 +134,6 @@ const YOUTUBE_HOSTS = ['youtube.com', 'youtu.be'];
 const SPOTIFY_HOSTS = ['spotify.com', 'spotify.link'];
 
 module.exports = {
-  missingFor, missingMessage, STAGE_HINTS, normalizeInstagram, normalizeProfile, normalizeGender, normalizeStatus, parseRecordingAt, normalizeUrl,
+  missingFor, missingMessage, STAGE_HINTS, normalizeInstagram, normalizeProfile, normalizeGender, normalizeStatus, normalizeLossReason, parseRecordingAt, normalizeUrl,
   YOUTUBE_HOSTS, SPOTIFY_HOSTS, normText,
 };

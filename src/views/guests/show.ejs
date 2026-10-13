@@ -81,7 +81,7 @@
       <% if (guest.email || guest.phone) { %><%- advance('em_agendamento', 'Aceitou o convite', 'primary') %>
       <% } else { %><button class="btn primary" type="button" data-modal-open="modal-contato">Aceitou o convite</button><% } %>
       <% if (canEmail) { %><button class="btn" type="button" data-modal-open="modal-email"><%- icon('mail') %> Reenviar</button><% } else if (inviteUrl) { %><button class="btn" type="button" data-copy="<%= inviteUrl %>">Copiar link</button><% } %>
-      <%- advance('recusou', 'Recusou', 'ghost', 'Marcar ' + guest.name + ' como Recusou?') %>
+      <button class="btn ghost" type="button" data-modal-open="modal-perda">Marcar como perdido</button>
     </div>
     <% } %>
 
@@ -125,8 +125,14 @@
     </div>
 
   <% } else { %>
-    <h2><%= guest.status === 'recusou' ? 'Recusou o convite' : 'Participação cancelada' %></h2>
+    <% if (guest.status === 'perdido') { %>
+    <h2>Perdido</h2>
+    <p class="mono-line muted"><span>MOTIVO: <%= (lossReasons[guest.loss_reason] || '—').toUpperCase() %></span></p>
+    <% if (guest.loss_note) { %><p class="quote pre"><%= guest.loss_note %></p><% } %>
+    <% } else { %>
+    <h2>Participação cancelada</h2>
     <% if (guest.rsvp_message) { %><p class="quote pre"><%= guest.rsvp_message %></p><% } %>
+    <% } %>
     <% if (canW) { %><div class="next-actions"><%- advance('prospect', 'Retomar contato', '') %></div><% } %>
   <% } %>
 
@@ -235,7 +241,7 @@
               <dt>Gerado</dt><dd class="handle"><%= fmt.formatDateTime(guest.invite_generated_at) %></dd>
               <dt>Enviado</dt><dd class="handle"><%= guest.invite_sent_at ? fmt.formatDateTime(guest.invite_sent_at) : 'ainda não' %></dd>
               <dt>Aberto</dt><dd class="handle"><%= guest.invite_viewed_at ? fmt.formatDateTime(guest.invite_viewed_at) : 'ainda não' %></dd>
-              <dt>Resposta</dt><dd class="handle"><%= guest.responded_at ? fmt.formatDateTime(guest.responded_at) + ' · ' + (guest.status === 'recusou' ? 'recusou' : idx >= 2 ? 'aceitou' : 'respondeu') : 'sem resposta' %></dd>
+              <dt>Resposta</dt><dd class="handle"><%= guest.responded_at ? fmt.formatDateTime(guest.responded_at) + ' · ' + (guest.status === 'perdido' && guest.loss_reason === 'recusado' ? 'recusou' : idx >= 2 ? 'aceitou' : 'respondeu') : 'sem resposta' %></dd>
               <% Object.keys(clickKinds).forEach(function (k) { %>
               <dt><%= clickKinds[k] %></dt>
               <dd><strong class="mono"><%= clicks[k].total %></strong><% if (clicks[k].total) { %> <span class="handle muted">· último <%= fmt.formatDateTime(clicks[k].last) %></span><% } %></dd>
@@ -276,6 +282,23 @@
       <% }) %>
     </div>
     <div class="row modal-actions"><button class="btn primary" type="submit" data-stage-confirm disabled>Confirmar mudança</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<% if (canW) { %>
+<dialog class="modal" id="modal-perda" aria-labelledby="m-perda-h" <%= openOnLoad('perda') %>>
+  <form method="post" action="/convidados/<%= guest.id %>/avancar" class="stack">
+    <%- csrfField %><%- hidden('para', 'perdido') %><%- hidden('perda', '1') %>
+    <h2 id="m-perda-h">Marcar <%= fmt.firstName(guest.name) %> como perdido</h2>
+    <p class="small muted">O motivo fica no histórico e ajuda a entender onde os convites param.</p>
+    <div class="stage-pick" role="radiogroup" aria-label="Motivo da perda">
+      <% Object.keys(lossReasons).forEach(function (k) { %>
+      <label class="choice"><input type="radio" name="loss_reason" value="<%= k %>" required <%= guest.loss_reason === k ? 'checked' : '' %> data-loss-radio><span><strong><%= lossReasons[k] %></strong></span></label>
+      <% }) %>
+    </div>
+    <label data-loss-note <%= guest.loss_reason === 'outros' ? '' : 'hidden' %>>Qual o motivo?<input type="text" name="loss_note" maxlength="500" value="<%= guest.loss_note || '' %>"></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Marcar como perdido</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>
 <% } %>

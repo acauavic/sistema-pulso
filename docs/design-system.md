@@ -42,7 +42,7 @@
 - **PUBLICADO** (único lime): `#2A3311`/`#C8FF42` · `#C8FF42`/`#0A0A0A`
 - **CANCELADO**: `#2E1614`/`#FF7A6B` · `#FBE3E0`/`#9E2A1E`
 - Chip: raio 2, mono 11px, caixa alta, tracking .12em. Classes `.badge` + `.b-st-*` / `.b-green` (publicado/ativo) / `.b-amber` / `.b-red` / `.b-gray`.
-- **Etapas do convidado → chip** (CRM, `src/constants.js`): prospect → PAUTA · convite_enviado → AGENDADO (plum: convidado vê) · em_agendamento → EM EDIÇÃO (âmbar, em andamento) · agendado → AGENDADO (plum: data combinada com o convidado) · gravado → GRAVADO · publicado → PUBLICADO · recusou/cancelado → CANCELADO.
+- **Etapas do convidado → chip** (CRM, `src/constants.js`): prospect → PAUTA · convite_enviado → AGENDADO (plum: convidado vê) · em_agendamento → EM EDIÇÃO (âmbar, em andamento) · agendado → AGENDADO (plum: data combinada com o convidado) · gravado → GRAVADO · publicado → PUBLICADO · perdido/cancelado → CANCELADO.
 
 ## Tipografia
 

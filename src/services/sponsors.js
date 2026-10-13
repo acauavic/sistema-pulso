@@ -290,7 +290,7 @@ async function portalData(sponsor) {
                 CASE WHEN g.status = 'agendado' THEN 'gravacao_marcada' ELSE 'previsto' END, b.role, true,
                 g.name, g.instagram, g.positioning, g.bio
            FROM sponsor_bookings b JOIN guests g ON g.id = b.guest_id
-          WHERE b.sponsor_id = $1 AND g.status NOT IN ('recusou', 'cancelado')
+          WHERE b.sponsor_id = $1 AND g.status NOT IN ('perdido', 'cancelado')
        ) x ORDER BY aired_on NULLS LAST, number NULLS LAST`, [sponsor.id]),
     db.query("SELECT id, kind, filename FROM sponsor_files WHERE sponsor_id = $1 AND kind IN ('moldura','qrcode','logo') ORDER BY id DESC", [sponsor.id]),
   ]);

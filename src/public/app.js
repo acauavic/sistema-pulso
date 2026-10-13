@@ -51,6 +51,19 @@
     sync();
   }
 
+  // motivo da perda: "Outros" pede a descrição (formulário do convidado e janela "Marcar como perdido")
+  document.querySelectorAll('[data-loss-select], [data-loss-radio]').forEach((input) => {
+    const form = input.form;
+    const note = form.querySelector('[data-loss-note]');
+    if (!note) return;
+    const sync = () => {
+      const picked = input.matches('select') ? input.value : form.querySelector('[data-loss-radio]:checked')?.value;
+      const on = picked === 'outros';
+      note.hidden = !on; note.querySelector('input').required = on;
+    };
+    input.addEventListener('change', sync); sync();
+  });
+
   // envio de arquivos da equipe (corpo cru): <div data-upload data-url="…"> com select[data-upload-kind], input[data-upload-file], button[data-upload-send]
   document.querySelectorAll('[data-upload]').forEach((box) => {
     const status = box.querySelector('[data-upload-status]');

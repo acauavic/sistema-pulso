@@ -31,7 +31,7 @@ async function guestByToken(token) {
 
 const rsvpStateOf = (guest) => {
   if (!guest.responded_at) return null;
-  if (guest.status === 'recusou') return 'recusado';
+  if (guest.status === 'perdido' && guest.loss_reason === 'recusado') return 'recusado';
   if (['em_agendamento', 'agendado', 'gravado'].includes(guest.status)) return 'aceito';
   return null;
 };
@@ -114,8 +114,8 @@ router.post('/convite/:token/responder', wrap(async (req, res) => {
   if (req.body.resposta !== 'recusado' || !RSVP_OPEN.includes(guest.status)) return res.redirect(back);
 
   const message = clean(req.body.mensagem, 600);
-  await db.query("UPDATE guests SET status = 'recusou', responded_at = now(), rsvp_message = $2, updated_at = now() WHERE id = $1",
-    [guest.id, message || null]);
+  await db.query(`UPDATE guests SET status = 'perdido', loss_reason = 'recusado', loss_note = $2, responded_at = now(), rsvp_message = $2,
+                    updated_at = now() WHERE id = $1`, [guest.id, message || null]);
   await guestsSvc.addEvent(guest.id, null, 'resposta', `Recusou o convite${message ? `: “${message}”` : ''}`);
   await notifyOwner(guest, false, message);
   return res.redirect(back);

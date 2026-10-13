@@ -9,7 +9,8 @@
   <ul class="small">
     <li><strong>perfil</strong>: médico, influencer, empresário ou profissional da saúde.</li>
     <li><strong>whatsapp</strong>, <strong>email</strong>, <strong>motivo do convite</strong>, <strong>genero</strong> (m/f, padrão m): opcionais.</li>
-    <li><strong>status</strong>: <%= importStatuses.join(', ') %>. Vazio = Prospecção. Em agendamento pede e-mail ou WhatsApp.</li>
+    <li><strong>status</strong>: <%= importStatuses.join(', ') %>. Vazio = Prospecção. Em agendamento pede e-mail ou WhatsApp. Perdido pede a coluna <strong>motivo da perda</strong> (Recusado, Sem agenda próxima, Nunca respondeu, Parou de responder, Conflito de interesse ou um texto, que entra como Outros); status Recusou já entra como Perdido com motivo Recusado.</li>
+    <li><strong>Gravado</strong> e <strong>Publicado</strong> trazem o histórico: pedem a data da gravação (só o dia basta) e criam o episódio, sem tarefas, custos ou avisos. Opcionais: <strong>episódio</strong> (número; sem ele, segue a numeração pela data), <strong>youtube</strong>, <strong>spotify</strong> e <strong>publicado em</strong>.</li>
     <li><strong>data da gravação</strong>: 25/11/2026 14:30, horário de Brasília (a hora pode vir numa coluna <strong>hora</strong>). Agendado pede data e hora futuras e entra com estúdio, hosts e convidado confirmados.</li>
   </ul>
 </details>
@@ -45,7 +46,7 @@
         <td><%= r.data.name || '—' %></td>
         <td class="handle"><%= r.data.instagram ? '@' + r.data.instagram : '—' %></td>
         <td><%= r.data.profile ? profileLabels[r.data.profile].label : '—' %></td>
-        <td class="mono small"><%= r.data.status ? statusInfo[r.data.status].label : '—' %><% if (r.data.proposed_at) { %><br><span class="muted"><%= fmt.formatDateTime(r.data.proposed_at) %></span><% } %></td>
+        <td class="mono small"><%= r.data.episode && r.data.episode.status === 'publicado' ? 'Publicado' : r.data.status ? statusInfo[r.data.status].label : '—' %><% if (r.data.episode && r.data.episode.number) { %> · EP.<%= String(r.data.episode.number).padStart(3, '0') %><% } %><% if (r.data.proposed_at) { %><br><span class="muted"><%= fmt.formatDateTime(r.data.proposed_at) %></span><% } %></td>
         <td class="small"><%= [r.data.phone, r.data.email].filter(Boolean).join(' · ') || '—' %></td>
         <td>
           <% if (r.errors.length) { %><span class="badge b-red">Erro</span> <span class="small"><%= r.errors.join('; ') %></span>

@@ -127,7 +127,11 @@ test('modelo: links dos botões vêm de buildVariables e viram # na prévia', ()
 test('regras: pendências por etapa', () => {
   const none = {};
   assert.deepEqual(rules.missingFor('prospect', none), []);
-  assert.deepEqual(rules.missingFor('recusou', none), []);
+  assert.deepEqual(rules.missingFor('cancelado', none), []);
+  assert.deepEqual(rules.missingFor('perdido', none), ['o motivo da perda']);
+  assert.equal(rules.missingFor('perdido', { loss_reason: 'outros', loss_note: ' ' }).length, 1);
+  assert.deepEqual(rules.missingFor('perdido', { loss_reason: 'outros', loss_note: 'Mudou de área' }), []);
+  assert.deepEqual(rules.missingFor('perdido', { loss_reason: 'nunca_respondeu' }), []);
   assert.deepEqual(rules.missingFor('gravado', none), []);
   assert.equal(rules.missingFor('em_agendamento', none).length, 1);
   assert.deepEqual(rules.missingFor('em_agendamento', { phone: '1' }), []);
@@ -173,7 +177,7 @@ test('csv: cabeçalhos com acento/variações são reconhecidos e a validação 
   assert.equal(headerError, null);
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0].errors, []);
-  assert.deepEqual(rows[0].data, { name: 'Ana', instagram: 'ana', profile: 'medico', email: 'a@b.co', gender: 'm', status: 'prospect', proposed_at: null, phone: '11 9', invite_reason: 'porque' });
+  assert.deepEqual(rows[0].data, { name: 'Ana', instagram: 'ana', profile: 'medico', email: 'a@b.co', gender: 'm', status: 'prospect', proposed_at: null, loss_reason: null, loss_note: null, episode: null, phone: '11 9', invite_reason: 'porque' });
   assert.equal(rows[0].line, 2);
   assert.deepEqual(rows[1].errors, ['nome ausente']);
   assert.match(csv.parseGuests('nome;perfil\nA;médico').headerError, /instagram/);
@@ -192,12 +196,51 @@ test('csv: coluna de status (etapa) opcional com as regras de cada etapa', () =>
     'A8;@a8;médico;;astronauta',
     'A9;@a9;médico;;',
   ].join('\n'));
-  assert.deepEqual(rows.map((r) => r.data.status), ['convite_enviado', 'em_agendamento', 'em_agendamento', 'recusou', 'cancelado', 'agendado', 'gravado', null, 'prospect']);
+  assert.deepEqual(rows.map((r) => r.data.status), ['convite_enviado', 'em_agendamento', 'em_agendamento', 'perdido', 'cancelado', 'agendado', 'gravado', null, 'prospect']);
   assert.deepEqual(rows.map((r) => r.errors.length), [0, 0, 1, 0, 0, 1, 1, 1, 0]);
   assert.match(rows[2].errors[0], /Em agendamento pede e-mail ou WhatsApp/);
   assert.match(rows[5].errors[0], /Agendado pede data e hora da gravação/);
-  assert.match(rows[6].errors[0], /Gravado não entra por planilha/);
+  assert.match(rows[6].errors[0], /Gravado pede a data da gravação/);
   assert.match(rows[7].errors[0], /status “astronauta” não reconhecido/);
+});
+
+test('csv: histórico (Gravado e Publicado) com episódio, links e data só com o dia', () => {
+  const { rows } = csv.parseGuests([
+    'nome;instagram;perfil;status;data da gravação;episódio;youtube;spotify;publicado em',
+    'H1;@h1;médico;Publicado;10/03/2026;EP.003;https://youtu.be/abc;https://open.spotify.com/episode/x;20/03/2026',
+    'H2;@h2;médico;Gravado;12/09/2026;;;;',
+    'H3;@h3;médico;Gravado;;;;;',
+    'H4;@h4;médico;Gravado;10/03/2099;;;;',
+    'H5;@h5;médico;Publicado;10/03/2026;três;https://vimeo.com/1;;',
+    'H6;@h6;médico;Gravado;10/03/2026;;https://youtu.be/abc;;',
+    'H7;@h7;médico;Agendado;10/12/2099 10:00;4;;;',
+  ].join('\n'));
+  assert.deepEqual(rows[0].errors, []);
+  assert.equal(rows[0].data.status, 'gravado');
+  assert.deepEqual({ ...rows[0].data.episode, aired_at: rows[0].data.episode.aired_at.toISOString() },
+    { number: 3, status: 'publicado', youtube_url: 'https://youtu.be/abc', spotify_url: 'https://open.spotify.com/episode/x', aired_at: '2026-03-20T15:00:00.000Z' });
+  assert.equal(rows[0].data.proposed_at.toISOString(), '2026-03-10T15:00:00.000Z', 'só o dia vira meio-dia em Brasília');
+  assert.deepEqual(rows[1].errors, []); assert.equal(rows[1].data.episode.status, 'gravado'); assert.equal(rows[1].data.episode.number, null);
+  assert.match(rows[2].errors[0], /Gravado pede a data da gravação/);
+  assert.match(rows[3].errors[0], /data no futuro/);
+  assert.match(rows[4].errors.join(' | '), /número do episódio “três” inválido.*YouTube inválido/);
+  assert.match(rows[5].errors[0], /use o status Publicado/);
+  assert.match(rows[6].errors[0], /só valem para Gravado ou Publicado/);
+});
+
+test('csv: Perdido com motivo da perda', () => {
+  const { rows } = csv.parseGuests([
+    'nome;instagram;perfil;status;motivo da perda',
+    'C1;@c1;médico;Perdido;Nunca respondeu',
+    'C2;@c2;médico;Perdido;Mudou de área',
+    'C3;@c3;médico;Perdido;',
+    'C4;@c4;médico;Recusou;',
+    'C5;@c5;médico;perdido;sem agenda',
+  ].join('\n'));
+  assert.deepEqual(rows.map((r) => [r.data.status, r.data.loss_reason, r.data.loss_note]), [
+    ['perdido', 'nunca_respondeu', null], ['perdido', 'outros', 'Mudou de área'], ['perdido', null, null], ['perdido', 'recusado', null], ['perdido', 'sem_agenda', null]]);
+  assert.deepEqual(rows.map((r) => r.errors.length), [0, 0, 1, 0, 0]);
+  assert.match(rows[2].errors[0], /Perdido pede o motivo da perda/);
 });
 
 test('csv: data e hora da gravação (Brasília) e Agendado', () => {

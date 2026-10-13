@@ -5,7 +5,7 @@ const GUEST_STATUSES = [
   { key: 'em_agendamento', label: 'Em agendamento', hint: 'Aceitou; alinhando data e detalhes' },
   { key: 'agendado', label: 'Agendado', hint: 'Data confirmada com Estúdio, hosts e convidado' },
   { key: 'gravado', label: 'Gravado', hint: 'Conversa gravada; daqui em diante é o episódio' },
-  { key: 'recusou', label: 'Recusou', hint: 'Não vai participar' },
+  { key: 'perdido', label: 'Perdido', hint: 'Não vai participar; o motivo fica registrado' },
   { key: 'cancelado', label: 'Cancelado', hint: 'Desistência / cancelamento' },
 ];
 
@@ -13,9 +13,19 @@ const STATUS_BY_KEY = Object.fromEntries(GUEST_STATUSES.map((s) => [s.key, s]));
 const isStatus = (key) => Object.prototype.hasOwnProperty.call(STATUS_BY_KEY, key);
 
 // Status em que o convidado ainda pode responder pelo link público.
-const RSVP_OPEN = ['prospect', 'convite_enviado', 'em_agendamento', 'recusou'];
+const RSVP_OPEN = ['prospect', 'convite_enviado', 'em_agendamento', 'perdido'];
 // Etapas em que o clique em "Aceitar" move o convidado para "Em agendamento".
-const ACCEPT_FROM = ['prospect', 'convite_enviado', 'recusou'];
+const ACCEPT_FROM = ['prospect', 'convite_enviado', 'perdido'];
+
+// Motivo da perda (obrigatório em Perdido). "Outros" pede uma descrição.
+const LOSS_REASONS = {
+  recusado: 'Recusado',
+  sem_agenda: 'Sem agenda próxima',
+  nunca_respondeu: 'Nunca respondeu',
+  parou_de_responder: 'Parou de responder',
+  conflito_de_interesse: 'Conflito de interesse',
+  outros: 'Outros',
+};
 
 const PROFILES = [
   { key: 'medico', label: 'Médico(a)' },
@@ -105,5 +115,6 @@ const FIN_TRIGGERS = {
 const FIN_ANCHORS = { gatilho: 'a partir do dia em que acontece', gravacao: 'a partir da data da gravação', veiculacao: 'a partir da data de veiculação' };
 const FILE_KINDS = ['logo', 'audio', 'moldura', 'qrcode', 'material'];
 
-module.exports = { FIN_OUT, FIN_IN, FIN_CATEGORIES, FIN_TRIGGERS, FIN_ANCHORS, NOTIFICATION_TYPES, ROUTINE_TRIGGERS, ROUTINE_ANCHORS, ROUTINE_ASSIGNEES, EPISODE_STAGES, EPISODE_STAGE_BY_KEY, EPISODE_FILE_KINDS, TASK_KINDS, TASK_STATUSES, CHECKLIST_GATES, SPONSOR_STAGES, SPONSOR_STAGE_BY_KEY, isSponsorStage, SPONSOR_KINDS, SPONSOR_TIERS, SPONSOR_GOALS,
+module.exports = {
+  LOSS_REASONS, FIN_OUT, FIN_IN, FIN_CATEGORIES, FIN_TRIGGERS, FIN_ANCHORS, NOTIFICATION_TYPES, ROUTINE_TRIGGERS, ROUTINE_ANCHORS, ROUTINE_ASSIGNEES, EPISODE_STAGES, EPISODE_STAGE_BY_KEY, EPISODE_FILE_KINDS, TASK_KINDS, TASK_STATUSES, CHECKLIST_GATES, SPONSOR_STAGES, SPONSOR_STAGE_BY_KEY, isSponsorStage, SPONSOR_KINDS, SPONSOR_TIERS, SPONSOR_GOALS,
   DELIVERABLE_KINDS, DELIVERABLE_STATUSES, EPISODE_STATUSES, FILE_KINDS, GUEST_STATUSES, STATUS_BY_KEY, isStatus, RSVP_OPEN, ACCEPT_FROM, PROFILES, PROFILE_BY_KEY, CLICK_KINDS };

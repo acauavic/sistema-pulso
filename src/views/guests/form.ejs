@@ -117,6 +117,15 @@
             <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= values.status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
           </select>
         </label>
+        <div class="stack" data-stages="perdido" <%= stageOf('perdido') %>>
+          <label>Motivo da perda
+            <select name="loss_reason" data-loss-select>
+              <option value="">Escolha o motivo</option>
+              <% Object.keys(lossReasons).forEach(function (k) { %><option value="<%= k %>" <%= values.loss_reason === k ? 'selected' : '' %>><%= lossReasons[k] %></option><% }) %>
+            </select>
+          </label>
+          <label data-loss-note <%= values.loss_reason === 'outros' ? '' : 'hidden' %>>Qual o motivo?<input type="text" name="loss_note" maxlength="500" value="<%= values.loss_note || '' %>"></label>
+        </div>
         <% Object.keys(stageHints).forEach(function (key) { %>
         <p class="stage-hint small" data-hint-for="<%= key %>" <%= values.status === key ? '' : 'hidden' %>><%- icon('info', 14) %> <%= stageHints[key] %></p>
         <% }) %>

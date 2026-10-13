@@ -42,6 +42,7 @@
         <% if (g.instagram || g.profile) { %><span class="muted small handle"><%= [g.instagram ? '@' + g.instagram : '', g.profile ? profileLabels[g.profile].label : ''].filter(Boolean).join(' · ') %></span><% } %>
         <% if (g.topic) { %><span class="small topic"><%= g.topic %></span><% } %>
         <span class="meta small muted">
+          <% if (g.status === 'perdido' && g.loss_reason) { %><span class="mono"><%= lossReasons[g.loss_reason] %></span><% } %>
           <% if (g.proposed_at) { %><span><%- icon('calendar', 12) %><%= fmt.shortDate(g.proposed_at) %></span><% } %>
           <% if (g.invite_viewed_at) { %><span><%- icon('eye', 12) %>visto</span><% } else if (g.invite_sent_at) { %><span><%- icon('send', 12) %>enviado</span><% } else if (g.invite_token) { %><span><%- icon('link', 12) %>link pronto</span><% } %>
         </span>

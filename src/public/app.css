@@ -181,7 +181,7 @@ td.num, th.num { text-align: right; } td.mono, td .mono-text { font-family: var(
 .b-st-ativo { background: var(--st-publicado-bg); color: var(--st-publicado-fg); }
 .b-st-inativo { background: var(--st-pauta-bg); color: var(--st-pauta-fg); }
 .b-st-perdido { background: var(--st-cancelado-bg); color: var(--st-cancelado-fg); }
-.b-st-recusou, .b-st-cancelado { background: var(--st-cancelado-bg); color: var(--st-cancelado-fg); }
+.b-st-perdido, .b-st-cancelado { background: var(--st-cancelado-bg); color: var(--st-cancelado-fg); }
 h1 .badge { font-size: 11px; margin-left: 8px; position: relative; top: -4px; }
 
 /* ============ dashboard ============ */

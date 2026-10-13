@@ -77,7 +77,7 @@ async function syncGuest(guestId) {
   const { rows: [ep] } = await db.query('SELECT id FROM episodes WHERE guest_id = $1', [guestId]);
   if (ep) return; // depois do episódio, quem manda é o episódio
   if (guest.status !== 'agendado') { // desistiu ou voltou para a negociação: o que ainda não foi pago sai da lista
-    if (['recusou', 'cancelado', 'prospect', 'convite_enviado'].includes(guest.status)) await cancelBySystem('guest_id = $1 AND episode_id IS NULL', [guestId]);
+    if (['perdido', 'cancelado', 'prospect', 'convite_enviado'].includes(guest.status)) await cancelBySystem('guest_id = $1 AND episode_id IS NULL', [guestId]);
     return;
   }
   const s = await settings();
