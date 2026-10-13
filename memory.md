@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Favicon e SEO da plateia (2026-10-13)**: favicon = o Ponto (`src/public/favicon.svg|.ico`, `apple-touch-icon.png`; `/favicon.ico` e `/apple-touch-icon.png` servidos na raiz, o que cobre convite e media kit sem `<link>`). `/plateia`: title/description/OG/Twitter na rota, imagem estática `og-plateia.jpg` (1200×630, renderizada com Chrome headless a partir de HTML com as fontes do repo + `kit/img-06.jpg`). **Notificações**: só no app (SSE `/eventos` → toast + contador); **não há** Notification API nem Web Push/service worker.
+
 - **CSV de convidados com etapa e data (2026-10-13)**: colunas opcionais `status` (aliases etapa/situação/fase; aceita rótulo ou chave, `normalizeStatus`) e `data da gravação` (+ `hora` opcional; `parseRecordingAt`, Brasília -03:00, `dd/mm/aaaa hh:mm`, `aaaa-mm-dd`, `14h30`). Entra em Prospecção, Convite enviado, Em agendamento (pede e-mail/WhatsApp), **Agendado** (pede data/hora futura e entra com as três confirmações = true: a planilha afirma que está fechado), Recusou, Cancelado. **Gravado não entra** (faria nascer episódio). Depois do COMMIT roda `production.syncFromGuest` por convidado, igual ao cadastro manual (Agendado avisa a equipe e gera custos do estúdio). Histórico registra etapa e data.
 
 - **Plateia: confirmar com valor** (migração 023): `POST /plateia/painel/leads/:id/confirmar` (audience.read) grava `amount_cents`, cria `fin_entries` (entrada, categoria `plateia`, source `plateia`, `auto_key plateia-lead-<id>`) e liga em `plateia_leads.entry_id`; `/recebido` marca/desfaz o recebimento; sair de Selecionado cancela a conta não recebida. Selecionar por `/leads/:id` com status confirmado é recusado.

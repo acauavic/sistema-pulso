@@ -42,7 +42,9 @@ router.get('/plateia', wrap(async (req, res) => {
   const s = await audience.settings();
   const agenda = s.active ? await audience.agenda() : [];
   res.set(pageHeaders(s)).render('plateia/page', {
-    title: 'Pulso Podcast com Plateia', s, agenda, faq: FAQ(s), icon, countries: audience.COUNTRIES, price: audience.money(s.priceCents), videoUrl: HERO_VIDEO,
+    title: 'Pulso Podcast com Plateia: assista às gravações em São Paulo',
+    description: 'Assista de perto às gravações do Pulso Podcast em São Paulo. Uma plateia pequena, escolhida pela produção por afinidade com o convidado. Peça sua participação.',
+    ogImage: `${config.appBaseUrl}/static/og-plateia.jpg?v=${res.locals.assetV}`, s, agenda, faq: FAQ(s), icon, countries: audience.COUNTRIES, price: audience.money(s.priceCents), videoUrl: HERO_VIDEO,
     hasHero: Boolean(s.heroKey), hasStudio: Boolean(s.studioKey), assetV: res.locals.assetV, canonical: `${config.appBaseUrl}/plateia`,
   });
 }));

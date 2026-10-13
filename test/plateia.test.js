@@ -54,6 +54,19 @@ describe('Pulso Podcast com Plateia', () => {
     assert.doesNotMatch(r.text, /<script>|onclick=/);
   });
 
+  it('compartilhamento e SEO: título, descrição, imagem e favicon', async () => {
+    const t = (await anon.get('/plateia')).text;
+    assert.match(t, /<title>Pulso Podcast com Plateia: assista às gravações em São Paulo<\/title>/);
+    assert.match(t, /<meta name="description" content="Assista de perto/);
+    assert.match(t, /<meta property="og:image" content="http[^"]+\/static\/og-plateia\.jpg/);
+    assert.match(t, /twitter:card" content="summary_large_image"/);
+    assert.match(t, /rel="icon" href="\/static\/favicon\.svg/);
+    const ico = await anon.get('/favicon.ico');
+    assert.equal(ico.status, 200);
+    assert.equal((await anon.get('/static/og-plateia.jpg')).status, 200);
+    assert.equal((await anon.get('/apple-touch-icon.png')).status, 200);
+  });
+
   it('desmarcar "aberto para plateia" tira da agenda; lotado e encerrado fecham o botão', async () => {
     assert.equal((await as.prod.act(`/convidados/${g2}/plateia`, { enabled: ['0'], status: 'disponivel' }, { from: `/convidados/${g2}` })).status, 302);
     assert.doesNotMatch((await anon.get('/plateia')).text, /Bruno Lima/);

@@ -4,10 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><%= title %></title>
-<meta name="description" content="Viva a experiência de estar perto de grandes nomes da saúde: assista presencialmente às gravações do Pulso Podcast, conheça os bastidores e solicite sua participação.">
+<meta name="description" content="<%= description %>">
 <link rel="canonical" href="<%= canonical %>">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pulso Podcast">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:url" content="<%= canonical %>">
 <meta property="og:title" content="<%= title %>">
-<meta property="og:description" content="Participe presencialmente das gravações do Pulso Podcast e conheça os bastidores.">
+<meta property="og:description" content="<%= description %>">
+<meta property="og:image" content="<%= ogImage %>">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Estúdio do Pulso Podcast. Uma plateia pequena para conversas grandes.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<%= title %>">
+<meta name="twitter:description" content="<%= description %>">
+<meta name="twitter:image" content="<%= ogImage %>">
+<link rel="icon" href="/static/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0A0A0A">
 <link rel="stylesheet" href="/static/plateia.css?v=<%= assetV %>">
 </head>

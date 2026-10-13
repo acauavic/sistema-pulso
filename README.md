@@ -184,6 +184,7 @@ Menu **Financeiro** (gestão e superadmin; a produtora vê só o **Estoque**). C
 
 Página **pública** `/plateia` (sem login, indexável) para o público pedir para assistir às gravações. Código: `src/routes/plateia.js` (público), `src/routes/plateiaAdmin.js` (interno), `src/services/audience.js`, `src/views/plateia/`, `src/public/plateia.{css,js}`, migração `021_plateia.sql`.
 
+- **Compartilhamento e SEO**: título, descrição, Open Graph e Twitter Card definidos em `routes/plateia.js`; imagem `src/public/og-plateia.jpg` (1200×630, gerada a partir da foto do estúdio do media kit).
 - **Agenda automática**: sai dos convidados em **Agendado**, com data futura e "Aberto para plateia" marcado (padrão). No card do convidado (quando Agendado/Em agendamento) há a caixa "Aberto para plateia" para tirá-lo e o seletor de vagas (Disponível, Lotado, Inscrições encerradas). A foto do convidado é enviada no mesmo card (PNG/JPEG/WebP, até 5 MB; só é pública enquanto ele está na agenda). Tema = campo "Temas" do convidado.
 - **Plateia escolhida, não aberta**: a copy deixa claro que pedir participação **não garante a vaga**; a produção seleciona a plateia de cada gravação por afinidade com o convidado e o tema (vagas limitadas, tom de exclusividade sem urgência falsa). Situações do pedido: Novo pedido, Em avaliação, Selecionado, Não selecionado, Desistiu.
 - **Fluxo**: escolher o episódio → nome completo + WhatsApp (país, validação por país; BR com DDD) → revisão (convidado, data, horário, R$ se selecionado, duração + aviso de que **não confirma a vaga**) → "Continuar pelo WhatsApp" abre `wa.me/<produtora>` com a mensagem pronta. O pedido vira um **lead** já na etapa de revisão e **avisa a equipe** (notificação "Plateia"); quem não abrir o WhatsApp aparece como "não abriu o WhatsApp"; a mesma pessoa no mesmo episódio não duplica nem avisa de novo. Nada é cobrado nem confirmado pela página. O fundo do topo é o vídeo do media kit.
@@ -315,6 +316,8 @@ responde com links internos. Só cria **tarefa** quando pedido; não publica, n�
 - Papéis checados no servidor em cada rota; ações sensíveis vão para a **Auditoria**.
 
 ## Identidade visual
+
+Favicon = **o Ponto** (ponto lime sobre preto): `src/public/favicon.svg`, `favicon.ico` e `apple-touch-icon.png` (também servidos na raiz).
 
 O painel segue o **Design System de interface** e o **Manual de Marca** do Pulso:
 
