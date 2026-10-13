@@ -258,6 +258,10 @@ TEST_DATABASE_URL=postgresql://usuario:senha@localhost:5432/pulso_test npm test
 Cobre autenticação, CSRF, roles, CRUD de usuários, fluxo completo do convite (YOURLS **simulado**,
 e-mail em dry-run — nada externo é chamado), página pública, rastreio de cliques, regras de etapa, importação CSV, o convite do Pulso a central de patrocinadores e a **produção de episódios** (Backblaze, Groq, Gemini e Upload-Post **simulados**; a suíte bloqueia qualquer chamada real a eles; os cortes e a análise rodam FFmpeg de verdade).
 
+## Deploy numa VPS única (Docker Compose + Caddy)
+
+`deploy/instalar.sh` instala o Docker, baixa o código, gera `SESSION_SECRET` e a senha do Postgres, pergunta o domínio e o e-mail do superadmin e sobe Postgres + painel (web) + fila/rotinas (worker) + Caddy com HTTPS automático (`deploy/docker-compose.yml`). **O domínio precisa apontar (DNS tipo A) para o IP do servidor antes**; sem HTTPS o login não funciona em produção (cookie Secure). Segredos e integrações ficam em `deploy/.env` no servidor (nunca no git). Atualizar: `cd /opt/pulso && git pull && cd deploy && docker compose up -d --build`.
+
 ## Deploy (Docker Swarm + Traefik)
 
 Padrão da VPS (Docker Swarm + Traefik). Em linhas gerais:

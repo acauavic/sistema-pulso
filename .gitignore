@@ -8,3 +8,7 @@ stack.yml
 *.log
 .DS_Store
 ._*
+
+# segredos da VPS gerados pelo deploy/instalar.sh
+deploy/.env
+deploy/.primeiro-admin
