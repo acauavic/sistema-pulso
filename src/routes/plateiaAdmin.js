@@ -51,7 +51,7 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
   const { rows: [counts] } = await db.query("SELECT count(*) FILTER (WHERE status = 'novo')::int AS novos, count(*)::int AS total FROM plateia_leads");
   res.render('plateia/admin', {
     title: 'Plateia', leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
-    canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL,
+    canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
   });
 }));
 
@@ -82,16 +82,17 @@ router.post('/plateia/painel/leads/:id/confirmar', requirePerm('audience.read'),
   const lead = await findLead(req.params.id);
   if (!lead) return res.redirect('/plateia/painel');
   const to = flashBack(req);
-  const amount = parseBRL(req.body.amount);
+  const exempt = req.body.paid === 'isento';
+  const amount = exempt ? 0 : parseBRL(req.body.amount);
   let due = parseInputDate(req.body.due_on) || audience.todayISO();
   if (Number.isNaN(due)) due = audience.todayISO();
-  if (amount == null || Number.isNaN(amount) || amount <= 0) { await req.flash('error', 'Informe o valor combinado, por exemplo 197,00.'); return res.redirect(to); }
+  if (amount == null || Number.isNaN(amount) || (amount <= 0 && !exempt)) { await req.flash('error', 'Informe o valor combinado, por exemplo 197,00.'); return res.redirect(to); }
   let paidOn = null;
-  if (req.body.paid === '1') { paidOn = parseInputDate(req.body.paid_on) || audience.todayISO(); if (Number.isNaN(paidOn)) paidOn = audience.todayISO(); }
-  const r = await audience.confirmLead(lead, { amountCents: amount, dueOn: due, paidOn }, req.user.id);
+  if (!exempt && req.body.paid === '1') { paidOn = parseInputDate(req.body.paid_on) || audience.todayISO(); if (Number.isNaN(paidOn)) paidOn = audience.todayISO(); }
+  const r = await audience.confirmLead(lead, { amountCents: amount, dueOn: due, paidOn, exempt }, req.user.id);
   if (r.error) { await req.flash('error', r.error); return res.redirect(to); }
-  await audit(req, 'plateia.confirmada', 'plateia_lead', lead.id, { valor: amount, recebido: Boolean(paidOn) });
-  await req.flash('ok', `${lead.name} está selecionado(a). ${paidOn ? 'Pagamento registrado como recebido.' : 'A conta a receber foi criada no financeiro.'}`);
+  await audit(req, 'plateia.confirmada', 'plateia_lead', lead.id, { valor: amount, recebido: Boolean(paidOn), isento: exempt });
+  await req.flash('ok', `${lead.name} está selecionado(a). ${exempt ? 'Participação isenta: sem cobrança e sem conta a receber.' : paidOn ? 'Pagamento registrado como recebido.' : 'A conta a receber foi criada no financeiro.'}`);
   res.redirect(to);
 }));
 

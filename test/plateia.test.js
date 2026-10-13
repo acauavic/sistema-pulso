@@ -287,4 +287,17 @@ describe('Pulso Podcast com Plateia', () => {
     const csv = (await as.prod.get('/plateia/painel/inscricoes.csv')).text;
     assert.match(csv, /Valor combinado/); assert.match(csv, /197,00/);
   });
+
+  it('isentar: participa sem cobrança, não cria conta e cancela a que estava prevista', async () => {
+    const r = await (await json('/plateia/inscricao', { guest_id: g1, name: 'Ana Souza Lima', country: 'BR', phone: '(31) 98888-1111', terms: true })).json();
+    const l = await one('SELECT id FROM plateia_leads WHERE ref=$1', [r.ref]);
+    const post = (f) => as.prod.act(`/plateia/painel/leads/${l.id}/confirmar`, f, { from: '/plateia/painel' });
+    await post({ amount: '197,00', paid: '0', due_on: '2026-11-05' });
+    const entry = await one('SELECT id FROM fin_entries WHERE auto_key=$1', [`plateia-lead-${l.id}`]);
+    await post({ paid: 'isento' });
+    const row = await one('SELECT status, amount_cents, entry_id FROM plateia_leads WHERE id=$1', [l.id]);
+    assert.equal(row.status, 'confirmado'); assert.equal(Number(row.amount_cents), 0); assert.equal(row.entry_id, null);
+    assert.equal((await one('SELECT status FROM fin_entries WHERE id=$1', [entry.id])).status, 'cancelado', 'a conta prevista some');
+    assert.match((await as.prod.get('/plateia/painel')).text, /isento/);
+  });
 });

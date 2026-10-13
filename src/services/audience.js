@@ -109,7 +109,7 @@ function whatsappMessage({ name, guestName, date, time, priceCents, phoneDisplay
 }
 
 // Versão do texto das condições da plateia (page.ejs). Mudou o texto, aumente a versão.
-const TERMS_VERSION = '2026-10';
+const TERMS_VERSION = '2026-10b';
 
 async function createLead({ guest, name, phone, utm, referrer, landingUrl, visitorId, userAgent }) {
   const s = await settings();
@@ -164,8 +164,18 @@ async function results(days = 30) {
 }
 
 // Confirma a participação: guarda o valor combinado e cria (ou atualiza) a conta a receber. paidOn = já recebeu nessa data.
-async function confirmLead(lead, { amountCents, dueOn, paidOn = null }, userId) {
+// exempt = isento: participa sem cobrança (valor 0, nenhuma conta a receber).
+async function confirmLead(lead, { amountCents, dueOn, paidOn = null, exempt = false }, userId) {
   const fin = require('./finance');
+  if (exempt) {
+    if (lead.entry_id) {
+      const { rows: [e] } = await db.query('SELECT status FROM fin_entries WHERE id = $1', [lead.entry_id]);
+      if (e && e.status === 'pago') return { error: 'O pagamento já foi recebido. Para isentar, desfaça o recebimento antes.' };
+      await db.query("UPDATE fin_entries SET status = 'cancelado', cancel_reason = 'sistema', updated_at = now() WHERE id = $1 AND status = 'previsto'", [lead.entry_id]);
+    }
+    await db.query("UPDATE plateia_leads SET status = 'confirmado', amount_cents = 0, confirmed_at = coalesce(confirmed_at, now()), entry_id = NULL, updated_at = now() WHERE id = $1", [lead.id]);
+    return { ok: true, exempt: true, today: fin.todayISO() };
+  }
   if (lead.entry_id) {
     const { rows: [e] } = await db.query('SELECT status FROM fin_entries WHERE id = $1', [lead.entry_id]);
     if (e && e.status === 'pago') return { error: 'O pagamento já foi recebido. Para mudar o valor, desfaça o recebimento antes.' };

@@ -48,13 +48,14 @@
         <div class="plan-list-main">
           <strong><%= l.name %></strong>
           <span class="small muted"><%= l.guest_name %><%= l.recording_at ? ' · ' + fmt.formatDate(l.recording_at) : '' %> · <%= l.utm_source ? l.utm_source + (l.utm_campaign ? ' / ' + l.utm_campaign : '') : 'direto' %></span>
-          <% if (l.status === 'confirmado' && l.amount_cents != null) { %><span class="small"><span class="badge <%= l.pay_status === 'pago' ? 'b-green' : 'b-amber' %>"><%= l.pay_status === 'pago' ? 'recebido ' + fmt.formatDayShort(l.pay_paid) : 'a receber até ' + fmt.formatDayShort(l.pay_due) %></span> <span class="mono"><%= fmtMoney(l.amount_cents) %></span></span><% } %>
+          <% if (l.status === 'confirmado' && isExempt(l)) { %><span class="small"><span class="badge b-gray">isento</span></span><% } else if (l.status === 'confirmado' && l.amount_cents != null) { %><span class="small"><span class="badge <%= l.pay_status === 'pago' ? 'b-green' : 'b-amber' %>"><%= l.pay_status === 'pago' ? 'recebido ' + fmt.formatDayShort(l.pay_paid) : 'a receber até ' + fmt.formatDayShort(l.pay_due) %></span> <span class="mono"><%= fmtMoney(l.amount_cents) %></span></span><% } %>
         </div>
         <span class="fin-when mono small muted"><%= fmt.formatDateTime(l.created_at) %><%= l.whatsapp_opened_at ? '' : ' · não abriu o WhatsApp' %></span>
         <span class="fin-amt mono"><a href="<%= waLink(l.phone) %>" target="_blank" rel="noopener noreferrer"><%= l.phone %></a></span>
         <span class="plan-list-tools">
           <% if (l.status === 'confirmado') { %>
-            <% if (l.pay_status === 'pago') { %>
+            <% if (isExempt(l)) { %>
+            <% } else if (l.pay_status === 'pago') { %>
               <form method="post" action="/plateia/painel/leads/<%= l.id %>/recebido" class="inline"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><input type="hidden" name="desfazer" value="1"><button class="link small" type="submit" title="Desfazer o recebimento">Desfazer</button></form>
             <% } else { %>
               <form method="post" action="/plateia/painel/leads/<%= l.id %>/recebido" class="inline"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><button class="btn sm" type="submit">Recebi o pagamento</button></form>
@@ -168,14 +169,15 @@
     <h2 id="mcf-h">Confirmar participação</h2>
     <label>Pedido<input type="text" name="_label" readonly></label>
     <div class="grid-2 tight">
-      <label>Valor combinado (R$)<input type="text" name="amount" inputmode="decimal" required autofocus></label>
+      <label data-when="paid!=isento">Valor combinado (R$)<input type="text" name="amount" inputmode="decimal" autofocus></label>
       <label>Pagamento
-        <select name="paid"><option value="0">Ainda vai pagar</option><option value="1">Já recebi</option></select>
+        <select name="paid"><option value="0">Ainda vai pagar</option><option value="1">Já recebi</option><option value="isento">Isento (sem cobrança)</option></select>
       </label>
     </div>
     <label data-when="paid=0">Combinado para pagar até<input type="date" name="due_on"></label>
     <label data-when="paid=1">Recebido em<input type="date" name="paid_on"></label>
-    <p class="small muted">A pessoa passa a Selecionada e o valor vira uma conta a receber no Financeiro (categoria Plateia), onde a gestão acompanha.</p>
+    <p class="small muted" data-when="paid=isento">A pessoa passa a Selecionada sem cobrança: nenhuma conta a receber é criada.</p>
+    <p class="small muted" data-when="paid!=isento">A pessoa passa a Selecionada e o valor vira uma conta a receber no Financeiro (categoria Plateia), onde a gestão acompanha.</p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Confirmar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>
