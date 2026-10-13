@@ -223,4 +223,5 @@ async function status() {
 module.exports = {
   api, sync, tick, ping, status, payload, eventId, credentials, settings, saveSettings, kick, kickOnWrite, kickDelay, TIMED, DEFAULT_MINUTES,
   _reset: () => { cached = { token: null, until: 0 }; },
+  _cancelKick: () => { if (kickTimer) clearTimeout(kickTimer); kickTimer = null; },
 };

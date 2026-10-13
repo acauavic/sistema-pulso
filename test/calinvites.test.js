@@ -15,6 +15,7 @@ describe('convite de calendário por e-mail ao convidado', () => {
   before(async () => {
     await h.resetDb();
     app = await h.startServer();
+    require('../src/services/googleCalendar').kickDelay.ms = 600_000; // sem voltas em segundo plano: o teste chama tick() à mão
     await h.createUser({ name: 'Ana Admin', email: 'adm@t.com', role: 'superadmin' });
     admin = h.client(app.base); await admin.login('adm@t.com');
   });

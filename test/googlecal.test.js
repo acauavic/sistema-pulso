@@ -41,7 +41,7 @@ describe('Google Agenda: o que tem data no painel acompanha o calendário do Pul
     config.google.calendarId = 'pulso@group.calendar.google.com';
     config.google.serviceAccount = Buffer.from(JSON.stringify({ client_email: 'pulso@proj.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }) })).toString('base64');
     config.googleConfigured = true;
-    g = fakeGoogle(); gcal.kickDelay.ms = 30;
+    g = fakeGoogle(); gcal.kickDelay.ms = 600_000; // as voltas em segundo plano só rodam no teste que as exercita
     await h.createUser({ name: 'Ana Admin', email: 'adm@t.com', role: 'superadmin' });
     admin = h.client(app.base); await admin.login('adm@t.com');
   });
@@ -126,7 +126,9 @@ describe('Google Agenda: o que tem data no painel acompanha o calendário do Pul
   });
 
   it('mudar a data no painel atualiza o Google em seguida (sem esperar a rotina)', async () => {
+    gcal._cancelKick(); gcal.kickDelay.ms = 30;
     await admin.act('/integracoes/google/tipos', { on_gravacao: 'on', min_gravacao: '120' }, { from: '/integracoes' });
+    await new Promise((ok) => setTimeout(ok, 200));
     await gcal.sync();
     const id = (await guest('Fabi Remarcada', 'agendado', `${day(50)} 09:00-03`));
     await gcal.sync();
@@ -136,6 +138,7 @@ describe('Google Agenda: o que tem data no painel acompanha o calendário do Pul
     assert.equal(res.status, 302);
     for (let i = 0; i < 40 && g.events.get(gid(id)).start.dateTime !== `${day(52)}T11:00:00`; i += 1) await new Promise((ok) => setTimeout(ok, 50));
     assert.equal(g.events.get(gid(id)).start.dateTime, `${day(52)}T11:00:00`, 'o Google acompanhou a nova data');
+    gcal._cancelKick(); gcal.kickDelay.ms = 600_000;
   });
 
   it('a tela de integrações mostra o status, o que vai e o botão de sincronizar', async () => {
