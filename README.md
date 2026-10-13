@@ -306,6 +306,10 @@ Na Brevo, o remetente (`BREVO_EMAIL`) e o domínio precisam estar validados (SPF
 - **Menu recolhível** (computador): o botão no topo do menu leva a só ícones (76 px, com o nome na dica e "p." no lugar do logo); a escolha fica guardada neste navegador e vale em todas as telas (`theme.js` aplica antes de pintar). No celular o menu continua sendo a barra de cima. Em tela baixa só a lista de itens rola; usuário, tema e "Sair" ficam sempre à vista.
 - **Quadros (Kanban)** de Episódios, Convidados, Patrocinadores e Tarefas ocupam a altura da tela: a **barra de rolagem horizontal fica no pé da tela** (grossa e sempre visível) e **cada coluna rola para baixo sozinha** quando tem cartões demais, como no ClickUp. No celular, o quadro rola normalmente com a página.
 
+## Versões e Novidades
+
+O sistema tem número de versão (semver) em `package.json`, e o histórico em `src/releases.js` (a primeira entrada é a versão no ar; o teste confere que as duas batem). A página **Novidades** (`/novidades`, menu: clique em `v1.1.0` no rodapé) lista as versões. Toda pessoa vê, uma vez por versão nova, o aviso "Sistema atualizado" com o título do lançamento e um X para dispensar (`users.release_seen`). Para lançar: acrescente a entrada no topo de `src/releases.js`, suba o `version` do `package.json` e publique.
+
 ## Calendário
 
 Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`src/services/calendar.js`, `src/routes/calendar.js`, `src/views/calendar/`).

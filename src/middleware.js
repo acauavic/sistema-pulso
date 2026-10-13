@@ -6,6 +6,7 @@ const sessions = require('./auth/sessions');
 const { can, ROLES } = require('./permissions');
 const fmt = require('./utils/format');
 const { icon } = require('./utils/icons');
+const releases = require('./services/releases');
 
 // Cabeçalhos de segurança + CSP restritiva para o painel (sem scripts inline).
 function securityHeaders(req, res, next) {
@@ -50,6 +51,7 @@ async function navData(req, res, next) {
     const [counts, users] = await Promise.all([
       db.query(`SELECT (SELECT count(*)::int FROM notifications WHERE user_id = $1 AND read_at IS NULL) AS unread,
                        (SELECT count(*)::int FROM tasks WHERE assignee_id = $1 AND status <> 'feito') AS tasks,
+                       (SELECT release_seen FROM users WHERE id = $1) AS release_seen,
                        CASE WHEN $2 THEN (SELECT count(*)::int FROM episode_publications WHERE status = 'revisao') ELSE 0 END AS reviews`, [req.user.id, can(req.user.role, 'social.publish')]),
       db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
     ]);
@@ -80,6 +82,8 @@ async function attachSession(req, res, next) {
     res.locals.podcastName = config.podcastName;
     res.locals.currentPath = req.path;
     res.locals.navCounts = null;
+    res.locals.appVersion = releases.current().version;
+    res.locals.releaseInfo = releases.current();
     res.locals.teamUsers = [];
 
     req.flash = async (type, message) => {

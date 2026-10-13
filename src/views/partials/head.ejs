@@ -49,6 +49,7 @@
     <%- navItem('/gestao', 'settings', 'Painel de gestão', currentPath.startsWith('/gestao') || currentPath.startsWith('/usuarios') || currentPath.startsWith('/auditoria') || currentPath.startsWith('/integracoes')) %><% } %>
   </nav>
   <div class="sidebar-foot">
+    <a class="version-link mono" href="/novidades" title="Novidades do sistema">v<%= appVersion %></a>
     <a class="who" href="/perfil" title="Meu perfil">
       <span class="avatar"><%= initials %></span>
       <span class="who-txt"><strong><%= currentUser.name %></strong><span class="kicker m-0"><%= ROLES[currentUser.role].label %></span></span>

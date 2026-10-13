@@ -15,6 +15,10 @@
 - **Jornada do usuário é regra de criação**: descreva e percorra no navegador a jornada antes de dar uma tela por pronta; nada de formulário gigante aberto (ver `docs/design-system.md`, "Experiência e jornada").
 - Toda UI/e-mail/texto novo segue `docs/design-system.md` e `docs/manual-de-marca.md` (originais em `docs/referencias/`). Veja o `CLAUDE.md`.
 
+## Releases e versão
+
+- Ao lançar, acrescente a entrada no topo de `src/releases.js` e suba o `version` do `package.json` para o mesmo número (o teste confere). Cada pessoa vê o aviso "Sistema atualizado" uma vez por versão e a página `/novidades` lista o histórico.
+
 ## Outras notas
 
 - Testes: `npm test` (precisa de um Postgres e de um banco que **termine em `_test`** — a suíte

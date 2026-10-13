@@ -96,6 +96,8 @@
 
 ## Últimas Decisões
 
+- **Versões e Novidades (1.1.0)**: `package.json` + `src/releases.js` (topo = versão no ar; teste confere). `/novidades` lista o histórico e marca como visto; `users.release_seen` (migração 030) faz o aviso "Sistema atualizado" aparecer uma vez por versão e por pessoa (`partials/foot.ejs`, dispensa em `POST /novidades/visto`). Versão no rodapé do menu. Regra de lançar em CLAUDE.md/AGENTS.md.
+
 - **Isenção na plateia**: em "Confirmar participação" o pagamento ganhou a opção **Isento (sem cobrança)**: confirma com valor 0, sem conta a receber (cancela a prevista, se houver) e o pedido mostra o selo "isento". Texto das condições terminou em "Nesses casos o valor será devolvido." (`TERMS_VERSION` 2026-10b).
 
 - **Aviso e aceite da plateia**: texto das condições na seção "Como funciona" e no formulário, com checkbox obrigatório (cliente e servidor). Migração 029 guarda data e versão do aceite no pedido. Texto em `views/plateia/page.ejs`; mudou, suba `TERMS_VERSION`.

@@ -7,6 +7,12 @@
   </div>
 </dialog>
 <div class="toasts" data-toasts aria-live="polite"></div>
+<% if (navCounts && navCounts.release_seen !== appVersion && currentPath !== '/novidades') { %>
+<aside class="release-toast" role="status" aria-label="Sistema atualizado">
+  <a class="release-toast-main" href="/novidades"><span class="kicker">Sistema atualizado · v<%= appVersion %></span><strong><%= releaseInfo.title %></strong><span class="small">Ver o que mudou</span></a>
+  <form method="post" action="/novidades/visto"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentPath %>"><button class="icon-btn" type="submit" aria-label="Dispensar o aviso" title="Dispensar"><%- icon('x') %></button></form>
+</aside>
+<% } %>
 <button class="assist-fab" type="button" data-assist-open aria-label="Abrir o assistente" aria-expanded="false"><%- icon('sparkles', 20) %><span class="assist-dot" aria-hidden="true"></span></button>
 <section class="assist" data-assist hidden aria-label="Assistente" data-user="<%= fmt.firstName(currentUser.name) %>">
   <header class="assist-head">

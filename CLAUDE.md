@@ -18,6 +18,7 @@ Doc pra humano: `README.md`. Memória pra IA (estado + decisões): `memory.md`.
 - **Lime é ação (um por área), dados em mono, plum é externo, serifa só para "voz".** Sem emoji na interface; ícones via `icon('nome')`.
 - **Idioma e tom**: tudo em português do Brasil, direto, sem "!!!", sem urgência falsa (ver "Evitamos" no manual).
 - **Permissões** só em `src/permissions.js` (matriz provisória). **Segredos** nunca no repo (`.env.example` documenta as variáveis).
+- **Releases**: o sistema tem versão (`package.json`, semver). A cada lançamento, acrescente a entrada **no topo** de `src/releases.js` (versão, data, título, itens novo/ajuste/correção) e suba o `version` do `package.json` para o mesmo número; o teste confere. Isso gera a página **Novidades** (`/novidades`) e o aviso "Sistema atualizado" que cada pessoa vê uma vez por versão. Correção pequena = patch (1.1.1), funcionalidade = minor (1.2.0), mudança grande = major.
 - **Ao terminar uma feature ou mudar arquitetura**: atualizar `memory.md` ("Estado Atual" e "Últimas Decisões", mais recente no topo) e commitar junto.
 - Se a mudança mexe no que o README descreve, atualize o `README.md` também.
 
