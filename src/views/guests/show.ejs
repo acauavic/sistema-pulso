@@ -215,11 +215,11 @@
         <% if (canW) { %>
         <div data-image-scope>
         <div class="row top-gap">
-          <% if (guest.photo_key) { %><img class="guest-thumb" src="/convidados/<%= guest.id %>/foto" alt="" width="48" height="48" loading="lazy"><% } %>
+          <% if (guest.photo_key) { %><img class="guest-photo" src="/convidados/<%= guest.id %>/foto" alt="Foto <%= guest.gender === 'f' ? 'da convidada' : 'do convidado' %> na moldura padrão" width="96" height="72" loading="lazy"><% } %>
           <button class="btn sm" type="button" data-image-pick="" <%= plateia.storageReady ? '' : 'disabled' %>><%- icon('upload', 14) %> <%= guest.photo_key ? 'Trocar foto' : 'Enviar foto' %></button>
           <span class="small muted"><%= guest.photo_key ? '' : 'A página pública usa a foto do convidado.' %></span>
         </div>
-        <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/foto">
+        <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-crop="<%= photoFrame.ratio %>" data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/foto">
         </div>
         <% } %>
       </section>
@@ -322,15 +322,16 @@
 </dialog>
 <% } %>
 
+<% if (canW) { %><%- include('../partials/photo-cropper') %><% } %>
 <% if (canW) { var photoFor = pendingStage && ['em_agendamento', 'agendado'].indexOf(pendingStage) >= 0 ? pendingStage : null; %>
 <dialog class="modal" id="modal-foto" aria-labelledby="m-foto-h" <%= openOnLoad('foto') %> data-image-scope>
   <div class="stack">
     <h2 id="m-foto-h">Foto <%= guest.gender === 'f' ? 'da convidada' : 'do convidado' %></h2>
     <p class="small muted"><%= photoFor ? 'Para ir para ' + statuses.find(function (s) { return s.key === photoFor; }).label + ', envie a foto de ' + fmt.firstName(guest.name) + '. Ela aparece na agenda da plateia e para os patrocinadores.' : 'A foto aparece na agenda da plateia e para os patrocinadores.' %></p>
-    <% if (guest.photo_key) { %><img class="guest-thumb" src="/convidados/<%= guest.id %>/foto" alt="" width="48" height="48"><% } %>
+    <% if (guest.photo_key) { %><img class="guest-photo md" src="/convidados/<%= guest.id %>/foto" alt="Foto atual" width="200" height="150"><% } %>
     <% if (!storageReady) { %><p class="small warn">O armazenamento de arquivos (Backblaze) não está configurado no servidor: não dá para enviar fotos.</p><% } %>
-    <p class="small muted">PNG, JPEG ou WebP, até 5 MB. De preferência quadrada.</p>
-    <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/foto">
+    <p class="small muted">PNG, JPEG ou WebP. Na próxima tela você enquadra a foto na moldura <span class="mono"><%= photoFrame.ratio %></span> (a mesma da plateia, do media kit e do portal).</p>
+    <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-crop="<%= photoFrame.ratio %>" data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/foto">
     <% if (photoFor) { %><form method="post" action="/convidados/<%= guest.id %>/avancar" hidden data-after-upload><%- csrfField %><%- hidden('para', photoFor) %></form><% } %>
     <div class="row modal-actions"><button class="btn primary" type="button" data-image-pick="" <%= storageReady ? '' : 'disabled' %>><%- icon('upload', 14) %> <%= guest.photo_key ? 'Trocar foto' : 'Enviar foto' %></button><button class="btn ghost" type="button" data-modal-close>Agora não</button></div>
   </div>
@@ -397,4 +398,5 @@
 </dialog>
 
 <% } %>
+<% if (canW) { %><script src="/static/cropper.js?v=<%= assetV %>" defer></script><% } %>
 <%- include('../partials/foot') %>

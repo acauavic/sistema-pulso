@@ -67,6 +67,7 @@
 - **Feedback**: `.flash` com filete lateral (lime ok / vermelho erro). Estado vazio: linha de pulso plana + título + frase útil (`partials/pulse-line.ejs`, classe `.empty`).
 - **Tabela**: cabeçalho mono caixa alta muted; linha com hover `raised`; colunas de data/número em mono; ações à direita.
 - **Navegação**: barra lateral 248px com wordmark "pulso." no topo, itens com ícone Lucide + rótulo, ativo = fundo `raised` + ícone lime; rodapé com avatar/perfil, tema e sair. No mobile vira barra superior com menu.
+- **Foto do convidado**: moldura única **4:3** (raio 6), a mesma na página da plateia, no media kit, no portal do patrocinador e no painel (`.guest-photo`, `.cal-photo`, `.confirmed-avatar`). Nada de círculo para foto de convidado; círculo com iniciais só quando não há foto. O envio passa pelo recorte (`cropper.js`), que entrega 1200×900.
 - **Quadro (Kanban)**: coluna = `surface` com chip da etapa + contagem mono; card = `raised`, nome em display, meta em mono 10px.
 
 ## Telas de referência (no HTML original)

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const db = require('../db/pool');
 const config = require('../config');
 const b2 = require('./b2');
+const guestPhotos = require('./guestPhotos');
 const { clean } = require('../utils/format');
 const { normalizeUrl } = require('./guestRules');
 const { SPONSOR_GOALS, FILE_KINDS } = require('../constants');
@@ -252,7 +253,7 @@ async function sendFile(res, file, { inline = true } = {}) {
 // ---- agenda do media kit: convidados em Agendado (gravação confirmada), agrupados por mês ----
 async function kitAgendaHtml() {
   const { rows } = await db.query(
-    `SELECT name, instagram, proposed_at FROM guests WHERE status = 'agendado' AND (proposed_at IS NULL OR proposed_at >= now() - interval '1 day')
+    `SELECT id, name, instagram, proposed_at, (photo_key IS NOT NULL) AS has_photo FROM guests WHERE status = 'agendado' AND (proposed_at IS NULL OR proposed_at >= now() - interval '1 day')
       ORDER BY proposed_at NULLS LAST, lower(name) LIMIT 24`);
   const { esc } = require('./inviteTemplate');
   if (!rows.length) return '<p class="slide-lede">A agenda dos próximos convidados é fechada semana a semana. Pergunte à equipe quem vem por aí.</p>';
@@ -267,7 +268,9 @@ async function kitAgendaHtml() {
   return groups.map((grp) => `<div class="confirmed-month">${esc(grp.label)}</div>
       <div class="confirmed-grid">${grp.items.map((g) => `
         <div class="confirmed-card">
-          <div class="confirmed-avatar img-slot"><span class="plus">+</span><span class="cap">Foto</span></div>
+          ${g.has_photo
+    ? `<div class="confirmed-avatar img-slot has-photo"><img src="${esc(guestPhotos.signedUrl(g.id))}" alt="${esc(g.name)}" loading="lazy" width="${guestPhotos.FRAME.width / 4}" height="${guestPhotos.FRAME.height / 4}"></div>`
+    : '<div class="confirmed-avatar img-slot"><span class="plus">+</span><span class="cap">Foto</span></div>'}
           <div class="confirmed-name">${esc(g.name)}</div>
           ${g.instagram ? `<div class="confirmed-handle">@${esc(g.instagram)}</div>` : ''}
         </div>`).join('')}
@@ -282,13 +285,14 @@ async function portalData(sponsor) {
       // episódios gravados + gravações reservadas na agenda (convidado ainda sem episódio)
       `SELECT * FROM (
          SELECT e.id, e.number, e.title, coalesce(e.aired_on, e.recorded_on) AS aired_on, e.status, se.role, false AS booking,
-                g.name AS guest_name, g.instagram AS guest_instagram, g.positioning AS guest_positioning, g.bio AS guest_bio
+                g.name AS guest_name, g.instagram AS guest_instagram, g.positioning AS guest_positioning, g.bio AS guest_bio,
+                g.id AS guest_id, (g.photo_key IS NOT NULL) AS guest_has_photo
            FROM sponsor_episodes se JOIN episodes e ON e.id = se.episode_id LEFT JOIN guests g ON g.id = e.guest_id
           WHERE se.sponsor_id = $1
          UNION ALL
          SELECT NULL, NULL, 'Conversa com ' || g.name, (g.proposed_at AT TIME ZONE 'America/Sao_Paulo')::date,
                 CASE WHEN g.status = 'agendado' THEN 'gravacao_marcada' ELSE 'previsto' END, b.role, true,
-                g.name, g.instagram, g.positioning, g.bio
+                g.name, g.instagram, g.positioning, g.bio, g.id, (g.photo_key IS NOT NULL)
            FROM sponsor_bookings b JOIN guests g ON g.id = b.guest_id
           WHERE b.sponsor_id = $1 AND g.status NOT IN ('perdido', 'cancelado')
        ) x ORDER BY aired_on NULLS LAST, number NULLS LAST`, [sponsor.id]),

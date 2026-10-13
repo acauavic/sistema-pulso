@@ -6,6 +6,7 @@ const express = require('express');
 const db = require('../db/pool');
 const config = require('../config');
 const sponsorsSvc = require('../services/sponsors');
+const guestPhotos = require('../services/guestPhotos');
 const sessions = require('../services/sponsorSessions');
 const groq = require('../services/groq');
 const mailer = require('../services/mailer');
@@ -256,6 +257,12 @@ router.post('/patrocinador/audio', express.raw({ type: () => true, limit: MAX_AU
   res.json({ ok: true, id: file.id, text });
 }));
 
+// ---- foto do convidado no media kit e no portal: endereço assinado e com validade (o kit roda isolado, sem cookie) ----
+router.get('/agenda/foto/:id', wrap(async (req, res) => {
+  if (!guestPhotos.verify(req.params.id, req.query.e, req.query.s)) return res.status(404).type('text').send('Foto não encontrada.');
+  if (!await guestPhotos.send(res, Number(req.params.id))) return res.status(404).type('text').send('Foto não encontrada.');
+}));
+
 // ---- arquivos que o próprio patrocinador pode ver (logo, moldura, QR Code) ----
 router.get('/patrocinador/arquivo/:fid', withSession(), wrap(async (req, res) => {
   if (!/^\d{1,9}$/.test(req.params.fid)) return gone(res);
@@ -270,7 +277,7 @@ router.get('/patrocinador/portal', withSession(), wrap(async (req, res) => {
   if (!PORTAL_STAGES.includes(sponsor.stage)) return notYet(res, 'Portal ainda não disponível', 'O portal do patrocinador abre assim que a parceria estiver ativa. Fale com a equipe do Pulso se tiver dúvidas.');
   const data = await sponsorsSvc.portalData(sponsor);
   res.set(appHeaders({ scripts: false })).render('sponsor-public/portal', {
-    title: `Portal ${sponsor.company}`, sponsor, ...data, C, base: '/patrocinador',
+    title: `Portal ${sponsor.company}`, sponsor, ...data, C, base: '/patrocinador', photoUrl: guestPhotos.signedUrl,
   });
 }));
 

@@ -71,6 +71,22 @@ describe('Pulso Podcast com Plateia', () => {
     assert.equal((await anon.get('/apple-touch-icon.png')).status, 200);
   });
 
+  it('foto do convidado: o painel abre o recorte na moldura 4:3 e quem só lê não vê o envio', async () => {
+    const page = (await as.prod.get(`/convidados/${g1}`)).text;
+    assert.match(page, /id="modal-recorte"[^>]*data-out-w="1200" data-out-h="900"/);
+    assert.match(page, /data-image-input data-crop="4:3"/, 'o envio passa pelo recorte');
+    assert.match(page, /\/static\/cropper\.js/);
+    assert.match(page, /data-crop-ok/); assert.match(page, /Plateia<\/figcaption>/); assert.match(page, /Media kit e portal<\/figcaption>/); assert.match(page, /Painel<\/figcaption>/);
+    const js = await fetch(`${app.base}/static/cropper.js`);
+    assert.equal(js.status, 200); assert.match(await js.text(), /window\.pulsoCrop/);
+    const editorPage = (await as.editor.get(`/convidados/${g1}`)).text;
+    assert.doesNotMatch(editorPage, /modal-recorte|cropper\.js|data-crop=/);
+    // o recorte entrega um JPEG já na moldura: o envio de sempre aceita
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 7)]);
+    assert.equal((await upload(as.prod, `/convidados/${g1}/foto`, jpeg, 'image/jpeg')).status, 200);
+    assert.match((await as.prod.get(`/convidados/${g1}`)).text, /<img class="guest-photo" src="\/convidados\/\d+\/foto"/);
+  });
+
   it('desmarcar "aberto para plateia" tira da agenda; lotado e encerrado fecham o botão', async () => {
     assert.equal((await as.prod.act(`/convidados/${g2}/plateia`, { enabled: ['0'], status: 'disponivel' }, { from: `/convidados/${g2}` })).status, 302);
     assert.doesNotMatch((await anon.get('/plateia')).text, /Bruno Lima/);

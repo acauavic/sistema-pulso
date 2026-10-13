@@ -109,11 +109,14 @@
     <div class="cal-row">
       <div class="cal-date"><%= e.aired_on ? fmt.formatDayShort(e.aired_on) : '—' %></div>
       <div class="cal-ep"><%= e.role === 'exclusivo' ? 'Exclusivo' : 'Inserção' %></div>
-      <div class="cal-topic">
+      <div class="cal-topic<%= e.guest_has_photo ? ' has-photo' : '' %>">
+        <% if (e.guest_has_photo) { %><img class="cal-photo" src="<%= photoUrl(e.guest_id) %>" alt="<%= e.guest_name %>" loading="lazy" width="72" height="54"><% } %>
+        <div class="cal-who">
         <strong><%= e.guest_name || e.title %></strong>
         <% if (e.guest_name && e.guest_instagram) { %><a class="cal-ig" href="https://www.instagram.com/<%= e.guest_instagram %>/" target="_blank" rel="noopener noreferrer">@<%= e.guest_instagram %> →</a>
         <% } else if (e.guest_name) { %><span><%= e.title %></span>
         <% } else { %><span>Convidado a confirmar pela produção</span><% } %>
+        </div>
       </div>
       <div class="cal-status"><i class="dot <%= dotOf(e) %>"></i> <%= statusLabel[e.status] %></div>
     </div>
@@ -131,7 +134,8 @@
     <% guestsShown.forEach(function (g) { %>
     <details class="guest-item">
       <summary>
-        <div class="guest-avatar"><%= initials(g.guest_name) %></div>
+        <% if (g.guest_has_photo) { %><img class="guest-photo" src="<%= photoUrl(g.guest_id) %>" alt="<%= g.guest_name %>" loading="lazy" width="84" height="63">
+        <% } else { %><div class="guest-avatar"><%= initials(g.guest_name) %></div><% } %>
         <div><div class="guest-name"><%= g.guest_name %></div><% if (g.guest_positioning) { %><div class="guest-cat"><%= g.guest_positioning %></div><% } %></div>
         <div class="guest-toggle">Ver perfil <span class="arrow">→</span></div>
       </summary>

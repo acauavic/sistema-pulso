@@ -18,6 +18,10 @@ function fakePng({ colorType = 6 } = {}) {
 
 const sponsorFields = (o = {}) => ({ company: 'Clínica Aurora', kind: 'negocio', ...o });
 
+// Fotos de convidado também passam pelo bucket (pp/convidados/…). A conferência de assinatura no fim do arquivo só trata de
+// chamadas do patrocinador, então os testes de foto tiram as deles do registro.
+const forgetGuestPhotoCalls = () => { for (let i = h.b2Calls.length - 1; i >= 0; i -= 1) if (!/^pp\/patrocinadores\//.test(h.b2Calls[i].key)) h.b2Calls.splice(i, 1); };
+
 describe('central de patrocinadores', () => {
   before(async () => {
     await h.resetDb();
@@ -289,6 +293,37 @@ describe('central de patrocinadores', () => {
       assert.match(t, /class="confirmed-month"/);
       assert.doesNotMatch(t, /Só Em Agendamento/, 'só quem está com a data confirmada');
       await h.db.query("DELETE FROM guests WHERE id=$1 OR instagram='emag'", [g.id]);
+    });
+
+    it('media kit: foto do convidado na moldura 4:3 por endereço assinado e com validade; sem foto mantém o espaço "Foto"', async () => {
+      const guestPhotos = require('../src/services/guestPhotos');
+      const { c } = await enter(token);
+      const b2 = require('../src/services/b2');
+      const { rows: [com] } = await h.db.query("INSERT INTO guests (name, instagram, profile, status, proposed_at) VALUES ('Dra. Foto Kit', 'dra.fotokit', 'medico', 'agendado', now() + interval '20 days') RETURNING id");
+      const { rows: [sem] } = await h.db.query("INSERT INTO guests (name, instagram, profile, status, proposed_at, photo_key) VALUES ('Dr. Sem Foto Kit', 'dr.semfotokit', 'medico', 'agendado', now() + interval '21 days', NULL) RETURNING id");
+      const key = await b2.keyFor('convidados', com.id, 'foto-kit.jpg');
+      await b2.putObject(key, Buffer.from('JPEGKIT'), 'image/jpeg');
+      await h.db.query('UPDATE guests SET photo_key = $2 WHERE id = $1', [com.id, key]);
+      try {
+        const t = (await c.get('/patrocinador/kit')).text;
+        const m = t.match(/<div class="confirmed-avatar img-slot has-photo"><img src="(\/agenda\/foto\/(\d+)\?e=(\d+)&amp;s=([\w-]{32}))" alt="Dra\. Foto Kit"/);
+        assert.ok(m, 'o convidado com foto ganha a imagem na moldura');
+        assert.equal(Number(m[2]), com.id);
+        assert.match(t, /confirmed-avatar img-slot"><span class="plus">\+<\/span><span class="cap">Foto/, 'sem foto, o espaço reservado continua');
+        assert.match(t, /\.confirmed-avatar\{[^}]*aspect-ratio:4\/3/, 'moldura padrão 4:3 no lugar do círculo');
+        const url = m[1].replace(/&amp;/g, '&');
+        const img = await fetch(app.base + url);
+        assert.equal(img.status, 200); assert.equal(await img.text(), 'JPEGKIT');
+        assert.equal(img.headers.get('content-type'), 'image/jpeg'); assert.match(img.headers.get('content-security-policy'), /sandbox/);
+        // assinatura: adulterada, de outro convidado, vencida, ausente ou convidado sem foto não abrem nada
+        const bad = [url.replace(/s=(.)/, (all, ch) => `s=${ch === 'a' ? 'b' : 'a'}`), url.replace(`/foto/${com.id}`, `/foto/${sem.id}`), guestPhotos.signedUrl(com.id, Date.now() - 3 * 24 * 3600 * 1000),
+          `/agenda/foto/${com.id}`, `/agenda/foto/${com.id}?e=9999999999&s=${'0'.repeat(32)}`, guestPhotos.signedUrl(sem.id), '/agenda/foto/abc?e=1&s=2'];
+        for (const u of bad) assert.equal((await fetch(app.base + u)).status, 404, u);
+      } finally {
+        await h.db.query('DELETE FROM guests WHERE id = ANY($1)', [[com.id, sem.id]]);
+        await b2.deleteObject(key).catch(() => {});
+        forgetGuestPhotoCalls();
+      }
     });
 
     it('"visto" conta a primeira abertura humana uma vez só', async () => {
@@ -839,6 +874,28 @@ describe('central de patrocinadores', () => {
       const css = await fetch(`${app.base}/static/patrocinador.css`);
       assert.equal(css.status, 200);
       assert.match(await css.text(), /tier-ouro/);
+    });
+
+    it('foto do convidado no portal: calendário e lista de convidados usam a moldura 4:3 (endereço assinado); sem foto, as iniciais', async () => {
+      const b2 = require('../src/services/b2');
+      const key = await b2.keyFor('convidados', agendaGuest, 'foto-portal.jpg');
+      await b2.putObject(key, Buffer.from('JPEGPORTAL'), 'image/jpeg');
+      await h.db.query("UPDATE guests SET photo_key = $2 WHERE id = $1 OR instagram = 'josebento'", [agendaGuest, key]);
+      const pc = h.client(app.base);
+      await pc.get(`/patrocinador/${token}/portal`);
+      const t = (await pc.get('/patrocinador/portal')).text;
+      assert.match(t, /<img class="cal-photo" src="\/agenda\/foto\/\d+\?e=\d+&amp;s=[\w-]{32}" alt="Dra\. Agenda"/, 'calendário');
+      assert.match(t, /<img class="guest-photo" src="\/agenda\/foto\/\d+\?e=\d+&amp;s=[\w-]{32}" alt="Dr\. José Bento"/, 'lista de convidados');
+      const src = t.match(/class="cal-photo" src="([^"]+)"/)[1].replace(/&amp;/g, '&');
+      const img = await fetch(app.base + src);
+      assert.equal(img.status, 200); assert.equal(await img.text(), 'JPEGPORTAL');
+      assert.match(await (await fetch(`${app.base}/static/patrocinador.css`)).text(), /\.guest-photo\{[^}]*aspect-ratio:4\/3/);
+      await h.db.query("UPDATE guests SET photo_key = NULL WHERE id = $1 OR instagram = 'josebento'", [agendaGuest]);
+      const bare = (await pc.get('/patrocinador/portal')).text;
+      assert.doesNotMatch(bare, /class="cal-photo"|class="guest-photo"/);
+      assert.match(bare, /class="guest-avatar"/);
+      await b2.deleteObject(key).catch(() => {});
+      forgetGuestPhotoCalls();
     });
 
     it('cota Ouro muda o tema e Inativo mostra "Parceria encerrada"; nome com HTML é escapado', async () => {

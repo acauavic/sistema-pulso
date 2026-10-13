@@ -6,6 +6,7 @@ const mailer = require('../services/mailer');
 const guestsSvc = require('../services/guests');
 const production = require('../services/production');
 const reminders = require('../services/reminders');
+const guestPhotos = require('../services/guestPhotos');
 const bulk = require('../services/guestBulk');
 const rules = require('../services/guestRules');
 const tpl = require('../services/inviteTemplate');
@@ -203,7 +204,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const { rows: [pl] } = await db.query("SELECT count(*)::int AS leads, count(*) FILTER (WHERE status = 'confirmado')::int AS confirmed FROM plateia_leads WHERE guest_id = $1", [guest.id]);
   const reminderList = await reminders.forGuest(guest);
   res.render('guests/show', {
-    reminderList,
+    reminderList, photoFrame: guestPhotos.FRAME,
     plateia: { ...pl, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
     episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, pendingStage: isStatus(req.query.para) ? req.query.para : null, storageReady: config.storageConfigured, openModal: ['contato', 'agenda', 'email', 'perda', 'foto'].includes(req.query.abrir) ? req.query.abrir : null,
     title: guest.name, guest, events, clicks, comments: thread, linkedTasks: linkedTasks.rows, clickKinds: CLICK_KINDS, profileLabels: PROFILE_BY_KEY,

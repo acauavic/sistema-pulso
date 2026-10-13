@@ -354,9 +354,16 @@
     input.addEventListener('change', async () => {
       const file = input.files[0];
       if (!file || slot == null) return;
-      if (file.size > 5 * 1024 * 1024) { window.alert('A imagem tem mais de 5 MB.'); return; }
+      let body = file;
+      if (input.dataset.crop) { // foto de convidado: enquadra na moldura padrão e envia o recorte (JPEG)
+        if (!window.pulsoCrop) { window.alert('Não consegui abrir o recorte. Recarregue a página.'); return; }
+        if (file.size > 40 * 1024 * 1024) { window.alert('A imagem tem mais de 40 MB.'); return; }
+        body = await window.pulsoCrop(file, { reopen: () => { input.value = ''; input.click(); } });
+        if (!body) return;
+      } else if (file.size > 5 * 1024 * 1024) { window.alert('A imagem tem mais de 5 MB.'); return; }
+      if (body.size > 5 * 1024 * 1024) { window.alert('A imagem recortada passou de 5 MB. Escolha outra foto.'); return; }
       try {
-        const res = await fetch(input.dataset.base + slot, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-csrf-token': input.dataset.csrf, Accept: 'application/json' }, body: file });
+        const res = await fetch(input.dataset.base + slot, { method: 'POST', headers: { 'Content-Type': body.type || 'application/octet-stream', 'x-csrf-token': input.dataset.csrf, Accept: 'application/json' }, body });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok) { window.alert(json.error || 'Não foi possível enviar a imagem.'); return; }
         // janela da foto aberta para mudar de etapa: com a foto enviada, a mudança continua sozinha
