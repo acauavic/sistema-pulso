@@ -250,31 +250,49 @@ async function sendFile(res, file, { inline = true } = {}) {
   return res.send(Buffer.from(await obj.arrayBuffer()));
 }
 
-// ---- agenda do media kit: convidados em Agendado (gravação confirmada), agrupados por mês ----
+// ---- agenda do media kit: convidados em Agendado (gravação confirmada), em uma galeria que passa sozinha e abre ao clicar ----
 async function kitAgendaHtml() {
   const { rows } = await db.query(
     `SELECT id, name, instagram, proposed_at, (photo_key IS NOT NULL) AS has_photo FROM guests WHERE status = 'agendado' AND (proposed_at IS NULL OR proposed_at >= now() - interval '1 day')
       ORDER BY proposed_at NULLS LAST, lower(name) LIMIT 24`);
   const { esc } = require('./inviteTemplate');
   if (!rows.length) return '<p class="slide-lede">A agenda dos próximos convidados é fechada semana a semana. Pergunte à equipe quem vem por aí.</p>';
-  const monthOf = (d) => (d ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', month: 'long' }).format(d) : 'Em breve');
-  const groups = [];
-  for (const g of rows) {
-    const m = monthOf(g.proposed_at);
-    const label = m.charAt(0).toUpperCase() + m.slice(1);
-    if (!groups.length || groups[groups.length - 1].label !== label) groups.push({ label, items: [] });
-    groups[groups.length - 1].items.push(g);
-  }
-  return groups.map((grp) => `<div class="confirmed-month">${esc(grp.label)}</div>
-      <div class="confirmed-grid">${grp.items.map((g) => `
-        <div class="confirmed-card">
+  const tz = 'America/Sao_Paulo';
+  const part = (d, opts, type) => new Intl.DateTimeFormat('pt-BR', { timeZone: tz, ...opts }).formatToParts(d).find((x) => x.type === type).value;
+  const short = (d) => (d ? `${part(d, { day: '2-digit' }, 'day')} ${part(d, { month: 'short' }, 'month').replace('.', '').toUpperCase()}` : 'EM BREVE');
+  const long = (d) => (d ? `${Number(part(d, { day: 'numeric' }, 'day'))} de ${part(d, { month: 'long' }, 'month')}` : 'Em breve');
+  const cards = rows.map((g) => {
+    const src = g.has_photo ? guestPhotos.signedUrl(g.id) : '';
+    const handle = g.instagram ? String(g.instagram).replace(/^@/, '') : '';
+    return `
+        <button type="button" class="agenda-card" data-agenda-open data-name="${esc(g.name)}" data-handle="${esc(handle)}" data-date="${esc(long(g.proposed_at))}" data-src="${esc(src)}" aria-label="Ver ${esc(g.name)}">
           ${g.has_photo
-    ? `<div class="confirmed-avatar img-slot has-photo"><img src="${esc(guestPhotos.signedUrl(g.id))}" alt="${esc(g.name)}" loading="lazy" width="${guestPhotos.FRAME.width / 4}" height="${guestPhotos.FRAME.height / 4}"></div>`
-    : '<div class="confirmed-avatar img-slot"><span class="plus">+</span><span class="cap">Foto</span></div>'}
-          <div class="confirmed-name">${esc(g.name)}</div>
-          ${g.instagram ? `<div class="confirmed-handle">@${esc(g.instagram)}</div>` : ''}
-        </div>`).join('')}
-      </div>`).join('\n      ');
+    ? `<span class="agenda-photo img-slot has-photo"><img src="${esc(src)}" alt="${esc(g.name)}" loading="lazy" width="${guestPhotos.FRAME.width / 4}" height="${guestPhotos.FRAME.height / 4}"></span>`
+    : '<span class="agenda-photo img-slot"><span class="plus">+</span><span class="cap">Foto</span></span>'}
+          <span class="agenda-date">${esc(short(g.proposed_at))}</span>
+          <span class="agenda-name">${esc(g.name)}</span>
+          ${handle ? `<span class="agenda-handle">@${esc(handle)}</span>` : ''}
+        </button>`;
+  }).join('');
+  return `<div class="agenda-carousel" data-agenda>
+      <button type="button" class="agenda-nav prev" data-agenda-prev aria-label="Anteriores">&larr;</button>
+      <div class="agenda-track" data-agenda-track tabindex="0" role="list" aria-label="Convidados confirmados">${cards}
+      </div>
+      <button type="button" class="agenda-nav next" data-agenda-next aria-label="Próximos">&rarr;</button>
+    </div>
+    <p class="agenda-hint">Clique em um convidado para ver de perto.</p>
+    <div class="agenda-modal" data-agenda-modal hidden role="dialog" aria-modal="true" aria-label="Convidado confirmado">
+      <div class="agenda-modal-box">
+        <button type="button" class="agenda-close" data-agenda-close aria-label="Fechar">&times;</button>
+        <div class="agenda-modal-photo img-slot" data-agenda-photo></div>
+        <div class="agenda-modal-info">
+          <div class="agenda-date" data-agenda-date></div>
+          <div class="agenda-modal-name" data-agenda-name></div>
+          <a class="agenda-modal-handle" data-agenda-handle target="_blank" rel="noopener noreferrer" hidden></a>
+        </div>
+        <div class="agenda-modal-nav"><button type="button" data-agenda-mprev aria-label="Anterior">&larr;</button><button type="button" data-agenda-mnext aria-label="Próximo">&rarr;</button></div>
+      </div>
+    </div>`;
 }
 
 // ---- dados do portal do patrocinador ativo ----

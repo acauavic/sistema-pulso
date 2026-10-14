@@ -290,7 +290,7 @@ describe('central de patrocinadores', () => {
       t = (await c.get('/patrocinador/kit')).text;
       assert.match(t, /Dra\. &lt;i&gt;Kit&lt;\/i&gt;/, 'nome escapado');
       assert.match(t, /@dra\.kit/);
-      assert.match(t, /class="confirmed-month"/);
+      assert.match(t, /data-agenda-track/); assert.match(t, /class="agenda-date">\d{2} [A-Z]{3}</, 'data curta no cartão'); assert.match(t, /data-handle="dra\.kit"/);
       assert.doesNotMatch(t, /Só Em Agendamento/, 'só quem está com a data confirmada');
       await h.db.query("DELETE FROM guests WHERE id=$1 OR instagram='emag'", [g.id]);
     });
@@ -306,15 +306,16 @@ describe('central de patrocinadores', () => {
       await h.db.query('UPDATE guests SET photo_key = $2 WHERE id = $1', [com.id, key]);
       try {
         const t = (await c.get('/patrocinador/kit')).text;
-        const m = t.match(/<div class="confirmed-avatar img-slot has-photo"><img src="(\/agenda\/foto\/(\d+)\?e=(\d+)&amp;s=([\w-]{32}))" alt="Dra\. Foto Kit"/);
+        const m = t.match(/<span class="agenda-photo img-slot has-photo"><img src="(\/agenda\/foto\/(\d+)\?e=(\d+)&amp;s=([\w-]{32}))" alt="Dra\. Foto Kit"/);
         assert.ok(m, 'o convidado com foto ganha a imagem na moldura');
         assert.equal(Number(m[2]), com.id);
-        assert.match(t, /confirmed-avatar img-slot"><span class="plus">\+<\/span><span class="cap">Foto/, 'sem foto, o espaço reservado continua');
-        assert.match(t, /\.confirmed-avatar\{[^}]*aspect-ratio:4\/3/, 'moldura padrão 4:3 no lugar do círculo');
+        assert.match(t, /agenda-photo img-slot"><span class="plus">\+<\/span><span class="cap">Foto/, 'sem foto, o espaço reservado continua');
+        assert.match(t, /\.agenda-photo\{[^}]*aspect-ratio:4\/3/, 'moldura padrão 4:3 no lugar do círculo');
         const url = m[1].replace(/&amp;/g, '&');
         const img = await fetch(app.base + url);
         assert.equal(img.status, 200); assert.equal(await img.text(), 'JPEGKIT');
         assert.equal(img.headers.get('content-type'), 'image/jpeg'); assert.match(img.headers.get('content-security-policy'), /sandbox/);
+        assert.equal(img.headers.get('cross-origin-resource-policy'), 'cross-origin', 'o kit roda em sandbox (origem opaca): com same-origin o navegador bloquearia a foto');
         // assinatura: adulterada, de outro convidado, vencida, ausente ou convidado sem foto não abrem nada
         const bad = [url.replace(/s=(.)/, (all, ch) => `s=${ch === 'a' ? 'b' : 'a'}`), url.replace(`/foto/${com.id}`, `/foto/${sem.id}`), guestPhotos.signedUrl(com.id, Date.now() - 3 * 24 * 3600 * 1000),
           `/agenda/foto/${com.id}`, `/agenda/foto/${com.id}?e=9999999999&s=${'0'.repeat(32)}`, guestPhotos.signedUrl(sem.id), '/agenda/foto/abc?e=1&s=2'];

@@ -34,7 +34,7 @@ async function send(res, guestId) {
   if (!obj) return false;
   res.set({
     'Content-Type': obj.headers.get('content-type') || 'image/jpeg', 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': "default-src 'none'; sandbox", 'Cross-Origin-Resource-Policy': 'same-origin',
+    'Content-Security-Policy': "default-src 'none'; sandbox", 'Cross-Origin-Resource-Policy': 'cross-origin', // o media kit roda em sandbox (origem opaca): same-origin bloquearia a foto. Quem controla o acesso é a assinatura do endereço
   });
   res.send(Buffer.from(await obj.arrayBuffer()));
   return true;
