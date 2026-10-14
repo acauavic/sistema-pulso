@@ -44,11 +44,8 @@ async function ensureToken(sponsor, { regenerate = false } = {}) {
   return token;
 }
 
-function whatsappUrl(kind, sponsor) {
-  const text = kind === 'quero'
-    ? `Oi, quero ser um patrocinador do ${config.podcastName}! Sou da ${sponsor.company}.`
-    : `Oi, quero saber mais sobre como funciona para ser parceiro do ${config.podcastName}. Sou da ${sponsor.company}.`;
-  return `https://wa.me/${config.whatsappPatrocinio}?text=${encodeURIComponent(text)}`;
+async function whatsappUrl(kind, sponsor) { // número e textos em Gestão > WhatsApp dos convites
+  return require('./contacts').waUrl('patrocinio', kind, sponsor.company);
 }
 
 const recordClick = (sponsorId, kind) => db.query('INSERT INTO sponsor_clicks (sponsor_id, kind) VALUES ($1,$2)', [sponsorId, kind]);

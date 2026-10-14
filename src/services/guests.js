@@ -67,13 +67,9 @@ async function renderInvite(guest, { rsvpState = null, closed = false, preview =
   };
 }
 
-// Link do WhatsApp da produção com mensagem pronta. kind: 'aceitar' | 'producao'.
-function whatsappUrl(kind, guest) {
-  const who = guest.name || 'convidado';
-  const text = kind === 'aceitar'
-    ? `Olá! Sou ${who} e aceito o convite para o ${config.podcastName}. Podemos alinhar a data da gravação?`
-    : `Olá! Sou ${who} e gostaria de falar com a produção do ${config.podcastName}.`;
-  return `https://wa.me/${config.whatsappProducao}?text=${encodeURIComponent(text)}`;
+// Link do WhatsApp da produção com mensagem pronta (número e texto em Gestão > WhatsApp dos convites). kind: 'aceitar' | 'producao'.
+async function whatsappUrl(kind, guest) {
+  return require('./contacts').waUrl('producao', kind, guest.name || 'convidado');
 }
 
 const recordClick = (guestId, kind) =>

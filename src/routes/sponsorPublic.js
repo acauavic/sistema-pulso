@@ -114,7 +114,7 @@ router.get('/patrocinador/kit', withSession(), wrap(async (req, res) => {
 // "Quero ser patrocinador": conta o clique, leva a Prospecção para Em negociação e abre o WhatsApp comercial.
 router.get('/patrocinador/quero', withSession(), wrap(async (req, res) => {
   const sponsor = req.sp.sponsor;
-  const target = sponsorsSvc.whatsappUrl('quero', sponsor);
+  const target = await sponsorsSvc.whatsappUrl('quero', sponsor);
   await sponsorsSvc.recordClick(sponsor.id, 'quero');
   const { rowCount } = await db.query("UPDATE sponsors SET stage = 'negociacao', updated_at = now() WHERE id = $1 AND stage = 'prospect'", [sponsor.id]);
   if (rowCount) {
@@ -131,7 +131,7 @@ router.get('/patrocinador/equipe', withSession(), wrap(async (req, res) => {
   const { rows } = await db.query("SELECT 1 FROM sponsor_clicks WHERE sponsor_id = $1 AND kind = 'equipe' LIMIT 1", [sponsor.id]);
   await sponsorsSvc.recordClick(sponsor.id, 'equipe');
   if (!rows.length) await sponsorsSvc.addEvent(sponsor.id, null, 'clique', 'Clicou em “Falar com a equipe” no media kit');
-  return res.redirect(302, sponsorsSvc.whatsappUrl('equipe', sponsor));
+  return res.redirect(302, await sponsorsSvc.whatsappUrl('equipe', sponsor));
 }));
 
 // ---- formulário de cadastro (briefing) ----

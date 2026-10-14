@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.7.0', date: '2026-10-14', title: 'Gestão em grupos e WhatsApp dos convites configurável',
+    items: [
+      { kind: 'novo', text: 'Gestão > WhatsApp dos convites: o número e as mensagens prontas de quem aceita o convite, fala com a produção, quer ser patrocinador ou fala com a equipe agora são configurados ali, sem mexer no servidor.' },
+      { kind: 'ajuste', text: 'O menu da gestão foi organizado em grupos (Visão geral, Equipe, Operação, Convites e parcerias, Sistema), cada um com as suas abas.' },
+    ],
+  },
+  {
     version: '1.6.1', date: '2026-10-14', title: 'Agenda do media kit em galeria',
     items: [
       { kind: 'correcao', text: 'Media kit: as fotos dos convidados confirmados não apareciam. O navegador bloqueava a imagem porque o kit abre isolado; corrigido.' },

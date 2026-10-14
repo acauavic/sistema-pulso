@@ -10,7 +10,7 @@ const { clean } = require('../utils/format');
 const { wrap, isIntId, isUuid } = require('../utils/wrap');
 
 const router = express.Router();
-const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage'].some((p) => can(req.user.role, p))
+const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage'].some((p) => can(req.user.role, p))
   ? next() : res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não acessa o painel de gestão.' }));
 
 router.get('/gestao', anyGestao, wrap(async (req, res) => {
@@ -74,6 +74,23 @@ router.post('/gestao/lembretes', requirePerm('reminders.manage'), wrap(async (re
   await audit(req, 'lembretes.configurados', 'settings', null, { campo: field });
   await req.flash('ok', 'Salvo.');
   res.redirect('/gestao/lembretes');
+}));
+
+// ---------------------------------------------------------------- WhatsApp dos convites
+router.get('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req, res) => {
+  const contacts = require('../services/contacts');
+  res.render('gestao/whatsapp', { title: 'WhatsApp dos convites', contacts, cur: await contacts.current(), sample: { producao: 'Dra. Maria Souza', patrocinio: 'Clínica Exemplo' }, openGroup: contacts.GROUPS[req.query.editar] ? req.query.editar : null, plateiaWa: await require('../services/settings').get('plateia_whatsapp') });
+}));
+
+router.post('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req, res) => {
+  const contacts = require('../services/contacts');
+  const group = contacts.GROUPS[req.body.grupo] ? req.body.grupo : null;
+  if (!group) return res.redirect('/gestao/whatsapp');
+  const r = await contacts.save(group, req.body);
+  if (r.error) { await req.flash('error', r.error); return res.redirect(`/gestao/whatsapp?editar=${group}`); }
+  await audit(req, 'whatsapp.configurado', 'settings', null, { grupo: group });
+  await req.flash('ok', 'Salvo. Os botões dos convites já usam o novo WhatsApp.');
+  res.redirect('/gestao/whatsapp');
 }));
 
 // ---------------------------------------------------------------- rotinas de tarefas

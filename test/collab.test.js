@@ -533,7 +533,7 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       const page = (await as.gestao.get('/gestao')).text;
       for (const t of ['Usuários', 'Logs', 'Notificações', 'Rotinas de tarefas', 'Busca global', 'Integrações']) assert.match(page, new RegExp(t), t);
       assert.equal((await as.editor.get('/gestao')).status, 403);
-      for (const p of ['/usuarios', '/auditoria', '/integracoes']) assert.match((await as.gestao.get(p)).text, /class="subnav"/, `${p} com as abas da gestão`);
+      for (const p of ['/usuarios', '/auditoria', '/integracoes']) assert.match((await as.gestao.get(p)).text, /class="subnav subnav-groups"/, `${p} com as abas da gestão`);
     });
 
     it('o menu tem busca (Ctrl+K), Notificações, Tarefas e só mostra Gestão para quem pode; a lista da equipe vai para a bolinha', async () => {

@@ -84,7 +84,7 @@ router.get('/convite/:token/aceitar', wrap(async (req, res) => {
   if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
   const guest = await guestByToken(req.params.token);
   if (!guest) return gone(res);
-  const target = guestsSvc.whatsappUrl('aceitar', guest);
+  const target = await guestsSvc.whatsappUrl('aceitar', guest);
   if (isBot(req)) return res.redirect(302, target);
 
   await guestsSvc.recordClick(guest.id, 'aceitar');
@@ -106,7 +106,7 @@ router.get('/convite/:token/producao', wrap(async (req, res) => {
   if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
   const guest = await guestByToken(req.params.token);
   if (!guest) return gone(res);
-  const target = guestsSvc.whatsappUrl('producao', guest);
+  const target = await guestsSvc.whatsappUrl('producao', guest);
   if (isBot(req)) return res.redirect(302, target);
 
   const { rows } = await db.query('SELECT 1 FROM invite_clicks WHERE guest_id = $1 AND kind = $2 LIMIT 1', [guest.id, 'producao']);
