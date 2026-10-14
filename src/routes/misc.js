@@ -29,8 +29,11 @@ router.get('/', wrap(async (req, res) => {
       "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on <= CURRENT_DATE + 7), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'")]);
     money = { late: c.atrasados, out7: Number(week.out7), toBuy: stock.filter((i) => i.active && ['comprar', 'acabou'].includes(i.state)).length };
   }
+  const outreach = require('../services/outreach');
+  const outToday = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? await outreach.todayFor(req.user) : null;
+  if (outToday) outToday.items = outToday.items.map((x) => ({ ...x, d: outreach.describe(x) }));
   res.render('dashboard', {
-    money,
+    money, outToday, CHANNELS: outreach.CHANNELS, outBase: (k) => outreach.KINDS[k].base,
     title: 'Início', cards: GUEST_STATUSES.map((s) => ({ ...s, n: byStatus[s.key] || 0 })),
     upcoming: upcoming.rows, recent: recent.rows, myOpen: mine.rows[0].n,
   });

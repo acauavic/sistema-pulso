@@ -59,13 +59,17 @@
     <h2>Apresentar o Pulso</h2>
     <% if (!links) { %>
       <p class="muted">Gere os links do patrocinador e mande o media kit. Ao abrir, a empresa entra direto, sem criar conta.</p>
-      <% if (canWrite) { %><div class="next-actions"><form method="post" action="/patrocinadores/<%= sponsor.id %>/links" class="inline"><%- csrfField %><button class="btn primary" type="submit"><%- icon('link') %> Gerar links</button></form></div><% } %>
+      <% if (outreachCtx.d) { %><p class="small <%= outreachCtx.d.tone === 'bad' ? 'err' : outreachCtx.d.tone === 'warn' ? 'warn' : 'muted' %>"><%= outreachCtx.d.text %></p><% } %>
+      <% if (canWrite) { %><div class="next-actions"><form method="post" action="/patrocinadores/<%= sponsor.id %>/links" class="inline"><%- csrfField %><button class="btn primary" type="submit"><%- icon('link') %> Gerar links</button></form><button class="btn" type="button" data-modal-open="modal-abordagem"><%- icon('send') %> Registrar abordagem</button></div><% } %>
     <% } else { %>
       <p class="muted mono-line"><span>MEDIA KIT <%= sponsor.kit_viewed_at ? 'VISTO ' + fmt.formatDateTime(sponsor.kit_viewed_at) : 'AINDA NÃO ABERTO' %></span><% if (clicks.quero.total) { %><span>QUERO SER PATROCINADOR · <%= clicks.quero.total %></span><% } %></p>
+      <% if (outreachCtx.d) { %><p class="small <%= outreachCtx.d.tone === 'bad' ? 'err' : outreachCtx.d.tone === 'warn' ? 'warn' : 'muted' %>"><%= outreachCtx.d.text %></p><% } %>
       <div class="next-actions">
-        <button class="btn primary" type="button" data-copy="<%= links.kit %>">Copiar link do media kit</button>
-        <% if (canWrite) { %><%- advance('negociacao', 'Mostrou interesse', '') %><%- advance('perdido', 'Não fechou', 'ghost', 'Marcar ' + sponsor.company + ' como Perdido?') %><% } %>
+        <% if (canWrite) { %><button class="btn primary" type="button" data-modal-open="modal-abordagem"><%- icon('send') %> Registrar abordagem</button><% } %>
+        <button class="btn <%= canWrite ? '' : 'primary' %>" type="button" data-copy="<%= links.kit %>">Copiar link do media kit</button>
+        <% if (canWrite) { %><%- advance('negociacao', 'Mostrou interesse', '') %><% } %>
       </div>
+      <% if (canWrite) { %><details class="more top-gap"><summary>Mais ações</summary><div class="next-actions"><%- advance('perdido', 'Não fechou', 'ghost', 'Marcar ' + sponsor.company + ' como Perdido?') %></div></details><% } %>
     <% } %>
 
   <% } else if (sponsor.stage === 'negociacao') { %>
@@ -168,6 +172,7 @@
       </div>
 
       <div class="stack-lg">
+        <% if (outreachCtx.sm || outreachCtx.hist.length) { %><%- include('../partials/outreach-card', Object.assign({ canWrite: canWrite }, outreachCtx)) %><% } %>
         <section class="card" id="tarefas">
           <div class="row spread"><h2>Tarefas<%= linkedTasks.length ? ' (' + linkedTasks.length + ')' : '' %></h2><% if (can('tasks.write')) { %><a class="btn sm" href="/tarefas?nova=1&patrocinador=<%= sponsor.id %>"><%- icon('plus') %> Nova tarefa</a><% } %></div>
           <% if (!linkedTasks.length) { %><p class="muted small">Nenhuma tarefa ligada a este patrocinador.</p><% } %>
@@ -427,6 +432,8 @@
 </dialog>
 <% } %>
 <% if (canWrite) { %>
+<% if (canWrite && sponsor.stage === 'prospect') { %><%- include('../partials/outreach-modal', outreachCtx) %><% } %>
+
 <dialog class="modal" id="modal-ganho" aria-labelledby="m-ganho-h" <%= openOnLoad('ganho') %>>
   <form method="post" action="/patrocinadores/<%= sponsor.id %>/avancar" class="stack">
     <%- csrfField %><input type="hidden" name="para" value="ganho">

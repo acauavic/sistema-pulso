@@ -156,10 +156,14 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
     require('../services/comments').list('sponsor', sponsor.id),
     db.query("SELECT t.id, t.title, t.status, t.due_on, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.sponsor_id = $1 ORDER BY (t.status = 'feito'), t.due_on NULLS LAST", [sponsor.id]),
   ]);
+  const outreach = require('../services/outreach');
+  const [outHist, outKnown, outEval] = await Promise.all([outreach.history('sponsor', sponsor.id), outreach.knownAddresses('sponsor', sponsor.id, sponsor), sponsor.stage === outreach.KINDS.sponsor.stage ? outreach.evaluateAll('sponsor', { ids: [sponsor.id] }) : new Map()]);
+  const outSm = outEval.get(sponsor.id) || null;
   const finSvc = require('../services/finance');
   const finView = can(req.user.role, 'finance.read')
     ? { finSummary: await finSvc.sponsorSummary(sponsor.id), fin: finSvc, money: fmtMoney, today: finSvc.todayISO(), here: req.originalUrl } : { finSummary: null };
   res.render('sponsors/show', {
+    outreachCtx: { kind: 'sponsor', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (sponsor.contact_phone ? 'whatsapp' : sponsor.contact_email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/patrocinadores', subjectId: sponsor.id },
     ...finView, openModal: ['ganho', 'ativo'].includes(req.query.abrir) ? req.query.abrir : null, agenda: agenda.rows, guestLinks: guestLinks.rows, guestStatuses: C.STATUS_BY_KEY,
     comments: thread, linkedTasks: linkedTasks.rows,
     title: sponsor.company, sponsor, events: events.rows, brief, files: files.rows,

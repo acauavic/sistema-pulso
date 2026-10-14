@@ -75,14 +75,22 @@
       <span>ENVIADO <%= guest.invite_sent_at ? fmt.formatDateTime(guest.invite_sent_at) : '—' %></span>
       <span><%= guest.invite_viewed_at ? 'ABERTO ' + fmt.formatDateTime(guest.invite_viewed_at) : 'AINDA NÃO ABRIU' %></span>
     </p>
-    <p class="small muted">Quando <%= fmt.firstName(guest.name) %> responder pelo convite, a etapa muda sozinha. Se a resposta veio por outro canal, registre aqui.</p>
+    <% if (outreachCtx.d) { %><p class="small <%= outreachCtx.d.tone === 'bad' ? 'err' : outreachCtx.d.tone === 'warn' ? 'warn' : 'muted' %>"><%= outreachCtx.d.text %></p><% } %>
+    <p class="small muted">Quando <%= fmt.firstName(guest.name) %> responder pelo convite, a etapa muda sozinha. Se a resposta veio por outro canal, registre a abordagem e depois marque que aceitou.</p>
     <% if (canW) { %>
     <div class="next-actions">
-      <% if (guest.email || guest.phone) { %><%- advance('em_agendamento', 'Aceitou o convite', 'primary') %>
-      <% } else { %><button class="btn primary" type="button" data-modal-open="modal-contato">Aceitou o convite</button><% } %>
-      <% if (canEmail) { %><button class="btn" type="button" data-modal-open="modal-email"><%- icon('mail') %> Reenviar</button><% } else if (inviteUrl) { %><button class="btn" type="button" data-copy="<%= inviteUrl %>">Copiar link</button><% } %>
-      <button class="btn ghost" type="button" data-modal-open="modal-perda">Marcar como perdido</button>
+      <button class="btn primary" type="button" data-modal-open="modal-abordagem"><%- icon('send') %> Registrar abordagem</button>
+      <% if (guest.email || guest.phone) { %><%- advance('em_agendamento', 'Aceitou o convite', '') %>
+      <% } else { %><button class="btn" type="button" data-modal-open="modal-contato">Aceitou o convite</button><% } %>
     </div>
+    <details class="more top-gap">
+      <summary>Mais ações</summary>
+      <div class="next-actions">
+        <% if (canEmail) { %><button class="btn sm" type="button" data-modal-open="modal-email"><%- icon('mail') %> Reenviar o convite por e-mail</button><% } %>
+        <% if (inviteUrl) { %><button class="btn sm" type="button" data-copy="<%= inviteUrl %>">Copiar link do convite</button><% } %>
+        <button class="btn sm ghost" type="button" data-modal-open="modal-perda">Marcar como perdido</button>
+      </div>
+    </details>
     <% } %>
 
   <% } else if (guest.status === 'em_agendamento') { %>
@@ -170,6 +178,7 @@
       </div>
 
       <div class="stack-lg">
+      <% if (outreachCtx.sm || outreachCtx.hist.length) { %><%- include('../partials/outreach-card', Object.assign({ canWrite: canW }, outreachCtx)) %><% } %>
       <% if (reminderList.length) { var R_STATE = { enviado: ['b-gray', 'enviado'], agora: ['b-amber', 'na hora'], agendado: ['b-gray', 'agendado'], passou: ['b-gray', 'não enviado'] }; %>
       <section class="card" id="lembretes">
         <h2>Lembretes da gravação</h2>
@@ -336,7 +345,7 @@
     <p class="small muted">O motivo fica no histórico e ajuda a entender onde os convites param.</p>
     <div class="stage-pick" role="radiogroup" aria-label="Motivo da perda">
       <% Object.keys(lossReasons).forEach(function (k) { %>
-      <label class="choice"><input type="radio" name="loss_reason" value="<%= k %>" required <%= guest.loss_reason === k ? 'checked' : '' %> data-loss-radio><span><strong><%= lossReasons[k] %></strong></span></label>
+      <label class="choice"><input type="radio" name="loss_reason" value="<%= k %>" required <%= guest.loss_reason === k || (!guest.loss_reason && outreachCtx.sm && outreachCtx.sm.state === 'possivel_perdido' && k === 'nunca_respondeu') ? 'checked' : '' %> data-loss-radio><span><strong><%= lossReasons[k] %></strong></span></label>
       <% }) %>
     </div>
     <label data-loss-note <%= guest.loss_reason === 'outros' ? '' : 'hidden' %>>Qual o motivo?<input type="text" name="loss_note" maxlength="500" value="<%= guest.loss_note || '' %>"></label>
@@ -344,6 +353,8 @@
   </form>
 </dialog>
 <% } %>
+
+<% if (canW && guest.status === 'convite_enviado') { %><%- include('../partials/outreach-modal', outreachCtx) %><% } %>
 
 <% if (canEmail) { %>
 <dialog class="modal" id="modal-email" aria-labelledby="m-email-h" <%= openOnLoad('email') %>>

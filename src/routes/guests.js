@@ -133,8 +133,14 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
     db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
     can(req.user.role, 'guests.write') && view === 'lista' ? db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)") : { rows: [] },
   ]);
-  const columns = GUEST_STATUSES.map((s) => ({ ...s, guests: guests.filter((g) => g.status === s.key) }));
-  res.render('guests/index', { lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
+  const outreach = require('../services/outreach');
+  const outEval = await outreach.evaluateAll('guest', { ids: guests.filter((g) => g.status === outreach.KINDS.guest.stage).map((g) => g.id) });
+  for (const g of guests) { const sm = outEval.get(g.id); if (sm) g.outreach = { ...outreach.describe(sm), state: sm.state, attempts: sm.attempts }; }
+  const followupCount = guests.filter((g) => g.outreach && outreach.NEEDS.has(g.outreach.state)).length;
+  const followupOnly = req.query.followup === '1';
+  const shown = followupOnly ? guests.filter((g) => g.outreach && outreach.NEEDS.has(g.outreach.state)) : guests;
+  const columns = GUEST_STATUSES.map((s) => ({ ...s, guests: shown.filter((g) => g.status === s.key) }));
+  res.render('guests/index', { followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: shown, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
 }));
 
 // ---- criar ----
@@ -203,7 +209,12 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const { rows: [linkedSponsor] } = guest.sponsor_id ? await db.query('SELECT id, company FROM sponsors WHERE id = $1', [guest.sponsor_id]) : { rows: [] };
   const { rows: [pl] } = await db.query("SELECT count(*)::int AS leads, count(*) FILTER (WHERE status = 'confirmado')::int AS confirmed FROM plateia_leads WHERE guest_id = $1", [guest.id]);
   const reminderList = await reminders.forGuest(guest);
+  const outreach = require('../services/outreach');
+  const inStage = guest.status === outreach.KINDS.guest.stage;
+  const [outHist, outKnown, outEval] = await Promise.all([outreach.history('guest', guest.id), outreach.knownAddresses('guest', guest.id, guest), inStage ? outreach.evaluateAll('guest', { ids: [guest.id] }) : new Map()]);
+  const outSm = outEval.get(guest.id) || null;
   res.render('guests/show', {
+    outreachCtx: { kind: 'guest', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (guest.instagram ? 'instagram' : guest.phone ? 'whatsapp' : guest.email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/convidados', subjectId: guest.id },
     reminderList, photoFrame: guestPhotos.FRAME,
     plateia: { ...pl, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
     episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, pendingStage: isStatus(req.query.para) ? req.query.para : null, storageReady: config.storageConfigured, openModal: ['contato', 'agenda', 'email', 'perda', 'foto'].includes(req.query.abrir) ? req.query.abrir : null,

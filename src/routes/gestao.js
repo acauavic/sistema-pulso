@@ -10,7 +10,7 @@ const { clean } = require('../utils/format');
 const { wrap, isIntId, isUuid } = require('../utils/wrap');
 
 const router = express.Router();
-const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage'].some((p) => can(req.user.role, p))
+const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage'].some((p) => can(req.user.role, p))
   ? next() : res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não acessa o painel de gestão.' }));
 
 router.get('/gestao', anyGestao, wrap(async (req, res) => {

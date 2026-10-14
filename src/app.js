@@ -49,6 +49,7 @@ function createApp() {
   app.use(require('./routes/collab')); // comentários, responsável, notificações e busca global
   app.use(require('./routes/assistant')); // assistente de IA flutuante (texto e áudio, com histórico)
   app.use(require('./routes/tasks'));
+  app.use(require('./routes/outreach')); // Cadência de abordagem: registro por canal, follow-ups e painel da gestão
   app.use(require('./routes/releases')); // Novidades: versões do sistema e aviso de atualização
   app.use(require('./routes/calendar')); // Calendário: tudo que tem data, com filtros e visualizações salvas
   app.use(require('./routes/gestao'));

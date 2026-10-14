@@ -59,6 +59,7 @@ const PERMISSIONS = {
   'reminders.manage': ['superadmin', 'gestao'],         // lembretes da gravação: endereço, horário e textos
   'plans.manage': ['superadmin', 'gestao'],             // planos de patrocínio (Ouro/Diamond): nome, preço e entregáveis
   'search.manage': ['superadmin', 'gestao'],            // atalhos e sugestões da busca global
+  'outreach.manage': ['superadmin', 'gestao'],          // cadência de abordagem: intervalos, metas diárias e o painel de follow-ups
   'audit.read': ['superadmin', 'gestao'],
   'integrations.manage': ['superadmin', 'gestao'], // ver status e testar Brevo/YOURLS
 };

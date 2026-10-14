@@ -27,6 +27,7 @@
     <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
   </select>
   <% } %>
+  <% if (followupCount || followupOnly) { %><label class="check"><input type="checkbox" name="followup" value="1" <%= followupOnly ? 'checked' : '' %> data-autosubmit> Só follow-ups pendentes (<%= followupCount %>)</label><% } %>
   <button class="btn" type="submit">Filtrar</button>
 </form>
 
@@ -44,6 +45,7 @@
         <span class="meta small muted">
           <% if (g.status === 'perdido' && g.loss_reason) { %><span class="mono"><%= lossReasons[g.loss_reason] %></span><% } %>
           <% if (g.proposed_at) { %><span><%- icon('calendar', 12) %><%= fmt.shortDate(g.proposed_at) %></span><% } %>
+          <% if (g.outreach && g.outreach.state !== 'respondeu') { %><span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %>
           <% if (g.invite_viewed_at) { %><span><%- icon('eye', 12) %>visto</span><% } else if (g.invite_sent_at) { %><span><%- icon('send', 12) %>enviado</span><% } else if (g.invite_token) { %><span><%- icon('link', 12) %>link pronto</span><% } %>
         </span>
         <span class="card-foot"><%- include('../partials/dot', { type: 'guest', id: g.id, user: g.owner_id ? { id: g.owner_id, name: g.owner_name } : null, editable: can('guests.write'), inLink: true }) %></span>
@@ -75,7 +77,7 @@
     <% guests.forEach(function (g) { %>
     <tr>
       <% if (canBulk) { %><td class="check-col"><input type="checkbox" form="form-massa" name="ids" value="<%= g.id %>" data-bulk-pick aria-label="Marcar <%= g.name %>"></td><% } %>
-      <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a><br><span class="muted small handle"><%= g.instagram ? '@' + g.instagram : '' %></span></td>
+      <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a><br><span class="muted small handle"><%= g.instagram ? '@' + g.instagram : '' %></span><% if (g.outreach && g.outreach.state !== 'respondeu') { %> <span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %></td>
       <td><%= g.profile ? profileLabels[g.profile].label : '—' %></td>
       <td><span class="badge b-st-<%= g.status %>"><%= statuses.find(function (s) { return s.key === g.status; }).label %></span></td>
       <td class="nowrap mono"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : '—' %></td>
