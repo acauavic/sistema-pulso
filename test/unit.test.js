@@ -18,8 +18,10 @@ test('permissões: todo perfil listado existe e superadmin tem tudo', () => {
   }
 });
 
-test('permissões: editor de vídeo só lê convidados; gestão não gerencia superadmin', () => {
-  assert.equal(can('editor_video', 'guests.read'), true);
+test('permissões: editor de vídeo não vê convidados nem patrocinadores; gestão não gerencia superadmin', () => {
+  assert.equal(can('editor_video', 'guests.read'), false);
+  assert.equal(can('editor_video', 'sponsors.read'), false);
+  assert.equal(can('editor_video', 'episodes.read'), true);
   assert.equal(can('editor_video', 'guests.write'), false);
   assert.equal(can('editor_video', 'users.read'), false);
   assert.equal(can('produtora', 'users.write'), false);

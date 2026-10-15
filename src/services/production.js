@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const db = require('../db/pool');
 const config = require('../config');
 const b2 = require('./b2');
-const { can } = require('../permissions');
+const { can, PERMISSIONS } = require('../permissions');
 const C = require('../constants');
 
 const MB = 1024 * 1024;
@@ -127,6 +127,33 @@ const EFFECTS = {
   async publicado(ep, user, client) { await client.query('UPDATE episodes SET published_at = coalesce(published_at, now()) WHERE id = $1', [ep.id]); },
 };
 
+// ---------------------------------------------------------------- avisos de etapa
+// Cada mudança importante avisa quem precisa agir agora (quem fez a mudança nunca é avisado). Por exemplo: liberou para edição, os
+// editores recebem; enviou para revisão, quem revisa recebe; pediu ajustes, o editor do episódio recebe.
+async function usersWithPerm(perm) {
+  const roles = PERMISSIONS[perm] || [];
+  const { rows } = await db.query('SELECT id FROM users WHERE active AND role = ANY($1)', [roles]);
+  return rows.map((r) => r.id);
+}
+const epLabel = (ep) => (ep.number ? `EP.${String(ep.number).padStart(3, '0')}` : 'Episódio');
+
+async function notifyStage(ep, to, user) {
+  const from = ep.status; const name = user.name; const label = `${epLabel(ep)} · ${ep.title}`;
+  const url = `/episodios/${ep.id}`; let users = []; let title; let body = null; let hash = '';
+  if (to === 'disponivel_edicao' && from === 'gravado') {
+    title = `Liberado para edição: ${label}`; body = `${name} liberou o material. Abra o episódio para assumir a edição.`;
+    users = (await db.query("SELECT id FROM users WHERE active AND role = 'editor_video'")).rows.map((r) => r.id); // a fila é dos editores
+  } else if (to === 'disponivel_edicao') { users = await usersWithPerm('production.manage'); title = `Devolvido à fila: ${label}`; body = `${name} devolveu o episódio à fila de edição.`; }
+  else if (to === 'em_edicao' && from === 'disponivel_edicao') { users = await usersWithPerm('production.manage'); title = `${name} assumiu a edição: ${label}`; }
+  else if (to === 'em_edicao' && from === 'em_revisao') { users = [ep.editor_id]; title = `Ajustes pedidos: ${label}`; body = 'Veja os comentários abertos e envie de novo para revisão.'; hash = '#revisao'; }
+  else if (to === 'em_revisao' && from === 'em_edicao') { users = await usersWithPerm('production.review'); title = `Vídeo para revisar: ${label}`; body = `${name} enviou o vídeo editado para revisão.`; hash = '#revisao'; }
+  else if (to === 'em_finalizacao' && from === 'em_revisao') { users = [ep.editor_id, ...await usersWithPerm('production.manage')]; title = `Vídeo aprovado: ${label}`; body = 'Segue para a finalização (títulos, descrições e thumbnail).'; }
+  else if (to === 'pronto_publicar') { users = [ep.editor_id, ...await usersWithPerm('production.manage')]; title = `Pronto para publicar: ${label}`; }
+  else if (to === 'publicado') { users = [ep.editor_id, ...await usersWithPerm('production.manage')]; title = `Publicado: ${label}`; }
+  else return;
+  await require('./notify').notify({ type: 'episodio', users, title, body, url: `${url}${hash}`, actorId: user.id, entity: { type: 'episode', id: ep.id } });
+}
+
 // Faz a mudança de etapa. Devolve { ok } ou { error, missing }.
 async function move(ep, to, user) {
   const t = TRANSITIONS.find((x) => x.from === ep.status && x.to === to);
@@ -147,6 +174,7 @@ async function move(ep, to, user) {
   } finally {
     client.release();
   }
+  try { await notifyStage(ep, to, user); } catch (err) { console.error('Avisos da etapa:', err.message); }
   try { await require('./tasks').applyRoutines(`etapa:${to}`, ep.id, user); } catch (err) { console.error('Rotinas de tarefas:', err.message); }
   try { await require('./finance').onEpisodeStage(ep.id, to); } catch (err) { console.error('Financeiro (etapa):', err.message); }
   return { ok: true };

@@ -46,8 +46,8 @@
           <a href="/tarefas/<%= t.id %>" class="tt-title"><%= t.title %></a>
           <span class="small muted">
             <% if (t.episode_id) { %><a href="/episodios/<%= t.episode_id %>"><%= t.episode_number ? 'EP.' + String(t.episode_number).padStart(3, '0') + ' · ' : '' %><%= t.episode_title %></a><% } %>
-            <% if (t.guest_id) { %><a href="/convidados/<%= t.guest_id %>"><%= t.guest_name %></a><% } %>
-            <% if (t.sponsor_id) { %><a href="/patrocinadores/<%= t.sponsor_id %>"><%= t.sponsor_name %></a><% } %>
+            <% if (t.guest_id) { %><% if (can('guests.read')) { %><a href="/convidados/<%= t.guest_id %>"><%= t.guest_name %></a><% } else { %><span><%= t.guest_name %></span><% } %><% } %>
+            <% if (t.sponsor_id) { %><% if (can('sponsors.read')) { %><a href="/patrocinadores/<%= t.sponsor_id %>"><%= t.sponsor_name %></a><% } else { %><span><%= t.sponsor_name %></span><% } %><% } %>
             <% if (t.status === 'bloqueada') { %><span class="err"><%- icon('lock', 12) %> <%= t.block_reason %></span><% } %>
           </span>
         </div>

@@ -9,8 +9,8 @@
   <div class="row">
     <a class="btn ghost" href="/tarefas"><%- icon('arrow-left') %> Tarefas</a>
     <% if (task.episode_id) { %><a class="btn" href="/episodios/<%= task.episode_id %>">Episódio</a><% } %>
-    <% if (task.guest_id) { %><a class="btn" href="/convidados/<%= task.guest_id %>">Convidado</a><% } %>
-    <% if (task.sponsor_id) { %><a class="btn" href="/patrocinadores/<%= task.sponsor_id %>">Patrocinador</a><% } %>
+    <% if (task.guest_id && can('guests.read')) { %><a class="btn" href="/convidados/<%= task.guest_id %>">Convidado</a><% } %>
+    <% if (task.sponsor_id && can('sponsors.read')) { %><a class="btn" href="/patrocinadores/<%= task.sponsor_id %>">Patrocinador</a><% } %>
   </div>
 </div>
 

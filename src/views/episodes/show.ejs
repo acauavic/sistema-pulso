@@ -23,7 +23,7 @@
   <div class="row">
     <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
     <a class="btn" href="/conteudo?episodio=<%= ep.id %>"><%- icon('layers') %> Conteúdo<%= content.total ? ' (' + content.total + ')' : '' %></a>
-    <% if (ep.guest_id) { %><a class="btn" href="/convidados/<%= ep.guest_id %>"><%- icon('mic') %> Convidado</a><% } %>
+    <% if (ep.guest_id && can('guests.read')) { %><a class="btn" href="/convidados/<%= ep.guest_id %>"><%- icon('mic') %> Convidado</a><% } %>
     <% if (perm.write) { %><a class="btn" href="/episodios/<%= ep.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
   </div>
 </div>
@@ -75,7 +75,7 @@
             <dt>Patrocínio</dt>
             <dd class="sponsor-line">
               <% sponsors.forEach(function (sp) { var miss = [!sp.moldura && 'moldura', !sp.qrcode && 'QR Code'].filter(Boolean); %>
-              <a class="chip-link" href="/patrocinadores/<%= sp.id %>" title="<%= (sp.role === 'exclusivo' ? 'Episódio exclusivo' : 'Inserção') + (miss.length ? ' · falta ' + miss.join(' e ') : '') %>"><strong><%= sp.company %></strong> <span class="mono"><%= sp.role === 'exclusivo' ? 'EXCL.' : 'INS.' %></span><% if (miss.length) { %> <span class="warn" aria-label="Faltam arquivos"><%- icon('triangle-alert', 12) %></span><% } %></a>
+              <<%= can('sponsors.read') ? 'a href="/patrocinadores/' + sp.id + '"' : 'span' %> class="chip-link" title="<%= (sp.role === 'exclusivo' ? 'Episódio exclusivo' : 'Inserção') + (miss.length ? ' · falta ' + miss.join(' e ') : '') %>"><strong><%= sp.company %></strong> <span class="mono"><%= sp.role === 'exclusivo' ? 'EXCL.' : 'INS.' %></span><% if (miss.length) { %> <span class="warn" aria-label="Faltam arquivos"><%- icon('triangle-alert', 12) %></span><% } %></<%= can('sponsors.read') ? 'a' : 'span' %>>
               <% }) %>
               <% if (perm.manage) { %><button class="link small" type="button" data-modal-open="modal-patrocinio"><%= sponsors.length ? 'trocar' : 'vincular patrocinador' %></button><% } else if (!sponsors.length) { %><span class="muted">—</span><% } %>
             </dd>

@@ -85,8 +85,8 @@ describe('calendário: tudo que tem data, filtros por perfil e visualizações',
       assert.ok(!(await typesOf(u.prod)).some((t) => ['pagar', 'receber'].includes(t)), 'produtora não vê o financeiro');
       assert.ok((await typesOf(u.prod)).includes('post') && (await typesOf(u.prod)).includes('cobranca'), 'mas cobra a plateia');
       const editor = await typesOf(u.editor);
-      assert.ok(!editor.some((t) => ['pagar', 'receber', 'post', 'cobranca'].includes(t)), 'editor de vídeo não vê financeiro, redes nem plateia');
-      assert.deepEqual(editor, ['episodio', 'gravacao', 'lembrete', 'patrocinio', 'tarefa']);
+      assert.ok(!editor.some((t) => ['pagar', 'receber', 'post', 'cobranca'].includes(t)), 'editor de vídeo não vê financeiro, redes, plateia nem convidados');
+      assert.deepEqual(editor, ['episodio', 'tarefa']);
       const forced = await ev(u.editor, { types: ['pagar', 'receber', 'post', 'tarefa'] });
       assert.deepEqual([...new Set(forced.map((e) => e.type))], ['tarefa'], 'pedir um tipo proibido não adianta');
     });

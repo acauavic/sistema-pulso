@@ -58,7 +58,7 @@ Para mudar, edite só `src/permissions.js` — todas as telas e rotas consultam 
 - **Superadmin**: tudo, inclusive excluir usuários e gerenciar outros superadmins.
 - **Gestão**: usuários (exceto superadmin, sem excluir), convidados (inclusive excluir), auditoria, integrações e o **Financeiro**.
 - **Produtora**: convidados (criar/editar, importar CSV, gerar e enviar convite) e o **Estoque** (sem valores).
-- **Editor de Vídeo**: somente leitura em convidados.
+- **Editor de Vídeo**: trabalha só com episódios, tarefas, calendário e conteúdo. **Não vê** o CRM de convidados, patrocinadores, plateia, social nem financeiro. O **Início** dele é a fila de edição, os episódios dele (com "ajustes pedidos") e as tarefas dele. Ele ainda baixa logo, moldura e QR Code do patrocinador pela página do episódio. Recebe avisos: **liberado para edição** (todos os editores), **ajustes pedidos**, **vídeo aprovado**, **pronto** e **publicado** (tipo "Etapas do episódio", configurável e silenciável); a produção é avisada de quem assumiu e quem devolveu, e quem revisa, de que há vídeo para revisar.
 
 ## Etapas do convidado e regras para avançar
 

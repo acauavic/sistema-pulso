@@ -15,11 +15,11 @@ const PERMISSIONS = {
   'users.read': ['superadmin', 'gestao'],
   'users.write': ['superadmin', 'gestao'], // gestão não mexe em superadmin (ver canManageUser)
   'users.delete': ['superadmin'],
-  'guests.read': ALL,
+  'guests.read': ['superadmin', 'gestao', 'produtora'], // o editor de vídeo trabalha com episódios: não vê o CRM de convidados
   'guests.write': ['superadmin', 'gestao', 'produtora'],
   'guests.invite': ['superadmin', 'gestao', 'produtora'], // gerar link e enviar e-mail
   'guests.delete': ['superadmin', 'gestao'],
-  'sponsors.read': ALL,
+  'sponsors.read': ['superadmin', 'gestao', 'produtora'], // o editor baixa logo, moldura e QR Code pelo episódio (episodes.read)
   'sponsors.write': ['superadmin', 'gestao', 'produtora'], // cadastrar, mover etapa, gerar links, entregáveis e arquivos
   'sponsors.delete': ['superadmin', 'gestao'],
   'episodes.read': ALL,

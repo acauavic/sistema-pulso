@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.8.0', date: '2026-10-15', title: 'Início e avisos do editor de vídeo',
+    items: [
+      { kind: 'novo', text: 'Avisos das etapas do episódio: o editor é avisado quando um episódio é liberado para edição, quando pedem ajustes e quando o vídeo é aprovado ou publicado. Quem revisa é avisado de que há vídeo para revisar, e a produção, de quem assumiu a edição.' },
+      { kind: 'novo', text: 'O Início do editor de vídeo mostra a fila de edição, os episódios dele (com "ajustes pedidos") e as tarefas dele.' },
+      { kind: 'ajuste', text: 'O editor de vídeo não vê mais convidados, patrocinadores e dados do CRM. Continua baixando logo, moldura e QR Code do patrocinador pela página do episódio.' },
+    ],
+  },
+  {
     version: '1.7.0', date: '2026-10-14', title: 'Gestão em grupos e WhatsApp dos convites configurável',
     items: [
       { kind: 'novo', text: 'Gestão > WhatsApp dos convites: o número e as mensagens prontas de quem aceita o convite, fala com a produção, quer ser patrocinador ou fala com a equipe agora são configurados ali, sem mexer no servidor.' },

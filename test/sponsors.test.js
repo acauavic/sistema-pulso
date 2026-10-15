@@ -171,9 +171,9 @@ describe('central de patrocinadores', () => {
       assert.match(page, /Etapa: Em negociação|Etapa: Prospecção → Ganho|Etapa: Ganho → Ativo/);
     });
 
-    it('permissões: editor de vídeo só enxerga; exclusão só gestão/superadmin; IDs ruins viram 404', async () => {
-      assert.equal((await as.editor.get('/patrocinadores')).status, 200);
-      assert.equal((await as.editor.get(`/patrocinadores/${id}`)).status, 200);
+    it('permissões: editor de vídeo não vê o CRM de patrocinadores; exclusão só gestão/superadmin; IDs ruins viram 404', async () => {
+      assert.equal((await as.editor.get('/patrocinadores')).status, 403);
+      assert.equal((await as.editor.get(`/patrocinadores/${id}`)).status, 403);
       assert.equal((await as.editor.get('/patrocinadores/novo')).status, 403);
       assert.equal((await as.editor.act('/patrocinadores', sponsorFields(), { from: '/patrocinadores' })).status, 403);
       assert.equal((await as.editor.act(`/patrocinadores/${id}/links`, {}, { from: '/patrocinadores' })).status, 403);

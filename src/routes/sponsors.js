@@ -480,10 +480,11 @@ router.post('/patrocinadores/:id/arquivo', requirePerm('sponsors.write'),
     res.json({ ok: true, id: file.id });
   }));
 
-router.get('/patrocinadores/:id/arquivos/:fid', requirePerm('sponsors.read'), wrap(async (req, res) => {
+// Quem vê patrocinadores baixa tudo; quem só edita episódios (editor de vídeo) baixa só o material de edição: logo, moldura e QR Code.
+router.get('/patrocinadores/:id/arquivos/:fid', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!isIntId(req.params.id) || !isIntId(req.params.fid)) return notFound(res);
   const { rows: [file] } = await db.query('SELECT * FROM sponsor_files WHERE id = $1 AND sponsor_id = $2', [req.params.fid, req.params.id]);
-  if (!file) return notFound(res);
+  if (!file || (!can(req.user.role, 'sponsors.read') && !['logo', 'moldura', 'qrcode'].includes(file.kind))) return notFound(res);
   return sponsorsSvc.sendFile(res, file, { inline: req.query.baixar !== '1' });
 }));
 
