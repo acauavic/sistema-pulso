@@ -105,4 +105,32 @@ describe('editor de vídeo: avisos de cada etapa e início só com produção', 
     assert.doesNotMatch(page, /data-edited="0"/, 'mas não o material bruto');
     assert.equal((await as.editor.act(`/episodios/${e.id}/arquivos/iniciar`, { kind: 'bruto_video', filename: 'x.mp4', size: '10' }, { from: `/episodios/${e.id}` })).status, 403, 'e o servidor também recusa o bruto');
   });
+
+  it('revisão contínua: comentar, resolver e apagar respondem em JSON (a tela atualiza sem recarregar)', async () => {
+    const e = (await q("INSERT INTO episodes (number, title, status, editor_id) VALUES (15, 'Em revisão', 'em_revisao', $1) RETURNING id", [u.editor.id])).rows[0];
+    const f = (await q("INSERT INTO episode_files (episode_id, kind, filename, size_bytes, storage_key, status) VALUES ($1, 'editado', 'v1.mp4', 10, 'kv1', 'pronto') RETURNING id", [e.id])).rows[0];
+    const api = async (client, path, body) => {
+      const token = await client.csrf('/');
+      const r = await fetch(`${app.base}${path}`, { method: 'POST', headers: { cookie: client.cookie(), accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded', 'x-csrf-token': token }, body: new URLSearchParams(body) });
+      return { status: r.status, json: await r.json().catch(() => null) };
+    };
+    const a = await api(as.gestao, `/episodios/${e.id}/comentarios`, { body: 'Corta a pausa <b>aqui</b>', at_ms: '83000', file_id: String(f.id) });
+    assert.equal(a.status, 200); assert.ok(a.json.ok);
+    assert.deepEqual([a.json.comment.clock, a.json.comment.at_ms, a.json.comment.author, a.json.comment.resolved], ['1:23', 83000, 'Gil Gestão', false]);
+    assert.equal(a.json.comment.body, 'Corta a pausa <b>aqui</b>', 'o texto volta como está (a tela insere como texto, sem HTML)');
+    assert.deepEqual(a.json.counts, { total: 1, open: 1 });
+    const g = await api(as.gestao, `/episodios/${e.id}/comentarios`, { body: 'Comentário geral', at_ms: '' });
+    assert.equal(g.json.comment.clock, null); assert.deepEqual(g.json.counts, { total: 2, open: 2 });
+    const r1 = await api(as.editor, `/episodios/${e.id}/comentarios/${a.json.id}/resolver`, { resolved: '1' });
+    assert.deepEqual([r1.json.ok, r1.json.resolved, r1.json.counts.open], [true, true, 1]);
+    assert.equal((await api(as.editor, `/episodios/${e.id}/comentarios/${a.json.id}/resolver`, { resolved: '0' })).json.counts.open, 2, 'reabrir');
+    // só quem escreveu (ou a gestão) apaga; o editor não apaga o da gestão
+    const denied = await api(as.editor, `/episodios/${e.id}/comentarios/${g.json.id}/excluir`, {});
+    assert.equal(denied.status, 403); assert.equal(denied.json.ok, false);
+    const del = await api(as.gestao, `/episodios/${e.id}/comentarios/${g.json.id}/excluir`, {});
+    assert.deepEqual([del.status, del.json.ok, del.json.counts.total], [200, true, 1]);
+    // a página traz os controles do player e os ganchos da tela contínua
+    const page = (await as.editor.get(`/episodios/${e.id}`)).text;
+    for (const re of [/data-playpause/, /data-skip="-10"/, /data-skip="5"/, /data-speed/, /data-comment-list/, /data-comment-delete/, /data-no-comments/, /Atalhos: espaço pausa/]) assert.match(page, re, String(re));
+  });
 });

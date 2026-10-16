@@ -225,7 +225,9 @@
   }));
 
   // ---------------------------------------------------------------- revisão: player e comentários na minutagem
+  // Tudo acontece na própria página: comentar, resolver e apagar não recarregam, e o vídeo continua onde está.
   const review = document.querySelector('[data-review]');
+  const epId = location.pathname.split('/')[2];
   const post = (url, data) => fetch(url, {
     method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': (review?.dataset.csrf || document.querySelector('meta[name="csrf"]')?.content || '') },
     body: new URLSearchParams(data),
@@ -234,11 +236,14 @@
   const video = review?.querySelector('[data-video]');
   const nowEl = review?.querySelector('[data-now]');
   const timeline = review?.querySelector('[data-timeline]');
+  const list = document.querySelector('[data-comment-list]');
+  const form = review?.querySelector('[data-comment-form]');
+  const tickable = Boolean(form);
 
   function drawMarkers() {
     if (!timeline || !video || !Number.isFinite(video.duration) || !video.duration) return;
     timeline.innerHTML = '';
-    document.querySelectorAll('.comment[data-at]').forEach((c) => {
+    document.querySelectorAll('[data-comment-list] .comment[data-at]').forEach((c) => {
       if (c.dataset.at === '') return;
       const ms = Number(c.dataset.at);
       const dot = document.createElement('button');
@@ -247,17 +252,72 @@
       dot.style.left = `${Math.min(100, (ms / 1000 / video.duration) * 100)}%`;
       dot.title = clock(ms);
       dot.setAttribute('aria-label', `Comentário em ${clock(ms)}`);
-      dot.addEventListener('click', () => { video.currentTime = ms / 1000; c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
+      dot.addEventListener('click', (e) => { e.stopPropagation(); video.currentTime = ms / 1000; c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
       timeline.appendChild(dot);
     });
   }
 
+  // contador da aba "Revisão" (comentários em aberto)
+  function setBadge(counts) {
+    const tab = document.querySelector('[data-tab-btn="revisao"]');
+    if (!tab || !counts) return;
+    let badge = tab.querySelector('.count');
+    if (!counts.open) { if (badge) badge.remove(); return; }
+    if (!badge) { badge = document.createElement('span'); badge.className = 'count'; tab.append(' ', badge); }
+    badge.textContent = counts.open;
+  }
+  const refreshEmpty = () => { const none = list?.querySelector('[data-no-comments]'); if (none) none.hidden = list.querySelectorAll('.comment').length > 0; };
+
+  // ---- controles do player: ir e voltar, play/pause, velocidade
   if (video) {
-    video.addEventListener('loadedmetadata', drawMarkers);
-    video.addEventListener('timeupdate', () => { if (nowEl) nowEl.textContent = clock(video.currentTime * 1000); });
-    if (video.readyState >= 1) drawMarkers();
+    const cur = review.querySelector('[data-cur]'); const dur = review.querySelector('[data-dur]');
+    const playBtn = review.querySelector('[data-playpause]');
+    const syncTime = () => { const t = clock(video.currentTime * 1000); if (cur) cur.textContent = t; if (nowEl) nowEl.textContent = t; };
+    const syncPlay = () => {
+      const playing = !video.paused && !video.ended;
+      review.querySelector('[data-pp-play]').hidden = playing; review.querySelector('[data-pp-pause]').hidden = !playing;
+      playBtn?.setAttribute('aria-label', playing ? 'Pausar' : 'Reproduzir');
+    };
+    const skip = (secs) => {
+      const max = Number.isFinite(video.duration) ? video.duration : Infinity;
+      video.currentTime = Math.min(max, Math.max(0, video.currentTime + secs)); syncTime();
+    };
+    const toggle = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
+    review.querySelectorAll('[data-skip]').forEach((b) => b.addEventListener('click', () => skip(Number(b.dataset.skip))));
+    playBtn?.addEventListener('click', toggle);
+    review.querySelector('[data-speed]')?.addEventListener('change', (e) => { video.playbackRate = Number(e.target.value); });
+
+    video.addEventListener('loadedmetadata', () => { drawMarkers(); if (dur) dur.textContent = clock(video.duration * 1000); });
+    video.addEventListener('durationchange', () => { if (dur && Number.isFinite(video.duration)) dur.textContent = clock(video.duration * 1000); });
+    video.addEventListener('timeupdate', syncTime);
+    video.addEventListener('seeked', syncTime);
+    video.addEventListener('play', syncPlay); video.addEventListener('pause', syncPlay); video.addEventListener('ended', syncPlay);
+    if (video.readyState >= 1) { drawMarkers(); if (dur) dur.textContent = clock(video.duration * 1000); }
+    syncPlay();
     // ao escrever um comentário o vídeo pausa, para o ponto não fugir
-    review.querySelector('[data-comment-form] textarea')?.addEventListener('focus', () => video.pause());
+    form?.querySelector('textarea')?.addEventListener('focus', () => video.pause());
+
+    // clicar na linha dos marcadores leva o vídeo até aquele ponto
+    timeline?.addEventListener('click', (e) => {
+      if (e.target !== timeline || !Number.isFinite(video.duration)) return;
+      const r = timeline.getBoundingClientRect();
+      video.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * video.duration; syncTime();
+    });
+
+    // atalhos (fora de campos de texto, e só com a aba Revisão à vista)
+    window.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || !video.offsetParent) return;
+      const t = e.target; if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+      if (document.querySelector('dialog[open]')) return;
+      const k = e.key.toLowerCase(); let used = true;
+      if (k === ' ' || k === 'k') toggle();
+      else if (k === 'arrowleft') skip(-5); else if (k === 'arrowright') skip(5);
+      else if (k === 'j') skip(-10); else if (k === 'l') skip(10);
+      else if (k === ',' || k === '.') { video.pause(); skip(k === ',' ? -1 / 30 : 1 / 30); }
+      else if (k === 'c' && form) { form.querySelector('textarea').focus(); }
+      else used = false;
+      if (used) e.preventDefault();
+    });
   }
 
   document.querySelectorAll('[data-seek]').forEach((b) => b.addEventListener('click', () => {
@@ -266,23 +326,77 @@
     video.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }));
 
+  // ---- comentar, resolver e apagar sem recarregar
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+  function renderComment(c) {
+    const li = el('li', 'comment'); li.dataset.at = c.at_ms == null ? '' : String(c.at_ms); li.dataset.id = String(c.id);
+    const head = el('div', 'row');
+    if (c.at_ms != null) { const b = el('button', 'seek handle', `\u00a0${c.clock}`); b.type = 'button'; b.dataset.seek = String(c.at_ms); b.addEventListener('click', () => { video.currentTime = c.at_ms / 1000; video.scrollIntoView({ block: 'center', behavior: 'smooth' }); }); head.append(b); }
+    else head.append(el('span', 'badge b-gray', 'geral'));
+    head.append(el('span', 'small muted', `${c.author || '—'} · ${c.when}`));
+    const body = el('p', 'pre', c.body);
+    const actions = el('div', 'row small');
+    if (tickable) actions.append(resolveButton(c.id, false));
+    actions.append(deleteForm(c.id));
+    li.append(head, body, actions);
+    return li;
+  }
+  function resolveButton(id, resolved) {
+    const b = el('button', 'link', resolved ? 'reabrir' : 'marcar como resolvido'); b.type = 'button'; b.dataset.resolve = resolved ? '0' : '1'; b.dataset.comment = String(id);
+    b.addEventListener('click', () => resolveComment(b)); return b;
+  }
+  function deleteForm(id) {
+    const f = el('form', 'inline'); f.method = 'post'; f.action = `/episodios/${epId}/comentarios/${id}/excluir`; f.dataset.commentDelete = '';
+    const tok = el('input'); tok.type = 'hidden'; tok.name = '_csrf'; tok.value = review?.dataset.csrf || document.querySelector('meta[name="csrf"]')?.content || '';
+    const b = el('button', 'link', 'apagar'); b.type = 'submit'; f.append(tok, b); bindDelete(f); return f;
+  }
+  function insertSorted(li) {
+    const key = (n) => (n.dataset.at === '' ? -1 : Number(n.dataset.at));
+    const next = [...list.querySelectorAll('.comment')].find((n) => key(n) > key(li) || (key(n) === key(li) && Number(n.dataset.id) > Number(li.dataset.id)));
+    if (next) list.insertBefore(li, next); else list.insertBefore(li, list.querySelector('[data-no-comments]') || null);
+  }
+
   const submitComment = async (general) => {
-    const form = review.querySelector('[data-comment-form]');
     const text = form.querySelector('textarea');
     if (!text.value.trim()) { text.focus(); return; }
-    const res = await post(review.dataset.url, {
-      body: text.value, at_ms: general ? '' : String(Math.round(video.currentTime * 1000)), file_id: review.dataset.file,
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok || !body.ok) { window.alert(body.error || 'Não foi possível salvar o comentário.'); return; }
-    window.location.hash = 'revisao';
-    window.location.reload();
+    const buttons = form.querySelectorAll('button'); buttons.forEach((b) => { b.disabled = true; });
+    try {
+      const res = await post(review.dataset.url, { body: text.value, at_ms: general ? '' : String(Math.round(video.currentTime * 1000)), file_id: review.dataset.file });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.ok) { window.alert(out.error || 'Não foi possível salvar o comentário.'); return; }
+      const li = renderComment(out.comment); insertSorted(li); refreshEmpty(); setBadge(out.counts); drawMarkers();
+      text.value = ''; li.classList.add('just-added'); li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      setTimeout(() => li.classList.remove('just-added'), 2400);
+      text.focus();
+    } catch { window.alert('Sem conexão. Tente de novo.'); } finally { buttons.forEach((b) => { b.disabled = false; }); }
   };
-  review?.querySelector('[data-comment-form]')?.addEventListener('submit', (e) => { e.preventDefault(); submitComment(false); });
+  form?.addEventListener('submit', (e) => { e.preventDefault(); submitComment(false); });
   review?.querySelector('[data-general]')?.addEventListener('click', () => submitComment(true));
+  form?.querySelector('textarea')?.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submitComment(false); } });
 
-  document.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', async () => {
-    const res = await post(`/episodios/${location.pathname.split('/')[2]}/comentarios/${b.dataset.comment}/resolver`, { resolved: b.dataset.resolve });
-    if (res.ok) { window.location.hash = 'revisao'; window.location.reload(); } else window.alert('Não foi possível atualizar o comentário.');
-  }));
+  async function resolveComment(b) {
+    const li = b.closest('.comment'); b.disabled = true;
+    try {
+      const res = await post(`/episodios/${epId}/comentarios/${b.dataset.comment}/resolver`, { resolved: b.dataset.resolve });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.ok) { window.alert('Não foi possível atualizar o comentário.'); return; }
+      li.classList.toggle('resolved', out.resolved); b.dataset.resolve = out.resolved ? '0' : '1'; b.textContent = out.resolved ? 'reabrir' : 'marcar como resolvido';
+      setBadge(out.counts); drawMarkers();
+    } finally { b.disabled = false; }
+  }
+  document.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () => resolveComment(b)));
+
+  function bindDelete(f) {
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault(); e.stopPropagation(); // a confirmação é daqui (a do app.js é para quem está sem JS)
+      if (!window.confirm('Apagar este comentário?')) return;
+      const li = f.closest('.comment');
+      const res = await post(f.action, {});
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.ok) { window.alert(out.error || 'Não foi possível apagar o comentário.'); return; }
+      li.remove(); refreshEmpty(); setBadge(out.counts); drawMarkers();
+    });
+  }
+  document.querySelectorAll('[data-comment-delete]').forEach(bindDelete);
 })();

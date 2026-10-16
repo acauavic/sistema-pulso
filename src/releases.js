@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.9.0', date: '2026-10-15', title: 'Revisão do vídeo mais fluida',
+    items: [
+      { kind: 'novo', text: 'Revisão: comentar, resolver e apagar comentários acontece na própria página, sem recarregar. O vídeo continua onde estava e o comentário novo já aparece na lista e na linha do tempo.' },
+      { kind: 'novo', text: 'Player da revisão com botões de voltar e avançar (5 e 10 segundos), play e pausa, velocidade de 0,5× a 2× e tempo atual e total. Clicar na linha do tempo leva o vídeo até aquele ponto.' },
+      { kind: 'novo', text: 'Atalhos no computador: espaço pausa, setas voltam e avançam 5 s, J e L 10 s, vírgula e ponto andam um quadro, C comenta neste ponto, Ctrl+Enter envia o comentário.' },
+    ],
+  },
+  {
     version: '1.8.1', date: '2026-10-15', title: 'Página do episódio mais clara para o editor',
     items: [
       { kind: 'ajuste', text: 'O editor de vídeo volta a ver convidados e patrocinadores (só leitura), para consultar briefing, datas e restrições.' },

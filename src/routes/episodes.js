@@ -591,6 +591,8 @@ router.get(['/episodios/:id/quadros/:fid', '/quadros/:fid'], requirePerm('episod
 }));
 
 // ---- checklists do episódio ----
+// Quantos comentários há na revisão e quantos seguem abertos (a tela atualiza o contador da aba sem recarregar).
+const commentCounts = async (epId) => (await db.query('SELECT count(*)::int AS total, count(*) FILTER (WHERE NOT resolved)::int AS open FROM episode_comments WHERE episode_id = $1', [epId])).rows[0];
 const canTick = (role) => can(role, 'production.edit') || can(role, 'production.review') || can(role, 'production.manage');
 
 router.post('/episodios/:id/checklist/:iid/marcar', requirePerm('episodes.read'), wrap(async (req, res) => {
@@ -678,7 +680,9 @@ router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(asy
   const { rows: [c] } = await db.query('INSERT INTO episode_comments (episode_id, file_id, at_ms, body, author_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
     [ep.id, fileId, at, body, req.user.id]);
   await prod.addEvent(ep.id, req.user.id, 'comentario', `Comentário${at != null ? ` em ${require('../utils/format').formatClock(at)}` : ''}: ${body.slice(0, 140)}`);
-  if (wantsJson(req)) return res.json({ ok: true, id: c.id });
+  if (wantsJson(req)) {
+    return res.json({ ok: true, id: c.id, comment: { id: c.id, at_ms: at, clock: at != null ? fmt.formatClock(at) : null, body, author: req.user.name, when: fmt.formatDateTime(new Date()), resolved: false }, counts: await commentCounts(ep.id) });
+  }
   res.redirect(back(ep.id, '#revisao'));
 }));
 
@@ -690,7 +694,7 @@ router.post('/episodios/:id/comentarios/:cid/resolver', requirePerm('episodes.re
     'UPDATE episode_comments SET resolved = $3, resolved_by = $4, resolved_at = CASE WHEN $3 THEN now() ELSE NULL END WHERE id = $1 AND episode_id = $2',
     [req.params.cid, req.params.id, resolved, resolved ? req.user.id : null]);
   if (!rowCount) return res.status(404).json({ ok: false });
-  if (wantsJson(req)) return res.json({ ok: true });
+  if (wantsJson(req)) return res.json({ ok: true, resolved, counts: await commentCounts(req.params.id) });
   res.redirect(back(req.params.id, '#revisao'));
 }));
 
@@ -698,8 +702,12 @@ router.post('/episodios/:id/comentarios/:cid/excluir', requirePerm('episodes.rea
   if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return notFound(res);
   const { rows: [c] } = await db.query('SELECT * FROM episode_comments WHERE id = $1 AND episode_id = $2', [req.params.cid, req.params.id]);
   if (!c) return notFound(res);
-  if (c.author_id !== req.user.id && !can(req.user.role, 'production.review')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem escreveu (ou a gestão) apaga o comentário.' });
+  if (c.author_id !== req.user.id && !can(req.user.role, 'production.review')) {
+    if (wantsJson(req)) return res.status(403).json({ ok: false, error: 'Só quem escreveu (ou a gestão) apaga o comentário.' });
+    return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem escreveu (ou a gestão) apaga o comentário.' });
+  }
   await db.query('DELETE FROM episode_comments WHERE id = $1', [c.id]);
+  if (wantsJson(req)) return res.json({ ok: true, counts: await commentCounts(req.params.id) });
   res.redirect(back(req.params.id, '#revisao'));
 }));
 
