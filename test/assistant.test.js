@@ -119,8 +119,8 @@ describe('assistente de IA', () => {
 
     it('numeros respeita o perfil: editor de vídeo não recebe redes, plateia nem financeiro', async () => {
       const r = await ask('editor', 'numeros', {});
-      assert.ok(r.episodios && r.tarefas);
-      assert.deepEqual(r.sem_acesso_para_o_seu_perfil.sort(), ['convidados', 'financeiro', 'patrocinadores', 'plateia', 'social']);
+      assert.ok(r.convidados && r.episodios && r.tarefas);
+      assert.deepEqual(r.sem_acesso_para_o_seu_perfil.sort(), ['financeiro', 'plateia', 'social']);
       assert.equal(r.financeiro, undefined);
       const only = await ask('editor', 'numeros', { assunto: 'financeiro' });
       assert.deepEqual(only, { sem_acesso_para_o_seu_perfil: ['financeiro'] });
@@ -152,7 +152,7 @@ describe('assistente de IA', () => {
       const lost = await ask('gestao', 'lista_convidados', { etapa: 'perdido' });
       assert.equal(lost.convidados[0].motivo_da_perda, 'Nunca respondeu');
       assert.match((await ask('gestao', 'lista_convidados', { etapa: 'astronauta' })).erro, /Etapa desconhecida/);
-      assert.equal((await ask('editor', 'lista_convidados', { etapa: 'prospect' })).total, undefined, 'editor de vídeo não vê convidados');
+      assert.equal((await ask('editor', 'lista_convidados', { etapa: 'prospect' })).total, 3, 'editor vê convidados (guests.read)');
     });
 
     it('criar_convidado: cadastra em Prospecção com a pessoa como responsável; pede o que falta; barra duplicado; editor não cria', async () => {

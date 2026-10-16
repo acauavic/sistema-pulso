@@ -228,7 +228,7 @@ describe('fluxos ponta a ponta', () => {
   describe('convidados + convite', () => {
     let guestId; let token; let shortUrl;
 
-    it('produtora cadastra convidado; editor de vídeo não enxerga o CRM', async () => {
+    it('produtora cadastra convidado; editor de vídeo só enxerga', async () => {
       const r = await as.prod.act('/convidados', min({
         name: 'Maria <b>Souza</b>', email: 'maria@conv.com', company: 'Estúdio X', topic: 'Marcas & histórias',
         proposed_at: '2026-12-10T15:00', owner_id: produtora.id, status: 'prospect',
@@ -237,8 +237,8 @@ describe('fluxos ponta a ponta', () => {
       guestId = r.location.split('/').pop();
       assert.match(guestId, /^\d+$/);
 
-      assert.equal((await as.editor.get('/convidados')).status, 403);
-      assert.equal((await as.editor.get(`/convidados/${guestId}`)).status, 403);
+      assert.equal((await as.editor.get('/convidados')).status, 200);
+      assert.equal((await as.editor.get(`/convidados/${guestId}`)).status, 200);
       assert.equal((await as.editor.get('/convidados/novo')).status, 403);
       assert.equal((await as.editor.act('/convidados', { name: 'Intruso' })).status, 403);
       assert.equal((await as.editor.act(`/convidados/${guestId}/convite`, {}, { from: '/convidados' })).status, 403);

@@ -38,16 +38,18 @@
   <span class="kicker">Próximo passo</span>
   <div class="move-list">
     <% if (!moves.length) { %><p class="muted">Este episódio está no fim da linha de produção.</p><% } %>
-    <% moves.forEach(function (m) { %>
+    <% moves.filter(function (m) { return m.allowed; }).forEach(function (m) { %>
     <div class="move">
       <form method="post" action="/episodios/<%= ep.id %>/etapa" class="inline">
         <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="to" value="<%= m.to %>">
-        <button class="btn <%= m.tone %>" type="submit" <%= m.allowed ? '' : 'disabled' %>><%= m.label %></button>
+        <button class="btn <%= m.tone %>" type="submit"><%= m.label %></button>
       </form>
-      <% if (!m.allowed) { %><span class="small muted">Seu perfil não faz este passo.</span>
-      <% } else if (m.missing.length) { %><span class="small blocked"><%- icon('info', 14) %> Antes: <%= m.missing.join(' · ') %></span><% } %>
+      <% if (m.missing.length) { %><span class="small blocked"><%- icon('info', 14) %> Antes: <%= m.missing.join(' · ') %></span><% } %>
     </div>
     <% }) %>
+    <% var others = moves.filter(function (m) { return !m.allowed; }); if (others.length) { var anyMine = moves.some(function (m) { return m.allowed; }); %>
+    <p class="small muted wait-line"><%- icon('clock', 14) %> <%= anyMine ? 'Outros passos desta etapa ficam com ' : 'Esta etapa está com ' %><%= Array.from(new Set(others.map(function (m) { return m.who; }))).join(' / ') %>: <%= others.map(function (m) { return m.label.toLowerCase(); }).join(' · ') %>.</p>
+    <% } %>
   </div>
 </section>
 
@@ -201,8 +203,9 @@
             <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
           </div>
           <% }; %>
+          <% var canSendEdited = perm.edit && storageReady && ep.status !== 'disponivel_edicao'; %>
           <% if (!editedFiles.length) { %>
-            <% if (perm.edit && storageReady) { %><% editedUploader('Enviar vídeo editado') %><% } else { %><p class="muted">Nenhuma versão enviada ainda.</p><% } %>
+            <% if (canSendEdited) { %><% editedUploader('Enviar vídeo editado') %><% } else if (ep.status === 'disponivel_edicao' && perm.edit) { %><p class="muted">Assuma a edição para enviar o vídeo editado.</p><% } else { %><p class="muted">Nenhuma versão enviada ainda.</p><% } %>
           <% } else { %>
           <ul class="plain file-list file-compact">
             <% editedFiles.forEach(function (f, i) { %>
@@ -215,7 +218,7 @@
             </li>
             <% }) %>
           </ul>
-          <% if (perm.edit && storageReady) { %><details class="top-gap"><summary>Enviar nova versão</summary><% editedUploader('Enviar nova versão') %></details><% } %>
+          <% if (canSendEdited) { %><details class="top-gap"><summary>Enviar nova versão</summary><% editedUploader('Enviar nova versão') %></details><% } %>
           <% } %>
           <% } %>
         </section>

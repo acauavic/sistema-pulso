@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const db = require('../db/pool');
 const config = require('../config');
 const b2 = require('./b2');
-const { can, PERMISSIONS } = require('../permissions');
+const { can, PERMISSIONS, ROLES } = require('../permissions');
 const C = require('../constants');
 
 const MB = 1024 * 1024;
@@ -91,12 +91,15 @@ const TRANSITIONS = [
   { from: 'pronto_publicar', to: 'em_finalizacao', perm: 'production.review', label: 'Voltar para finalização' },
 ];
 
+// Quem faz o passo, para dizer a quem não pode ("Produtora ou Gestão"). O superadmin faz tudo e não entra na frase.
+const whoDoes = (perm) => (PERMISSIONS[perm] || []).filter((r) => r !== 'superadmin').map((r) => ROLES[r].label).join(' ou ');
+
 // Botões da etapa atual para este perfil, já com as pendências de cada um.
 async function availableMoves(ep, role) {
   const out = [];
   for (const t of TRANSITIONS.filter((x) => x.from === ep.status)) {
     const allowed = can(role, t.perm);
-    out.push({ to: t.to, label: t.label, tone: t.tone || '', allowed, missing: allowed && t.gate ? await t.gate(ep) : [] });
+    out.push({ to: t.to, label: t.label, tone: t.tone || '', allowed, missing: allowed && t.gate ? await t.gate(ep) : [], who: allowed ? '' : whoDoes(t.perm) });
   }
   return out;
 }

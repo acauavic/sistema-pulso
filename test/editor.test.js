@@ -70,27 +70,39 @@ describe('editor de vídeo: avisos de cada etapa e início só com produção', 
     assert.equal((await notes(u.editor)).length, before, 'silenciado: nada novo');
   });
 
-  it('o Início do editor mostra fila, os episódios dele e as tarefas, sem convidados, patrocinadores ou financeiro', async () => {
+  it('o Início do editor mostra fila, os episódios dele e as tarefas, sem dados de convidados, patrocinadores ou financeiro', async () => {
     const e2 = (await q("INSERT INTO episodes (number, title, status) VALUES (13, 'Conversa na fila', 'disponivel_edicao') RETURNING id")).rows[0];
     await q("INSERT INTO tasks (title, kind, status, assignee_id, due_on) VALUES ('Subir os cortes', 'geral', 'a_fazer', $1, CURRENT_DATE + 1)", [u.editor.id]);
     const page = (await as.editor.get('/')).text;
     assert.match(page, /Fila de edição/); assert.match(page, /EP\.013 · Conversa na fila/); assert.match(page, /Meus episódios/); assert.match(page, /EP\.012 · Conversa com Dra\. Lia/); assert.match(page, /ajustes pedidos/);
     assert.match(page, /Minhas tarefas/); assert.match(page, /Subir os cortes/);
     for (const re of [/Dra\. Lia Segredo/, /Marca Confidencial/, /Próximas gravações/, /Atividade recente/, /Convite enviado/, /Financeiro/]) assert.doesNotMatch(page, re, String(re));
-    assert.doesNotMatch(page, /href="\/convidados"/, 'sem Convidados no menu'); assert.doesNotMatch(page, /href="\/patrocinadores"/, 'sem Patrocinadores no menu');
-    assert.equal((await as.editor.get('/convidados')).status, 403); assert.equal((await as.editor.get('/patrocinadores')).status, 403);
-    assert.equal((await as.editor.get(`/episodios/${e2.id}`)).status, 200, 'mas o episódio abre normalmente');
-    // as outras pessoas continuam com o Início de sempre
-    assert.match((await as.prod.get('/')).text, /Próximas gravações/);
+    assert.equal((await as.editor.get(`/episodios/${e2.id}`)).status, 200);
+    assert.match((await as.prod.get('/')).text, /Próximas gravações/, 'as outras pessoas continuam com o Início de sempre');
   });
 
-  it('o editor ainda baixa logo, moldura e QR Code do patrocinador pelo episódio, mas não os arquivos internos', async () => {
-    const sp = (await q("SELECT id FROM sponsors WHERE company = 'Marca Confidencial'")).rows[0];
-    const b2 = require('../src/services/b2');
-    const mk = async (kind) => { const key = `pp/t/${kind}`; await b2.putObject(key, Buffer.from('x'), 'image/png'); return (await q("INSERT INTO sponsor_files (sponsor_id, kind, filename, content_type, size_bytes, storage_key) VALUES ($1, $2, 'a.png', 'image/png', 1, $3) RETURNING id", [sp.id, kind, key])).rows[0].id; };
-    const logo = await mk('logo'); const audio = await mk('audio');
-    assert.equal((await as.editor.get(`/patrocinadores/${sp.id}/arquivos/${logo}`)).status, 200, 'logo: liberado para quem edita');
-    assert.equal((await as.editor.get(`/patrocinadores/${sp.id}/arquivos/${audio}`)).status, 404, 'áudio do briefing: só quem vê o CRM');
-    assert.equal((await as.prod.get(`/patrocinadores/${sp.id}/arquivos/${audio}`)).status, 200, 'a produtora continua vendo tudo');
+  it('o editor só lê convidados e patrocinadores (briefing, datas, restrições): vê, mas não cria nem muda', async () => {
+    const g = (await q("SELECT id FROM guests WHERE name = 'Dra. Lia Segredo'")).rows[0]; const sp = (await q("SELECT id FROM sponsors WHERE company = 'Marca Confidencial'")).rows[0];
+    for (const path of ['/convidados', `/convidados/${g.id}`, '/patrocinadores', `/patrocinadores/${sp.id}`]) assert.equal((await as.editor.get(path)).status, 200, path);
+    const menu = (await as.editor.get('/tarefas')).text;
+    assert.match(menu, /href="\/convidados"/); assert.match(menu, /href="\/patrocinadores"/);
+    assert.equal((await as.editor.get('/convidados/novo')).status, 403);
+    assert.equal((await as.editor.act(`/convidados/${g.id}/status`, { status: 'gravado' }, { from: '/' })).status, 403);
+    assert.equal((await as.editor.act(`/patrocinadores/${sp.id}/avancar`, { para: 'negociacao' }, { from: '/' })).status, 403);
+  });
+
+  it('na página do episódio o editor não vê o que não é dele: sobe só o vídeo editado e vê só os passos que faz', async () => {
+    const e = (await q("INSERT INTO episodes (number, title, status) VALUES (14, 'Conversa nova', 'gravado') RETURNING id")).rows[0];
+    let page = (await as.editor.get(`/episodios/${e.id}`)).text;
+    assert.doesNotMatch(page, /Liberar para edição<\/button>/, 'o botão da produção não aparece para ele');
+    assert.match(page, /Esta etapa está com Gestão ou Produtora: liberar para edição/);
+    assert.doesNotMatch(page, /data-uploader/, 'sem envio de material bruto');
+    assert.match((await as.prod.get(`/episodios/${e.id}`)).text, /Liberar para edição<\/button>/);
+    assert.match((await as.prod.get(`/episodios/${e.id}`)).text, /data-uploader/, 'a produção sobe o bruto');
+    await q("UPDATE episodes SET status = 'em_edicao', editor_id = $2 WHERE id = $1", [e.id, u.editor.id]);
+    page = (await as.editor.get(`/episodios/${e.id}`)).text;
+    assert.match(page, /Vídeo editado/); assert.match(page, /data-edited="1"/, 'o editor sobe o vídeo editado');
+    assert.doesNotMatch(page, /data-edited="0"/, 'mas não o material bruto');
+    assert.equal((await as.editor.act(`/episodios/${e.id}/arquivos/iniciar`, { kind: 'bruto_video', filename: 'x.mp4', size: '10' }, { from: `/episodios/${e.id}` })).status, 403, 'e o servidor também recusa o bruto');
   });
 });

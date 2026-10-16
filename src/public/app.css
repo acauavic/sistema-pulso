@@ -860,3 +860,5 @@ html[data-sidebar="collapsed"] .version-link { text-align: center; padding: 0; f
 .subnav-inner a:hover { color: var(--text); text-decoration: none; background: var(--surface); } .subnav-inner a.on { background: var(--raised); color: var(--text); border-color: var(--text-2); }
 
 .today-list.two-col li { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+
+.wait-line { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; } .wait-line .icon { flex: none; }

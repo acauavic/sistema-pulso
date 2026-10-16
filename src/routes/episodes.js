@@ -417,14 +417,25 @@ async function loadFile(req) {
   const { rows: [file] } = await db.query('SELECT * FROM episode_files WHERE id = $1 AND episode_id = $2', [req.params.fid, req.params.id]);
   return file || null;
 }
+// Para as rotas de envio: arquivo existente e que este perfil pode mexer (bruto = produção; editado = editor).
+async function loadOwnFile(req) {
+  const file = await loadFile(req);
+  return file && fileAccess(req.user, file.kind) ? file : null;
+}
 
-router.post('/episodios/:id/arquivos/iniciar', requirePerm('production.upload'), wrap(async (req, res) => {
+// Material bruto é da produção (production.upload); o vídeo editado é de quem edita (production.edit). A rota deixa entrar os dois
+// e cada arquivo é conferido pelo tipo (fileAccess).
+const uploadAccess = (req, res, next) => (req.user && (can(req.user.role, 'production.upload') || can(req.user.role, 'production.edit'))
+  ? next() : res.status(403).json({ ok: false, error: 'Seu perfil não envia arquivos.' }));
+const fileAccess = (user, kind) => can(user.role, kind === 'editado' ? 'production.edit' : 'production.upload');
+
+router.post('/episodios/:id/arquivos/iniciar', uploadAccess, wrap(async (req, res) => {
   if (!config.storageConfigured) return uploadError(res, 503, 'Armazenamento (Backblaze) não configurado.');
   const ep = await findEpisode(req.params.id);
   if (!ep) return uploadError(res, 404, 'Episódio não encontrado.');
   const kind = String(req.body.kind || '');
   if (!Object.prototype.hasOwnProperty.call(C.EPISODE_FILE_KINDS, kind)) return uploadError(res, 400, 'Tipo de arquivo inválido.');
-  if (kind === 'editado' && !can(req.user.role, 'production.edit')) return uploadError(res, 403, 'Só quem edita sobe o vídeo editado.');
+  if (!fileAccess(req.user, kind)) return uploadError(res, 403, kind === 'editado' ? 'Só quem edita sobe o vídeo editado.' : 'O material bruto é enviado pela produção.');
   const filename = prod.safeName(req.body.nome);
   const size = Number(req.body.tamanho);
   if (!Number.isSafeInteger(size) || size <= 0) return uploadError(res, 400, 'Arquivo vazio.');
@@ -437,8 +448,8 @@ router.post('/episodios/:id/arquivos/iniciar', requirePerm('production.upload'),
   res.json({ ok: true, id: file.id, partSize, totalParts });
 }));
 
-router.put('/episodios/:id/arquivos/:fid/parte/:n', requirePerm('production.upload'), express.raw({ type: () => true, limit: MAX_PART }), wrap(async (req, res) => {
-  const file = await loadFile(req);
+router.put('/episodios/:id/arquivos/:fid/parte/:n', uploadAccess, express.raw({ type: () => true, limit: MAX_PART }), wrap(async (req, res) => {
+  const file = await loadOwnFile(req);
   if (!file || file.status !== 'enviando') return uploadError(res, 404, 'Envio não encontrado ou já concluído.');
   const n = Number.parseInt(req.params.n, 10);
   const total = Math.max(1, Math.ceil(Number(file.size_bytes) / file.part_size));
@@ -449,15 +460,15 @@ router.put('/episodios/:id/arquivos/:fid/parte/:n', requirePerm('production.uplo
   res.json({ ok: true });
 }));
 
-router.get('/episodios/:id/arquivos/:fid/partes', requirePerm('production.upload'), wrap(async (req, res) => {
-  const file = await loadFile(req);
+router.get('/episodios/:id/arquivos/:fid/partes', uploadAccess, wrap(async (req, res) => {
+  const file = await loadOwnFile(req);
   if (!file) return uploadError(res, 404, 'Arquivo não encontrado.');
   const { rows } = await db.query('SELECT part_number FROM episode_file_parts WHERE file_id = $1 ORDER BY part_number', [file.id]);
   res.json({ ok: true, status: file.status, parts: rows.map((r) => r.part_number) });
 }));
 
-router.post('/episodios/:id/arquivos/:fid/concluir', requirePerm('production.upload'), wrap(async (req, res) => {
-  const file = await loadFile(req);
+router.post('/episodios/:id/arquivos/:fid/concluir', uploadAccess, wrap(async (req, res) => {
+  const file = await loadOwnFile(req);
   if (!file) return uploadError(res, 404, 'Arquivo não encontrado.');
   if (file.status === 'pronto') return res.json({ ok: true });
   const result = await prod.finishUpload(file);
@@ -472,8 +483,8 @@ router.post('/episodios/:id/arquivos/:fid/concluir', requirePerm('production.upl
   res.json({ ok: true, id: f.id });
 }));
 
-router.post('/episodios/:id/arquivos/:fid/cancelar', requirePerm('production.upload'), wrap(async (req, res) => {
-  const file = await loadFile(req);
+router.post('/episodios/:id/arquivos/:fid/cancelar', uploadAccess, wrap(async (req, res) => {
+  const file = await loadOwnFile(req);
   if (!file) return uploadError(res, 404, 'Arquivo não encontrado.');
   if (file.status !== 'enviando') return uploadError(res, 409, 'Esse arquivo já foi enviado; use "remover".');
   await prod.cancelUpload(file);
@@ -495,10 +506,10 @@ const redirectToFile = (inline) => wrap(async (req, res) => {
 router.get('/episodios/:id/arquivos/:fid/baixar', requirePerm('episodes.read'), redirectToFile(false));
 router.get('/episodios/:id/arquivos/:fid/ver', requirePerm('episodes.read'), redirectToFile(true));
 
-router.post('/episodios/:id/arquivos/:fid/excluir', requirePerm('production.upload'), wrap(async (req, res) => {
+router.post('/episodios/:id/arquivos/:fid/excluir', uploadAccess, wrap(async (req, res) => {
   const file = await loadFile(req);
   if (!file) return notFound(res);
-  if (file.kind === 'editado' && !can(req.user.role, 'production.edit')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem edita remove o vídeo editado.' });
+  if (!fileAccess(req.user, file.kind)) return res.status(403).render('error', { title: 'Sem permissão', message: file.kind === 'editado' ? 'Só quem edita remove o vídeo editado.' : 'O material bruto é removido pela produção.' });
   await prod.deleteFile(file);
   await prod.addEvent(file.episode_id, req.user.id, 'arquivo', `Arquivo removido: ${file.filename}`);
   res.redirect(back(file.episode_id, '#material'));

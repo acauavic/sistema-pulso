@@ -100,9 +100,9 @@ describe('formato do vídeo editado do episódio', { skip: !hasFfmpeg && 'precis
     assert.equal(ok.done.status, 200);
     config.checkVideoFormat = true;
     const data = videos['vertical.mp4'];
-    const init = await call(editor, 'POST', `/episodios/${ep}/arquivos/iniciar`, { json: { kind: 'bruto_video', nome: 'cam.mp4', tamanho: data.length, tipo: 'video/mp4' } });
+    const init = await call(gestao, 'POST', `/episodios/${ep}/arquivos/iniciar`, { json: { kind: 'bruto_video', nome: 'cam.mp4', tamanho: data.length, tipo: 'video/mp4' } });
     const { id, partSize, totalParts } = init.json;
-    for (let n = 1; n <= totalParts; n += 1) await call(editor, 'PUT', `/episodios/${ep}/arquivos/${id}/parte/${n}`, { raw: data.subarray((n - 1) * partSize, Math.min(data.length, n * partSize)) });
-    assert.equal((await call(editor, 'POST', `/episodios/${ep}/arquivos/${id}/concluir`)).status, 200, 'câmera vertical no bruto não é problema');
+    for (let n = 1; n <= totalParts; n += 1) await call(gestao, 'PUT', `/episodios/${ep}/arquivos/${id}/parte/${n}`, { raw: data.subarray((n - 1) * partSize, Math.min(data.length, n * partSize)) });
+    assert.equal((await call(gestao, 'POST', `/episodios/${ep}/arquivos/${id}/concluir`)).status, 200, 'câmera vertical no bruto não é problema');
   });
 });

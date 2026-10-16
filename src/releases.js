@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.8.1', date: '2026-10-15', title: 'Página do episódio mais clara para o editor',
+    items: [
+      { kind: 'ajuste', text: 'O editor de vídeo volta a ver convidados e patrocinadores (só leitura), para consultar briefing, datas e restrições.' },
+      { kind: 'ajuste', text: 'Na página do episódio, cada pessoa vê só os passos que faz: o editor não vê mais o envio de material bruto (é da produção) nem os botões da produção, e só envia o vídeo editado depois de assumir a edição.' },
+    ],
+  },
+  {
     version: '1.8.0', date: '2026-10-15', title: 'Início e avisos do editor de vídeo',
     items: [
       { kind: 'novo', text: 'Avisos das etapas do episódio: o editor é avisado quando um episódio é liberado para edição, quando pedem ajustes e quando o vídeo é aprovado ou publicado. Quem revisa é avisado de que há vídeo para revisar, e a produção, de quem assumiu a edição.' },

@@ -33,26 +33,26 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
     before(async () => { await clear(); g = await guest(u.prod.id); });
 
     it('menção com @ avisa a pessoa; o responsável pelo item é avisado de que comentaram; quem comentou não é avisado', async () => {
-      const r = await form(as.gestao, '/comentarios', { tipo: 'guest', id: String(g.id), texto: 'Oi @Ana Admin, confere a pauta? E @Paula também.', voltar: `/convidados/${g.id}` });
+      const r = await form(as.gestao, '/comentarios', { tipo: 'guest', id: String(g.id), texto: 'Oi @Edu Editor, confere a pauta? E @Paula também.', voltar: `/convidados/${g.id}` });
       assert.equal(r.status, 302); assert.equal(r.location, `/convidados/${g.id}`);
       const [c] = (await h.db.query('SELECT * FROM comments')).rows;
-      assert.deepEqual(c.mentions.sort(), [u.admin.id, u.prod.id].sort(), 'nome completo e primeiro nome (único) viram menção');
-      const ed = await notes(u.admin.id, 'comentario');
+      assert.deepEqual(c.mentions.sort(), [u.editor.id, u.prod.id].sort(), 'nome completo e primeiro nome (único) viram menção');
+      const ed = await notes(u.editor.id, 'comentario');
       assert.equal(ed.length, 1); assert.match(ed[0].title, /Gil Gestão mencionou você em convidado: Dr\. Marcos Lima/);
       assert.equal(ed[0].url, `/convidados/${g.id}#comentarios`);
       assert.equal((await notes(u.prod.id, 'comentario')).length, 1, 'a responsável mencionada recebe uma só notificação');
       assert.equal((await notes(u.gestao.id)).length, 0, 'quem comentou não é avisado');
       const page = (await as.prod.get(`/convidados/${g.id}`)).text;
-      assert.match(page, /<span class="mention">@Ana Admin<\/span>/);
+      assert.match(page, /<span class="mention">@Edu Editor<\/span>/);
       assert.match(page, /id="comentarios"/);
     });
 
     it('quem já comentou e o responsável recebem os próximos comentários; texto é escapado', async () => {
       await clear();
-      await form(as.admin, '/comentarios', { tipo: 'guest', id: String(g.id), texto: 'Pauta ok <script>alert(1)</script>' });
+      await form(as.editor, '/comentarios', { tipo: 'guest', id: String(g.id), texto: 'Pauta ok <script>alert(1)</script>' });
       assert.equal((await notes(u.gestao.id, 'comentario')).length, 1, 'quem já comentou');
-      assert.match((await notes(u.prod.id, 'comentario'))[0].title, /Ana Admin comentou em convidado/);
-      assert.equal((await notes(u.admin.id)).length, 0);
+      assert.match((await notes(u.prod.id, 'comentario'))[0].title, /Edu Editor comentou em convidado/);
+      assert.equal((await notes(u.editor.id)).length, 0);
       const page = (await as.prod.get(`/convidados/${g.id}`)).text;
       assert.match(page, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
       assert.doesNotMatch(page, /<script>alert\(1\)/);
@@ -62,10 +62,10 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       assert.equal((await json(as.gestao, 'POST', '/comentarios', { tipo: 'guest', id: g.id, texto: '  ' })).status, 422);
       assert.equal((await json(as.gestao, 'POST', '/comentarios', { tipo: 'planeta', id: 1, texto: 'x' })).status, 400);
       assert.equal((await json(as.gestao, 'POST', '/comentarios', { tipo: 'guest', id: 999999, texto: 'x' })).status, 404);
-      const mine = (await h.db.query("SELECT id FROM comments WHERE author_id = $1", [u.admin.id])).rows[0];
+      const mine = (await h.db.query("SELECT id FROM comments WHERE author_id = $1", [u.editor.id])).rows[0];
       await form(as.editor2, `/comentarios/${mine.id}/excluir`, {});
       assert.equal((await h.db.query('SELECT count(*)::int n FROM comments WHERE id=$1', [mine.id])).rows[0].n, 1, 'outra editora não apaga');
-      await form(as.admin, `/comentarios/${mine.id}/excluir`, {});
+      await form(as.editor, `/comentarios/${mine.id}/excluir`, {});
       assert.equal((await h.db.query('SELECT count(*)::int n FROM comments WHERE id=$1', [mine.id])).rows[0].n, 0);
     });
 
@@ -288,7 +288,8 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       const after = (await as.prod.get('/notificacoes/lembretes')).text;
       assert.match(after, /Nenhum lembrete pendente/); assert.match(after, /Já enviados/);
       assert.match(after, /Reenviar pelo WhatsApp/, 'quem já recebeu pode receber de novo');
-      assert.equal((await as.editor.get('/notificacoes/lembretes')).status, 403, 'o editor de vídeo não vê o CRM, nem a fila de lembretes');
+      assert.equal((await as.editor.get('/notificacoes/lembretes')).status, 200, 'a equipe toda vê a fila');
+      assert.doesNotMatch((await as.editor.get('/notificacoes/lembretes')).text, /Enviar pelo WhatsApp/, 'mas só quem edita convidados envia');
       const evil = await as.prod.post(`/convidados/${gid}/lembretes/d1/enviado`, { _csrf: await as.prod.csrf('/'), voltar: '//outro-site.com' });
       assert.match(evil.location, /^\/convidados\//, 'voltar só aceita caminho do próprio painel');
     });

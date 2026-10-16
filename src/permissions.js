@@ -15,11 +15,11 @@ const PERMISSIONS = {
   'users.read': ['superadmin', 'gestao'],
   'users.write': ['superadmin', 'gestao'], // gestão não mexe em superadmin (ver canManageUser)
   'users.delete': ['superadmin'],
-  'guests.read': ['superadmin', 'gestao', 'produtora'], // o editor de vídeo trabalha com episódios: não vê o CRM de convidados
+  'guests.read': ALL, // o editor de vídeo só lê: precisa do briefing, das datas e do contexto do convidado
   'guests.write': ['superadmin', 'gestao', 'produtora'],
   'guests.invite': ['superadmin', 'gestao', 'produtora'], // gerar link e enviar e-mail
   'guests.delete': ['superadmin', 'gestao'],
-  'sponsors.read': ['superadmin', 'gestao', 'produtora'], // o editor baixa logo, moldura e QR Code pelo episódio (episodes.read)
+  'sponsors.read': ALL, // o editor de vídeo só lê: briefing, restrições e material do patrocinador
   'sponsors.write': ['superadmin', 'gestao', 'produtora'], // cadastrar, mover etapa, gerar links, entregáveis e arquivos
   'sponsors.delete': ['superadmin', 'gestao'],
   'episodes.read': ALL,
@@ -27,7 +27,7 @@ const PERMISSIONS = {
   'episodes.delete': ['superadmin', 'gestao'],
   // produção do episódio
   'production.manage': ['superadmin', 'gestao', 'produtora'],               // gravado, liberar para edição, tarefas, observações
-  'production.upload': ['superadmin', 'gestao', 'produtora', 'editor_video'], // subir brutos, bastidores, fotos
+  'production.upload': ['superadmin', 'gestao', 'produtora'], // subir brutos, bastidores, fotos (o editor recebe o material pronto; ele sobe só o vídeo editado)
   'production.edit': ['superadmin', 'gestao', 'editor_video'],              // assumir a edição, subir o editado, enviar para revisão
   'production.review': ['superadmin', 'gestao'],                            // aprovar, pedir ajustes, finalizar, publicar
   'production.checklists': ['superadmin', 'gestao', 'editor_video'],        // criar/editar modelos de checklist

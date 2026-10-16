@@ -187,7 +187,7 @@ describe('produção de episódios', () => {
       assert.equal((await init(as.prod, { kind: 'bruto_video', nome: 'a.mp4', tamanho: 10 }, { csrf: false })).status, 403, 'sem CSRF');
       const anon = await fetch(`${app.base}/episodios/${epId}/arquivos/iniciar`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', redirect: 'manual' });
       assert.equal(anon.status, 401);
-      assert.equal((await api(as.editor, 'POST', '/episodios/99999999/arquivos/iniciar', { json: { kind: 'foto', nome: 'a.jpg', tamanho: 5 } })).status, 404);
+      assert.equal((await api(as.prod, 'POST', '/episodios/99999999/arquivos/iniciar', { json: { kind: 'foto', nome: 'a.jpg', tamanho: 5 } })).status, 404);
     });
 
     it('recusa parte com tamanho errado e fecha só com todas as partes; dá para retomar', async () => {
@@ -249,12 +249,14 @@ describe('produção de episódios', () => {
       assert.equal((await as.editor.get(`/episodios/${epId + 100}/arquivos/${f.id}/baixar`)).status, 404, 'arquivo de outro episódio não vaza');
     });
 
-    it('remover apaga do bucket; editor de vídeo pode subir material bruto', async () => {
-      const r = await upload(as.editor, epId, { kind: 'foto', name: 'extra.png', data: rnd(500), type: 'image/png', label: '' });
+    it('remover apaga do bucket; a produção sobe material bruto e o editor de vídeo não', async () => {
+      const denied = await api(as.editor, 'POST', `/episodios/${epId}/arquivos/iniciar`, { json: { kind: 'foto', nome: 'extra.png', tamanho: 500, tipo: 'image/png' } });
+      assert.equal(denied.status, 403, 'o editor recebe o material pronto; ele sobe só o vídeo editado');
+      const r = await upload(as.prod, epId, { kind: 'foto', name: 'extra.png', data: rnd(500), type: 'image/png', label: '' });
       assert.equal(r.done.status, 200);
       const { rows: [f] } = await h.db.query('SELECT storage_key FROM episode_files WHERE id=$1', [r.id]);
       assert.ok(h.b2Store.has(f.storage_key));
-      assert.equal((await as.editor.act(`/episodios/${epId}/arquivos/${r.id}/excluir`, {}, { from: `/episodios/${epId}` })).status, 302);
+      assert.equal((await as.prod.act(`/episodios/${epId}/arquivos/${r.id}/excluir`, {}, { from: `/episodios/${epId}` })).status, 302);
       assert.equal(h.b2Store.has(f.storage_key), false);
     });
   });
@@ -695,8 +697,9 @@ describe('produção de episódios', () => {
       assert.match(full, /3 arquivos/);
       assert.match(full, /2 vídeo bruto · 1 áudio bruto/);
       assert.equal((full.match(/>\s*(?:<svg[^>]*>.*?<\/svg>)?\s*Baixar\s*</gs) || []).length >= 3, true, 'um botão de baixar por arquivo');
-      assert.match(full, /<summary>Enviar mais material<\/summary>/, 'o editor também pode complementar, mas recolhido');
-      assert.equal((full.match(/data-uploader/g) || []).length, 2, 'só o envio recolhido (bruto) e o do vídeo editado: nada de formulário aberto');
+      assert.doesNotMatch(full, /<summary>Enviar mais material<\/summary>/, 'o editor recebe o material pronto: não sobe bruto');
+      assert.equal((full.match(/data-uploader/g) || []).length, 0, 'ele só envia o vídeo editado, e só depois de assumir a edição');
+      assert.match(full, /Assuma a edição para enviar o vídeo editado/);
       const prod = await page(as.prod, id);
       assert.match(prod, /<details class="top-gap"><summary>Enviar mais material<\/summary>/, 'quem sobe bruto vê o envio recolhido');
     });
