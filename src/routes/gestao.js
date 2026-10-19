@@ -93,6 +93,26 @@ router.post('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req,
   res.redirect('/gestao/whatsapp');
 }));
 
+// ---------------------------------------------------------------- galeria do media kit
+router.get('/gestao/galeria-kit', requirePerm('plans.manage'), wrap(async (req, res) => {
+  const kit = require('../services/kitGallery');
+  const rows = await kit.candidates();
+  res.render('gestao/galeria-kit', { title: 'Galeria do media kit', rows, kit, photoUrl: require('../services/guestPhotos').signedUrl, openId: Number(req.query.editar) || null });
+}));
+
+router.post('/gestao/galeria-kit/:id/mostrar', requirePerm('plans.manage'), wrap(async (req, res) => {
+  const on = req.body.mostrar === '1';
+  if (!await require('../services/kitGallery').setFeatured(Number(req.params.id), on)) await req.flash('error', 'Só episódios publicados entram na galeria.');
+  else await audit(req, on ? 'kit.galeria_inclui' : 'kit.galeria_tira', 'episode', req.params.id);
+  res.redirect('/gestao/galeria-kit');
+}));
+
+router.post('/gestao/galeria-kit/:id', requirePerm('plans.manage'), wrap(async (req, res) => {
+  if (!await require('../services/kitGallery').save(Number(req.params.id), req.body)) await req.flash('error', 'Episódio não encontrado ou ainda não publicado.');
+  else { await audit(req, 'kit.galeria_edita', 'episode', req.params.id); await req.flash('ok', 'Salvo. O media kit já mostra o novo texto.'); }
+  res.redirect('/gestao/galeria-kit');
+}));
+
 // ---------------------------------------------------------------- rotinas de tarefas
 function parseRoutine(body) {
   const v = {

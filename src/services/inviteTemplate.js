@@ -13,7 +13,7 @@ const inviteHtml = () => (templateCache ??= fs.readFileSync(TEMPLATE_FILE, 'utf8
 let kitCache = null;
 const mediaKitHtml = () => (kitCache ??= fs.readFileSync(path.join(__dirname, '..', 'templates', 'media-kit.html'), 'utf8'));
 
-const RAW = new Set(['bloco_resposta', 'guest_json', 'agenda_html', 'slide_ouro_html', 'slide_diamond_html', 'compare_html']); // únicas variáveis inseridas sem escape (geradas aqui, nunca digitadas)
+const RAW = new Set(['bloco_resposta', 'guest_json', 'agenda_html', 'slide_ouro_html', 'slide_diamond_html', 'compare_html', 'guests_json']); // únicas variáveis inseridas sem escape (geradas aqui, nunca digitadas)
 
 // JSON que pode ir dentro de <script> sem fechar a tag nem quebrar a linha (</script>, <!--, U+2028).
 function safeJson(obj) {

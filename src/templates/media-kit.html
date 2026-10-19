@@ -278,24 +278,23 @@
   @media (max-width:900px){ .fronts-grid{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:480px){ .fronts-grid{grid-template-columns:1fr;} }
 
-  /* ---- 04 galeria de convidados ---- */
+  /* ---- 03 galeria de convidados: 4 colunas x 2 linhas, com carrossel horizontal quando passa de 8 ---- */
   .gallery-wrap{margin-top:6px;}
   .gallery{
     position:relative;
-    height:min(46vh,440px);
+    height:clamp(320px, calc(100vh - 400px), 560px);
     border:1px solid rgba(255,255,255,0.12);
     overflow:hidden;
     background:var(--charcoal);
   }
-  .gallery-slide{
-    position:absolute; inset:0;
-    opacity:0; visibility:hidden;
-    transition:opacity 0.7s ease;
-    display:grid; grid-template-columns:1fr 1fr; gap:1px;
-    background:rgba(255,255,255,0.12);
+  .gallery-track{
+    height:100%;
+    display:grid; grid-template-rows:repeat(2,minmax(0,1fr)); grid-auto-flow:column; grid-auto-columns:calc((100% - 3px) / 4);
+    gap:1px; background:rgba(255,255,255,0.12);
+    overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scroll-behavior:smooth; scrollbar-width:none;
   }
-  .gallery-slide.active{opacity:1; visibility:visible;}
-  .guest-card{position:relative; display:flex; flex-direction:column; overflow:hidden; background:var(--charcoal);}
+  .gallery-track::-webkit-scrollbar{display:none;}
+  .guest-card{position:relative; display:flex; flex-direction:column; overflow:hidden; background:var(--charcoal); scroll-snap-align:start; min-width:0;}
   .gallery-photo{
     flex:1; position:relative;
     display:flex; align-items:center; justify-content:center; gap:8px;
@@ -305,45 +304,45 @@
       linear-gradient(200deg,#1c1c1c,#0a0a0a);
   }
   .gallery-photo.has-photo{background:var(--charcoal);}
-  .gallery-photo img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 22%; transform:scale(1); transition:transform 0.6s ease;}
-  .gallery-slide.active .gallery-photo img{animation:galleryZoom 2.4s ease-out forwards;}
-  @keyframes galleryZoom{ from{transform:scale(1.1);} to{transform:scale(1);} }
+  .gallery-photo img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 22%; transition:transform 0.5s ease;}
+  .guest-card:hover .gallery-photo img{transform:scale(1.04);}
   .gallery-photo .plus{font-size:24px; color:rgba(255,255,255,0.35);}
   .gallery-photo .cap{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(255,255,255,0.4); padding:0 12px; text-align:center;}
   .gallery-scrim{
-    position:absolute; left:0; right:0; bottom:0; height:72%;
-    background:linear-gradient(to top, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.8) 38%, transparent 100%);
+    position:absolute; left:0; right:0; bottom:0; height:78%;
+    background:linear-gradient(to top, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.8) 40%, transparent 100%);
     display:flex; flex-direction:column; justify-content:flex-end;
-    padding:22px 24px 24px;
+    padding:14px 16px 16px;
     pointer-events:none;
   }
   .gallery-index{
-    position:absolute; top:16px; left:18px;
-    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; color:rgba(255,255,255,0.55);
+    position:absolute; top:12px; left:14px;
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:rgba(255,255,255,0.55);
   }
-  .gallery-audience{
-    display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
-    align-self:flex-start;
-    margin-bottom:12px;
-  }
+  .gallery-audience{display:flex; flex-direction:column; gap:3px; align-self:flex-start; margin-bottom:6px;}
   .gallery-audience-num{
-    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(30px,3.6vw,42px);
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(22px,2.3vw,30px);
     letter-spacing:-0.03em; line-height:1; color:var(--lime);
   }
-  .gallery-audience-label{
-    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.68);
-  }
-  .gallery-name{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(20px,2.3vw,29px); letter-spacing:-0.02em; color:var(--white); margin-bottom:6px;}
+  .gallery-audience-label{font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.68);}
+  .gallery-name{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(15px,1.5vw,19px); letter-spacing:-0.02em; line-height:1.15; color:var(--white); margin-bottom:4px;}
   .gallery-cred{
-    font-size:12.5px; line-height:1.45; color:rgba(255,255,255,0.75); margin-bottom:10px;
-    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+    font-size:11.5px; line-height:1.4; color:rgba(255,255,255,0.75); margin-bottom:8px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
   }
   .gallery-link{
-    font-family:'JetBrains Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em;
+    font-family:'JetBrains Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:0.08em;
     color:var(--white); text-decoration:none; border-bottom:1px solid rgba(255,255,255,0.6); padding-bottom:2px; align-self:flex-start;
     pointer-events:auto;
   }
+  .gallery-nav{
+    position:absolute; top:50%; transform:translateY(-50%); z-index:3; width:42px; height:42px; border-radius:50%; border:0; cursor:pointer;
+    background:rgba(10,10,10,0.78); color:var(--white); font-size:17px; transition:background .2s, transform .2s;
+  }
+  .gallery-nav:hover{background:var(--lime); color:var(--black);} .gallery-nav.prev{left:10px;} .gallery-nav.next{right:10px;}
+  .gallery-nav[hidden]{display:none;}
   .gallery-dots{display:flex; gap:4px; justify-content:center; margin-top:16px; flex-wrap:wrap;}
+  .gallery-dots:empty{display:none;}
   .gallery-dot{
     width:30px; height:26px; background-color:rgba(255,255,255,0.28); background-clip:content-box;
     padding:11.5px 2px; border:none; cursor:pointer;
@@ -354,6 +353,7 @@
   .white .gallery-dot, .bone .gallery-dot{ background-color:rgba(10,10,10,0.18); }
   .white .gallery-dot.active, .bone .gallery-dot.active{ background-color:var(--lime); }
   .gallery-foot{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:10px; flex-wrap:wrap;}
+  @media(prefers-reduced-motion:reduce){ .gallery-track{scroll-behavior:auto;} .guest-card:hover .gallery-photo img{transform:none;} }
 
   /* ---- 05 audiência + conteúdo multiplicado + onde/quando ---- */
   .split3{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); margin-top:20px;}
@@ -552,9 +552,10 @@
     .opening-word{font-size:clamp(52px,18vw,84px);}
     .opening-pitch{font-size:19px; max-width:none;}
 
-    .gallery{height:62vh; min-height:400px;}
-    .gallery-name{font-size:19px;}
-    .gallery-cred{font-size:12px;}
+    .gallery{height:580px;}
+    .gallery-track{grid-auto-columns:min(74vw,300px);}
+    .gallery-nav{display:none;}
+    .gallery-name{font-size:18px;} .gallery-cred{font-size:12px; -webkit-line-clamp:3;}
 
     .impact-line{max-width:none;}
     .impact-line .accent{white-space:normal;}
@@ -578,13 +579,6 @@
     .closing-cta .btn{width:100%; justify-content:center;}
   }
 
-  /* galeria de convidados: empilha em 1 coluna (2 cards, 1 por linha) em telas bem estreitas */
-  @media (max-width:700px){
-    .gallery{height:661px; min-height:0;}
-    .gallery-slide{grid-template-columns:1fr;}
-    .guest-card{height:330px;}
-    .gallery-name{font-size:21px;}
-  }
 </style>
 
 <div id="topline"><div id="topline-fill"></div></div>
@@ -648,13 +642,15 @@
       <h2 class="slide-title" style="margin-bottom:16px;">Grandes nomes. Grandes audiências. Uma mesma mesa.</h2>
       <div class="gallery-wrap">
         <div class="gallery" id="gallery">
-          <!-- gerado via JS a partir de GUESTS -->
+          <button type="button" class="gallery-nav prev" id="galleryPrev" aria-label="Convidados anteriores" hidden>&larr;</button>
+          <div class="gallery-track" id="galleryTrack" role="list" aria-label="Convidados que já sentaram à mesa"><!-- gerado via JS a partir de GUESTS --></div>
+          <button type="button" class="gallery-nav next" id="galleryNext" aria-label="Próximos convidados" hidden>&rarr;</button>
         </div>
         <div class="gallery-foot">
           <div class="gallery-dots" id="galleryDots"></div>
           <div style="display:flex; align-items:center; gap:16px;">
             <span class="tag lime-fill" style="font-size:11.5px;">E isso é apenas o começo.</span>
-            <span class="mono" style="font-size:11.5px; color:var(--gray-500);">14 episó1mdios até set/2026 · 1 novo por semana</span>
+            <span class="mono" style="font-size:11.5px; color:var(--gray-500);">14 episódios até set/2026 · 1 novo por semana</span>
           </div>
         </div>
       </div>
@@ -914,7 +910,7 @@
 <div id="navhint" class="mono">Use as setas ou role horizontalmente</div>
 
 <script>
-  var GUESTS = [
+  var GUESTS_DEFAULT = [
     { name:"Guto Galamba", photo:"/static/kit/img-03.jpg", audience:"+3,6M", credential:"Empresário, comunicador e influenciador ligado ao universo da saúde, comportamento e negócios.", handle:null },
     { name:"Dra. Tamiris Mariano", photo:"/static/kit/img-04.jpg", audience:"+2,2M", credential:"Médica e criadora de conteúdo com forte presença digital na área da saúde.", handle:null },
     { name:"Dr. Márcio Martins", photo:"/static/kit/img-05.jpg", audience:"+1M", credential:"Médico, empresário e referência digital no universo de saúde, performance e empreendedorismo médico.", handle:"dr.marciom" },
@@ -924,28 +920,31 @@
     { name:"Dr. Rafael Pelosi", photo:"/static/kit/img-09.jpg", audience:"—", credential:"Médico — biografia e dados a confirmar.", handle:null },
     { name:"Matheus · Illumi.ai", photo:"/static/kit/img-10.jpg", audience:"+65K", credential:"CEO e fundador, empresário de Goiânia atuante em educação, prestação de serviços e inteligência artificial, com expansão para a saúde.", handle:"illumi.ai" }
   ];
+  var GUESTS_CHOSEN = {{ guests_json }};
+  var GUESTS = GUESTS_CHOSEN.length ? GUESTS_CHOSEN : GUESTS_DEFAULT; // a equipe escolhe em Gestão > Galeria do media kit
+
 
   function instagramHref(g){
     if (g.handle) return "https://www.instagram.com/" + g.handle;
     return "https://www.instagram.com/explore/search/keyword/?q=" + encodeURIComponent(g.name);
   }
 
-  // ---- monta a galeria automática do slide 04 (carrossel, 2 convidados por página) ----
+  // ---- galeria do slide 03: 4 colunas x 2 linhas (8 por vez); passando de 8, vira carrossel horizontal ----
   var galleryEl = document.getElementById("gallery");
+  var trackEl = document.getElementById("galleryTrack");
   var dotsEl = document.getElementById("galleryDots");
-  var GUESTS_PER_PAGE = 2;
-  var GUEST_PAGES = [];
-  for (var gp = 0; gp < GUESTS.length; gp += GUESTS_PER_PAGE) GUEST_PAGES.push(GUESTS.slice(gp, gp + GUESTS_PER_PAGE));
+  var prevEl = document.getElementById("galleryPrev");
+  var nextEl = document.getElementById("galleryNext");
 
   function guestCardHTML(g, indexInTotal){
-    return '<div class="guest-card">' +
+    return '<div class="guest-card" role="listitem">' +
       '<div class="gallery-photo' + (g.photo ? ' has-photo' : '') + '">' +
         (g.photo
-          ? '<img src="' + g.photo + '" alt="' + g.name + '">'
+          ? '<img src="' + g.photo + '" alt="' + g.name + '" loading="lazy">'
           : '<span class="plus mono">+</span><span class="cap">foto — ' + g.name + '</span>') +
       '</div>' +
       '<div class="gallery-scrim">' +
-        '<div class="gallery-audience"><span class="gallery-audience-num">' + g.audience + '</span><span class="gallery-audience-label">seguidores no Instagram</span></div>' +
+        '<div class="gallery-audience"><span class="gallery-audience-num">' + g.audience + '</span><span class="gallery-audience-label">seguidores</span></div>' +
         '<div class="gallery-name">' + g.name + '</div>' +
         '<p class="gallery-cred">' + g.credential + '</p>' +
         '<a class="gallery-link" href="' + instagramHref(g) + '" target="_blank" rel="noopener">Instagram →</a>' +
@@ -953,53 +952,53 @@
       '<div class="gallery-index mono">' + String(indexInTotal+1).padStart(2,"0") + ' / ' + String(GUESTS.length).padStart(2,"0") + '</div>' +
     '</div>';
   }
+  // a grade corre por coluna; cada página de 8 é reordenada para ler linha por linha (1 2 3 4 / 5 6 7 8)
+  var PER_PAGE = 8, ORDER = [0,4,1,5,2,6,3,7];
+  var cardsHtml = [];
+  for (var pg = 0; pg < GUESTS.length; pg += PER_PAGE){
+    ORDER.forEach(function(o){
+      var i = pg + o;
+      cardsHtml.push(i < GUESTS.length ? guestCardHTML(GUESTS[i], i) : '<div class="guest-card" aria-hidden="true"></div>'); // página incompleta: casa vazia
+    });
+  }
+  trackEl.innerHTML = cardsHtml.join("");
 
-  galleryEl.innerHTML = GUEST_PAGES.map(function(pageGuests, p){
-    return '<div class="gallery-slide' + (p === 0 ? " active" : "") + '" data-i="' + p + '">' +
-      pageGuests.map(function(g, gi){ return guestCardHTML(g, p * GUESTS_PER_PAGE + gi); }).join("") +
-    '</div>';
-  }).join("");
-  dotsEl.innerHTML = GUEST_PAGES.map(function(pageGuests, p){
-    var label = pageGuests.map(function(g){ return g.name; }).join(" · ");
-    return '<button class="gallery-dot' + (p === 0 ? " active" : "") + '" data-i="' + p + '" aria-label="' + label + '"></button>';
-  }).join("");
-
-  var gallerySlides = Array.prototype.slice.call(galleryEl.querySelectorAll(".gallery-slide"));
-  var galleryDots = Array.prototype.slice.call(dotsEl.querySelectorAll(".gallery-dot"));
-  var galleryIndex = 0;
-  var galleryTimer = null;
-
-  function showGuest(i){
-    galleryIndex = (i + GUEST_PAGES.length) % GUEST_PAGES.length;
-    gallerySlides.forEach(function(s, idx){ s.classList.toggle("active", idx === galleryIndex); });
-    galleryDots.forEach(function(d, idx){ d.classList.toggle("active", idx === galleryIndex); });
+  var galleryTimer = null, galleryVisible = false, galleryPaused = false;
+  function galleryPages(){ return Math.max(1, Math.round(trackEl.scrollWidth / trackEl.clientWidth)); }
+  function galleryPage(){ return Math.round(trackEl.scrollLeft / trackEl.clientWidth); }
+  function goGallery(p){
+    var pages = galleryPages();
+    p = (p + pages) % pages;
+    trackEl.scrollTo({ left: p * (trackEl.clientWidth + 1) });
+  }
+  function drawGalleryDots(){
+    var pages = galleryPages(), cur = galleryPage();
+    prevEl.hidden = nextEl.hidden = pages < 2;
+    dotsEl.innerHTML = pages < 2 ? "" : Array.apply(null, Array(pages)).map(function(_, p){
+      return '<button class="gallery-dot' + (p === cur ? ' active' : '') + '" data-i="' + p + '" aria-label="Página ' + (p + 1) + ' de ' + pages + '"></button>';
+    }).join("");
   }
   function startGallery(){
     stopGallery();
-    galleryTimer = setInterval(function(){ showGuest(galleryIndex + 1); }, 2200);
+    if (galleryPages() < 2) return;
+    galleryTimer = setInterval(function(){ if (galleryVisible && !galleryPaused) goGallery(galleryPage() + 1); }, 4500);
   }
-  function stopGallery(){
-    if (galleryTimer) clearInterval(galleryTimer);
-    galleryTimer = null;
-  }
-  galleryDots.forEach(function(d){
-    d.addEventListener("click", function(){
-      showGuest(Number(d.getAttribute("data-i")));
-      startGallery();
-    });
-  });
-  galleryEl.addEventListener("mouseenter", stopGallery);
-  galleryEl.addEventListener("mouseleave", startGallery);
+  function stopGallery(){ if (galleryTimer) clearInterval(galleryTimer); galleryTimer = null; }
+  prevEl.addEventListener("click", function(){ goGallery(galleryPage() - 1); });
+  nextEl.addEventListener("click", function(){ goGallery(galleryPage() + 1); });
+  dotsEl.addEventListener("click", function(e){ var d = e.target.closest(".gallery-dot"); if (d) goGallery(Number(d.getAttribute("data-i"))); });
+  var galleryScrollT;
+  trackEl.addEventListener("scroll", function(){ clearTimeout(galleryScrollT); galleryScrollT = setTimeout(drawGalleryDots, 80); }, { passive:true });
+  galleryEl.addEventListener("mouseenter", function(){ galleryPaused = true; });
+  galleryEl.addEventListener("mouseleave", function(){ galleryPaused = false; });
+  window.addEventListener("resize", function(){ drawGalleryDots(); startGallery(); });
+  drawGalleryDots(); startGallery();
 
-  // só roda a galeria automática enquanto o slide 04 está visível
-  var s04 = document.getElementById("s04");
+  // só passa sozinha enquanto o slide 03 está visível
+  var s03 = document.getElementById("s03");
   if ("IntersectionObserver" in window){
-    new IntersectionObserver(function(entries){
-      entries.forEach(function(e){ e.isIntersecting ? startGallery() : stopGallery(); });
-    }, { threshold:0.6 }).observe(s04);
-  } else {
-    startGallery();
-  }
+    new IntersectionObserver(function(entries){ galleryVisible = entries[0].isIntersecting; }, { threshold:0.6 }).observe(s03);
+  } else { galleryVisible = true; }
 
   // ================= NAVEGAÇÃO DO DECK =================
   var mobileQuery = window.matchMedia("(max-width:860px)");

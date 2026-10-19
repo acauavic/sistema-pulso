@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.10.0', date: '2026-10-19', title: 'Galeria de convidados do media kit',
+    items: [
+      { kind: 'novo', text: 'Gestão > Galeria do media kit: você escolhe, entre os episódios publicados, quais convidados aparecem no slide "Quem já sentou à mesa". Cada um tem alcance e frase de apresentação editáveis; sem frase, vale o cargo e a empresa do cadastro.' },
+      { kind: 'ajuste', text: 'No media kit, a galeria agora tem 4 colunas e 2 linhas (8 convidados por vez) e vira carrossel horizontal quando há mais: setas, pontos por página, passa sozinha e desliza no celular.' },
+      { kind: 'correcao', text: 'Media kit: a galeria só passava sozinha quando o slide da agenda estava aberto (agora é quando ela mesma está na tela) e um texto do rodapé do slide saía com letras trocadas.' },
+    ],
+  },
+  {
     version: '1.9.0', date: '2026-10-15', title: 'Revisão do vídeo mais fluida',
     items: [
       { kind: 'novo', text: 'Revisão: comentar, resolver e apagar comentários acontece na própria página, sem recarregar. O vídeo continua onde estava e o comentário novo já aparece na lista e na linha do tempo.' },
