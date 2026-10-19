@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.14.0', date: '2026-10-19', title: 'Plateia: lista e quadro redesenhados, com editar e excluir',
+    items: [
+      { kind: 'ajuste', text: 'Plateia > Pedidos refeita: a lista virou uma tabela alinhada (pessoa, WhatsApp, situação, data, ações) e os detalhes pequenos viraram ícones com dica (WhatsApp, copiar link de pagamento, selecionar, receber, editar). A situação é um chip que abre as opções.' },
+      { kind: 'ajuste', text: 'O quadro agora ocupa a altura da tela, cada coluna rola sozinha na vertical e a barra horizontal fica no pé da tela. Os cards têm tamanho uniforme, com nome, WhatsApp, convidado, data e estado do pagamento.' },
+      { kind: 'ajuste', text: 'Barra de filtros enxuta: busca com lupa, episódio, origem e situação (a situação só na lista), e botões de ícone para quadro/lista, adicionar pessoa e exportar.' },
+      { kind: 'novo', text: 'Editar pedido: nome, WhatsApp, gravação e observações. A conta a receber de quem já foi selecionado acompanha o nome e a gravação.' },
+      { kind: 'novo', text: 'Excluir pedido, com confirmação. Se havia conta a receber ainda não paga, ela é cancelada; pedido com pagamento já recebido não é excluído (desfaça o recebimento antes).' },
+    ],
+  },
+  {
     version: '1.13.0', date: '2026-10-19', title: 'Plateia em quadro',
     items: [
       { kind: 'novo', text: 'Plateia > Pedidos ganhou a visão em Quadro, ao lado da Lista: uma coluna por situação (Novo pedido, Em avaliação, Selecionado, Não selecionado, Desistiu). Arraste o pedido para mudar a situação; ao soltar em Selecionado, abre a janela do valor combinado.' },

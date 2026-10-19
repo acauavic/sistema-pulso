@@ -66,7 +66,7 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
   const { rows: recordings } = await db.query("SELECT id, name, proposed_at FROM guests WHERE status = 'agendado' AND proposed_at IS NOT NULL AND proposed_at > now() - interval '1 day' ORDER BY proposed_at, id");
   res.render('plateia/admin', {
     title: 'Plateia', view, q, origin, recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
-    canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, canMove: true, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
+    canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, COUNTRY_BY_CODE: audience.COUNTRY_BY_CODE, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
   });
 }));
 
@@ -117,6 +117,46 @@ router.post('/plateia/painel/leads/:id/mover', requirePerm('audience.read'), wra
   let reload = false;
   if (status !== lead.status) { ({ reload } = await applyStatus(req, lead, status)); await audit(req, 'plateia.inscricao', 'plateia_lead', lead.id, { status }); }
   res.json({ ok: true, reload });
+}));
+
+// Editar os dados do pedido (nome, WhatsApp, gravação, observações). A situação muda no chip da lista ou arrastando no quadro.
+router.post('/plateia/painel/leads/:id/editar', requirePerm('audience.read'), wrap(async (req, res) => {
+  const lead = await findLead(req.params.id);
+  if (!lead) return res.redirect('/plateia/painel');
+  const to = flashBack(req);
+  const name = clean(req.body.name, 120);
+  const phone = audience.validatePhone(req.body.country || lead.country || 'BR', req.body.phone);
+  const guestId = isIntId(String(req.body.guest_id || '')) ? Number(req.body.guest_id) : lead.guest_id;
+  const { rows: [guest] } = await db.query('SELECT id, name, proposed_at FROM guests WHERE id = $1 AND (id = $2 OR (status = \'agendado\' AND proposed_at IS NOT NULL))', [guestId, lead.guest_id]);
+  const error = !name ? 'Informe o nome da pessoa.' : phone.error || (!guest ? 'Escolha a gravação (só convidados Agendados com data).' : null);
+  if (error) { await req.flash('error', error); return res.redirect(to); }
+  const { rows: [dup] } = await db.query('SELECT id FROM plateia_leads WHERE guest_id = $1 AND phone = $2 AND id <> $3 LIMIT 1', [guest.id, phone.e164, lead.id]);
+  if (dup) { await req.flash('error', 'Já existe outro pedido com esse WhatsApp nessa gravação.'); return res.redirect(to); }
+  const moved = guest.id !== lead.guest_id;
+  await db.query(
+    `UPDATE plateia_leads SET name = $2, phone = $3, country = $4, guest_id = $5, guest_name = $6, recording_at = CASE WHEN $7 THEN $8 ELSE recording_at END, notes = $9, updated_at = now() WHERE id = $1`,
+    [lead.id, name, phone.e164, phone.country, guest.id, guest.name, moved, guest.proposed_at, clean(req.body.notes, 1000) || null]);
+  if (lead.entry_id && (name !== lead.name || moved)) { // a conta a receber acompanha o nome e a gravação
+    await db.query("UPDATE fin_entries SET description = $2, guest_id = $3, updated_at = now() WHERE id = $1 AND status <> 'cancelado'", [lead.entry_id, `Plateia · ${name} · ${guest.name}`, guest.id]);
+  }
+  await audit(req, 'plateia.editada', 'plateia_lead', lead.id, { nome: name });
+  await req.flash('ok', 'Pedido atualizado.');
+  res.redirect(to);
+}));
+
+// Excluir o pedido. Não apaga o que já foi pago: o recebimento precisa ser desfeito antes (o dinheiro não some do financeiro sem querer).
+router.post('/plateia/painel/leads/:id/excluir', requirePerm('audience.read'), wrap(async (req, res) => {
+  const lead = await findLead(req.params.id);
+  const to = flashBack(req);
+  if (!lead) return res.redirect(to);
+  const { rows: [paid] } = await db.query(
+    `SELECT (SELECT status FROM fin_entries WHERE id = $1) AS entry, EXISTS (SELECT 1 FROM plateia_pay_links WHERE lead_id = $2 AND status = 'pago') AS link_paid`, [lead.entry_id, lead.id]);
+  if (paid.entry === 'pago' || paid.link_paid) { await req.flash('error', `${lead.name} já tem pagamento recebido. Desfaça o recebimento (ou mude a situação para Desistiu) em vez de excluir.`); return res.redirect(to); }
+  await audience.releaseLead(lead);
+  await db.query('DELETE FROM plateia_leads WHERE id = $1', [lead.id]);
+  await audit(req, 'plateia.excluida', 'plateia_lead', lead.id, { nome: lead.name, convidado: lead.guest_name });
+  await req.flash('ok', `Pedido de ${lead.name} excluído.`);
+  res.redirect(to);
 }));
 
 // Link de pagamento (InfinitePay): gerar ou trocar o valor. Cria um link novo; o anterior deixa de ser o atual.

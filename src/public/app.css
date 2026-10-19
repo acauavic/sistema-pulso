@@ -797,11 +797,15 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
 .cards::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text) 46%, transparent); background-clip: padding-box; }
 @supports not selector(::-webkit-scrollbar) { .board, .cards { scrollbar-width: auto; scrollbar-color: color-mix(in srgb, var(--text) 40%, transparent) var(--surface); } }
 @media (min-width: 861px) {
-  .main:has(.board) { height: 100vh; height: 100dvh; padding-bottom: 10px; display: flex; flex-direction: column; overflow: hidden; }
-  .main:has(.board) > .container { flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; display: flex; flex-direction: column; }
-  .main:has(.board) .board { flex: 1; min-height: 0; padding-bottom: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); overflow-x: scroll; overflow-y: hidden; }
-  .main:has(.board) .column { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
-  .main:has(.board) .column .cards { flex: 1; min-height: 60px; overflow-y: auto; overflow-x: hidden; align-content: start; padding-right: 2px; }
+  .main:is(:has(.board:not(.pboard)), :has(.pane:not([hidden]) .pboard)) { height: 100vh; height: 100dvh; padding-bottom: 10px; display: flex; flex-direction: column; overflow: hidden; }
+  .main:is(:has(.board:not(.pboard)), :has(.pane:not([hidden]) .pboard)) > .container { flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; display: flex; flex-direction: column; }
+  .main:is(:has(.board:not(.pboard)), :has(.pane:not([hidden]) .pboard)) .board { flex: 1; min-height: 0; padding-bottom: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); overflow-x: scroll; overflow-y: hidden; }
+  .main:is(:has(.board:not(.pboard)), :has(.pane:not([hidden]) .pboard)) .column { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
+  .main:is(:has(.board:not(.pboard)), :has(.pane:not([hidden]) .pboard)) .column .cards { flex: 1; min-height: 60px; overflow-y: auto; overflow-x: hidden; align-content: start; padding-right: 2px; }
+  .pboard { min-height: 340px; }
+  .main:has(.pane:not([hidden]) .pboard) { overflow-y: auto; }
+  .main:has(.pane:not([hidden]) .pboard) .tabs-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .main:has(.pane:not([hidden]) .pboard) .pane:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 }
 @media (max-width: 860px) { .board .cards { max-height: 70dvh; overflow-y: auto; } }
 
@@ -921,3 +925,38 @@ dialog[data-material-dialog] { max-height: calc(100vh - 32px); overflow: auto; }
 dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z-index: 2; background: var(--surface); padding: 12px 0 0; margin-top: 8px; border-top: 1px solid var(--line); } /* o botão de enviar sempre à vista */
 .fin-filter input[type="search"] { flex: 1 1 220px; min-width: 180px; }
 .fin-filter { flex-wrap: wrap; flex: 1 1 520px; }
+
+/* ---------------------------------------------------------------- plateia: barra, tabela e cards */
+.pbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 16px; }
+.pbar-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 520px; min-width: 0; }
+.pbar-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+.pbar-search { position: relative; flex: 1 1 240px; min-width: 200px; max-width: 360px; display: block; }
+.pbar-search .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.pbar-search input { width: 100%; padding-left: 36px; }
+.pbar-filters input, .pbar-filters select { height: 38px; min-height: 0; padding-top: 0; padding-bottom: 0; }
+.pbar-filters select { width: auto; max-width: 230px; }
+.pbar .seg a { padding: 0 12px; display: inline-flex; align-items: center; height: 32px; }
+.pbar .icon-btn { width: 36px; height: 36px; padding: 0; justify-content: center; border: 1px solid var(--line); }
+.pbar .icon-btn:hover { border-color: var(--line-strong); }
+.ellipsis { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pact { display: inline-flex; align-items: center; gap: 2px; justify-content: flex-end; }
+.pact form { display: inline-flex; margin: 0; }
+.pact .icon-btn { width: 34px; height: 34px; padding: 0; justify-content: center; }
+.pcard-head { display: flex; align-items: center; gap: 8px; min-width: 0; } .pcard-head strong { flex: 1; min-width: 0; }
+.pchips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; } .pchips:empty { display: none; }
+.ptable { table-layout: fixed; min-width: 880px; }
+.ptable th:nth-child(1) { width: 26%; } .ptable th:nth-child(2) { width: 17%; } .ptable th:nth-child(3) { width: 21%; } .ptable th:nth-child(4) { width: 17%; } .ptable th:nth-child(5) { width: 19%; }
+.ptable td { padding-top: 14px; padding-bottom: 14px; } .ptable td.actions { text-align: right; }
+.ptable td .row-menu > summary { cursor: pointer; display: inline-flex; align-items: center; }
+.pwhen { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; } .pwhen .icon { vertical-align: -2px; }
+.menu-sep { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.row-menu-list form { margin: 0; }
+.pcard { grid-template-rows: auto; gap: 6px; padding: 14px; cursor: grab; }
+.pcard .pcard-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 22px; margin-top: 2px; }
+.pcard .pcard-meta .icon { vertical-align: -2px; }
+.pcard .pcard-foot { display: flex; justify-content: flex-end; margin: 2px -6px -6px 0; padding-top: 8px; border-top: 1px solid var(--line); }
+.pboard .column header { padding: 2px 4px 12px; }
+@media (max-width: 860px) { .pbar-tools { width: 100%; justify-content: space-between; } .pbar-search { max-width: none; } }
+.ptable .row-menu-list { left: 0; right: auto; }
+.pbar-filters input[type="search"] { min-width: 0; }
+.main:has(.pane:not([hidden]) .pboard) .lead { display: none; } /* no quadro o espaço é do quadro */

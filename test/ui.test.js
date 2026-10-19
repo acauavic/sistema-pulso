@@ -35,9 +35,10 @@ describe('interface: menu recolhível e quadros', () => {
 
   it('quadros: altura da tela, barra horizontal no pé e rolagem própria em cada coluna', async () => {
     const css = await get('/static/app.css');
-    assert.match(css, /\.main:has\(\.board\) \{ height: 100vh;[^}]*overflow: hidden;/);
-    assert.match(css, /\.main:has\(\.board\) \.board \{ flex: 1; min-height: 0;[^}]*grid-template-rows: minmax\(0, 1fr\);[^}]*overflow-x: scroll; overflow-y: hidden; \}/);
-    assert.match(css, /\.main:has\(\.board\) \.column \.cards \{ flex: 1; min-height: 60px; overflow-y: auto;/);
+    const M = '\\.main:is\\(:has\\(\\.board:not\\(\\.pboard\\)\\), :has\\(\\.pane:not\\(\\[hidden\\]\\) \\.pboard\\)\\)'; // quadros dos convidados e da plateia (este só com a aba à vista)
+    assert.match(css, new RegExp(`${M} \\{ height: 100vh;[^}]*overflow: hidden;`));
+    assert.match(css, new RegExp(`${M} \\.board \\{ flex: 1; min-height: 0;[^}]*grid-template-rows: minmax\\(0, 1fr\\);[^}]*overflow-x: scroll; overflow-y: hidden; \\}`));
+    assert.match(css, new RegExp(`${M} \\.column \\.cards \\{ flex: 1; min-height: 60px; overflow-y: auto;`));
     assert.match(css, /\.board::-webkit-scrollbar \{ height: 14px;/, 'barra horizontal grossa e sempre visível');
     for (const path of ['/episodios', '/convidados', '/patrocinadores']) assert.match((await prod.get(path)).text, /class="board[ "]/, `${path} usa o quadro`);
   });

@@ -38,7 +38,7 @@ describe('Plateia: adicionar pessoa à mão e lembrete no dia da gravação', ()
     assert.equal(l.guest_name, 'Dra. Hoje'); assert.ok(l.recording_at);
     assert.equal(l.terms_accepted_at, null, 'sem aceite online: veio por fora da página');
     const page = (await as.prod.get(`/plateia/painel?convidado=${g1}`)).text;
-    assert.match(page, /Marina Costa/); assert.match(page, /adicionada pela equipe/); assert.match(page, /Adicionar pessoa/);
+    assert.match(page, /Marina Costa/); assert.match(page, /Adicionada pela equipe/); assert.match(page, /Adicionar pessoa/);
     assert.equal((await q("SELECT 1 FROM plateia_events WHERE type = 'lead'")).length, 0, 'não entra no funil da página pública');
   });
 

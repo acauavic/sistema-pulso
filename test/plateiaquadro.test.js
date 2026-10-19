@@ -35,7 +35,7 @@ describe('Plateia: visão em quadro, busca e filtros dos pedidos', () => {
     assert.match(column(html, 'em_atendimento'), /João Avaliação/); assert.match(column(html, 'desistiu'), /Davi Desistiu/);
     assert.match(column(html, 'novo'), /<span class="count">2<\/span>/);
     assert.match(html, /data-base="\/plateia\/painel\/leads"/); assert.match(html, /data-status-path="mover"/);
-    assert.match(html, /Quadro<\/a>/); assert.match(html, /Lista<\/a>/);
+    assert.match(html, /aria-label="Ver em quadro"/); assert.match(html, /aria-label="Ver em lista"/);
     assert.match(column(html, 'confirmado'), /data-drop-open/, 'soltar em Selecionado abre a janela de confirmação');
     assert.doesNotMatch(html, /name="status" aria-label="Situação"/, 'no quadro a situação é a coluna');
     const list = (await as.prod.get('/plateia/painel')).text;
@@ -83,5 +83,82 @@ describe('Plateia: visão em quadro, busca e filtros dos pedidos', () => {
   it('o editor de vídeo não acessa o quadro nem move pedidos', async () => {
     assert.equal((await as.editor.get('/plateia/painel?vista=quadro')).status, 403);
     assert.equal((await mover(as.editor, ids.des, 'novo')).status, 403);
+  });
+});
+
+describe('Plateia: editar e excluir pedidos', () => {
+  const as = {}; let app; let g1; let g2;
+  const q = (sql, p) => h.db.query(sql, p).then((r) => r.rows);
+  const days = (n) => new Date(Date.now() + n * 86400_000).toISOString();
+  const act = (client, path, form) => client.act(path, form, { from: '/plateia/painel' });
+  const mkLead = async (name, phone, gid, extra = {}) => (await q(
+    `INSERT INTO plateia_leads (ref, guest_id, guest_name, recording_at, name, phone, country, price_cents, status)
+     SELECT $1, g.id, g.name, g.proposed_at, $2, $3, 'BR', 19700, $4 FROM guests g WHERE g.id = $5 RETURNING id`, [`ref-${name}`, name, phone, extra.status || 'novo', gid]))[0].id;
+
+  before(async () => {
+    await h.resetDb(); app = await h.startServer();
+    for (const [k, role] of [['prod', 'produtora'], ['editor', 'editor_video']]) { await h.createUser({ name: k, email: `${k}@t.com`, role }); as[k] = h.client(app.base); await as[k].login(`${k}@t.com`); }
+    const mk = async (name, at) => (await q("INSERT INTO guests (name, status, proposed_at, email, scheduled_studio, scheduled_hosts, scheduled_guest) VALUES ($1,'agendado',$2,'a@b.com',true,true,true) RETURNING id", [name, at]))[0].id;
+    g1 = await mk('Dra. Um', days(5)); g2 = await mk('Dr. Dois', days(8));
+  });
+  after(async () => { await app.close(); await h.db.close(); });
+
+  it('a lista é uma tabela alinhada, com ícones nas ações e a situação num chip que abre as opções', async () => {
+    await mkLead('Ana Lista', '+5511911112222', g1);
+    const html = (await as.prod.get('/plateia/painel')).text;
+    assert.match(html, /<table class="ptable">/); assert.match(html, /<th>Pessoa<\/th><th>WhatsApp<\/th><th>Situação<\/th><th>Pedido em<\/th>/);
+    assert.match(html, /aria-label="Chamar Ana Lista no WhatsApp"/); assert.match(html, /aria-label="Editar o pedido de Ana Lista"/); assert.match(html, /aria-label="Selecionar Ana Lista"/);
+    assert.match(html, /aria-label="Mudar a situação de Ana Lista"[\s\S]*Em avaliação[\s\S]*Selecionado…/);
+    assert.doesNotMatch(html, /Confirmar participação<\/button>/, 'sem botões de texto repetidos em cada linha');
+  });
+
+  it('editar: nome, WhatsApp, gravação e observações; recusa nome vazio, WhatsApp inválido ou repetido', async () => {
+    const id = await mkLead('Beto Edita', '+5511933334444', g1); await mkLead('Outro Beto', '+5511955556666', g2);
+    await act(as.prod, `/plateia/painel/leads/${id}/editar`, { name: 'Beto Editado', country: 'BR', phone: '(11) 97777-8888', guest_id: String(g2), notes: 'Vem com a esposa' });
+    let [l] = await q('SELECT * FROM plateia_leads WHERE id = $1', [id]);
+    assert.equal(l.name, 'Beto Editado'); assert.equal(l.phone, '+5511977778888'); assert.equal(l.notes, 'Vem com a esposa');
+    assert.equal(l.guest_id, g2); assert.equal(l.guest_name, 'Dr. Dois'); assert.ok(l.recording_at, 'acompanha a data da nova gravação');
+    const same = async (form) => { await act(as.prod, `/plateia/painel/leads/${id}/editar`, form); [l] = await q('SELECT * FROM plateia_leads WHERE id = $1', [id]); assert.equal(l.name, 'Beto Editado', JSON.stringify(form)); };
+    await same({ name: '', country: 'BR', phone: '11 97777-8888', guest_id: String(g2) });
+    await same({ name: 'X', country: 'BR', phone: '123', guest_id: String(g2) });
+    await same({ name: 'X', country: 'BR', phone: '11 95555-6666', guest_id: String(g2) }); // já existe nessa gravação
+    const page = (await as.prod.get('/plateia/painel')).text;
+    assert.match(page, /id="modal-editar"/); assert.match(page, /data-fill-remove="\/plateia\/painel\/leads\/\d+\/excluir"/);
+    assert.equal((await as.editor.get('/plateia/painel')).status, 403);
+    assert.notEqual((await act(as.editor, `/plateia/painel/leads/${id}/editar`, { name: 'Invasor', country: 'BR', phone: '11 97777-8888', guest_id: String(g2) })).status, 200);
+    assert.equal((await q('SELECT name FROM plateia_leads WHERE id = $1', [id]))[0].name, 'Beto Editado');
+  });
+
+  it('editar o nome de quem já está selecionado atualiza a conta a receber', async () => {
+    const id = await mkLead('Carla Selecionada', '+5511912340000', g1);
+    await act(as.prod, `/plateia/painel/leads/${id}/confirmar`, { amount: '197,00', paid: '0', due_on: new Date().toISOString().slice(0, 10) });
+    const { entry_id: entry } = (await q('SELECT entry_id FROM plateia_leads WHERE id = $1', [id]))[0];
+    await act(as.prod, `/plateia/painel/leads/${id}/editar`, { name: 'Carla Souza', country: 'BR', phone: '11 91234-0000', guest_id: String(g1) });
+    assert.match((await q('SELECT description FROM fin_entries WHERE id = $1', [entry]))[0].description, /Plateia · Carla Souza · Dra\. Um/);
+  });
+
+  it('excluir: apaga o pedido e cancela a conta ainda não paga; não apaga quem já pagou', async () => {
+    const a = await mkLead('Davi Descartável', '+5511900001111', g1);
+    await act(as.prod, `/plateia/painel/leads/${a}/confirmar`, { amount: '197,00', paid: '0', due_on: new Date().toISOString().slice(0, 10) });
+    const entry = (await q('SELECT entry_id FROM plateia_leads WHERE id = $1', [a]))[0].entry_id;
+    await act(as.prod, `/plateia/painel/leads/${a}/excluir`, {});
+    assert.equal((await q('SELECT 1 FROM plateia_leads WHERE id = $1', [a])).length, 0);
+    assert.equal((await q('SELECT status FROM fin_entries WHERE id = $1', [entry]))[0].status, 'cancelado');
+    const b = await mkLead('Eva Pagou', '+5511900002222', g1);
+    await act(as.prod, `/plateia/painel/leads/${b}/confirmar`, { amount: '197,00', paid: '1', paid_on: new Date().toISOString().slice(0, 10) });
+    await act(as.prod, `/plateia/painel/leads/${b}/excluir`, {});
+    assert.equal((await q('SELECT 1 FROM plateia_leads WHERE id = $1', [b])).length, 1, 'pagamento recebido: não apaga');
+    await act(as.prod, `/plateia/painel/leads/${b}/recebido`, { desfazer: '1' });
+    await act(as.prod, `/plateia/painel/leads/${b}/excluir`, {});
+    assert.equal((await q('SELECT 1 FROM plateia_leads WHERE id = $1', [b])).length, 0, 'desfeito o recebimento, apaga');
+    assert.notEqual((await act(as.editor, `/plateia/painel/leads/${a}/excluir`, {})).status, 200);
+  });
+
+  it('o quadro preenche a altura da tela: classe própria, sem o texto de apoio e com rolagem por coluna', async () => {
+    const html = (await as.prod.get('/plateia/painel?vista=quadro')).text;
+    assert.match(html, /class="board board-wide pboard"/);
+    const css = (await as.prod.get(html.match(/\/static\/app\.css\?v=[a-f0-9]+/)[0])).text;
+    assert.match(css, /\.pboard \{ min-height: 340px; \}/);
+    assert.match(css, /\.pane:not\(\[hidden\]\) \.pboard\)\) \.column \.cards \{ flex: 1; min-height: 60px; overflow-y: auto;/);
   });
 });

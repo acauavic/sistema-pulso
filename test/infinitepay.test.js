@@ -52,7 +52,7 @@ describe('InfinitePay: link de pagamento da plateia e confirmação por webhook'
     assert.match(b.order_nsu, new RegExp(`^pl${leadId}-[0-9a-f]{10}$`)); assert.match(b.webhook_url, /\/webhooks\/infinitepay\/[0-9a-f]{32}$/);
     assert.match(b.redirect_url, /\/plateia\/pagamento-concluido$/); assert.equal(b.customer, undefined, 'sem dados da pessoa: o checkout não pede confirmar o telefone dela'); assert.equal(b.address, undefined);
     const page = (await prod.get('/plateia/painel')).text;
-    assert.match(page, /Link de pagamento/); assert.match(page, /checkout\.infinitepay\.io\/pulso\?lenc=/); assert.match(page, /Enviar pelo WhatsApp/);
+    assert.match(page, /Link de pagamento/); assert.match(page, /checkout\.infinitepay\.io\/pulso\?lenc=/); assert.match(page, /Chamar no WhatsApp com o link de pagamento/);
 
     await setStatus('em_atendimento'); assert.equal(fake.links.length, 1, 'não duplica o link');
     const r = await prod.act(`/plateia/painel/leads/${leadId}/link`, { amount: '150,00' }, { from: '/plateia/painel' });
@@ -89,7 +89,7 @@ describe('InfinitePay: link de pagamento da plateia e confirmação por webhook'
 
     const again = await webhook(secret, { order_nsu: link.order_nsu, transaction_nsu: 'T1', invoice_slug: 'S1' });
     assert.equal(again.status, 200); assert.equal((await q("SELECT 1 FROM fin_entries WHERE source = 'plateia'")).rowCount, 1, 'reenvio da InfinitePay não duplica');
-    assert.match((await prod.get('/plateia/painel')).text, /InfinitePay · cartão 3x/);
+    assert.match((await prod.get('/plateia/painel')).text, /Pago pelo link da InfinitePay[\s\S]*cartão 3x/);
     assert.equal((await prod.act(`/plateia/painel/leads/${leadId}/link`, { amount: '100' }, { from: '/plateia/painel' })).status, 302);
     assert.equal(fake.links.length, 2, 'já pago: não gera outro link');
   });
