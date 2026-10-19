@@ -38,16 +38,19 @@
         <% Object.keys(STATUS).forEach(function (k) { %><option value="<%= k %>" <%= statusFilter === k ? 'selected' : '' %>><%= STATUS[k] %></option><% }) %>
       </select>
     </form>
-    <a class="btn sm ghost" href="/plateia/painel/inscricoes.csv"><%- icon('download', 14) %> Exportar planilha</a>
+    <div class="row">
+      <button class="btn sm" type="button" data-modal-open="modal-adicionar"><%- icon('plus', 14) %> Adicionar pessoa</button>
+      <a class="btn sm ghost" href="/plateia/painel/inscricoes.csv"><%- icon('download', 14) %> Exportar planilha</a>
     </div>
-    <% if (!leads.length) { %><div class="empty card top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhuma inscrição por aqui</strong></p><p class="muted small">Quando alguém pedir para participar pela página pública, o pedido aparece aqui com o WhatsApp e a origem do clique. A seleção da plateia é sua: marque Em avaliação, Selecionado ou Não selecionado.</p></div><% } %>
+    </div>
+    <% if (!leads.length) { %><div class="empty card top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhuma inscrição por aqui</strong></p><p class="muted small">Quando alguém pedir para participar pela página pública, o pedido aparece aqui com o WhatsApp e a origem do clique. A seleção da plateia é sua: marque Em avaliação, Selecionado ou Não selecionado. Quem você já combinou por fora entra em "Adicionar pessoa".</p></div><% } %>
     <% if (leads.length) { %>
     <ul class="plain plan-list fin-list card top-gap">
       <% leads.forEach(function (l) { %>
       <li class="fin-row">
         <div class="plan-list-main">
           <strong><%= l.name %></strong>
-          <span class="small muted"><%= l.guest_name %><%= l.recording_at ? ' · ' + fmt.formatDate(l.recording_at) : '' %> · <%= l.utm_source ? l.utm_source + (l.utm_campaign ? ' / ' + l.utm_campaign : '') : 'direto' %></span>
+          <span class="small muted"><%= l.guest_name %><%= l.recording_at ? ' · ' + fmt.formatDate(l.recording_at) : '' %> · <%= l.added_by ? 'adicionada pela equipe' : (l.utm_source ? l.utm_source + (l.utm_campaign ? ' / ' + l.utm_campaign : '') : 'direto') %></span>
           <% if (l.status === 'confirmado' && isExempt(l)) { %><span class="small"><span class="badge b-gray">isento</span></span><% } else if (l.status === 'confirmado' && l.amount_cents != null) { %><span class="small"><span class="badge <%= l.pay_status === 'pago' ? 'b-green' : 'b-amber' %>"><%= l.pay_status === 'pago' ? 'recebido ' + fmt.formatDayShort(l.pay_paid) : 'a receber até ' + fmt.formatDayShort(l.pay_due) %></span> <span class="mono"><%= fmtMoney(l.amount_cents) %></span></span><% } %>
           <% if (l.link_status === 'pago') { %><span class="small muted mono">InfinitePay · <%= l.link_method === 'pix' ? 'Pix' : 'cartão' + (l.link_installments > 1 ? ' ' + l.link_installments + 'x' : '') %></span><% } %>
           <% if (payLinks && ['novo', 'em_atendimento'].indexOf(l.status) >= 0) { %>
@@ -179,6 +182,43 @@
   <% } %>
 </div>
 
+<dialog class="modal" id="modal-adicionar" aria-labelledby="mad-h">
+  <form method="post" action="/plateia/painel/leads" class="stack" data-when-form>
+    <%- csrfField %>
+    <h2 id="mad-h">Adicionar pessoa à plateia</h2>
+    <% if (!recordings.length) { %>
+    <p class="notice small">Nenhuma gravação agendada. Só dá para adicionar quem vai a uma gravação de convidado <strong>Agendado</strong> com data.</p>
+    <% } else { %>
+    <label>Gravação
+      <select name="guest_id" required>
+        <% recordings.forEach(function (g) { %><option value="<%= g.id %>" <%= guestFilter === g.id ? 'selected' : '' %>><%= g.name %> · <%= fmt.formatDate(g.proposed_at) %></option><% }) %>
+      </select>
+    </label>
+    <label>Nome<input type="text" name="name" maxlength="120" required autocomplete="off"></label>
+    <div class="grid-2 tight">
+      <label>País
+        <select name="country"><% countries.forEach(function (c) { %><option value="<%= c.code %>" <%= c.code === 'BR' ? 'selected' : '' %>><%= c.name %> (+<%= c.dial %>)</option><% }) %></select>
+      </label>
+      <label>WhatsApp<input type="tel" name="phone" inputmode="tel" required autocomplete="off" placeholder="(11) 91234-5678"></label>
+    </div>
+    <label>Situação
+      <select name="status"><option value="novo">Novo pedido (ainda vou avaliar)</option><option value="confirmado">Selecionada: já combinei</option></select>
+    </label>
+    <div class="stack" data-when="status=confirmado">
+      <div class="grid-2 tight">
+        <label data-when="paid!=isento">Valor combinado (R$)<input type="text" name="amount" inputmode="decimal" placeholder="197,00"></label>
+        <label>Pagamento
+          <select name="paid"><option value="0">Ainda vai pagar</option><option value="1">Já recebi</option><option value="isento">Isento (sem cobrança)</option></select>
+        </label>
+      </div>
+      <label data-when="paid=0">Combinado para pagar até<input type="date" name="due_on"></label>
+      <label data-when="paid=1">Recebido em<input type="date" name="paid_on"></label>
+    </div>
+    <p class="small muted">Quem entra por aqui não passa pela página pública: não conta no funil e não gera aviso. No dia da gravação, as pessoas selecionadas entram na tarefa de lembrete da produtora.</p>
+    <% } %>
+    <div class="row modal-actions"><% if (recordings.length) { %><button class="btn primary" type="submit">Adicionar</button><% } %><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
 <dialog class="modal" id="modal-link" aria-labelledby="mlk-h">
   <form method="post" action="" class="stack" data-fill-form>
     <%- csrfField %><input type="hidden" name="voltar" value="">

@@ -52,8 +52,9 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
     audience.agenda(),
   ]);
   const { rows: [counts] } = await db.query("SELECT count(*) FILTER (WHERE status = 'novo')::int AS novos, count(*)::int AS total FROM plateia_leads");
+  const { rows: recordings } = await db.query("SELECT id, name, proposed_at FROM guests WHERE status = 'agendado' AND proposed_at IS NOT NULL AND proposed_at > now() - interval '1 day' ORDER BY proposed_at, id");
   res.render('plateia/admin', {
-    title: 'Plateia', leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
+    title: 'Plateia', recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
     canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
   });
 }));
@@ -105,19 +106,49 @@ router.post('/plateia/painel/leads/:id/link', requirePerm('audience.read'), wrap
   res.redirect(to);
 }));
 
+// Lê a janela de confirmação (valor combinado, vencimento, já recebido ou isento).
+function parseConfirm(body) {
+  const exempt = body.paid === 'isento';
+  const amount = exempt ? 0 : parseBRL(body.amount);
+  let dueOn = parseInputDate(body.due_on) || audience.todayISO();
+  if (Number.isNaN(dueOn)) dueOn = audience.todayISO();
+  if (amount == null || Number.isNaN(amount) || (amount <= 0 && !exempt)) return { error: 'Informe o valor combinado, por exemplo 197,00.' };
+  let paidOn = null;
+  if (!exempt && body.paid === '1') { paidOn = parseInputDate(body.paid_on) || audience.todayISO(); if (Number.isNaN(paidOn)) paidOn = audience.todayISO(); }
+  return { amountCents: amount, dueOn, paidOn, exempt };
+}
+
+// Adicionar uma pessoa à mão (já combinada por fora): entra no pedido da gravação escolhida; pode já nascer Selecionada.
+router.post('/plateia/painel/leads', requirePerm('audience.read'), wrap(async (req, res) => {
+  const back = (guestId) => res.redirect(guestId ? `/plateia/painel?convidado=${guestId}` : '/plateia/painel');
+  const guestId = isIntId(String(req.body.guest_id || '')) ? Number(req.body.guest_id) : null;
+  const { rows: [guest] } = guestId ? await db.query("SELECT id, name, proposed_at FROM guests WHERE id = $1 AND status = 'agendado' AND proposed_at IS NOT NULL", [guestId]) : { rows: [] };
+  const name = clean(req.body.name, 120);
+  const phone = audience.validatePhone(req.body.country || 'BR', req.body.phone);
+  const confirmed = req.body.status === 'confirmado';
+  const pay = confirmed ? parseConfirm(req.body) : null;
+  const error = !guest ? 'Escolha a gravação (só aparecem convidados Agendados).' : !name ? 'Informe o nome da pessoa.' : phone.error || (pay && pay.error);
+  if (error) { await req.flash('error', error); return res.redirect('/plateia/painel'); }
+  const added = await audience.addLead({ guest, name, phone, userId: req.user.id });
+  if (added.duplicate) { await req.flash('error', 'Essa pessoa (mesmo WhatsApp) já está nesta gravação.'); return back(guest.id); }
+  await audit(req, 'plateia.adicionada', 'plateia_lead', added.lead.id, { convidado: guest.id, selecionada: confirmed });
+  if (confirmed) {
+    const r = await audience.confirmLead(added.lead, pay, req.user.id);
+    if (r.error) { await req.flash('error', `${name} foi adicionada(o), mas não consegui selecionar: ${r.error}`); return back(guest.id); }
+  }
+  await req.flash('ok', confirmed ? `${name} foi adicionada(o) e já está selecionada(o).` : `${name} foi adicionada(o) como novo pedido. Avalie e confirme a participação quando combinar.`);
+  back(guest.id);
+}));
+
 // Confirmar a participação: valor combinado, vencimento e (se já pagou) a data do recebimento. Vira conta a receber no financeiro.
 router.post('/plateia/painel/leads/:id/confirmar', requirePerm('audience.read'), wrap(async (req, res) => {
   const lead = await findLead(req.params.id);
   if (!lead) return res.redirect('/plateia/painel');
   const to = flashBack(req);
-  const exempt = req.body.paid === 'isento';
-  const amount = exempt ? 0 : parseBRL(req.body.amount);
-  let due = parseInputDate(req.body.due_on) || audience.todayISO();
-  if (Number.isNaN(due)) due = audience.todayISO();
-  if (amount == null || Number.isNaN(amount) || (amount <= 0 && !exempt)) { await req.flash('error', 'Informe o valor combinado, por exemplo 197,00.'); return res.redirect(to); }
-  let paidOn = null;
-  if (!exempt && req.body.paid === '1') { paidOn = parseInputDate(req.body.paid_on) || audience.todayISO(); if (Number.isNaN(paidOn)) paidOn = audience.todayISO(); }
-  const r = await audience.confirmLead(lead, { amountCents: amount, dueOn: due, paidOn, exempt }, req.user.id);
+  const pay = parseConfirm(req.body);
+  if (pay.error) { await req.flash('error', pay.error); return res.redirect(to); }
+  const { amountCents: amount, exempt, paidOn } = pay;
+  const r = await audience.confirmLead(lead, pay, req.user.id);
   if (r.error) { await req.flash('error', r.error); return res.redirect(to); }
   await audit(req, 'plateia.confirmada', 'plateia_lead', lead.id, { valor: amount, recebido: Boolean(paidOn), isento: exempt });
   await req.flash('ok', `${lead.name} está selecionado(a). ${exempt ? 'Participação isenta: sem cobrança e sem conta a receber.' : paidOn ? 'Pagamento registrado como recebido.' : 'A conta a receber foi criada no financeiro.'}`);

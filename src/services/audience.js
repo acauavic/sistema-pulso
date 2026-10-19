@@ -207,7 +207,71 @@ async function setReceived(lead, paidOn) { // paidOn null = desfazer
   return true;
 }
 
+// ---------------------------------------------------------------- pessoas adicionadas à mão
+// Quem a equipe já combinou por fora entra pelo painel, sem passar pela página pública (nada de funil, UTM nem aviso).
+async function addLead({ guest, name, phone, userId }) {
+  const { rows: [dup] } = await db.query('SELECT id FROM plateia_leads WHERE guest_id = $1 AND phone = $2 LIMIT 1', [guest.id, phone.e164]);
+  if (dup) return { duplicate: true };
+  const s = await settings();
+  const { rows: [row] } = await db.query(
+    `INSERT INTO plateia_leads (ref, guest_id, guest_name, recording_at, name, phone, country, price_cents, added_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [crypto.randomBytes(9).toString('base64url'), guest.id, guest.name, guest.proposed_at, name, phone.e164, phone.country, s.priceCents, userId]);
+  return { lead: row };
+}
+
+// ---------------------------------------------------------------- lembrete no dia da gravação
+// No dia da gravação, se há gente selecionada na plateia, nasce UMA tarefa para a produtora lembrar todo mundo (não uma por pessoa).
+// Quem entra na plateia depois, no mesmo dia, é somado na descrição enquanto a tarefa não foi feita.
+async function producerFor(ownerId) {
+  if (ownerId) {
+    const { rows: [o] } = await db.query("SELECT id FROM users WHERE id = $1 AND active AND role = 'produtora'", [ownerId]);
+    if (o) return o.id;
+  }
+  const { rows: [p] } = await db.query("SELECT id FROM users WHERE active AND role = 'produtora' ORDER BY name, id LIMIT 1");
+  if (p) return p.id;
+  const { rows: [g] } = await db.query("SELECT id FROM users WHERE active AND role IN ('gestao', 'superadmin') ORDER BY (role = 'gestao') DESC, name, id LIMIT 1");
+  return g ? g.id : null;
+}
+
+function reminderText(guest, people, location) {
+  const list = people.map((p) => `- ${p.name} · ${p.phone}`).join('\n');
+  return `Hoje, às ${timeShort(guest.proposed_at)}, tem gravação com ${guest.name}${location ? ` (${location})` : ''}.\n`
+    + `Mande o lembrete para ${people.length === 1 ? 'a pessoa selecionada' : `as ${people.length} pessoas selecionadas`} da plateia:\n${list}\n\n`
+    + `Sugestão de mensagem: "Oi, {nome}! Passando para lembrar que hoje, às ${timeShort(guest.proposed_at)}, é a gravação do Pulso Podcast com ${guest.name}. Esperamos você${location ? ` no ${location}` : ''}. Qualquer imprevisto, é só avisar por aqui."\n\n`
+    + `A lista com o WhatsApp de cada um está em Plateia > Pedidos (filtre pelo episódio).`;
+}
+
+async function reminderTick(now = new Date()) {
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' }).format(now));
+  if (hour < 6) return 0;
+  const tasks = require('./tasks');
+  const today = tasks.todayISO();
+  const { rows: guests } = await db.query(
+    `SELECT g.id, g.name, g.owner_id, g.proposed_at FROM guests g
+      WHERE g.status = 'agendado' AND g.proposed_at > $2 AND (g.proposed_at AT TIME ZONE 'America/Sao_Paulo')::date = $1::date
+        AND EXISTS (SELECT 1 FROM plateia_leads l WHERE l.guest_id = g.id AND l.status = 'confirmado')
+      ORDER BY g.proposed_at`, [today, now]);
+  if (!guests.length) return 0;
+  const location = (await settings()).location;
+  let made = 0;
+  for (const g of guests) {
+    const { rows: people } = await db.query("SELECT name, phone FROM plateia_leads WHERE guest_id = $1 AND status = 'confirmado' ORDER BY name, id", [g.id]);
+    const description = reminderText(g, people, location);
+    const autoKey = `plateia-lembrete-${g.id}-${today}`;
+    const { rows: [existing] } = await db.query('SELECT id, status FROM tasks WHERE auto_key = $1', [autoKey]);
+    if (existing) { if (existing.status !== 'feito') await db.query('UPDATE tasks SET description = $2, updated_at = now() WHERE id = $1 AND description IS DISTINCT FROM $2', [existing.id, description]); continue; }
+    const t = await tasks.create({
+      values: { title: `Lembrar a plateia: gravação com ${g.name} às ${timeShort(g.proposed_at)}`, description, kind: 'geral', status: 'a_fazer', due_on: today },
+      user: null, assigneeId: await producerFor(g.owner_id), links: { guestId: g.id }, autoKey,
+    });
+    if (t) made += 1;
+  }
+  return made;
+}
+
 module.exports = {
+  addLead, reminderTick, producerFor,
   todayISO: () => require('./finance').todayISO(), confirmLead, releaseLead, setReceived,
   settings, COUNTRIES, COUNTRY_BY_CODE, validatePhone, dateLong, timeShort, weekday, money, agenda, agendaGuest, cleanUtm, cleanVisitor, recordEvent, whatsappMessage, createLead, TERMS_VERSION, results, EVENT_TYPES, clip,
 };

@@ -53,12 +53,15 @@ function parse(body, { partial = false } = {}) {
   return { values: v, error: errors[0] || null };
 }
 
-async function create({ values, user, assigneeId = null, links = {}, routineId = null, notifyAssignee = true }) {
+// autoKey: tarefa do sistema que não pode repetir (se já existe uma com a mesma chave, não cria e devolve null).
+async function create({ values, user, assigneeId = null, links = {}, routineId = null, notifyAssignee = true, autoKey = null }) {
   const { rows: [t] } = await db.query(
-    `INSERT INTO tasks (title, description, kind, status, block_reason, due_on, notes, assignee_id, created_by, episode_id, guest_id, sponsor_id, routine_id, completed_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, CASE WHEN $4 = 'feito' THEN now() END) RETURNING *`,
+    `INSERT INTO tasks (title, description, kind, status, block_reason, due_on, notes, assignee_id, created_by, episode_id, guest_id, sponsor_id, routine_id, completed_at, auto_key)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, CASE WHEN $4 = 'feito' THEN now() END, $14)
+     ON CONFLICT (auto_key) WHERE auto_key IS NOT NULL DO NOTHING RETURNING *`,
     [values.title, values.description || null, values.kind || 'geral', values.status || 'a_fazer', values.status === 'bloqueada' ? values.block_reason : null, values.due_on || null,
-      values.notes || null, assigneeId || null, user?.id || null, links.episodeId || null, links.guestId || null, links.sponsorId || null, routineId]);
+      values.notes || null, assigneeId || null, user?.id || null, links.episodeId || null, links.guestId || null, links.sponsorId || null, routineId, autoKey]);
+  if (!t) return null;
   if (notifyAssignee && assigneeId) {
     await notify({ type: 'tarefa', users: [assigneeId], title: `${user ? `${user.name} criou uma tarefa para você` : 'Nova tarefa para você'}: ${t.title}`, body: t.due_on ? `Vence em ${formatDay(t.due_on)}.` : null, url: `/tarefas/${t.id}`, actorId: user?.id || null, entity: { type: 'task', id: t.id } });
   }

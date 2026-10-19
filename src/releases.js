@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.12.0', date: '2026-10-19', title: 'Plateia: adicionar pessoas e lembrete no dia',
+    items: [
+      { kind: 'novo', text: 'Plateia > Pedidos > Adicionar pessoa: a equipe inclui à mão quem já combinou por fora (nome, WhatsApp e a gravação). A pessoa pode entrar como novo pedido ou já Selecionada, com valor, já recebido ou isenta. Na lista aparece como "adicionada pela equipe" e não conta no funil da página pública.' },
+      { kind: 'novo', text: 'No dia da gravação, se há pessoas Selecionadas na plateia, o sistema cria uma única tarefa para a produtora lembrar todo mundo, com a lista de nomes e WhatsApp e uma mensagem sugerida. Quem for selecionado depois, no mesmo dia, entra na lista da tarefa enquanto ela não for concluída.' },
+    ],
+  },
+  {
     version: '1.11.0', date: '2026-10-19', title: 'Envio de material em segundo plano',
     items: [
       { kind: 'novo', text: 'Material bruto: escolha ou arraste vários arquivos de uma vez, de grupos diferentes (vídeos do episódio, áudios, bastidores, fotografias). Uma janela pergunta o que é cada um; só vídeos e áudios do episódio têm rótulo (Câmera 1, Lapela…). Fotografias e bastidores entram em quantidade, sem rótulo.' },
