@@ -478,7 +478,7 @@ router.post('/episodios/:id/arquivos/:fid/concluir', uploadAccess, wrap(async (r
     const check = await prod.checkEditedVideo(f);
     if (check.error) { await prod.deleteFile(f); return uploadError(res, 422, check.error); }
   }
-  await prod.addEvent(f.episode_id, req.user.id, 'arquivo', `Arquivo enviado: ${C.EPISODE_FILE_KINDS[f.kind]}${f.label ? ` — ${f.label}` : ''}${f.kind === 'editado' ? ` (versão ${f.version})` : ''} · ${f.filename}`);
+  await prod.addFileEvent(f, req.user.id);
   await db.query('UPDATE episodes SET updated_at = now() WHERE id = $1', [f.episode_id]);
   res.json({ ok: true, id: f.id });
 }));

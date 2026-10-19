@@ -26,10 +26,11 @@
       <h2>Enviar cortes</h2>
       <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } else { %>
       <p class="small muted">Selecione vários vídeos de uma vez (MP4, MOV, M4V, WebM ou MKV). Cada um recebe um nome interno (Corte 1, Corte 2…) que você pode trocar.<%= aiReady ? '' : ' A leitura por IA (fala, rostos, título e capas) não está completa neste servidor.' %></p>
-      <div class="uploader" data-uploader data-base="/cortes/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-hash="cortes">
+      <div class="uploader" data-uploader data-base="/cortes/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="Cortes" data-hash="cortes">
         <input type="file" multiple accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
         <button class="btn primary" type="button" data-start><%- icon('upload') %> Enviar cortes</button>
         <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+        <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
       </div>
       <% } %>
     </section>

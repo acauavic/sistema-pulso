@@ -33,6 +33,8 @@
   </form>
 </section>
 <script type="application/json" id="team-users"><%- JSON.stringify((teamUsers || []).map(function (u) { return { id: u.id, name: u.name, ini: fmt.initials(u.name) }; })).replace(/</g, '\\u003c') %></script>
+<template data-upl-icons><span data-i="x"><%- icon('x', 14) %></span><span data-i="rotate-cw"><%- icon('rotate-cw', 14) %></span><span data-i="chevron-up"><%- icon('chevron-up', 16) %></span></template>
+<script src="/static/uploads.js?v=<%= assetV %>" defer></script>
 <script src="/static/collab.js?v=<%= assetV %>" defer></script>
 <script src="/static/assistant.js?v=<%= assetV %>" defer></script>
 <script src="/static/push.js?v=<%= assetV %>" defer></script>

@@ -14,6 +14,33 @@ async function addEvent(episodeId, userId, type, message, client = db) {
     [episodeId, userId || null, type, String(message).slice(0, 1000)]);
 }
 
+// Fotografias e bastidores chegam às dezenas: o histórico ganha uma linha só ("Fotografias enviadas: 23"), somada enquanto
+// a mesma pessoa continua enviando (até 30 min entre um arquivo e outro). Os demais tipos têm uma linha por arquivo.
+const BATCH_EVENT = { foto: 'Fotografias enviadas', bastidor: 'Bastidores enviados' };
+async function addFileEvent(f, userId) {
+  const head = BATCH_EVENT[f.kind];
+  if (!head) {
+    await addEvent(f.episode_id, userId, 'arquivo', `Arquivo enviado: ${C.EPISODE_FILE_KINDS[f.kind]}${f.label ? ` — ${f.label}` : ''}${f.kind === 'editado' ? ` (versão ${f.version})` : ''} · ${f.filename}`);
+    return;
+  }
+  // Vários arquivos terminam ao mesmo tempo: o lock por episódio/pessoa/tipo faz um esperar o outro, e a soma nunca se perde.
+  const client = await db.getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`evento-arquivo:${f.episode_id}:${userId || ''}:${f.kind}`]);
+    const { rowCount } = await client.query(
+      `UPDATE episode_events SET message = $4 || ': ' || ((substring(message from '[0-9]+$'))::int + 1)::text, created_at = now()
+        WHERE id = (SELECT id FROM episode_events WHERE episode_id = $1 AND user_id IS NOT DISTINCT FROM $2 AND type = 'arquivo' AND message LIKE $3
+                      AND created_at > now() - interval '30 minutes' ORDER BY id DESC LIMIT 1)`,
+      [f.episode_id, userId || null, `${head}: %`, head]);
+    if (!rowCount) await addEvent(f.episode_id, userId, 'arquivo', `${head}: 1`, client);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally { client.release(); }
+}
+
 // ---------------------------------------------------------------- checklists
 // Copia os modelos ativos para o episódio (uma vez). Itens avulsos têm template_id nulo.
 async function ensureChecklists(episodeId) {
@@ -352,6 +379,7 @@ async function sponsorAssets(episodeId) {
 }
 
 module.exports = {
+  addFileEvent,
   MB, addEvent, ensureChecklists, openRequired, TRANSITIONS, availableMoves, move,
   createTasks, syncFromGuest, createEpisode,
   partSizeFor, safeName, startUpload, receivePart, finishUpload, checkEditedVideo, cancelUpload, deleteFile, purgeEpisodeFiles,

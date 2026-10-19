@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.11.0', date: '2026-10-19', title: 'Envio de material em segundo plano',
+    items: [
+      { kind: 'novo', text: 'Material bruto: escolha ou arraste vários arquivos de uma vez, de grupos diferentes (vídeos do episódio, áudios, bastidores, fotografias). Uma janela pergunta o que é cada um; só vídeos e áudios do episódio têm rótulo (Câmera 1, Lapela…). Fotografias e bastidores entram em quantidade, sem rótulo.' },
+      { kind: 'novo', text: 'Os envios seguem em segundo plano: uma bandeja no canto mostra o andamento, a velocidade e o tempo que falta, e você pode continuar usando o sistema (abrir outras telas, comentar, criar tarefas) sem parar o envio. Dá para cancelar, tentar de novo, e se a internet cair ele retoma sozinho.' },
+      { kind: 'ajuste', text: 'Vídeo editado e cortes também enviam pela bandeja. Na página do episódio, o material aparece agrupado: vídeos e áudios com rótulo, fotografias e bastidores recolhidos com a contagem.' },
+      { kind: 'ajuste', text: 'Histórico do episódio: fotografias e bastidores enviados juntos viram uma linha só (por exemplo, "Fotografias enviadas: 23").' },
+    ],
+  },
+  {
     version: '1.10.0', date: '2026-10-19', title: 'Galeria de convidados do media kit',
     items: [
       { kind: 'novo', text: 'Gestão > Galeria do media kit: você escolhe, entre os episódios publicados, quais convidados aparecem no slide "Quem já sentou à mesa". Cada um tem alcance e frase de apresentação editáveis; sem frase, vale o cargo e a empresa do cadastro.' },

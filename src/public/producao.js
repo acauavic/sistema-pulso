@@ -31,99 +31,182 @@
     }
   }
 
-  // ---------------------------------------------------------------- envio em partes
+  // ---------------------------------------------------------------- envio de arquivos
+  // A fila de verdade (partes, tentativas, bandeja, envio em segundo plano) vive em uploads.js; aqui só se escolhe o que enviar.
+  const uploads = () => window.PulsoUploads;
+  const shellHidden = () => document.body.classList.contains('upl-shell-on'); // esta página está escondida sob o quadro de navegação: nunca recarregar
+
+  // Ao terminar o lote, a página do envio se atualiza sozinha, sem atropelar quem está digitando ou com janela aberta.
+  function refreshWhenDone(box) {
+    const note = box.querySelector('[data-refresh-note]');
+    document.addEventListener('DOMContentLoaded', () => { // uploads.js carrega depois desta página; ao fim do carregamento a fila já existe
+    const U = uploads();
+    if (!U) return;
+    const off = U.on((ev) => {
+      if (ev.type !== 'all-done' || !ev.bases.includes(box.dataset.base) || shellHidden()) return;
+      if (ev.failed) { if (note) { note.textContent = 'Alguns arquivos não subiram. Veja a bandeja de envios para tentar de novo.'; note.hidden = false; } return; }
+      const a = document.activeElement;
+      const busy = document.querySelector('dialog[open]') || (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'file');
+      if (busy) { if (note) { note.hidden = false; note.querySelector('[data-refresh]')?.addEventListener('click', () => window.location.reload()); } return; }
+      window.location.hash = box.dataset.hash || '';
+      window.location.reload();
+    });
+    window.addEventListener('pagehide', off);
+    });
+  }
+
+  // Vídeo editado e cortes: escolher e enviar (um vídeo por clique no botão, vários nos cortes).
   document.querySelectorAll('[data-uploader]').forEach((box) => {
-    const base = box.dataset.base;
-    const csrf = box.dataset.csrf;
-    const edited = box.dataset.edited === '1';
-    const queue = box.querySelector('[data-queue]');
     const input = box.querySelector('[data-files]');
     const startBtn = box.querySelector('[data-start]');
-    const CONCURRENCY = 3;
-
-    const json = async (url, opts = {}) => {
-      const res = await fetch(url, { ...opts, headers: { Accept: 'application/json', 'x-csrf-token': csrf, ...(opts.headers || {}) } });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || !body.ok) throw new Error(body.error || `erro ${res.status}`);
-      return body;
-    };
-
-    function row(file) {
-      const li = document.createElement('li');
-      li.className = 'upload-item';
-      li.innerHTML = '<div class="row"><strong class="u-name"></strong><span class="handle muted u-size"></span><span class="u-state small"></span></div><div class="bar"><i></i></div>';
-      li.querySelector('.u-name').textContent = file.name;
-      li.querySelector('.u-size').textContent = fmtBytes(file.size);
-      queue.appendChild(li);
-      return { li, bar: li.querySelector('.bar i'), state: li.querySelector('.u-state') };
-    }
-
-    async function sendPart(id, file, partSize, n, ui, progress) {
-      const start = (n - 1) * partSize;
-      const blob = file.slice(start, Math.min(file.size, start + partSize));
-      for (let attempt = 1; ; attempt += 1) {
-        try {
-          await json(`${base}${id}/parte/${n}`, { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
-          progress.done += blob.size;
-          ui.bar.style.width = `${Math.round((progress.done / file.size) * 100)}%`;
-          ui.state.textContent = `${Math.round((progress.done / file.size) * 100)}%`;
-          return;
-        } catch (err) {
-          if (attempt >= 4) throw err;
-          ui.state.textContent = `reenviando parte ${n} (tentativa ${attempt + 1})…`;
-          await sleep(1500 * attempt);
-        }
-      }
-    }
-
-    async function upload(file) {
-      const ui = row(file);
-      let id = null;
-      try {
-        const kind = edited ? 'editado' : (box.querySelector('[data-kind]')?.value || 'corte');
-        if (edited) await requireHorizontal(file); // o vídeo pilar do episódio é horizontal: avisa antes de subir gigabytes
-        const label = box.querySelector('[data-label]')?.value || '';
-        ui.state.textContent = 'preparando…';
-        const init = await json(`${base}iniciar`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ kind, rotulo: label, nome: file.name, tamanho: file.size, tipo: file.type }),
-        });
-        id = init.id;
-        const progress = { done: 0 };
-        const parts = Array.from({ length: init.totalParts }, (_, i) => i + 1);
-        const workers = Array.from({ length: Math.min(CONCURRENCY, parts.length) }, async () => {
-          while (parts.length) await sendPart(id, file, init.partSize, parts.shift(), ui, progress);
-        });
-        await Promise.all(workers);
-        ui.state.textContent = 'finalizando…';
-        await json(`${base}${id}/concluir`, { method: 'POST' });
-        ui.bar.style.width = '100%';
-        ui.li.classList.add('ok');
-        ui.state.textContent = 'enviado';
-        return true;
-      } catch (err) {
-        ui.li.classList.add('err');
-        ui.state.textContent = `falhou: ${err.message}`;
-        if (id) json(`${base}${id}/cancelar`, { method: 'POST' }).catch(() => {});
-        return false;
-      }
-    }
-
+    const queue = box.querySelector('[data-queue]');
+    const edited = box.dataset.edited === '1';
+    const say = (text) => { const li = document.createElement('li'); li.className = 'upload-item err'; li.innerHTML = '<span class="u-state small"></span>'; li.firstChild.textContent = text; queue.appendChild(li); };
+    refreshWhenDone(box);
     startBtn?.addEventListener('click', async () => {
       const files = [...input.files];
       if (!files.length) { input.focus(); return; }
-      startBtn.disabled = true;
-      input.disabled = true;
-      let allOk = true;
-      for (const f of files) allOk = (await upload(f)) && allOk; // um arquivo por vez (cada um já usa 3 conexões)
-      startBtn.disabled = false;
-      input.disabled = false;
+      queue.replaceChildren();
+      const ok = [];
+      for (const f of files) {
+        try { if (edited) await requireHorizontal(f); ok.push({ file: f, kind: edited ? 'editado' : 'corte', label: '' }); } catch (err) { say(`${f.name}: ${err.message}`); }
+      }
       input.value = '';
-      if (allOk) { window.location.hash = box.dataset.hash || (edited ? 'edicao' : 'material'); window.location.reload(); }
+      if (ok.length) uploads().add(ok, { base: box.dataset.base, csrf: box.dataset.csrf, where: box.dataset.where || '', hash: box.dataset.hash });
     });
+  });
 
-    // não deixa fechar a aba no meio de um envio sem avisar
-    window.addEventListener('beforeunload', (e) => { if (startBtn?.disabled) { e.preventDefault(); e.returnValue = ''; } });
+  // Material bruto: tudo de uma vez (vídeos, áudios, fotos), e uma janela para dizer o que é cada coisa.
+  const EXT = {
+    video: ['mp4', 'mov', 'm4v', 'mkv', 'webm', 'avi', 'mxf', 'mts', 'm2ts', 'braw', 'r3d', 'mpg', 'mpeg', 'wmv'],
+    audio: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'aif', 'aiff', 'ogg', 'opus', 'wma'],
+    image: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'tif', 'tiff', 'dng', 'cr2', 'cr3', 'arw', 'nef', 'gif'],
+  };
+  const GROUPS = {
+    bruto_video: { label: 'Vídeo do episódio', labelled: true, ph: 'Rótulo (ex.: Câmera 1)' },
+    bruto_audio: { label: 'Áudio', labelled: true, ph: 'Rótulo (ex.: Lapela do convidado)' },
+    bastidor: { label: 'Bastidores', labelled: false },
+    foto: { label: 'Fotografias', labelled: false },
+    outro: { label: 'Outro', labelled: true, ph: 'Rótulo (opcional)' },
+  };
+  const TYPES = [
+    { key: 'video', title: 'Vídeos', options: ['bruto_video', 'bastidor', 'outro'], listed: true },
+    { key: 'audio', title: 'Áudios', options: ['bruto_audio', 'outro'], listed: true },
+    { key: 'image', title: 'Imagens', options: ['foto', 'bastidor', 'outro'], listed: false },
+    { key: 'outro', title: 'Outros arquivos', options: ['outro'], listed: true },
+  ];
+  const typeOf = (name) => {
+    const ext = (String(name).match(/\.([A-Za-z0-9]{1,6})$/) || [])[1]?.toLowerCase() || '';
+    return Object.keys(EXT).find((k) => EXT[k].includes(ext)) || 'outro';
+  };
+  const firstOption = (t) => TYPES.find((x) => x.key === t).options[0];
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  document.querySelectorAll('[data-material]').forEach((box) => {
+    const picker = box.querySelector('[data-material-files]');
+    const dlg = document.querySelector('[data-material-dialog]');
+    if (!picker || !dlg) return;
+    const sections = dlg.querySelector('[data-m-sections]');
+    const summary = dlg.querySelector('[data-m-summary]');
+    const sendBtn = dlg.querySelector('[data-m-send]');
+    let rows = [];
+    refreshWhenDone(box);
+
+    const key = (f) => `${f.name}|${f.size}|${f.lastModified}`;
+    function addFiles(list) {
+      const seen = new Set(rows.map((r) => key(r.file)));
+      [...list].forEach((f) => { if (f.size > 0 && !seen.has(key(f))) { seen.add(key(f)); const type = typeOf(f.name); rows.push({ file: f, type, group: firstOption(type), label: '' }); } });
+      if (!rows.length) return;
+      render();
+      if (!dlg.open) dlg.showModal();
+    }
+    const total = () => rows.reduce((n, r) => n + r.file.size, 0);
+
+    function rowEl(r, withSelect) {
+      const li = document.createElement('li');
+      li.className = 'mrow';
+      const name = document.createElement('span'); name.className = 'mrow-name'; name.textContent = r.file.name; name.title = r.file.name;
+      const size = document.createElement('span'); size.className = 'mono small muted'; size.textContent = fmtBytes(r.file.size);
+      li.append(name, size);
+      const opts = TYPES.find((x) => x.key === r.type).options;
+      if (withSelect && opts.length > 1) {
+        const sel = document.createElement('select'); sel.setAttribute('aria-label', `O que é ${r.file.name}`);
+        opts.forEach((o) => { const op = document.createElement('option'); op.value = o; op.textContent = GROUPS[o].label; sel.appendChild(op); });
+        sel.value = r.group;
+        sel.addEventListener('change', () => { r.group = sel.value; render(); });
+        li.appendChild(sel);
+      }
+      if (GROUPS[r.group].labelled) {
+        const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 80; inp.value = r.label; inp.placeholder = GROUPS[r.group].ph;
+        inp.setAttribute('aria-label', `Rótulo de ${r.file.name}`);
+        inp.addEventListener('input', () => { r.label = inp.value; });
+        li.appendChild(inp);
+      }
+      const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'icon-btn'; rm.setAttribute('aria-label', `Tirar ${r.file.name}`); rm.title = 'Tirar da lista';
+      rm.textContent = '×';
+      rm.addEventListener('click', () => { rows = rows.filter((x) => x !== r); if (!rows.length) dlg.close(); else render(); });
+      li.appendChild(rm);
+      return li;
+    }
+
+    function bulkSelect(type, options) {
+      const sel = document.createElement('select'); sel.setAttribute('aria-label', `Enviar todos os arquivos de ${type.title.toLowerCase()} como`);
+      options.forEach((o) => { const op = document.createElement('option'); op.value = o; op.textContent = GROUPS[o].label; sel.appendChild(op); });
+      const mine = rows.filter((r) => r.type === type.key);
+      sel.value = mine.every((r) => r.group === mine[0].group) ? mine[0].group : '';
+      if (!sel.value) { const op = document.createElement('option'); op.value = ''; op.textContent = 'Misto'; op.disabled = true; sel.prepend(op); sel.value = ''; }
+      sel.addEventListener('change', () => { mine.forEach((r) => { r.group = sel.value; }); render(); });
+      return sel;
+    }
+
+    function render() {
+      sections.replaceChildren();
+      TYPES.forEach((t) => {
+        const mine = rows.filter((r) => r.type === t.key);
+        if (!mine.length) return;
+        const sec = document.createElement('section'); sec.className = 'msec';
+        const head = document.createElement('div'); head.className = 'msec-head';
+        const h = document.createElement('strong'); h.textContent = t.title;
+        const meta = document.createElement('span'); meta.className = 'mono small muted'; meta.textContent = `${mine.length} · ${fmtBytes(mine.reduce((n, r) => n + r.file.size, 0))}`;
+        head.append(h, meta);
+        const bulkOpts = t.key === 'video' ? ['bruto_video', 'bastidor'] : (t.key === 'image' ? ['foto', 'bastidor'] : null);
+        if (bulkOpts && (mine.length > 1 || !t.listed)) { const w = document.createElement('label'); w.className = 'msec-bulk small muted'; w.append(mine.length > 1 ? 'Todos como ' : 'Enviar como ', bulkSelect(t, bulkOpts)); head.appendChild(w); }
+        sec.appendChild(head);
+        const list = document.createElement('ul'); list.className = 'plain mlist';
+        if (t.listed) { mine.forEach((r) => list.appendChild(rowEl(r, true))); sec.appendChild(list); } else {
+          const det = document.createElement('details'); det.className = 'msec-more';
+          const sum = document.createElement('summary'); sum.className = 'small'; sum.textContent = `Ver ${plural(mine.length, 'arquivo', 'arquivos')}`;
+          mine.forEach((r) => list.appendChild(rowEl(r, false)));
+          det.append(sum, list); sec.appendChild(det);
+        }
+        sections.appendChild(sec);
+      });
+      const by = {};
+      rows.forEach((r) => { by[r.group] = (by[r.group] || 0) + 1; });
+      const parts = [];
+      if (by.bruto_video) parts.push(plural(by.bruto_video, 'vídeo do episódio', 'vídeos do episódio'));
+      if (by.bruto_audio) parts.push(plural(by.bruto_audio, 'áudio', 'áudios'));
+      if (by.foto) parts.push(plural(by.foto, 'fotografia', 'fotografias'));
+      if (by.bastidor) parts.push(plural(by.bastidor, 'arquivo de bastidores', 'arquivos de bastidores'));
+      if (by.outro) parts.push(plural(by.outro, 'outro', 'outros'));
+      summary.textContent = `${parts.join(' · ')} · ${fmtBytes(total())}. Rótulos são opcionais e só valem para vídeos e áudios do episódio; fotografias e bastidores entram em quantidade.`;
+      sendBtn.textContent = `Enviar ${plural(rows.length, 'arquivo', 'arquivos')}`;
+    }
+
+    picker.addEventListener('change', () => { addFiles(picker.files); picker.value = ''; });
+    box.closest('[data-material-drop]')?.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); box.closest('[data-material-drop]').classList.add('dropping'); } });
+    box.closest('[data-material-drop]')?.addEventListener('dragleave', (e) => { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('dropping'); });
+    box.closest('[data-material-drop]')?.addEventListener('drop', (e) => { e.preventDefault(); e.currentTarget.classList.remove('dropping'); addFiles(e.dataTransfer.files); });
+    document.querySelectorAll('[data-material-pick]').forEach((b) => b.addEventListener('click', () => picker.click()));
+    dlg.querySelector('[data-m-more]')?.addEventListener('click', () => picker.click());
+    dlg.querySelector('[data-m-cancel]')?.addEventListener('click', () => { rows = []; dlg.close(); });
+    dlg.addEventListener('cancel', () => { rows = []; });
+    sendBtn.addEventListener('click', () => {
+      if (!rows.length) return;
+      const entries = rows.map((r) => ({ file: r.file, kind: r.group, label: GROUPS[r.group].labelled ? r.label.trim() : '' }));
+      rows = []; dlg.close();
+      uploads().add(entries, { base: box.dataset.base, csrf: box.dataset.csrf, where: box.dataset.where || '', hash: box.dataset.hash });
+    });
   });
 
   // ---------------------------------------------------------------- checklists

@@ -684,24 +684,23 @@ describe('produção de episódios', () => {
       assert.match(await page(as.editor, id), /Ajustes pedidos na revisão \(1\)/, 'o editor vê o que precisa ajustar');
     });
 
-    it('material bruto enviado vira lista com "Baixar" e o envio fica recolhido; sem arquivos, o envio aparece aberto', async () => {
+    it('material bruto enviado vira lista agrupada com "Baixar"; o botão "Enviar material" é só de quem sobe bruto', async () => {
       const id = await mk('disponivel_edicao');
       const empty = await page(as.prod, id);
-      assert.match(empty, /Enviar arquivos/);
-      assert.doesNotMatch(empty, /<summary>Enviar mais material<\/summary>/);
+      assert.match(empty, /data-material-pick/); assert.match(empty, /Enviar material/);
       for (const [name, kind] of [['cam1.mp4', 'bruto_video'], ['cam2.mp4', 'bruto_video'], ['mesa.wav', 'bruto_audio']]) {
         const key = `pp/episodios/${id}/${name}`; h.b2Store.set(key, { body: bytes(10), contentType: 'application/octet-stream' });
         await h.db.query("INSERT INTO episode_files (episode_id, kind, label, filename, content_type, size_bytes, storage_key, status) VALUES ($1,$2,$3,$4,'application/octet-stream',10,$5,'pronto')", [id, kind, name, name, key]);
       }
       const full = await page(as.editor, id);
       assert.match(full, /3 arquivos/);
-      assert.match(full, /2 vídeo bruto · 1 áudio bruto/);
+      assert.match(full, /Vídeos do episódio <span[^>]*>2 ·/); assert.match(full, /Áudios <span[^>]*>1 ·/);
       assert.equal((full.match(/>\s*(?:<svg[^>]*>.*?<\/svg>)?\s*Baixar\s*</gs) || []).length >= 3, true, 'um botão de baixar por arquivo');
-      assert.doesNotMatch(full, /<summary>Enviar mais material<\/summary>/, 'o editor recebe o material pronto: não sobe bruto');
+      assert.doesNotMatch(full, /data-material-pick|data-material-dialog/, 'o editor recebe o material pronto: não sobe bruto');
       assert.equal((full.match(/data-uploader/g) || []).length, 0, 'ele só envia o vídeo editado, e só depois de assumir a edição');
       assert.match(full, /Assuma a edição para enviar o vídeo editado/);
       const prod = await page(as.prod, id);
-      assert.match(prod, /<details class="top-gap"><summary>Enviar mais material<\/summary>/, 'quem sobe bruto vê o envio recolhido');
+      assert.match(prod, /data-material-pick/, 'quem sobe bruto vê o botão de enviar material'); assert.match(prod, /data-material-dialog/);
     });
 
     it('o vídeo editado também vira "Baixar" + "Enviar nova versão" recolhido, com as versões antigas esmaecidas', async () => {

@@ -9,9 +9,7 @@
   var tickable = perm.manage || perm.edit || perm.review;
   var inProduction = ['disponivel_edicao', 'em_edicao', 'em_revisao', 'em_finalizacao', 'pronto_publicar', 'publicado'].indexOf(ep.status) >= 0;
   var openComments = comments.filter(function (c) { return !c.resolved; });
-  var kindOptions = Object.keys(C.EPISODE_FILE_KINDS).filter(function (k) { return k !== 'editado'; });
   var rawTotal = rawFiles.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0);
-  var rawByKind = {}; rawFiles.forEach(function (f) { rawByKind[f.kind] = (rawByKind[f.kind] || 0) + 1; });
   var tabsBtn = function (t) { return '<button type="button" role="tab" data-tab-btn="' + t.key + '" aria-controls="pane-' + t.key + '">' + t.label + (t.badge ? ' <span class="count">' + t.badge + '</span>' : '') + '</button>'; };
 %>
 <div class="page-head">
@@ -149,33 +147,12 @@
   <% if (tabs.some(function (t) { return t.key === 'material'; })) { %>
   <div class="pane" id="pane-material" data-pane-id="material" hidden>
     <div class="grid-2 align-start">
-      <section class="card" id="material">
-        <div class="row spread">
-          <h2>Material bruto</h2>
-          <% if (rawFiles.length) { %><span class="handle muted"><%= rawFiles.length %> arquivo<%= rawFiles.length > 1 ? 's' : '' %> · <%= fmt.formatBytes(rawTotal) %></span><% } %>
-        </div>
-        <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
-        <% var rawUploader = function () { %>
-        <div class="uploader" data-uploader data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-edited="0" data-hash="material">
-          <div class="row">
-            <select data-kind aria-label="Tipo de material"><% kindOptions.forEach(function (k) { %><option value="<%= k %>"><%= C.EPISODE_FILE_KINDS[k] %></option><% }) %></select>
-            <input type="text" data-label placeholder="Rótulo (ex.: Câmera 1)" maxlength="80" aria-label="Rótulo">
-          </div>
-          <input type="file" multiple data-files>
-          <button class="btn" type="button" data-start><%- icon('arrow-right') %> Enviar arquivos</button>
-          <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
-        </div>
-        <% }; %>
-        <% if (!rawFiles.length) { %>
-          <p class="small muted">Vídeos de cada câmera, áudios, bastidores e fotografias. Vão para um armazenamento privado e ficam disponíveis para o editor.</p>
-          <% if (perm.upload && storageReady) { %><% rawUploader() %><% } else { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
-        <% } else { %>
-          <p class="small muted"><%= kindOptions.filter(function (k) { return rawByKind[k]; }).map(function (k) { return rawByKind[k] + ' ' + C.EPISODE_FILE_KINDS[k].toLowerCase(); }).join(' · ') %></p>
-          <ul class="plain file-list file-compact">
-            <% rawFiles.forEach(function (f) { %>
+      <section class="card" id="material"<%- perm.upload && storageReady ? ' data-material-drop' : '' %>>
+        <% var canRaw = perm.upload && storageReady;
+           var where = epNo + ' · ' + ep.title;
+           var fileRow = function (f) { %>
             <li>
               <span>
-                <span class="badge b-gray"><%= C.EPISODE_FILE_KINDS[f.kind] %></span>
                 <%= f.label ? f.label + ' · ' : '' %><span class="mono small"><%= f.filename %></span>
                 <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %></span>
                 <% if (f.status === 'enviando') { %><span class="badge b-amber">enviando</span><% } %>
@@ -185,11 +162,52 @@
                 <% if (perm.upload) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo do armazenamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">remover</button></form><% } %>
               </span>
             </li>
-            <% }) %>
-          </ul>
-          <% if (perm.upload && storageReady) { %><details class="top-gap"><summary>Enviar mais material</summary><% rawUploader() %></details><% } %>
-        <% } %>
+        <% };
+           var groupDefs = [
+             { kind: 'bruto_video', title: 'Vídeos do episódio', labelled: true },
+             { kind: 'bruto_audio', title: 'Áudios', labelled: true },
+             { kind: 'bastidor', title: 'Bastidores', labelled: false },
+             { kind: 'foto', title: 'Fotografias', labelled: false },
+             { kind: 'outro', title: 'Outros', labelled: true },
+           ]; %>
+        <div class="row spread">
+          <div>
+            <h2>Material bruto</h2>
+            <% if (rawFiles.length) { %><span class="handle muted"><%= rawFiles.length %> arquivo<%= rawFiles.length > 1 ? 's' : '' %> · <%= fmt.formatBytes(rawTotal) %></span><% } %>
+          </div>
+          <% if (canRaw) { %><button class="btn" type="button" data-material-pick><%- icon('upload') %> Enviar material</button><% } %>
+        </div>
+        <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
+        <% if (canRaw) { %>
+        <div class="uploader quiet" data-material data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-where="<%= where %>" data-hash="material">
+          <input type="file" multiple hidden data-material-files aria-label="Escolher arquivos">
+          <p class="small muted"><%= rawFiles.length ? 'Arraste mais arquivos para cá ou use o botão.' : 'Vídeos de cada câmera, áudios, bastidores e fotografias: escolha tudo de uma vez ou arraste para cá.' %> Na próxima janela você diz o que é cada um. O envio segue em segundo plano: pode continuar usando o sistema.</p>
+          <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
+        </div>
+        <% } else if (!rawFiles.length) { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
+        <% groupDefs.forEach(function (g) { var list = rawFiles.filter(function (f) { return f.kind === g.kind; }); if (!list.length) return;
+             var size = list.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0); %>
+          <% if (g.labelled) { %>
+          <h3 class="file-group-title"><%= g.title %> <span class="mono small muted"><%= list.length %> · <%= fmt.formatBytes(size) %></span></h3>
+          <ul class="plain file-list file-compact"><% list.forEach(fileRow) %></ul>
+          <% } else { %>
+          <details class="file-group">
+            <summary><strong><%= g.title %></strong> <span class="mono small muted"><%= list.length %> · <%= fmt.formatBytes(size) %></span></summary>
+            <ul class="plain file-list file-compact"><% list.forEach(fileRow) %></ul>
+          </details>
+          <% } %>
+        <% }) %>
       </section>
+      <% if (perm.upload && storageReady) { %>
+      <dialog class="modal modal-wide" data-material-dialog aria-labelledby="material-dlg-h">
+        <div class="stack">
+          <h2 id="material-dlg-h">Enviar material</h2>
+          <p class="small muted" data-m-summary></p>
+          <div class="stack" data-m-sections></div>
+          <div class="row modal-actions"><button class="btn primary" type="button" data-m-send>Enviar</button><button class="btn" type="button" data-m-more>Adicionar mais</button><button class="btn ghost" type="button" data-m-cancel>Cancelar</button></div>
+        </div>
+      </dialog>
+      <% } %>
 
       <div class="stack-lg">
         <section class="card" id="edicao">
@@ -197,10 +215,11 @@
           <% if (!inProduction) { %><p class="muted">A edição começa quando o material for liberado para o editor.</p><% } else { %>
           <p class="small muted">O vídeo do episódio é <strong>horizontal</strong> (16:9). Vídeos verticais são cortes e vão em <a href="/conteudo">Conteúdo</a>.</p>
           <% var editedUploader = function (label) { %>
-          <div class="uploader" data-uploader data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-edited="1" data-hash="edicao">
+          <div class="uploader" data-uploader data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-edited="1" data-where="<%= epNo + ' · ' + ep.title %>" data-hash="edicao">
             <input type="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
             <button class="btn" type="button" data-start><%- icon('arrow-right') %> <%= label %></button>
             <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+            <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
           </div>
           <% }; %>
           <% var canSendEdited = perm.edit && storageReady && ep.status !== 'disponivel_edicao'; %>

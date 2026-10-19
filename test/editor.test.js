@@ -96,9 +96,9 @@ describe('editor de vídeo: avisos de cada etapa e início só com produção', 
     let page = (await as.editor.get(`/episodios/${e.id}`)).text;
     assert.doesNotMatch(page, /Liberar para edição<\/button>/, 'o botão da produção não aparece para ele');
     assert.match(page, /Esta etapa está com Gestão ou Produtora: liberar para edição/);
-    assert.doesNotMatch(page, /data-uploader/, 'sem envio de material bruto');
+    assert.doesNotMatch(page, /data-material|data-uploader/, 'sem envio de material bruto');
     assert.match((await as.prod.get(`/episodios/${e.id}`)).text, /Liberar para edição<\/button>/);
-    assert.match((await as.prod.get(`/episodios/${e.id}`)).text, /data-uploader/, 'a produção sobe o bruto');
+    assert.match((await as.prod.get(`/episodios/${e.id}`)).text, /data-material/, 'a produção sobe o bruto');
     await q("UPDATE episodes SET status = 'em_edicao', editor_id = $2 WHERE id = $1", [e.id, u.editor.id]);
     page = (await as.editor.get(`/episodios/${e.id}`)).text;
     assert.match(page, /Vídeo editado/); assert.match(page, /data-edited="1"/, 'o editor sobe o vídeo editado');
