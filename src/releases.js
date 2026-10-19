@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.13.0', date: '2026-10-19', title: 'Plateia em quadro',
+    items: [
+      { kind: 'novo', text: 'Plateia > Pedidos ganhou a visão em Quadro, ao lado da Lista: uma coluna por situação (Novo pedido, Em avaliação, Selecionado, Não selecionado, Desistiu). Arraste o pedido para mudar a situação; ao soltar em Selecionado, abre a janela do valor combinado.' },
+      { kind: 'novo', text: 'Busca por nome, WhatsApp ou convidado e filtros por episódio e por origem (veio da página ou adicionada pela equipe), valendo na Lista e no Quadro.' },
+      { kind: 'correcao', text: 'Janela "Confirmar participação" mostrava um pedaço de código no topo.' },
+    ],
+  },
+  {
     version: '1.12.0', date: '2026-10-19', title: 'Plateia: adicionar pessoas e lembrete no dia',
     items: [
       { kind: 'novo', text: 'Plateia > Pedidos > Adicionar pessoa: a equipe inclui à mão quem já combinou por fora (nome, WhatsApp e a gravação). A pessoa pode entrar como novo pedido ou já Selecionada, com valor, já recebido ou isenta. Na lista aparece como "adicionada pela equipe" e não conta no funil da página pública.' },

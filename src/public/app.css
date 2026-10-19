@@ -919,3 +919,5 @@ body.upl-shell-on > :not(.upl-shell):not(.upl-tray) { display: none !important; 
 @media (prefers-reduced-motion: reduce) { .upl-bar i, .upl-item .bar i, .upl-chev { transition: none; } }
 dialog[data-material-dialog] { max-height: calc(100vh - 32px); overflow: auto; }
 dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z-index: 2; background: var(--surface); padding: 12px 0 0; margin-top: 8px; border-top: 1px solid var(--line); } /* o botão de enviar sempre à vista */
+.fin-filter input[type="search"] { flex: 1 1 220px; min-width: 180px; }
+.fin-filter { flex-wrap: wrap; flex: 1 1 520px; }

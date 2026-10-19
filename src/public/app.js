@@ -199,6 +199,7 @@
       const from = dragging.closest('[data-dropzone]');
       if (from === zone) return;
       const card = dragging;
+      if (col.hasAttribute('data-drop-open')) { card.querySelector('[data-drop-open]')?.click(); return; } // a coluna pede dados (ex.: valor combinado): abre a janela em vez de mover
       zone.prepend(card); // otimista
       refreshCounts();
       try {
@@ -212,13 +213,16 @@
           from.prepend(card);
           refreshCounts();
           if (info.editUrl && window.confirm(`${info.error}\n\nCompletar agora?`)) window.location.href = info.editUrl;
+          else if (!info.editUrl && info.error) window.alert(info.error);
           return;
         }
         if (!res.ok) throw new Error(String(res.status));
+        const info = await res.json().catch(() => ({}));
+        if (info.reload) window.location.reload(); // o servidor fez algo que a pessoa precisa ver (aviso na tela)
       } catch {
         from.prepend(card); // desfaz
         refreshCounts();
-        window.alert('Não foi possível mover o convidado. Tente de novo.');
+        window.alert(board.dataset.failMsg || 'Não foi possível mover o convidado. Tente de novo.');
       }
     });
   }

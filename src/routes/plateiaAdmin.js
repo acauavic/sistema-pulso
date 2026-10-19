@@ -39,10 +39,21 @@ async function storeImage(prefix, id, buf, kind) {
 router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res) => {
   const days = [7, 30, 90].includes(Number(req.query.dias)) ? Number(req.query.dias) : 30;
   const guestFilter = isIntId(String(req.query.convidado || '')) ? Number(req.query.convidado) : null;
-  const statusFilter = STATUS[req.query.status] ? req.query.status : '';
+  const view = req.query.vista === 'quadro' ? 'quadro' : 'lista';
+  const statusFilter = view === 'lista' && STATUS[req.query.status] ? req.query.status : ''; // no quadro, cada coluna já é uma situação
+  const q = clean(req.query.q, 80) || '';
+  const origin = ['equipe', 'pagina'].includes(req.query.origem) ? req.query.origem : '';
   const where = []; const p = [];
   if (guestFilter) { p.push(guestFilter); where.push(`l.guest_id = $${p.length}`); }
   if (statusFilter) { p.push(statusFilter); where.push(`l.status = $${p.length}`); }
+  if (origin) where.push(origin === 'equipe' ? 'l.added_by IS NOT NULL' : 'l.added_by IS NULL');
+  if (q) { // nome da pessoa, do convidado ou parte do WhatsApp
+    p.push(`%${q.replace(/[\\%_]/g, '\\$&')}%`); const like = `$${p.length}`;
+    const digits = q.replace(/\D/g, '');
+    let phone = '';
+    if (digits.length >= 3) { p.push(`%${digits}%`); phone = ` OR regexp_replace(l.phone, '\\D', '', 'g') LIKE $${p.length}`; }
+    where.push(`(l.name ILIKE ${like} OR l.guest_name ILIKE ${like}${phone})`);
+  }
   const [leads, results, s, upcoming, agenda] = await Promise.all([
     db.query(`SELECT l.*, e.status AS pay_status, e.due_on AS pay_due, e.paid_on AS pay_paid, k.url AS link_url, k.amount_cents AS link_amount, k.status AS link_status, k.capture_method AS link_method, k.installments AS link_installments
        FROM plateia_leads l LEFT JOIN fin_entries e ON e.id = l.entry_id AND e.status <> 'cancelado'
@@ -54,13 +65,34 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
   const { rows: [counts] } = await db.query("SELECT count(*) FILTER (WHERE status = 'novo')::int AS novos, count(*)::int AS total FROM plateia_leads");
   const { rows: recordings } = await db.query("SELECT id, name, proposed_at FROM guests WHERE status = 'agendado' AND proposed_at IS NOT NULL AND proposed_at > now() - interval '1 day' ORDER BY proposed_at, id");
   res.render('plateia/admin', {
-    title: 'Plateia', recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
-    canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
+    title: 'Plateia', view, q, origin, recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
+    canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, canMove: true, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
   });
 }));
 
 const flashBack = (req) => (/^\/plateia\/painel[?=&a-z_0-9]*$/.test(String(req.body.voltar || '')) ? req.body.voltar : '/plateia/painel');
 const findLead = async (id) => (isIntId(id) ? (await db.query('SELECT * FROM plateia_leads WHERE id = $1', [id])).rows[0] : null);
+
+// Muda a situação do pedido e cuida do que vem junto (link de pagamento ao avaliar, conta a receber ao deixar de selecionar).
+// Devolve { reload }: true quando houve um aviso que a pessoa precisa ver (o quadro recarrega para mostrar).
+async function applyStatus(req, lead, status) {
+  let reload = false;
+  await db.query('UPDATE plateia_leads SET status = $2, updated_at = now() WHERE id = $1', [lead.id, status]);
+  if (status === 'em_atendimento' && config.infinitepayConfigured && !(await infinitePay.currentLink(lead.id)) && lead.status !== 'confirmado') { // em avaliação: já nasce o link de pagamento
+    reload = true;
+    try {
+      const link = await infinitePay.createLink({ lead, amountCents: await infinitePay.defaultAmount(lead), userId: req.user.id });
+      await audit(req, 'plateia.link_criado', 'plateia_lead', lead.id, { valor: Number(link.amount_cents) });
+      await req.flash('ok', `Em avaliação. O link de pagamento de ${formatBRL(link.amount_cents)} está em "Link de pagamento" no pedido.`);
+    } catch (err) { await req.flash('error', `Situação atualizada, mas não consegui gerar o link de pagamento: ${err.message}`); }
+  }
+  if (lead.status === 'confirmado') {
+    reload = true;
+    const r = await audience.releaseLead(lead);
+    await req.flash('ok', r.kept ? 'Situação atualizada. O pagamento já recebido continua nas contas do financeiro.' : 'Situação atualizada e a conta a receber foi cancelada.');
+  }
+  return { reload };
+}
 
 // Muda a situação do pedido (Selecionado tem janela própria: pede o valor combinado).
 router.post('/plateia/painel/leads/:id', requirePerm('audience.read'), wrap(async (req, res) => {
@@ -69,23 +101,22 @@ router.post('/plateia/painel/leads/:id', requirePerm('audience.read'), wrap(asyn
   const to = flashBack(req);
   const status = STATUS[req.body.status] ? req.body.status : null;
   if (status === 'confirmado') { await req.flash('error', 'Para selecionar, use "Confirmar participação": ela pede o valor combinado.'); return res.redirect(to); }
-  if (status && status !== lead.status) {
-    await db.query('UPDATE plateia_leads SET status = $2, updated_at = now() WHERE id = $1', [lead.id, status]);
-    if (status === 'em_atendimento' && config.infinitepayConfigured && !(await infinitePay.currentLink(lead.id)) && lead.status !== 'confirmado') { // em avaliação: já nasce o link de pagamento
-      try {
-        const link = await infinitePay.createLink({ lead, amountCents: await infinitePay.defaultAmount(lead), userId: req.user.id });
-        await audit(req, 'plateia.link_criado', 'plateia_lead', lead.id, { valor: Number(link.amount_cents) });
-        await req.flash('ok', `Em avaliação. O link de pagamento de ${formatBRL(link.amount_cents)} está em "Link de pagamento" no pedido.`);
-      } catch (err) { await req.flash('error', `Situação atualizada, mas não consegui gerar o link de pagamento: ${err.message}`); }
-    }
-    if (lead.status === 'confirmado') {
-      const r = await audience.releaseLead(lead);
-      await req.flash('ok', r.kept ? 'Situação atualizada. O pagamento já recebido continua nas contas do financeiro.' : 'Situação atualizada e a conta a receber foi cancelada.');
-    }
-  }
+  if (status && status !== lead.status) await applyStatus(req, lead, status);
   if (req.body.notes !== undefined) await db.query('UPDATE plateia_leads SET notes = $2, updated_at = now() WHERE id = $1', [lead.id, clean(req.body.notes, 1000) || null]);
   await audit(req, 'plateia.inscricao', 'plateia_lead', lead.id, { status });
   res.redirect(to);
+}));
+
+// Arrastar no quadro: mesma regra, resposta em JSON. Selecionado não passa por aqui (a janela pede o valor combinado).
+router.post('/plateia/painel/leads/:id/mover', requirePerm('audience.read'), wrap(async (req, res) => {
+  const lead = await findLead(req.params.id);
+  if (!lead) return res.status(404).json({ ok: false, error: 'Pedido não encontrado.' });
+  const status = STATUS[req.body.status] ? req.body.status : null;
+  if (!status) return res.status(400).json({ ok: false, error: 'Situação inválida.' });
+  if (status === 'confirmado') return res.status(422).json({ ok: false, error: 'Para selecionar, informe o valor combinado em "Confirmar participação".' });
+  let reload = false;
+  if (status !== lead.status) { ({ reload } = await applyStatus(req, lead, status)); await audit(req, 'plateia.inscricao', 'plateia_lead', lead.id, { status }); }
+  res.json({ ok: true, reload });
 }));
 
 // Link de pagamento (InfinitePay): gerar ou trocar o valor. Cria um link novo; o anterior deixa de ser o atual.
