@@ -132,6 +132,12 @@ function formatClock(ms) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 const formatDayShort = (v) => formatDay(v).slice(0, 5);
+// Hora do prazo das tarefas: 'HH:MM' ou 'HH:MM:SS' (coluna TIME) -> "14h" / "14h30".
+const timeParts = (v) => { const m = String(v || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/); return m ? { h: m[1], m: m[2] } : null; };
+const formatTime = (v) => { const t = timeParts(v); return t ? (t.m === '00' ? `${Number(t.h)}h` : `${Number(t.h)}h${t.m}`) : ''; };
+const toInputTime = (v) => { const t = timeParts(v); return t ? `${t.h}:${t.m}` : ''; };
+const formatDue = (d, t) => (d ? `${formatDay(d)}${formatTime(t) ? ` às ${formatTime(t)}` : ''}` : '');
+const formatDueShort = (d, t) => (d ? `${formatDayShort(d)}${formatTime(t) ? ` · ${formatTime(t)}` : ''}` : '');
 
 const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Texto de comentário: escapa o HTML e destaca as menções (@Nome) de pessoas da equipe.
@@ -156,7 +162,7 @@ function relativeDays(v, now = new Date()) {
 const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
 module.exports = { escHtml, commentHtml, initials, relativeDays,
-  formatBRL, parseBRL, parseInputDate, toInputDate, formatDay, formatDayShort, formatDayLong, formatBytes, formatClock,
+  formatBRL, parseBRL, parseInputDate, toInputDate, formatDay, formatDayShort, formatDayLong, timeParts, formatTime, toInputTime, formatDue, formatDueShort, formatBytes, formatClock,
   TZ, formatDateTime, formatDate, formatLong, toInputValue, parseInputDateTime,
   shortDate, monthShort, dayNum, todayLabel, greeting,
   slugify, firstName, clean, isEmail,

@@ -1,5 +1,5 @@
 <%# Cartão de tarefa (quadro e calendário). Variáveis: t, compact %>
-<% var due = isoOf(t.due_on); var late = due && due < today && t.status !== 'feito'; var edit = canEdit(t); %>
+<% var due = isoOf(t.due_on); var late = lateOf(t); var edit = canEdit(t); %>
 <article class="task-card st-<%= t.status %> <%= late ? 'late' : '' %> <%= t.status === 'bloqueada' ? 'is-blocked' : '' %>" data-task="<%= t.id %>" draggable="<%= edit ? 'true' : 'false' %>">
   <div class="tc-top">
     <a href="/tarefas/<%= t.id %>" class="tc-title"><%= t.title %></a>
@@ -7,7 +7,7 @@
   </div>
   <p class="small err" data-reason <%= t.status === 'bloqueada' ? '' : 'hidden' %>><%= t.status === 'bloqueada' ? 'Bloqueada: ' + t.block_reason : '' %></p>
   <div class="tc-meta handle">
-    <% if (due) { %><span class="<%= late ? 'err' : '' %>"><%- icon('clock', 12) %> <%= fmt.formatDayShort(t.due_on) %><%= late ? ' · atrasada' : '' %></span><% } %>
+    <% if (due) { %><span class="<%= late ? 'err' : '' %>"><%- icon('clock', 12) %> <%= fmt.formatDueShort(t.due_on, t.due_time) %><%= late ? ' · atrasada' : '' %></span><% } %>
     <% if (t.episode_id) { %><span><%= t.episode_number ? 'EP.' + String(t.episode_number).padStart(3, '0') : 'Episódio' %></span><% } %>
     <% if (t.guest_id) { %><span><%= t.guest_name %></span><% } %>
     <% if (t.sponsor_id) { %><span><%= t.sponsor_name %></span><% } %>

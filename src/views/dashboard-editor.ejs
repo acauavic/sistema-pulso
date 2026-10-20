@@ -51,7 +51,7 @@
   <% if (!tasks.length) { %><p class="small muted">Nenhuma tarefa aberta com você.</p><% } else { %>
   <ul class="plain today-list two-col">
     <% tasks.forEach(function (t) { %>
-    <li><span><a href="/tarefas/<%= t.id %>"><strong><%= t.title %></strong></a><br><span class="mono small <%= t.due_on && t.due_on < today ? 'err' : 'muted' %>"><%= t.due_on ? 'ATÉ ' + fmt.shortDate(t.due_on + 'T12:00:00').toUpperCase() : 'SEM PRAZO' %></span></span><span class="badge b-gray"><%= t.status === 'fazendo' ? 'fazendo' : (t.status === 'bloqueada' ? 'bloqueada' : 'a fazer') %></span></li>
+    <li><span><a href="/tarefas/<%= t.id %>"><strong><%= t.title %></strong></a><br><span class="mono small <%= t.late ? 'err' : 'muted' %>"><%= t.due_on ? 'ATÉ ' + fmt.shortDate(fmt.toInputDate(t.due_on) + 'T12:00:00').toUpperCase() + (t.due_time ? ' · ' + fmt.formatTime(t.due_time) : '') : 'SEM PRAZO' %></span></span><span class="badge b-gray"><%= t.status === 'fazendo' ? 'fazendo' : (t.status === 'bloqueada' ? 'bloqueada' : 'a fazer') %></span></li>
     <% }) %>
   </ul>
   <% } %>

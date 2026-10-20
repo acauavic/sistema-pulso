@@ -40,7 +40,7 @@ describe('tarefa por voz: a fala vira um rascunho de tarefa organizado', () => {
     const r = await post(as.prod);
     assert.equal(r.status, 200); assert.equal(r.json.ok, true);
     assert.equal(r.json.transcript, 'texto transcrito de teste');
-    assert.deepEqual(r.json.draft, { title: 'Confirmar a pauta com a Dra. Ana', description: '- Mandar o roteiro\n- Pedir foto', assignee_id: String(u.editor.id), due_on: plus(3), kind: 'bastidores', episode_id: epId, guest_id: guestId, sponsor_id: sponsorId });
+    assert.deepEqual(r.json.draft, { title: 'Confirmar a pauta com a Dra. Ana', description: '- Mandar o roteiro\n- Pedir foto', assignee_id: String(u.editor.id), due_on: plus(3), due_time: null, kind: 'bastidores', episode_id: epId, guest_id: guestId, sponsor_id: sponsorId });
     assert.deepEqual(r.json.warnings, []);
     assert.equal((await h.db.query('SELECT count(*)::int AS n FROM tasks')).rows[0].n, before, 'só o rascunho: a tarefa é criada no clique em Criar tarefa');
     const sent = geminiBodies.at(-1);
@@ -54,7 +54,7 @@ describe('tarefa por voz: a fala vira um rascunho de tarefa organizado', () => {
     answer({ responsavel_id: '00000000-0000-4000-8000-000000000000', responsavel_citado: 'Fulana', vence_em: plus(-2), tipo: 'qualquer', episodio_id: 9999, convidado_id: 9999, patrocinador_id: 9999 });
     const r = await post(as.prod);
     assert.equal(r.status, 200);
-    assert.deepEqual(r.json.draft, { title: 'Confirmar a pauta', description: '', assignee_id: null, due_on: null, kind: 'geral', episode_id: null, guest_id: null, sponsor_id: null });
+    assert.deepEqual(r.json.draft, { title: 'Confirmar a pauta', description: '', assignee_id: null, due_on: null, due_time: null, kind: 'geral', episode_id: null, guest_id: null, sponsor_id: null });
     assert.match(r.json.warnings[0], /Não achei "Fulana" na equipe/);
     answer({ vence_em: 'sexta' });
     assert.equal((await post(as.prod)).json.draft.due_on, null, 'data que não é AAAA-MM-DD não passa');
@@ -70,6 +70,20 @@ describe('tarefa por voz: a fala vira um rascunho de tarefa organizado', () => {
      assert.equal(r.status, 502); assert.match(r.json.error, /organizar a tarefa/);
     const noAuth = await fetch(`${app.base}/tarefas/voz`, { method: 'POST', headers: { 'content-type': 'audio/webm' }, body: AUDIO, redirect: 'manual' });
     assert.ok([302, 401, 403].includes(noAuth.status));
+  });
+
+  it('hora dita: "hoje às 14h" vira data de hoje + 14:00; só a hora vale hoje (ou amanhã se já passou); hora de ontem ou inválida cai', async () => {
+    const taskVoice = require('../src/services/taskVoice');
+    const now = new Date(`${today}T09:00:00-03:00`);
+    const run = async (o) => { answer(o); return (await taskVoice.organize({ text: 'x', user: u.prod, now })).draft; };
+    let d = await run({ vence_em: today, vence_hora: '14:00' }); assert.equal(d.due_on, today); assert.equal(d.due_time, '14:00');
+    d = await run({ vence_hora: '14:30' }); assert.equal(d.due_on, today); assert.equal(d.due_time, '14:30');
+    d = await run({ vence_hora: '08:00' }); assert.equal(d.due_on, plus(1), 'as 8h de hoje já passaram (são 9h)'); assert.equal(d.due_time, '08:00');
+    d = await run({ vence_em: today, vence_hora: '08:00' }); assert.equal(d.due_on, today); assert.equal(d.due_time, null, 'hora que já passou hoje não vale');
+    d = await run({ vence_em: plus(2), vence_hora: '25:00' }); assert.equal(d.due_time, null); assert.equal(d.due_on, plus(2));
+    d = await run({ vence_hora: '14:00', vence_em: plus(-3) }); assert.equal(d.due_on, today, 'data passada cai e a hora dita vale hoje'); assert.equal(d.due_time, '14:00');
+    const sent = geminiBodies.at(-1);
+    assert.match(sent.systemInstruction.parts[0].text, /agora são 09:00 em Brasília/); assert.match(sent.systemInstruction.parts[0].text, /vence_hora/);
   });
 
   it('a janela Nova tarefa e o cabeçalho ganham o botão de voz; sem Groq/Gemini configurados, nada aparece e a rota recusa', async () => {

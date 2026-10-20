@@ -2,7 +2,7 @@
 <%
   var here = '/tarefas?escopo=' + scope + '&visao=' + view + (q ? '&q=' + encodeURIComponent(q) : '') + (cal ? '&mes=' + cal.ym : '');
   var url = function (o) { var s = Object.assign({ escopo: scope, visao: view, q: q, mes: cal ? cal.ym : '' }, o); var parts = []; Object.keys(s).forEach(function (k) { if (s[k]) parts.push(k + '=' + encodeURIComponent(s[k])); }); return '/tarefas?' + parts.join('&'); };
-  var bucket = function (t) { var d = isoOf(t.due_on); if (t.status === 'feito') return 'feitas'; if (!d) return 'semprazo'; if (d < today) return 'atrasadas'; if (d === today) return 'hoje'; return 'proximas'; };
+  var bucket = function (t) { var d = isoOf(t.due_on); if (t.status === 'feito') return 'feitas'; if (!d) return 'semprazo'; if (lateOf(t)) return 'atrasadas'; if (d === today) return 'hoje'; return 'proximas'; };
   var BUCKETS = [['atrasadas', 'Atrasadas'], ['hoje', 'Para hoje'], ['proximas', 'Próximas'], ['semprazo', 'Sem prazo'], ['feitas', 'Feitas']];
   var empty = { minhas: 'Nenhuma tarefa sua em aberto.', hoje: 'Nada vence hoje para você.', todas: 'Nenhuma tarefa ainda.' };
 %>
@@ -52,7 +52,7 @@
             <% if (t.status === 'bloqueada') { %><span class="err"><%- icon('lock', 12) %> <%= t.block_reason %></span><% } %>
           </span>
         </div>
-        <span class="handle tt-due <%= due && due < today && t.status !== 'feito' ? 'err' : '' %>"><%= due ? fmt.formatDayShort(t.due_on) : '—' %></span>
+        <span class="handle tt-due <%= lateOf(t) ? 'err' : '' %>"><%= due ? fmt.formatDueShort(t.due_on, t.due_time) : '—' %></span>
         <span class="handle muted"><%= t.comments ? t.comments + ' coment.' : '' %></span>
         <%- include('../partials/dot', { type: 'task', id: t.id, user: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null, editable: edit }) %>
       </li>

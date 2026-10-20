@@ -648,7 +648,7 @@ router.post('/episodios/:id/tarefas/:tid', requirePerm('episodes.read'), wrap(as
   if (!cur) return notFound(res);
   const manage = can(req.user.role, 'production.manage');
   const body = { ...req.body };
-  if (!manage) { delete body.due_on; }
+  if (!manage) { delete body.due_on; delete body.due_time; }
   const { values, error } = tasksSvc.parse({ title: cur.title, kind: cur.kind, ...body }, { partial: true });
   if (error) { await req.flash('error', error); return res.redirect(back(cur.episode_id, '#tarefas')); }
   const result = await tasksSvc.update(cur, values, req.user, { assigneeId: manage && body.assignee_id !== undefined ? (isUuid(body.assignee_id) ? body.assignee_id : null) : undefined });

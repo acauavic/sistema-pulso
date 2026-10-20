@@ -21,7 +21,7 @@
 
   function fill(draft) {
     const set = (name, value) => { const el = form.elements[name]; if (el && value !== null && value !== undefined && value !== '') el.value = value; };
-    set('title', draft.title); set('description', draft.description); set('assignee_id', draft.assignee_id); set('due_on', draft.due_on); set('kind', draft.kind);
+    set('title', draft.title); set('description', draft.description); set('assignee_id', draft.assignee_id); set('due_on', draft.due_on); if (draft.due_on && form.elements.due_time) form.elements.due_time.value = draft.due_time || ''; // prazo novo vale com a hora dita (ou sem hora) set('kind', draft.kind);
     set('episode_id', draft.episode_id); set('guest_id', draft.guest_id); set('sponsor_id', draft.sponsor_id);
     if (draft.episode_id || draft.guest_id || draft.sponsor_id) { const d = form.querySelector('details'); if (d) d.open = true; }
     form.elements.title?.focus();

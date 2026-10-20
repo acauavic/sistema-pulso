@@ -1,5 +1,5 @@
 <%- include('../partials/head') %>
-<% var due = isoOf(task.due_on); var late = due && due < today && task.status !== 'feito'; %>
+<% var due = isoOf(task.due_on); var late = lateOf(task); %>
 <div class="page-head">
   <div>
     <span class="kicker">Tarefa · <%= C.TASK_KINDS[task.kind] %></span>
@@ -21,7 +21,7 @@
       <%- include('../partials/dot', { type: 'task', id: task.id, user: task.assignee_id ? { id: task.assignee_id, name: task.assignee_name } : null, editable: editable, label: true }) %>
     </div>
     <% if (task.status === 'bloqueada') { %><p class="flash flash-error"><%- icon('lock', 14) %> Bloqueada: <%= task.block_reason %></p><% } %>
-    <% if (late) { %><p class="small err">Venceu em <%= fmt.formatDay(task.due_on) %>.</p><% } %>
+    <% if (late) { %><p class="small err">Venceu em <%= fmt.formatDue(task.due_on, task.due_time) %>.</p><% } %>
     <% if (editable) { %>
     <form method="post" action="/tarefas/<%= task.id %>" class="stack" data-task-detail>
       <input type="hidden" name="_csrf" value="<%= csrf %>">
@@ -30,6 +30,7 @@
       <div class="row">
         <label>Status<select name="status" data-block-toggle><% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= task.status === k ? 'selected' : '' %>><%= C.TASK_STATUSES[k] %></option><% }) %></select></label>
         <label>Vence em<input type="date" name="due_on" value="<%= due || '' %>"></label>
+        <label>Hora<input type="time" name="due_time" value="<%= fmt.toInputTime(task.due_time) %>" title="Sem data, a hora vale para hoje"></label>
         <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>" <%= task.kind === k ? 'selected' : '' %>><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
       </div>
       <label data-block-reason <%= task.status === 'bloqueada' ? '' : 'hidden' %>>Motivo do bloqueio<input type="text" name="block_reason" value="<%= task.block_reason || '' %>" maxlength="500" placeholder="O que está impedindo e de quem depende"></label>
@@ -46,7 +47,7 @@
     <% } else { %>
     <dl class="kv">
       <dt>Detalhes</dt><dd class="pre"><%= task.description || '—' %></dd>
-      <dt>Vence em</dt><dd class="handle"><%= due ? fmt.formatDay(task.due_on) : '—' %></dd>
+      <dt>Vence em</dt><dd class="handle"><%= due ? fmt.formatDue(task.due_on, task.due_time) : '—' %></dd>
     </dl>
     <p class="small muted">Só quem criou, o responsável ou a gestão mudam esta tarefa. Você pode comentar.</p>
     <% } %>

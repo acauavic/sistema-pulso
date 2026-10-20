@@ -36,7 +36,7 @@ const TOOLS = [
     async run({ escopo = 'minhas' }, user) {
       const rows = await tasksSvc.list({ user, scope: ['minhas', 'hoje', 'todas'].includes(escopo) ? escopo : 'minhas' });
       return rows.filter((t) => t.status !== 'feito').slice(0, 25).map((t) => ({
-        titulo: t.title, status: C.TASK_STATUSES[t.status], vence: t.due_on ? fmt.formatDay(t.due_on) : null, responsavel: t.assignee_name || null,
+        titulo: t.title, status: C.TASK_STATUSES[t.status], vence: t.due_on ? fmt.formatDue(t.due_on, t.due_time) : null, responsavel: t.assignee_name || null,
         bloqueio: t.block_reason || null, link: `/tarefas/${t.id}`,
       }));
     },
@@ -65,13 +65,13 @@ const TOOLS = [
         if (!ep) return { erro: 'Episódio não encontrado.' };
         const [moves, tasks, clips] = await Promise.all([
           prod.availableMoves(ep, user.role),
-          db.query("SELECT title, status, due_on FROM tasks WHERE episode_id = $1 AND status <> 'feito' ORDER BY due_on NULLS LAST", [ep.id]),
+          db.query("SELECT title, status, due_on, due_time FROM tasks WHERE episode_id = $1 AND status <> 'feito' ORDER BY due_on NULLS LAST, due_time NULLS LAST", [ep.id]),
           db.query("SELECT count(*)::int AS n, count(*) FILTER (WHERE status = 'pronto')::int AS prontos FROM episode_clips WHERE episode_id = $1", [ep.id]),
         ]);
         return {
           episodio: `${epNo(ep.number)} ${ep.title}`, etapa: C.EPISODE_STATUSES[ep.status], convidado: ep.guest_name, editor: ep.editor_name, gravado_em: ep.recorded_on ? fmt.formatDay(ep.recorded_on) : null,
           proximos_passos: moves.map((m) => ({ acao: m.label, pode_fazer: m.allowed, falta: m.missing })),
-          tarefas_abertas: tasks.rows.map((t) => ({ titulo: t.title, status: C.TASK_STATUSES[t.status], vence: t.due_on ? fmt.formatDay(t.due_on) : null })),
+          tarefas_abertas: tasks.rows.map((t) => ({ titulo: t.title, status: C.TASK_STATUSES[t.status], vence: t.due_on ? fmt.formatDue(t.due_on, t.due_time) : null })),
           cortes: clips.rows[0], link: `/episodios/${ep.id}`,
         };
       }
@@ -280,12 +280,12 @@ const TOOLS = [
   },
   {
     perm: 'tasks.write',
-    decl: { name: 'criar_tarefa', description: 'Cria uma tarefa. SÓ use quando a pessoa pedir claramente para criar/anotar uma tarefa. vencimento no formato AAAA-MM-DD.', parameters: { type: 'OBJECT', properties: { titulo: { type: 'STRING' }, descricao: { type: 'STRING' }, vencimento: { type: 'STRING' } }, required: ['titulo'] } },
-    async run({ titulo, descricao, vencimento }, user) {
-      const { values, error } = tasksSvc.parse({ title: titulo, description: descricao || '', due_on: /^\d{4}-\d{2}-\d{2}$/.test(vencimento || '') ? vencimento : '' });
+    decl: { name: 'criar_tarefa', description: 'Cria uma tarefa. SÓ use quando a pessoa pedir claramente para criar/anotar uma tarefa. vencimento no formato AAAA-MM-DD; hora (opcional) no formato HH:MM, horário de Brasília.', parameters: { type: 'OBJECT', properties: { titulo: { type: 'STRING' }, descricao: { type: 'STRING' }, vencimento: { type: 'STRING' }, hora: { type: 'STRING' } }, required: ['titulo'] } },
+    async run({ titulo, descricao, vencimento, hora }, user) {
+      const { values, error } = tasksSvc.parse({ title: titulo, description: descricao || '', due_on: /^\d{4}-\d{2}-\d{2}$/.test(vencimento || '') ? vencimento : '', due_time: /^\d{2}:\d{2}$/.test(hora || '') ? hora : '' });
       if (error) return { erro: error };
       const t = await tasksSvc.create({ values, user, assigneeId: user.id, notifyAssignee: false });
-      return { criada: true, titulo: t.title, vence: t.due_on ? fmt.formatDay(t.due_on) : null, link: `/tarefas/${t.id}` };
+      return { criada: true, titulo: t.title, vence: t.due_on ? fmt.formatDue(t.due_on, t.due_time) : null, link: `/tarefas/${t.id}` };
     },
   },
 ];

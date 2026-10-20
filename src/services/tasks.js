@@ -4,11 +4,20 @@ const db = require('../db/pool');
 const C = require('../constants');
 const { can } = require('../permissions');
 const { notify } = require('./notify');
-const { clean, parseInputDate } = require('../utils/format');
+const { clean, parseInputDate, timeParts, toInputTime, formatTime } = require('../utils/format');
 
 const STATUSES = Object.keys(C.TASK_STATUSES);
 const TZ = 'America/Sao_Paulo';
-const todayISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date()); // AAAA-MM-DD no horário de Brasília
+const todayISO = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(now); // AAAA-MM-DD no horário de Brasília
+
+// Hora de agora em Brasília ('HH:MM') e a regra de atraso: sem hora, vence no fim do dia; com hora, vence naquela hora.
+const nowTime = (now = new Date()) => new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
+const isoDate = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d || '').slice(0, 10));
+function isLate(t, today = todayISO(), now = nowTime()) {
+  if (!t || t.status === 'feito' || !t.due_on) return false;
+  const d = isoDate(t.due_on);
+  return d < today || (d === today && Boolean(t.due_time) && toInputTime(t.due_time) < now);
+}
 
 const SELECT = `SELECT t.*, a.name AS assignee_name, cb.name AS creator_name,
     e.title AS episode_title, e.number AS episode_number, g.name AS guest_name, s.company AS sponsor_name,
@@ -32,7 +41,7 @@ async function list({ user, scope = 'minhas', status = null, from = null, to = n
   if (to) where.push(`t.due_on <= ${p(to)}`);
   if (q) where.push(`(t.title ILIKE ${p(`%${q.replace(/[\\%_]/g, '\\$&')}%`)} OR t.description ILIKE $${params.length})`);
   const { rows } = await db.query(`${SELECT} ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-    ORDER BY (t.status = 'feito'), t.due_on NULLS LAST, t.id DESC LIMIT 1000`, params);
+    ORDER BY (t.status = 'feito'), t.due_on NULLS LAST, t.due_time NULLS LAST, t.id DESC LIMIT 1000`, params);
   return rows;
 }
 
@@ -48,6 +57,13 @@ function parse(body, { partial = false } = {}) {
     if (body.due_on && !parseInputDate(body.due_on)) errors.push('Data de vencimento inválida.');
     v.due_on = body.due_on && parseInputDate(body.due_on) ? body.due_on : null;
   }
+  if (!partial || body.due_time !== undefined || body.due_on !== undefined) {
+    const raw = String(body.due_time ?? '').trim();
+    if (raw && !timeParts(raw)) errors.push('Hora de vencimento inválida.');
+    const time = raw && timeParts(raw) ? toInputTime(raw) : null;
+    if (time && !v.due_on && !(partial && body.due_on === undefined)) v.due_on = todayISO(); // só a hora: vale hoje
+    v.due_time = v.due_on || (partial && body.due_on === undefined) ? time : null; // sem data não há hora
+  }
   if (!partial || body.notes !== undefined) v.notes = clean(body.notes, 1000) || null;
   if (v.status === 'bloqueada' && !v.block_reason) errors.push('Diga o motivo do bloqueio.');
   return { values: v, error: errors[0] || null };
@@ -56,18 +72,19 @@ function parse(body, { partial = false } = {}) {
 // autoKey: tarefa do sistema que não pode repetir (se já existe uma com a mesma chave, não cria e devolve null).
 async function create({ values, user, assigneeId = null, links = {}, routineId = null, notifyAssignee = true, autoKey = null }) {
   const { rows: [t] } = await db.query(
-    `INSERT INTO tasks (title, description, kind, status, block_reason, due_on, notes, assignee_id, created_by, episode_id, guest_id, sponsor_id, routine_id, completed_at, auto_key)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, CASE WHEN $4 = 'feito' THEN now() END, $14)
+    `INSERT INTO tasks (title, description, kind, status, block_reason, due_on, due_time, notes, assignee_id, created_by, episode_id, guest_id, sponsor_id, routine_id, completed_at, auto_key)
+     VALUES ($1,$2,$3,$4,$5,$6,$15,$7,$8,$9,$10,$11,$12,$13, CASE WHEN $4 = 'feito' THEN now() END, $14)
      ON CONFLICT (auto_key) WHERE auto_key IS NOT NULL DO NOTHING RETURNING *`,
     [values.title, values.description || null, values.kind || 'geral', values.status || 'a_fazer', values.status === 'bloqueada' ? values.block_reason : null, values.due_on || null,
-      values.notes || null, assigneeId || null, user?.id || null, links.episodeId || null, links.guestId || null, links.sponsorId || null, routineId, autoKey]);
+      values.notes || null, assigneeId || null, user?.id || null, links.episodeId || null, links.guestId || null, links.sponsorId || null, routineId, autoKey, values.due_on ? (values.due_time || null) : null]);
   if (!t) return null;
   if (notifyAssignee && assigneeId) {
-    await notify({ type: 'tarefa', users: [assigneeId], title: `${user ? `${user.name} criou uma tarefa para você` : 'Nova tarefa para você'}: ${t.title}`, body: t.due_on ? `Vence em ${formatDay(t.due_on)}.` : null, url: `/tarefas/${t.id}`, actorId: user?.id || null, entity: { type: 'task', id: t.id } });
+    await notify({ type: 'tarefa', users: [assigneeId], title: `${user ? `${user.name} criou uma tarefa para você` : 'Nova tarefa para você'}: ${t.title}`, body: dueText(t), url: `/tarefas/${t.id}`, actorId: user?.id || null, entity: { type: 'task', id: t.id } });
   }
   return t;
 }
 
+const dueText = (t) => (t.due_on ? `Vence em ${formatDay(t.due_on)}${t.due_time ? ` às ${formatTime(t.due_time)}` : ''}.` : null);
 const formatDay = (d) => { const s = typeof d === 'string' ? d : new Date(d).toISOString().slice(0, 10); const [y, m, dd] = s.slice(0, 10).split('-'); return `${dd}/${m}/${y}`; };
 
 // Atualiza e avisa: concluída (avisa quem criou), bloqueada (avisa quem criou e a gestão), responsável novo (avisa ele).
@@ -78,15 +95,20 @@ async function update(task, values, user, { assigneeId } = {}) {
   const reassign = assigneeId !== undefined && String(assigneeId || '') !== String(task.assignee_id || '');
   if (reassign && !can(user.role, 'tasks.manage') && ![task.created_by, task.assignee_id].map(String).includes(String(user.id))) return { error: 'Você não pode reatribuir esta tarefa.', status: 403 };
   const { rows: [t] } = await db.query(
-    `UPDATE tasks SET title = $2, description = $3, kind = $4, status = $5, block_reason = $6, due_on = $7, notes = $8, assignee_id = $9,
+    `UPDATE tasks SET title = $2, description = $3, kind = $4, status = $5, block_reason = $6, due_on = $7, due_time = $10, notes = $8, assignee_id = $9,
        completed_at = CASE WHEN $5 = 'feito' THEN coalesce(completed_at, now()) ELSE NULL END, updated_at = now() WHERE id = $1 RETURNING *`,
-    [task.id, next.title, next.description, next.kind, next.status, next.block_reason, next.due_on, next.notes, reassign ? (assigneeId || null) : task.assignee_id]);
+    [task.id, next.title, next.description, next.kind, next.status, next.block_reason, next.due_on, next.notes, reassign ? (assigneeId || null) : task.assignee_id, next.due_on ? (next.due_time ? toInputTime(next.due_time) : null) : null]);
   const url = `/tarefas/${t.id}`;
   if (t.status !== task.status) {
     if (t.status === 'feito') await notify({ type: 'tarefa', users: [task.created_by], title: `${user.name} concluiu: ${t.title}`, url, actorId: user.id, entity: { type: 'task', id: t.id } });
     if (t.status === 'bloqueada') await notify({ type: 'tarefa', users: [task.created_by, task.assignee_id], title: `Tarefa bloqueada: ${t.title}`, body: `Motivo: ${t.block_reason}`, url, actorId: user.id, entity: { type: 'task', id: t.id } });
   }
-  if (reassign && t.assignee_id) await notify({ type: 'tarefa', users: [t.assignee_id], title: `${user.name} atribuiu uma tarefa a você: ${t.title}`, body: t.due_on ? `Vence em ${formatDay(t.due_on)}.` : null, url, actorId: user.id, entity: { type: 'task', id: t.id } });
+  if (reassign && t.assignee_id) await notify({ type: 'tarefa', users: [t.assignee_id], title: `${user.name} atribuiu uma tarefa a você: ${t.title}`, body: dueText(t), url, actorId: user.id, entity: { type: 'task', id: t.id } });
+  // prazo (data ou hora) mudou: quem é responsável fica sabendo, a menos que tenha sido ele mesmo a mudar
+  const dueChanged = isoDate(t.due_on) !== isoDate(task.due_on) || toInputTime(t.due_time) !== toInputTime(task.due_time);
+  if (dueChanged && !reassign && t.assignee_id && String(t.assignee_id) !== String(user.id)) {
+    await notify({ type: 'tarefa', users: [t.assignee_id], title: `${user.name} mudou o prazo: ${t.title}`, body: t.due_on ? dueText(t).replace('Vence em', 'Novo prazo:') : 'A tarefa ficou sem prazo.', url, actorId: user.id, entity: { type: 'task', id: t.id } });
+  }
   return { task: t };
 }
 
@@ -116,16 +138,29 @@ async function applyRoutines(trigger, episodeId, user = null) {
 }
 
 // Rotina do sistema (roda junto com o agendador): avisa o responsável das tarefas que vencem hoje e das atrasadas, uma vez por dia.
-async function dueTick() {
-  const today = todayISO();
-  const { rows } = await db.query("SELECT id, title, due_on, assignee_id FROM tasks WHERE status <> 'feito' AND assignee_id IS NOT NULL AND due_on <= $1", [today]);
+// Avisos de prazo (a cada 15 min): atrasada; vence hoje (de manhã); e, quando a tarefa tem hora, "vence em breve" na última hora antes
+// dela e "atrasada" assim que a hora passa. Cada aviso sai uma vez por dia (dedupe).
+async function dueTick(now = new Date()) {
+  const today = todayISO(now);
+  const hhmm = nowTime(now);
+  const { rows } = await db.query("SELECT id, title, due_on, due_time, assignee_id FROM tasks WHERE status <> 'feito' AND assignee_id IS NOT NULL AND due_on <= $1", [today]);
+  const minutes = (v) => { const [h, m] = toInputTime(v).split(':').map(Number); return h * 60 + m; };
   let sent = 0;
   for (const t of rows) {
-    const due = t.due_on instanceof Date ? t.due_on.toISOString().slice(0, 10) : String(t.due_on).slice(0, 10);
-    const late = due < today;
-    sent += (await notify({ type: 'tarefa', users: [t.assignee_id], title: late ? `Tarefa atrasada: ${t.title}` : `Tarefa vence hoje: ${t.title}`, body: late ? `Venceu em ${formatDay(due)}.` : null, url: `/tarefas/${t.id}`, entity: { type: 'task', id: t.id }, dedupe: `${late ? 'late' : 'due'}-${t.id}-${today}` })).length;
+    const due = isoDate(t.due_on);
+    const at = t.due_time ? formatTime(t.due_time) : '';
+    const late = isLate({ status: 'a_fazer', due_on: due, due_time: t.due_time }, today, hhmm);
+    const base = { type: 'tarefa', users: [t.assignee_id], url: `/tarefas/${t.id}`, entity: { type: 'task', id: t.id } };
+    if (late) {
+      sent += (await notify({ ...base, title: `Tarefa atrasada: ${t.title}`, body: due < today ? `Venceu em ${formatDay(due)}${at ? ` às ${at}` : ''}.` : `Venceu hoje às ${at}.`, dedupe: `late-${t.id}-${today}` })).length;
+      continue;
+    }
+    sent += (await notify({ ...base, title: `Tarefa vence hoje${at ? ` às ${at}` : ''}: ${t.title}`, body: null, dedupe: `due-${t.id}-${today}` })).length;
+    if (t.due_time && minutes(t.due_time) - minutes(hhmm) <= 60) {
+      sent += (await notify({ ...base, title: `Falta pouco: ${t.title}`, body: `Vence hoje às ${at}.`, dedupe: `soon-${t.id}-${today}` })).length;
+    }
   }
   return sent;
 }
 
-module.exports = { STATUSES, todayISO, addDays, get, list, parse, create, update, canEdit, applyRoutines, dueTick, formatDay };
+module.exports = { STATUSES, nowTime, isLate, isoDate, dueText, todayISO, addDays, get, list, parse, create, update, canEdit, applyRoutines, dueTick, formatDay };

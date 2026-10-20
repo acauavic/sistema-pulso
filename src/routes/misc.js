@@ -19,10 +19,10 @@ async function editorHome(req, res) {
     db.query("SELECT id, number, title, recorded_on FROM episodes WHERE status = 'disponivel_edicao' ORDER BY number NULLS LAST, id"),
     db.query(`SELECT id, number, title, status, review_round FROM episodes WHERE editor_id = $1 AND status IN ('em_edicao', 'em_revisao', 'em_finalizacao', 'pronto_publicar')
                ORDER BY CASE status WHEN 'em_edicao' THEN 0 WHEN 'em_revisao' THEN 1 ELSE 2 END, number DESC NULLS LAST`, [me]),
-    db.query("SELECT id, title, status, to_char(due_on, 'YYYY-MM-DD') AS due_on FROM tasks WHERE assignee_id = $1 AND status <> 'feito' ORDER BY due_on NULLS LAST, id LIMIT 8", [me]),
+    db.query("SELECT id, title, status, due_on, to_char(due_time, 'HH24:MI') AS due_time FROM tasks WHERE assignee_id = $1 AND status <> 'feito' ORDER BY due_on NULLS LAST, due_time NULLS LAST, id LIMIT 8", [me]),
   ]);
   const adjust = mine.filter((e) => e.status === 'em_edicao' && e.review_round > 0);
-  res.render('dashboard-editor', { title: 'Início', queue, mine, tasks, adjustCount: adjust.length, today: require('../services/calendar').todayISO(), EPISODE_STATUSES: require('../constants').EPISODE_STATUSES });
+  res.render('dashboard-editor', { title: 'Início', queue, mine, tasks: tasks.map((t) => ({ ...t, late: require('../services/tasks').isLate(t) })), adjustCount: adjust.length, today: require('../services/calendar').todayISO(), EPISODE_STATUSES: require('../constants').EPISODE_STATUSES });
 }
 
 router.get('/', wrap(async (req, res) => {

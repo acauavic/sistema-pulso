@@ -15,6 +15,7 @@
     <div class="row">
       <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>" <%= u.id === currentUser.id ? 'selected' : '' %>><%= u.name %></option><% }) %></select></label>
       <label>Vence em<input type="date" name="due_on"></label>
+      <label>Hora<input type="time" name="due_time" title="Sem data, a hora vale para hoje"></label>
       <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
     </div>
     <details <%= prefill.episode_id || prefill.guest_id || prefill.sponsor_id ? 'open' : '' %>>

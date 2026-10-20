@@ -86,11 +86,12 @@ const SOURCES = {
     const p = [from, to]; let w = 't.due_on BETWEEN $1::date AND $2::date';
     if (owner) { p.push(owner); w += ` AND t.assignee_id = $${p.length}`; }
     const { rows } = await db.query(
-      `SELECT t.id, t.title, t.status, to_char(t.due_on, 'YYYY-MM-DD') AS day, t.assignee_id, u.name AS who FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id
-        WHERE ${w} ORDER BY t.due_on, t.id LIMIT ${MAX_PER_TYPE}`, p);
+      `SELECT t.id, t.title, t.status, to_char(t.due_on, 'YYYY-MM-DD') AS day, to_char(t.due_time, 'HH24:MI') AS time, t.assignee_id, u.name AS who FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id
+        WHERE ${w} ORDER BY t.due_on, t.due_time NULLS LAST, t.id LIMIT ${MAX_PER_TYPE}`, p);
+    const nowHM = require('./tasks').nowTime();
     return rows.map((t) => ({
-      type: 'tarefa', id: `tarefa-${t.id}`, title: t.title, sub: C.TASK_STATUSES[t.status], day: t.day, time: null,
-      url: `/tarefas/${t.id}`, done: t.status === 'feito', late: t.status !== 'feito' && t.day < today, blocked: t.status === 'bloqueada', who: t.who, whoId: t.assignee_id,
+      type: 'tarefa', id: `tarefa-${t.id}`, title: t.title, sub: C.TASK_STATUSES[t.status], day: t.day, time: t.time,
+      url: `/tarefas/${t.id}`, done: t.status === 'feito', late: t.status !== 'feito' && (t.day < today || (t.day === today && Boolean(t.time) && t.time < nowHM)), blocked: t.status === 'bloqueada', who: t.who, whoId: t.assignee_id,
     }));
   },
 

@@ -154,7 +154,7 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
   ]);
   const [thread, linkedTasks] = await Promise.all([
     require('../services/comments').list('sponsor', sponsor.id),
-    db.query("SELECT t.id, t.title, t.status, t.due_on, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.sponsor_id = $1 ORDER BY (t.status = 'feito'), t.due_on NULLS LAST", [sponsor.id]),
+    db.query("SELECT t.id, t.title, t.status, t.due_on, t.due_time, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.sponsor_id = $1 ORDER BY (t.status = 'feito'), t.due_on NULLS LAST", [sponsor.id]),
   ]);
   const outreach = require('../services/outreach');
   const [outHist, outKnown, outEval] = await Promise.all([outreach.history('sponsor', sponsor.id), outreach.knownAddresses('sponsor', sponsor.id, sponsor), sponsor.stage === outreach.KINDS.sponsor.stage ? outreach.evaluateAll('sponsor', { ids: [sponsor.id] }) : new Map()]);

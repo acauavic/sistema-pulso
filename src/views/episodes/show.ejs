@@ -119,20 +119,20 @@
           <li class="task-row <%= t.status === 'feito' ? 'done' : '' %>">
             <form method="post" action="/episodios/<%= ep.id %>/tarefas/<%= t.id %>" class="task-quick">
               <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kind" value="<%= t.kind %>"><input type="hidden" name="notes" value="<%= t.notes || '' %>">
-              <input type="hidden" name="assignee_id" value="<%= t.assignee_id || '' %>"><input type="hidden" name="due_on" value="<%= fmt.toInputDate(t.due_on) %>">
+              <input type="hidden" name="assignee_id" value="<%= t.assignee_id || '' %>"><input type="hidden" name="due_on" value="<%= fmt.toInputDate(t.due_on) %>"><input type="hidden" name="due_time" value="<%= fmt.toInputTime(t.due_time) %>">
               <span class="task-title"><%= t.title %></span>
               <select name="status" aria-label="Status de <%= t.title %>" data-status-select <%= tickable ? '' : 'disabled' %>>
                 <% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= t.status === k ? 'selected' : '' %>><%= C.TASK_STATUSES[k] %></option><% }) %>
               </select>
             </form>
             <span class="task-meta small muted">
-              <%- include('../partials/dot', { type: 'task', id: t.id, user: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null, editable: perm.manage, label: true }) %><%= t.due_on ? ' · prazo ' + fmt.formatDayShort(t.due_on) : '' %><%= t.status === 'bloqueada' ? ' · bloqueada: ' + t.block_reason : '' %><%= t.notes ? ' · ' + t.notes : '' %>
+              <%- include('../partials/dot', { type: 'task', id: t.id, user: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null, editable: perm.manage, label: true }) %><%= t.due_on ? ' · prazo ' + fmt.formatDueShort(t.due_on, t.due_time) : '' %><%= t.status === 'bloqueada' ? ' · bloqueada: ' + t.block_reason : '' %><%= t.notes ? ' · ' + t.notes : '' %>
             </span>
             <span class="row task-actions">
               <% if (t.kind === 'cortes') { %><a class="small" href="/conteudo?episodio=<%= ep.id %>">abrir Conteúdo</a><% } %>
             <a class="small" href="/tarefas/<%= t.id %>">abrir</a>
             <% if (tickable) { %><button type="button" class="link small" data-modal-open="modal-task-edit"
-              data-task='<%= JSON.stringify({ id: t.id, title: t.title, kind: t.kind, status: t.status, assignee_id: t.assignee_id || "", due_on: fmt.toInputDate(t.due_on), notes: t.notes || "", block_reason: t.block_reason || "" }) %>'>detalhes</button><% } %>
+              data-task='<%= JSON.stringify({ id: t.id, title: t.title, kind: t.kind, status: t.status, assignee_id: t.assignee_id || "", due_on: fmt.toInputDate(t.due_on), due_time: fmt.toInputTime(t.due_time), notes: t.notes || "", block_reason: t.block_reason || "" }) %>'>detalhes</button><% } %>
             </span>
           </li>
           <% }) %>
@@ -392,6 +392,7 @@
       <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
       <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></label>
       <label>Prazo<input type="date" name="due_on"></label>
+      <label>Hora<input type="time" name="due_time"></label>
     </div>
     <div class="row modal-actions"><button class="btn primary" type="submit">Criar tarefa</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
@@ -406,6 +407,7 @@
       <label>Status<select name="status" data-f="status"><% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_STATUSES[k] %></option><% }) %></select></label>
       <label>Responsável<select name="assignee_id" data-f="assignee_id" <%= perm.manage ? '' : 'disabled' %>><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></label>
       <label>Prazo<input type="date" name="due_on" data-f="due_on" <%= perm.manage ? '' : 'disabled' %>></label>
+      <label>Hora<input type="time" name="due_time" data-f="due_time" <%= perm.manage ? '' : 'disabled' %>></label>
     </div>
     <label>Motivo do bloqueio <small class="muted">(se o status for Bloqueada)</small><input type="text" name="block_reason" maxlength="500" data-f="block_reason"></label>
     <label>Observação<textarea name="notes" rows="3" maxlength="1000" data-f="notes"></textarea></label>

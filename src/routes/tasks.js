@@ -74,7 +74,7 @@ router.get('/tarefas', requirePerm('tasks.read'), wrap(async (req, res) => {
   const prefill = { episode_id: req.query.episodio || '', guest_id: req.query.convidado || '', sponsor_id: req.query.patrocinador || '' };
   res.render('tasks/index', {
     title: 'Tarefas', items, scope, view, q, cal, scopes: SCOPES, views: VIEWS, counts: counts.rows[0], ...opts, prefill, openNew: req.query.nova === '1',
-    voiceReady: voiceReady(), today: tasks.todayISO(), isoOf, C, canEdit: (t) => tasks.canEdit(req.user, t),
+    voiceReady: voiceReady(), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), isoOf, C, canEdit: (t) => tasks.canEdit(req.user, t),
   });
 }));
 
@@ -119,7 +119,7 @@ router.get('/tarefas/:id', requirePerm('tasks.read'), wrap(async (req, res) => {
   const task = await tasks.get(req.params.id);
   if (!task) return notFound(res);
   const [opts, thread] = await Promise.all([linkOptions(), comments.list('task', task.id)]);
-  res.render('tasks/show', { title: task.title, task, ...opts, comments: thread, C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO() });
+  res.render('tasks/show', { title: task.title, task, ...opts, comments: thread, C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t) });
 }));
 
 router.post('/tarefas/:id', requirePerm('tasks.write'), wrap(async (req, res) => {
@@ -127,7 +127,7 @@ router.post('/tarefas/:id', requirePerm('tasks.write'), wrap(async (req, res) =>
   const task = await tasks.get(req.params.id);
   if (!task) return notFound(res);
   if (!tasks.canEdit(req.user, task)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Você só altera tarefas que criou ou que são suas.' });
-  const { values, error } = tasks.parse({ ...task, due_on: isoOf(task.due_on) || '', ...req.body });
+  const { values, error } = tasks.parse({ ...task, due_on: isoOf(task.due_on) || '', due_time: task.due_time || '', ...req.body });
   if (error) { await req.flash('error', error); return res.redirect(`/tarefas/${task.id}`); }
   const links = await readLinks(req.body);
   const result = await tasks.update(task, values, req.user, { assigneeId: req.body.assignee_id !== undefined ? (isUuid(req.body.assignee_id) ? req.body.assignee_id : null) : undefined });

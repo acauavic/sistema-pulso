@@ -202,7 +202,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const clicks = await guestsSvc.clickStats(guest.id);
   const [thread, linkedTasks, episode] = await Promise.all([
     require('../services/comments').list('guest', guest.id),
-    db.query("SELECT t.id, t.title, t.status, t.due_on, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.guest_id = $1 ORDER BY (t.status = 'feito'), t.due_on NULLS LAST", [guest.id]),
+    db.query("SELECT t.id, t.title, t.status, t.due_on, t.due_time, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.guest_id = $1 ORDER BY (t.status = 'feito'), t.due_on NULLS LAST", [guest.id]),
     db.query('SELECT id, number, status, youtube_url, spotify_url FROM episodes WHERE guest_id = $1', [guest.id]),
   ]);
   const { rows: bookings } = await db.query('SELECT b.role, s.id, s.company FROM sponsor_bookings b JOIN sponsors s ON s.id = b.sponsor_id WHERE b.guest_id = $1 ORDER BY s.company', [guest.id]);

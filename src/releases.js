@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.16.0', date: '2026-10-20', title: 'Tarefas com hora',
+    items: [
+      { kind: 'novo', text: 'As tarefas agora podem ter hora, além da data (opcional): "entregar hoje às 14h". O campo Hora fica ao lado de "Vence em" ao criar e editar. Se você preencher só a hora, vale para hoje.' },
+      { kind: 'novo', text: 'A hora aparece nas listas, no quadro, no calendário, na página da tarefa, nas telas de convidado e patrocinador e na notificação que a pessoa recebe (nova tarefa, tarefa atribuída, prazo alterado).' },
+      { kind: 'novo', text: 'Avisos de prazo mais úteis: de manhã, "Tarefa vence hoje às 14h"; na última hora, "Falta pouco"; e quando a hora passa, a tarefa fica atrasada e a pessoa é avisada. Sem hora, a tarefa continua vencendo no fim do dia.' },
+      { kind: 'ajuste', text: 'Tarefa por voz e assistente entendem a hora: "entregar hoje às 14 horas" já vem preenchido com a data de hoje e 14:00.' },
+    ],
+  },
+  {
     version: '1.15.0', date: '2026-10-20', title: 'Tarefa por voz',
     items: [
       { kind: 'novo', text: 'Em Tarefas, o botão "Falar tarefa" (e o botão dentro de "Nova tarefa") grava sua voz: você divaga sobre o que precisa ser feito, para quem e até quando, e a IA organiza em uma tarefa: título curto no imperativo, detalhes só com o que ajuda, responsável, prazo, tipo e vínculo com episódio, convidado ou patrocinador citados.' },
