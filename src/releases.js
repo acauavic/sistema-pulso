@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.19.0', date: '2026-10-20', title: 'Assistente de IA atualizado: entende o sistema e faz mais',
+    items: [
+      { kind: 'novo', text: 'O assistente agora conhece o sistema de hoje: tarefas com hora e voz, comentários com anexos e áudio, cadência de follow-up, plateia (pedidos, quadro, pagamento), financeiro e estoque, media kit, Google Agenda e o painel de gestão. Pergunte "como faço…" e ele responde com os passos e diz se o seu perfil faz.' },
+      { kind: 'novo', text: 'Novas consultas: quem precisa de follow-up, pedidos da plateia e quem está selecionado, resumo do financeiro e contas em aberto, estoque para repor, suas notificações, o que mudou no sistema, quem é quem na equipe e os últimos comentários de um item (com áudios transcritos).' },
+      { kind: 'novo', text: 'Novas ações, só quando você pede: criar tarefa para outra pessoa com prazo e hora, concluir ou mudar uma tarefa, comentar num item, registrar uma abordagem, trocar o responsável, mudar a etapa de um convidado, avançar um episódio e cuidar da plateia (adicionar, mudar a situação, selecionar).' },
+      { kind: 'ajuste', text: 'Ações de efeito maior (mudar etapa, selecionar na plateia, cancelar cobrança) sempre mostram um resumo e esperam o seu "sim". Tudo segue as regras das telas e o seu perfil, e fica na auditoria como feito pelo assistente.' },
+    ],
+  },
+  {
     version: '1.18.0', date: '2026-10-20', title: 'Todos os comentários com texto rico, anexos e áudio',
     items: [
       { kind: 'novo', text: 'Convidados, patrocinadores, episódios e cortes passam a ter a mesma caixa de comentário das tarefas: formatação, tabelas, imagens coladas (Ctrl+V), PDF, HTML e ZIP, miniatura de links, @menções e áudio com transcrição.' },

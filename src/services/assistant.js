@@ -1,6 +1,7 @@
 // Assistente de IA do painel: conversa com histórico (por pessoa), entende texto ou áudio (Groq Whisper) e consulta o sistema
 // por ferramentas que respeitam o perfil de quem pergunta (nunca mostra o que a pessoa não poderia ver no painel).
-// Só duas ações mudam dados, e só quando a pessoa pede: criar tarefa e cadastrar convidado novo (em Prospecção).
+// Ele também age (criar e atualizar tarefas, comentar, registrar abordagem, trocar responsável, mudar etapas, plateia), só quando a pessoa pede,
+// com as mesmas regras das telas e dupla checagem nas ações de maior efeito (assistantActions.js).
 const db = require('../db/pool');
 const gemini = require('./gemini');
 const search = require('./search');
@@ -14,7 +15,7 @@ const fmt = require('../utils/format');
 const { clean, isEmail } = fmt;
 
 const MAX_HISTORY = 20; // mensagens que vão como contexto
-const MAX_ROUNDS = 4;   // voltas de ferramenta por pergunta
+const MAX_ROUNDS = 6;   // voltas de ferramenta por pergunta (achar o item, conferir, confirmar, agir)
 
 const when = (d) => (d ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(new Date(d)) : null);
 const epNo = (n) => (n ? `EP.${String(n).padStart(3, '0')}` : 'EP sem número');
@@ -32,12 +33,12 @@ const TOOLS = [
   },
   {
     perm: 'tasks.read',
-    decl: { name: 'tarefas', description: 'Lista tarefas. escopo: "minhas" (abertas da pessoa), "hoje" (vencendo hoje ou atrasadas da pessoa) ou "todas" (da equipe).', parameters: { type: 'OBJECT', properties: { escopo: { type: 'STRING', enum: ['minhas', 'hoje', 'todas'] } } } },
-    async run({ escopo = 'minhas' }, user) {
-      const rows = await tasksSvc.list({ user, scope: ['minhas', 'hoje', 'todas'].includes(escopo) ? escopo : 'minhas' });
-      return rows.filter((t) => t.status !== 'feito').slice(0, 25).map((t) => ({
-        titulo: t.title, status: C.TASK_STATUSES[t.status], vence: t.due_on ? fmt.formatDue(t.due_on, t.due_time) : null, responsavel: t.assignee_name || null,
-        bloqueio: t.block_reason || null, link: `/tarefas/${t.id}`,
+    decl: { name: 'tarefas', description: 'Lista tarefas abertas. escopo: "minhas" (abertas da pessoa), "hoje" (vencendo hoje ou atrasadas da pessoa) ou "todas" (da equipe). busca: parte do título ou dos detalhes. atrasadas=true mostra só as atrasadas (considera a hora). Cada tarefa traz o id, que serve para atualizar_tarefa.', parameters: { type: 'OBJECT', properties: { escopo: { type: 'STRING', enum: ['minhas', 'hoje', 'todas'] }, busca: { type: 'STRING' }, atrasadas: { type: 'BOOLEAN' } } } },
+    async run({ escopo = 'minhas', busca = '', atrasadas = false }, user) {
+      const rows = await tasksSvc.list({ user, scope: ['minhas', 'hoje', 'todas'].includes(escopo) ? escopo : 'minhas', q: String(busca || '').trim().slice(0, 80) });
+      return rows.filter((t) => t.status !== 'feito' && (!atrasadas || tasksSvc.isLate(t))).slice(0, 25).map((t) => ({
+        id: t.id, titulo: t.title, status: C.TASK_STATUSES[t.status], vence: t.due_on ? fmt.formatDue(t.due_on, t.due_time) : null, atrasada: tasksSvc.isLate(t) || undefined, responsavel: t.assignee_name || null,
+        detalhes: t.description ? String(t.description).replace(/\s+/g, ' ').slice(0, 160) : undefined, bloqueio: t.block_reason || null, comentarios: t.comments || undefined, link: `/tarefas/${t.id}`,
       }));
     },
   },
@@ -63,15 +64,19 @@ const TOOLS = [
             WHERE ($1::int IS NOT NULL AND e.number = $1) OR ($2::text IS NOT NULL AND (e.title ILIKE $2 OR g.name ILIKE $2)) ORDER BY e.number DESC NULLS LAST LIMIT 1`,
           [numero ? Number(numero) : null, texto ? like(texto) : null]);
         if (!ep) return { erro: 'Episódio não encontrado.' };
-        const [moves, tasks, clips] = await Promise.all([
+        const [moves, tasks, clips, material, review] = await Promise.all([
           prod.availableMoves(ep, user.role),
           db.query("SELECT title, status, due_on, due_time FROM tasks WHERE episode_id = $1 AND status <> 'feito' ORDER BY due_on NULLS LAST, due_time NULLS LAST", [ep.id]),
           db.query("SELECT count(*)::int AS n, count(*) FILTER (WHERE status = 'pronto')::int AS prontos FROM episode_clips WHERE episode_id = $1", [ep.id]),
+          db.query("SELECT kind, count(*)::int AS n FROM episode_files WHERE episode_id = $1 AND status = 'pronto' GROUP BY kind", [ep.id]),
+          db.query('SELECT count(*) FILTER (WHERE NOT resolved)::int AS abertos, count(*)::int AS total FROM episode_comments WHERE episode_id = $1', [ep.id]),
         ]);
         return {
           episodio: `${epNo(ep.number)} ${ep.title}`, etapa: C.EPISODE_STATUSES[ep.status], convidado: ep.guest_name, editor: ep.editor_name, gravado_em: ep.recorded_on ? fmt.formatDay(ep.recorded_on) : null,
           proximos_passos: moves.map((m) => ({ acao: m.label, pode_fazer: m.allowed, falta: m.missing })),
           tarefas_abertas: tasks.rows.map((t) => ({ titulo: t.title, status: C.TASK_STATUSES[t.status], vence: t.due_on ? fmt.formatDue(t.due_on, t.due_time) : null })),
+          material_enviado: Object.fromEntries(material.rows.map((m) => [C.EPISODE_FILE_KINDS[m.kind] || m.kind, m.n])), revisao_do_video: { comentarios_em_aberto: review.rows[0].abertos, total: review.rows[0].total },
+          links_de_publicacao: { youtube: ep.youtube_url || null, spotify: ep.spotify_url || null },
           cortes: clips.rows[0], link: `/episodios/${ep.id}`,
         };
       }
@@ -278,42 +283,31 @@ const TOOLS = [
       };
     },
   },
-  {
-    perm: 'tasks.write',
-    decl: { name: 'criar_tarefa', description: 'Cria uma tarefa. SÓ use quando a pessoa pedir claramente para criar/anotar uma tarefa. vencimento no formato AAAA-MM-DD; hora (opcional) no formato HH:MM, horário de Brasília.', parameters: { type: 'OBJECT', properties: { titulo: { type: 'STRING' }, descricao: { type: 'STRING' }, vencimento: { type: 'STRING' }, hora: { type: 'STRING' } }, required: ['titulo'] } },
-    async run({ titulo, descricao, vencimento, hora }, user) {
-      const { values, error } = tasksSvc.parse({ title: titulo, description: descricao || '', due_on: /^\d{4}-\d{2}-\d{2}$/.test(vencimento || '') ? vencimento : '', due_time: /^\d{2}:\d{2}$/.test(hora || '') ? hora : '' });
-      if (error) return { erro: error };
-      const t = await tasksSvc.create({ values, user, assigneeId: user.id, notifyAssignee: false });
-      return { criada: true, titulo: t.title, vence: t.due_on ? fmt.formatDue(t.due_on, t.due_time) : null, link: `/tarefas/${t.id}` };
-    },
-  },
+  ...require('./assistantReads').TOOLS,
+  ...require('./assistantActions').TOOLS,
 ];
 
 const toolsFor = (user) => TOOLS.filter((t) => !t.perm || can(user.role, t.perm));
 
 function systemPrompt(user, page) {
-  const today = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full' }).format(new Date());
+  const today = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' }).format(new Date());
   return [
     'Você é o assistente do Pulso Gestão, o painel da equipe do Podcast Pulso ("As conversas que estão movimentando a saúde").',
-    `Hoje é ${today}. Quem pergunta: ${user.name} (${ROLES[user.role]?.label || user.role}).${page ? ` A pessoa está na página ${page}.` : ''}`,
+    `Agora é ${today} (horário de Brasília). Quem pergunta: ${user.name} (${ROLES[user.role]?.label || user.role}).${page ? ` A pessoa está na página ${page}.` : ''}`,
     'Tom: português do Brasil, direto e cordial, frases curtas, sem exclamações, sem emoji, sem superlativos. Responda em poucas linhas; use listas curtas com "-" quando ajudar.',
-    'Use as ferramentas para responder sobre dados do painel (agenda, tarefas, episódios, convidados, patrocinadores, redes). Nunca invente números, nomes ou datas: se a ferramenta não trouxer, diga que não encontrou.',
+    'Regra de ouro: nunca invente números, nomes, datas, valores ou passos. Dado do painel vem das ferramentas; se não vier, diga que não encontrou. Datas relativas (amanhã, sexta, dia 25) você converte pela data de hoje; "às 14" é a hora, em Brasília.',
     'Quando citar algo do painel, inclua o link no formato [texto](/caminho) usando os links que as ferramentas devolvem.',
-    'Como o sistema funciona (use para instruir; confirme sempre se o perfil da pessoa faz o passo):',
-    '- Convidados (CRM): etapas Prospecção, Convite enviado, Em agendamento, Agendado, Gravado, Perdido e Cancelado. Em agendamento e Agendado exigem a foto do convidado (enviada na página dele, bloco "Podcast com plateia"; a pessoa enquadra a foto na moldura 4:3 que vale para a plateia, o media kit, o portal do patrocinador e o painel); Em agendamento pede e-mail ou WhatsApp; Agendado pede data, hora e a confirmação do estúdio, dos hosts e do convidado; Perdido pede o motivo (Recusado, Sem agenda próxima, Nunca respondeu, Parou de responder, Conflito de interesse ou Outros com descrição). A etapa muda pelo quadro (arrastar), pelo botão de próximo passo ou pela etiqueta da etapa no topo da página do convidado.',
-    '- Aceite do convite: quando o convidado clica em Aceitar, vai para Em agendamento e a equipe recebe uma notificação. Se foi por engano, quem edita convidados usa "Zerar aceite e voltar para Prospecção" na aba Convite do convidado.',
-    '- Edição em massa: em Convidados > Lista, marque os convidados e use "Editar em massa" para mudar etapa, responsável, perfil, gênero e patrocinador. Agendado e Gravado não vão em massa. Quem não tem o que a etapa exige fica onde está e aparece no resultado.',
-    '- Importar CSV (Convidados > Importar CSV): aceita status, data da gravação, motivo da perda e, para Gravado ou Publicado, o episódio com links do YouTube e do Spotify.',
-    '- Quando o convidado fica Agendado, vira agenda (media kit, portal dos patrocinadores e página da plateia). Os lembretes da gravação (3 dias, 1 dia, no dia de manhã e 3 horas antes) aparecem em Notificações > Lembretes da gravação, com a mensagem pronta e o botão do WhatsApp; a produtora envia e marca como enviado.',
-    '- Quando grava, nasce o episódio: Gravado, Disponível para edição, Em edição, Em revisão, Em finalização, Pronto para publicar e Publicado (material bruto, edição, revisão, finalização com IA, publicação). Cortes são enviados em Conteúdo e atribuídos a um episódio.',
-    '- Social: publicações, novo post (a produtora pede e a gestão aprova), ideias por episódio, insights e automações de comentários e directs. Patrocinador: Prospecção, Em negociação, Ganho (formulário de cadastro), Ativo (portal e entregas). Tarefas têm lista, quadro e calendário. Plateia: página pública de inscrição, com agenda gerada dos convidados agendados.',
-    '- Alertas: cada pessoa liga os alertas do navegador em Notificações > Avisos > Alertas neste aparelho (no iPhone, só com o painel na Tela de Início).',
+    'O sistema (mapa): Painel/Início, Notificações, Tarefas (com hora, anexos, voz), Calendário (+ Google Agenda), Convidados (CRM e convite), Patrocinadores (planos e media kit), Episódios (produção, material, revisão, finalização), Conteúdo (cortes), Social, Plateia (pedidos, quadro, pagamento), Financeiro (contas, caixa, estoque) e Gestão (usuários, logs, cadência, lembretes, rotinas, notificações, WhatsApp dos convites, planos, galeria do media kit, integrações, busca, saúde do sistema). Comentários de todos os itens aceitam texto formatado, anexos, imagens e áudio com transcrição.',
+    'O QUE VOCÊ CONSULTA: buscar, tarefas, agenda, calendario, episodios, convidado, lista_convidados, patrocinador, social, numeros, follow_ups, plateia, financeiro, contas, estoque, notificacoes, novidades, equipe, comentarios e como_fazer. Consulte as ferramentas em vez de responder de memória, e combine mais de uma quando a pergunta pedir (ex.: tarefas + calendario).',
+    'COMO FAZER: para "como faço", "onde fica" ou "como funciona", chame SEMPRE como_fazer primeiro e responda com os passos que ele devolver, adaptados ao perfil de quem pergunta (campo seu_perfil_faz e quem_faz). Se o perfil não faz o passo, diga quem faz.',
+    'O QUE VOCÊ FAZ (só quando a pessoa pedir claramente): criar_tarefa, atualizar_tarefa, comentar, registrar_abordagem, definir_responsavel, criar_convidado, mudar_etapa_convidado, avancar_episodio, plateia_adicionar, plateia_situacao e plateia_selecionar. Tudo sai em nome da pessoa e fica registrado como feito pelo assistente.',
+    'Como agir: (1) ache o item pela ferramenta de consulta ou pelo próprio nome; se a ferramenta devolver "opcoes" (mais de um item), pergunte qual. (2) Faltou dado obrigatório (nome, Instagram e perfil de convidado; valor ou isenção para selecionar na plateia; destino da etapa), pergunte antes de chamar. (3) Se a ferramenta devolver precisa_confirmar, mostre o resumo à pessoa, pergunte "confirma?" e só chame de novo com confirmado=true depois do sim dela; nunca confirme por conta própria. (4) Se devolver erro, explique com as palavras da ferramenta e diga o próximo passo; não diga que fez. (5) Depois de agir, confirme em uma frase o que mudou e dê o link.',
+    'Você NÃO: publica posts, lança ou paga contas, apaga nada, muda etapa de patrocinador, envia arquivos nem mexe em configurações. Para isso, explique onde a pessoa faz no painel (como_fazer), pelo perfil dela.',
     guide.promptSection(user.role),
-    'Calendário (menu Calendário): reúne tudo que tem data, com filtros por tipo e por responsável e visualizações salvas (pessoais ou da equipe). Para "o que tenho hoje, esta semana ou neste mês", use a ferramenta calendario e cite o link /calendario. "Só os meus" inclui o que é do perfil da pessoa: gestão e superadmin respondem por todas as gravações, contas a pagar e a receber; a produtora, por todos os lembretes da gravação e pelas cobranças da plateia.',
-    'Números: para "quantos", "quanto está parado", "como está o funil", use a ferramenta numeros (e lista_convidados para dizer quem são). Cite o número exato que veio, com o link. Se o assunto aparecer em sem_acesso_para_o_seu_perfil, diga que o perfil da pessoa não vê isso e quem vê.',
-    'Cadastro: se a pessoa pedir para cadastrar um convidado, use criar_convidado. Nome, Instagram e perfil são obrigatórios: pergunte o que faltar antes de chamar. Depois confirme o que foi criado e diga o próximo passo.',
-    'Para criar tarefa, use criar_tarefa apenas quando a pessoa pedir; confirme o que foi criado. Você só cria tarefas e convidados novos (em Prospecção). Não muda etapas, não publica, não edita e não apaga nada: explique onde a pessoa faz isso no painel, pelo perfil dela.',
+    'Calendário: para "o que tenho hoje, esta semana ou neste mês", use calendario e cite /calendario. "Só os meus" inclui o que é do perfil da pessoa (gestão e superadmin: gravações, contas a pagar e a receber; produtora: lembretes da gravação e cobranças da plateia).',
+    'Números: para "quantos", "quanto está parado", "como está o funil", use numeros (e lista_convidados para dizer quem são). Cite o número exato, com o link. Se o assunto aparecer em sem_acesso_para_o_seu_perfil, diga que o perfil não vê isso e quem vê.',
+    'Follow-up e cadência: "quem eu preciso abordar", "o que está atrasado na cadência" = follow_ups. Depois que a pessoa disser que abordou alguém, use registrar_abordagem.',
+    'Tarefas: para "minhas tarefas", "o que está atrasado" use tarefas (cada uma traz o id). Para concluir, mudar prazo, hora, responsável ou status, use atualizar_tarefa. Para criar com responsável, prazo e hora, use criar_tarefa.',
   ].join('\n');
 }
 

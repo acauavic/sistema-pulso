@@ -73,22 +73,17 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
 const flashBack = (req) => (/^\/plateia\/painel[?=&a-z_0-9]*$/.test(String(req.body.voltar || '')) ? req.body.voltar : '/plateia/painel');
 const findLead = async (id) => (isIntId(id) ? (await db.query('SELECT * FROM plateia_leads WHERE id = $1', [id])).rows[0] : null);
 
-// Muda a situação do pedido e cuida do que vem junto (link de pagamento ao avaliar, conta a receber ao deixar de selecionar).
-// Devolve { reload }: true quando houve um aviso que a pessoa precisa ver (o quadro recarrega para mostrar).
+// Muda a situação do pedido e traduz o que aconteceu em avisos de tela. Devolve { reload }: true quando há um aviso que a pessoa precisa ver.
 async function applyStatus(req, lead, status) {
+  const r = await audience.changeStatus(lead, status, req.user.id);
   let reload = false;
-  await db.query('UPDATE plateia_leads SET status = $2, updated_at = now() WHERE id = $1', [lead.id, status]);
-  if (status === 'em_atendimento' && config.infinitepayConfigured && !(await infinitePay.currentLink(lead.id)) && lead.status !== 'confirmado') { // em avaliação: já nasce o link de pagamento
+  if (r.link) {
     reload = true;
-    try {
-      const link = await infinitePay.createLink({ lead, amountCents: await infinitePay.defaultAmount(lead), userId: req.user.id });
-      await audit(req, 'plateia.link_criado', 'plateia_lead', lead.id, { valor: Number(link.amount_cents) });
-      await req.flash('ok', `Em avaliação. O link de pagamento de ${formatBRL(link.amount_cents)} está em "Link de pagamento" no pedido.`);
-    } catch (err) { await req.flash('error', `Situação atualizada, mas não consegui gerar o link de pagamento: ${err.message}`); }
-  }
+    await audit(req, 'plateia.link_criado', 'plateia_lead', lead.id, { valor: Number(r.link.amount_cents) });
+    await req.flash('ok', `Em avaliação. O link de pagamento de ${formatBRL(r.link.amount_cents)} está em "Link de pagamento" no pedido.`);
+  } else if (r.linkError) { reload = true; await req.flash('error', `Situação atualizada, mas não consegui gerar o link de pagamento: ${r.linkError}`); }
   if (lead.status === 'confirmado') {
     reload = true;
-    const r = await audience.releaseLead(lead);
     await req.flash('ok', r.kept ? 'Situação atualizada. O pagamento já recebido continua nas contas do financeiro.' : 'Situação atualizada e a conta a receber foi cancelada.');
   }
   return { reload };

@@ -184,7 +184,7 @@ describe('assistente de IA', () => {
       assert.match(editorPrompt, /pode: .*assumir a edição, subir o vídeo editado/);
       assert.match(editorPrompt, /NÃO pode \(e quem pode\): .*cadastrar e editar convidados.*\[Superadmin ou Gestão ou Produtora\]/);
       assert.match(editorPrompt, /aprovar ou devolver pedidos de post.*\[Superadmin ou Gestão\]/);
-      assert.match(editorPrompt, /Zerar aceite e voltar para Prospecção/); assert.match(editorPrompt, /Editar em massa/); assert.match(editorPrompt, /Lembretes da gravação/);
+      assert.match(editorPrompt, /como_fazer/); assert.match(editorPrompt, /precisa_confirmar/); assert.match(editorPrompt, /Plateia \(pedidos, quadro, pagamento\)/);
       script = [{ text: 'Ok.' }]; await post(as.gestao, '/assistente/mensagem', { text: 'o que eu posso fazer?' });
       const gestaoPrompt = geminiBodies.at(-1).systemInstruction.parts[0].text;
       assert.match(gestaoPrompt, /Perfil de quem pergunta: Gestão/);

@@ -191,6 +191,20 @@ async function confirmLead(lead, { amountCents, dueOn, paidOn = null, exempt = f
   return { ok: true, entryId: entry.id, today: fin.todayISO() };
 }
 
+// Muda a situação do pedido e cuida do que vem junto: ao entrar em "Em avaliação" nasce o link de pagamento (se a InfinitePay está
+// configurada); ao deixar "Selecionado", a conta a receber ainda não paga é cancelada. Devolve o que aconteceu, sem mensagens de tela.
+async function changeStatus(lead, status, userId) {
+  const config = require('../config');
+  const infinitePay = require('./infinitePay');
+  const out = { link: null, linkError: null, released: false, kept: false };
+  await db.query('UPDATE plateia_leads SET status = $2, updated_at = now() WHERE id = $1', [lead.id, status]);
+  if (status === 'em_atendimento' && config.infinitepayConfigured && !(await infinitePay.currentLink(lead.id)) && lead.status !== 'confirmado') {
+    try { out.link = await infinitePay.createLink({ lead, amountCents: await infinitePay.defaultAmount(lead), userId }); } catch (err) { out.linkError = err.message; }
+  }
+  if (lead.status === 'confirmado') { const r = await releaseLead(lead); out.released = !r.kept; out.kept = r.kept; }
+  return out;
+}
+
 // Mudou a situação para outra que não "Selecionado": a conta ainda não recebida deixa de existir.
 async function releaseLead(lead) {
   if (!lead.entry_id) return { kept: false };
@@ -271,7 +285,7 @@ async function reminderTick(now = new Date()) {
 }
 
 module.exports = {
-  addLead, reminderTick, producerFor,
+  changeStatus, addLead, reminderTick, producerFor,
   todayISO: () => require('./finance').todayISO(), confirmLead, releaseLead, setReceived,
   settings, COUNTRIES, COUNTRY_BY_CODE, validatePhone, dateLong, timeShort, weekday, money, agenda, agendaGuest, cleanUtm, cleanVisitor, recordEvent, whatsappMessage, createLead, TERMS_VERSION, results, EVENT_TYPES, clip,
 };
