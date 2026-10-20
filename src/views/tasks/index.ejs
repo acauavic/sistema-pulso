@@ -14,6 +14,7 @@
       <a class="<%= view === 'quadro' ? 'on' : '' %>" href="<%= url({ visao: 'quadro', mes: '' }) %>"><%- icon('columns-3') %> Quadro</a>
       <a class="<%= view === 'calendario' ? 'on' : '' %>" href="<%= url({ visao: 'calendario' }) %>"><%- icon('calendar') %> Calendário</a>
     </div>
+    <% if (can('tasks.write') && voiceReady) { %><button class="btn" type="button" data-voice-open title="Falar a tarefa: a IA organiza" aria-label="Falar a tarefa"><%- icon('mic') %> Falar tarefa</button><% } %>
     <% if (can('tasks.write')) { %><button class="btn primary" type="button" data-modal-open="modal-task-new"><%- icon('plus') %> Nova tarefa</button><% } %>
   </div>
 </div>
@@ -93,4 +94,5 @@
 
 <% if (can('tasks.write')) { %><%- include('_new', { back: here }) %><% } %>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<script src="/static/tarefa-voz.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/foot') %>

@@ -1,5 +1,9 @@
 // Área Tarefas: minhas, hoje e todas; em lista, quadro (Kanban) ou calendário. Status: a fazer, fazendo, feito e bloqueada (com motivo).
 const express = require('express');
+const config = require('../config');
+const groq = require('../services/groq');
+const taskVoice = require('../services/taskVoice');
+const { createLimiter } = require('../auth/rateLimit');
 const db = require('../db/pool');
 const tasks = require('../services/tasks');
 const comments = require('../services/comments');
@@ -10,6 +14,9 @@ const { audit } = require('../services/audit');
 const { wrap, isIntId, isUuid } = require('../utils/wrap');
 
 const router = express.Router();
+const voiceLimiter = createLimiter({ name: 'tarefa-voz', max: 30, windowMs: 10 * 60_000 });
+const MAX_AUDIO = 8 * 1024 * 1024; // ~2 min de voz
+const voiceReady = () => config.groqConfigured && config.geminiConfigured;
 const SCOPES = { minhas: 'Minhas tarefas', hoje: 'Hoje', todas: 'Todas' };
 const VIEWS = { lista: 'Lista', quadro: 'Quadro', calendario: 'Calendário' };
 const wantsJson = (req) => /json/.test(req.get('accept') || '');
@@ -67,8 +74,32 @@ router.get('/tarefas', requirePerm('tasks.read'), wrap(async (req, res) => {
   const prefill = { episode_id: req.query.episodio || '', guest_id: req.query.convidado || '', sponsor_id: req.query.patrocinador || '' };
   res.render('tasks/index', {
     title: 'Tarefas', items, scope, view, q, cal, scopes: SCOPES, views: VIEWS, counts: counts.rows[0], ...opts, prefill, openNew: req.query.nova === '1',
-    today: tasks.todayISO(), isoOf, C, canEdit: (t) => tasks.canEdit(req.user, t),
+    voiceReady: voiceReady(), today: tasks.todayISO(), isoOf, C, canEdit: (t) => tasks.canEdit(req.user, t),
   });
+}));
+
+// Tarefa por voz: o navegador manda o áudio, o servidor transcreve e organiza em um rascunho de tarefa (nada é criado aqui).
+router.post('/tarefas/voz', requirePerm('tasks.write'), express.raw({ type: () => true, limit: MAX_AUDIO }), wrap(async (req, res) => {
+  const fail = (status, error) => res.status(status).json({ ok: false, error });
+  if (!voiceReady()) return fail(503, 'A tarefa por voz precisa da transcrição (Groq) e da IA (Gemini) configuradas neste servidor.');
+  const type = String(req.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!type.startsWith('audio/') && type !== 'video/webm') return fail(400, 'Formato de áudio não aceito.');
+  if (!Buffer.isBuffer(req.body) || req.body.length < 500) return fail(400, 'A gravação ficou vazia. Tente de novo.');
+  if (!await voiceLimiter.hit(req.user.id)) return fail(429, 'Muitas gravações seguidas. Espere alguns minutos.');
+  let text;
+  try { text = await groq.transcribe(req.body, { filename: `tarefa.${type.split('/')[1] || 'webm'}`, contentType: type }); } catch (err) {
+    console.error('[tarefa por voz] transcrição:', err.message);
+    return fail(502, 'Não consegui entender o áudio agora. Tente de novo ou escreva a tarefa.');
+  }
+  if (!text) return fail(422, 'Não ouvi nada na gravação. Tente de novo mais perto do microfone.');
+  let r;
+  try { r = await taskVoice.organize({ text, user: req.user }); } catch (err) {
+    console.error('[tarefa por voz] organização:', err.message);
+    return fail(502, 'Entendi o áudio, mas não consegui organizar a tarefa agora. Tente de novo.');
+  }
+  if (r.error) return res.status(422).json({ ok: false, error: r.error, transcript: text });
+  await audit(req, 'tarefa.voz', 'task', null, { caracteres: text.length });
+  res.json({ ok: true, transcript: text, draft: r.draft, warnings: r.warnings });
 }));
 
 router.post('/tarefas', requirePerm('tasks.write'), wrap(async (req, res) => {

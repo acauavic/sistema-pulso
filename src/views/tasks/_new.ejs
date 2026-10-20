@@ -3,6 +3,13 @@
   <form method="post" action="/tarefas" class="stack">
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= back %>">
     <h2 id="nt-h">Nova tarefa</h2>
+    <% if (voiceReady) { %>
+    <div class="voice-bar" data-voice data-url="/tarefas/voz">
+      <button class="btn sm" type="button" data-voice-btn><span data-voice-ic="mic"><%- icon('mic', 16) %></span><span data-voice-ic="stop" hidden><%- icon('square', 14) %></span> <span data-voice-label>Falar a tarefa</span></button>
+      <span class="small muted" data-voice-status>Diga o que precisa ser feito, para quem e até quando. A IA organiza nos campos abaixo.</span>
+    </div>
+    <details class="small" data-voice-heard hidden><summary>O que eu ouvi</summary><p class="muted" data-voice-text></p></details>
+    <% } %>
     <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="Ex.: confirmar a pauta com o convidado"></label>
     <label>Detalhes <small class="muted">(opcional)</small><textarea name="description" rows="3" maxlength="4000"></textarea></label>
     <div class="row">

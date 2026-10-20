@@ -960,3 +960,15 @@ dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z
 .ptable .row-menu-list { left: 0; right: auto; }
 .pbar-filters input[type="search"] { min-width: 0; }
 .main:has(.pane:not([hidden]) .pboard) .lead { display: none; } /* no quadro o espaço é do quadro */
+
+/* ---------------------------------------------------------------- tarefa por voz */
+.voice-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: var(--r-card); }
+.voice-bar .btn { flex: none; } .voice-bar .small { min-width: 0; }
+.voice-bar .voice-err { color: var(--bad); }
+.voice-bar.rec { border-color: var(--bad); border-style: solid; }
+.voice-bar.rec .btn { color: var(--bad); border-color: var(--bad); background: var(--bad-bg); }
+.voice-bar.rec [data-voice-label]::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--bad); animation: voice-pulse 1.2s ease-in-out infinite; }
+.voice-bar.busy { opacity: .85; }
+@keyframes voice-pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .voice-bar.rec [data-voice-label]::before { animation: none; } }
+@media (max-width: 700px) { .voice-bar { flex-direction: column; align-items: stretch; } }

@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.15.0', date: '2026-10-20', title: 'Tarefa por voz',
+    items: [
+      { kind: 'novo', text: 'Em Tarefas, o botão "Falar tarefa" (e o botão dentro de "Nova tarefa") grava sua voz: você divaga sobre o que precisa ser feito, para quem e até quando, e a IA organiza em uma tarefa: título curto no imperativo, detalhes só com o que ajuda, responsável, prazo, tipo e vínculo com episódio, convidado ou patrocinador citados.' },
+      { kind: 'novo', text: 'Nada é criado sozinho: os campos da janela são preenchidos para você conferir (dá para ver o que a IA ouviu) e só então tocar em Criar tarefa. Se você disser um nome que não está na equipe, ela avisa e deixa o responsável para você escolher.' },
+    ],
+  },
+  {
     version: '1.14.0', date: '2026-10-19', title: 'Plateia: lista e quadro redesenhados, com editar e excluir',
     items: [
       { kind: 'ajuste', text: 'Plateia > Pedidos refeita: a lista virou uma tabela alinhada (pessoa, WhatsApp, situação, data, ações) e os detalhes pequenos viraram ícones com dica (WhatsApp, copiar link de pagamento, selecionar, receber, editar). A situação é um chip que abre as opções.' },
