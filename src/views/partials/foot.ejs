@@ -27,17 +27,28 @@
   <div class="assist-msgs" data-assist-msgs aria-live="polite"></div>
   <form class="assist-form" data-assist-form>
     <label class="sr-only" for="assist-input">Pergunta</label>
-    <textarea id="assist-input" rows="1" maxlength="4000" placeholder="Pergunte algo ou grave um áudio" data-assist-input></textarea>
+    <textarea id="assist-input" rows="1" maxlength="4000" placeholder="Pergunte ou grave um áudio" data-assist-input></textarea>
     <button class="icon-btn assist-mic" type="button" data-assist-mic aria-label="Gravar pergunta por voz" title="Gravar por voz"><%- icon('mic') %></button>
     <button class="btn primary sm" type="submit" data-assist-send aria-label="Enviar"><%- icon('send') %></button>
   </form>
 </section>
+<dialog class="modal" id="modal-pwa-ios" aria-labelledby="pwa-ios-h">
+  <h2 id="pwa-ios-h">Instalar o Pulso no iPhone</h2>
+  <p class="small muted">O Safari instala pelo menu de compartilhar. Com o app na tela, os alertas chegam como os de qualquer aplicativo.</p>
+  <ol class="pwa-steps">
+    <li><span class="pwa-step-ico"><%- icon('share', 20) %></span><span>Toque em <strong>Compartilhar</strong>, na barra do Safari.</span></li>
+    <li><span class="pwa-step-ico"><%- icon('square-plus', 20) %></span><span>Escolha <strong>Adicionar à Tela de Início</strong> e toque em Adicionar.</span></li>
+    <li><span class="pwa-step-ico"><%- icon('bell', 20) %></span><span>Abra o Pulso pelo ícone e toque em <strong>Ativar alertas</strong> no Início.</span></li>
+  </ol>
+  <div class="row modal-actions"><button class="btn" type="button" data-modal-close>Entendi</button></div>
+</dialog>
 <script type="application/json" id="team-users"><%- JSON.stringify((teamUsers || []).map(function (u) { return { id: u.id, name: u.name, ini: fmt.initials(u.name) }; })).replace(/</g, '\\u003c') %></script>
 <template data-upl-icons><span data-i="x"><%- icon('x', 14) %></span><span data-i="rotate-cw"><%- icon('rotate-cw', 14) %></span><span data-i="chevron-up"><%- icon('chevron-up', 16) %></span></template>
 <script src="/static/uploads.js?v=<%= assetV %>" defer></script>
 <script src="/static/collab.js?v=<%= assetV %>" defer></script>
 <script src="/static/assistant.js?v=<%= assetV %>" defer></script>
 <script src="/static/push.js?v=<%= assetV %>" defer></script>
+<script src="/static/pwa.js?v=<%= assetV %>" defer></script>
 <% } else { %></div></div><% } %>
 <script src="/static/app.js?v=<%= assetV %>" defer></script>
 </body>

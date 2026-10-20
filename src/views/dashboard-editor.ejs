@@ -9,6 +9,7 @@
   <h1><%= fmt.greeting() %>, <%= currentUser.name.split(' ')[0] %>.</h1>
   <p class="voz"><%= adjustCount ? adjustCount + (adjustCount === 1 ? ' episódio seu tem' : ' episódios seus têm') + ' ajustes pedidos.' : (queue.length ? queue.length + (queue.length === 1 ? ' episódio espera' : ' episódios esperam') + ' na fila de edição.' : 'Nada na fila de edição agora.') %></p>
 </header>
+<%- include('partials/app-card') %>
 
 <section class="stat-grid" aria-label="Produção">
   <a class="stat" href="/episodios?view=lista"><span class="stat-label">Na fila</span><span class="stat-n <%= queue.length ? 'hl' : '' %>"><%= queue.length %></span></a>

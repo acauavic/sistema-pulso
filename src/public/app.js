@@ -2,17 +2,32 @@
 (function () {
   const csrf = document.querySelector('meta[name="csrf"]')?.content || '';
 
-  // menu mobile
-  document.querySelector('[data-nav-toggle]')?.addEventListener('click', () => {
-    document.querySelector('[data-sidebar]')?.classList.toggle('open');
-  });
+  // menu no celular: o botão Menu (barra de baixo) abre o menu completo por cima da página; Esc ou o mesmo botão fecham
+  const sidebar = document.querySelector('[data-sidebar]');
+  const navToggles = document.querySelectorAll('[data-nav-toggle]');
+  const setMenu = (open) => {
+    if (!sidebar) return;
+    sidebar.classList.toggle('open', open);
+    document.documentElement.classList.toggle('menu-open', open);
+    navToggles.forEach((b) => b.setAttribute('aria-expanded', String(open)));
+  };
+  navToggles.forEach((b) => b.addEventListener('click', () => setMenu(!sidebar?.classList.contains('open'))));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sidebar?.classList.contains('open')) setMenu(false); });
+  window.addEventListener('pageshow', () => setMenu(false)); // voltar pelo histórico não reabre a página com o menu aberto
 
   // tema: escuro (padrão) ou claro; a escolha fica só neste navegador
   document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
     const root = document.documentElement;
     const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
     root.setAttribute('data-theme', next);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next === 'light' ? '#F4F2EC' : '#0A0A0A');
     try { localStorage.setItem('pulso-theme', next); } catch { /* storage bloqueado */ }
+  });
+
+  // celular: abas e etapas que não cabem rolam de lado; a ativa já aparece (sem mexer na rolagem da página)
+  document.querySelectorAll('.stepper li.now, .tabbar .on, .seg .on').forEach((el) => {
+    const box = el.parentElement;
+    if (box && box.scrollWidth > box.clientWidth) box.scrollLeft += el.getBoundingClientRect().left - box.getBoundingClientRect().left - 16;
   });
 
   // confirmação antes de ações destrutivas: <form data-confirm="...">

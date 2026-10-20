@@ -160,10 +160,14 @@
   // ---------------------------------------------------------------- avisos em tempo real (SSE) + contador de notificações
   // O servidor empurra cada notificação nova (/eventos). Se a conexão cair, o navegador reconecta sozinho;
   // por garantia o contador também é conferido a cada 2 minutos e quando a aba volta a ficar visível.
-  const badge = document.querySelector('[data-unread]');
+  // o contador aparece no menu lateral, na barra de baixo do celular e no ícone do app instalado (Badging API)
+  const badges = document.querySelectorAll('[data-unread]');
+  const badge = badges[0];
   const toasts = document.querySelector('[data-toasts]');
   const setTitle = (n) => { document.title = document.title.replace(/^\(\d+\) /, ''); if (n) document.title = `(${n}) ${document.title}`; };
-  const setUnread = (n) => { if (!badge) return; badge.textContent = n; badge.hidden = !n; setTitle(n); };
+  const setAppBadge = (n) => { try { if (n) navigator.setAppBadge?.(n)?.catch?.(() => {}); else navigator.clearAppBadge?.()?.catch?.(() => {}); } catch { /* sem suporte */ } };
+  const setUnread = (n) => { if (!badge) return; badges.forEach((b) => { b.textContent = n; b.hidden = !n; }); setTitle(n); setAppBadge(n); };
+  if (badge) setAppBadge(Number(badge.textContent || 0));
   const refresh = async () => {
     if (document.hidden || !badge) return;
     try { const data = await (await fetch('/notificacoes/resumo', { headers: { Accept: 'application/json' } })).json(); setUnread(data.unread); } catch { /* tenta de novo depois */ }

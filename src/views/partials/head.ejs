@@ -2,8 +2,9 @@
 <html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="csrf" content="<%= csrf %>">
+  <% if (currentUser) { %><meta name="push-key" content="<%= pushKey %>"><% } %>
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0A0A0A">
   <title><%= title %> · <%= podcastName || 'Pulso' %></title>
@@ -12,6 +13,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Pulso">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <script src="/static/theme.js?v=<%= assetV %>"></script>
@@ -55,11 +57,25 @@
       <span class="who-txt"><strong><%= currentUser.name %></strong><span class="kicker m-0"><%= ROLES[currentUser.role].label %></span></span>
     </a>
     <div class="foot-actions">
+      <button class="icon-btn" type="button" data-pwa-install hidden><%- icon('smartphone') %><span>Instalar o app</span></button>
       <button class="icon-btn" type="button" data-theme-toggle aria-label="Alternar tema claro/escuro"><span class="theme-moon"><%- icon('moon') %></span><span class="theme-sun"><%- icon('sun') %></span><span>Tema</span></button>
       <form method="post" action="/logout" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn" type="submit"><%- icon('log-out') %><span>Sair</span></button></form>
     </div>
   </div>
 </aside>
+<%# Celular: barra inferior de app (3 atalhos conforme o perfil + Notificações + Menu, que abre o menu completo). %>
+<% const tabItems = [
+     { href: '/', icon: 'layout-dashboard', label: 'Painel', on: currentPath === '/', show: true },
+     { href: '/tarefas', icon: 'check-square', label: 'Tarefas', on: currentPath.startsWith('/tarefas'), show: can('tasks.read') },
+     { href: '/calendario', icon: 'calendar-days', label: 'Agenda', on: currentPath.startsWith('/calendario'), show: can('calendar.read') },
+     { href: '/convidados', icon: 'mic', label: 'Convidados', on: currentPath.startsWith('/convidados'), show: can('guests.read') },
+     { href: '/episodios', icon: 'calendar', label: 'Episódios', on: currentPath.startsWith('/episodios'), show: can('episodes.read') },
+   ].filter(function (t) { return t.show; }).slice(0, 3); %>
+<nav class="tabnav" aria-label="Atalhos">
+  <% tabItems.forEach(function (t) { %><a href="<%= t.href %>" class="<%= t.on ? 'on' : '' %>"<%- t.on ? ' aria-current="page"' : '' %>><%- icon(t.icon, 20) %><span><%= t.label %></span></a><% }) %>
+  <a href="/notificacoes" class="<%= currentPath.startsWith('/notificacoes') ? 'on' : '' %>"><span class="tabnav-ico"><%- icon('bell', 20) %><span class="tabnav-count" data-unread <%= navCounts && navCounts.unread ? '' : 'hidden' %>><%= navCounts ? navCounts.unread : 0 %></span></span><span>Avisos</span></a>
+  <button type="button" data-nav-toggle aria-expanded="false"><%- icon('menu', 20) %><span>Menu</span></button>
+</nav>
 <main class="main"><div class="container">
 <% } else { %>
 <div class="auth"><div class="auth-box">

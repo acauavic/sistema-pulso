@@ -131,7 +131,7 @@
     rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
-      clearInterval(timer); mic.classList.remove('on'); mic.setAttribute('aria-label', 'Gravar pergunta por voz'); input.placeholder = 'Pergunte algo ou grave um áudio';
+      clearInterval(timer); mic.classList.remove('on'); mic.setAttribute('aria-label', 'Gravar pergunta por voz'); input.placeholder = 'Pergunte ou grave um áudio';
       const blob = new Blob(chunks, { type: (rec.mimeType || 'audio/webm').split(';')[0] });
       rec = null;
       if (Date.now() - started < 700 || blob.size < 500) return; // toque acidental

@@ -4,6 +4,17 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.20.0', date: '2026-10-20', title: 'Pulso como app no celular, com alertas',
+    items: [
+      { kind: 'novo', text: 'O painel vira app: instale pelo cartão "Use o Pulso como app" no Início do celular (Android pede para instalar; no iPhone, uma janela mostra os três toques no Safari) ou por "Instalar o app" no rodapé do menu. Ele abre em tela cheia, com ícone próprio e atalhos (segure o ícone): Nova tarefa, Tarefas, Agenda e Notificações.' },
+      { kind: 'novo', text: 'Alertas no app: com o app instalado, o Início oferece "Ativar alertas" e, a partir daí, tarefas, prazos e respostas chegam como notificação com o app fechado. O número de avisos não lidos aparece no ícone do app.' },
+      { kind: 'novo', text: 'No celular, uma barra embaixo com Painel, Tarefas, Agenda, Avisos e Menu (os atalhos seguem o seu perfil). O Menu abre a lista completa por cima da página. A barra de cima ficou só com o logo e a busca.' },
+      { kind: 'novo', text: 'Sem internet, o app mostra a página "Sem conexão" e volta sozinho quando a conexão retorna. Fontes, estilos e ícones ficam guardados no aparelho, então o app abre mais rápido.' },
+      { kind: 'ajuste', text: 'Revisão do celular: etapas do convidado, do episódio e do patrocinador numa linha que desliza (já mostrando a etapa atual), abas e filtros que deslizam em vez de quebrar linha, calendário sem vazar para o lado, botões do cabeçalho numa linha só, janelas que sobem de baixo e campos que não dão zoom no iPhone.' },
+      { kind: 'ajuste', text: 'Quem usa o sistema não cai mais no login toda semana: a sessão se renova enquanto você usa (continua saindo sozinha depois de 7 dias sem uso).' },
+    ],
+  },
+  {
     version: '1.19.0', date: '2026-10-20', title: 'Assistente de IA atualizado: entende o sistema e faz mais',
     items: [
       { kind: 'novo', text: 'O assistente agora conhece o sistema de hoje: tarefas com hora e voz, comentários com anexos e áudio, cadência de follow-up, plateia (pedidos, quadro, pagamento), financeiro e estoque, media kit, Google Agenda e o painel de gestão. Pergunte "como faço…" e ele responde com os passos e diz se o seu perfil faz.' },

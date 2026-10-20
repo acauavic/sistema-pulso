@@ -113,6 +113,17 @@ const TOPICS = [
     ],
   },
   {
+    key: 'app_celular', title: 'App no celular (instalar e ligar os alertas)', words: ['app', 'aplicativo', 'instalar', 'celular', 'iphone', 'android', 'tela de início', 'tela inicial', 'pwa', 'offline', 'sem internet', 'ícone'],
+    where: '/', perm: null,
+    steps: [
+      'O Pulso instala como app no celular (e no computador). No Início do celular aparece o cartão "Use o Pulso como app"; também há "Instalar o app" no rodapé do menu.',
+      'Android (Chrome, Edge, Samsung): tocar em Instalar e confirmar. iPhone: no Safari, Compartilhar > Adicionar à Tela de Início > Adicionar, e abrir o Pulso pelo ícone (os alertas no iPhone só funcionam assim, iOS 16.4 ou mais novo).',
+      'Com o app aberto pelo ícone, o Início oferece "Ativar alertas": a partir daí as notificações chegam com o app fechado e o número de não lidas aparece no ícone. Dá para desligar em Notificações > Avisos.',
+      'Segurar o ícone do app mostra atalhos: Nova tarefa, Tarefas, Agenda e Notificações. No celular, a barra de baixo tem Painel, atalhos do seu perfil, Avisos e Menu.',
+      'Sem internet o app mostra "Sem conexão" e volta sozinho quando a rede retorna; o que estava salvo continua no servidor.',
+    ],
+  },
+  {
     key: 'notificacoes', title: 'Notificações e lembretes da gravação', words: ['notificação', 'notificacao', 'notificações', 'aviso', 'avisos', 'alerta', 'push', 'lembrete', 'lembretes'],
     where: '/notificacoes', perm: null,
     steps: [

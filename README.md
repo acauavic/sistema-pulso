@@ -314,7 +314,7 @@ Na Brevo, o remetente (`BREVO_EMAIL`) e o domínio precisam estar validados (SPF
 
 ## Menu lateral e quadros
 
-- **Menu recolhível** (computador): o botão no topo do menu leva a só ícones (76 px, com o nome na dica e "p." no lugar do logo); a escolha fica guardada neste navegador e vale em todas as telas (`theme.js` aplica antes de pintar). No celular o menu continua sendo a barra de cima. Em tela baixa só a lista de itens rola; usuário, tema e "Sair" ficam sempre à vista.
+- **Menu recolhível** (computador): o botão no topo do menu leva a só ícones (76 px, com o nome na dica e "p." no lugar do logo); a escolha fica guardada neste navegador e vale em todas as telas (`theme.js` aplica antes de pintar). No celular o menu vira a barra de baixo (ver "App no celular"). Em tela baixa só a lista de itens rola; usuário, tema e "Sair" ficam sempre à vista.
 - **Quadros (Kanban)** de Episódios, Convidados, Patrocinadores e Tarefas ocupam a altura da tela: a **barra de rolagem horizontal fica no pé da tela** (grossa e sempre visível) e **cada coluna rola para baixo sozinha** quando tem cartões demais, como no ClickUp. No celular, o quadro rola normalmente com a página.
 
 ## Pagamento da plateia (InfinitePay)
@@ -351,6 +351,20 @@ Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`
 - **Quem responde pelo quê** (`ROLE_DUTIES` em `calendar.js`): "só os meus" (ou a escolha de uma pessoa) traz o que está no nome dela **e o que é do perfil dela**, mesmo sem responsável cadastrado. **Gestão e Superadmin**: todas as gravações, contas a pagar e contas a receber. **Produtora**: todos os lembretes da gravação e as cobranças da plateia (as suas gravações são as dos convidados dela). Editor de vídeo: só o que está no nome dele. O painel avisa o que o perfil inclui. A conta da plateia aparece uma vez só: como cobrança (se o tipo estiver marcado) ou como "a receber".
 - **Visualizações**: combinações salvas de modo, tipos, responsável e concluídos. Da casa: **Tudo**, **Meu trabalho** (semana, só os meus e os do meu perfil, sem concluídos), **Produção** e **Dinheiro** (só para quem vê o financeiro). Qualquer pessoa salva as suas ("Salvar esta visualização" aparece quando os filtros não batem com nenhuma); **Gestão e Superadmin** (`calendar.share`) também compartilham com a equipe e apagam as dos outros. A visualização da equipe abre para cada perfil já limitada ao que ele enxerga.
 - O **assistente de IA** consulta o calendário (`calendario`): "o que tenho esta semana?".
+
+## App no celular (PWA)
+
+O painel instala como app (Android, iPhone e computador). No celular, o Início mostra **Use o Pulso como app** (Android abre o pedido de
+instalação; no iPhone, uma janela mostra o caminho no Safari: Compartilhar > Adicionar à Tela de Início); o rodapé do menu tem
+**Instalar o app**. Instalado, o Início oferece **Ativar alertas** e o número de não lidas aparece no ícone. Segurar o ícone mostra os atalhos
+(Nova tarefa, Tarefas, Agenda, Notificações).
+
+- **Barra de baixo** no celular: Painel + dois atalhos conforme o perfil (Tarefas, Agenda, Convidados ou Episódios) + Avisos + Menu (abre o menu completo).
+- **Sem internet**: a página "Sem conexão" (`src/public/offline.html`) aparece e recarrega sozinha quando a rede volta. Só os arquivos
+  fixos (`/static`) ficam guardados no aparelho, por versão; as páginas sempre vêm do servidor.
+- Código: `src/public/sw.js` (servido em `/sw.js` com a versão dos arquivos), `src/public/pwa.js`, `src/public/push.js`,
+  `src/public/manifest.webmanifest`, `src/views/partials/app-card.ejs`.
+- A sessão se renova enquanto é usada (sai sozinha depois de 7 dias sem uso), para o app instalado não pedir login toda semana.
 
 ## Alertas no navegador (Web Push)
 

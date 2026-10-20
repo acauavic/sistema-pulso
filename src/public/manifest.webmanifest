@@ -1,16 +1,27 @@
 {
+  "id": "/",
   "name": "Pulso Gestão",
   "short_name": "Pulso",
-  "description": "Painel de gestão do Podcast Pulso.",
+  "description": "Painel de gestão do Podcast Pulso: tarefas, agenda, convidados, episódios e alertas da equipe.",
   "lang": "pt-BR",
+  "dir": "ltr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#0A0A0A",
   "theme_color": "#0A0A0A",
+  "categories": ["productivity", "business"],
   "icons": [
-    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Nova tarefa", "short_name": "Nova tarefa", "url": "/tarefas?nova=1", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Minhas tarefas", "short_name": "Tarefas", "url": "/tarefas", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Agenda", "short_name": "Agenda", "url": "/calendario", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Notificações", "short_name": "Avisos", "url": "/notificacoes", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
   ]
 }

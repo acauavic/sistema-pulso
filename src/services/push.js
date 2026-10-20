@@ -72,7 +72,9 @@ async function queue(notification) {
 jobs.register('push_notificacao', async (job) => {
   const { rows: [n] } = await db.query('SELECT n.* FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.id = $1 AND u.active', [job.ref_id]);
   if (!n || n.read_at) return { skipped: true };
-  return sendToUser(n.user_id, payloadFor(n));
+  // número de não lidas vai junto: o app instalado mostra no ícone (Badging API)
+  const { rows: [c] } = await db.query('SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [n.user_id]);
+  return sendToUser(n.user_id, { ...payloadFor(n), unread: c.n });
 });
 
 module.exports = { configured, publicKey: () => config.push.publicKey || '', subscribe, unsubscribe, countFor, sendToUser, queue };

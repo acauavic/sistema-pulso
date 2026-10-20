@@ -956,7 +956,7 @@ dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z
 .pcard .pcard-meta .icon { vertical-align: -2px; }
 .pcard .pcard-foot { display: flex; justify-content: flex-end; margin: 2px -6px -6px 0; padding-top: 8px; border-top: 1px solid var(--line); }
 .pboard .column header { padding: 2px 4px 12px; }
-@media (max-width: 860px) { .pbar-tools { width: 100%; justify-content: space-between; } .pbar-search { max-width: none; } }
+@media (max-width: 860px) { .pbar-tools { width: 100%; justify-content: space-between; } .pbar-search { max-width: none; flex-basis: 100%; } .pbar-filters select { flex: 1 1 140px; max-width: none; } }
 .ptable .row-menu-list { left: 0; right: auto; }
 .pbar-filters input[type="search"] { min-width: 0; }
 .main:has(.pane:not([hidden]) .pboard) .lead { display: none; } /* no quadro o espaço é do quadro */
@@ -1033,3 +1033,69 @@ dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z
 .rte-area table { display: block; overflow-x: auto; max-width: 100%; }
 .rte-area img { max-width: 100%; height: auto; }
 .field { grid-template-columns: minmax(0, 1fr); } .rte-bar { max-width: 100%; }
+
+/* ============ celular como app (PWA): barra de baixo, barra de cima enxuta, menu em tela cheia, áreas seguras do aparelho ============ */
+.tabnav { display: none; }
+.toast.warn { color: var(--text); border-left-color: var(--warn); }
+.app-card { display: flex; align-items: center; gap: 12px; margin: 0 0 24px; padding: 12px 12px 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); }
+.app-card[hidden] { display: none; }
+.app-card-ico { display: grid; place-items: center; flex: 0 0 auto; width: 40px; height: 40px; border-radius: var(--r-full); background: var(--raised); color: var(--text); }
+.app-card-txt { display: grid; gap: 2px; flex: 1; min-width: 0; } .app-card-txt .small { color: var(--text-2); }
+.app-card-act { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; } .app-card-act .icon-btn { padding: 6px; }
+.pwa-steps { list-style: none; margin: 16px 0 20px; padding: 0; display: grid; gap: 12px; counter-reset: pwa; }
+.pwa-steps li { display: flex; align-items: center; gap: 12px; }
+.pwa-step-ico { display: grid; place-items: center; flex: 0 0 auto; width: 40px; height: 40px; border-radius: var(--r-field); background: var(--raised); color: var(--text); }
+@media (max-width: 860px) {
+  :root { --tabnav-h: 60px; --safe-b: env(safe-area-inset-bottom, 0px); }
+  .app { align-content: start; } /* página curta: a sobra da tela não estica a barra de cima */
+  /* barra de cima: logo e busca (ícone). O menu completo sai da barra de baixo. */
+  .sidebar { top: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+  .sidebar-top { order: 1; } .search-trigger { order: 2; } .nav { order: 3; } .sidebar-foot { order: 4; }
+  .sidebar .sidebar-toggle { display: none; }
+  .search-trigger { width: 40px; height: 40px; margin: 0 -8px 0 auto; padding: 0; justify-content: center; border: 0; background: none; color: var(--text-2); }
+  .search-trigger span, .search-trigger kbd { display: none; } .search-trigger .icon { width: 20px; height: 20px; }
+  .sidebar.open { position: fixed; inset: 0 0 calc(var(--tabnav-h) + var(--safe-b)) 0; z-index: 46; overflow-y: auto; overscroll-behavior: contain; align-content: flex-start; }
+  .sidebar.open .nav { overflow: visible; padding: 8px 0 16px; } .sidebar.open .nav a { padding: 12px 10px; }
+  .sidebar.open .sidebar-foot { padding-bottom: 16px; }
+  html.menu-open { overflow: hidden; }
+  /* barra de baixo: atalhos do dia a dia; o ativo ganha o ícone lime */
+  .tabnav { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 47; height: calc(var(--tabnav-h) + var(--safe-b)); padding: 0 env(safe-area-inset-right, 0px) var(--safe-b) env(safe-area-inset-left, 0px); background: var(--bg); border-top: 1px solid var(--line); }
+  .tabnav a, .tabnav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 6px 2px 4px; border: 0; background: none; color: var(--muted); font: 500 10px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .tabnav a > span:last-child, .tabnav button > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tabnav a:hover { text-decoration: none; color: var(--text); }
+  .tabnav .on, .tabnav [aria-expanded="true"] { color: var(--text); }
+  .tabnav .on .icon, .tabnav [aria-expanded="true"] .icon { color: var(--action); }
+  :root[data-theme="light"] .tabnav .on .icon, :root[data-theme="light"] .tabnav [aria-expanded="true"] .icon { color: var(--text); }
+  html.menu-open .tabnav .on { color: var(--muted); } html.menu-open .tabnav .on .icon { color: inherit; }
+  .tabnav-ico { position: relative; display: inline-flex; }
+  .tabnav-count { position: absolute; top: -6px; left: 11px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-full); background: var(--bad); color: var(--white); font: 600 10px/16px var(--f-mono); letter-spacing: 0; text-align: center; }
+  .tabnav-count[hidden] { display: none; }
+  /* o que flutua sobe acima da barra de baixo */
+  .main { padding-bottom: calc(var(--tabnav-h) + var(--safe-b) + 80px); }
+  .assist-fab { bottom: calc(var(--tabnav-h) + var(--safe-b) + 12px); }
+  .toasts { left: 16px; right: 16px; width: auto; bottom: calc(var(--tabnav-h) + var(--safe-b) + 76px); }
+  .upl-tray { bottom: calc(var(--tabnav-h) + var(--safe-b) + 76px); }
+  .release-toast { top: calc(64px + env(safe-area-inset-top, 0px)); }
+  /* campos com 16px: o iPhone não dá zoom ao tocar */
+  input, select, textarea, .rte-area { font-size: 16px; }
+  /* etapas, abas e controles segmentados: uma linha que rola de lado, sem empurrar a tela */
+  .stepper { display: flex; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .stepper::-webkit-scrollbar, .tabbar::-webkit-scrollbar, .seg::-webkit-scrollbar { display: none; }
+  .stepper li { flex: 0 0 auto; width: 116px; scroll-snap-align: start; }
+  .tabbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .tabbar > * { flex: 0 0 auto; white-space: nowrap; }
+  .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; } .seg a { flex: 0 0 auto; white-space: nowrap; }
+  .cal-head { flex-wrap: wrap; } .cal-title { flex: 1; min-width: 0; margin: 0; font-size: 18px; text-align: center; } .cal-count { flex-basis: 100%; }
+  .app-card { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: "ico txt x" ". go go"; align-items: start; gap: 10px 12px; margin-top: -8px; }
+  .app-card-ico { grid-area: ico; } .app-card-txt { grid-area: txt; } .app-card-act { display: contents; }
+  .app-card-act .btn { grid-area: go; justify-self: start; } .app-card-act .icon-btn { grid-area: x; margin: -4px -4px 0 0; }
+  /* cabeçalhos: botões em uma linha só e menores; título e ação descem quando não cabem */
+  .btn { white-space: nowrap; }
+  .page-head > .row { gap: 6px; } .page-head > .row .btn:not(.primary) { height: 36px; padding: 0 14px; }
+  .row.spread { flex-wrap: wrap; }
+}
+.offline-card { display: grid; gap: 12px; } .offline-card h1 { font-size: 24px; } .offline-card p { margin: 0; } .offline-card .pulse-line { height: 24px; width: 100%; }
+@media (hover: none) and (pointer: coarse) { .kbd-hint, .palette-input kbd, .palette-foot > span { display: none; } } /* toque: sem dicas de teclado */
+@media (max-width: 600px) { /* celular: janelas sobem de baixo, como folha de app; o botão de ação fica acima da barra do aparelho */
+  dialog.modal, dialog.modal.modal-wide, dialog.modal.modal-xl { width: 100%; max-width: 100%; margin: auto 0 0; max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px)); overflow: auto; overscroll-behavior: contain; border-radius: var(--r-card) var(--r-card) 0 0; border-width: 1px 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .assist { height: 82dvh; padding-bottom: env(safe-area-inset-bottom, 0px); }
+}

@@ -26,7 +26,7 @@
   <form method="post" action="/comentarios" class="comment-form" data-comment-form>
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= type %>"><input type="hidden" name="id" value="<%= id %>"><input type="hidden" name="voltar" value="<%= back %>#comentarios">
     <%- include('rich-editor', { name: 'texto_html', attach: 'anexos', placeholder: 'Escreva um comentário… use @ para chamar alguém. Cole imagens, anexe arquivos ou grave um áudio.', label: 'Comentário', size: 'sm', audio: true, mentions: true, required: true, ctrlEnter: true }) %>
-    <div class="row"><button class="btn" type="submit"><%- icon('send', 14) %> Comentar</button><span class="small muted">Ctrl+Enter envia</span></div>
+    <div class="row"><button class="btn" type="submit"><%- icon('send', 14) %> Comentar</button><span class="small muted kbd-hint">Ctrl+Enter envia</span></div>
   </form>
   <% } %>
 </section>

@@ -8,6 +8,7 @@
     <p class="voz">Bem-vindo(a) à gestão do <%= podcastName %>.</p>
   <% } %>
 </header>
+<%- include('partials/app-card') %>
 
 <% if (outToday && (outToday.items.length || outToday.goal.target || outToday.toApproach)) { %>
 <section class="card today" aria-labelledby="today-h">
