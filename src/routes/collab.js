@@ -21,7 +21,7 @@ const backTo = (req, fallback) => { const v = String(req.body.voltar || ''); ret
 router.post('/comentarios', requirePerm('comments.write'), wrap(async (req, res) => {
   const type = String(req.body.tipo || ''); const id = req.body.id;
   if (!comments.isEntity(type) || !isIntId(id)) return wantsJson(req) ? res.status(400).json({ ok: false, error: 'Item inválido.' }) : res.status(400).send('Item inválido.');
-  const result = await comments.add({ type, id: Number(id), author: req.user, body: req.body.texto });
+  const result = await comments.add({ type, id: Number(id), author: req.user, body: req.body.texto, html: req.body.texto_html, attachmentIds: [].concat(req.body.anexos || []) });
   if (result.error) {
     if (wantsJson(req)) return res.status(result.status || 422).json({ ok: false, error: result.error });
     await req.flash('error', result.error);

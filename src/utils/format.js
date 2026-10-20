@@ -139,6 +139,8 @@ const toInputTime = (v) => { const t = timeParts(v); return t ? `${t.h}:${t.m}` 
 const formatDue = (d, t) => (d ? `${formatDay(d)}${formatTime(t) ? ` às ${formatTime(t)}` : ''}` : '');
 const formatDueShort = (d, t) => (d ? `${formatDayShort(d)}${formatTime(t) ? ` · ${formatTime(t)}` : ''}` : '');
 
+// HTML guardado (já limpo) ou, em registros antigos, o texto puro formatado.
+const richHtml = (html, plain) => require('../services/richText').display(html, plain);
 const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Texto de comentário: escapa o HTML e destaca as menções (@Nome) de pessoas da equipe.
 function commentHtml(text, names = []) {
@@ -161,7 +163,7 @@ function relativeDays(v, now = new Date()) {
 }
 const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
-module.exports = { escHtml, commentHtml, initials, relativeDays,
+module.exports = { escHtml, richHtml, commentHtml, initials, relativeDays,
   formatBRL, parseBRL, parseInputDate, toInputDate, formatDay, formatDayShort, formatDayLong, timeParts, formatTime, toInputTime, formatDue, formatDueShort, formatBytes, formatClock,
   TZ, formatDateTime, formatDate, formatLong, toInputValue, parseInputDateTime,
   shortDate, monthShort, dayNum, todayLabel, greeting,

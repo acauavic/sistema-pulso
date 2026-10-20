@@ -26,7 +26,16 @@
     <form method="post" action="/tarefas/<%= task.id %>" class="stack" data-task-detail>
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <label>Título<input type="text" name="title" value="<%= task.title %>" maxlength="200" required></label>
-      <label>Detalhes<textarea name="description" rows="4" maxlength="4000"><%= task.description || '' %></textarea></label>
+      <% var hasDesc = Boolean(task.description || task.description_html); %>
+      <div class="field" data-desc><span class="field-label row spread">Detalhes <% if (hasDesc) { %><button type="button" class="link small" data-desc-edit><%- icon('pencil', 12) %> Editar</button><% } %></span>
+        <% if (hasDesc) { %><div class="rich-content desc-view" data-desc-view><%- fmt.richHtml(task.description_html, task.description) %></div><% } %>
+        <div data-desc-editor <%= hasDesc ? 'hidden' : '' %>>
+          <%- include('../partials/rich-editor', { name: 'description_html', attach: 'attachment_ids', html: fmt.richHtml(task.description_html, task.description), placeholder: 'Descreva a tarefa. Cole imagens com Ctrl+V, anexe PDF, HTML ou ZIP, monte tabelas…', label: 'Detalhes da tarefa' }) %>
+        </div>
+      </div>
+      <% if (docs.length) { %><div class="field"><span class="field-label">Anexos</span>
+        <ul class="plain task-docs"><% docs.forEach(function (d) { %><li><span class="rte-ic"><%- icon('file-text', 16) %></span><a class="doc-name" href="/anexos/<%= d.id %>/baixar"><%= d.filename %></a><span class="mono small muted"><%= fmt.formatBytes(d.size_bytes) %></span><button type="button" class="icon-btn" data-attachment-delete="<%= d.id %>" aria-label="Remover <%= d.filename %>" title="Remover"><%- icon('x', 14) %></button></li><% }) %></ul>
+      </div><% } %>
       <div class="row">
         <label>Status<select name="status" data-block-toggle><% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= task.status === k ? 'selected' : '' %>><%= C.TASK_STATUSES[k] %></option><% }) %></select></label>
         <label>Vence em<input type="date" name="due_on" value="<%= due || '' %>"></label>
@@ -46,14 +55,16 @@
     <% } %>
     <% } else { %>
     <dl class="kv">
-      <dt>Detalhes</dt><dd class="pre"><%= task.description || '—' %></dd>
+      <dt>Detalhes</dt><dd><% if (task.description || task.description_html) { %><div class="rich-content"><%- fmt.richHtml(task.description_html, task.description) %></div><% } else { %>—<% } %>
+        <% if (docs.length) { %><ul class="plain task-docs"><% docs.forEach(function (d) { %><li><span class="rte-ic"><%- icon('file-text', 16) %></span><a class="doc-name" href="/anexos/<%= d.id %>/baixar"><%= d.filename %></a><span class="mono small muted"><%= fmt.formatBytes(d.size_bytes) %></span></li><% }) %></ul><% } %></dd>
       <dt>Vence em</dt><dd class="handle"><%= due ? fmt.formatDue(task.due_on, task.due_time) : '—' %></dd>
     </dl>
     <p class="small muted">Só quem criou, o responsável ou a gestão mudam esta tarefa. Você pode comentar.</p>
     <% } %>
   </section>
 
-  <%- include('../partials/comments', { type: 'task', id: task.id, items: comments, back: '/tarefas/' + task.id }) %>
+  <%- include('../partials/comments', { type: 'task', id: task.id, items: comments, back: '/tarefas/' + task.id, rich: true }) %>
 </div>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<script src="/static/richtext.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/foot') %>

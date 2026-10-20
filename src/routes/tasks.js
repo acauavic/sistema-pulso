@@ -3,6 +3,7 @@ const express = require('express');
 const config = require('../config');
 const groq = require('../services/groq');
 const taskVoice = require('../services/taskVoice');
+const attachments = require('../services/attachments');
 const { createLimiter } = require('../auth/rateLimit');
 const db = require('../db/pool');
 const tasks = require('../services/tasks');
@@ -21,6 +22,8 @@ const SCOPES = { minhas: 'Minhas tarefas', hoje: 'Hoje', todas: 'Todas' };
 const VIEWS = { lista: 'Lista', quadro: 'Quadro', calendario: 'Calendário' };
 const wantsJson = (req) => /json/.test(req.get('accept') || '');
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Tarefa não encontrada.' });
+// Anexos que a pessoa enviou para esta tarefa: imagens que estão no texto + documentos listados no formulário.
+const attachmentIdsOf = (values, body) => [...(values.attachmentIds || []), ...[].concat(body.attachment_ids || [])];
 const backTo = (req, fallback) => { const v = String(req.body.voltar || ''); return /^\/(?!\/)[\w\-/?=&#.%]*$/.test(v) ? v : fallback; };
 
 // Calendário do mês (semanas de segunda a domingo).
@@ -108,6 +111,7 @@ router.post('/tarefas', requirePerm('tasks.write'), wrap(async (req, res) => {
   let assignee = isUuid(req.body.assignee_id) ? req.body.assignee_id : null;
   if (assignee && assignee !== req.user.id && !can(req.user.role, 'tasks.write')) assignee = null;
   const task = await tasks.create({ values, user: req.user, assigneeId: assignee, links: await readLinks(req.body) });
+  await attachments.link(attachmentIdsOf(values, req.body), 'task', task.id, req.user);
   await audit(req, 'tarefa.criada', 'task', task.id, { titulo: task.title });
   if (wantsJson(req)) return res.json({ ok: true, task });
   await req.flash('ok', 'Tarefa criada.');
@@ -118,8 +122,8 @@ router.get('/tarefas/:id', requirePerm('tasks.read'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);
   const task = await tasks.get(req.params.id);
   if (!task) return notFound(res);
-  const [opts, thread] = await Promise.all([linkOptions(), comments.list('task', task.id)]);
-  res.render('tasks/show', { title: task.title, task, ...opts, comments: thread, C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t) });
+  const [opts, thread, files] = await Promise.all([linkOptions(), comments.list('task', task.id), attachments.forEntity('task', task.id)]);
+  res.render('tasks/show', { title: task.title, task, ...opts, comments: thread, docs: files.filter((a) => a.kind === 'file'), C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t) });
 }));
 
 router.post('/tarefas/:id', requirePerm('tasks.write'), wrap(async (req, res) => {
@@ -132,6 +136,7 @@ router.post('/tarefas/:id', requirePerm('tasks.write'), wrap(async (req, res) =>
   const links = await readLinks(req.body);
   const result = await tasks.update(task, values, req.user, { assigneeId: req.body.assignee_id !== undefined ? (isUuid(req.body.assignee_id) ? req.body.assignee_id : null) : undefined });
   if (result.error) { await req.flash('error', result.error); return res.redirect(`/tarefas/${task.id}`); }
+  await attachments.link(attachmentIdsOf(values, req.body), 'task', task.id, req.user);
   if (req.body.episode_id !== undefined) await db.query('UPDATE tasks SET episode_id = $2, guest_id = $3, sponsor_id = $4 WHERE id = $1', [task.id, links.episodeId || null, links.guestId || null, links.sponsorId || null]);
   await req.flash('ok', 'Tarefa salva.');
   res.redirect(backTo(req, `/tarefas/${task.id}`));

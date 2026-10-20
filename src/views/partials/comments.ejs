@@ -9,7 +9,12 @@
       <span class="avatar sm"><%= fmt.initials(c.author_name) %></span>
       <div class="cmt-body">
         <div class="cmt-head"><strong><%= c.author_name || 'Alguém que saiu da equipe' %></strong><span class="handle muted"><%= fmt.formatDateTime(c.created_at) %></span></div>
-        <div class="cmt-text"><%- fmt.commentHtml(c.body, names) %></div>
+        <% if (locals.rich && c.body_html) { %><div class="cmt-text rich-content" data-mentions="1"><%- c.body_html %></div>
+        <% } else if (c.body) { %><div class="cmt-text"><%- fmt.commentHtml(c.body, names) %></div><% } %>
+        <% if (c.attachments && c.attachments.length) { %><div class="cmt-media">
+          <% c.attachments.filter(function (a) { return a.kind === 'audio'; }).forEach(function (a) { %><div class="cmt-audio"><audio controls preload="none" src="/anexos/<%= a.id %>"></audio><% if (a.transcript) { %><details open><summary class="small muted">Transcrição</summary><p class="rte-transcript small"><%= a.transcript %></p></details><% } %></div><% }) %>
+          <div class="cmt-docs"><% c.attachments.filter(function (a) { return a.kind === 'file'; }).forEach(function (a) { %><a class="btn sm" href="/anexos/<%= a.id %>/baixar"><%- icon('file-text', 14) %> <%= a.filename %> <span class="mono small muted"><%= fmt.formatBytes(a.size_bytes) %></span></a><% }) %></div>
+        </div><% } %>
         <% if (currentUser && (String(c.author_id) === String(currentUser.id) || can('tasks.manage'))) { %>
         <form method="post" action="/comentarios/<%= c.id %>/excluir" class="inline" data-confirm="Apagar este comentário?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= back %>#comentarios"><button class="link small" type="submit">apagar</button></form>
         <% } %>
@@ -20,10 +25,14 @@
   <% if (can('comments.write')) { %>
   <form method="post" action="/comentarios" class="comment-form" data-comment-form>
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= type %>"><input type="hidden" name="id" value="<%= id %>"><input type="hidden" name="voltar" value="<%= back %>#comentarios">
+    <% if (locals.rich) { %>
+    <%- include('rich-editor', { name: 'texto_html', attach: 'anexos', placeholder: 'Escreva um comentário… use @ para chamar alguém. Cole imagens, anexe arquivos ou grave um áudio.', label: 'Comentário', size: 'sm', audio: true, mentions: true, required: true, ctrlEnter: true }) %>
+    <% } else { %>
     <div class="mention-wrap">
       <textarea name="texto" rows="3" maxlength="4000" required placeholder="Escreva um comentário… use @ para mencionar alguém" aria-label="Comentário" data-mention></textarea>
       <ul class="mention-list" data-mention-list hidden role="listbox"></ul>
     </div>
+    <% } %>
     <div class="row"><button class="btn" type="submit"><%- icon('send', 14) %> Comentar</button><span class="small muted">Ctrl+Enter envia</span></div>
   </form>
   <% } %>

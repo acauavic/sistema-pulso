@@ -5,6 +5,7 @@ const C = require('../constants');
 const { can } = require('../permissions');
 const { notify } = require('./notify');
 const { clean, parseInputDate, timeParts, toInputTime, formatTime } = require('../utils/format');
+const richText = require('./richText');
 
 const STATUSES = Object.keys(C.TASK_STATUSES);
 const TZ = 'America/Sao_Paulo';
@@ -49,7 +50,13 @@ async function list({ user, scope = 'minhas', status = null, from = null, to = n
 function parse(body, { partial = false } = {}) {
   const v = {}; const errors = [];
   if (!partial || body.title !== undefined) { v.title = clean(body.title, 200); if (!v.title) errors.push('Dê um título para a tarefa.'); }
-  if (!partial || body.description !== undefined) v.description = String(body.description || '').replace(/\r/g, '').trim().slice(0, 4000) || null;
+  if (body.description_html != null) { // texto rico (editor): guarda o HTML limpo e o texto puro
+    const r = richText.sanitize(body.description_html);
+    v.description_html = r.html || null; v.description = r.text || null; v.attachmentIds = r.attachmentIds;
+  } else if (!partial || body.description !== undefined) {
+    v.description = String(body.description || '').replace(/\r/g, '').trim().slice(0, 4000) || null;
+    if (body.description !== undefined) v.description_html = null; // texto puro novo vale mais que o HTML antigo
+  }
   if (!partial || body.kind !== undefined) v.kind = Object.prototype.hasOwnProperty.call(C.TASK_KINDS, body.kind) ? body.kind : 'geral';
   if (!partial || body.status !== undefined) v.status = STATUSES.includes(body.status) ? body.status : 'a_fazer';
   if (!partial || body.block_reason !== undefined) v.block_reason = clean(body.block_reason, 500) || null;
@@ -72,11 +79,11 @@ function parse(body, { partial = false } = {}) {
 // autoKey: tarefa do sistema que não pode repetir (se já existe uma com a mesma chave, não cria e devolve null).
 async function create({ values, user, assigneeId = null, links = {}, routineId = null, notifyAssignee = true, autoKey = null }) {
   const { rows: [t] } = await db.query(
-    `INSERT INTO tasks (title, description, kind, status, block_reason, due_on, due_time, notes, assignee_id, created_by, episode_id, guest_id, sponsor_id, routine_id, completed_at, auto_key)
-     VALUES ($1,$2,$3,$4,$5,$6,$15,$7,$8,$9,$10,$11,$12,$13, CASE WHEN $4 = 'feito' THEN now() END, $14)
+    `INSERT INTO tasks (title, description, kind, status, block_reason, due_on, due_time, notes, assignee_id, created_by, episode_id, guest_id, sponsor_id, routine_id, completed_at, auto_key, description_html)
+     VALUES ($1,$2,$3,$4,$5,$6,$15,$7,$8,$9,$10,$11,$12,$13, CASE WHEN $4 = 'feito' THEN now() END, $14, $16)
      ON CONFLICT (auto_key) WHERE auto_key IS NOT NULL DO NOTHING RETURNING *`,
     [values.title, values.description || null, values.kind || 'geral', values.status || 'a_fazer', values.status === 'bloqueada' ? values.block_reason : null, values.due_on || null,
-      values.notes || null, assigneeId || null, user?.id || null, links.episodeId || null, links.guestId || null, links.sponsorId || null, routineId, autoKey, values.due_on ? (values.due_time || null) : null]);
+      values.notes || null, assigneeId || null, user?.id || null, links.episodeId || null, links.guestId || null, links.sponsorId || null, routineId, autoKey, values.due_on ? (values.due_time || null) : null, values.description_html || null]);
   if (!t) return null;
   if (notifyAssignee && assigneeId) {
     await notify({ type: 'tarefa', users: [assigneeId], title: `${user ? `${user.name} criou uma tarefa para você` : 'Nova tarefa para você'}: ${t.title}`, body: dueText(t), url: `/tarefas/${t.id}`, actorId: user?.id || null, entity: { type: 'task', id: t.id } });
@@ -95,9 +102,9 @@ async function update(task, values, user, { assigneeId } = {}) {
   const reassign = assigneeId !== undefined && String(assigneeId || '') !== String(task.assignee_id || '');
   if (reassign && !can(user.role, 'tasks.manage') && ![task.created_by, task.assignee_id].map(String).includes(String(user.id))) return { error: 'Você não pode reatribuir esta tarefa.', status: 403 };
   const { rows: [t] } = await db.query(
-    `UPDATE tasks SET title = $2, description = $3, kind = $4, status = $5, block_reason = $6, due_on = $7, due_time = $10, notes = $8, assignee_id = $9,
+    `UPDATE tasks SET title = $2, description = $3, kind = $4, status = $5, block_reason = $6, due_on = $7, due_time = $10, description_html = $11, notes = $8, assignee_id = $9,
        completed_at = CASE WHEN $5 = 'feito' THEN coalesce(completed_at, now()) ELSE NULL END, updated_at = now() WHERE id = $1 RETURNING *`,
-    [task.id, next.title, next.description, next.kind, next.status, next.block_reason, next.due_on, next.notes, reassign ? (assigneeId || null) : task.assignee_id, next.due_on ? (next.due_time ? toInputTime(next.due_time) : null) : null]);
+    [task.id, next.title, next.description, next.kind, next.status, next.block_reason, next.due_on, next.notes, reassign ? (assigneeId || null) : task.assignee_id, next.due_on ? (next.due_time ? toInputTime(next.due_time) : null) : null, next.description_html || null]);
   const url = `/tarefas/${t.id}`;
   if (t.status !== task.status) {
     if (t.status === 'feito') await notify({ type: 'tarefa', users: [task.created_by], title: `${user.name} concluiu: ${t.title}`, url, actorId: user.id, entity: { type: 'task', id: t.id } });

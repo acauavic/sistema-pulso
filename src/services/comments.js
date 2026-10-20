@@ -3,6 +3,7 @@
 const db = require('../db/pool');
 const { notify } = require('./notify');
 const { can } = require('../permissions');
+const richText = require('./richText');
 
 // Cada tipo de item: como achar, quem é o responsável, o título e o endereço, e quem pode ver.
 const ENTITIES = {
@@ -35,23 +36,30 @@ async function list(type, id) {
   const { rows } = await db.query(
     `SELECT c.*, u.name AS author_name FROM comments c LEFT JOIN users u ON u.id = c.author_id
       WHERE c.entity_type = $1 AND c.entity_id = $2 ORDER BY c.created_at, c.id`, [type, id]);
-  return rows;
+  const files = await require('./attachments').forComments(rows.map((c) => c.id));
+  return rows.map((c) => ({ ...c, attachments: files[c.id] || [] }));
 }
 
-async function add({ type, id, author, body }) {
+// html: comentário do editor rico (limpo aqui); attachmentIds: áudios e documentos enviados antes (imagens do texto entram sozinhas).
+async function add({ type, id, author, body, html = null, attachmentIds = [] }) {
   if (!isEntity(type)) return { error: 'Tipo de item desconhecido.' };
   if (!canSee(author.role, type)) return { error: 'Sem acesso a este item.', status: 403 };
-  const text = String(body || '').replace(/\r/g, '').trim().slice(0, 4000);
-  if (!text) return { error: 'Escreva o comentário.' };
+  const rich = html != null && String(html).trim() ? richText.sanitize(html) : null;
+  const text = rich ? rich.text.slice(0, 4000) : String(body || '').replace(/\r/g, '').trim().slice(0, 4000);
+  const ids = [...(rich ? rich.attachmentIds : []), ...[].concat(attachmentIds || [])];
+  if (!text && !ids.length && !(rich && rich.html)) return { error: 'Escreva o comentário.' };
   const entity = await ENTITIES[type].load(id);
   if (!entity) return { error: 'Item não encontrado.', status: 404 };
   const mentions = await findMentions(text);
   const { rows: [comment] } = await db.query(
-    'INSERT INTO comments (entity_type, entity_id, author_id, body, mentions) VALUES ($1,$2,$3,$4,$5) RETURNING *', [type, entity.id, author.id, text, mentions]);
+    'INSERT INTO comments (entity_type, entity_id, author_id, body, body_html, mentions) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [type, entity.id, author.id, text, rich ? rich.html || null : null, mentions]);
+  const linked = ids.length ? await require('./attachments').link(ids, 'comment', comment.id, author) : 0;
+  const { rows: [audio] } = linked ? await db.query("SELECT transcript FROM attachments WHERE entity_type = 'comment' AND entity_id = $1 AND kind = 'audio' ORDER BY id LIMIT 1", [comment.id]) : { rows: [] };
+  const said = text || (audio ? `Áudio: ${audio.transcript || '(sem transcrição)'}` : 'Enviou um anexo.');
   const { rows: before } = await db.query('SELECT DISTINCT author_id FROM comments WHERE entity_type = $1 AND entity_id = $2 AND id <> $3 AND author_id IS NOT NULL', [type, entity.id, comment.id]);
   const def = ENTITIES[type];
   const url = def.url(entity.id);
-  const preview = text.length > 160 ? `${text.slice(0, 157)}…` : text;
+  const preview = said.length > 160 ? `${said.slice(0, 157)}…` : said;
   // quem foi mencionado recebe "mencionou você"; os outros (responsável, quem criou, quem já comentou) recebem "comentou"
   await notify({ type: 'comentario', users: mentions, title: `${author.name} mencionou você em ${def.label}: ${entity.title}`, body: preview, url, actorId: author.id, entity: { type, id: entity.id }, dedupe: `comment-${comment.id}` });
   const others = [entity.responsible, entity.creator, ...before.map((r) => r.author_id)].filter((u) => u && !mentions.includes(u));

@@ -1,5 +1,5 @@
 <%# Janela "Nova tarefa". Variáveis: users, episodes, guests, sponsors, prefill, back %>
-<dialog class="modal" id="modal-task-new" aria-labelledby="nt-h" <%= openNew ? 'data-open-on-load' : '' %>>
+<dialog class="modal modal-wide" id="modal-task-new" aria-labelledby="nt-h" <%= openNew ? 'data-open-on-load' : '' %>>
   <form method="post" action="/tarefas" class="stack">
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= back %>">
     <h2 id="nt-h">Nova tarefa</h2>
@@ -11,7 +11,9 @@
     <details class="small" data-voice-heard hidden><summary>O que eu ouvi</summary><p class="muted" data-voice-text></p></details>
     <% } %>
     <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="Ex.: confirmar a pauta com o convidado"></label>
-    <label>Detalhes <small class="muted">(opcional)</small><textarea name="description" rows="3" maxlength="4000"></textarea></label>
+    <div class="field"><span class="field-label">Detalhes <small class="muted">(opcional)</small></span>
+      <%- include('../partials/rich-editor', { name: 'description_html', attach: 'attachment_ids', placeholder: 'Descreva a tarefa. Cole imagens com Ctrl+V, anexe PDF, HTML ou ZIP, monte tabelas…', label: 'Detalhes da tarefa', size: 'sm' }) %>
+    </div>
     <div class="row">
       <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>" <%= u.id === currentUser.id ? 'selected' : '' %>><%= u.name %></option><% }) %></select></label>
       <label>Vence em<input type="date" name="due_on"></label>

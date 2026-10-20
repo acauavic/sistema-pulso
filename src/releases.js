@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.17.0', date: '2026-10-20', title: 'Tarefas e comentários com texto rico, anexos e áudio',
+    items: [
+      { kind: 'novo', text: 'A descrição da tarefa agora tem formatação: negrito, itálico, sublinhado, tachado, título, listas, citação, código, links e tabelas (com linhas e colunas que você adiciona e remove). Atalhos como "- " e "1. " viram lista. Na página da tarefa, a descrição aparece lida e o botão Editar abre o editor.' },
+      { kind: 'novo', text: 'Cole imagens com Ctrl+V (ou arraste) direto no texto, e anexe PDF, HTML e ZIP. As imagens aparecem no texto e ampliam ao clicar; os documentos ficam em Anexos, sempre para baixar.' },
+      { kind: 'novo', text: 'Links: ao colar um endereço você escolhe mostrar só a URL ou uma miniatura (título, resumo e imagem da página), como no ClickUp. Clique no link no editor para trocar a qualquer momento.' },
+      { kind: 'novo', text: 'Comentários das tarefas ganharam o mesmo editor, com @menções, e gravação de áudio com transcrição automática: o comentário mostra o player e o texto falado, e dá para inserir a transcrição no comentário. O aviso para a equipe traz o que foi dito.' },
+    ],
+  },
+  {
     version: '1.16.0', date: '2026-10-20', title: 'Tarefas com hora',
     items: [
       { kind: 'novo', text: 'As tarefas agora podem ter hora, além da data (opcional): "entregar hoje às 14h". O campo Hora fica ao lado de "Vence em" ao criar e editar. Se você preencher só a hora, vale para hoje.' },
