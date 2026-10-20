@@ -313,7 +313,7 @@
   const epId = location.pathname.split('/')[2];
   const post = (url, data) => fetch(url, {
     method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': (review?.dataset.csrf || document.querySelector('meta[name="csrf"]')?.content || '') },
-    body: new URLSearchParams(data),
+    body: data instanceof URLSearchParams ? data : new URLSearchParams(data),
   });
 
   const video = review?.querySelector('[data-video]');
@@ -378,7 +378,7 @@
     if (video.readyState >= 1) { drawMarkers(); if (dur) dur.textContent = clock(video.duration * 1000); }
     syncPlay();
     // ao escrever um comentário o vídeo pausa, para o ponto não fugir
-    form?.querySelector('textarea')?.addEventListener('focus', () => video.pause());
+    form?.querySelector('.rte-area')?.addEventListener('focus', () => video.pause());
 
     // clicar na linha dos marcadores leva o vídeo até aquele ponto
     timeline?.addEventListener('click', (e) => {
@@ -397,7 +397,7 @@
       else if (k === 'arrowleft') skip(-5); else if (k === 'arrowright') skip(5);
       else if (k === 'j') skip(-10); else if (k === 'l') skip(10);
       else if (k === ',' || k === '.') { video.pause(); skip(k === ',' ? -1 / 30 : 1 / 30); }
-      else if (k === 'c' && form) { form.querySelector('textarea').focus(); }
+      else if (k === 'c' && form) { form.querySelector('.rte-area').focus(); }
       else used = false;
       if (used) e.preventDefault();
     });
@@ -412,27 +412,12 @@
   // ---- comentar, resolver e apagar sem recarregar
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
 
-  function renderComment(c) {
-    const li = el('li', 'comment'); li.dataset.at = c.at_ms == null ? '' : String(c.at_ms); li.dataset.id = String(c.id);
-    const head = el('div', 'row');
-    if (c.at_ms != null) { const b = el('button', 'seek handle', `\u00a0${c.clock}`); b.type = 'button'; b.dataset.seek = String(c.at_ms); b.addEventListener('click', () => { video.currentTime = c.at_ms / 1000; video.scrollIntoView({ block: 'center', behavior: 'smooth' }); }); head.append(b); }
-    else head.append(el('span', 'badge b-gray', 'geral'));
-    head.append(el('span', 'small muted', `${c.author || '—'} · ${c.when}`));
-    const body = el('p', 'pre', c.body);
-    const actions = el('div', 'row small');
-    if (tickable) actions.append(resolveButton(c.id, false));
-    actions.append(deleteForm(c.id));
-    li.append(head, body, actions);
-    return li;
-  }
-  function resolveButton(id, resolved) {
-    const b = el('button', 'link', resolved ? 'reabrir' : 'marcar como resolvido'); b.type = 'button'; b.dataset.resolve = resolved ? '0' : '1'; b.dataset.comment = String(id);
-    b.addEventListener('click', () => resolveComment(b)); return b;
-  }
-  function deleteForm(id) {
-    const f = el('form', 'inline'); f.method = 'post'; f.action = `/episodios/${epId}/comentarios/${id}/excluir`; f.dataset.commentDelete = '';
-    const tok = el('input'); tok.type = 'hidden'; tok.name = '_csrf'; tok.value = review?.dataset.csrf || document.querySelector('meta[name="csrf"]')?.content || '';
-    const b = el('button', 'link', 'apagar'); b.type = 'submit'; f.append(tok, b); bindDelete(f); return f;
+  // O servidor devolve o comentário pronto (texto rico, anexos, áudio): aqui só se insere e se ligam os botões.
+  function bindComment(li) {
+    li.querySelectorAll('[data-seek]').forEach((b) => b.addEventListener('click', () => { if (!video) return; video.currentTime = Number(b.dataset.seek) / 1000; video.scrollIntoView({ block: 'center', behavior: 'smooth' }); }));
+    li.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () => resolveComment(b)));
+    li.querySelectorAll('[data-comment-delete]').forEach(bindDelete);
+    window.PulsoRich?.hydrate(li);
   }
   function insertSorted(li) {
     const key = (n) => (n.dataset.at === '' ? -1 : Number(n.dataset.at));
@@ -441,22 +426,25 @@
   }
 
   const submitComment = async (general) => {
-    const text = form.querySelector('textarea');
-    if (!text.value.trim()) { text.focus(); return; }
+    const rte = form.querySelector('[data-rich]'); const html = rte.rte.getHTML(); const ids = [...rte.querySelectorAll('.rte-chip input')].map((i) => i.value);
+    if (!html && !ids.length) { rte.rte.focus(); return; }
+    if (rte.rte.pending()) { window.alert('Espere o envio do anexo terminar.'); return; }
     const buttons = form.querySelectorAll('button'); buttons.forEach((b) => { b.disabled = true; });
     try {
-      const res = await post(review.dataset.url, { body: text.value, at_ms: general ? '' : String(Math.round(video.currentTime * 1000)), file_id: review.dataset.file });
+      const data = new URLSearchParams({ body_html: html, at_ms: general ? '' : String(Math.round(video.currentTime * 1000)), file_id: review.dataset.file });
+      ids.forEach((id) => data.append('anexos', id));
+      const res = await post(review.dataset.url, data);
       const out = await res.json().catch(() => ({}));
       if (!res.ok || !out.ok) { window.alert(out.error || 'Não foi possível salvar o comentário.'); return; }
-      const li = renderComment(out.comment); insertSorted(li); refreshEmpty(); setBadge(out.counts); drawMarkers();
-      text.value = ''; li.classList.add('just-added'); li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      setTimeout(() => li.classList.remove('just-added'), 2400);
-      text.focus();
+      const li = document.createElement('template'); li.innerHTML = out.html.trim(); const node = li.content.firstElementChild;
+      bindComment(node); insertSorted(node); refreshEmpty(); setBadge(out.counts); drawMarkers();
+      rte.rte.reset(); node.classList.add('just-added'); node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      setTimeout(() => node.classList.remove('just-added'), 2400);
+      rte.rte.focus();
     } catch { window.alert('Sem conexão. Tente de novo.'); } finally { buttons.forEach((b) => { b.disabled = false; }); }
   };
   form?.addEventListener('submit', (e) => { e.preventDefault(); submitComment(false); });
   review?.querySelector('[data-general]')?.addEventListener('click', () => submitComment(true));
-  form?.querySelector('textarea')?.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submitComment(false); } });
 
   async function resolveComment(b) {
     const li = b.closest('.comment'); b.disabled = true;
@@ -468,7 +456,6 @@
       setBadge(out.counts); drawMarkers();
     } finally { b.disabled = false; }
   }
-  document.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () => resolveComment(b)));
 
   function bindDelete(f) {
     f.addEventListener('submit', async (e) => {
@@ -481,5 +468,5 @@
       li.remove(); refreshEmpty(); setBadge(out.counts); drawMarkers();
     });
   }
-  document.querySelectorAll('[data-comment-delete]').forEach(bindDelete);
+  list?.querySelectorAll('.comment').forEach(bindComment);
 })();

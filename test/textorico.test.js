@@ -134,11 +134,55 @@ describe('texto rico nas tarefas e comentários: anexos, imagens, links e áudio
     assert.equal(a3.status, 200); assert.equal(a3.json.attachment.transcript, null); assert.match(a3.json.transcribeError, /transcrever/);
   });
 
-  it('comentário puro nos outros itens continua igual (convidado), sem editor rico', async () => {
+  it('todas as caixas de comentário têm o editor rico: convidado, patrocinador, episódio e corte; texto puro antigo continua aparecendo', async () => {
     const g = (await q("INSERT INTO guests (name, status) VALUES ('Dra. Teste', 'prospect') RETURNING id"))[0].id;
-    await as.prod.act('/comentarios', { tipo: 'guest', id: String(g), texto: 'oi <b>x</b> @Gil Gestão' }, { from: `/convidados/${g}` });
-    const [c] = await q("SELECT * FROM comments WHERE entity_type = 'guest' AND entity_id = $1", [g]); assert.equal(c.body_html, null); assert.equal(c.body, 'oi <b>x</b> @Gil Gestão');
-    const page = (await as.prod.get(`/convidados/${g}`)).text; assert.match(page, /name="texto"/); assert.doesNotMatch(page, /data-rich/); assert.match(page, /&lt;b&gt;x&lt;\/b&gt;/);
+    const sp = (await q("INSERT INTO sponsors (company, stage) VALUES ('Marca Teste', 'prospect') RETURNING id"))[0].id;
+    const ep = (await q("INSERT INTO episodes (number, title, status) VALUES (31, 'Episódio comentado', 'gravado') RETURNING id"))[0].id;
+    const cl = (await q("INSERT INTO episode_clips (title, source, status, filename, content_type, part_size, size_bytes, created_by) VALUES ('Corte x', 'upload', 'pronto', 'c.mp4', 'video/mp4', 5242880, 10, $1) RETURNING id", [u.prod.id]))[0].id;
+    for (const [type, id, path] of [['guest', g, `/convidados/${g}`], ['sponsor', sp, `/patrocinadores/${sp}`], ['episode', ep, `/episodios/${ep}`], ['clip', cl, `/cortes/${cl}`]]) {
+      const page = (await as.prod.get(path)).text;
+      assert.match(page, /name="texto_html"/, `${type}: editor rico`); assert.match(page, /data-cmd="mic"/, `${type}: áudio`); assert.match(page, /data-cmd="attach"/, `${type}: anexos`); assert.doesNotMatch(page, /<textarea name="texto"/, `${type}: sem a caixa antiga`);
+      const audio = (await upload(as.prod, Buffer.alloc(3000, 8), { name: 'a.webm', type: 'audio/webm' })).json.attachment;
+      await as.prod.act('/comentarios', { tipo: type, id: String(id), texto_html: `<p>Oi <strong>${type}</strong> @Gil Gestão <script>x</script></p>`, anexos: String(audio.id) }, { from: path });
+      const [c] = await q('SELECT * FROM comments WHERE entity_type = $1 AND entity_id = $2 ORDER BY id DESC', [type, id]);
+      assert.match(c.body_html, new RegExp(`^<p>Oi <strong>${type}</strong> @Gil Gestão\\s*</p>$`), type); assert.doesNotMatch(c.body_html, /script/); assert.deepEqual(c.mentions.map(String), [String(u.gestao.id)]);
+      const shown = (await as.gestao.get(path)).text;
+      assert.match(shown, new RegExp(`<strong>${type}</strong>`), `${type}: comentário formatado aparece`); assert.match(shown, /<audio controls[^>]*src="\/anexos\/\d+"/); assert.match(shown, /texto transcrito de teste/);
+      assert.equal((await as.gestao.get(`/anexos/${audio.id}`, { redirect: 'manual' })).status, 302, `${type}: a equipe com acesso ao item toca o áudio`);
+    }
+    // texto puro antigo (sem HTML) continua aparecendo, escapado
+    await as.prod.act('/comentarios', { tipo: 'guest', id: String(g), texto: 'antigo <b>x</b>' }, { from: `/convidados/${g}` });
+    const [old] = await q("SELECT * FROM comments WHERE entity_type = 'guest' AND entity_id = $1 ORDER BY id DESC", [g]); assert.equal(old.body_html, null);
+    assert.match((await as.prod.get(`/convidados/${g}`)).text, /antigo &lt;b&gt;x&lt;\/b&gt;/);
+  });
+
+  it('revisão do vídeo: comentário na minutagem com texto rico, imagem, documento e áudio; o servidor devolve o comentário pronto', async () => {
+    const ep = (await q("INSERT INTO episodes (number, title, status) VALUES (32, 'Revisão rica', 'em_revisao') RETURNING id"))[0].id;
+    const vid = (await q("INSERT INTO episode_files (episode_id, kind, filename, content_type, size_bytes, storage_key, status, version) VALUES ($1, 'editado', 'v.mp4', 'video/mp4', 10, 'k/v.mp4', 'pronto', 1) RETURNING id", [ep]))[0].id;
+    const img = (await upload(as.gestao, PNG, { name: 'p.png' })).json.attachment; const pdf = (await upload(as.gestao, PDF, { name: 'lista.pdf' })).json.attachment; const au = (await upload(as.gestao, Buffer.alloc(3000, 4), { name: 'a.webm', type: 'audio/webm' })).json.attachment;
+    const post = async (client, form) => {
+      const body = new URLSearchParams(); for (const [k, v] of Object.entries(form)) [].concat(v).forEach((x) => body.append(k, x));
+      const res = await fetch(`${app.base}/episodios/${ep}/comentarios`, { method: 'POST', headers: { cookie: client.cookie(), accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded', 'x-csrf-token': await client.csrf(`/episodios/${ep}`) }, body });
+      return { status: res.status, json: await res.json().catch(() => null) };
+    };
+    const r = await post(as.gestao, { body_html: `<p>Cortar <strong>aqui</strong></p><img src="${img.url}"><script>x</script>`, at_ms: '83000', file_id: String(vid), anexos: [String(pdf.id), String(au.id)] });
+    assert.equal(r.status, 200); assert.equal(r.json.ok, true); assert.equal(r.json.comment.clock, '1:23');
+    assert.match(r.json.html, /<li class="comment\s*"[^>]*data-at="83000"/); assert.match(r.json.html, /<strong>aqui<\/strong>/); assert.match(r.json.html, /<audio controls[^>]*src="\/anexos\/\d+"/); assert.match(r.json.html, /lista\.pdf/); assert.match(r.json.html, /texto transcrito de teste/); assert.doesNotMatch(r.json.html, /<script/);
+    const [c] = await q('SELECT * FROM episode_comments WHERE episode_id = $1', [ep]);
+    assert.equal(c.body, 'Cortar aqui'); assert.match(c.body_html, /<img src="\/anexos\/\d+"/);
+    assert.equal((await q("SELECT count(*)::int AS n FROM attachments WHERE entity_type = 'review' AND entity_id = $1", [c.id]))[0].n, 3, 'imagem do texto, PDF e áudio ligados ao comentário');
+    assert.ok((await q("SELECT 1 FROM episode_events WHERE episode_id = $1 AND message LIKE 'Comentário em 1:23: Cortar aqui%'", [ep])).length);
+    const page = (await as.gestao.get(`/episodios/${ep}`)).text;
+    assert.match(page, /name="body_html"/); assert.match(page, /data-cmd="mic"/); assert.match(page, /class="rich-content comment-body"/); assert.match(page, /<audio controls/);
+    assert.doesNotMatch(page, /<textarea name="body"/, 'a caixa simples da revisão saiu');
+    // só áudio, sem texto, vale; sem nada, não
+    const au2 = (await upload(as.gestao, Buffer.alloc(3000, 2), { name: 'b.webm', type: 'audio/webm' })).json.attachment;
+    assert.equal((await post(as.gestao, { body_html: '<p><br></p>', at_ms: '', file_id: String(vid), anexos: String(au2.id) })).status, 200);
+    assert.equal((await post(as.gestao, { body_html: '<p><br></p>', at_ms: '', file_id: String(vid) })).status, 400);
+    assert.equal((await post(as.gestao, { body: 'texto simples antigo', at_ms: '', file_id: String(vid) })).status, 200, 'texto puro (sem HTML) continua aceito');
+    // a limpeza reconhece anexo de revisão cujo comentário foi apagado
+    await h.db.query('DELETE FROM episode_comments WHERE id = $1', [c.id]);
+    assert.equal(await attachments.purge() >= 3, true);
   });
 
   it('miniatura de link: o servidor lê a página (com cache), recusa rede interna e a tela só mostra o que existe', async () => {

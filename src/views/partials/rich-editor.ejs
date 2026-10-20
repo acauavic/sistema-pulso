@@ -42,4 +42,5 @@
   <% if (locals.mentions) { %><ul class="mention-list" data-rte-mentions hidden role="listbox"></ul><% } %>
   <input type="file" data-rte-picker multiple accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.html,.htm,.zip" hidden>
 </div>
+<script src="/static/richtext.js?v=<%= assetV %>" defer></script>
 <template data-rte-icons><span data-i="mic"><%- icon('mic', 16) %></span><span data-i="file-text"><%- icon('file-text', 16) %></span><span data-i="x"><%- icon('x', 14) %></span></template>

@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.18.0', date: '2026-10-20', title: 'Todos os comentários com texto rico, anexos e áudio',
+    items: [
+      { kind: 'novo', text: 'Convidados, patrocinadores, episódios e cortes passam a ter a mesma caixa de comentário das tarefas: formatação, tabelas, imagens coladas (Ctrl+V), PDF, HTML e ZIP, miniatura de links, @menções e áudio com transcrição.' },
+      { kind: 'novo', text: 'A revisão do vídeo também: o comentário na minutagem aceita texto formatado, imagem, documento e áudio gravado (com transcrição), e entra na lista na hora, sem recarregar a página.' },
+      { kind: 'ajuste', text: 'A exibição dos comentários mostra tudo isso: texto formatado, imagens ampliáveis, player de áudio com a transcrição e os documentos para baixar. Comentários antigos continuam iguais.' },
+    ],
+  },
+  {
     version: '1.17.0', date: '2026-10-20', title: 'Tarefas e comentários com texto rico, anexos e áudio',
     items: [
       { kind: 'novo', text: 'A descrição da tarefa agora tem formatação: negrito, itálico, sublinhado, tachado, título, listas, citação, código, links e tabelas (com linhas e colunas que você adiciona e remove). Atalhos como "- " e "1. " viram lista. Na página da tarefa, a descrição aparece lida e o botão Editar abre o editor.' },

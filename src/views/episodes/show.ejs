@@ -288,7 +288,7 @@
         <p class="small muted pc-hint">Atalhos: espaço pausa · ← → 5 s · J L 10 s · , . um quadro · C comenta neste ponto</p>
         <% if (tickable) { %>
         <form class="stack top-gap" data-comment-form>
-          <textarea name="body" rows="2" maxlength="2000" placeholder="Comente neste ponto do vídeo…" required aria-label="Comentário"></textarea>
+          <%- include('../partials/rich-editor', { name: 'body_html', attach: 'anexos', placeholder: 'Comente neste ponto do vídeo… cole imagens, anexe arquivos ou grave um áudio', label: 'Comentário', size: 'sm', audio: true, ctrlEnter: true }) %>
           <div class="row">
             <span class="handle muted">no ponto <strong data-now>0:00</strong></span>
             <button class="btn primary" type="submit">Comentar neste ponto</button>
@@ -299,19 +299,7 @@
       </div>
       <% } %>
       <ul class="plain comment-list top-gap" data-comment-list>
-        <% comments.forEach(function (c) { %>
-        <li class="comment <%= c.resolved ? 'resolved' : '' %>" data-at="<%= c.at_ms == null ? '' : c.at_ms %>" data-id="<%= c.id %>">
-          <div class="row">
-            <% if (c.at_ms != null) { %><button type="button" class="seek handle" data-seek="<%= c.at_ms %>"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></button><% } else { %><span class="badge b-gray">geral</span><% } %>
-            <span class="small muted"><%= c.author_name || '—' %> · <%= fmt.formatDateTime(c.created_at) %></span>
-          </div>
-          <p class="pre"><%= c.body %></p>
-          <div class="row small">
-            <% if (tickable) { %><button type="button" class="link" data-resolve="<%= c.resolved ? '0' : '1' %>" data-comment="<%= c.id %>"><%= c.resolved ? 'reabrir' : 'marcar como resolvido' %></button><% } %>
-            <form method="post" action="/episodios/<%= ep.id %>/comentarios/<%= c.id %>/excluir" class="inline" data-confirm="Apagar este comentário?" data-comment-delete><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">apagar</button></form>
-          </div>
-        </li>
-        <% }) %>
+        <% comments.forEach(function (c) { %><%- include('_review_comment', { c: c, ep: ep, tickable: tickable }) %><% }) %>
         <li class="muted" data-no-comments <%= comments.length ? 'hidden' : '' %>>Sem comentários.</li>
       </ul>
     </section>

@@ -4,6 +4,7 @@
 // Sem inline script (CSP 'self'). Também mostra o conteúdo salvo: miniaturas de link, @menções destacadas e imagens ampliáveis.
 (function () {
   'use strict';
+  if (window.PulsoRich) return; // o editor pode ser pedido por mais de um trecho da mesma página
   const csrf = document.querySelector('meta[name="csrf"]')?.content || '';
   const team = (() => { try { return JSON.parse(document.getElementById('team-users')?.textContent || '[]'); } catch { return []; } })();
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,6 +12,7 @@
   const fmtBytes = (n) => { const u = ['B', 'KB', 'MB']; let i = 0; let x = n; while (x >= 1024 && i < 2) { x /= 1024; i += 1; } return `${x >= 100 || i === 0 ? Math.round(x) : x.toFixed(1).replace('.', ',')} ${u[i]}`; };
   const clock = (ms) => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
   const icons = (() => { const t = document.querySelector('template[data-rte-icons]'); return (n) => (t ? (t.content.querySelector(`[data-i="${n}"]`)?.innerHTML || '') : ''); })();
+
   const URL_RE = /^(https?:\/\/[^\s<>"']+)$/i;
 
   // ---------------------------------------------------------------- limpeza do que é colado
@@ -76,6 +78,8 @@
       setHTML(html) { area.innerHTML = html || ''; sync(); },
       setPlain(text) { area.innerHTML = plainToHtml(text); sync(); },
       focus: () => area.focus(),
+      pending: () => pending > 0,
+      reset() { area.innerHTML = ''; hidden.value = ''; filesBox.replaceChildren(); say(''); if (linkBar) linkBar.hidden = true; },
     };
     try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* navegador antigo */ }
     if (hidden.value && !area.innerHTML.trim()) area.innerHTML = hidden.value;

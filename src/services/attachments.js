@@ -73,6 +73,15 @@ async function link(ids, entityType, entityId, user) {
   return rowCount;
 }
 
+// Anexos dos comentários da revisão do vídeo: { [commentId]: [anexos] }
+async function forReviews(ids) {
+  if (!ids.length) return {};
+  const { rows } = await db.query("SELECT * FROM attachments WHERE entity_type = 'review' AND entity_id = ANY($1) ORDER BY id", [ids]);
+  const out = {};
+  for (const a of rows) (out[a.entity_id] ||= []).push(a);
+  return out;
+}
+
 const forEntity = async (type, id) => (await db.query('SELECT * FROM attachments WHERE entity_type = $1 AND entity_id = $2 ORDER BY id', [type, id])).rows;
 
 // Anexos de vários comentários de uma vez: { [commentId]: [anexos] }
@@ -88,6 +97,7 @@ async function forComments(commentIds) {
 async function canView(user, att) {
   if (!att.entity_id) return String(att.uploaded_by) === String(user.id);
   if (att.entity_type === 'task') return can(user.role, 'tasks.read');
+  if (att.entity_type === 'review') return can(user.role, 'episodes.read');
   const { rows: [c] } = await db.query('SELECT entity_type FROM comments WHERE id = $1', [att.entity_id]);
   return Boolean(c) && require('./comments').canSee(user.role, c.entity_type);
 }
@@ -104,11 +114,12 @@ async function purge() {
   const { rows } = await db.query(
     `SELECT * FROM attachments WHERE (entity_id IS NULL AND created_at < now() - interval '2 days')
         OR (entity_type = 'task' AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.id = entity_id))
-        OR (entity_type = 'comment' AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.id = entity_id)) LIMIT 200`);
+        OR (entity_type = 'comment' AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.id = entity_id))
+        OR (entity_type = 'review' AND NOT EXISTS (SELECT 1 FROM episode_comments c WHERE c.id = entity_id)) LIMIT 200`);
   for (const a of rows) await remove(a);
   return rows.length;
 }
 
 const presign = (att, { download = false } = {}) => b2.presignGet(att.storage_key, { expires: 6 * 3600, download: download || att.kind === 'file' ? att.filename : null, contentType: att.content_type });
 
-module.exports = { LIMITS, MAX_BODY, FILE_TYPES, detect, imageType, store, link, forEntity, forComments, canView, canRemove, remove, purge, presign };
+module.exports = { LIMITS, MAX_BODY, FILE_TYPES, detect, imageType, store, link, forEntity, forComments, forReviews, canView, canRemove, remove, purge, presign };

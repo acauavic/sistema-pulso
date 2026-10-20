@@ -4,6 +4,8 @@ const express = require('express');
 const db = require('../db/pool');
 const config = require('../config');
 const uploadPost = require('../services/uploadPost');
+const richText = require('../services/richText');
+const attachmentsSvc = require('../services/attachments');
 const b2 = require('../services/b2');
 const prod = require('../services/production');
 const sponsorsSvc = require('../services/sponsors');
@@ -274,7 +276,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   const edited = files.rows.filter((f) => f.kind === 'editado' && f.status === 'pronto');
   const latestEdited = edited[0] || null; // a mais nova primeiro
   res.render('episodes/show', {
-    title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: comments.rows,
+    title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: await withReviewFiles(comments.rows),
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
     epComments: await commentsSvc.list('episode', ep.id),
     content: { ...contentRows.rows[0], total: contentRows.rows[0].clips + contentRows.rows[0].posts }, tabs, defaultTab, publications: pubRows.rows, social, uploadPost, uploadLive: config.uploadPost.live,
@@ -592,6 +594,7 @@ router.get(['/episodios/:id/quadros/:fid', '/quadros/:fid'], requirePerm('episod
 
 // ---- checklists do episódio ----
 // Quantos comentários há na revisão e quantos seguem abertos (a tela atualiza o contador da aba sem recarregar).
+const withReviewFiles = async (rows) => { const f = await attachmentsSvc.forReviews(rows.map((c) => c.id)); return rows.map((c) => ({ ...c, attachments: f[c.id] || [] })); };
 const commentCounts = async (epId) => (await db.query('SELECT count(*)::int AS total, count(*) FILTER (WHERE NOT resolved)::int AS open FROM episode_comments WHERE episode_id = $1', [epId])).rows[0];
 const canTick = (role) => can(role, 'production.edit') || can(role, 'production.review') || can(role, 'production.manage');
 
@@ -664,12 +667,16 @@ router.post('/episodios/:id/tarefas/:tid/excluir', requirePerm('production.manag
 }));
 
 // ---- revisão: comentários na minutagem ----
+// Renderiza um pedaço de página (o comentário recém-criado) com as variáveis do layout, para o navegador só inserir.
+const renderPartial = (res, view, data) => new Promise((resolve, reject) => res.render(view, data, (err, html) => (err ? reject(err) : resolve(html))));
 router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!canTick(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não comenta.' });
   const ep = await findEpisode(req.params.id);
   if (!ep) return res.status(404).json({ ok: false });
-  const body = clean(req.body.body, 2000);
-  if (!body) return res.status(400).json({ ok: false, error: 'Escreva o comentário.' });
+  const rich = req.body.body_html != null && String(req.body.body_html).trim() ? richText.sanitize(req.body.body_html) : null;
+  const ids = [...(rich ? rich.attachmentIds : []), ...[].concat(req.body.anexos || [])];
+  const body = rich ? rich.text.slice(0, 4000) : clean(req.body.body, 2000);
+  if (!body && !ids.length && !(rich && rich.html)) return res.status(400).json({ ok: false, error: 'Escreva o comentário.' });
   const at = req.body.at_ms === '' || req.body.at_ms == null ? null : Number.parseInt(req.body.at_ms, 10);
   if (at != null && (!Number.isInteger(at) || at < 0 || at > 24 * 3600 * 1000)) return res.status(400).json({ ok: false, error: 'Minutagem inválida.' });
   let fileId = null;
@@ -677,11 +684,15 @@ router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(asy
     const { rowCount } = await db.query("SELECT 1 FROM episode_files WHERE id = $1 AND episode_id = $2 AND kind = 'editado'", [req.body.file_id, ep.id]);
     if (rowCount) fileId = Number(req.body.file_id);
   }
-  const { rows: [c] } = await db.query('INSERT INTO episode_comments (episode_id, file_id, at_ms, body, author_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-    [ep.id, fileId, at, body, req.user.id]);
-  await prod.addEvent(ep.id, req.user.id, 'comentario', `Comentário${at != null ? ` em ${require('../utils/format').formatClock(at)}` : ''}: ${body.slice(0, 140)}`);
+  const { rows: [c] } = await db.query('INSERT INTO episode_comments (episode_id, file_id, at_ms, body, body_html, author_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+    [ep.id, fileId, at, body, rich ? rich.html || null : null, req.user.id]);
+  const linked = ids.length ? await attachmentsSvc.link(ids, 'review', c.id, req.user) : 0;
+  const files = linked ? (await attachmentsSvc.forReviews([c.id]))[c.id] || [] : [];
+  const said = body || (files.find((f) => f.kind === 'audio')?.transcript ? `Áudio: ${files.find((f) => f.kind === 'audio').transcript}` : 'Anexo enviado.');
+  await prod.addEvent(ep.id, req.user.id, 'comentario', `Comentário${at != null ? ` em ${require('../utils/format').formatClock(at)}` : ''}: ${said.slice(0, 140)}`);
   if (wantsJson(req)) {
-    return res.json({ ok: true, id: c.id, comment: { id: c.id, at_ms: at, clock: at != null ? fmt.formatClock(at) : null, body, author: req.user.name, when: fmt.formatDateTime(new Date()), resolved: false }, counts: await commentCounts(ep.id) });
+    const html = await renderPartial(res, 'episodes/_review_comment', { c: { ...c, author_name: req.user.name, attachments: files }, ep, tickable: true });
+    return res.json({ ok: true, id: c.id, html, comment: { id: c.id, at_ms: at, clock: at != null ? fmt.formatClock(at) : null, body, author: req.user.name, when: fmt.formatDateTime(new Date()), resolved: false }, counts: await commentCounts(ep.id) });
   }
   res.redirect(back(ep.id, '#revisao'));
 }));

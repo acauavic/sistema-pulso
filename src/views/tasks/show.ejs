@@ -63,8 +63,7 @@
     <% } %>
   </section>
 
-  <%- include('../partials/comments', { type: 'task', id: task.id, items: comments, back: '/tarefas/' + task.id, rich: true }) %>
+  <%- include('../partials/comments', { type: 'task', id: task.id, items: comments, back: '/tarefas/' + task.id }) %>
 </div>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
-<script src="/static/richtext.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/foot') %>
