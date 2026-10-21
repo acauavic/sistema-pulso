@@ -30,6 +30,13 @@ router.post('/comentarios', requirePerm('comments.write'), wrap(async (req, res)
   res.redirect(backTo(req, comments.ENTITIES[type].url(id)));
 }));
 
+router.post('/comentarios/:id/editar', requirePerm('comments.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return res.status(404).send('Não encontrado.');
+  const result = await comments.update(req.params.id, req.user, { body: req.body.texto, html: req.body.texto_html, attachmentIds: [].concat(req.body.anexos || []), removeIds: [].concat(req.body.remover || []) });
+  if (result.error) await req.flash('error', result.error);
+  res.redirect(backTo(req, result.comment ? comments.ENTITIES[result.comment.entity_type].url(result.comment.entity_id) : '/'));
+}));
+
 router.post('/comentarios/:id/excluir', requirePerm('comments.write'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return res.status(404).send('Não encontrado.');
   const result = await comments.remove(req.params.id, req.user);

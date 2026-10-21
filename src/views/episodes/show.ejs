@@ -291,10 +291,11 @@
           <%- include('../partials/rich-editor', { name: 'body_html', attach: 'anexos', placeholder: 'Comente neste ponto do vídeo… cole imagens, anexe arquivos ou grave um áudio', label: 'Comentário', size: 'sm', audio: true, ctrlEnter: true }) %>
           <div class="row">
             <span class="handle muted">no ponto <strong data-now>0:00</strong></span>
-            <button class="btn primary" type="submit">Comentar neste ponto</button>
-            <button class="btn" type="button" data-general>Comentário geral</button>
+            <button class="btn primary icon-only" type="submit" aria-label="Comentar neste ponto" title="Comentar neste ponto"><%- icon('send', 16) %></button>
+            <button class="btn icon-only" type="button" data-general aria-label="Comentário geral (sem minutagem)" title="Comentário geral (sem minutagem)"><%- icon('message-square', 16) %></button>
           </div>
         </form>
+        <%- include('../partials/comment-edit', { review: true }) %>
         <% } %>
       </div>
       <% } %>

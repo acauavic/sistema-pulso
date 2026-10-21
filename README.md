@@ -352,6 +352,21 @@ Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`
 - **Visualizações**: combinações salvas de modo, tipos, responsável e concluídos. Da casa: **Tudo**, **Meu trabalho** (semana, só os meus e os do meu perfil, sem concluídos), **Produção** e **Dinheiro** (só para quem vê o financeiro). Qualquer pessoa salva as suas ("Salvar esta visualização" aparece quando os filtros não batem com nenhuma); **Gestão e Superadmin** (`calendar.share`) também compartilham com a equipe e apagam as dos outros. A visualização da equipe abre para cada perfil já limitada ao que ele enxerga.
 - O **assistente de IA** consulta o calendário (`calendario`): "o que tenho esta semana?".
 
+## Avisos de alteração e exclusão de cadastro
+
+Quando alguém altera ou exclui um convidado, patrocinador, episódio, corte ou tarefa, o **responsável** (dono do convidado ou patrocinador, editor
+do episódio, quem criou o corte, responsável pela tarefa) recebe um aviso: "Fulano alterou o convidado X" com **o que mudou** (nome, e-mail,
+etapa…), ou "Fulano excluiu…". Quem fez a ação não é avisado. Em tarefas, status, prazo, hora e responsável já tinham aviso próprio e não se repetem.
+
+- **Configurável**: em **Gestão > Notificações**, "Cadastro alterado" e "Cadastro excluído" ligam/desligam painel e e-mail; cada pessoa silencia em **Notificações**.
+- Código: `src/services/recordChanges.js` (novo cadastro com responsável entra em `PLACES`), tipos `alteracao` e `exclusao`, migração `042`.
+
+## Comentários: editar e apagar
+
+Em todas as caixas de comentário (convidado, patrocinador, episódio, corte, tarefa e revisão do vídeo), quem escreveu edita pelo **ícone de lápis**
+(janela com o texto atual, novos anexos e áudio, e dá para tirar anexos) e apaga pela **lixeira**; a gestão também apaga os dos outros. Um lápis pequeno marca o
+editado. As ações são ícones (nome na dica). Quem for mencionado só na edição recebe o aviso de menção.
+
 ## App no celular (PWA)
 
 O painel instala como app (Android, iPhone e computador). No celular, o Início mostra **Use o Pulso como app** (Android abre o pedido de

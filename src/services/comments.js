@@ -76,4 +76,42 @@ async function remove(commentId, user) {
   return { ok: true, comment: c };
 }
 
-module.exports = { ENTITIES, isEntity, canSee, findMentions, list, add, remove };
+// Prepara o novo conteúdo de um comentário editado (comum 'comment' ou da revisão do vídeo 'review'): limpa o HTML, liga os
+// anexos novos, apaga os que a pessoa tirou (removeIds) e as imagens que saíram do texto. Devolve { text, html } ou { error }.
+async function prepareEdit({ attType, commentId, user, body, html, attachmentIds = [], removeIds = [], maxLength = 4000 }) {
+  const attachments = require('./attachments');
+  const rich = html != null && String(html).trim() ? richText.sanitize(html) : null;
+  const text = rich ? rich.text.slice(0, maxLength) : String(body || '').replace(/\r/g, '').trim().slice(0, maxLength);
+  const kept = await attachments.forEntity(attType, commentId);
+  const dropIds = new Set([].concat(removeIds || []).map(Number));
+  const newIds = [...(rich ? rich.attachmentIds : []), ...[].concat(attachmentIds || [])];
+  const stays = kept.filter((a) => !dropIds.has(Number(a.id)) && !(a.kind === 'image' && !(rich ? rich.attachmentIds : []).map(Number).includes(Number(a.id))));
+  if (!text && !stays.length && !newIds.length && !(rich && rich.html)) return { error: 'Escreva o comentário.' };
+  await attachments.link(newIds, attType, commentId, user);
+  for (const a of kept.filter((x) => !stays.includes(x))) await attachments.remove(a);
+  return { text, html: rich ? rich.html || null : null };
+}
+
+// Edita: só quem escreveu. Quem foi mencionado agora (e antes não era) recebe o aviso de menção.
+async function update(commentId, user, { body, html = null, attachmentIds = [], removeIds = [] }) {
+  const { rows: [c] } = await db.query('SELECT * FROM comments WHERE id = $1', [commentId]);
+  if (!c) return { error: 'Comentário não encontrado.', status: 404 };
+  if (String(c.author_id) !== String(user.id)) return { error: 'Só quem escreveu pode editar.', status: 403 };
+  if (!canSee(user.role, c.entity_type)) return { error: 'Sem acesso a este item.', status: 403 };
+  const edit = await prepareEdit({ attType: 'comment', commentId: c.id, user, body, html, attachmentIds, removeIds });
+  if (edit.error) return edit;
+  const mentions = await findMentions(edit.text);
+  const { rows: [comment] } = await db.query(
+    'UPDATE comments SET body = $2, body_html = $3, mentions = $4, edited_at = now() WHERE id = $1 RETURNING *', [c.id, edit.text, edit.html, mentions]);
+  const fresh = mentions.filter((m) => !(c.mentions || []).map(String).includes(String(m)));
+  if (fresh.length) {
+    const def = ENTITIES[c.entity_type]; const entity = await def.load(c.entity_id);
+    if (entity) {
+      const said = edit.text || 'Comentário editado.';
+      await notify({ type: 'comentario', users: fresh, title: `${user.name} mencionou você em ${def.label}: ${entity.title}`, body: said.length > 160 ? `${said.slice(0, 157)}…` : said, url: def.url(entity.id), actorId: user.id, entity: { type: c.entity_type, id: entity.id }, dedupe: `comment-${c.id}-edit` });
+    }
+  }
+  return { ok: true, comment };
+}
+
+module.exports = { ENTITIES, isEntity, canSee, findMentions, list, add, update, prepareEdit, remove };

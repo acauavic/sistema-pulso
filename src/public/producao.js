@@ -452,7 +452,8 @@
       const res = await post(`/episodios/${epId}/comentarios/${b.dataset.comment}/resolver`, { resolved: b.dataset.resolve });
       const out = await res.json().catch(() => ({}));
       if (!res.ok || !out.ok) { window.alert('Não foi possível atualizar o comentário.'); return; }
-      li.classList.toggle('resolved', out.resolved); b.dataset.resolve = out.resolved ? '0' : '1'; b.textContent = out.resolved ? 'reabrir' : 'marcar como resolvido';
+      li.classList.toggle('resolved', out.resolved); b.dataset.resolve = out.resolved ? '0' : '1';
+      b.title = out.resolved ? 'Reabrir' : 'Marcar como resolvido'; b.setAttribute('aria-label', out.resolved ? 'Reabrir o comentário' : 'Marcar como resolvido');
       setBadge(out.counts); drawMarkers();
     } finally { b.disabled = false; }
   }
@@ -469,4 +470,26 @@
     });
   }
   list?.querySelectorAll('.comment').forEach(bindComment);
+
+  // editar um comentário da revisão: a janela (richtext.js abre e preenche) salva aqui, sem recarregar, e troca o item na lista
+  const editDlg = document.getElementById('modal-review-edit');
+  editDlg?.querySelector('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.currentTarget; const rte = f.querySelector('[data-rich]'); const html = rte.rte.getHTML();
+    const ids = [...rte.querySelectorAll('.rte-chip input')].map((i) => i.value); const gone = [...f.querySelectorAll('input[name="remover"]:not(:disabled)')].map((i) => i.value);
+    if (!html && !ids.length) { rte.rte.focus(); return; }
+    if (rte.rte.pending()) { window.alert('Espere o envio do anexo terminar.'); return; }
+    const buttons = f.querySelectorAll('button'); buttons.forEach((b) => { b.disabled = true; });
+    try {
+      const data = new URLSearchParams({ body_html: html });
+      ids.forEach((id) => data.append('anexos', id)); gone.forEach((id) => data.append('remover', id));
+      const res = await post(f.getAttribute('action'), data);
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.ok) { window.alert(out.error || 'Não foi possível salvar a edição.'); return; }
+      const old = list.querySelector(`.comment[data-id="${out.id}"]`);
+      const tpl = document.createElement('template'); tpl.innerHTML = out.html.trim(); const node = tpl.content.firstElementChild;
+      bindComment(node); old?.replaceWith(node); setBadge(out.counts); drawMarkers();
+      editDlg.close(); node.classList.add('just-added'); setTimeout(() => node.classList.remove('just-added'), 2400);
+    } catch { window.alert('Sem conexão. Tente de novo.'); } finally { buttons.forEach((b) => { b.disabled = false; }); }
+  });
 })();

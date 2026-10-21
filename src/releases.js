@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.21.0', date: '2026-10-21', title: 'Avisos de alteração e exclusão, e comentários que dá para editar',
+    items: [
+      { kind: 'novo', text: 'Quem é responsável por um convidado, patrocinador, episódio (editor), corte ou tarefa agora recebe um aviso quando outra pessoa altera o cadastro, dizendo o que mudou, ou o exclui. Quem fez a ação não recebe aviso.' },
+      { kind: 'novo', text: 'Configurável: em Gestão > Notificações, "Cadastro alterado" e "Cadastro excluído" podem ser ligados ou desligados (painel e e-mail), e cada pessoa silencia o que não quer ver em Notificações.' },
+      { kind: 'novo', text: 'Comentários podem ser editados por quem os escreveu, em todos os tipos (convidado, patrocinador, episódio, corte, tarefa) e também na revisão do vídeo. A janela de edição abre com o texto atual, aceita novos anexos e áudio, e deixa tirar anexos. Um lápis pequeno marca o comentário editado, e quem for mencionado só na edição recebe o aviso.' },
+      { kind: 'ajuste', text: 'Ações dos comentários agora são ícones: enviar, editar (lápis), apagar (lixeira), resolver e reabrir na revisão do vídeo, e o comentário geral. Passe o mouse (ou segure no celular) para ver o nome.' },
+    ],
+  },
+  {
     version: '1.20.0', date: '2026-10-20', title: 'Pulso como app no celular, com alertas',
     items: [
       { kind: 'novo', text: 'O painel vira app: instale pelo cartão "Use o Pulso como app" no Início do celular (Android pede para instalar; no iPhone, uma janela mostra os três toques no Safari) ou por "Instalar o app" no rodapé do menu. Ele abre em tela cheia, com ícone próprio e atalhos (segure o ícone): Nova tarefa, Tarefas, Agenda e Notificações.' },

@@ -69,7 +69,9 @@ describe('tarefas com hora', () => {
     assert.equal(after.length, before + 1);
     assert.match(after.at(-1).title, /Gil Gestão mudou o prazo: Entregar o roteiro/); assert.match(after.at(-1).body, /Novo prazo: \d\d\/\d\d\/\d{4} às 16h30\./);
     await as.gestao.act(`/tarefas/${t.id}`, { title: 'Entregar o roteiro', status: 'a_fazer', kind: 'geral', due_on: today, due_time: '16:30', assignee_id: String(u.prod.id), description: 'só detalhes' }, { from: `/tarefas/${t.id}` });
-    assert.equal((await notifs(u.prod.id)).length, before + 1, 'prazo igual: sem aviso');
+    const again = await notifs(u.prod.id);
+    assert.equal(again.length, before + 2, 'prazo igual: sem aviso de prazo; só o de alteração (a descrição mudou)');
+    assert.match(again.at(-1).title, /alterou a tarefa: Entregar o roteiro/); assert.equal(again.at(-1).body, 'Mudou: descrição.');
     await as.gestao.act(`/tarefas/${t.id}`, { title: 'Entregar o roteiro', status: 'a_fazer', kind: 'geral', due_on: '', due_time: '14:00', assignee_id: String(u.prod.id) }, { from: `/tarefas/${t.id}` });
     // pela página de edição a hora sem data vale hoje (mesma regra de criar)
     assert.equal((await one('Entregar o roteiro')).hm, '14:00');

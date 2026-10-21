@@ -11,6 +11,7 @@ const bulk = require('../services/guestBulk');
 const rules = require('../services/guestRules');
 const tpl = require('../services/inviteTemplate');
 const { audit } = require('../services/audit');
+const recordChanges = require('../services/recordChanges');
 const { requirePerm } = require('../middleware');
 const { GUEST_STATUSES, STATUS_BY_KEY, isStatus, PROFILES, PROFILE_BY_KEY, CLICK_KINDS, LOSS_REASONS } = require('../constants');
 
@@ -156,7 +157,9 @@ router.post('/convidados/em-massa', requirePerm('guests.write'), wrap(async (req
   const back = '/convidados?view=lista';
   const { ids, changes, error } = await bulk.parse(req.body);
   if (error) { await req.flash('error', error); return res.redirect(back); }
+  const { rows: beforeRows } = await db.query('SELECT * FROM guests WHERE id = ANY($1::int[])', [ids]);
   const result = await bulk.apply({ ids, changes, user: req.user });
+  for (const before of beforeRows) await recordChanges.updated({ type: 'guest', before, actor: req.user });
   await audit(req, 'convidados.edicao_em_massa', 'guest', null, {
     selecionados: ids.length, atualizados: result.updated, etapa_nao_mudou: result.stageSkipped.length,
     mudancas: Object.keys(changes).filter((k) => !['owner_name', 'sponsor_name'].includes(k)),
@@ -243,6 +246,7 @@ router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res
   if (error) {
     return formView(res, 400, { title: `Editar ${guest.name}`, guest, error, values: echoValues(req.body, values), ...(await formOptions()) });
   }
+  const before = await recordChanges.snapshot('guest', guest.id);
   await db.query(
     `UPDATE guests SET ${COLUMNS.map((c, i) => `${c}=$${i + 2}`).join(', ')}, updated_at=now() WHERE id=$1`,
     [guest.id, ...columnValues(values)]);
@@ -254,6 +258,7 @@ router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res
   }
   await production.syncFromGuest(guest.id, req.user.id);
   await audit(req, 'convidado.editado', 'guest', guest.id);
+  await recordChanges.updated({ type: 'guest', before, actor: req.user });
   if (pendingStage) {
     await req.flash('error', `Salvo. Para ir para ${STATUS_BY_KEY[pendingStage].label}, envie a foto.`);
     return res.redirect(`/convidados/${guest.id}?abrir=foto&para=${pendingStage}`);
@@ -469,7 +474,9 @@ router.post('/convidados/:id/excluir', requirePerm('guests.delete'), wrap(async 
   await audit(req, 'convidado.excluido', 'guest', guest.id, { name: guest.name });
   await require('../services/finance').onGuestDeleted(guest.id);
   if (guest.photo_key) await require('../services/b2').deleteObject(guest.photo_key).catch(() => {});
+  const gone = await recordChanges.snapshot('guest', guest.id);
   await db.query('DELETE FROM guests WHERE id = $1', [guest.id]);
+  await recordChanges.deleted({ type: 'guest', row: gone, actor: req.user });
   await req.flash('ok', `${guest.name} foi removido(a).`);
   res.redirect('/convidados');
 }));

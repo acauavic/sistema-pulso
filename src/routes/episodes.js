@@ -10,6 +10,7 @@ const b2 = require('../services/b2');
 const prod = require('../services/production');
 const sponsorsSvc = require('../services/sponsors');
 const { audit } = require('../services/audit');
+const recordChanges = require('../services/recordChanges');
 const { requirePerm } = require('../middleware');
 const { can } = require('../permissions');
 const C = require('../constants');
@@ -303,10 +304,12 @@ router.post('/episodios/:id', requirePerm('episodes.write'), wrap(async (req, re
   if (!ep) return notFound(res);
   const { values, error } = await parseForm(req.body, ep.id);
   if (error) return res.status(400).render('episodes/form', { title: `Editar ${ep.title}`, episode: ep, error, values: echo(req.body, values), statuses: C.EPISODE_STATUSES });
+  const before = await recordChanges.snapshot('episode', ep.id);
   await db.query('UPDATE episodes SET number=$2, title=$3, aired_on=$4, recorded_on=$5, notes=$6, updated_at=now() WHERE id=$1',
     [ep.id, values.number, values.title, values.aired_on, values.recorded_on, values.notes]);
   try { await require('../services/finance').onEpisodeDates(ep.id); } catch (err) { console.error('Financeiro (datas):', err.message); }
   await audit(req, 'episodio.editado', 'episode', ep.id);
+  await recordChanges.updated({ type: 'episode', before, actor: req.user });
   await req.flash('ok', 'Episódio atualizado.');
   res.redirect(back(ep.id));
 }));
@@ -317,7 +320,9 @@ router.post('/episodios/:id/excluir', requirePerm('episodes.delete'), wrap(async
   await audit(req, 'episodio.excluido', 'episode', ep.id, { title: ep.title });
   await prod.purgeEpisodeFiles(ep.id);
   await require('../services/finance').onEpisodeDeleted(ep.id);
+  const gone = await recordChanges.snapshot('episode', ep.id);
   await db.query('DELETE FROM episodes WHERE id = $1', [ep.id]);
+  await recordChanges.deleted({ type: 'episode', row: gone, actor: req.user });
   await req.flash('ok', 'Episódio removido.');
   res.redirect('/episodios');
 }));
@@ -695,6 +700,21 @@ router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(asy
     return res.json({ ok: true, id: c.id, html, comment: { id: c.id, at_ms: at, clock: at != null ? fmt.formatClock(at) : null, body, author: req.user.name, when: fmt.formatDateTime(new Date()), resolved: false }, counts: await commentCounts(ep.id) });
   }
   res.redirect(back(ep.id, '#revisao'));
+}));
+
+router.post('/episodios/:id/comentarios/:cid/editar', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return res.status(404).json({ ok: false });
+  if (!canTick(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não comenta.' });
+  const ep = await findEpisode(req.params.id);
+  const { rows: [c] } = await db.query('SELECT * FROM episode_comments WHERE id = $1 AND episode_id = $2', [req.params.cid, req.params.id]);
+  if (!ep || !c) return res.status(404).json({ ok: false, error: 'Comentário não encontrado.' });
+  if (String(c.author_id) !== String(req.user.id)) return res.status(403).json({ ok: false, error: 'Só quem escreveu pode editar.' });
+  const edit = await require('../services/comments').prepareEdit({ attType: 'review', commentId: c.id, user: req.user, body: req.body.body, html: req.body.body_html, attachmentIds: [].concat(req.body.anexos || []), removeIds: [].concat(req.body.remover || []), maxLength: 4000 });
+  if (edit.error) return res.status(422).json({ ok: false, error: edit.error });
+  const { rows: [saved] } = await db.query('UPDATE episode_comments SET body = $2, body_html = $3, edited_at = now() WHERE id = $1 RETURNING *', [c.id, edit.text, edit.html]);
+  const files = (await attachmentsSvc.forReviews([c.id]))[c.id] || [];
+  const html = await renderPartial(res, 'episodes/_review_comment', { c: { ...saved, author_name: req.user.name, attachments: files }, ep, tickable: true });
+  res.json({ ok: true, id: c.id, html, counts: await commentCounts(ep.id) });
 }));
 
 router.post('/episodios/:id/comentarios/:cid/resolver', requirePerm('episodes.read'), wrap(async (req, res) => {

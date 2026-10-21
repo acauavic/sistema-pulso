@@ -12,6 +12,7 @@ const C = require('../constants');
 const { can } = require('../permissions');
 const { requirePerm } = require('../middleware');
 const { audit } = require('../services/audit');
+const recordChanges = require('../services/recordChanges');
 const { wrap, isIntId, isUuid } = require('../utils/wrap');
 
 const router = express.Router();
@@ -134,10 +135,12 @@ router.post('/tarefas/:id', requirePerm('tasks.write'), wrap(async (req, res) =>
   const { values, error } = tasks.parse({ ...task, due_on: isoOf(task.due_on) || '', due_time: task.due_time || '', ...req.body });
   if (error) { await req.flash('error', error); return res.redirect(`/tarefas/${task.id}`); }
   const links = await readLinks(req.body);
+  const before = await recordChanges.snapshot('task', task.id);
   const result = await tasks.update(task, values, req.user, { assigneeId: req.body.assignee_id !== undefined ? (isUuid(req.body.assignee_id) ? req.body.assignee_id : null) : undefined });
   if (result.error) { await req.flash('error', result.error); return res.redirect(`/tarefas/${task.id}`); }
   await attachments.link(attachmentIdsOf(values, req.body), 'task', task.id, req.user);
   if (req.body.episode_id !== undefined) await db.query('UPDATE tasks SET episode_id = $2, guest_id = $3, sponsor_id = $4 WHERE id = $1', [task.id, links.episodeId || null, links.guestId || null, links.sponsorId || null]);
+  await recordChanges.updated({ type: 'task', before, actor: req.user });
   await req.flash('ok', 'Tarefa salva.');
   res.redirect(backTo(req, `/tarefas/${task.id}`));
 }));
@@ -164,7 +167,9 @@ router.post('/tarefas/:id/excluir', requirePerm('tasks.write'), wrap(async (req,
   const task = await tasks.get(req.params.id);
   if (!task) return notFound(res);
   if (!can(req.user.role, 'tasks.manage') && String(task.created_by) !== String(req.user.id)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem criou (ou a gestão) apaga a tarefa.' });
+  const gone = await recordChanges.snapshot('task', task.id);
   await db.query('DELETE FROM tasks WHERE id = $1', [task.id]);
+  await recordChanges.deleted({ type: 'task', row: gone, actor: req.user });
   await db.query("DELETE FROM comments WHERE entity_type = 'task' AND entity_id = $1", [task.id]);
   await audit(req, 'tarefa.excluida', 'task', task.id, { titulo: task.title });
   res.redirect(backTo(req, '/tarefas'));

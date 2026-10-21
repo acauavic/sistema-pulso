@@ -381,6 +381,30 @@
     try { const res = await fetch(`/anexos/${b.dataset.attachmentDelete}/excluir`, { method: 'POST', headers: { Accept: 'application/json', 'x-csrf-token': csrf } }); if (!res.ok && res.status !== 404) throw new Error(); b.closest('li')?.remove(); } catch { window.alert('Não consegui remover o anexo.'); }
   });
 
+  // editar comentário: o lápis abre a janela com o texto atual; os anexos que não são imagem aparecem para tirar
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-comment-edit]'); if (!b) return;
+    const dlg = document.getElementById(b.dataset.dialog || 'modal-comment-edit'); if (!dlg) return;
+    const form = dlg.querySelector('form'); const root = dlg.querySelector('[data-rich]');
+    form.action = b.dataset.action;
+    const back = form.querySelector('[data-ce-back]'); if (back) back.value = b.dataset.back || '';
+    root.rte.reset();
+    if (b.dataset.html) root.rte.setHTML(b.dataset.html); else root.rte.setPlain(b.dataset.text || '');
+    const box = dlg.querySelector('[data-ce-files]'); box.replaceChildren();
+    let files = []; try { files = JSON.parse(b.dataset.files || '[]'); } catch { files = []; }
+    const icons = dlg.parentNode.querySelector('template[data-ce-icons]') || document.querySelector('template[data-ce-icons]');
+    for (const f of files) {
+      const li = document.createElement('li'); li.className = 'ce-file';
+      const name = document.createElement('span'); name.textContent = f.name; li.append(name);
+      const input = document.createElement('input'); input.type = 'hidden'; input.name = 'remover'; input.value = f.id; input.disabled = true; li.append(input);
+      const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'icon-btn'; rm.title = 'Tirar este anexo'; rm.setAttribute('aria-label', `Tirar o anexo ${f.name}`);
+      rm.innerHTML = icons?.content.querySelector('[data-i="trash-2"]')?.innerHTML || '×';
+      rm.addEventListener('click', () => { input.disabled = !input.disabled; li.classList.toggle('removed', !input.disabled); rm.setAttribute('aria-pressed', String(!input.disabled)); });
+      li.append(rm); box.append(li);
+    }
+    dlg.showModal(); root.rte.focus();
+  });
+
   // descrição da tarefa: lê primeiro, edita sob demanda
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-desc-edit]'); if (!b) return;

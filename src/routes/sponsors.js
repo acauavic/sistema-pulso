@@ -6,6 +6,7 @@ const config = require('../config');
 const sponsorsSvc = require('../services/sponsors');
 const guestRules = require('../services/guestRules');
 const { audit } = require('../services/audit');
+const recordChanges = require('../services/recordChanges');
 const { requirePerm } = require('../middleware');
 const C = require('../constants');
 const { wrap, isUuid, isIntId } = require('../utils/wrap');
@@ -192,12 +193,14 @@ router.post('/patrocinadores/:id', requirePerm('sponsors.write'), wrap(async (re
   if (!sponsor) return notFound(res);
   const { values, error } = await parseSponsorForm(req.body);
   if (error) return res.status(400).render('sponsors/form', { title: `Editar ${sponsor.company}`, sponsor, error, notice: null, values: echo(req.body, values), ...(await formOptions()) });
+  const before = await recordChanges.snapshot('sponsor', sponsor.id);
   await db.query(`UPDATE sponsors SET ${COLUMNS.map((c, i) => `${c}=$${i + 2}`).join(', ')}, updated_at=now() WHERE id=$1`, [sponsor.id, ...columnValues(values)]);
   if (values.stage !== sponsor.stage) {
     await sponsorsSvc.addEvent(sponsor.id, req.user.id, 'etapa', `Etapa: ${C.SPONSOR_STAGE_BY_KEY[sponsor.stage].label} → ${C.SPONSOR_STAGE_BY_KEY[values.stage].label}`);
   }
   if (values.tier !== sponsor.tier) await syncTier(sponsor, values.tier, req.user);
   await audit(req, 'patrocinador.editado', 'sponsor', sponsor.id);
+  await recordChanges.updated({ type: 'sponsor', before, actor: req.user });
   await req.flash('ok', 'Patrocinador atualizado.');
   res.redirect(back(sponsor.id));
 }));
@@ -261,6 +264,7 @@ router.post('/patrocinadores/:id/avancar', requirePerm('sponsors.write'), wrap(a
   if (error) { await req.flash('error', error); return res.redirect(reopen); }
   const missing = target === sponsor.stage ? [] : sponsorsSvc.missingFor(target, next);
   const stage = missing.length ? sponsor.stage : target;
+  const before = await recordChanges.snapshot('sponsor', sponsor.id);
   await db.query(
     `UPDATE sponsors SET tier=$2, value_cents=$3, contact_name=$4, contact_phone=$5, contact_email=$6, paid_at=$7, starts_on=$8, ends_on=$9, stage=$10, updated_at=now() WHERE id=$1`,
     [sponsor.id, next.tier, next.value_cents, next.contact_name, next.contact_phone, next.contact_email, next.paid_at, next.starts_on, next.ends_on, stage]);
@@ -271,6 +275,7 @@ router.post('/patrocinadores/:id/avancar', requirePerm('sponsors.write'), wrap(a
   } else {
     await audit(req, 'patrocinador.editado', 'sponsor', sponsor.id);
   }
+  await recordChanges.updated({ type: 'sponsor', before, actor: req.user });
   if (missing.length) {
     await req.flash('error', `Salvo. Para mover para ${C.SPONSOR_STAGE_BY_KEY[target].label} falta: ${listJoin(missing)}.`);
     return res.redirect(reopen);
@@ -503,7 +508,9 @@ router.post('/patrocinadores/:id/excluir', requirePerm('sponsors.delete'), wrap(
   const { rows: files } = await db.query('SELECT * FROM sponsor_files WHERE sponsor_id = $1', [sponsor.id]);
   await audit(req, 'patrocinador.excluido', 'sponsor', sponsor.id, { company: sponsor.company });
   await require('../services/finance').onSponsorDeleted(sponsor.id);
+  const gone = await recordChanges.snapshot('sponsor', sponsor.id);
   await db.query('DELETE FROM sponsors WHERE id = $1', [sponsor.id]);
+  await recordChanges.deleted({ type: 'sponsor', row: gone, actor: req.user });
   for (const f of files) await require('../services/b2').deleteObject(f.storage_key).catch((err) => console.error('Falha ao apagar arquivo:', err.message));
   await req.flash('ok', `${sponsor.company} foi removido(a).`);
   res.redirect('/patrocinadores');

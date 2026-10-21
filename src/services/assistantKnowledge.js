@@ -30,6 +30,7 @@ const TOPICS = [
       'Todas as caixas de comentário têm o mesmo editor: formatação, tabelas, imagens coladas ou arrastadas, anexos (imagem até 10 MB; PDF, HTML e ZIP até 25 MB), links com miniatura e @menções (a pessoa mencionada recebe notificação).',
       'O microfone grava um áudio (até ~2 minutos) e transcreve sozinho; o comentário mostra o player e o texto falado, e a transcrição vai no aviso da equipe. É possível inserir a transcrição no texto.',
       'Ctrl+Enter envia. Na revisão do vídeo, o comentário vale para o ponto do vídeo (ou geral) e pode ser marcado como resolvido.',
+      'Quem escreveu pode editar o comentário (ícone de lápis; abre uma janela com o texto atual) ou apagar (lixeira). Um lápis pequeno marca o que foi editado. A gestão apaga os dos outros, mas só o autor edita.',
       'Pelo assistente: "comentar" publica um comentário de texto em um item e "comentarios" mostra os últimos comentários de um item.',
     ],
   },
@@ -127,7 +128,7 @@ const TOPICS = [
     key: 'notificacoes', title: 'Notificações e lembretes da gravação', words: ['notificação', 'notificacao', 'notificações', 'aviso', 'avisos', 'alerta', 'push', 'lembrete', 'lembretes'],
     where: '/notificacoes', perm: null,
     steps: [
-      'O sino mostra os avisos (tarefas, comentários e menções, agendamentos, plateia, financeiro, etapas do episódio, follow-ups). Cada pessoa liga os alertas do navegador em Notificações > Avisos (no iPhone, só com o painel na Tela de Início).',
+      'O sino mostra os avisos (tarefas, comentários e menções, agendamentos, plateia, financeiro, etapas do episódio, follow-ups). Cada pessoa liga os alertas do navegador em Notificações > Avisos (no iPhone, só com o painel na Tela de Início). Quem é responsável por um convidado, patrocinador, episódio, corte ou tarefa também recebe aviso quando outra pessoa altera ou exclui esse cadastro (tipos "Cadastro alterado" e "Cadastro excluído"); a gestão liga ou desliga em Gestão > Notificações e cada pessoa pode silenciar.',
       'Lembretes da gravação (3 dias, 1 dia, no dia de manhã e 3 horas antes) ficam em Notificações > Lembretes da gravação, com a mensagem pronta e o botão do WhatsApp; a produtora envia e marca como enviado.',
       'Pelo assistente: "notificacoes" mostra as não lidas.',
     ],

@@ -12,6 +12,7 @@ const L = require('../services/platformLimits');
 const fmt = require('../utils/format');
 const C = require('../constants');
 const { audit } = require('../services/audit');
+const recordChanges = require('../services/recordChanges');
 const { requirePerm } = require('../middleware');
 const { can } = require('../permissions');
 const { wrap, isIntId } = require('../utils/wrap');
@@ -157,7 +158,9 @@ router.post('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =
   const title = fmt.clean(req.body.title, 80) || c.title;
   const postTitle = fmt.clean(req.body.post_title, 100) || null;
   const caption = String(req.body.caption ?? c.caption ?? '').replace(/\r/g, '').slice(0, 2200);
+  const before = await recordChanges.snapshot('clip', c.id);
   await db.query('UPDATE episode_clips SET title = $2, post_title = $3, caption = $4, updated_at = now() WHERE id = $1', [c.id, title, postTitle, caption]);
+  await recordChanges.updated({ type: 'clip', before, actor: req.user });
   await req.flash('ok', 'Corte salvo.');
   res.redirect(`/cortes/${c.id}`);
 }));
@@ -188,7 +191,9 @@ router.post('/cortes/:id/reprocessar', requirePerm('episodes.read'), wrap(async 
 router.post('/cortes/:id/excluir', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!canCut(req.user.role)) return deny(req, res);
   const c = await findClip(req); if (!c) return notFound(res);
+  const gone = await recordChanges.snapshot('clip', c.id);
   await clips.removeClip(c.id);
+  await recordChanges.deleted({ type: 'clip', row: gone, actor: req.user });
   await audit(req, 'corte.excluido', 'clip', c.id, { episodio: c.episode_id });
   res.redirect('/conteudo');
 }));
