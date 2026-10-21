@@ -712,7 +712,7 @@ describe('produção de episódios', () => {
       }
       const html = await page(as.editor, id);
       assert.match(html, /<summary>Enviar nova versão<\/summary>/);
-      assert.match(html, /<li class="older">[\s\S]*v1/);
+      assert.match(html, /<button type="button" class="folder older" data-folder-open="v\d+"[\s\S]*Versão 1/);
       assert.match(html, /horizontal/, 'avisa que o vídeo do episódio é horizontal');
     });
 

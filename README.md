@@ -352,6 +352,12 @@ Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`
 - **Visualizações**: combinações salvas de modo, tipos, responsável e concluídos. Da casa: **Tudo**, **Meu trabalho** (semana, só os meus e os do meu perfil, sem concluídos), **Produção** e **Dinheiro** (só para quem vê o financeiro). Qualquer pessoa salva as suas ("Salvar esta visualização" aparece quando os filtros não batem com nenhuma); **Gestão e Superadmin** (`calendar.share`) também compartilham com a equipe e apagam as dos outros. A visualização da equipe abre para cada perfil já limitada ao que ele enxerga.
 - O **assistente de IA** consulta o calendário (`calendario`): "o que tenho esta semana?".
 
+## Material do episódio em pastas
+
+No card do episódio, o **Material bruto** aparece em pastas (Vídeos do episódio, Áudios, Bastidores, Fotografias, Outros; só as que têm arquivo), com
+subpastas pelo rótulo dentro de Vídeos, Áudios e Outros. O **Vídeo editado** tem uma pasta por versão, com os comentários de revisão daquela versão. A pasta
+aberta é lembrada quando a página recarrega. Código: `src/views/episodes/show.ejs`, `src/public/producao.js`, estilos `.folder*` em `app.css`.
+
 ## Avisos de alteração e exclusão de cadastro
 
 Quando alguém altera ou exclui um convidado, patrocinador, episódio, corte ou tarefa, o **responsável** (dono do convidado ou patrocinador, editor

@@ -69,7 +69,7 @@ describe('envio de material: vários grupos de uma vez, em segundo plano', () =>
     assert.match(page, /data-material-dialog/); assert.match(page, /data-material-files[^>]*multiple|multiple[^>]*data-material-files/);
     assert.doesNotMatch(page, /Tipo de material/, 'sem o seletor de tipo único de antes');
     assert.match(page, /Vídeos do episódio/); assert.match(page, /Áudios/);
-    assert.match(page, /<summary><strong>Fotografias<\/strong>/); assert.match(page, /<summary><strong>Bastidores<\/strong>/);
+    assert.match(page, /data-folder-open="foto"/); assert.match(page, /data-folder-open="bastidor"/);
     assert.match(page, /Câmera 1/); assert.match(page, /Lapela do convidado/);
     assert.match(page, /static\/uploads\.js/); assert.match(page, /data-upl-icons/);
     assert.equal((await as.prod.get('/static/uploads.js')).status, 200);

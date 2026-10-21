@@ -492,4 +492,27 @@
       editDlg.close(); node.classList.add('just-added'); setTimeout(() => node.classList.remove('just-added'), 2400);
     } catch { window.alert('Sem conexão. Tente de novo.'); } finally { buttons.forEach((b) => { b.disabled = false; }); }
   });
+
+  // ---- pastas (material bruto e versões do vídeo editado): uma pasta aberta por vez, dentro do próprio card
+  document.querySelectorAll('[data-folders]').forEach((box) => {
+    const grid = box.querySelector('[data-folder-grid]');
+    const panels = [...box.querySelectorAll('[data-folder-panel]')];
+    const memo = `pulso-pasta-${box.dataset.key}`; // depois de enviar ou remover e a página recarregar, a pasta continua aberta
+    const keep = (key) => { try { if (key) sessionStorage.setItem(memo, key); else sessionStorage.removeItem(memo); } catch { /* sem armazenamento */ } };
+    const open = (key, focus = true) => {
+      const panel = panels.find((p) => p.dataset.folderPanel === key);
+      grid.hidden = Boolean(panel); panels.forEach((p) => { p.hidden = p !== panel; }); keep(panel ? key : '');
+      if (!focus) return;
+      if (panel) panel.querySelector('[data-folder-back]')?.focus();
+      else box.querySelector(`[data-folder-open="${box.dataset.last || ''}"]`)?.focus();
+    };
+    box.addEventListener('click', (e) => {
+      const o = e.target.closest('[data-folder-open]');
+      if (o) { box.dataset.last = o.dataset.folderOpen; open(o.dataset.folderOpen); return; }
+      if (e.target.closest('[data-folder-back]')) open('');
+    });
+    box.addEventListener('keydown', (e) => { if (e.key === 'Escape' && grid.hidden && !e.target.closest('dialog')) open(''); });
+    let saved = ''; try { saved = sessionStorage.getItem(memo) || ''; } catch { /* sem armazenamento */ }
+    if (saved) { box.dataset.last = saved; open(saved, false); }
+  });
 })();

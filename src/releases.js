@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.22.0', date: '2026-10-21', title: 'Material do episódio em pastas',
+    items: [
+      { kind: 'novo', text: 'No card do episódio, o Material bruto agora é visto em pastas: Vídeos do episódio, Áudios, Bastidores, Fotografias e Outros, cada uma com a contagem e o tamanho. Toque numa pasta para abrir, e use a seta para voltar. Dentro de Vídeos e Áudios, os arquivos se separam pelo rótulo (Câmera 1, Lapela…).' },
+      { kind: 'novo', text: 'O Vídeo editado também virou pastas, uma por versão (a mais nova é a atual). Cada pasta mostra o arquivo, quem enviou e quando, e quantos comentários de revisão a versão recebeu e quantos estão em aberto, com atalho para a aba de revisão.' },
+      { kind: 'ajuste', text: 'A pasta aberta continua aberta quando a página recarrega (depois de enviar ou remover um arquivo). Remover agora é um ícone de lixeira.' },
+    ],
+  },
+  {
     version: '1.21.0', date: '2026-10-21', title: 'Avisos de alteração e exclusão, e comentários que dá para editar',
     items: [
       { kind: 'novo', text: 'Quem é responsável por um convidado, patrocinador, episódio (editor), corte ou tarefa agora recebe um aviso quando outra pessoa altera o cadastro, dizendo o que mudou, ou o exclui. Quem fez a ação não recebe aviso.' },

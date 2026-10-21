@@ -159,17 +159,20 @@
               </span>
               <span class="row">
                 <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
-                <% if (perm.upload) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo do armazenamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">remover</button></form><% } %>
+                <% if (perm.upload) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo do armazenamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover o arquivo" title="Remover"><%- icon('trash-2', 14) %></button></form><% } %>
               </span>
             </li>
         <% };
            var groupDefs = [
-             { kind: 'bruto_video', title: 'Vídeos do episódio', labelled: true },
-             { kind: 'bruto_audio', title: 'Áudios', labelled: true },
-             { kind: 'bastidor', title: 'Bastidores', labelled: false },
-             { kind: 'foto', title: 'Fotografias', labelled: false },
-             { kind: 'outro', title: 'Outros', labelled: true },
-           ]; %>
+             { kind: 'bruto_video', title: 'Vídeos do episódio', labelled: true, ic: 'film' },
+             { kind: 'bruto_audio', title: 'Áudios', labelled: true, ic: 'mic' },
+             { kind: 'bastidor', title: 'Bastidores', labelled: false, ic: 'users' },
+             { kind: 'foto', title: 'Fotografias', labelled: false, ic: 'image' },
+             { kind: 'outro', title: 'Outros', labelled: true, ic: 'paperclip' },
+           ];
+           var sizeOf = function (list) { return list.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0); };
+           var folders = groupDefs.map(function (g) { var list = rawFiles.filter(function (f) { return f.kind === g.kind; }); return Object.assign({}, g, { list: list, size: sizeOf(list) }); }).filter(function (g) { return g.list.length; });
+           var hasReview = tabs.some(function (t) { return t.key === 'revisao'; }); %>
         <div class="row spread">
           <div>
             <h2>Material bruto</h2>
@@ -185,18 +188,34 @@
           <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
         </div>
         <% } else if (!rawFiles.length) { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
-        <% groupDefs.forEach(function (g) { var list = rawFiles.filter(function (f) { return f.kind === g.kind; }); if (!list.length) return;
-             var size = list.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0); %>
-          <% if (g.labelled) { %>
-          <h3 class="file-group-title"><%= g.title %> <span class="mono small muted"><%= list.length %> · <%= fmt.formatBytes(size) %></span></h3>
-          <ul class="plain file-list file-compact"><% list.forEach(fileRow) %></ul>
-          <% } else { %>
-          <details class="file-group">
-            <summary><strong><%= g.title %></strong> <span class="mono small muted"><%= list.length %> · <%= fmt.formatBytes(size) %></span></summary>
-            <ul class="plain file-list file-compact"><% list.forEach(fileRow) %></ul>
-          </details>
-          <% } %>
-        <% }) %>
+        <% if (folders.length) { %>
+        <div class="folders" data-folders data-key="raw-<%= ep.id %>">
+          <div class="folder-grid" data-folder-grid>
+            <% folders.forEach(function (g) { %>
+            <button type="button" class="folder" data-folder-open="<%= g.kind %>" aria-label="Abrir a pasta <%= g.title %>, <%= g.list.length %> arquivo<%= g.list.length > 1 ? 's' : '' %>">
+              <span class="folder-ic"><%- icon('folder', 30) %></span>
+              <span class="folder-name"><%- icon(g.ic, 14) %><strong><%= g.title %></strong></span>
+              <span class="mono small muted"><%= g.list.length %> · <%= fmt.formatBytes(g.size) %></span>
+              <% if (g.list.some(function (f) { return f.status === 'enviando'; })) { %><span class="badge b-amber">enviando</span><% } %>
+            </button>
+            <% }) %>
+          </div>
+          <% folders.forEach(function (g) { %>
+          <div class="folder-panel" data-folder-panel="<%= g.kind %>" hidden>
+            <div class="folder-crumb">
+              <button class="icon-btn" type="button" data-folder-back aria-label="Voltar às pastas" title="Voltar às pastas"><%- icon('arrow-left', 16) %></button>
+              <span class="muted small">Material bruto /</span>
+              <h3 class="folder-title"><%= g.title %> <span class="mono small muted"><%= g.list.length %> · <%= fmt.formatBytes(g.size) %></span></h3>
+            </div>
+            <% var labels = g.labelled ? g.list.reduce(function (a, f) { var k = f.label || ''; if (a.indexOf(k) < 0) a.push(k); return a; }, []) : ['']; %>
+            <% labels.forEach(function (lb) { var sub = g.list.filter(function (f) { return (g.labelled ? (f.label || '') : '') === lb; }); %>
+            <% if (labels.length > 1 && lb) { %><h4 class="folder-sub"><%- icon('folder', 14) %> <%= lb %> <span class="mono small muted"><%= sub.length %></span></h4><% } %>
+            <ul class="plain file-list file-compact"><% sub.forEach(fileRow) %></ul>
+            <% }) %>
+          </div>
+          <% }) %>
+        </div>
+        <% } %>
       </section>
       <% if (perm.upload && storageReady) { %>
       <dialog class="modal modal-wide" data-material-dialog aria-labelledby="material-dlg-h">
@@ -226,17 +245,37 @@
           <% if (!editedFiles.length) { %>
             <% if (canSendEdited) { %><% editedUploader('Enviar vídeo editado') %><% } else if (ep.status === 'disponivel_edicao' && perm.edit) { %><p class="muted">Assuma a edição para enviar o vídeo editado.</p><% } else { %><p class="muted">Nenhuma versão enviada ainda.</p><% } %>
           <% } else { %>
-          <ul class="plain file-list file-compact">
-            <% editedFiles.forEach(function (f, i) { %>
-            <li class="<%= i > 0 ? 'older' : '' %>">
-              <span><span class="badge b-st-em_edicao">v<%= f.version %></span> <span class="mono small"><%= f.filename %></span> <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDateTime(f.created_at) %><%= f.uploader ? ' · ' + f.uploader : '' %></span><% if (f.status === 'enviando') { %> <span class="badge b-amber">enviando</span><% } %></span>
-              <span class="row">
-                <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
-                <% if (perm.edit) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover esta versão?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">remover</button></form><% } %>
-              </span>
-            </li>
+          <div class="folders" data-folders data-key="edited-<%= ep.id %>">
+            <div class="folder-grid" data-folder-grid>
+              <% editedFiles.forEach(function (f, i) { var cm = comments.filter(function (c) { return String(c.file_id) === String(f.id); }); var open = cm.filter(function (c) { return !c.resolved; }).length; %>
+              <button type="button" class="folder <%= i > 0 ? 'older' : '' %>" data-folder-open="v<%= f.id %>" aria-label="Abrir a pasta da versão <%= f.version %>">
+                <span class="folder-ic"><%- icon('folder', 30) %></span>
+                <span class="folder-name"><%- icon('film', 14) %><strong>Versão <%= f.version %></strong><% if (i === 0) { %><span class="badge b-st-em_edicao">atual</span><% } %></span>
+                <span class="mono small muted"><%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDay(f.created_at) %></span>
+                <% if (f.status === 'enviando') { %><span class="badge b-amber">enviando</span><% } else if (cm.length) { %><span class="mono small <%= open ? 'warn' : 'muted' %>"><%- icon('message-square', 12) %> <%= open ? open + ' em aberto' : cm.length + (cm.length > 1 ? ' resolvidos' : ' resolvido') %></span><% } %>
+              </button>
+              <% }) %>
+            </div>
+            <% editedFiles.forEach(function (f, i) { var cm = comments.filter(function (c) { return String(c.file_id) === String(f.id); }); var open = cm.filter(function (c) { return !c.resolved; }).length; %>
+            <div class="folder-panel" data-folder-panel="v<%= f.id %>" hidden>
+              <div class="folder-crumb">
+                <button class="icon-btn" type="button" data-folder-back aria-label="Voltar às pastas" title="Voltar às pastas"><%- icon('arrow-left', 16) %></button>
+                <span class="muted small">Vídeo editado /</span>
+                <h3 class="folder-title">Versão <%= f.version %> <% if (i === 0) { %><span class="badge b-st-em_edicao">atual</span><% } %></h3>
+              </div>
+              <ul class="plain file-list file-compact">
+                <li>
+                  <span><span class="mono small"><%= f.filename %></span> <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDateTime(f.created_at) %><%= f.uploader ? ' · ' + f.uploader : '' %></span><% if (f.status === 'enviando') { %> <span class="badge b-amber">enviando</span><% } %></span>
+                  <span class="row">
+                    <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
+                    <% if (perm.edit) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover esta versão?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover a versão" title="Remover"><%- icon('trash-2', 14) %></button></form><% } %>
+                  </span>
+                </li>
+              </ul>
+              <% if (cm.length) { %><p class="small muted top-gap"><%- icon('message-square', 12) %> <%= cm.length %> comentário<%= cm.length > 1 ? 's' : '' %> de revisão nesta versão<%= open ? ' · ' + open + ' em aberto' : ' · todos resolvidos' %>.<% if (hasReview && i === 0) { %> <a href="#revisao">Abrir a revisão</a><% } %></p><% } %>
+            </div>
             <% }) %>
-          </ul>
+          </div>
           <% if (canSendEdited) { %><details class="top-gap"><summary>Enviar nova versão</summary><% editedUploader('Enviar nova versão') %></details><% } %>
           <% } %>
           <% } %>

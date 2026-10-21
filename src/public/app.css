@@ -1111,3 +1111,17 @@ dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z
 .ce-file { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 2px 10px; border: 1px solid var(--line); border-radius: var(--r-field); font-size: 13px; }
 .ce-file span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ce-file.removed span { text-decoration: line-through; color: var(--muted); }
 .ce-file.removed .icon-btn { color: var(--bad); }
+
+/* ---- pastas do episódio (material bruto e versões do vídeo editado) ---- */
+.folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; margin-top: 14px; }
+.folder { display: grid; gap: 6px; align-content: start; justify-items: start; text-align: left; padding: 14px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-card); color: var(--text); font: inherit; cursor: pointer; transition: border-color var(--t) var(--ease), background var(--t) var(--ease); }
+.folder:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--raised) 70%, var(--surface)); } .folder:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.folder.older { opacity: .75; }
+.folder-ic { color: var(--text-2); display: inline-flex; }
+.folder-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; } .folder-name .icon { color: var(--muted); flex: 0 0 auto; } .folder-name strong { font-weight: 600; }
+.folder-panel { margin-top: 10px; }
+.folder-crumb { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.folder-crumb .icon-btn { margin-left: -8px; padding: 6px; } .folder-title { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.folder-sub { display: flex; align-items: center; gap: 6px; margin: 16px 0 0; font-size: 13px; font-weight: 600; color: var(--text-2); } .folder-sub + .file-list { margin-top: 4px; }
+@media (max-width: 520px) { .folder-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.folder-panel .file-list li { flex-wrap: wrap; } .folder-panel .file-list li > .row { flex-wrap: nowrap; margin-left: auto; }
