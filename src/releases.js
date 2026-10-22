@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.23.1', date: '2026-10-22', title: 'Miniaturas da galeria mais leves',
+    items: [
+      { kind: 'ajuste', text: 'As miniaturas das fotos e vídeos agora são feitas pelo seu próprio navegador logo depois do envio, a partir do arquivo que você já tem: o servidor não baixa nada do armazenamento para isso. Fotos do iPhone (HEIC) ganham miniatura quando enviadas pelo Safari.' },
+      { kind: 'ajuste', text: 'Cada miniatura é feita uma vez só e fica guardada no servidor (fora do Backblaze, sem ocupar o limite da conta), e o navegador guarda sem prazo. Arquivos antigos ganham a miniatura na primeira vez que alguém abre a galeria, uma única vez.' },
+    ],
+  },
+  {
     version: '1.23.0', date: '2026-10-22', title: 'Envio sem repetir arquivo, retomada do que parou e galeria com prévia',
     items: [
       { kind: 'novo', text: 'Ao enviar material, o sistema confere o que já está no episódio pelo nome. O que tinha parado no meio continua de onde parou (sem recomeçar). Para os que já subiram inteiros, você escolhe: não enviar de novo (padrão), substituir (o antigo só sai quando o novo termina) ou manter os dois.' },

@@ -357,7 +357,7 @@ Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`
 - **Arquivos repetidos**: ao escolher arquivos, o sistema confere pelo nome o que já existe no episódio. O que tinha parado no meio **continua de onde parou**; para os que já subiram inteiros, a pessoa escolhe **não enviar de novo** (padrão), **substituir** (o antigo sai só quando o novo termina) ou **manter os dois**.
 - **Não terminou**: envio sem nenhuma parte nova há 30 minutos aparece marcado; o card explica que basta escolher os mesmos arquivos de novo, e dá para descartar todos de uma vez (libera o espaço das partes no Backblaze).
 - **Armazenamento cheio**: quando a conta do Backblaze chega ao limite (painel do Backblaze > **Caps & Alerts**), o envio para com a explicação, a gestão recebe um aviso e "Tentar todos de novo" retoma depois que o limite for aumentado.
-- **Galeria**: botão no card do material abre a janela com as pastas, miniaturas de fotos e vídeos (geradas no servidor e guardadas no bucket) e visualização grande. Código: `src/services/previews.js`, rota `/episodios/:id/arquivos/:fid/previa`.
+- **Galeria**: botão no card do material abre a janela com as pastas, miniaturas de fotos e vídeos e visualização grande. As miniaturas são feitas **pelo navegador no envio** (nada é baixado do Backblaze) e guardadas **no disco do servidor** (volume `previews` no Docker, `PREVIEW_DIR`); o que faltar o servidor gera uma única vez. Código: `src/services/previews.js`, rota `/episodios/:id/arquivos/:fid/previa`.
 
 ## Material do episódio em pastas
 

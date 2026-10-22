@@ -30,6 +30,8 @@ services:
       TZ: America/Sao_Paulo
       PODCAST_DATABASE_URL: postgresql://pulso:${POSTGRES_PASSWORD}@postgres:5432/pulso
       AUTO_MIGRATE: "true"
+    volumes:
+      - previews:/app/data/previews # miniaturas da galeria: geradas uma vez, guardadas aqui (não no Backblaze)
 
   worker:
     <<: *app
@@ -62,5 +64,6 @@ services:
 
 volumes:
   pgdata:
+  previews:
   caddy_data:
   caddy_config:

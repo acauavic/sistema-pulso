@@ -1,16 +1,19 @@
 // Miniaturas e visualizações da galeria do material (fotos e vídeos do episódio).
-// t = miniatura (480 px) para a grade; p = visualização (1600 px) para ver grande sem baixar a foto original (10-20 MB).
-// Foto: lida com @napi-rs/canvas (respeita a rotação EXIF do celular/câmera). Vídeo: um quadro pelo ffmpeg, lido direto do
-// link assinado (só os pedaços necessários). A imagem gerada fica no bucket (preview_keys) para não gerar de novo; se o bucket
-// recusar (ex.: armazenamento cheio), a imagem é entregue mesmo assim e o navegador guarda em cache.
+// t = miniatura (480 px) para a grade; p = visualização (1600 px) para ver a foto grande sem baixar o original (10-20 MB).
+//
+// Economia: cada imagem é feita UMA vez e fica no disco do servidor (config.previewDir, volume no Docker), nunca no Backblaze.
+// 1) No envio, o próprio navegador gera a miniatura a partir do arquivo que já tem na mão e manda só alguns KB (receive):
+//    nada é baixado do bucket.
+// 2) O que faltar (arquivos antigos, formatos que o navegador não abre) o servidor gera uma vez: foto lida do bucket com
+//    @napi-rs/canvas (respeita a rotação EXIF); vídeo com o ffmpeg pelo link assinado (lê só os pedaços necessários).
 const fs = require('fs');
 const path = require('path');
-const db = require('../db/pool');
+const config = require('../config');
 const b2 = require('./b2');
 const media = require('./media');
 
 const SIZES = { t: 480, p: 1600 };
-const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'avif']; // HEIC/AVIF: o navegador (Safari) faz a miniatura no envio
 const VIDEO_EXT = ['mp4', 'mov', 'm4v', 'mkv', 'webm', 'avi', 'mts', 'm2ts', 'mpg', 'mpeg', 'wmv', 'mxf'];
 const AUDIO_EXT = ['wav', 'mp3', 'm4a', 'aac', 'flac', 'aif', 'aiff', 'ogg', 'opus'];
 const MAX_IMAGE_BYTES = 80 * 1024 * 1024;
@@ -65,13 +68,12 @@ async function shrink(buf, side, orientation = 1) {
   return canvas.encode('jpeg', 82);
 }
 
-async function imagePreview(file, side) {
+async function imageBytes(file) {
   const res = await b2.getObject(file.storage_key);
   if (!res) throw new Error('Arquivo não está no armazenamento.');
   const len = Number(res.headers.get('content-length') || 0);
   if (len > MAX_IMAGE_BYTES) throw new Error('Foto grande demais para a miniatura.');
-  const buf = Buffer.from(await res.arrayBuffer());
-  return shrink(buf, side, jpegOrientation(buf));
+  return Buffer.from(await res.arrayBuffer());
 }
 
 async function videoPreview(file, side) {
@@ -86,6 +88,21 @@ async function videoPreview(file, side) {
   } finally { await media.rmDir(dir); }
 }
 
+// Arquivo no disco: <previewDir>/<episódio>/<arquivo>-<t|p>.jpg (o id do arquivo nunca se repete; substituir gera outro id).
+const fileFor = (file, size) => path.join(config.previewDir, String(Number(file.episode_id)), `${Number(file.id)}-${size}.jpg`);
+const stored = (file, size) => { const f = fileFor(file, size); try { return fs.statSync(f).size > 0 ? f : null; } catch { return null; } };
+async function save(file, size, buf) {
+  const f = fileFor(file, size);
+  await fs.promises.mkdir(path.dirname(f), { recursive: true });
+  const tmp = `${f}.${process.pid}.tmp`;
+  await fs.promises.writeFile(tmp, buf);
+  await fs.promises.rename(tmp, f); // troca de uma vez: quem lê nunca pega meio arquivo
+  return f;
+}
+// Apaga as miniaturas de um arquivo (removido ou substituído) ou de um episódio inteiro.
+const removeFor = (file) => Promise.all(Object.keys(SIZES).map((k) => fs.promises.rm(fileFor(file, k), { force: true })));
+const removeEpisode = (episodeId) => fs.promises.rm(path.join(config.previewDir, String(Number(episodeId))), { recursive: true, force: true });
+
 // Fila curta: no máximo 2 gerações ao mesmo tempo (foto grande decodificada ocupa memória; ffmpeg ocupa CPU).
 let running = 0; const waiting = [];
 const slot = () => (running < 2 ? (running += 1, Promise.resolve()) : new Promise((r) => waiting.push(r)));
@@ -93,25 +110,28 @@ const free = () => { const next = waiting.shift(); if (next) next(); else runnin
 const inflight = new Map(); // mesma imagem pedida duas vezes ao mesmo tempo: gera uma vez
 const failed = new Map(); // falhou há pouco: não tenta de novo por 10 min
 
-// Devolve { url } (já guardada no bucket) ou { buf } (acabou de gerar) ou null (não dá para visualizar este arquivo).
+// Caminho do JPEG no disco (gerando agora, uma vez, se faltar) ou null (não dá para visualizar este arquivo).
 async function get(file, size) {
   const side = SIZES[size];
   if (!side || file.status !== 'pronto' || !hasPreview(file)) return null;
-  const saved = file.preview_keys?.[size];
-  if (saved) return { url: await b2.presignGet(saved, { expires: 6 * 3600 }) };
+  const have = stored(file, size);
+  if (have) return have;
+  if (size === 'p' && mediaType(file) === 'video') return get(file, 't'); // vídeo: o grande é o próprio player; a capa é a miniatura
   const id = `${file.id}:${size}`;
   if ((failed.get(id) || 0) > Date.now()) return null;
   if (inflight.has(id)) return inflight.get(id);
   const job = (async () => {
     await slot();
     try {
-      const buf = mediaType(file) === 'image' ? await imagePreview(file, side) : await videoPreview(file, side);
-      const key = `${file.storage_key}.previa-${size}.jpg`;
-      try {
-        await b2.putObject(key, buf, 'image/jpeg');
-        await db.query("UPDATE episode_files SET preview_keys = preview_keys || jsonb_build_object($2::text, $3::text) WHERE id = $1", [file.id, size, key]);
-      } catch (err) { console.error('[galeria] guardar miniatura:', err.message); }
-      return { buf };
+      if (mediaType(file) === 'image') {
+        // um download da foto serve para os dois tamanhos
+        const original = await imageBytes(file);
+        const orientation = jpegOrientation(original);
+        const out = {};
+        for (const k of Object.keys(SIZES)) out[k] = stored(file, k) || await save(file, k, await shrink(original, SIZES[k], orientation));
+        return out[size];
+      }
+      return save(file, size, await videoPreview(file, side));
     } catch (err) {
       console.error(`[galeria] miniatura ${file.id}:`, err.message);
       failed.set(id, Date.now() + 10 * 60_000);
@@ -122,4 +142,17 @@ async function get(file, size) {
   return job;
 }
 
-module.exports = { SIZES, mediaType, hasPreview, jpegOrientation, shrink, get };
+// Miniatura feita pelo navegador no envio. Não confia no que chega: decodifica, limita o tamanho e regrava como JPEG limpo.
+const MAX_INCOMING = 3 * 1024 * 1024;
+async function receive(file, size, buf) {
+  const side = SIZES[size];
+  if (!side) return { error: 'Tamanho inválido.', status: 400 };
+  if (!hasPreview(file)) return { error: 'Este arquivo não tem miniatura.', status: 422 };
+  if (!Buffer.isBuffer(buf) || !buf.length || buf.length > MAX_INCOMING) return { error: 'Imagem inválida.', status: 400 };
+  let clean;
+  try { clean = await shrink(buf, side, 1); } catch { return { error: 'Imagem inválida.', status: 400 }; }
+  await save(file, size, clean);
+  return { ok: true, bytes: clean.length };
+}
+
+module.exports = { SIZES, mediaType, hasPreview, jpegOrientation, shrink, get, receive, stored, removeFor, removeEpisode };

@@ -6,6 +6,8 @@ node_modules/
 stack.yml
 
 *.log
+# miniaturas da galeria geradas em desenvolvimento (no servidor ficam num volume)
+data/
 .DS_Store
 ._*
 

@@ -561,15 +561,24 @@ const redirectToFile = (inline) => wrap(async (req, res) => {
   res.set('Cache-Control', 'no-store').redirect(302, url);
 });
 router.get('/episodios/:id/arquivos/:fid/baixar', requirePerm('episodes.read'), redirectToFile(false));
-// Galeria: miniatura (t) ou visualização grande (p) de foto ou vídeo. Já guardada: link assinado; recém-gerada: a própria imagem.
+// Galeria: miniatura (t) ou visualização grande (p) de foto ou vídeo, servida do disco do servidor. Cada arquivo tem id único
+// e a miniatura nunca muda: o navegador guarda para sempre (immutable), sem pedir de novo.
 router.get('/episodios/:id/arquivos/:fid/previa', requirePerm('episodes.read'), wrap(async (req, res) => {
   const file = await loadFile(req);
   if (!file) return res.status(404).end();
   const size = req.query.t === 'p' ? 'p' : 't';
-  const out = await require('../services/previews').get(file, size);
-  if (!out) return res.status(404).end();
-  if (out.url) return res.set('Cache-Control', 'private, max-age=3600').redirect(302, out.url);
-  res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' }).send(out.buf);
+  const disk = await require('../services/previews').get(file, size);
+  if (!disk) return res.status(404).end();
+  res.set('Cache-Control', 'private, max-age=31536000, immutable').type('image/jpeg').sendFile(disk);
+}));
+
+// Miniatura feita pelo navegador logo depois do envio (sai do arquivo que a pessoa já tem: nada é baixado do Backblaze).
+router.post('/episodios/:id/arquivos/:fid/previa', uploadAccess, express.raw({ type: () => true, limit: '3mb' }), wrap(async (req, res) => {
+  const file = await loadOwnFile(req);
+  if (!file || file.status !== 'pronto') return uploadError(res, 404, 'Arquivo não encontrado.');
+  const r = await require('../services/previews').receive(file, req.query.t === 'p' ? 'p' : 't', req.body);
+  if (r.error) return uploadError(res, r.status || 400, r.error);
+  res.json({ ok: true });
 }));
 router.get('/episodios/:id/arquivos/:fid/ver', requirePerm('episodes.read'), redirectToFile(true));
 

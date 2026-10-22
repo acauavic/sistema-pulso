@@ -349,7 +349,7 @@ async function deleteFile(file) {
   if (file.status === 'enviando') return cancelUpload(file);
   await db.query('DELETE FROM episode_files WHERE id = $1', [file.id]);
   await b2.deleteObject(file.storage_key).catch((err) => console.error('Falha ao apagar arquivo:', err.message));
-  for (const k of Object.values(file.preview_keys || {})) await b2.deleteObject(k).catch(() => {}); // miniaturas da galeria
+  await require('./previews').removeFor(file).catch(() => {}); // miniaturas da galeria (disco)
   return null;
 }
 
@@ -378,8 +378,8 @@ async function purgeEpisodeFiles(episodeId) {
   for (const f of rows) {
     if (f.upload_id) await b2.abortMultipart(f.storage_key, f.upload_id).catch(() => {});
     await b2.deleteObject(f.storage_key).catch((err) => console.error('Falha ao apagar arquivo:', err.message));
-    for (const k of Object.values(f.preview_keys || {})) await b2.deleteObject(k).catch(() => {});
   }
+  await require('./previews').removeEpisode(episodeId).catch(() => {});
 }
 
 // ---------------------------------------------------------------- dados da tela do episódio

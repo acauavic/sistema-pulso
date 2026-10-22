@@ -22,6 +22,8 @@ const config = {
   sessionSecret: env.SESSION_SECRET,
   sessionDays: 7,
   autoMigrate: env.AUTO_MIGRATE !== 'false',
+  // Miniaturas da galeria do material: ficam no disco do servidor (volume no Docker), não no Backblaze.
+  previewDir: env.PREVIEW_DIR || require('path').join(__dirname, '..', 'data', 'previews'),
   mailDryRun: env.MAIL_DRY_RUN === 'true', // dev/teste: registra o e-mail em vez de enviar
   podcastName: env.PODCAST_NAME || 'Podcast Pulso',
   // WhatsApp da produção (só dígitos, com DDI): destino dos botões do convite.

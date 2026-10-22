@@ -10,6 +10,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --libc=musl && node -e "require(\"@napi-rs/canvas\")"
 
 COPY src ./src
+# Miniaturas da galeria (volume "previews" no docker-compose): a pasta já nasce do usuário node
+RUN mkdir -p /app/data/previews && chown -R node:node /app/data
 
 ENV NODE_ENV=production
 EXPOSE 3100

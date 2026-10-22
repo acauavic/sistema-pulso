@@ -156,6 +156,7 @@
       await start(it);
       it.status = 'done'; it.note = '';
       emit({ type: 'file-done', item: it });
+      queuePreview(it);
     } catch (err) {
       if (it.aborted) { it.status = 'canceled'; } else if (isFull(err)) {
         blocked = err.message; it.status = 'error'; it.error = 'armazenamento cheio'; it.fatal = false;
@@ -171,6 +172,65 @@
     }
   }
 
+  // ---------------------------------------------------------------- miniaturas da galeria
+  // Feitas aqui, a partir do arquivo que acabou de subir (já está no computador da pessoa): o servidor não precisa baixar nada
+  // do Backblaze. Uma por vez, depois do envio, sem atrapalhar a fila. Se o navegador não abrir o formato, o servidor faz depois.
+  const EPISODE_BASE = /^\/episodios\/\d+\/arquivos\/$/;
+  const IMG = /\.(jpe?g|png|webp|gif|heic|heif|avif)$/i;
+  const VID = /\.(mp4|mov|m4v|webm|mkv)$/i;
+  const previewQueue = []; let previewBusy = false;
+  function queuePreview(it) {
+    if (!EPISODE_BASE.test(it.ctx.base) || !it.serverId || it.kind === 'corte') return;
+    if (!IMG.test(it.file.name) && !VID.test(it.file.name) && it.kind !== 'editado') return;
+    previewQueue.push(it);
+    if (!previewBusy) runPreviews();
+  }
+  async function runPreviews() {
+    previewBusy = true;
+    while (previewQueue.length) {
+      const it = previewQueue.shift();
+      try { await makePreviews(it); } catch { /* sem miniatura agora: o servidor gera quando alguém abrir a galeria */ }
+    }
+    previewBusy = false;
+    if (batchWaiting && !activeCount()) finishBatch(); // o aviso de "tudo enviado" (que recarrega a página) esperou as miniaturas
+  }
+  const toJpeg = async (source, w0, h0, side) => {
+    const k = Math.min(1, side / Math.max(w0, h0));
+    const w = Math.max(1, Math.round(w0 * k)); const h = Math.max(1, Math.round(h0 * k));
+    const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(source, 0, 0, w, h);
+    return new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', 0.82));
+  };
+  const sendPreview = (it, size, blob) => fetch(`${it.ctx.base}${it.serverId}/previa?t=${size}`, {
+    method: 'POST', headers: { 'Content-Type': 'image/jpeg', Accept: 'application/json', 'x-csrf-token': it.ctx.csrf }, body: blob,
+  });
+  function videoFrame(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file); const v = document.createElement('video');
+      const done = (fn, arg) => { clearTimeout(timer); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); fn(arg); };
+      const timer = setTimeout(() => done(reject, new Error('tempo esgotado')), 20000);
+      v.muted = true; v.playsInline = true; v.preload = 'auto';
+      v.addEventListener('error', () => done(reject, new Error('formato')), { once: true });
+      v.addEventListener('loadedmetadata', () => { v.currentTime = Math.min(2, (v.duration || 0) / 2); }, { once: true });
+      v.addEventListener('seeked', async () => {
+        if (!v.videoWidth) return done(reject, new Error('sem imagem'));
+        try { done(resolve, await toJpeg(v, v.videoWidth, v.videoHeight, 480)); } catch (err) { done(reject, err); }
+      }, { once: true });
+      v.src = url;
+    });
+  }
+  async function makePreviews(it) {
+    if (IMG.test(it.file.name)) {
+      const bmp = await createImageBitmap(it.file); // o navegador já aplica a rotação da câmera (EXIF)
+      try {
+        for (const [size, side] of [['t', 480], ['p', 1600]]) { const blob = await toJpeg(bmp, bmp.width, bmp.height, side); if (blob) await sendPreview(it, size, blob); }
+      } finally { bmp.close?.(); }
+      return;
+    }
+    const blob = await videoFrame(it.file);
+    if (blob) await sendPreview(it, 't', blob);
+  }
+
   function pump() {
     while (running < FILE_LIMIT && !blocked) {
       const next = items.find((it) => it.status === 'queued' && !it.started);
@@ -181,7 +241,11 @@
   }
 
   let batchBases = new Set();
+  let batchWaiting = false;
   function finishBatch() {
+    // miniaturas ainda sendo feitas: espera (a página recarrega no "tudo enviado" e perderia o que falta)
+    if (previewBusy || previewQueue.length) { batchWaiting = true; return; }
+    batchWaiting = false;
     const done = items.filter((it) => it.status === 'done');
     if (done.length) emit({ type: 'all-done', bases: [...batchBases], ok: done.length, failed: items.filter((it) => it.status === 'error').length });
     batchBases = new Set();

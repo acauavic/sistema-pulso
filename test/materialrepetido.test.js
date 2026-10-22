@@ -11,6 +11,7 @@ describe('material: repetidos, envios parados, armazenamento cheio e galeria', (
     await h.resetDb(); app = await h.startServer();
     for (const [k, role] of [['prod', 'produtora'], ['gestao', 'gestao'], ['editor', 'editor_video']]) { u[k] = await h.createUser({ name: k, email: `${k}@t.com`, role }); as[k] = h.client(app.base); await as[k].login(`${k}@t.com`); }
     epId = (await q("INSERT INTO episodes (number, title, status) VALUES (9, 'Episódio repetidos', 'gravado') RETURNING id"))[0].id;
+    h.config.previewDir = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'pulso-previas-')); // miniaturas do teste num lugar descartável
   });
   after(async () => { h.setB2Full(false); await app.close(); await h.db.close(); });
 
@@ -116,7 +117,7 @@ describe('material: repetidos, envios parados, armazenamento cheio e galeria', (
 
   it('galeria: rotação da câmera, tipos de arquivo e miniatura de foto gerada uma vez e guardada', async () => {
     assert.equal(previews.mediaType({ filename: 'a.JPG' }), 'image'); assert.equal(previews.mediaType({ filename: 'a.mov' }), 'video');
-    assert.equal(previews.mediaType({ filename: 'a.wav' }), 'audio'); assert.equal(previews.mediaType({ filename: 'a.heic' }), 'file');
+    assert.equal(previews.mediaType({ filename: 'a.wav' }), 'audio'); assert.equal(previews.mediaType({ filename: 'a.heic' }), 'image'); assert.equal(previews.mediaType({ filename: 'a.r3d' }), 'file');
     assert.equal(previews.mediaType({ filename: 'final.bin', kind: 'editado' }), 'video');
     // EXIF com Orientation = 6 (girar 90°)
     const exif = Buffer.from([0xFF, 0xD8, 0xFF, 0xE1, 0x00, 0x22, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08, 0x00, 0x01, 0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xDA]);
@@ -127,18 +128,46 @@ describe('material: repetidos, envios parados, armazenamento cheio e galeria', (
     const turned = await previews.shrink(jpg, 480, 6);
     const { loadImage } = require('@napi-rs/canvas'); const img = await loadImage(turned);
     assert.deepEqual([img.width, img.height], [240, 480], 'deitada na câmera, em pé na miniatura');
-    // pela rota: foto enviada → miniatura gerada e guardada no bucket; segunda vez vem do bucket
+    // arquivo antigo (sem miniatura): o servidor baixa a foto UMA vez, faz os dois tamanhos e guarda no disco, não no bucket
     const photoId = await send('foto1.jpg', jpg, { kind: 'foto' });
-    const first = await api(as.gestao, 'GET', `/episodios/${epId}/arquivos/${photoId}/previa`);
-    assert.equal(first.status, 200);
-    const [row] = await q('SELECT preview_keys FROM episode_files WHERE id = $1', [photoId]);
-    assert.ok(row.preview_keys.t && h.b2Store.has(row.preview_keys.t));
-    const second = await fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa`, { headers: { cookie: as.gestao.cookie() }, redirect: 'manual' });
-    assert.equal(second.status, 302); assert.match(second.headers.get('location'), /previa-t\.jpg/);
+    const [ph] = await q('SELECT * FROM episode_files WHERE id = $1', [photoId]);
+    const gets = () => h.b2Calls.filter((c) => c.method === 'GET' && c.key === ph.storage_key).length;
+    const before = gets(); const putsBefore = h.b2Calls.filter((c) => c.method === 'PUT').length;
+    const first = await fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa`, { headers: { cookie: as.gestao.cookie() } });
+    assert.equal(first.status, 200); assert.equal(first.headers.get('content-type'), 'image/jpeg');
+    assert.match(first.headers.get('cache-control'), /immutable/, 'o navegador guarda para sempre');
+    assert.equal((await fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa?t=p`, { headers: { cookie: as.gestao.cookie() } })).status, 200);
+    for (let i = 0; i < 3; i += 1) await fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa`, { headers: { cookie: as.gestao.cookie() } });
+    assert.equal(gets() - before, 1, 'a foto original foi baixada uma vez só, para os dois tamanhos e todas as visitas');
+    assert.equal(h.b2Calls.filter((c) => c.method === 'PUT').length, putsBefore, 'nada de miniatura no Backblaze');
+    assert.ok(previews.stored(ph, 't') && previews.stored(ph, 'p'));
     assert.equal((await fetch(`${app.base}/episodios/${epId}/arquivos/999999/previa`, { headers: { cookie: as.gestao.cookie() } })).status, 404);
-    // remover a foto apaga a miniatura também
+    // remover a foto apaga as miniaturas do disco
     await as.prod.act(`/episodios/${epId}/arquivos/${photoId}/excluir`, {}, { from: `/episodios/${epId}` });
-    assert.equal(h.b2Store.has(row.preview_keys.t), false);
+    assert.equal(previews.stored(ph, 't'), null); assert.equal(previews.stored(ph, 'p'), null);
+  });
+
+  it('miniatura feita pelo navegador no envio: o servidor confere, regrava limpa e não baixa nada do Backblaze', async () => {
+    const { createCanvas } = require('@napi-rs/canvas');
+    const big = createCanvas(2400, 1600); big.getContext('2d').fillRect(0, 0, 2400, 1600);
+    const photoId = await send('foto9.jpg', await big.encode('jpeg', 80), { kind: 'foto' });
+    const [ph] = await q('SELECT * FROM episode_files WHERE id = $1', [photoId]);
+    const small = createCanvas(480, 320); small.getContext('2d').fillRect(0, 0, 480, 320);
+    const before = h.b2Calls.filter((c) => c.method === 'GET' && c.key === ph.storage_key).length;
+    const post = (who, size, body) => fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa?t=${size}`, { method: 'POST', headers: { cookie: as[who].cookie(), 'content-type': 'image/jpeg', accept: 'application/json', 'x-csrf-token': '' }, body });
+    const withCsrf = async (who, size, body) => fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa?t=${size}`, { method: 'POST', headers: { cookie: as[who].cookie(), 'content-type': 'image/jpeg', accept: 'application/json', 'x-csrf-token': await as[who].csrf('/episodios') }, body });
+    assert.equal((await post('prod', 't', await small.encode('jpeg', 80))).status, 403, 'sem o token de segurança, recusa');
+    assert.equal((await withCsrf('prod', 't', await small.encode('jpeg', 80))).status, 200);
+    assert.equal((await withCsrf('prod', 't', Buffer.from('<script>não é imagem</script>'))).status, 400);
+    assert.equal((await withCsrf('editor', 't', await small.encode('jpeg', 80))).status, 404, 'quem não envia material bruto não troca a miniatura');
+    // grande demais para o tamanho pedido: o servidor reduz
+    assert.equal((await withCsrf('prod', 'p', await big.encode('jpeg', 80))).status, 200);
+    const { loadImage } = require('@napi-rs/canvas');
+    const p = await loadImage(require('fs').readFileSync(previews.stored(ph, 'p')));
+    assert.equal(Math.max(p.width, p.height), 1600);
+    const shown = await fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa`, { headers: { cookie: as.editor.cookie() } });
+    assert.equal(shown.status, 200);
+    assert.equal(h.b2Calls.filter((c) => c.method === 'GET' && c.key === ph.storage_key).length, before, 'a galeria usa o que o navegador mandou: zero download');
   });
 
   it('galeria na página: botão, pastas com os arquivos prontos e os endereços de prévia, sem script inline', async () => {
