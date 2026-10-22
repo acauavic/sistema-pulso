@@ -62,6 +62,15 @@ async function keyFor(...parts) {
 const encodePath = (path) => path.split('/').map((seg) => uriEncode(decodeURIComponent(seg))).join('/');
 const queryString = (query) => Object.keys(query).sort().map((k) => `${uriEncode(k)}=${uriEncode(query[k])}`).join('&');
 
+// Erro do Backblaze com motivo reconhecível. STORAGE_FULL: o limite de armazenamento da conta (Caps & Alerts) foi atingido;
+// repetir não adianta até a conta ganhar espaço.
+function b2Error(message, status, body = '') {
+  const err = new Error(`${message} (${status}): ${String(body).slice(0, 200)}`);
+  err.status = status;
+  if (status === 403 && /cap exceeded|Cannot upload files|storage cap/i.test(body)) err.code = 'STORAGE_FULL';
+  return err;
+}
+
 async function request(method, key, { body, contentType, query = {}, timeout = 60_000 } = {}) {
   if (!config.storageConfigured) throw new Error('Armazenamento não configurado (BB_KEY_ID, BB_APPLICATION_KEY, BUCKET_NAME).');
   const base = new URL(await endpoint());
@@ -84,7 +93,7 @@ async function request(method, key, { body, contentType, query = {}, timeout = 6
 
 async function putObject(key, body, contentType) {
   const res = await request('PUT', key, { body, contentType });
-  if (!res.ok) throw new Error(`Backblaze recusou o envio (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw b2Error('Backblaze recusou o envio', res.status, await res.text());
 }
 
 // Devolve a Response do fetch (o chamador faz o stream); 404 vira null.
@@ -133,13 +142,13 @@ async function createMultipart(key, contentType) {
   const res = await request('POST', key, { contentType, query: { uploads: '' } });
   const xml = await res.text();
   const uploadId = xmlValue(xml, 'UploadId');
-  if (!res.ok || !uploadId) throw new Error(`Backblaze recusou iniciar o envio (${res.status}): ${xml.slice(0, 200)}`);
+  if (!res.ok || !uploadId) throw b2Error('Backblaze recusou iniciar o envio', res.status, xml);
   return uploadId;
 }
 
 async function uploadPart(key, uploadId, partNumber, body) {
   const res = await request('PUT', key, { body, query: { partNumber: String(partNumber), uploadId }, timeout: 300_000 });
-  if (!res.ok) throw new Error(`Backblaze recusou a parte ${partNumber} (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw b2Error(`Backblaze recusou a parte ${partNumber}`, res.status, await res.text());
   const etag = res.headers.get('etag');
   if (!etag) throw new Error(`Backblaze não devolveu o ETag da parte ${partNumber}.`);
   return etag;
@@ -149,7 +158,7 @@ async function completeMultipart(key, uploadId, parts) {
   const xml = `<CompleteMultipartUpload>${parts.map((p) => `<Part><PartNumber>${p.number}</PartNumber><ETag>${p.etag}</ETag></Part>`).join('')}</CompleteMultipartUpload>`;
   const res = await request('POST', key, { body: Buffer.from(xml), contentType: 'application/xml', query: { uploadId }, timeout: 120_000 });
   const text = await res.text();
-  if (!res.ok || /<Error>/.test(text)) throw new Error(`Backblaze recusou concluir o envio (${res.status}): ${text.slice(0, 200)}`);
+  if (!res.ok || /<Error>/.test(text)) throw b2Error('Backblaze recusou concluir o envio', res.ok ? 403 : res.status, text);
 }
 
 async function abortMultipart(key, uploadId) {
@@ -165,4 +174,4 @@ async function headObject(key) {
   return { size: Number(res.headers.get('content-length')), contentType: res.headers.get('content-type') };
 }
 
-module.exports = { presignUrl, presignGet, createMultipart, uploadPart, completeMultipart, abortMultipart, headObject, signRequest, uriEncode, putObject, getObject, deleteObject, endpoint, keyFor };
+module.exports = { b2Error, presignUrl, presignGet, createMultipart, uploadPart, completeMultipart, abortMultipart, headObject, signRequest, uriEncode, putObject, getObject, deleteObject, endpoint, keyFor };

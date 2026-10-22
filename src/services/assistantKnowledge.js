@@ -76,6 +76,7 @@ const TOPICS = [
     steps: [
       'Etapas: Gravado, Disponível para edição, Em edição, Em revisão, Em finalização, Pronto para publicar e Publicado. Cada passo tem quem faz e o que precisa estar pronto (por exemplo, ao menos um vídeo bruto para liberar a edição).',
       'Material bruto: na aba Material, "Enviar material" aceita vários arquivos de uma vez (vídeos do episódio e bastidores, áudios, fotografias); só vídeos e áudios do episódio têm rótulo. Os envios seguem em segundo plano na bandeja do canto da tela, e dá para navegar enquanto sobe.',
+      'Enviar de novo os mesmos arquivos é seguro: o sistema reconhece pelo nome, continua os que pararam no meio e pergunta o que fazer com os repetidos (não enviar, substituir ou manter os dois). Se o envio parar com "armazenamento cheio", a conta do Backblaze chegou ao limite: a gestão aumenta em Backblaze > Caps & Alerts e depois é só tocar em "Tentar todos de novo". O botão Galeria abre fotos e vídeos com prévia.',
       'Na aba Material, os arquivos aparecem em pastas: Vídeos do episódio, Áudios, Bastidores, Fotografias e Outros (com subpastas pelo rótulo), e o vídeo editado tem uma pasta por versão, com os comentários de revisão daquela versão.',
       'O editor assume a edição, sobe o vídeo editado (horizontal) e envia para revisão. A gestão revisa com comentários na minutagem (texto, imagem, áudio), pede ajustes ou aprova.',
       'Finalização usa IA (transcrição, quadros, títulos, descrições, capas e posts), depois publica. Cortes são enviados em Conteúdo e ligados ao episódio.',

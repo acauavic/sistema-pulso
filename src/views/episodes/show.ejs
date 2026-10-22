@@ -155,7 +155,7 @@
               <span>
                 <%= f.label ? f.label + ' · ' : '' %><span class="mono small"><%= f.filename %></span>
                 <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %></span>
-                <% if (f.status === 'enviando') { %><span class="badge b-amber">enviando</span><% } %>
+                <% if (f.stalled) { %><span class="badge b-red" title="O envio parou no meio. Envie o mesmo arquivo de novo: continua de onde parou.">não terminou</span><% } else if (f.status === 'enviando') { %><span class="badge b-amber">enviando</span><% } %>
               </span>
               <span class="row">
                 <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
@@ -172,13 +172,24 @@
            ];
            var sizeOf = function (list) { return list.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0); };
            var folders = groupDefs.map(function (g) { var list = rawFiles.filter(function (f) { return f.kind === g.kind; }); return Object.assign({}, g, { list: list, size: sizeOf(list) }); }).filter(function (g) { return g.list.length; });
-           var hasReview = tabs.some(function (t) { return t.key === 'revisao'; }); %>
+           var hasReview = tabs.some(function (t) { return t.key === 'revisao'; });
+           var galItem = function (f, title) {
+             var ok = f.status === 'pronto';
+             return { id: f.id, name: f.filename, title: title || f.label || '', size: fmt.formatBytes(f.size_bytes), when: fmt.formatDay(f.created_at), type: mediaType(f),
+                      thumb: ok && hasPreview(f) ? fileBase + f.id + '/previa' : null, big: fileBase + f.id + '/previa?t=p', view: fileBase + f.id + '/ver', down: fileBase + f.id + '/baixar' };
+           };
+           var gallery = folders.map(function (g) { return { key: g.kind, title: g.title, items: g.list.filter(function (f) { return f.status === 'pronto'; }).map(function (f) { return galItem(f); }) }; })
+             .concat([{ key: 'editado', title: 'Vídeo editado', items: editedDone.map(function (f) { return galItem(f, 'Versão ' + f.version); }) }])
+             .filter(function (g) { return g.items.length; }); %>
         <div class="row spread">
           <div>
             <h2>Material bruto</h2>
             <% if (rawFiles.length) { %><span class="handle muted"><%= rawFiles.length %> arquivo<%= rawFiles.length > 1 ? 's' : '' %> · <%= fmt.formatBytes(rawTotal) %></span><% } %>
           </div>
-          <% if (canRaw) { %><button class="btn" type="button" data-material-pick><%- icon('upload') %> Enviar material</button><% } %>
+          <div class="row">
+            <% if (gallery.length) { %><button class="btn icon-only" type="button" data-gallery-open aria-label="Abrir a galeria (fotos e vídeos com prévia)" title="Galeria"><%- icon('image', 16) %></button><% } %>
+            <% if (canRaw) { %><button class="btn" type="button" data-material-pick><%- icon('upload') %> Enviar material</button><% } %>
+          </div>
         </div>
         <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
         <% if (canRaw) { %>
@@ -188,6 +199,14 @@
           <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
         </div>
         <% } else if (!rawFiles.length) { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
+        <% var stalledAll = rawFiles.filter(function (f) { return f.stalled; }); %>
+        <% if (stalledAll.length) { %>
+        <div class="stalled-note" role="status">
+          <p class="small m-0"><strong><%= stalledAll.length %> arquivo<%= stalledAll.length > 1 ? 's não terminaram' : ' não terminou' %> de subir</strong> <span class="mono small muted">· <%= fmt.formatBytes(sizeOf(stalledAll)) %></span></p>
+          <p class="small muted m-0"><% if (canRaw) { %>Escolha os mesmos arquivos de novo em Enviar material: o sistema reconhece pelo nome e continua de onde parou. Os que já subiram inteiros não são enviados de novo.<% } else { %>Quem envia o material pode escolher os mesmos arquivos de novo: o sistema continua de onde parou.<% } %></p>
+          <% if (canRaw) { %><form method="post" action="<%= fileBase %>descartar-parados" class="inline" data-confirm="Descartar os <%= stalledAll.length %> envios que não terminaram? O que já tinha subido deles é apagado do armazenamento."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">Descartar os que não terminaram</button></form><% } %>
+        </div>
+        <% } %>
         <% if (folders.length) { %>
         <div class="folders" data-folders data-key="raw-<%= ep.id %>">
           <div class="folder-grid" data-folder-grid>
@@ -196,7 +215,8 @@
               <span class="folder-ic"><%- icon('folder', 30) %></span>
               <span class="folder-name"><%- icon(g.ic, 14) %><strong><%= g.title %></strong></span>
               <span class="mono small muted"><%= g.list.length %> · <%= fmt.formatBytes(g.size) %></span>
-              <% if (g.list.some(function (f) { return f.status === 'enviando'; })) { %><span class="badge b-amber">enviando</span><% } %>
+              <% var gStalled = g.list.filter(function (f) { return f.stalled; }).length; %>
+              <% if (gStalled) { %><span class="badge b-red"><%= gStalled %> não <%= gStalled > 1 ? 'terminaram' : 'terminou' %></span><% } else if (g.list.some(function (f) { return f.status === 'enviando'; })) { %><span class="badge b-amber">enviando</span><% } %>
             </button>
             <% }) %>
           </div>
@@ -217,6 +237,29 @@
         </div>
         <% } %>
       </section>
+      <% if (gallery.length) { %>
+      <dialog class="modal gallery" id="modal-galeria" aria-labelledby="gal-h" data-gallery>
+        <div class="gal-head">
+          <div><span class="kicker"><%= epNo %> · <%= ep.title %></span><h2 id="gal-h">Galeria</h2></div>
+          <button class="icon-btn" type="button" data-modal-close aria-label="Fechar a galeria" title="Fechar"><%- icon('x', 18) %></button>
+        </div>
+        <div class="gal-folders" role="tablist" aria-label="Pastas" data-g-folders></div>
+        <div class="gal-grid" data-g-grid></div>
+        <div class="gal-view" data-g-view hidden>
+          <div class="gal-bar">
+            <button class="icon-btn" type="button" data-g-back aria-label="Voltar à pasta" title="Voltar à pasta"><%- icon('arrow-left', 16) %></button>
+            <div class="gal-info"><strong data-g-name></strong><span class="mono small muted" data-g-meta></span></div>
+            <span class="mono small muted" data-g-pos></span>
+            <a class="btn sm" data-g-down href="#"><%- icon('download', 14) %> Baixar</a>
+          </div>
+          <div class="gal-stage" data-g-stage></div>
+          <button class="gal-nav gal-prev" type="button" data-g-prev aria-label="Anterior" title="Anterior (←)"><%- icon('chevron-left', 22) %></button>
+          <button class="gal-nav gal-next" type="button" data-g-next aria-label="Próximo" title="Próximo (→)"><%- icon('chevron-right', 22) %></button>
+        </div>
+        <script type="application/json" data-g-data><%- JSON.stringify(gallery).replace(/</g, '\\u003c') %></script>
+        <template data-g-icons><span data-i="play"><%- icon('play', 22) %></span><span data-i="file"><%- icon('file-text', 28) %></span><span data-i="audio"><%- icon('mic', 28) %></span><span data-i="video"><%- icon('film', 28) %></span><span data-i="image"><%- icon('image', 28) %></span></template>
+      </dialog>
+      <% } %>
       <% if (perm.upload && storageReady) { %>
       <dialog class="modal modal-wide" data-material-dialog aria-labelledby="material-dlg-h">
         <div class="stack">
@@ -230,7 +273,7 @@
 
       <div class="stack-lg">
         <section class="card" id="edicao">
-          <div class="row spread"><h2>Vídeo editado</h2><% if (editedDone.length) { %><span class="badge b-st-em_edicao">v<%= editedDone[0].version %></span><% } %></div>
+          <div class="row spread"><h2>Vídeo editado</h2><span class="row"><% if (editedDone.length) { %><button class="icon-btn" type="button" data-gallery-open data-folder="editado" aria-label="Ver as versões na galeria" title="Ver na galeria"><%- icon('image', 16) %></button><span class="badge b-st-em_edicao">v<%= editedDone[0].version %></span><% } %></span></div>
           <% if (!inProduction) { %><p class="muted">A edição começa quando o material for liberado para o editor.</p><% } else { %>
           <p class="small muted">O vídeo do episódio é <strong>horizontal</strong> (16:9). Vídeos verticais são cortes e vão em <a href="/conteudo">Conteúdo</a>.</p>
           <% var editedUploader = function (label) { %>

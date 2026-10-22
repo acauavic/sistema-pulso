@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.23.0', date: '2026-10-22', title: 'Envio sem repetir arquivo, retomada do que parou e galeria com prévia',
+    items: [
+      { kind: 'novo', text: 'Ao enviar material, o sistema confere o que já está no episódio pelo nome. O que tinha parado no meio continua de onde parou (sem recomeçar). Para os que já subiram inteiros, você escolhe: não enviar de novo (padrão), substituir (o antigo só sai quando o novo termina) ou manter os dois.' },
+      { kind: 'novo', text: 'Envios que pararam aparecem marcados como "não terminou", com a contagem e o tamanho, e um aviso no card: basta escolher os mesmos arquivos de novo. Também dá para descartar de uma vez os que não terminaram, liberando o espaço.' },
+      { kind: 'novo', text: 'Galeria do material: um botão no card abre uma janela com as pastas (Vídeos do episódio, Bastidores, Fotografias, Vídeo editado…), miniaturas de fotos e vídeos, e a visualização grande com anterior e próximo (setas do teclado ou deslizando no celular), player de vídeo e áudio, e Baixar.' },
+      { kind: 'correcao', text: 'Quando o armazenamento (Backblaze) chega ao limite da conta, o envio para na hora com a explicação e o caminho para resolver (Backblaze > Caps & Alerts), em vez de insistir arquivo por arquivo. A gestão recebe um aviso. Depois de liberar espaço, "Tentar todos de novo" continua de onde parou.' },
+    ],
+  },
+  {
     version: '1.22.0', date: '2026-10-21', title: 'Material do episódio em pastas',
     items: [
       { kind: 'novo', text: 'No card do episódio, o Material bruto agora é visto em pastas: Vídeos do episódio, Áudios, Bastidores, Fotografias e Outros, cada uma com a contagem e o tamanho. Toque numa pasta para abrir, e use a seta para voltar. Dentro de Vídeos e Áudios, os arquivos se separam pelo rótulo (Câmera 1, Lapela…).' },

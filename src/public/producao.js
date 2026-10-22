@@ -110,17 +110,50 @@
     const summary = dlg.querySelector('[data-m-summary]');
     const sendBtn = dlg.querySelector('[data-m-send]');
     let rows = [];
+    let existing = []; // o que já está no material bruto deste episódio (servidor)
+    let dupChoice = 'skip'; // arquivos com o mesmo nome de um já enviado: skip (não enviar) | replace (substituir) | keep (manter os dois)
     refreshWhenDone(box);
 
     const key = (f) => `${f.name}|${f.size}|${f.lastModified}`;
-    function addFiles(list) {
-      const seen = new Set(rows.map((r) => key(r.file)));
-      [...list].forEach((f) => { if (f.size > 0 && !seen.has(key(f))) { seen.add(key(f)); const type = typeOf(f.name); rows.push({ file: f, type, group: firstOption(type), label: '' }); } });
-      if (!rows.length) return;
-      render();
-      if (!dlg.open) dlg.showModal();
+    // o servidor guarda o nome "limpo" (sem / : * ? " < > |): compara do mesmo jeito, sem diferenciar maiúsculas
+    const sameName = (a, b) => String(a).normalize('NFC').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 180).toLowerCase() === String(b).toLowerCase();
+    // Cada arquivo escolhido: new (novo), resume (tinha parado no meio: continua de onde parou), redo (parou no meio mas o arquivo mudou:
+    // o envio velho sai e este recomeça), dup (já existe completo) ou queued (já está na fila de envio agora).
+    function classify() {
+      rows.forEach((r) => {
+        r.state = 'new'; r.match = null;
+        if (uploads()?.has?.(box.dataset.base, r.file.name, r.file.size)) { r.state = 'queued'; return; }
+        const same = existing.filter((f) => sameName(r.file.name, f.name));
+        const partial = same.find((f) => f.status === 'enviando' && f.size === r.file.size);
+        if (partial) { r.state = 'resume'; r.match = partial; return; }
+        const done = same.filter((f) => f.status === 'pronto');
+        if (done.length) { r.state = 'dup'; r.match = done[done.length - 1]; return; }
+        const other = same.find((f) => f.status === 'enviando');
+        if (other) { r.state = 'redo'; r.match = other; }
+      });
     }
-    const total = () => rows.reduce((n, r) => n + r.file.size, 0);
+    const goes = (r) => r.state !== 'queued' && !(r.state === 'dup' && dupChoice === 'skip');
+    async function loadExisting() {
+      try {
+        const res = await fetch(`${box.dataset.base}existentes`, { headers: { Accept: 'application/json' } });
+        const body = await res.json();
+        existing = res.ok && body.ok ? body.files : [];
+      } catch { existing = []; }
+    }
+    async function addFiles(list) {
+      const seen = new Set(rows.map((r) => key(r.file)));
+      const fresh = [];
+      [...list].forEach((f) => { if (f.size > 0 && !seen.has(key(f))) { seen.add(key(f)); const type = typeOf(f.name); fresh.push({ file: f, type, group: firstOption(type), label: '' }); } });
+      if (!fresh.length && !rows.length) return;
+      rows.push(...fresh);
+      if (!dlg.open) { summary.textContent = 'Conferindo o que já está no episódio…'; sections.replaceChildren(); sendBtn.disabled = true; dlg.showModal(); }
+      await loadExisting();
+      classify();
+      // quem já existe completo herda o tipo e o rótulo de lá (substituir mantém o arquivo no mesmo lugar)
+      rows.forEach((r) => { if (r.match && fresh.includes(r) && GROUPS[r.match.kind]) { r.group = TYPES.find((t) => t.key === r.type).options.includes(r.match.kind) ? r.match.kind : r.group; r.label = r.label || r.match.label || ''; } });
+      render();
+    }
+    const total = () => rows.filter(goes).reduce((n, r) => n + r.file.size, 0);
 
     function rowEl(r, withSelect) {
       const li = document.createElement('li');
@@ -145,6 +178,8 @@
       const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'icon-btn'; rm.setAttribute('aria-label', `Tirar ${r.file.name}`); rm.title = 'Tirar da lista';
       rm.textContent = '×';
       rm.addEventListener('click', () => { rows = rows.filter((x) => x !== r); if (!rows.length) dlg.close(); else render(); });
+      if (r.state === 'resume') { const tag = document.createElement('span'); tag.className = 'badge b-amber mrow-tag'; tag.textContent = 'continua'; tag.title = 'Tinha parado no meio do envio: continua de onde parou'; name.prepend(tag); }
+      if (r.state === 'dup') { const tag = document.createElement('span'); tag.className = 'badge b-gray mrow-tag'; tag.textContent = dupChoice === 'replace' ? 'substitui' : 'cópia'; name.prepend(tag); }
       li.appendChild(rm);
       return li;
     }
@@ -159,10 +194,62 @@
       return sel;
     }
 
+    function dupSection() {
+      const dups = rows.filter((r) => r.state === 'dup');
+      const resumes = rows.filter((r) => r.state === 'resume' || r.state === 'redo');
+      const queued = rows.filter((r) => r.state === 'queued');
+      if (!dups.length && !resumes.length && !queued.length) return null;
+      const sec = document.createElement('section'); sec.className = 'msec mdup';
+      if (dups.length) {
+        const head = document.createElement('div'); head.className = 'msec-head';
+        const h = document.createElement('strong'); h.textContent = dups.length === 1 ? 'Já existe no episódio' : 'Já existem no episódio';
+        const meta = document.createElement('span'); meta.className = 'mono small muted'; meta.textContent = `${dups.length} · ${fmtBytes(dups.reduce((n, r) => n + r.file.size, 0))}`;
+        head.append(h, meta); sec.appendChild(head);
+        const p = document.createElement('p'); p.className = 'small muted m-0';
+        p.textContent = dups.length === 1 ? 'Um arquivo tem o mesmo nome de um que já subiu. O que fazer com ele?' : `${dups.length} arquivos têm o mesmo nome de arquivos que já subiram. O que fazer com eles?`;
+        sec.appendChild(p);
+        const seg = document.createElement('div'); seg.className = 'seg-radio mdup-choice'; seg.setAttribute('role', 'radiogroup'); seg.setAttribute('aria-label', 'Arquivos repetidos');
+        [['skip', 'Não enviar de novo'], ['replace', 'Substituir'], ['keep', 'Manter os dois']].forEach(([v, label]) => {
+          const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'radio'; i.name = 'm-dup'; i.value = v; i.checked = dupChoice === v;
+          i.addEventListener('change', () => { dupChoice = v; render(); });
+          const sp = document.createElement('span'); sp.textContent = label; l.append(i, sp); seg.appendChild(l);
+        });
+        sec.appendChild(seg);
+        const hint = document.createElement('p'); hint.className = 'small muted m-0';
+        hint.textContent = { skip: 'Só os arquivos novos sobem.', replace: 'O arquivo antigo sai quando o novo terminar de subir (se der erro, o antigo fica).', keep: 'Os dois ficam, com o mesmo nome.' }[dupChoice];
+        sec.appendChild(hint);
+        const det = document.createElement('details'); det.className = 'msec-more';
+        const sum = document.createElement('summary'); sum.className = 'small'; sum.textContent = `Ver ${plural(dups.length, 'arquivo repetido', 'arquivos repetidos')}`;
+        const list = document.createElement('ul'); list.className = 'plain mlist';
+        dups.forEach((r) => {
+          const li = document.createElement('li'); li.className = 'mrow mrow-dup';
+          const name = document.createElement('span'); name.className = 'mrow-name'; name.textContent = r.file.name; name.title = r.file.name;
+          const sz = document.createElement('span'); sz.className = 'mono small muted'; sz.textContent = r.match.size === r.file.size ? `${fmtBytes(r.file.size)} · mesmo tamanho` : `${fmtBytes(r.file.size)} · antes ${fmtBytes(r.match.size)}`;
+          li.append(name, sz); list.appendChild(li);
+        });
+        det.append(sum, list); sec.appendChild(det);
+      }
+      if (resumes.length) {
+        const p = document.createElement('p'); p.className = 'small mdup-note';
+        const cont = resumes.filter((r) => r.state === 'resume').length;
+        p.textContent = cont === resumes.length
+          ? `${plural(cont, 'arquivo tinha parado', 'arquivos tinham parado')} no meio do envio: ${cont === 1 ? 'continua' : 'continuam'} de onde parou.`
+          : `${plural(resumes.length, 'arquivo tinha parado', 'arquivos tinham parado')} no meio do envio: ${cont ? `${cont} continuam de onde pararam e ` : ''}os que mudaram recomeçam.`;
+        sec.appendChild(p);
+      }
+      if (queued.length) {
+        const p = document.createElement('p'); p.className = 'small muted m-0';
+        p.textContent = `${plural(queued.length, 'arquivo já está', 'arquivos já estão')} na fila de envio agora e ${queued.length === 1 ? 'ficou' : 'ficaram'} de fora.`;
+        sec.appendChild(p);
+      }
+      return sec;
+    }
+
     function render() {
       sections.replaceChildren();
+      const ds = dupSection(); if (ds) sections.appendChild(ds);
       TYPES.forEach((t) => {
-        const mine = rows.filter((r) => r.type === t.key);
+        const mine = rows.filter((r) => r.type === t.key && goes(r));
         if (!mine.length) return;
         const sec = document.createElement('section'); sec.className = 'msec';
         const head = document.createElement('div'); head.className = 'msec-head';
@@ -182,15 +269,17 @@
         sections.appendChild(sec);
       });
       const by = {};
-      rows.forEach((r) => { by[r.group] = (by[r.group] || 0) + 1; });
+      const sending = rows.filter(goes);
+      sending.forEach((r) => { by[r.group] = (by[r.group] || 0) + 1; });
       const parts = [];
       if (by.bruto_video) parts.push(plural(by.bruto_video, 'vídeo do episódio', 'vídeos do episódio'));
       if (by.bruto_audio) parts.push(plural(by.bruto_audio, 'áudio', 'áudios'));
       if (by.foto) parts.push(plural(by.foto, 'fotografia', 'fotografias'));
       if (by.bastidor) parts.push(plural(by.bastidor, 'arquivo de bastidores', 'arquivos de bastidores'));
       if (by.outro) parts.push(plural(by.outro, 'outro', 'outros'));
-      summary.textContent = `${parts.join(' · ')} · ${fmtBytes(total())}. Rótulos são opcionais e só valem para vídeos e áudios do episódio; fotografias e bastidores entram em quantidade.`;
-      sendBtn.textContent = `Enviar ${plural(rows.length, 'arquivo', 'arquivos')}`;
+      summary.textContent = sending.length ? `${parts.join(' · ')} · ${fmtBytes(total())}. Rótulos são opcionais e só valem para vídeos e áudios do episódio; fotografias e bastidores entram em quantidade.` : 'Nada novo para enviar: tudo o que você escolheu já está no episódio.';
+      sendBtn.disabled = !sending.length;
+      sendBtn.textContent = sending.length ? `Enviar ${plural(sending.length, 'arquivo', 'arquivos')}` : 'Nada para enviar';
     }
 
     picker.addEventListener('change', () => { addFiles(picker.files); picker.value = ''; });
@@ -199,12 +288,17 @@
     box.closest('[data-material-drop]')?.addEventListener('drop', (e) => { e.preventDefault(); e.currentTarget.classList.remove('dropping'); addFiles(e.dataTransfer.files); });
     document.querySelectorAll('[data-material-pick]').forEach((b) => b.addEventListener('click', () => picker.click()));
     dlg.querySelector('[data-m-more]')?.addEventListener('click', () => picker.click());
-    dlg.querySelector('[data-m-cancel]')?.addEventListener('click', () => { rows = []; dlg.close(); });
-    dlg.addEventListener('cancel', () => { rows = []; });
+    dlg.querySelector('[data-m-cancel]')?.addEventListener('click', () => { rows = []; dupChoice = 'skip'; dlg.close(); });
+    dlg.addEventListener('cancel', () => { rows = []; dupChoice = 'skip'; });
     sendBtn.addEventListener('click', () => {
-      if (!rows.length) return;
-      const entries = rows.map((r) => ({ file: r.file, kind: r.group, label: GROUPS[r.group].labelled ? r.label.trim() : '' }));
-      rows = []; dlg.close();
+      const go = rows.filter(goes);
+      if (!go.length) return;
+      const entries = go.map((r) => ({
+        file: r.file, kind: r.group, label: GROUPS[r.group].labelled ? r.label.trim() : '',
+        resumeId: r.state === 'resume' ? r.match.id : null,
+        replaceId: r.state === 'redo' || (r.state === 'dup' && dupChoice === 'replace') ? r.match.id : null,
+      }));
+      rows = []; dupChoice = 'skip'; dlg.close();
       uploads().add(entries, { base: box.dataset.base, csrf: box.dataset.csrf, where: box.dataset.where || '', hash: box.dataset.hash });
     });
   });
@@ -515,4 +609,91 @@
     let saved = ''; try { saved = sessionStorage.getItem(memo) || ''; } catch { /* sem armazenamento */ }
     if (saved) { box.dataset.last = saved; open(saved, false); }
   });
+
+  // ---- galeria do material: pastas em abas, grade com miniaturas e visualização grande (foto, vídeo, áudio)
+  const gal = document.querySelector('[data-gallery]');
+  if (gal) {
+    let data = []; try { data = JSON.parse(gal.querySelector('[data-g-data]').textContent); } catch { data = []; }
+    const tabsEl = gal.querySelector('[data-g-folders]'); const gridEl = gal.querySelector('[data-g-grid]'); const view = gal.querySelector('[data-g-view]');
+    const stage = gal.querySelector('[data-g-stage]'); const nameEl = gal.querySelector('[data-g-name]'); const metaEl = gal.querySelector('[data-g-meta]');
+    const posEl = gal.querySelector('[data-g-pos]'); const downEl = gal.querySelector('[data-g-down]');
+    const prevBtn = gal.querySelector('[data-g-prev]'); const nextBtn = gal.querySelector('[data-g-next]');
+    const ic = (k) => gal.querySelector('template[data-g-icons]')?.content.querySelector(`[data-i="${k}"]`)?.innerHTML || '';
+    let folder = data[0]?.key; let idx = -1;
+    const items = () => (data.find((f) => f.key === folder) || { items: [] }).items;
+    const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+    const fallback = (box, type) => { box.replaceChildren(); const f = mk('span', 'g-fallback'); f.innerHTML = ic(type === 'video' ? 'video' : type === 'audio' ? 'audio' : type === 'image' ? 'image' : 'file'); box.appendChild(f); };
+
+    function drawTabs() {
+      tabsEl.replaceChildren(...data.map((f) => {
+        const b = mk('button', `gal-tab${f.key === folder ? ' on' : ''}`); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(f.key === folder));
+        b.append(mk('span', '', f.title), mk('span', 'mono small muted', String(f.items.length)));
+        b.addEventListener('click', () => { folder = f.key; closeView(false); drawTabs(); drawGrid(); });
+        return b;
+      }));
+    }
+    function drawGrid() {
+      gridEl.replaceChildren(...items().map((it, n) => {
+        const b = mk('button', `g-tile g-${it.type}`); b.type = 'button'; b.setAttribute('aria-label', `Abrir ${it.name}`); b.title = it.name;
+        const pic = mk('span', 'g-pic');
+        if (it.thumb) {
+          const img = document.createElement('img'); img.loading = 'lazy'; img.decoding = 'async'; img.alt = ''; img.src = it.thumb;
+          img.addEventListener('error', () => fallback(pic, it.type), { once: true });
+          pic.appendChild(img);
+        } else fallback(pic, it.type);
+        if (it.type === 'video') { const play = mk('span', 'g-play'); play.innerHTML = ic('play'); pic.appendChild(play); }
+        b.append(pic, mk('span', 'g-cap', it.title ? `${it.title} · ${it.name}` : it.name));
+        b.addEventListener('click', () => openView(n));
+        return b;
+      }));
+      gridEl.scrollTop = 0;
+    }
+    function openView(n) {
+      const list = items(); if (!list[n]) return;
+      idx = n; const it = list[n];
+      stage.replaceChildren();
+      if (it.type === 'image') {
+        const img = document.createElement('img'); img.alt = it.name; img.src = it.thumb ? it.big : it.view;
+        img.addEventListener('error', () => fallback(stage, 'image'), { once: true });
+        stage.appendChild(img);
+      } else if (it.type === 'video') {
+        const v = document.createElement('video'); v.controls = true; v.playsInline = true; v.preload = 'metadata'; if (it.thumb) v.poster = it.thumb; v.src = it.view;
+        stage.appendChild(v);
+      } else if (it.type === 'audio') {
+        const a = document.createElement('audio'); a.controls = true; a.preload = 'metadata'; a.src = it.view; stage.appendChild(a);
+      } else {
+        fallback(stage, 'file'); stage.appendChild(mk('p', 'small muted', 'Este formato não tem pré-visualização. Baixe o arquivo para abrir.'));
+      }
+      nameEl.textContent = it.title ? `${it.title} · ${it.name}` : it.name; nameEl.title = it.name;
+      metaEl.textContent = `${it.size} · ${it.when}`;
+      posEl.textContent = `${n + 1} / ${list.length}`;
+      downEl.href = it.down;
+      prevBtn.disabled = n === 0; nextBtn.disabled = n === list.length - 1;
+      view.hidden = false; gridEl.hidden = true;
+      gal.querySelector('[data-g-back]').focus();
+    }
+    function closeView(focus = true) {
+      stage.querySelectorAll('video, audio').forEach((m) => m.pause());
+      stage.replaceChildren(); view.hidden = true; gridEl.hidden = false;
+      if (focus && idx >= 0) gridEl.children[idx]?.focus();
+      idx = -1;
+    }
+    const step = (d) => { if (idx < 0) return; const n = idx + d; if (n >= 0 && n < items().length) openView(n); };
+    prevBtn.addEventListener('click', () => step(-1)); nextBtn.addEventListener('click', () => step(1));
+    gal.querySelector('[data-g-back]').addEventListener('click', () => closeView());
+    gal.addEventListener('keydown', (e) => {
+      if (view.hidden || e.target.closest('video, audio')) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+    });
+    gal.addEventListener('cancel', (e) => { if (!view.hidden) { e.preventDefault(); closeView(); } }); // Esc na foto volta à pasta; na pasta, fecha
+    gal.addEventListener('close', () => closeView(false));
+    let x0 = null; // deslizar no celular
+    stage.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+    stage.addEventListener('touchend', (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 60) step(dx < 0 ? 1 : -1); });
+    document.querySelectorAll('[data-gallery-open]').forEach((b) => b.addEventListener('click', () => {
+      folder = data.some((f) => f.key === b.dataset.folder) ? b.dataset.folder : data[0]?.key;
+      drawTabs(); drawGrid(); closeView(false);
+      if (!gal.open) gal.showModal();
+    }));
+  }
 })();

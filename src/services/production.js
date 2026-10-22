@@ -276,7 +276,7 @@ const partSizeFor = (size) => Math.max(config.uploadPartBytes, Math.ceil(size / 
 
 const safeName = (name) => String(name || 'arquivo').normalize('NFC').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 180);
 
-async function startUpload({ episode, kind, label, filename, contentType, size, userId }) {
+async function startUpload({ episode, kind, label, filename, contentType, size, userId, replacesId = null }) {
   const type = String(contentType || 'application/octet-stream').split(';')[0].trim().toLowerCase().slice(0, 100) || 'application/octet-stream';
   const name = safeName(filename);
   const ext = (name.match(/\.([A-Za-z0-9]{1,6})$/)?.[1] || 'bin').toLowerCase();
@@ -289,9 +289,9 @@ async function startUpload({ episode, kind, label, filename, contentType, size, 
   }
   const uploadId = await b2.createMultipart(key, type);
   const { rows: [file] } = await db.query(
-    `INSERT INTO episode_files (episode_id, kind, label, filename, content_type, size_bytes, part_size, storage_key, upload_id, version, uploaded_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-    [episode.id, kind, label || null, name, type, size, partSize, key, uploadId, version, userId]);
+    `INSERT INTO episode_files (episode_id, kind, label, filename, content_type, size_bytes, part_size, storage_key, upload_id, version, uploaded_by, replaces_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [episode.id, kind, label || null, name, type, size, partSize, key, uploadId, version, userId, replacesId]);
   return { file, partSize, totalParts: Math.max(1, Math.ceil(size / partSize)) };
 }
 
@@ -300,6 +300,7 @@ async function receivePart(file, number, body) {
   await db.query(
     `INSERT INTO episode_file_parts (file_id, part_number, etag, size_bytes) VALUES ($1,$2,$3,$4)
      ON CONFLICT (file_id, part_number) DO UPDATE SET etag = EXCLUDED.etag, size_bytes = EXCLUDED.size_bytes`, [file.id, number, etag, body.length]);
+  await db.query('UPDATE episode_files SET last_part_at = now() WHERE id = $1', [file.id]);
   return etag;
 }
 
@@ -315,7 +316,14 @@ async function finishUpload(file) {
   const { rows: [done] } = await db.query(
     "UPDATE episode_files SET status = 'pronto', upload_id = NULL, completed_at = now() WHERE id = $1 RETURNING *", [file.id]);
   await db.query('DELETE FROM episode_file_parts WHERE file_id = $1', [file.id]);
-  return { file: done };
+  // "Substituir": o arquivo antigo (mesmo episódio, material bruto) só sai agora que o novo chegou inteiro
+  let replaced = null;
+  if (done.replaces_id) {
+    const { rows: [old] } = await db.query("SELECT * FROM episode_files WHERE id = $1 AND episode_id = $2 AND kind <> 'editado' AND id <> $3", [done.replaces_id, done.episode_id, done.id]);
+    if (old) { await deleteFile(old); replaced = old; }
+    await db.query('UPDATE episode_files SET replaces_id = NULL WHERE id = $1', [done.id]);
+  }
+  return { file: done, replaced };
 }
 
 // O vídeo "pilar" do episódio é horizontal. Lê o arquivo já no bucket (ffprobe por link assinado, só os cabeçalhos).
@@ -341,7 +349,21 @@ async function deleteFile(file) {
   if (file.status === 'enviando') return cancelUpload(file);
   await db.query('DELETE FROM episode_files WHERE id = $1', [file.id]);
   await b2.deleteObject(file.storage_key).catch((err) => console.error('Falha ao apagar arquivo:', err.message));
+  for (const k of Object.values(file.preview_keys || {})) await b2.deleteObject(k).catch(() => {}); // miniaturas da galeria
   return null;
+}
+
+// Envio parado: ainda "enviando", mas nenhuma parte chegou na última meia hora (a aba fechou, a internet caiu, o bucket encheu).
+const STALL_MS = 30 * 60_000;
+const isStalled = (f, now = Date.now()) => f.status === 'enviando' && now - new Date(f.last_part_at || f.created_at).getTime() > STALL_MS;
+
+// O Backblaze recusou por falta de espaço: mensagem única para a tela e aviso à gestão (uma vez por dia).
+const STORAGE_FULL_MSG = 'O armazenamento (Backblaze) chegou ao limite da conta e recusou novos arquivos. Aumente o limite em Backblaze > Caps & Alerts ou libere espaço, e envie de novo os mesmos arquivos: o sistema reconhece o que já subiu e continua de onde parou.';
+async function storageFull() {
+  const { rows } = await db.query("SELECT id FROM users WHERE active AND role IN ('superadmin', 'gestao')");
+  const day = new Date().toISOString().slice(0, 10);
+  await require('./notify').notify({ type: 'rotina', users: rows.map((r) => r.id), title: 'Armazenamento cheio: os envios de arquivos pararam', body: STORAGE_FULL_MSG, url: '/integracoes', dedupe: `armazenamento-cheio-${day}` })
+    .catch((err) => console.error('Aviso de armazenamento cheio:', err.message));
 }
 
 // Apaga do bucket tudo o que pertence ao episódio (antes de excluí-lo do banco).
@@ -356,6 +378,7 @@ async function purgeEpisodeFiles(episodeId) {
   for (const f of rows) {
     if (f.upload_id) await b2.abortMultipart(f.storage_key, f.upload_id).catch(() => {});
     await b2.deleteObject(f.storage_key).catch((err) => console.error('Falha ao apagar arquivo:', err.message));
+    for (const k of Object.values(f.preview_keys || {})) await b2.deleteObject(k).catch(() => {});
   }
 }
 
@@ -383,5 +406,6 @@ module.exports = {
   MB, addEvent, ensureChecklists, openRequired, TRANSITIONS, availableMoves, move,
   createTasks, syncFromGuest, createEpisode,
   partSizeFor, safeName, startUpload, receivePart, finishUpload, checkEditedVideo, cancelUpload, deleteFile, purgeEpisodeFiles,
+  STALL_MS, isStalled, STORAGE_FULL_MSG, storageFull,
   sponsorAssets,
 };

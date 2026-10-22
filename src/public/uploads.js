@@ -49,13 +49,16 @@
   const bytesDone = (it) => it.doneBytes + Object.values(it.live).reduce((a, b) => a + b, 0);
 
   // ---------------------------------------------------------------- rede
-  class HttpError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
+  class HttpError extends Error { constructor(msg, status, code = '') { super(msg); this.status = status; this.code = code; } }
+  // Armazenamento cheio (507): não adianta insistir. A fila inteira para com uma mensagem só, até alguém tentar de novo.
+  let blocked = '';
+  const isFull = (err) => err && (err.status === 507 || err.code === 'storage_full');
   const failText = (body, status) => body.error || (status >= 500 ? 'o servidor de arquivos não respondeu' : `erro ${status}`);
 
   async function json(it, url, opts = {}) {
     const res = await fetch(url, { ...opts, headers: { Accept: 'application/json', 'x-csrf-token': it.ctx.csrf, ...(opts.headers || {}) } });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || !body.ok) throw new HttpError(failText(body, res.status), res.status);
+    if (!res.ok || !body.ok) throw new HttpError(failText(body, res.status), res.status, body.code || '');
     return body;
   }
 
@@ -72,7 +75,7 @@
         it.xhrs.delete(xhr);
         let body = {}; try { body = JSON.parse(xhr.responseText); } catch { /* resposta sem corpo */ }
         if (xhr.status >= 200 && xhr.status < 300 && body.ok) resolve();
-        else reject(new HttpError(failText(body, xhr.status), xhr.status));
+        else reject(new HttpError(failText(body, xhr.status), xhr.status, body.code || ''));
       };
       xhr.onerror = () => { it.xhrs.delete(xhr); reject(new HttpError('sem conexão', 0)); };
       xhr.onabort = () => { it.xhrs.delete(xhr); reject(new HttpError('cancelado', -1)); };
@@ -98,6 +101,7 @@
       } catch (err) {
         delete it.live[n];
         if (it.aborted || err.status === -1) throw new HttpError('cancelado', -1);
+        if (isFull(err)) throw err;
         if (err.status >= 400 && err.status < 500 && err.status !== 429 && err.status !== 408) throw err; // erro do pedido: repetir não adianta
         if (!navigator.onLine) { it.note = 'sem internet, retoma sozinho'; changed(); await online(); attempt -= 1; continue; }
         if (attempt >= 5) throw err;
@@ -113,6 +117,8 @@
     if (it.serverId) { // retomar: pergunta ao servidor quais partes já chegaram (se ele não souber, recomeça do zero)
       try {
         const r = await json(it, `${it.ctx.base}${it.serverId}/partes`);
+        if (r.status !== 'enviando' || (r.size && r.size !== it.file.size)) throw new HttpError('outro arquivo', 409);
+        if (r.partSize) { it.partSize = r.partSize; it.totalParts = r.totalParts; }
         have = new Set(r.parts);
       } catch (err) {
         if (err.status === 401 || err.status === 403) throw err;
@@ -123,7 +129,7 @@
     if (!it.serverId) {
       const init = await json(it, `${it.ctx.base}iniciar`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: it.kind, rotulo: it.label, nome: it.file.name, tamanho: it.file.size, tipo: it.file.type }),
+        body: JSON.stringify({ kind: it.kind, rotulo: it.label, nome: it.file.name, tamanho: it.file.size, tipo: it.file.type, substituir: it.replaceId || '' }),
       });
       it.serverId = init.id; it.partSize = init.partSize; it.totalParts = init.totalParts;
     }
@@ -151,7 +157,10 @@
       it.status = 'done'; it.note = '';
       emit({ type: 'file-done', item: it });
     } catch (err) {
-      if (it.aborted) { it.status = 'canceled'; } else {
+      if (it.aborted) { it.status = 'canceled'; } else if (isFull(err)) {
+        blocked = err.message; it.status = 'error'; it.error = 'armazenamento cheio'; it.fatal = false;
+        items.filter((x) => x.status === 'queued' && !x.started).forEach((x) => { x.status = 'error'; x.error = 'parado: armazenamento cheio'; x.fatal = false; });
+      } else {
         it.status = 'error'; it.error = err.message || 'erro desconhecido';
         it.fatal = err.status === 409 || err.status === 422 || err.status === 401 || err.status === 403; // o servidor recusou: tentar de novo não muda nada
       }
@@ -163,7 +172,7 @@
   }
 
   function pump() {
-    while (running < FILE_LIMIT) {
+    while (running < FILE_LIMIT && !blocked) {
       const next = items.find((it) => it.status === 'queued' && !it.started);
       if (!next) return;
       next.started = true;
@@ -185,11 +194,12 @@
     entries.forEach((e) => {
       items.push({
         id: (seq += 1), file: wrap(e.file), kind: e.kind, label: e.label || '', ctx, status: 'queued', started: false, aborted: false,
-        serverId: null, partSize: 0, totalParts: 0, doneBytes: 0, live: {}, xhrs: new Set(), error: '', note: '', fatal: false,
+        serverId: e.resumeId || null, replaceId: e.replaceId || null, resumed: Boolean(e.resumeId),
+        partSize: 0, totalParts: 0, doneBytes: 0, live: {}, xhrs: new Set(), error: '', note: '', fatal: false,
       });
       batchBases.add(ctx.base);
     });
-    expanded = true; userToggled = false;
+    expanded = true; userToggled = false; blocked = '';
     clearTimeout(hideTimer);
     pump(); changed();
     return entries.length;
@@ -205,12 +215,16 @@
   }
   function retry(it) {
     if (it.status !== 'error' || it.fatal) return;
+    blocked = '';
     it.aborted = false; it.status = 'queued'; it.started = false; it.failed = false;
     batchBases.add(it.ctx.base);
     clearTimeout(hideTimer);
     pump(); changed();
   }
-  window.PulsoUploads = { add, active: activeCount, on(fn) { listeners.add(fn); return () => listeners.delete(fn); }, fmtBytes };
+  const retryAll = () => { blocked = ''; items.filter((x) => x.status === 'error' && !x.fatal).forEach(retry); };
+  // Este arquivo já está na fila (na mesma pasta de destino)? A janela de envio usa para não mandar duas vezes.
+  const has = (base, name, size) => items.some((x) => isActive(x) && x.ctx.base === base && x.file.name === name && x.file.size === size);
+  window.PulsoUploads = { add, has, retryAll, active: activeCount, on(fn) { listeners.add(fn); return () => listeners.delete(fn); }, fmtBytes };
 
   // ---------------------------------------------------------------- avisos ao sair
   window.addEventListener('beforeunload', (e) => { if (activeCount()) { e.preventDefault(); e.returnValue = ''; } });
@@ -269,12 +283,13 @@
     tray = document.createElement('aside');
     tray.className = 'upl-tray'; tray.setAttribute('aria-label', 'Envios de arquivos'); tray.hidden = true;
     tray.innerHTML = '<button type="button" class="upl-head" aria-expanded="true"><span class="upl-head-txt"><strong class="upl-title"></strong><span class="upl-meta mono small"></span></span><span class="upl-chev"></span><span class="upl-bar" aria-hidden="true"><i></i></span></button>'
-      + '<div class="upl-body"><ul class="plain upl-list" aria-live="polite"></ul><div class="upl-foot"><button type="button" class="link small" data-upl-clear>Limpar concluídos</button></div></div>';
+      + '<div class="upl-body"><p class="upl-alert small" data-upl-alert hidden></p><ul class="plain upl-list" aria-live="polite"></ul><div class="upl-foot"><button type="button" class="link small" data-upl-retry-all hidden>Tentar todos de novo</button><button type="button" class="link small" data-upl-clear>Limpar concluídos</button></div></div>';
     document.body.appendChild(tray);
     headBtn = tray.querySelector('.upl-head'); titleEl = tray.querySelector('.upl-title'); metaEl = tray.querySelector('.upl-meta');
     barEl = tray.querySelector('.upl-bar i'); bodyEl = tray.querySelector('.upl-body'); listEl = tray.querySelector('.upl-list');
     tray.querySelector('.upl-chev').innerHTML = icon('chevron-up');
     headBtn.addEventListener('click', () => { expanded = !expanded; userToggled = true; paint(); });
+    tray.querySelector('[data-upl-retry-all]').addEventListener('click', retryAll);
     tray.querySelector('[data-upl-clear]').addEventListener('click', () => { for (let i = items.length - 1; i >= 0; i -= 1) if (['done', 'canceled'].includes(items[i].status)) items.splice(i, 1); changed(); });
     listEl.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-act]'); if (!b) return;
@@ -297,7 +312,7 @@
 
   function stateText(it) {
     if (it.status === 'queued') return 'na fila';
-    if (it.status === 'starting') return it.note || 'preparando…';
+    if (it.status === 'starting') return it.note || (it.resumed ? 'retomando…' : 'preparando…');
     if (it.status === 'sending') return it.note || `${Math.min(99, Math.round((bytesDone(it) / it.file.size) * 100))}%`;
     if (it.status === 'finishing') return 'finalizando…';
     if (it.status === 'done') return 'enviado';
@@ -328,6 +343,9 @@
       samples.length = 0;
     }
     tray.classList.toggle('is-error', !act.length && errs.length > 0);
+    const alertEl = tray.querySelector('[data-upl-alert]'); alertEl.textContent = blocked; alertEl.hidden = !blocked;
+    tray.querySelector('[data-upl-retry-all]').hidden = !errs.some((i) => !i.fatal) || errs.length < 2;
+    if (blocked && !act.length) titleEl.textContent = 'Armazenamento cheio: envios parados';
     headBtn.setAttribute('aria-expanded', String(expanded));
     bodyEl.hidden = !expanded;
     tray.classList.toggle('open', expanded);

@@ -61,6 +61,7 @@ const uploadPostState = {
   conversations: [],
 };
 
+let b2Full = false; // simula a conta do Backblaze sem espaço (Caps & Alerts)
 global.fetch = async (url, opts = {}) => {
   const u = String(url);
   if (u.startsWith('https://s3.test-region.backblazeb2.com/test-bucket/')) {
@@ -81,6 +82,7 @@ global.fetch = async (url, opts = {}) => {
       b2Multipart.set(id, { key, contentType: opts.headers['content-type'], parts: new Map() });
       return new Response(`<InitiateMultipartUploadResult><Bucket>test-bucket</Bucket><Key>${key}</Key><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`, { status: 200 });
     }
+    if (b2Full && method === 'PUT') return new Response('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Error><Code>AccessDenied</Code><Message>Cannot upload files, storage cap exceeded. See the Caps &amp; Alerts page to increase your cap.</Message></Error>', { status: 403 });
     if (method === 'PUT' && q.has('partNumber')) {
       const mp = b2Multipart.get(q.get('uploadId'));
       if (!mp) return new Response('<Error><Code>NoSuchUpload</Code></Error>', { status: 404 });
@@ -219,4 +221,4 @@ function client(base) {
   return api;
 }
 
-module.exports = { uploadPostCalls, uploadPostState, b2Store, b2Calls, b2Multipart, groqCalls, setGroqFail: (v) => { groqFail = v; }, db, config, mailer, resetDb, createUser, startServer, client, yourlsCalls, setCollisions: (n) => { collideNext = n; } };
+module.exports = { uploadPostCalls, uploadPostState, b2Store, b2Calls, b2Multipart, groqCalls, setGroqFail: (v) => { groqFail = v; }, setB2Full: (v) => { b2Full = v; }, db, config, mailer, resetDb, createUser, startServer, client, yourlsCalls, setCollisions: (n) => { collideNext = n; } };

@@ -352,6 +352,13 @@ Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`
 - **Visualizações**: combinações salvas de modo, tipos, responsável e concluídos. Da casa: **Tudo**, **Meu trabalho** (semana, só os meus e os do meu perfil, sem concluídos), **Produção** e **Dinheiro** (só para quem vê o financeiro). Qualquer pessoa salva as suas ("Salvar esta visualização" aparece quando os filtros não batem com nenhuma); **Gestão e Superadmin** (`calendar.share`) também compartilham com a equipe e apagam as dos outros. A visualização da equipe abre para cada perfil já limitada ao que ele enxerga.
 - O **assistente de IA** consulta o calendário (`calendario`): "o que tenho esta semana?".
 
+## Envio de material: repetidos, retomada e armazenamento cheio
+
+- **Arquivos repetidos**: ao escolher arquivos, o sistema confere pelo nome o que já existe no episódio. O que tinha parado no meio **continua de onde parou**; para os que já subiram inteiros, a pessoa escolhe **não enviar de novo** (padrão), **substituir** (o antigo sai só quando o novo termina) ou **manter os dois**.
+- **Não terminou**: envio sem nenhuma parte nova há 30 minutos aparece marcado; o card explica que basta escolher os mesmos arquivos de novo, e dá para descartar todos de uma vez (libera o espaço das partes no Backblaze).
+- **Armazenamento cheio**: quando a conta do Backblaze chega ao limite (painel do Backblaze > **Caps & Alerts**), o envio para com a explicação, a gestão recebe um aviso e "Tentar todos de novo" retoma depois que o limite for aumentado.
+- **Galeria**: botão no card do material abre a janela com as pastas, miniaturas de fotos e vídeos (geradas no servidor e guardadas no bucket) e visualização grande. Código: `src/services/previews.js`, rota `/episodios/:id/arquivos/:fid/previa`.
+
 ## Material do episódio em pastas
 
 No card do episódio, o **Material bruto** aparece em pastas (Vídeos do episódio, Áudios, Bastidores, Fotografias, Outros; só as que têm arquivo), com

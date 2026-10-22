@@ -274,9 +274,11 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   }
   tabs.push({ key: 'historico', label: 'Histórico' });
   const defaultTab = ep.status === 'em_revisao' ? 'revisao' : stageIndex >= finIdx ? 'finalizacao' : 'material';
+  files.rows.forEach((f) => { f.stalled = prod.isStalled(f); }); // envio que parou no meio: "não terminou"
   const edited = files.rows.filter((f) => f.kind === 'editado' && f.status === 'pronto');
   const latestEdited = edited[0] || null; // a mais nova primeiro
   res.render('episodes/show', {
+    mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: await withReviewFiles(comments.rows),
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
     epComments: await commentsSvc.list('episode', ep.id),
@@ -418,6 +420,14 @@ const ACCEPT = {
 const extOf = (name) => String(name).match(/\.([A-Za-z0-9]{1,6})$/)?.[1]?.toLowerCase() || '';
 
 const uploadError = (res, status, error) => res.status(status).json({ ok: false, error });
+// Backblaze sem espaço: 507 com código próprio (o navegador para a fila inteira em vez de insistir arquivo por arquivo).
+async function storageGuard(res, fn) {
+  try { return await fn(); } catch (err) {
+    if (err.code !== 'STORAGE_FULL') throw err;
+    await prod.storageFull();
+    return res.status(507).json({ ok: false, code: 'storage_full', error: prod.STORAGE_FULL_MSG });
+  }
+}
 
 async function loadFile(req) {
   if (!isIntId(req.params.id) || !isIntId(req.params.fid)) return null;
@@ -449,10 +459,48 @@ router.post('/episodios/:id/arquivos/iniciar', uploadAccess, wrap(async (req, re
   if (size > MAX_FILE) return uploadError(res, 400, 'Arquivo grande demais (limite de 200 GB).');
   const allowed = ACCEPT[kind];
   if (allowed && !allowed.includes(extOf(filename))) return uploadError(res, 400, `Formato não aceito para "${C.EPISODE_FILE_KINDS[kind]}" (${allowed.slice(0, 6).join(', ')}…).`);
-  const { file, partSize, totalParts } = await prod.startUpload({
-    episode: ep, kind, label: clean(req.body.rotulo, 80), filename, contentType: req.body.tipo, size, userId: req.user.id,
+  // "Substituir" um arquivo do mesmo episódio: envio que tinha parado sai já; arquivo completo só quando o novo terminar.
+  let replacesId = null;
+  if (req.body.substituir != null && req.body.substituir !== '') {
+    const { rows: [old] } = isIntId(String(req.body.substituir))
+      ? await db.query("SELECT * FROM episode_files WHERE id = $1 AND episode_id = $2 AND kind <> 'editado'", [req.body.substituir, ep.id]) : { rows: [] };
+    if (old && fileAccess(req.user, old.kind)) {
+      if (old.status === 'enviando') await prod.cancelUpload(old); else replacesId = old.id;
+    }
+  }
+  return storageGuard(res, async () => {
+    const { file, partSize, totalParts } = await prod.startUpload({
+      episode: ep, kind, label: clean(req.body.rotulo, 80), filename, contentType: req.body.tipo, size, userId: req.user.id, replacesId,
+    });
+    res.json({ ok: true, id: file.id, partSize, totalParts });
   });
-  res.json({ ok: true, id: file.id, partSize, totalParts });
+}));
+
+// Descartar os envios que pararam no meio (libera o espaço que as partes ocupam no Backblaze).
+router.post('/episodios/:id/arquivos/descartar-parados', requirePerm('production.upload'), wrap(async (req, res) => {
+  const ep = await findEpisode(req.params.id);
+  if (!ep) return notFound(res);
+  const { rows } = await db.query("SELECT * FROM episode_files WHERE episode_id = $1 AND kind <> 'editado' AND status = 'enviando'", [ep.id]);
+  const stalled = rows.filter((f) => prod.isStalled(f));
+  for (const f of stalled) await prod.cancelUpload(f);
+  if (stalled.length) await prod.addEvent(ep.id, req.user.id, 'arquivo', `${stalled.length} envio${stalled.length > 1 ? 's' : ''} que não terminaram foram descartados`);
+  await req.flash('ok', stalled.length ? `${stalled.length} envio${stalled.length > 1 ? 's descartados' : ' descartado'}.` : 'Nenhum envio parado para descartar.');
+  res.redirect(back(ep.id, '#material'));
+}));
+
+// O que já existe no material bruto (para a janela de envio reconhecer arquivos repetidos e envios que pararam no meio).
+router.get('/episodios/:id/arquivos/existentes', uploadAccess, wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return uploadError(res, 404, 'Episódio não encontrado.');
+  const { rows } = await db.query("SELECT id, kind, label, filename, size_bytes, status, part_size, created_at, last_part_at FROM episode_files WHERE episode_id = $1 AND kind <> 'editado' ORDER BY id", [req.params.id]);
+  const { rows: parts } = await db.query('SELECT p.file_id, count(*)::int AS n FROM episode_file_parts p JOIN episode_files f ON f.id = p.file_id WHERE f.episode_id = $1 GROUP BY p.file_id', [req.params.id]);
+  const got = Object.fromEntries(parts.map((p) => [p.file_id, p.n]));
+  res.json({
+    ok: true,
+    files: rows.map((f) => ({
+      id: f.id, kind: f.kind, label: f.label, name: f.filename, size: Number(f.size_bytes), status: f.status, stalled: prod.isStalled(f),
+      parts: got[f.id] || 0, totalParts: f.status === 'enviando' ? Math.max(1, Math.ceil(Number(f.size_bytes) / f.part_size)) : null,
+    })),
+  });
 }));
 
 router.put('/episodios/:id/arquivos/:fid/parte/:n', uploadAccess, express.raw({ type: () => true, limit: MAX_PART }), wrap(async (req, res) => {
@@ -463,24 +511,26 @@ router.put('/episodios/:id/arquivos/:fid/parte/:n', uploadAccess, express.raw({ 
   if (!Number.isInteger(n) || n < 1 || n > total) return uploadError(res, 400, 'Parte inválida.');
   const expected = n < total ? file.part_size : Number(file.size_bytes) - file.part_size * (total - 1);
   if (!Buffer.isBuffer(req.body) || req.body.length !== expected) return uploadError(res, 400, `A parte ${n} deveria ter ${expected} bytes e chegou com ${Buffer.isBuffer(req.body) ? req.body.length : 0}.`);
-  await prod.receivePart(file, n, req.body);
-  res.json({ ok: true });
+  return storageGuard(res, async () => { await prod.receivePart(file, n, req.body); res.json({ ok: true }); });
 }));
 
 router.get('/episodios/:id/arquivos/:fid/partes', uploadAccess, wrap(async (req, res) => {
   const file = await loadOwnFile(req);
   if (!file) return uploadError(res, 404, 'Arquivo não encontrado.');
   const { rows } = await db.query('SELECT part_number FROM episode_file_parts WHERE file_id = $1 ORDER BY part_number', [file.id]);
-  res.json({ ok: true, status: file.status, parts: rows.map((r) => r.part_number) });
+  res.json({ ok: true, status: file.status, parts: rows.map((r) => r.part_number), size: Number(file.size_bytes), partSize: file.part_size, totalParts: Math.max(1, Math.ceil(Number(file.size_bytes) / file.part_size)) });
 }));
 
 router.post('/episodios/:id/arquivos/:fid/concluir', uploadAccess, wrap(async (req, res) => {
   const file = await loadOwnFile(req);
   if (!file) return uploadError(res, 404, 'Arquivo não encontrado.');
   if (file.status === 'pronto') return res.json({ ok: true });
-  const result = await prod.finishUpload(file);
+  let result;
+  const sent = await storageGuard(res, async () => { result = await prod.finishUpload(file); });
+  if (!result) return sent;
   if (result.error) return uploadError(res, 409, result.error);
   const f = result.file;
+  if (result.replaced) await prod.addEvent(f.episode_id, req.user.id, 'arquivo', `Arquivo substituído: ${result.replaced.filename}`);
   if (f.kind === 'editado') { // o vídeo pilar do episódio só pode ser horizontal
     const check = await prod.checkEditedVideo(f);
     if (check.error) { await prod.deleteFile(f); return uploadError(res, 422, check.error); }
@@ -511,6 +561,16 @@ const redirectToFile = (inline) => wrap(async (req, res) => {
   res.set('Cache-Control', 'no-store').redirect(302, url);
 });
 router.get('/episodios/:id/arquivos/:fid/baixar', requirePerm('episodes.read'), redirectToFile(false));
+// Galeria: miniatura (t) ou visualização grande (p) de foto ou vídeo. Já guardada: link assinado; recém-gerada: a própria imagem.
+router.get('/episodios/:id/arquivos/:fid/previa', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const file = await loadFile(req);
+  if (!file) return res.status(404).end();
+  const size = req.query.t === 'p' ? 'p' : 't';
+  const out = await require('../services/previews').get(file, size);
+  if (!out) return res.status(404).end();
+  if (out.url) return res.set('Cache-Control', 'private, max-age=3600').redirect(302, out.url);
+  res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' }).send(out.buf);
+}));
 router.get('/episodios/:id/arquivos/:fid/ver', requirePerm('episodes.read'), redirectToFile(true));
 
 router.post('/episodios/:id/arquivos/:fid/excluir', uploadAccess, wrap(async (req, res) => {
