@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.23.2', date: '2026-10-22', title: 'Baixar a capa depois de editar',
+    items: [
+      { kind: 'correcao', text: 'Baixar uma capa logo depois de editá-la podia abrir uma página de erro ("NoSuchKey"): o navegador reaproveitava o endereço da imagem antiga, que é apagada ao salvar a edição. Agora o Baixar sempre pega a versão atual.' },
+    ],
+  },
+  {
     version: '1.23.1', date: '2026-10-22', title: 'Miniaturas da galeria mais leves',
     items: [
       { kind: 'ajuste', text: 'As miniaturas das fotos e vídeos agora são feitas pelo seu próprio navegador logo depois do envio, a partir do arquivo que você já tem: o servidor não baixa nada do armazenamento para isso. Fotos do iPhone (HEIC) ganham miniatura quando enviadas pelo Safari.' },

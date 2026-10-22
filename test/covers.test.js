@@ -278,6 +278,23 @@ describe('capas e posts do episódio (rotas, B2 e permissões)', () => {
     assert.equal((await as.gestao.get(`/episodios/abc/capas/${c.id}/imagem`)).status, 404);
   });
 
+  it('capa editada: "Baixar" e links sem versão nunca ficam guardados no navegador (o arquivo antigo é apagado ao editar)', async () => {
+    const [c] = await covers();
+    const v = new Date(c.updated_at).getTime();
+    const shown = await as.gestao.get(`/episodios/${ep.id}/capas/${c.id}/imagem?v=${v}`);
+    assert.match(shown.headers.get('cache-control'), /max-age=600/, 'miniatura com a versão atual pode ficar no cache');
+    assert.equal((await as.gestao.get(`/episodios/${ep.id}/capas/${c.id}/imagem?baixar=1`)).headers.get('cache-control'), 'no-store');
+    assert.equal((await as.gestao.get(`/episodios/${ep.id}/capas/${c.id}/imagem`)).headers.get('cache-control'), 'no-store');
+    assert.equal((await as.gestao.get(`/episodios/${ep.id}/capas/${c.id}/imagem?v=${v - 1000}`)).headers.get('cache-control'), 'no-store', 'versão velha (página aberta antes da edição) não é guardada');
+    // editar troca o arquivo: o próximo "Baixar" aponta para o novo, que existe
+    const store = require('../src/services/coverStore');
+    const { row } = await store.updateCover(c, c.spec, c.ctx, null);
+    assert.equal(h.b2Store.has(c.storage_key), false, 'o arquivo antigo saiu do bucket');
+    const d = await as.gestao.get(`/episodios/${ep.id}/capas/${c.id}/imagem?baixar=1`);
+    const key = decodeURIComponent(new URL(d.location).pathname).replace(/^\/[^/]+\//, '');
+    assert.equal(key, row.storage_key); assert.ok(h.b2Store.has(key));
+  });
+
   it('permissões: produtora não gera nem edita; editor edita mas não aprova; só gestão aprova', async () => {
     const [c] = await covers();
     const prodGen = await as.prod.post(`/episodios/${ep.id}/capas/gerar`, { _csrf: await as.prod.csrf('/episodios') });

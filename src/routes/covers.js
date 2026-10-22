@@ -39,7 +39,11 @@ router.get(both('/imagem'), requirePerm('episodes.read'), wrap(async (req, res) 
   if (!c) return notFound(res);
   const { rows: [ep] } = c.episode_id ? await db.query('SELECT number FROM episodes WHERE id = $1', [c.episode_id]) : { rows: [] };
   const url = await b2.presignGet(c.storage_key, { expires: 3600, download: req.query.baixar === '1' ? fileName(ep, c) : null });
-  res.set('Cache-Control', 'private, max-age=60').redirect(302, url);
+  // A capa muda de arquivo quando é editada (o antigo é apagado do bucket). Só dá para guardar o redirecionamento no navegador
+  // quando o endereço traz a versão atual (?v=updated_at); "Baixar" e links sem versão perguntam sempre, para nunca cair no
+  // arquivo antigo ("NoSuchKey").
+  const current = String(req.query.v || '') === String(new Date(c.updated_at).getTime()) && req.query.baixar !== '1';
+  res.set('Cache-Control', current ? 'private, max-age=600' : 'no-store').redirect(302, url);
 }));
 
 router.post('/episodios/:id/capas/gerar', requirePerm('episodes.read'), wrap(async (req, res) => {
