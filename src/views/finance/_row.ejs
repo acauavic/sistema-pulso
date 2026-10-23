@@ -1,0 +1,35 @@
+<%# Uma linha de lançamento. Variáveis: e (lançamento), here (para voltar), history (bool). %>
+<%
+  var late = e.status === 'previsto' && e.due_on < today;
+  var isIn = e.direction === 'entrada';
+  var eJson = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
+  var brl = function (c) { return (Number(c) / 100).toFixed(2).replace('.', ','); };
+  var links = [];
+  if (e.episode_id) links.push('<a href="/episodios/' + e.episode_id + '#financeiro">' + (e.episode_number ? 'EP.' + String(e.episode_number).padStart(3, '0') : 'Episódio') + '</a>');
+  else if (e.guest_name) links.push('<a href="/convidados/' + e.guest_id + '">' + fmt.escHtml(e.guest_name) + '</a>');
+  if (e.sponsor_id && e.sponsor_name) links.push('<a href="/patrocinadores/' + e.sponsor_id + '#financeiro">' + fmt.escHtml(e.sponsor_name) + '</a>');
+%>
+<li class="fin-row<%= e.status === 'cancelado' ? ' is-off' : '' %>">
+  <div class="plan-list-main">
+    <strong><%= e.description %></strong>
+    <span class="small muted"><%= C.FIN_CATEGORIES[e.category] || e.category %><%= e.supplier ? ' · ' + e.supplier : '' %><% if (links.length) { %> · <%- links.join(' · ') %><% } %><%= e.auto_key ? ' · automático' : '' %></span>
+  </div>
+  <span class="fin-when mono small <%= late ? 'err' : 'muted' %>">
+    <% if (e.status === 'pago') { %><%= fmt.formatDayShort(e.paid_on) %> · <%= isIn ? 'recebido' : 'pago' %><% } else if (e.status === 'cancelado') { %>cancelado<% } else { %><%= fmt.formatDayShort(e.due_on) %><%= late ? ' · atrasado' : '' %><% } %>
+  </span>
+  <span class="fin-amt mono"><%= isIn ? '+' : '−' %> <%= money(e.amount_cents) %></span>
+  <span class="plan-list-tools">
+    <% if (can('finance.write')) { %>
+      <% if (e.status === 'previsto') { %>
+        <button class="btn sm" type="button" data-fill-modal="modal-pagar" data-fill-mode="<%= e.direction %>" data-fill-action="/financeiro/lancamentos/<%= e.id %>/pagar" data-fill='<%- eJson({ _label: e.description, amount: brl(e.amount_cents), paid_on: today, voltar: here }) %>'><%= isIn ? 'Receber' : 'Pagar' %></button>
+        <button class="btn sm ghost" type="button" aria-label="Editar <%= e.description %>" data-fill-modal="modal-lanc" data-fill-mode="edit" data-fill-action="/financeiro/lancamentos/<%= e.id %>"
+          <% if (!e.auto_key) { %>data-fill-remove="/financeiro/lancamentos/<%= e.id %>/excluir" data-fill-remove-label="Excluir lançamento" data-fill-confirm="Excluir este lançamento?"<% } else { %>data-fill-remove="/financeiro/lancamentos/<%= e.id %>/cancelar" data-fill-remove-label="Cancelar este custo" data-fill-confirm="Cancelar este custo automático? Ele não volta sozinho."<% } %>
+          data-fill='<%- eJson({ description: e.description, amount: brl(e.amount_cents), due_on: e.due_on, category: e.category, supplier: e.supplier || '', notes: e.notes || '', episode_id: e.episode_id ? String(e.episode_id) : '', sponsor_id: e.sponsor_id ? String(e.sponsor_id) : '', voltar: here }) %>'><%- icon('pencil', 14) %></button>
+      <% } else if (e.status === 'pago') { %>
+        <form method="post" action="/financeiro/lancamentos/<%= e.id %>/desfazer" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= here %>"><button class="link small" type="submit">Desfazer</button></form>
+      <% } else { %>
+        <span class="badge b-st-cancelado">Cancelado</span>
+      <% } %>
+    <% } %>
+  </span>
+</li>

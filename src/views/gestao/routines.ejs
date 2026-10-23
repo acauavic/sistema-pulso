@@ -1,0 +1,56 @@
+<%- include('../partials/head') %>
+<%
+  var byTrigger = {}; routines.forEach(function (r) { (byTrigger[r.trigger] = byTrigger[r.trigger] || []).push(r); });
+  var describe = function (r) { return (r.offset_days === 0 ? 'no dia' : (r.offset_days > 0 ? r.offset_days + ' dia' + (Math.abs(r.offset_days) > 1 ? 's' : '') + ' depois' : Math.abs(r.offset_days) + ' dia' + (Math.abs(r.offset_days) > 1 ? 's' : '') + ' antes')) + ' ' + ({ gatilho: 'do gatilho', gravacao: 'da gravação', veiculacao: 'da veiculação' })[r.anchor]; };
+  var form = function (r) { r = r || { trigger: 'episodio_criado', kind: 'geral', anchor: 'gatilho', offset_days: 0, assignee_mode: 'ninguem', active: true }; %>
+  <div class="row">
+    <label>Quando criar<select name="trigger"><% Object.keys(C.ROUTINE_TRIGGERS).forEach(function (k) { %><option value="<%= k %>" <%= r.trigger === k ? 'selected' : '' %>><%= C.ROUTINE_TRIGGERS[k] %></option><% }) %></select></label>
+    <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>" <%= r.kind === k ? 'selected' : '' %>><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
+  </div>
+  <label>Tarefa<input type="text" name="title" value="<%= r.title || '' %>" maxlength="200" required placeholder="Ex.: Revisar o vídeo editado"></label>
+  <label>Detalhes <small class="muted">(opcional)</small><textarea name="description" rows="2" maxlength="2000"><%= r.description || '' %></textarea></label>
+  <div class="row">
+    <label>Vence em (dias)<input type="number" name="offset_days" value="<%= r.offset_days %>" min="-365" max="365" step="1"></label>
+    <label>Contando<select name="anchor"><% Object.keys(C.ROUTINE_ANCHORS).forEach(function (k) { %><option value="<%= k %>" <%= r.anchor === k ? 'selected' : '' %>><%= C.ROUTINE_ANCHORS[k] %></option><% }) %></select></label>
+  </div>
+  <div class="row">
+    <label>Responsável<select name="assignee_mode"><% Object.keys(C.ROUTINE_ASSIGNEES).forEach(function (k) { %><option value="<%= k %>" <%= r.assignee_mode === k ? 'selected' : '' %>><%= C.ROUTINE_ASSIGNEES[k] %></option><% }) %></select></label>
+    <label>Pessoa fixa <small class="muted">(se escolher "uma pessoa fixa")</small><select name="assignee_id"><option value="">—</option><% users.forEach(function (u) { %><option value="<%= u.id %>" <%= r.assignee_id === u.id ? 'selected' : '' %>><%= u.name %></option><% }) %></select></label>
+  </div>
+  <label class="check"><input type="checkbox" name="active" value="1" <%= r.active ? 'checked' : '' %>> Ativa</label>
+<% }; %>
+<div class="page-head"><div><span class="kicker">Gestão</span><h1>Rotinas de tarefas</h1></div>
+  <div class="row"><button class="btn primary" type="button" data-modal-open="modal-routine-new"><%- icon('plus') %> Nova rotina</button></div></div>
+<%- include('../partials/gestao-nav', { active: 'rotinas' }) %>
+<p class="lead">Tarefas que nascem sozinhas em momentos da produção, já com responsável e vencimento padrão. O vencimento de cada tarefa continua editável na própria tarefa; mudar a rotina vale para os próximos episódios.</p>
+<% if (!routines.length) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma rotina.</strong></p></div><% } %>
+<% Object.keys(C.ROUTINE_TRIGGERS).forEach(function (trig) { var list = byTrigger[trig]; if (!list) return; %>
+<section class="card top-gap">
+  <h2><%= C.ROUTINE_TRIGGERS[trig] %></h2>
+  <ul class="plain routine-list">
+    <% list.forEach(function (r) { %>
+    <li class="<%= r.active ? '' : 'off' %>">
+      <% if (editing === r.id) { %>
+      <form method="post" action="/gestao/rotinas/<%= r.id %>" class="stack"><input type="hidden" name="_csrf" value="<%= csrf %>"><% form(r) %>
+        <div class="row"><button class="btn primary sm" type="submit">Salvar</button><a class="btn ghost sm" href="/gestao/rotinas">Cancelar</a></div></form>
+      <% } else { %>
+      <div class="routine-row">
+        <div><strong><%= r.title %></strong> <span class="badge b-gray"><%= C.TASK_KINDS[r.kind] %></span><% if (!r.active) { %> <span class="badge b-gray">pausada</span><% } %>
+          <p class="small muted">Vence <%= describe(r) %> · <%= r.assignee_mode === 'usuario' ? (r.assignee_name || 'pessoa removida') : C.ROUTINE_ASSIGNEES[r.assignee_mode].toLowerCase() %> · <span class="mono"><%= r.created %></span> tarefas criadas</p></div>
+        <div class="row"><a class="btn sm" href="/gestao/rotinas?editar=<%= r.id %>">Editar</a>
+          <form method="post" action="/gestao/rotinas/<%= r.id %>/excluir" class="inline" data-confirm="Excluir esta rotina? As tarefas já criadas continuam."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger" type="submit">excluir</button></form></div>
+      </div>
+      <% } %>
+    </li>
+    <% }) %>
+  </ul>
+</section>
+<% }) %>
+<dialog class="modal" id="modal-routine-new" aria-labelledby="nr-h">
+  <form method="post" action="/gestao/rotinas" class="stack"><input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="nr-h">Nova rotina</h2><% form() %>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar rotina</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

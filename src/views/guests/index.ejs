@@ -6,13 +6,16 @@
       <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/convidados?view=quadro&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>"><%- icon('columns-3') %> Quadro</a>
       <a class="<%= view === 'lista' ? 'on' : '' %>" href="/convidados?view=lista&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>"><%- icon('list') %> Lista</a>
     </div>
-    <% if (can('guests.write')) { %><a class="btn primary" href="/convidados/novo"><%- icon('plus') %> Novo convidado</a><% } %>
+    <% if (can('guests.write')) { %>
+    <a class="btn" href="/convidados/importar"><%- icon('file-text') %> Importar CSV</a>
+    <a class="btn primary" href="/convidados/novo"><%- icon('plus') %> Novo convidado</a>
+    <% } %>
   </div>
 </div>
 
 <form method="get" action="/convidados" class="filters">
   <input type="hidden" name="view" value="<%= view %>">
-  <input type="search" name="q" value="<%= q %>" placeholder="Buscar nome, e-mail, empresa ou tema">
+  <input type="search" name="q" value="<%= q %>" placeholder="Buscar nome, Instagram, e-mail ou tema">
   <select name="owner">
     <option value="">Todos os responsáveis</option>
     <option value="eu" <%= ownerFilter === 'eu' ? 'selected' : '' %>>Só os meus</option>
@@ -24,6 +27,7 @@
     <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
   </select>
   <% } %>
+  <% if (followupCount || followupOnly) { %><label class="check"><input type="checkbox" name="followup" value="1" <%= followupOnly ? 'checked' : '' %> data-autosubmit> Só follow-ups pendentes (<%= followupCount %>)</label><% } %>
   <button class="btn" type="submit">Filtrar</button>
 </form>
 
@@ -36,13 +40,15 @@
       <% col.guests.forEach(function (g) { %>
       <a class="kcard" href="/convidados/<%= g.id %>" data-guest-id="<%= g.id %>" draggable="<%= can('guests.write') ? 'true' : 'false' %>">
         <strong><%= g.name %></strong>
-        <% if (g.company || g.job_title) { %><span class="muted small"><%= [g.job_title, g.company].filter(Boolean).join(' · ') %></span><% } %>
-        <% if (g.topic) { %><span class="small" style="color:var(--text-2)"><%= g.topic %></span><% } %>
+        <% if (g.instagram || g.profile) { %><span class="muted small handle"><%= [g.instagram ? '@' + g.instagram : '', g.profile ? profileLabels[g.profile].label : ''].filter(Boolean).join(' · ') %></span><% } %>
+        <% if (g.topic) { %><span class="small topic"><%= g.topic %></span><% } %>
         <span class="meta small muted">
+          <% if (g.status === 'perdido' && g.loss_reason) { %><span class="mono"><%= lossReasons[g.loss_reason] %></span><% } %>
           <% if (g.proposed_at) { %><span><%- icon('calendar', 12) %><%= fmt.shortDate(g.proposed_at) %></span><% } %>
+          <% if (g.outreach && g.outreach.state !== 'respondeu') { %><span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %>
           <% if (g.invite_viewed_at) { %><span><%- icon('eye', 12) %>visto</span><% } else if (g.invite_sent_at) { %><span><%- icon('send', 12) %>enviado</span><% } else if (g.invite_token) { %><span><%- icon('link', 12) %>link pronto</span><% } %>
         </span>
-        <% if (g.owner_name) { %><span class="owner small"><%= g.owner_name %></span><% } %>
+        <span class="card-foot"><%- include('../partials/dot', { type: 'guest', id: g.id, user: g.owner_id ? { id: g.owner_id, name: g.owner_name } : null, editable: can('guests.write'), inLink: true }) %></span>
       </a>
       <% }) %>
     </div>
@@ -50,23 +56,88 @@
   <% }) %>
 </div>
 <% } else { %>
+<% var canBulk = can('guests.write') && guests.length > 0; %>
+<% if (canBulk) { %>
+<div data-bulk>
+  <p class="small muted" data-bulk-hint>Marque os convidados para mudar etapa, responsável, perfil, gênero ou patrocinador de vários de uma vez.</p>
+  <div class="bulk-bar" data-bulk-bar hidden>
+    <strong><span data-bulk-count class="mono">0</span> selecionado(s)</strong>
+    <div class="row">
+      <button class="btn primary sm" type="button" data-modal-open="modal-massa">Editar em massa</button>
+      <button class="link small" type="button" data-bulk-clear>Limpar seleção</button>
+    </div>
+  </div>
+</div>
+<% } %>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Convidado</th><th>Tema</th><th>Etapa</th><th>Gravação</th><th>Convite</th><th>Responsável</th></tr></thead>
+  <thead><tr><% if (canBulk) { %><th class="check-col"><input type="checkbox" data-bulk-all aria-label="Marcar todos os convidados da lista"></th><% } %><th>Convidado</th><th>Perfil</th><th>Etapa</th><th>Gravação</th><th>Convite</th><th>Responsável</th></tr></thead>
   <tbody>
-    <% if (!guests.length) { %><tr><td colspan="6"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum convidado por aqui ainda</strong><span>Cadastre o primeiro convidado ou ajuste os filtros.</span></div></td></tr><% } %>
+    <% if (!guests.length) { %><tr><td colspan="<%= canBulk ? 7 : 6 %>"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum convidado por aqui ainda</strong><span>Cadastre o primeiro convidado ou ajuste os filtros.</span></div></td></tr><% } %>
     <% guests.forEach(function (g) { %>
     <tr>
-      <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a><br><span class="muted small"><%= [g.job_title, g.company].filter(Boolean).join(' · ') %></span></td>
-      <td><%= g.topic || '—' %></td>
+      <% if (canBulk) { %><td class="check-col"><input type="checkbox" form="form-massa" name="ids" value="<%= g.id %>" data-bulk-pick aria-label="Marcar <%= g.name %>"></td><% } %>
+      <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a><br><span class="muted small handle"><%= g.instagram ? '@' + g.instagram : '' %></span><% if (g.outreach && g.outreach.state !== 'respondeu') { %> <span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %></td>
+      <td><%= g.profile ? profileLabels[g.profile].label : '—' %></td>
       <td><span class="badge b-st-<%= g.status %>"><%= statuses.find(function (s) { return s.key === g.status; }).label %></span></td>
       <td class="nowrap mono"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : '—' %></td>
       <td class="small"><%= g.invite_viewed_at ? 'Visto' : g.invite_sent_at ? 'Enviado' : g.invite_token ? 'Link pronto' : '—' %></td>
-      <td><%= g.owner_name || '—' %></td>
+      <td><%- include('../partials/dot', { type: 'guest', id: g.id, user: g.owner_id ? { id: g.owner_id, name: g.owner_name } : null, editable: can('guests.write'), label: true }) %></td>
     </tr>
     <% }) %>
   </tbody>
 </table>
 </div>
+<% if (canBulk) { %>
+<dialog class="modal" id="modal-massa" aria-labelledby="m-massa-h">
+  <form method="post" action="/convidados/em-massa" id="form-massa" class="stack" data-bulk-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="m-massa-h">Editar <span data-bulk-count class="mono">0</span> convidado(s)</h2>
+    <p class="small muted">Só muda o que você escolher. Em branco, fica como está.</p>
+    <label>Etapa
+      <select name="status" data-bulk-status>
+        <option value="">Não alterar</option>
+        <% bulkStatuses.forEach(function (s) { %><option value="<%= s.key %>"><%= s.label %></option><% }) %>
+      </select>
+    </label>
+    <p class="small muted">Agendado e Gravado pedem os dados de cada convidado: mude um a um. Quem não tiver o que a etapa exige (contato, foto) fica onde está e aparece no resultado.</p>
+    <div class="stack" data-bulk-loss hidden>
+      <label>Motivo da perda
+        <select name="loss_reason" data-loss-select>
+          <option value="">Escolha o motivo</option>
+          <% Object.keys(lossReasons).forEach(function (k) { %><option value="<%= k %>"><%= lossReasons[k] %></option><% }) %>
+        </select>
+      </label>
+      <label data-loss-note hidden>Qual o motivo?<input type="text" name="loss_note" maxlength="500"></label>
+    </div>
+    <label>Responsável
+      <select name="owner_id">
+        <option value="">Não alterar</option>
+        <option value="nenhum">Sem responsável</option>
+        <% owners.forEach(function (o) { %><option value="<%= o.id %>"><%= o.name %></option><% }) %>
+      </select>
+    </label>
+    <div class="row-2">
+      <label>Perfil
+        <select name="profile"><option value="">Não alterar</option><% profiles.forEach(function (p) { %><option value="<%= p.key %>"><%= p.label %></option><% }) %></select>
+      </label>
+      <label>Gênero
+        <select name="gender"><option value="">Não alterar</option><% genders.forEach(function (gd) { %><option value="<%= gd[0] %>"><%= gd[1] %></option><% }) %></select>
+      </label>
+    </div>
+    <label>Patrocinador
+      <select name="sponsor_id" data-bulk-sponsor>
+        <option value="">Não alterar</option>
+        <option value="nenhum">Desvincular</option>
+        <% sponsors.forEach(function (s) { %><option value="<%= s.id %>"><%= s.company %></option><% }) %>
+      </select>
+    </label>
+    <label data-bulk-relation hidden>Quem são
+      <select name="sponsor_relation"><option value="indicado">Indicados pelo patrocinador</option><option value="representante">Pessoas do patrocinador</option></select>
+    </label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Aplicar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <% } %>
 <%- include('../partials/foot') %>

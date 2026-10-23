@@ -1,0 +1,41 @@
+<%# Capas e posts do episódio. Variáveis: ep, covers, perm, csrf, C, fmt %>
+<% var designers = perm.review || perm.edit; var approvers = perm.review;
+   var KINDS = { youtube_thumb: 'Thumbnails do YouTube' };
+   var order = ['youtube_thumb']; %>
+<div id="capas" class="capas">
+  <div class="row spread">
+    <span class="small muted"><%= covers.length ? 'Aprove uma opção para usar na publicação.' : '' %></span>
+    <% if (designers && aiReady && frames.length) { %>
+    <form method="post" action="/episodios/<%= ep.id %>/capas/gerar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kinds" value="youtube_thumb"><button class="btn sm" type="submit"><%= covers.length ? 'Gerar de novo' : 'Gerar thumbnails' %></button></form>
+    <% } %>
+  </div>
+  <% if (!covers.length) { %>
+    <p class="muted small">Depois da análise por IA o sistema monta 3 opções de thumbnail, sem texto sobre rosto nem sobre legenda. Escolha e aprove uma (obrigatório para finalizar). Posts e carrosséis ficam em Conteúdo.</p>
+  <% } %>
+  <% order.forEach(function (kind) { var list = covers.filter(function (c) { return c.kind === kind; }); if (!list.length) return; %>
+  <div class="cover-grid cover-<%= kind %>">
+    <% list.forEach(function (c) { var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
+    <figure class="cover-card <%= c.approved ? 'approved' : '' %>">
+      <a href="/episodios/<%= ep.id %>/capas/<%= c.id %>/imagem" target="_blank" rel="noopener"><img src="/episodios/<%= ep.id %>/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
+      <figcaption>
+        <span class="small"><%= c.label || '' %></span>
+        <span class="row small">
+          <% if (c.approved) { %><span class="badge b-green">aprovada</span><% } %>
+          <% if (!c.auto) { %><span class="badge b-gray">editada</span><% } %>
+          <% if (issues) { %><span class="badge b-red" title="<%= (l.issues || []).join(' ') %>"><%= issues %> problema(s)</span><% } else if (warns) { %><span class="badge b-amber" title="<%= (l.warnings || []).join(' ') %>"><%= warns %> aviso(s)</span><% } else { %><span class="badge b-gray">conferida</span><% } %>
+          <span class="handle muted"><%= c.width %>×<%= c.height %> · <%= fmt.formatBytes(c.size_bytes) %></span>
+        </span>
+        <span class="row">
+          <a class="link small" href="/episodios/<%= ep.id %>/capas/<%= c.id %>/imagem?baixar=1">baixar</a>
+          <% if (designers) { %><a class="btn sm" href="/episodios/<%= ep.id %>/capas/<%= c.id %>/editar">Editar</a><% } %>
+          <% if (approvers) { %>
+          <form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/aprovar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="aprovar" value="<%= c.approved ? '0' : '1' %>"><button class="btn sm" type="submit"><%= c.approved ? 'Tirar aprovação' : 'Aprovar' %></button></form>
+          <% } %>
+          <% if (designers) { %><form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/excluir" class="inline" data-confirm="Excluir esta imagem?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">excluir</button></form><% } %>
+        </span>
+      </figcaption>
+    </figure>
+    <% }) %>
+  </div>
+  <% }) %>
+</div>

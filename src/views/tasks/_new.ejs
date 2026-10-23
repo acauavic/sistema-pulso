@@ -1,0 +1,33 @@
+<%# Janela "Nova tarefa". Variáveis: users, episodes, guests, sponsors, prefill, back %>
+<dialog class="modal modal-wide" id="modal-task-new" aria-labelledby="nt-h" <%= openNew ? 'data-open-on-load' : '' %>>
+  <form method="post" action="/tarefas" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= back %>">
+    <h2 id="nt-h">Nova tarefa</h2>
+    <% if (voiceReady) { %>
+    <div class="voice-bar" data-voice data-url="/tarefas/voz">
+      <button class="btn sm" type="button" data-voice-btn><span data-voice-ic="mic"><%- icon('mic', 16) %></span><span data-voice-ic="stop" hidden><%- icon('square', 14) %></span> <span data-voice-label>Falar a tarefa</span></button>
+      <span class="small muted" data-voice-status>Diga o que precisa ser feito, para quem e até quando. A IA organiza nos campos abaixo.</span>
+    </div>
+    <details class="small" data-voice-heard hidden><summary>O que eu ouvi</summary><p class="muted" data-voice-text></p></details>
+    <% } %>
+    <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="Ex.: confirmar a pauta com o convidado"></label>
+    <div class="field"><span class="field-label">Detalhes <small class="muted">(opcional)</small></span>
+      <%- include('../partials/rich-editor', { name: 'description_html', attach: 'attachment_ids', placeholder: 'Descreva a tarefa. Cole imagens com Ctrl+V, anexe PDF, HTML ou ZIP, monte tabelas…', label: 'Detalhes da tarefa', size: 'sm' }) %>
+    </div>
+    <div class="row">
+      <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>" <%= u.id === currentUser.id ? 'selected' : '' %>><%= u.name %></option><% }) %></select></label>
+      <label>Vence em<input type="date" name="due_on"></label>
+      <label>Hora<input type="time" name="due_time" title="Sem data, a hora vale para hoje"></label>
+      <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
+    </div>
+    <details <%= prefill.episode_id || prefill.guest_id || prefill.sponsor_id ? 'open' : '' %>>
+      <summary>Ligar a um episódio, convidado ou patrocinador</summary>
+      <div class="row top-gap">
+        <label>Episódio<select name="episode_id"><option value="">—</option><% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= String(prefill.episode_id) === String(e.id) ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %></select></label>
+        <label>Convidado<select name="guest_id"><option value="">—</option><% guests.forEach(function (g) { %><option value="<%= g.id %>" <%= String(prefill.guest_id) === String(g.id) ? 'selected' : '' %>><%= g.name %></option><% }) %></select></label>
+        <label>Patrocinador<select name="sponsor_id"><option value="">—</option><% sponsors.forEach(function (s) { %><option value="<%= s.id %>" <%= String(prefill.sponsor_id) === String(s.id) ? 'selected' : '' %>><%= s.company %></option><% }) %></select></label>
+      </div>
+    </details>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar tarefa</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>

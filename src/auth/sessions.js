@@ -38,19 +38,26 @@ function clearCookie(res) {
 }
 
 // Resolve o usuário da sessão. Desativado/sem senha = sem sessão.
-async function loadSession(req) {
+// Sessão em uso se renova (com `res`): passada a metade do prazo, ganha mais `sessionDays`. Quem usa o app instalado
+// no celular todo dia não cai no login; sessão parada por `sessionDays` expira como antes.
+async function loadSession(req, res = null) {
   const token = parseCookies(req.headers.cookie)[COOKIE];
   if (!token) return null;
   const tokenHash = sha256(token);
+  const maxAge = config.sessionDays * 86400;
   const { rows } = await db.query(
-    `SELECT s.token_hash, s.flash,
+    `SELECT s.token_hash, s.flash, s.expires_at < now() + ($2 || ' seconds')::interval AS renew,
             u.id, u.name, u.email, u.role, u.active
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()`,
-    [tokenHash],
+    [tokenHash, String(Math.floor(maxAge / 2))],
   );
   const row = rows[0];
   if (!row || !row.active) return null;
+  if (row.renew && res) {
+    await db.query("UPDATE sessions SET expires_at = now() + ($2 || ' seconds')::interval WHERE token_hash = $1", [tokenHash, String(maxAge)]);
+    res.append('Set-Cookie', `${COOKIE}=${encodeURIComponent(token)}; Max-Age=${maxAge}; ${cookieOptions()}`);
+  }
   return {
     tokenHash: row.token_hash,
     flash: row.flash,

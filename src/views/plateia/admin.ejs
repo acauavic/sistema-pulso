@@ -1,0 +1,373 @@
+<%- include('../partials/head') %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var pct = function (a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
+  var waLink = function (phone) { return 'https://wa.me/' + String(phone).replace(/\D/g, ''); };
+  var tabs = [{ key: 'inscricoes', label: 'Pedidos', n: counts.novos }, { key: 'agenda', label: 'Agenda', n: agenda.length }, { key: 'resultados', label: 'Resultados' }];
+  if (canManage) tabs.push({ key: 'ajustes', label: 'Ajustes' });
+  var here = '/plateia/painel' + (view === 'quadro' || guestFilter ? '?' + [view === 'quadro' ? 'vista=quadro' : '', guestFilter ? 'convidado=' + guestFilter : ''].filter(Boolean).join('&') : '');
+  var qs = function (over) { var o = Object.assign({ vista: view, convidado: guestFilter || '', status: statusFilter, q: q, origem: origin }, over || {}); return '/plateia/painel?' + Object.keys(o).filter(function (k) { return o[k]; }).map(function (k) { return k + '=' + encodeURIComponent(o[k]); }).join('&'); };
+  var COLS = [['novo', 'b-gray'], ['em_atendimento', 'b-amber'], ['confirmado', 'b-green'], ['nao_selecionado', 'b-gray'], ['desistiu', 'b-red']];
+  var brl = function (c) { return (Number(c) / 100).toFixed(2).replace('.', ','); };
+  var fillJson = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
+  var todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+%>
+<div class="page-head">
+  <div><span class="kicker">Pulso Podcast com Plateia</span><h1>Plateia</h1></div>
+  <div class="row">
+    <button class="btn primary" type="button" data-copy="<%= publicUrl %>"><%- icon('copy') %> Copiar link da página</button>
+    <a class="btn" href="/plateia" target="_blank" rel="noopener"><%- icon('external-link') %> Ver a página</a>
+  </div>
+</div>
+<p class="lead">A agenda da página sai sozinha dos convidados <strong>Agendados</strong> com data futura. Para tirar alguém, desmarque "Aberto para plateia" no card do convidado.</p>
+<% if (!s.active) { %><p class="notice small">A página está <strong>pausada</strong>: ninguém consegue se inscrever. <% if (canManage) { %>Reative em Ajustes.<% } %></p><% } %>
+<% if (!s.whatsapp) { %><p class="notice small">O WhatsApp da produtora ainda não foi informado: a inscrição é registrada, mas a pessoa não é levada ao WhatsApp. <% if (canManage) { %>Informe em Ajustes.<% } %></p><% } %>
+
+<div class="tabs-wrap" data-tabs data-default="inscricoes">
+  <div class="tabbar" role="tablist" aria-label="Plateia">
+    <% tabs.forEach(function (t) { %><button type="button" role="tab" data-tab-btn="<%= t.key %>" aria-controls="pane-<%= t.key %>"><%= t.label %><% if (t.n) { %> <span class="count"><%= t.n %></span><% } %></button><% }) %>
+  </div>
+
+  <div class="pane" id="pane-inscricoes" data-pane-id="inscricoes">
+    <%
+      var filtersOn = Boolean(q || guestFilter || statusFilter || origin);
+      var natPhone = function (l) { var c = COUNTRY_BY_CODE[l.country]; var p = String(l.phone || '').replace(/^\+/, ''); return c && p.indexOf(c.dial) === 0 ? p.slice(c.dial.length) : p; };
+      var linkOpen = function (l) { return l.link_url && l.link_status === 'aberto' && ['novo', 'em_atendimento'].indexOf(l.status) >= 0; };
+      var waHref = function (l) {
+        var base = waLink(l.phone);
+        if (!linkOpen(l)) return base;
+        return base + '?text=' + encodeURIComponent('Oi, ' + l.name.split(' ')[0] + '! Seu pedido para a plateia do Pulso Podcast com ' + l.guest_name + ' foi avaliado. O pagamento da vaga (' + fmtMoney(l.link_amount) + ') é por este link: ' + l.link_url + ' . Qualquer dúvida, é só chamar por aqui.');
+      };
+      var origin_ = function (l) { return l.added_by ? 'Adicionada pela equipe' : (l.utm_source ? 'Página · ' + l.utm_source + (l.utm_campaign ? ' / ' + l.utm_campaign : '') : 'Página · direto'); };
+      var editJson = function (l) { return fillJson({ _label: l.name, _origin: origin_(l), name: l.name, country: l.country || 'BR', phone: natPhone(l), guest_id: String(l.guest_id || ''), notes: l.notes || '', voltar: here }); };
+      var payChips = function (l) { %>
+        <% if (l.status === 'confirmado' && isExempt(l)) { %><span class="badge b-gray">isento</span>
+        <% } else if (l.status === 'confirmado' && l.amount_cents != null) { %><span class="badge <%= l.pay_status === 'pago' ? 'b-green' : 'b-amber' %>"><%= l.pay_status === 'pago' ? 'recebido ' + fmt.formatDayShort(l.pay_paid) : 'a receber até ' + fmt.formatDayShort(l.pay_due) %></span><span class="mono small"><%= fmtMoney(l.amount_cents) %></span><% } %>
+        <% if (l.link_status === 'pago') { %><span class="mono small muted" title="Pago pelo link da InfinitePay"><%- icon('link', 12) %> <%= l.link_method === 'pix' ? 'Pix' : 'cartão' + (l.link_installments > 1 ? ' ' + l.link_installments + 'x' : '') %></span><% } else if (linkOpen(l)) { %><span class="mono small muted" title="Link de pagamento enviado"><%- icon('link', 12) %> <%= fmtMoney(l.link_amount) %></span><% } %>
+      <% };
+      var leadActions = function (l) { %>
+        <div class="pact">
+          <a class="icon-btn" href="<%= waHref(l) %>" target="_blank" rel="noopener noreferrer" title="<%= linkOpen(l) ? 'Chamar no WhatsApp com o link de pagamento' : 'Chamar no WhatsApp' %>" aria-label="Chamar <%= l.name %> no WhatsApp"><%- icon('whatsapp', 16) %></a>
+          <% if (linkOpen(l)) { %><button class="icon-btn" type="button" data-copy="<%= l.link_url %>" title="Copiar o link de pagamento (<%= fmtMoney(l.link_amount) %>)" aria-label="Copiar o link de pagamento de <%= l.name %>"><%- icon('copy', 16) %></button><% } %>
+          <% if (l.status !== 'confirmado') { %>
+            <button class="icon-btn" type="button" data-drop-open data-fill-modal="modal-confirmar" data-fill-mode="new" data-fill-action="/plateia/painel/leads/<%= l.id %>/confirmar" title="Selecionar: confirmar a participação" aria-label="Selecionar <%= l.name %>"
+              data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.amount_cents != null ? l.amount_cents : (l.price_cents || s.priceCents)), due_on: todayIso, paid: '0', paid_on: todayIso, voltar: here }) %>'><%- icon('circle-check', 16) %></button>
+          <% } else if (!isExempt(l) && l.pay_status !== 'pago') { %>
+            <form method="post" action="/plateia/painel/leads/<%= l.id %>/recebido" class="inline"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><button class="icon-btn" type="submit" title="Recebi o pagamento" aria-label="Marcar como recebido o pagamento de <%= l.name %>"><%- icon('wallet', 16) %></button></form>
+          <% } else if (!isExempt(l)) { %>
+            <form method="post" action="/plateia/painel/leads/<%= l.id %>/recebido" class="inline"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><input type="hidden" name="desfazer" value="1"><button class="icon-btn" type="submit" title="Desfazer o recebimento" aria-label="Desfazer o recebimento de <%= l.name %>"><%- icon('rotate-ccw', 16) %></button></form>
+          <% } %>
+          <button class="icon-btn" type="button" data-fill-modal="modal-editar" data-fill-mode="edit" data-fill-action="/plateia/painel/leads/<%= l.id %>/editar" data-fill-remove="/plateia/painel/leads/<%= l.id %>/excluir" data-fill-remove-label="Excluir pedido" data-fill-confirm="Excluir o pedido de <%= l.name %>? Isso não pode ser desfeito."
+            data-fill='<%- editJson(l) %>' title="Editar ou excluir" aria-label="Editar o pedido de <%= l.name %>"><%- icon('pencil', 16) %></button>
+        </div>
+      <% }; %>
+    <div class="pbar">
+      <form method="get" action="/plateia/painel" class="pbar-filters">
+        <input type="hidden" name="vista" value="<%= view %>">
+        <label class="pbar-search"><%- icon('search', 16) %><input type="search" name="q" value="<%= q %>" placeholder="Buscar nome, WhatsApp ou convidado" aria-label="Buscar pedidos"></label>
+        <select name="convidado" aria-label="Episódio" data-autosubmit>
+          <option value="">Todos os episódios</option>
+          <% guests.forEach(function (g) { %><option value="<%= g.id %>" <%= guestFilter === g.id ? 'selected' : '' %>><%= g.name %><%= g.proposed_at ? ' · ' + fmt.formatDate(g.proposed_at) : '' %></option><% }) %>
+        </select>
+        <select name="origem" aria-label="Origem" data-autosubmit>
+          <option value="">Qualquer origem</option>
+          <option value="pagina" <%= origin === 'pagina' ? 'selected' : '' %>>Veio da página</option>
+          <option value="equipe" <%= origin === 'equipe' ? 'selected' : '' %>>Adicionada pela equipe</option>
+        </select>
+        <% if (view === 'lista') { %>
+        <select name="status" aria-label="Situação" data-autosubmit>
+          <option value="">Todas as situações</option>
+          <% Object.keys(STATUS).forEach(function (k) { %><option value="<%= k %>" <%= statusFilter === k ? 'selected' : '' %>><%= STATUS[k] %></option><% }) %>
+        </select>
+        <% } %>
+        <% if (filtersOn) { %><a class="icon-btn" href="<%= qs({ q: '', convidado: '', status: '', origem: '' }) %>" title="Limpar filtros" aria-label="Limpar filtros"><%- icon('x', 16) %></a><% } %>
+      </form>
+      <div class="pbar-tools">
+        <div class="seg" aria-label="Visualização">
+          <a class="<%= view === 'quadro' ? 'on' : '' %>" href="<%= qs({ vista: 'quadro', status: '' }) %>" title="Quadro" aria-label="Ver em quadro"><%- icon('columns-3', 16) %></a>
+          <a class="<%= view === 'lista' ? 'on' : '' %>" href="<%= qs({ vista: 'lista' }) %>" title="Lista" aria-label="Ver em lista"><%- icon('list', 16) %></a>
+        </div>
+        <button class="btn sm" type="button" data-modal-open="modal-adicionar"><%- icon('plus', 14) %> Adicionar pessoa</button>
+        <a class="icon-btn" href="/plateia/painel/inscricoes.csv" title="Exportar planilha" aria-label="Exportar planilha"><%- icon('download', 16) %></a>
+      </div>
+    </div>
+
+    <% if (!leads.length && filtersOn) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido com esses filtros</strong></p><p class="muted small"><a href="<%= qs({ q: '', convidado: '', status: '', origem: '' }) %>">Limpar filtros</a></p></div>
+    <% } else if (!leads.length) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma inscrição por aqui</strong></p><p class="muted small">Quando alguém pedir para participar pela página pública, o pedido aparece aqui com o WhatsApp e a origem do clique. A seleção da plateia é sua. Quem você já combinou por fora entra em "Adicionar pessoa".</p></div><% } %>
+
+    <% if (leads.length && view === 'quadro') { %>
+    <div class="board board-wide pboard" data-board data-can-move="1" data-base="/plateia/painel/leads" data-status-path="mover" data-fail-msg="Não foi possível mover o pedido. Tente de novo.">
+      <% COLS.forEach(function (c) { var items = leads.filter(function (l) { return l.status === c[0]; }); %>
+      <section class="column" data-status="<%= c[0] %>"<%- c[0] === 'confirmado' ? ' data-drop-open' : '' %>>
+        <header><span class="badge <%= c[1] %>"><%= STATUS[c[0]] %></span><span class="count"><%= items.length %></span></header>
+        <div class="cards" data-dropzone>
+          <% items.forEach(function (l) { %>
+          <article class="kcard pcard" draggable="true" data-item-id="<%= l.id %>">
+            <div class="pcard-head"><strong class="ellipsis" title="<%= l.name %>"><%= l.name %></strong><% if (l.notes) { %><span class="muted" title="<%= l.notes %>"><%- icon('file-text', 14) %></span><% } %></div>
+            <a class="mono small ellipsis" href="<%= waLink(l.phone) %>" target="_blank" rel="noopener noreferrer" draggable="false"><%= l.phone %></a>
+            <span class="small muted ellipsis" title="<%= l.guest_name %>"><%= l.guest_name %><%= l.recording_at ? ' · ' + fmt.shortDate(l.recording_at) : '' %></span>
+            <div class="pcard-meta">
+              <span class="mono small muted" title="<%= origin_(l) %> · pedido em <%= fmt.formatDateTime(l.created_at) %>"><%- icon(l.added_by ? 'user' : 'globe', 12) %> <%= fmt.shortDate(l.created_at) %></span>
+              <% if (!l.added_by && !l.whatsapp_opened_at) { %><span class="muted" title="Pediu pela página, mas não abriu o WhatsApp"><%- icon('message-circle', 12) %></span><% } %>
+              <% payChips(l) %>
+            </div>
+            <div class="pcard-foot"><% leadActions(l) %></div>
+          </article>
+          <% }) %>
+        </div>
+      </section>
+      <% }) %>
+    </div>
+    <% } %>
+
+    <% if (leads.length && view === 'lista') { %>
+    <div class="table-wrap">
+      <table class="ptable">
+        <thead><tr><th>Pessoa</th><th>WhatsApp</th><th>Situação</th><th>Pedido em</th><th><span class="sr-only">Ações</span></th></tr></thead>
+        <tbody>
+          <% leads.forEach(function (l) { var tone = (COLS.filter(function (c) { return c[0] === l.status; })[0] || [])[1] || 'b-gray'; %>
+          <tr>
+            <td class="pcell-main">
+              <div class="pcard-head"><strong class="ellipsis" title="<%= l.name %>"><%= l.name %></strong><% if (l.notes) { %><span class="muted" title="<%= l.notes %>"><%- icon('file-text', 14) %></span><% } %></div>
+              <span class="small muted ellipsis" title="<%= l.guest_name %>"><%= l.guest_name %><%= l.recording_at ? ' · ' + fmt.shortDate(l.recording_at) : '' %></span>
+            </td>
+            <td class="mono"><a href="<%= waLink(l.phone) %>" target="_blank" rel="noopener noreferrer"><%= l.phone %></a></td>
+            <td>
+              <details class="row-menu">
+                <summary class="badge badge-btn <%= tone %>" aria-label="Mudar a situação de <%= l.name %>"><%= STATUS[l.status] %> <%- icon('chevron-down', 12) %></summary>
+                <div class="row-menu-list">
+                  <% Object.keys(STATUS).forEach(function (k) { if (k === l.status) return; %>
+                    <% if (k === 'confirmado') { %>
+                    <button class="link" type="button" data-fill-modal="modal-confirmar" data-fill-mode="new" data-fill-action="/plateia/painel/leads/<%= l.id %>/confirmar"
+                      data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.amount_cents != null ? l.amount_cents : (l.price_cents || s.priceCents)), due_on: todayIso, paid: '0', paid_on: todayIso, voltar: here }) %>'>Selecionado…</button>
+                    <% } else { %>
+                    <form method="post" action="/plateia/painel/leads/<%= l.id %>"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><input type="hidden" name="status" value="<%= k %>"><button class="link" type="submit"><%= STATUS[k] %></button></form>
+                    <% } %>
+                  <% }) %>
+                  <% if (payLinks && ['novo', 'em_atendimento'].indexOf(l.status) >= 0) { %>
+                  <hr class="menu-sep">
+                  <% if (l.link_url) { %>
+                  <button class="link" type="button" data-fill-modal="modal-link" data-fill-mode="new" data-fill-action="/plateia/painel/leads/<%= l.id %>/link" data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.link_amount), voltar: here }) %>'>Alterar valor do link</button>
+                  <% } else { %>
+                  <form method="post" action="/plateia/painel/leads/<%= l.id %>/link"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><button class="link" type="submit">Gerar link de <%= fmtMoney(l.price_cents || s.priceCents) %></button></form>
+                  <% } %>
+                  <% } %>
+                </div>
+              </details>
+              <div class="pchips"><% payChips(l) %></div>
+            </td>
+            <td class="mono small muted">
+              <span class="pwhen"><span title="<%= origin_(l) %>"><%- icon(l.added_by ? 'user' : 'globe', 14) %></span><%= fmt.formatDateTime(l.created_at) %><% if (!l.added_by && !l.whatsapp_opened_at) { %><span title="Pediu pela página, mas não abriu o WhatsApp"><%- icon('message-circle', 14) %></span><% } %></span>
+            </td>
+            <td class="actions"><% leadActions(l) %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="pane" id="pane-agenda" data-pane-id="agenda" hidden>
+    <p class="muted small">É isto que a pessoa vê agora na página. Para tirar um convidado, abra o card dele e desmarque "Aberto para plateia"; para fechar as vagas, marque Lotado ou Encerrado.</p>
+    <% if (!agenda.length) { %><div class="empty card top-gap"><%- include('../partials/pulse-line') %><p><strong>Agenda vazia</strong></p><p class="muted small">Convidados em Agendado com data futura entram aqui sozinhos.</p></div><% } %>
+    <ul class="plain plan-list card top-gap">
+      <% agenda.forEach(function (g) { %>
+      <li><div class="plan-list-main"><a href="/convidados/<%= g.id %>#plateia"><strong><%= g.name %></strong></a><span class="small muted"><%= g.date %>, <%= g.time %><%= g.topic ? ' · ' + g.topic : '' %></span></div>
+        <span class="badge <%= g.status === 'disponivel' ? 'b-green' : (g.status === 'lotado' ? 'b-amber' : 'b-gray') %>"><%= { disponivel: 'Disponível', lotado: 'Lotado', encerrado: 'Encerrado' }[g.status] %></span>
+        <span class="mono small muted"><%= g.hasPhoto ? 'com foto' : 'sem foto' %></span></li>
+      <% }) %>
+    </ul>
+  </div>
+
+  <div class="pane" id="pane-resultados" data-pane-id="resultados" hidden>
+    <div class="row spread">
+      <div class="seg" role="tablist" aria-label="Período">
+        <% [7, 30, 90].forEach(function (d) { %><a class="<%= days === d ? 'on' : '' %>" href="/plateia/painel?dias=<%= d %>#resultados"><%= d %> dias</a><% }) %>
+      </div>
+    </div>
+    <section class="stat-grid top-gap" aria-label="Funil">
+      <div class="stat"><span class="stat-label">Visitantes</span><span class="stat-n"><%= results.visitors %></span></div>
+      <div class="stat"><span class="stat-label">Cliques na agenda</span><span class="stat-n"><%= results.agendaClicks %></span></div>
+      <div class="stat"><span class="stat-label">Cliques em "Quero participar"</span><span class="stat-n"><%= results.signupClicks %></span></div>
+      <div class="stat"><span class="stat-label">Pedidos</span><span class="stat-n"><%= results.leads %></span></div>
+      <div class="stat"><span class="stat-label">Abriram o WhatsApp</span><span class="stat-n"><%= results.whatsapp %></span></div>
+    </section>
+    <section class="card top-gap"><h2>Conversão</h2>
+    <ul class="plain conv-list">
+      <li><span class="small muted">Visitas que viraram pedido</span><span class="mono"><%= results.views ? (Math.round(results.leads / results.views * 1000) / 10).toString().replace('.', ',') + '%' : '—' %></span></li>
+      <li><span class="small muted">Cliques em "Quero participar" que viraram pedido</span><span class="mono"><%= pct(results.leads, results.signupClicks) %></span></li>
+      <li><span class="small muted">Pedidos que abriram o WhatsApp</span><span class="mono"><%= pct(results.whatsapp, results.leads) %></span></li>
+    </ul></section>
+
+    <section class="card top-gap">
+      <h2>Por episódio</h2>
+      <% if (!results.perGuest.length) { %><p class="muted small">Ainda sem interesse registrado.</p><% } else { %>
+      <div class="table-wrap flat"><table class="fin-table">
+        <thead><tr><th>Convidado</th><th class="num">Cliques</th><th class="num">Pedidos</th><th class="num">Selecionadas</th></tr></thead>
+        <tbody><% results.perGuest.forEach(function (g) { %><tr><td><a href="/plateia/painel?convidado=<%= g.id %>"><%= g.name %></a> <span class="mono small muted"><%= g.proposed_at ? fmt.formatDate(g.proposed_at) : '' %></span></td><td class="num mono"><%= g.clicks %></td><td class="num mono"><%= g.leads %></td><td class="num mono"><%= g.confirmed %></td></tr><% }) %></tbody>
+      </table></div><% } %>
+    </section>
+    <section class="card top-gap">
+      <h2>Por origem (UTM)</h2>
+      <% if (!results.perUtm.length) { %><p class="muted small">As UTMs da URL de campanha (utm_source, utm_medium, utm_campaign) são guardadas sozinhas. Sem UTM, o acesso entra como "direto".</p><% } else { %>
+      <p class="small muted">Sem UTM na URL, o acesso entra como "direto". Monte links de campanha em Ajustes.</p>
+      <div class="table-wrap flat"><table class="fin-table">
+        <thead><tr><th>Origem</th><th>Mídia</th><th>Campanha</th><th class="num">Visitas</th><th class="num">Cliques</th><th class="num">Pedidos</th></tr></thead>
+        <tbody><% results.perUtm.forEach(function (u) { %><tr><td class="mono"><%= u.source %></td><td class="mono"><%= u.medium %></td><td class="mono"><%= u.campaign %></td><td class="num mono"><%= u.views %></td><td class="num mono"><%= u.clicks %></td><td class="num mono"><%= u.leads %></td></tr><% }) %></tbody>
+      </table></div><% } %>
+    </section>
+  </div>
+
+  <% if (canManage) { %>
+  <div class="pane" id="pane-ajustes" data-pane-id="ajustes" hidden>
+    <section class="card">
+      <div class="row spread"><div><h2>Página pública</h2><p class="small muted mono raw"><%= publicUrl %></p></div><button class="btn" type="button" data-modal-open="modal-ajustes"><%- icon('pencil') %> Editar</button></div>
+      <dl class="kv">
+        <dt>Situação</dt><dd><%= s.active ? 'No ar' : 'Pausada' %></dd>
+        <dt>Investimento</dt><dd><span class="mono"><%= price %></span> por participante</dd>
+        <dt>Duração</dt><dd><%= s.duration %></dd>
+        <dt>Local</dt><dd><%= s.location %></dd>
+        <dt>WhatsApp da produtora</dt><dd><span class="mono"><%= s.whatsapp || 'não informado' %></span></dd>
+        <dt>Meta Pixel</dt><dd><span class="mono"><%= s.metaPixel || '—' %></span></dd>
+        <dt>Google Analytics 4</dt><dd><span class="mono"><%= s.ga4 || '—' %></span></dd>
+      </dl>
+    </section>
+    <section class="card top-gap">
+      <h2>Imagens da página</h2>
+      <p class="small muted">O topo da página usa o vídeo do media kit. A foto do estúdio aparece na seção Localização. PNG, JPEG ou WebP, até 5 MB. As fotos dos convidados são enviadas no card de cada um.</p>
+      <% if (!storageReady) { %><p class="notice small">O armazenamento de arquivos não está configurado neste servidor.</p><% } %>
+      <ul class="plain plan-list">
+        <li><div class="plan-list-main"><strong>Imagem de abertura</strong><span class="small muted"><%= s.heroKey ? 'enviada' : 'sem imagem' %> · aparece enquanto o vídeo do topo carrega (o vídeo é o mesmo do media kit)</span></div><span></span><span class="plan-list-tools"><button class="btn sm" type="button" data-image-pick="hero" <%= storageReady ? '' : 'disabled' %>>Enviar imagem</button></span></li>
+        <li><div class="plan-list-main"><strong>Foto do estúdio</strong><span class="small muted"><%= s.studioKey ? 'enviada' : 'sem imagem' %></span></div><span></span><span class="plan-list-tools"><button class="btn sm" type="button" data-image-pick="estudio" <%= storageReady ? '' : 'disabled' %>>Enviar imagem</button></span></li>
+      </ul>
+      <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-csrf="<%= csrf %>" data-base="/plateia/painel/imagem/">
+    </section>
+    <section class="card top-gap">
+      <h2>Links para campanhas</h2>
+      <p class="small muted">Use um link por lugar onde você divulga. As UTMs ficam guardadas e aparecem em Resultados e em cada inscrição.</p>
+      <ul class="plain plan-list">
+        <% [['Instagram (bio)', 'instagram', 'bio'], ['Instagram (stories)', 'instagram', 'story'], ['WhatsApp (lista de transmissão)', 'whatsapp', 'broadcast'], ['E-mail', 'email', 'newsletter'], ['Anúncio pago (Meta)', 'facebook', 'cpc']].forEach(function (c) { var u = publicUrl + '?utm_source=' + c[1] + '&utm_medium=' + c[2] + '&utm_campaign=plateia'; %>
+        <li><div class="plan-list-main"><strong><%= c[0] %></strong><span class="small muted mono raw"><%= u.replace(publicUrl, '') %></span></div><span></span><span class="plan-list-tools"><button class="btn sm" type="button" data-copy="<%= u %>">Copiar link</button></span></li>
+        <% }) %>
+      </ul>
+      <p class="small muted">Para outro lugar, acrescente <span class="mono raw">?utm_source=…&amp;utm_medium=…&amp;utm_campaign=…</span> ao endereço da página.</p>
+    </section>
+  </div>
+  <% } %>
+</div>
+
+<dialog class="modal" id="modal-adicionar" aria-labelledby="mad-h">
+  <form method="post" action="/plateia/painel/leads" class="stack" data-when-form>
+    <%- csrfField %>
+    <h2 id="mad-h">Adicionar pessoa à plateia</h2>
+    <% if (!recordings.length) { %>
+    <p class="notice small">Nenhuma gravação agendada. Só dá para adicionar quem vai a uma gravação de convidado <strong>Agendado</strong> com data.</p>
+    <% } else { %>
+    <label>Gravação
+      <select name="guest_id" required>
+        <% recordings.forEach(function (g) { %><option value="<%= g.id %>" <%= guestFilter === g.id ? 'selected' : '' %>><%= g.name %> · <%= fmt.formatDate(g.proposed_at) %></option><% }) %>
+      </select>
+    </label>
+    <label>Nome<input type="text" name="name" maxlength="120" required autocomplete="off"></label>
+    <div class="grid-2 tight">
+      <label>País
+        <select name="country"><% countries.forEach(function (c) { %><option value="<%= c.code %>" <%= c.code === 'BR' ? 'selected' : '' %>><%= c.name %> (+<%= c.dial %>)</option><% }) %></select>
+      </label>
+      <label>WhatsApp<input type="tel" name="phone" inputmode="tel" required autocomplete="off" placeholder="(11) 91234-5678"></label>
+    </div>
+    <label>Situação
+      <select name="status"><option value="novo">Novo pedido (ainda vou avaliar)</option><option value="confirmado">Selecionada: já combinei</option></select>
+    </label>
+    <div class="stack" data-when="status=confirmado">
+      <div class="grid-2 tight">
+        <label data-when="paid!=isento">Valor combinado (R$)<input type="text" name="amount" inputmode="decimal" placeholder="197,00"></label>
+        <label>Pagamento
+          <select name="paid"><option value="0">Ainda vai pagar</option><option value="1">Já recebi</option><option value="isento">Isento (sem cobrança)</option></select>
+        </label>
+      </div>
+      <label data-when="paid=0">Combinado para pagar até<input type="date" name="due_on"></label>
+      <label data-when="paid=1">Recebido em<input type="date" name="paid_on"></label>
+    </div>
+    <p class="small muted">Quem entra por aqui não passa pela página pública: não conta no funil e não gera aviso. No dia da gravação, as pessoas selecionadas entram na tarefa de lembrete da produtora.</p>
+    <% } %>
+    <div class="row modal-actions"><% if (recordings.length) { %><button class="btn primary" type="submit">Adicionar</button><% } %><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<dialog class="modal" id="modal-editar" aria-labelledby="med-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %><input type="hidden" name="voltar" value="">
+    <h2 id="med-h">Editar pedido</h2>
+    <label>Gravação
+      <select name="guest_id" required>
+        <% var seen = {}; recordings.concat(guests).forEach(function (g) { if (seen[g.id]) return; seen[g.id] = 1; %><option value="<%= g.id %>"><%= g.name %><%= g.proposed_at ? ' · ' + fmt.formatDate(g.proposed_at) : '' %></option><% }) %>
+      </select>
+    </label>
+    <label>Nome<input type="text" name="name" maxlength="120" required autocomplete="off"></label>
+    <div class="grid-2 tight">
+      <label>País
+        <select name="country"><% countries.forEach(function (c) { %><option value="<%= c.code %>"><%= c.name %> (+<%= c.dial %>)</option><% }) %></select>
+      </label>
+      <label>WhatsApp<input type="tel" name="phone" inputmode="tel" required autocomplete="off"></label>
+    </div>
+    <label>Observações<textarea name="notes" rows="3" maxlength="1000" placeholder="Combinados, restrições, quem indicou…"></textarea></label>
+    <label>Origem<input type="text" name="_origin" readonly></label>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+      <button class="link small danger-link push-right" type="submit" data-fill-remove-btn data-mode="edit" formnovalidate>Excluir pedido</button>
+    </div>
+  </form>
+</dialog>
+<dialog class="modal" id="modal-link" aria-labelledby="mlk-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %><input type="hidden" name="voltar" value="">
+    <h2 id="mlk-h">Valor do link de pagamento</h2>
+    <label>Pedido<input type="text" name="_label" readonly></label>
+    <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required autofocus></label>
+    <p class="small muted">Cria um link novo com este valor e ele passa a ser o link atual. Se a pessoa ainda pagar pelo anterior, o pagamento também é registrado.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar link</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<dialog class="modal" id="modal-confirmar" aria-labelledby="mcf-h">
+  <form method="post" action="" class="stack" data-fill-form data-when-form>
+    <%- csrfField %><input type="hidden" name="voltar" value="">
+    <h2 id="mcf-h">Confirmar participação</h2>
+    <label>Pedido<input type="text" name="_label" readonly></label>
+    <div class="grid-2 tight">
+      <label data-when="paid!=isento">Valor combinado (R$)<input type="text" name="amount" inputmode="decimal" autofocus></label>
+      <label>Pagamento
+        <select name="paid"><option value="0">Ainda vai pagar</option><option value="1">Já recebi</option><option value="isento">Isento (sem cobrança)</option></select>
+      </label>
+    </div>
+    <label data-when="paid=0">Combinado para pagar até<input type="date" name="due_on"></label>
+    <label data-when="paid=1">Recebido em<input type="date" name="paid_on"></label>
+    <p class="small muted" data-when="paid=isento">A pessoa passa a Selecionada sem cobrança: nenhuma conta a receber é criada.</p>
+    <p class="small muted" data-when="paid!=isento">A pessoa passa a Selecionada e o valor vira uma conta a receber no Financeiro (categoria Plateia), onde a gestão acompanha.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Confirmar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% if (canManage) { %>
+<dialog class="modal modal-wide" id="modal-ajustes" aria-labelledby="mpa-h">
+  <form method="post" action="/plateia/painel/ajustes" class="stack">
+    <%- csrfField %>
+    <h2 id="mpa-h">Ajustes da página</h2>
+    <label class="check"><input type="checkbox" name="active" value="1" <%= s.active ? 'checked' : '' %>> Página no ar (desmarque para pausar as inscrições)</label>
+    <div class="grid-2 tight">
+      <label>Investimento por participante (R$)<input type="text" name="price" inputmode="decimal" value="<%= brl(s.priceCents) %>" required></label>
+      <label>Duração estimada<input type="text" name="duration" maxlength="40" value="<%= s.duration %>" required></label>
+    </div>
+    <label>Local<input type="text" name="location" maxlength="160" value="<%= s.location %>" required></label>
+    <label>WhatsApp da produtora <small class="muted">(com código do país, só números)</small><input type="text" name="whatsapp" inputmode="numeric" value="<%= s.whatsapp %>" placeholder="5511912345678"></label>
+    <details class="more">
+      <summary>Rastreamento de campanhas</summary>
+      <div class="stack top-gap">
+        <label>ID do Meta Pixel<input type="text" name="meta_pixel" inputmode="numeric" value="<%= s.metaPixel %>" placeholder="1234567890123456"></label>
+        <label>ID do Google Analytics 4<input type="text" name="ga4" value="<%= s.ga4 %>" placeholder="G-XXXXXXXXXX"></label>
+        <p class="small muted">Só esta página carrega essas ferramentas. Sem os IDs, nada de terceiros é carregado.</p>
+      </div>
+    </details>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<%- include('../partials/foot') %>

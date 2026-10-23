@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title><%= title %> · Pulso</title>
+<link rel="stylesheet" href="/static/patrocinador.css?v=<%= assetV %>">
+</head>
+<%
+  var tierLabel = sponsor.tier ? C.SPONSOR_TIERS[sponsor.tier] : '';
+  var exclusives = episodes.filter(function (e) { return e.role === 'exclusivo'; });
+  var insertions = episodes.filter(function (e) { return e.role !== 'exclusivo'; });
+  var active = sponsor.stage === 'ativo';
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  var parts = [];
+  if (exclusives.length) parts.push(exclusives.length + (exclusives.length === 1 ? ' episódio exclusivo' : ' episódios exclusivos'));
+  if (insertions.length) parts.push('inserção em ' + insertions.length + (insertions.length === 1 ? ' episódio' : ' episódios'));
+  var summary = parts.join(' + ');
+  var period = (sponsor.starts_on || sponsor.ends_on) ? (sponsor.starts_on ? 'de ' + fmt.formatDay(sponsor.starts_on) : '') + (sponsor.ends_on ? ' até ' + fmt.formatDay(sponsor.ends_on) : '') : '';
+  var statusLabel = { previsto: 'Previsto', gravacao_marcada: 'Gravação marcada', gravado: 'Gravado', disponivel_edicao: 'Em produção', em_edicao: 'Em produção', em_revisao: 'Em produção', em_finalizacao: 'Em produção', pronto_publicar: 'Pronto para publicar', publicado: 'Publicado' };
+  var dotOf = function (e) { return e.status === 'publicado' ? 'done' : (e.role === 'exclusivo' ? 'diamond' : (e.status === 'previsto' ? 'next' : 'scheduled')); };
+  var initials = function (n) { return String(n).split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0]; }).join('').toUpperCase(); };
+  var guestsShown = [];
+  episodes.forEach(function (e) { if (e.guest_name && (e.guest_bio || e.guest_positioning) && !guestsShown.some(function (g) { return g.guest_name === e.guest_name; })) guestsShown.push(e); });
+  var qrDeliverable = deliverables.find(function (d) { return d.kind === 'qr_code'; });
+  var brandKinds = ['insercao', 'qr_code', 'moldura'].filter(function (k) { return deliverables.some(function (d) { return d.kind === k; }); });
+%>
+<body class="tier-<%= sponsor.tier || 'diamond' %>">
+
+<div class="topbar">
+  <div class="topbar-logo">pulso<span>.</span></div>
+  <div class="topbar-tag">Portal do Patrocinador</div>
+</div>
+
+<div class="hero">
+  <div class="hero-inner">
+    <% if (logo) { %><img class="portal-logo" src="<%= base %>/arquivo/<%= logo.id %>" alt="Logo de <%= sponsor.company %>"><% } %>
+    <div class="hero-eyebrow"><%= sponsor.company %><%= sponsor.contact_name ? ' · Responsável ' + sponsor.contact_name : '' %></div>
+    <h1>Sua marca<br>no Pulso.</h1>
+    <div class="hero-badges">
+      <% if (tierLabel) { %><span class="badge">Patrocínio <%= tierLabel %></span><% } %>
+      <% if (summary) { %><span class="badge plain"><%= summary %></span><% } %>
+    </div>
+    <div class="status-pill <%= active ? '' : 'off' %>"><span class="status-dot"></span> <%= active ? 'Parceria em andamento' : 'Parceria encerrada' %></div>
+  </div>
+</div>
+
+<div class="summary-strip">
+  <section>
+    <div class="section-label">Seu patrocínio</div>
+    <div class="summary-row">
+      <div class="summary-chip"><strong><%= pad(episodes.length) %></strong> episódios</div>
+      <div class="summary-chip">YouTube</div>
+      <div class="summary-chip">Spotify</div>
+      <div class="summary-chip">Instagram</div>
+    </div>
+    <div class="summary-sponsor"><strong><%= sponsor.company %></strong><%= tierLabel ? ' — parceria ' + tierLabel : '' %><%= sponsor.contact_name ? ' conduzida por ' + sponsor.contact_name : '' %><%= period ? ', ativa ' + period : '' %><%= summary ? ', com ' + summary : '' %>.</div>
+  </section>
+</div>
+
+<% if (deliverables.length) { %>
+<section>
+  <div class="section-label">O que está incluso</div>
+  <div class="section-title">Entregas</div>
+  <div class="deliverables">
+    <% deliverables.forEach(function (d) { %>
+    <div class="deliverable <%= d.kind === 'episodio_exclusivo' ? 'highlight' : '' %>">
+      <div class="deliverable-n"><%= d.qty ? pad(d.qty) : '—' %></div>
+      <div class="deliverable-label"><%= d.label %></div>
+      <% if (d.text) { %><div class="deliverable-desc"><%= d.text %></div><% } %>
+      <div class="deliverable-state"><%= C.DELIVERABLE_STATUSES[d.status] %></div>
+    </div>
+    <% }) %>
+  </div>
+</section>
+<% } %>
+
+<% if (exclusives.length) { %>
+<section>
+  <div class="section-label"><%= tierLabel ? 'Benefício ' + tierLabel : 'Benefício' %></div>
+  <div class="section-title">Seu episódio exclusivo</div>
+  <% exclusives.forEach(function (e) { %>
+  <div class="exclusive-card">
+    <div>
+      <div class="exclusive-date"><%= e.aired_on ? fmt.formatDayLong(e.aired_on) : 'Data a definir' %></div>
+      <div class="exclusive-time"><%= e.booking ? "Gravação marcada · episódio exclusivo" : "Episódio exclusivo" %></div>
+    </div>
+    <div class="exclusive-desc">
+      Episódio <strong>inteiramente dedicado à <%= sponsor.company %></strong><%= e.guest_name ? ', com ' : '' %><% if (e.guest_name) { %><strong><%= e.guest_name %></strong><% } %> — o espaço é só da marca, sem divisão com outros patrocinadores.
+    </div>
+  </div>
+  <% }) %>
+</section>
+<% } %>
+
+<% if (episodes.length) { %>
+<section>
+  <div class="section-label">Gravações e veiculação</div>
+  <div class="section-title">Calendário</div>
+  <div class="cal-legend">
+    <span><i class="dot diamond"></i> exclusivo</span>
+    <span><i class="dot next"></i> previsto</span>
+    <span><i class="dot scheduled"></i> gravação marcada / em produção</span>
+    <span><i class="dot done"></i> publicado</span>
+  </div>
+  <div class="cal-list">
+    <% episodes.forEach(function (e) { %>
+    <div class="cal-row">
+      <div class="cal-date"><%= e.aired_on ? fmt.formatDayShort(e.aired_on) : '—' %></div>
+      <div class="cal-ep"><%= e.role === 'exclusivo' ? 'Exclusivo' : 'Inserção' %></div>
+      <div class="cal-topic<%= e.guest_has_photo ? ' has-photo' : '' %>">
+        <% if (e.guest_has_photo) { %><img class="cal-photo" src="<%= photoUrl(e.guest_id) %>" alt="<%= e.guest_name %>" loading="lazy" width="72" height="54"><% } %>
+        <div class="cal-who">
+        <strong><%= e.guest_name || e.title %></strong>
+        <% if (e.guest_name && e.guest_instagram) { %><a class="cal-ig" href="https://www.instagram.com/<%= e.guest_instagram %>/" target="_blank" rel="noopener noreferrer">@<%= e.guest_instagram %> →</a>
+        <% } else if (e.guest_name) { %><span><%= e.title %></span>
+        <% } else { %><span>Convidado a confirmar pela produção</span><% } %>
+        </div>
+      </div>
+      <div class="cal-status"><i class="dot <%= dotOf(e) %>"></i> <%= statusLabel[e.status] %></div>
+    </div>
+    <% }) %>
+  </div>
+  <p class="cal-disclaimer">Agenda preliminar — datas e convidados podem sofrer alteração sem aviso prévio, inclusive por conta da disponibilidade de agenda de cada convidado.</p>
+</section>
+<% } %>
+
+<% if (guestsShown.length) { %>
+<section>
+  <div class="section-label">Quem passa pelo microfone</div>
+  <div class="section-title">Conheça os convidados</div>
+  <div class="guests">
+    <% guestsShown.forEach(function (g) { %>
+    <details class="guest-item">
+      <summary>
+        <% if (g.guest_has_photo) { %><img class="guest-photo" src="<%= photoUrl(g.guest_id) %>" alt="<%= g.guest_name %>" loading="lazy" width="84" height="63">
+        <% } else { %><div class="guest-avatar"><%= initials(g.guest_name) %></div><% } %>
+        <div><div class="guest-name"><%= g.guest_name %></div><% if (g.guest_positioning) { %><div class="guest-cat"><%= g.guest_positioning %></div><% } %></div>
+        <div class="guest-toggle">Ver perfil <span class="arrow">→</span></div>
+      </summary>
+      <div class="guest-bio-inner">
+        <% if (g.guest_bio) { %><p><%= g.guest_bio %></p><% } %>
+        <% if (g.guest_instagram) { %><a href="https://www.instagram.com/<%= g.guest_instagram %>" target="_blank" rel="noopener noreferrer">Instagram → @<%= g.guest_instagram %></a><% } %>
+      </div>
+    </details>
+    <% }) %>
+  </div>
+  <p class="cal-disclaimer">Bios e participações sujeitas a alteração conforme confirmação final da produção.</p>
+</section>
+<% } %>
+
+<section>
+  <div class="section-label">Ativação da marca</div>
+  <div class="section-title">Como sua marca aparece</div>
+  <% if (moldura || qrcode) { %>
+  <div class="brand-showcase">
+    <% if (moldura) { %><div class="mock-card"><img src="<%= base %>/arquivo/<%= moldura.id %>" alt="Moldura — <%= sponsor.company %>"><div class="mock-caption">moldura · bloco lateral fixo</div></div><% } %>
+    <% if (qrcode) { %><div class="mock-card"><img src="<%= base %>/arquivo/<%= qrcode.id %>" alt="QR Code — <%= sponsor.company %>"><div class="mock-caption">inserção · card com QR Code</div></div><% } %>
+  </div>
+  <% } else { %>
+  <div class="brand-empty">Estamos preparando a moldura e o QR Code da sua marca. Eles aparecem aqui assim que ficarem prontos.</div>
+  <% } %>
+  <% if (brandKinds.length) { %>
+  <div class="brand-summary"><% brandKinds.forEach(function (k, i) { %><%= i ? '' : '' %><% if (i) { %><span class="sep">+</span><% } %><%= C.DELIVERABLE_KINDS[k].replace('Inserção em episódios', 'Inserção') %><% }) %></div>
+  <% } %>
+  <% if (qrDeliverable && qrDeliverable.link_url) { %><p class="brand-note">O QR Code leva direto para o link de destino combinado com a <%= sponsor.company %>.</p><% } %>
+</section>
+
+<section>
+  <div class="section-label">Dicas para o patrocinador</div>
+  <div class="section-title">Como potencializar sua parceria</div>
+  <div class="checklist">
+    <div class="check-item"><div class="check-mark">✓</div><p><strong>Tenha uma oferta específica</strong> — algo claro para quem chegar até você pelo episódio.</p></div>
+    <div class="check-item"><div class="check-mark">✓</div><p><strong>Use um link rastreável</strong> — assim você mede exatamente o que veio do Pulso.</p></div>
+    <div class="check-item"><div class="check-mark">✓</div><p><strong>Compartilhe o episódio</strong> — nos seus stories, feed e canais próprios.</p></div>
+    <div class="check-item"><div class="check-mark">✓</div><p><strong>Reposte os cortes</strong> — eles ampliam o alcance da sua marca nas redes.</p></div>
+    <div class="check-item"><div class="check-mark">✓</div><p><strong>Prepare seu atendimento</strong> — para receber bem quem chegar através da parceria.</p></div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">pulso<span>.</span></div>
+    <div class="footer-tag">As conversas que estão movimentando a saúde.</div>
+    <div class="footer-meta">
+      <div><strong>Patrocinador</strong><%= sponsor.company %></div>
+      <div><strong>Responsável</strong><%= sponsor.contact_name || '—' %></div>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

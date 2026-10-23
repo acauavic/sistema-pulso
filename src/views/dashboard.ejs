@@ -8,16 +8,56 @@
     <p class="voz">Bem-vindo(a) à gestão do <%= podcastName %>.</p>
   <% } %>
 </header>
+<%- include('partials/app-card') %>
+
+<% if (outToday && (outToday.items.length || outToday.goal.target || outToday.toApproach)) { %>
+<section class="card today" aria-labelledby="today-h">
+  <div class="today-head"><h2 id="today-h">Hoje</h2><% if (outToday.items.length > 6) { %><a class="small" href="/convidados?view=lista&status=convite_enviado&followup=1">Ver os follow-ups de convidados</a><% } %></div>
+  <div class="today-grid">
+    <div>
+      <span class="kicker">Follow-ups</span>
+      <% if (!outToday.items.length) { %><p class="small muted">Nenhum follow-up para hoje. Tudo em dia.</p><% } %>
+      <ul class="plain today-list">
+        <% outToday.items.slice(0, 6).forEach(function (x) { %>
+        <li>
+          <a href="<%= outBase(x.kind) %>/<%= x.id %>#abordagens"><strong><%= x.name %></strong></a>
+          <span class="mono small muted"><%= x.kind === 'guest' ? 'CONVIDADO' : 'PATROCINADOR' %><%= x.lastChannel ? ' · ' + CHANNELS[x.lastChannel].toUpperCase() : '' %></span>
+          <span class="outreach-chip <%= x.d.tone %> small"><%= x.d.short %></span>
+        </li>
+        <% }) %>
+      </ul>
+    </div>
+    <% if (outToday.goal.target) { var done = outToday.goal.done, target = outToday.goal.target, pct = Math.min(100, Math.round(done / target * 100)); %>
+    <div class="goal">
+      <span class="kicker">Meta de patrocinadores</span>
+      <p class="goal-n"><span class="mono <%= done >= target ? 'hit' : '' %>"><%= done %></span><span class="muted"> / <%= target %></span></p>
+      <p class="small muted goal-l">abordagens de patrocinadores hoje</p>
+      <svg class="goal-bar <%= done >= target ? 'hit' : '' %>" viewBox="0 0 100 4" preserveAspectRatio="none" role="img" aria-label="<%= done %> de <%= target %> abordagens"><rect class="bg" width="100" height="4" rx="2"/><rect class="fg" width="<%= pct %>" height="4" rx="2"/></svg>
+      <p class="small muted"><%= outToday.toApproach ? outToday.toApproach + ' patrocinador' + (outToday.toApproach === 1 ? '' : 'es') + ' seu' + (outToday.toApproach === 1 ? '' : 's') + ' ainda sem abordagem' : (done >= target ? 'Meta de hoje cumprida.' : 'Registre cada abordagem na página do patrocinador.') %> · <a href="/patrocinadores">abrir patrocinadores</a></p>
+    </div>
+    <% } %>
+  </div>
+</section>
+<% } %>
 
 <% if (can('guests.read')) { %>
 <section class="stat-grid" aria-label="Convidados por etapa">
   <% cards.forEach(function (c) { %>
     <a class="stat" href="/convidados?view=lista&status=<%= c.key %>">
       <span class="stat-label"><%= c.label %></span>
-      <span class="stat-n <%= c.key === 'confirmado' && c.n ? 'hl' : '' %>"><%= c.n %></span>
+      <span class="stat-n <%= c.key === 'em_agendamento' && c.n ? 'hl' : '' %>"><%= c.n %></span>
     </a>
   <% }) %>
 </section>
+
+<% if (money) { %>
+<a class="card money-strip" href="/financeiro">
+  <span class="kicker">Financeiro</span>
+  <span><span class="mono"><%= fmt.formatBRL(money.out7) %></span> a pagar nos próximos 7 dias</span>
+  <span class="<%= money.late ? 'err' : 'muted' %>"><%= money.late ? money.late + ' conta' + (money.late === 1 ? '' : 's') + ' atrasada' + (money.late === 1 ? '' : 's') : 'nada atrasado' %></span>
+  <span class="<%= money.toBuy ? 'warn' : 'muted' %>"><%= money.toBuy ? money.toBuy + ' item' + (money.toBuy === 1 ? '' : 'ns') + ' de estoque para repor' : 'estoque em dia' %></span>
+</a>
+<% } %>
 
 <div class="grid-2 tight">
   <section class="card">
@@ -26,7 +66,7 @@
       <div class="empty">
         <%- include('partials/pulse-line') %>
         <strong>Nenhuma gravação marcada</strong>
-        <span>Confirme um convidado com data futura e ele aparece aqui.</span>
+        <span>Quando um convidado entra em Agendado, a gravação aparece aqui.</span>
       </div>
     <% } %>
     <ul class="plain upcoming">

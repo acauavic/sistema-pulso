@@ -1,0 +1,47 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker">Gestão · Convites e parcerias</span><h1>WhatsApp dos convites</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'whatsapp' }) %>
+<p class="lead">Quando o convidado aceita o convite, ou o patrocinador clica em "Quero ser patrocinador", ele é levado a um WhatsApp com a mensagem já escrita. Aqui você escolhe qual número recebe e o que a mensagem diz.</p>
+<div class="stack">
+  <% Object.keys(contacts.GROUPS).forEach(function (name) { var g = contacts.GROUPS[name], c = cur[name]; %>
+  <section class="card">
+    <div class="row spread">
+      <div><h2><%= g.label %></h2><p class="small muted">Recebe quem clica nos botões do <%= name === 'producao' ? 'convite do convidado' : 'media kit e do portal do patrocinador' %>.</p></div>
+      <button class="btn sm" type="button" data-modal-open="m-<%= name %>"><%- icon('pencil', 14) %> Editar</button>
+    </div>
+    <dl class="kv">
+      <dt>WhatsApp</dt><dd><span class="mono"><%= contacts.pretty(c.number) %></span> <a class="small" href="https://wa.me/<%= c.number %>" target="_blank" rel="noopener noreferrer">testar</a><% if (c.numberFromEnv) { %> <span class="small muted">· padrão do servidor</span><% } %></dd>
+      <% Object.keys(g.messages).forEach(function (k) { %>
+      <dt><%= g.messages[k].label %></dt><dd class="pre small"><%= c.messages[k].text %><% if (!c.messages[k].custom) { %> <span class="muted">(mensagem padrão)</span><% } %></dd>
+      <% }) %>
+    </dl>
+  </section>
+  <% }) %>
+  <section class="card">
+    <h2>Página da plateia</h2>
+    <p class="small muted">O WhatsApp de quem pede uma vaga na plateia fica em <a href="/plateia/painel">Plateia &gt; Ajustes da página</a>, junto com preço e local.</p>
+    <p class="mono"><%= plateiaWa ? contacts.pretty(plateiaWa.replace(/\D/g, '')) : 'não definido' %></p>
+  </section>
+</div>
+
+<% Object.keys(contacts.GROUPS).forEach(function (name) { var g = contacts.GROUPS[name], c = cur[name]; %>
+<dialog class="modal" id="m-<%= name %>" aria-labelledby="m-<%= name %>-h" <%= openGroup === name ? 'data-open-on-load' : '' %>>
+  <form method="post" action="/gestao/whatsapp" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="grupo" value="<%= name %>">
+    <h2 id="m-<%= name %>-h"><%= g.label %></h2>
+    <label>WhatsApp
+      <input type="text" name="numero" inputmode="tel" value="<%= c.numberFromEnv ? '' : contacts.pretty(c.number) %>" placeholder="<%= contacts.pretty(c.number) %> (padrão do servidor)">
+    </label>
+    <p class="small muted">Com DDD (e o código do país, se for de fora do Brasil). Em branco, vale o padrão do servidor.</p>
+    <% Object.keys(g.messages).forEach(function (k) { var m = g.messages[k]; %>
+    <label><%= m.label %>
+      <textarea name="msg_<%= k %>" rows="3" maxlength="600"><%= c.messages[k].text %></textarea>
+    </label>
+    <p class="small muted"><%= m.hint %></p>
+    <% }) %>
+    <p class="small muted">Use <span class="mono">{nome}</span> para o nome d<%= name === 'producao' ? 'o convidado' : 'a empresa' %> e <span class="mono">{podcast}</span> para o nome do podcast. Exemplo com <%= sample[name] %>.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% }) %>
+<%- include('../partials/foot') %>

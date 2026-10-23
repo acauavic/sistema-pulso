@@ -6,5 +6,11 @@ node_modules/
 stack.yml
 
 *.log
+# miniaturas da galeria geradas em desenvolvimento (no servidor ficam num volume)
+data/
 .DS_Store
 ._*
+
+# segredos da VPS gerados pelo deploy/instalar.sh
+deploy/.env
+deploy/.primeiro-admin

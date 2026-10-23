@@ -1,0 +1,118 @@
+<%- include('../partials/head') %>
+<%
+  var KINDS = { post_quote: 'Posts de frase', post_split: 'Tela dividida', carousel: 'Carrossel' };
+  var epLabel = function (e) { return (e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '') + e.title; };
+  var unassigned = clips.filter(function (c) { return !c.episode_id; });
+  var assigned = clips.filter(function (c) { return c.episode_id; });
+  var postCount = postGroups.reduce(function (n, g) { return n + g.covers.length; }, 0);
+%>
+<div class="page-head">
+  <div><span class="kicker">Cortes, posts e carrosséis</span><h1>Conteúdo<%= onlyEpisode ? ' · ' + epLabel(onlyEpisode) : '' %></h1></div>
+  <div class="row">
+    <% if (only) { %><a class="btn ghost" href="/episodios/<%= only %>"><%- icon('arrow-left') %> Voltar ao episódio</a><a class="btn" href="/conteudo">Ver tudo</a><% } %>
+  </div>
+</div>
+<p class="lead">O que sai de cada episódio fica aqui, fora do card do episódio. O editor envia os cortes (vários vídeos de uma vez); o sistema lê cada um e sugere título, legenda e capas; depois cada corte é atribuído a um episódio já gravado.</p>
+
+<div class="tabs-wrap" data-tabs data-default="cortes">
+  <div class="tabbar" role="tablist" aria-label="Tipos de conteúdo">
+    <button type="button" role="tab" data-tab-btn="cortes" aria-controls="pane-cortes">Cortes <span class="count"><%= clips.length %></span></button>
+    <button type="button" role="tab" data-tab-btn="posts" aria-controls="pane-posts">Posts e carrosséis <span class="count"><%= postCount %></span></button>
+  </div>
+
+  <div class="pane" id="pane-cortes" data-pane-id="cortes" data-cortes data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
+    <% if (perm.cut) { %>
+    <section class="card">
+      <h2>Enviar cortes</h2>
+      <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } else { %>
+      <p class="small muted">Selecione vários vídeos de uma vez (MP4, MOV, M4V, WebM ou MKV). Cada um recebe um nome interno (Corte 1, Corte 2…) que você pode trocar.<%= aiReady ? '' : ' A leitura por IA (fala, rostos, título e capas) não está completa neste servidor.' %></p>
+      <div class="uploader" data-uploader data-base="/cortes/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="Cortes" data-hash="cortes">
+        <input type="file" multiple accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
+        <button class="btn primary" type="button" data-start><%- icon('upload') %> Enviar cortes</button>
+        <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+        <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
+      </div>
+      <% } %>
+    </section>
+    <% } %>
+
+    <% if (moments && moments.length) { %>
+    <section class="card top-gap">
+      <h2>Momentos que a IA sugere cortar</h2>
+      <p class="small muted">Só uma dica, tirada da análise do episódio. Nada é cortado sozinho.</p>
+      <ul class="plain moment-list">
+        <% moments.forEach(function (m) { %><li><span class="handle"><%= fmt.formatClock(m.start_ms) %>–<%= fmt.formatClock(m.end_ms) %></span> <strong><%= m.titulo %></strong><% if (m.motivo) { %><span class="small muted"> — <%= m.motivo %></span><% } %></li><% }) %>
+      </ul>
+    </section>
+    <% } %>
+
+    <% if (!clips.length) { %>
+    <div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhum corte <%= only ? 'neste episódio' : 'ainda' %>.</strong></p><p class="muted small">Envie os vídeos editados acima. Eles aparecem aqui já com título, legenda e capas sugeridos.</p></div>
+    <% } %>
+
+    <% if (unassigned.length) { %>
+    <h2 class="top-gap">Sem episódio (<%= unassigned.length %>)</h2>
+    <p class="small muted">Escolha o episódio de cada corte. Só aparecem episódios que já foram gravados.</p>
+    <div class="clip-grid">
+      <% unassigned.forEach(function (c) { %><%- include('_clip_card', { c: c }) %><% }) %>
+    </div>
+    <% } %>
+
+    <% if (assigned.length) { %>
+    <h2 class="top-gap">Atribuídos (<%= assigned.length %>)</h2>
+    <div class="clip-grid">
+      <% assigned.forEach(function (c) { %><%- include('_clip_card', { c: c }) %><% }) %>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="pane" id="pane-posts" data-pane-id="posts" hidden>
+    <% if (!postGroups.length) { %>
+    <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum post ainda.</strong></p><p class="muted small">Quando o episódio for analisado pela IA (ao entrar em finalização), o sistema monta posts de frase, tela dividida e carrossel.</p></div>
+    <% } %>
+    <% postGroups.forEach(function (g) { %>
+    <section class="card top-gap">
+      <div class="row spread">
+        <div><span class="kicker"><%= g.episode.number ? 'EP.' + String(g.episode.number).padStart(3, '0') : 'Episódio' %></span><h2><a href="/episodios/<%= g.episode.id %>"><%= g.episode.title %></a></h2><% if (g.episode.guest_name) { %><p class="small muted"><%= g.episode.guest_name %></p><% } %></div>
+        <% if (perm.cut && g.canGenerate && aiReady) { %>
+        <form method="post" action="/episodios/<%= g.episode.id %>/capas/gerar" class="inline">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="conteudo">
+          <% ['post_quote', 'post_split', 'carousel'].forEach(function (k) { %><input type="hidden" name="kinds" value="<%= k %>"><% }) %>
+          <button class="btn sm" type="submit"><%= g.covers.length ? 'Gerar de novo' : 'Gerar posts' %></button>
+        </form>
+        <% } %>
+      </div>
+      <% if (!g.covers.length) { %><p class="muted">Ainda sem posts.</p><% } %>
+      <% ['post_quote', 'post_split', 'carousel'].forEach(function (kind) { var list = g.covers.filter(function (c) { return c.kind === kind; }); if (!list.length) return; %>
+      <h3 class="capas-kind"><%= KINDS[kind] %></h3>
+      <div class="cover-grid">
+        <% list.forEach(function (c) { var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
+        <figure class="cover-card <%= c.approved ? 'approved' : '' %>">
+          <a href="/capas/<%= c.id %>/imagem" target="_blank" rel="noopener"><img src="/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
+          <figcaption>
+            <span class="small"><%= c.label || '' %></span>
+            <span class="row small">
+              <% if (c.approved) { %><span class="badge b-green">aprovada</span><% } %>
+              <% if (!c.auto) { %><span class="badge b-gray">editada</span><% } %>
+              <% if (issues) { %><span class="badge b-red" title="<%= (l.issues || []).join(' ') %>"><%= issues %> problema(s)</span><% } else if (warns) { %><span class="badge b-amber" title="<%= (l.warnings || []).join(' ') %>"><%= warns %> aviso(s)</span><% } else { %><span class="badge b-gray">conferida</span><% } %>
+              <span class="handle muted"><%= c.width %>×<%= c.height %> · <%= fmt.formatBytes(c.size_bytes) %></span>
+            </span>
+            <span class="row">
+              <a class="btn sm" href="/capas/<%= c.id %>/imagem?baixar=1"><%- icon('download', 14) %> Baixar</a>
+              <% if (perm.cut) { %><a class="btn sm" href="/capas/<%= c.id %>/editar">Editar</a><% } %>
+              <% if (perm.publish) { %>
+              <form method="post" action="/capas/<%= c.id %>/aprovar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="aprovar" value="<%= c.approved ? '0' : '1' %>"><button class="btn sm <%= c.approved ? '' : 'primary' %>" type="submit"><%= c.approved ? 'Tirar aprovação' : 'Aprovar' %></button></form>
+              <% } %>
+              <% if (perm.cut) { %><form method="post" action="/capas/<%= c.id %>/excluir" class="inline" data-confirm="Excluir esta imagem?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">excluir</button></form><% } %>
+            </span>
+          </figcaption>
+        </figure>
+        <% }) %>
+      </div>
+      <% }) %>
+    </section>
+    <% }) %>
+  </div>
+</div>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

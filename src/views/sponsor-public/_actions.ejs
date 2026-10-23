@@ -1,0 +1,8 @@
+<%# Botões de uma pergunta do formulário. Variável: q (da lista de perguntas). %>
+<div class="q-actions" data-actions hidden>
+  <button type="button" class="btn-submit" data-act="responder">Salvar e continuar</button>
+  <% if (q.skippable) { %><button type="button" class="btn-ghost" data-act="pular">Responder depois</button><% } %>
+  <% if (q.na) { %><button type="button" class="btn-ghost" data-act="nao_se_aplica"><%= q.na %></button><% } %>
+  <button type="button" class="btn-link" data-act="voltar">Voltar</button>
+</div>
+<p class="q-msg" data-msg role="alert"></p>

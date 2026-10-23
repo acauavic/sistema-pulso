@@ -1,0 +1,65 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Avisos para você</span><h1>Notificações</h1></div>
+  <% if (canConfig) { %><a class="btn ghost" href="/gestao/lembretes"><%- icon('settings') %> Endereço, horário e textos</a><% } %>
+</div>
+<%- include('../partials/notif-tabs') %>
+<p class="lead">Quem está agendado precisa receber um lembrete 3 dias antes, 1 dia antes, no dia de manhã e 3 horas antes da gravação. Aqui estão os que pedem a sua mensagem agora.</p>
+
+
+<section class="stack top-gap">
+  <h2>Na hora de mandar <% if (q.now.length) { %><span class="count"><%= q.now.length %></span><% } %></h2>
+  <% if (!q.now.length) { %>
+  <div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum lembrete pendente</strong><span>Quando chegar a hora de um lembrete, ele aparece aqui e você recebe um aviso.</span></div>
+  <% } %>
+  <% q.now.forEach(function (it) { %>
+  <article class="card reminder-card is-current">
+    <div class="row spread">
+      <div><a href="/convidados/<%= it.guest.id %>#lembretes"><strong><%= it.guest.name %></strong></a>
+        <span class="handle muted"> · gravação <%= fmt.formatDateTime(it.guest.proposed_at) %></span></div>
+      <span class="badge b-amber"><%= it.label %></span>
+    </div>
+    <p class="small muted"><%= it.hint %><%= it.withAddress ? ' (com o endereço)' : '' %></p>
+    <details class="more"><summary>Ver mensagem</summary><p class="pre small"><%= it.text %></p></details>
+    <% if (canSend) { %><%- include('../partials/reminder-actions', { it: it, guestId: it.guest.id, guestName: it.guest.name, voltar: '/notificacoes/lembretes' }) %><% } %>
+  </article>
+  <% }) %>
+</section>
+
+<section class="stack top-gap">
+  <h2>Próximos</h2>
+  <% if (!q.next.length) { %><p class="muted small">Nenhum lembrete a caminho. Eles nascem quando um convidado fica em Agendado, com data futura.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Convidado</th><th>Gravação</th><th>Próximo lembrete</th><th class="num">Quando</th></tr></thead>
+    <tbody>
+      <% q.next.forEach(function (it) { %>
+      <tr>
+        <td><a href="/convidados/<%= it.guest.id %>#lembretes"><strong><%= it.guest.name %></strong></a></td>
+        <td class="nowrap mono"><%= fmt.formatDateTime(it.guest.proposed_at) %></td>
+        <td><%= it.label %><span class="small muted"> · <%= it.hint %></span></td>
+        <td class="nowrap mono num"><%= fmt.formatDateTime(it.due) %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+
+<section class="stack top-gap">
+  <h2>Já enviados</h2>
+  <p class="small muted">De quem ainda vai gravar. Dá para reenviar a mensagem se o convidado não respondeu.</p>
+  <% if (!q.sent.length) { %><p class="muted small">Nada enviado ainda.</p><% } else { %>
+  <ul class="plain reminder-sent">
+    <% q.sent.forEach(function (it) { %>
+    <li>
+      <div class="row spread">
+        <span><a href="/convidados/<%= it.guest.id %>#lembretes"><%= it.guest.name %></a> <span class="small muted">· <%= it.label.toLowerCase() %></span>
+          <span class="handle muted"> · <%= it.sendCount > 1 ? it.sendCount + '× · último ' : '' %><%= fmt.formatDateTime(it.sentAt) %><%= it.sentBy ? ' · ' + it.sentBy : '' %></span></span>
+        <% if (canSend) { %><%- include('../partials/reminder-actions', { it: it, guestId: it.guest.id, guestName: it.guest.name, voltar: '/notificacoes/lembretes' }) %><% } %>
+      </div>
+    </li>
+    <% }) %>
+  </ul>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

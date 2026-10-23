@@ -1,0 +1,19 @@
+<%# Frases fortes e momentos de corte sugeridos pela IA. Variáveis: meta, fmt %>
+<% var sug = (meta && meta.suggestions) || {}; var nq = (sug.quotes || []).length, nm = (sug.moments || []).length; %>
+<% if (nq || nm) { %>
+<details class="card more-card top-gap">
+  <summary><strong>Ideias da IA para posts e cortes</strong> <span class="count"><%= nq + nm %></span></summary>
+  <% if (nq) { %>
+  <h3 class="top-gap">Frases fortes</h3>
+  <ul class="plain quote-list">
+    <% sug.quotes.forEach(function (q) { %><li><span class="voz">“<%= q.frase %>”</span> <span class="handle muted"><%= q.at_ms != null ? fmt.formatClock(q.at_ms) : '' %><%= q.quem ? ' · ' + q.quem : '' %></span></li><% }) %>
+  </ul>
+  <% } %>
+  <% if (nm) { %>
+  <h3 class="top-gap">Momentos para cortes</h3>
+  <ul class="plain">
+    <% sug.moments.forEach(function (m) { %><li><strong><%= m.titulo %></strong> <span class="handle muted"><%= fmt.formatClock(m.start_ms) %>–<%= fmt.formatClock(m.end_ms) %></span><br><span class="small muted"><%= m.motivo %></span></li><% }) %>
+  </ul>
+  <% } %>
+</details>
+<% } %>

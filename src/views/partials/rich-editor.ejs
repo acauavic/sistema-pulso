@@ -1,0 +1,46 @@
+<%#
+  Editor de texto rico (estilo ClickUp). Variáveis: name (campo escondido com o HTML), html (conteúdo inicial, já limpo), placeholder,
+  attach (nome dos campos com os ids dos anexos), audio (gravar áudio com transcrição), mentions (@), required, ctrlEnter, size ('md'|'sm').
+%>
+<%
+  var rteName = locals.name || 'description_html'; var rteAttach = locals.attach || 'attachment_ids';
+  var rteBtn = function (cmd, ic, label) { return '<button type="button" class="rte-btn" data-cmd="' + cmd + '" title="' + label + '" aria-label="' + label + '">' + icon(ic, 16) + '</button>'; };
+%>
+<div class="rte <%= locals.size === 'sm' ? 'rte-sm' : '' %>" data-rich data-attach="<%= rteAttach %>"<%- locals.required ? ' data-require="1"' : '' %><%- locals.ctrlEnter ? ' data-submit="ctrl-enter"' : '' %>>
+  <div class="rte-bar" role="toolbar" aria-label="Formatação do texto">
+    <%- rteBtn('bold', 'bold', 'Negrito (Ctrl+B)') %><%- rteBtn('italic', 'italic', 'Itálico (Ctrl+I)') %><%- rteBtn('underline', 'underline', 'Sublinhado (Ctrl+U)') %><%- rteBtn('strike', 'strikethrough', 'Tachado') %>
+    <span class="rte-sep" aria-hidden="true"></span>
+    <%- rteBtn('h2', 'heading-2', 'Título') %><%- rteBtn('ul', 'list', 'Lista com marcadores') %><%- rteBtn('ol', 'list-ordered', 'Lista numerada') %><%- rteBtn('quote', 'quote', 'Citação') %><%- rteBtn('code', 'code', 'Código') %>
+    <span class="rte-sep" aria-hidden="true"></span>
+    <%- rteBtn('link', 'link', 'Link') %><%- rteBtn('table', 'table', 'Tabela') %><%- rteBtn('attach', 'paperclip', 'Anexar imagem, PDF, HTML ou ZIP (ou cole uma imagem com Ctrl+V)') %><% if (locals.audio) { %><%- rteBtn('mic', 'mic', 'Gravar áudio (com transcrição)') %><% } %>
+  </div>
+  <div class="rte-linkbar" data-rte-linkbar hidden>
+    <div class="rte-linkrow" data-link-form>
+      <input type="url" placeholder="https://…" aria-label="Endereço do link" autocomplete="off">
+      <label class="check"><input type="checkbox" data-link-card> Miniatura</label>
+      <button type="button" class="btn sm" data-link-apply>Aplicar</button>
+      <button type="button" class="link small" data-link-open>Abrir</button>
+      <button type="button" class="link small danger-link" data-link-remove>Tirar o link</button>
+      <button type="button" class="icon-btn" data-link-close aria-label="Fechar"><%- icon('x', 14) %></button>
+    </div>
+    <div class="rte-linkrow" data-link-choice hidden>
+      <span class="small muted">Link colado. Mostrar como:</span>
+      <button type="button" class="btn sm ghost" data-link-url>Só a URL</button>
+      <button type="button" class="btn sm" data-link-thumb>Miniatura</button>
+    </div>
+  </div>
+  <div class="rte-tablebar" data-rte-tablebar hidden>
+    <span class="mono small muted">Tabela</span>
+    <button type="button" class="link small" data-table-op="row-above">Linha acima</button><button type="button" class="link small" data-table-op="row-below">Linha abaixo</button>
+    <button type="button" class="link small" data-table-op="col-left">Coluna à esquerda</button><button type="button" class="link small" data-table-op="col-right">Coluna à direita</button>
+    <button type="button" class="link small danger-link" data-table-op="row-del">Excluir linha</button><button type="button" class="link small danger-link" data-table-op="col-del">Excluir coluna</button><button type="button" class="link small danger-link" data-table-op="table-del">Excluir tabela</button>
+  </div>
+  <div class="rte-area rich-content" contenteditable="true" role="textbox" aria-multiline="true" aria-label="<%= locals.label || 'Texto' %>" data-placeholder="<%= locals.placeholder || 'Escreva aqui…' %>"><%- locals.html || '' %></div>
+  <input type="hidden" name="<%= rteName %>" value="" data-rte-html>
+  <div class="rte-files" data-rte-files></div>
+  <p class="rte-status small muted" data-rte-status role="status" aria-live="polite"></p>
+  <% if (locals.mentions) { %><ul class="mention-list" data-rte-mentions hidden role="listbox"></ul><% } %>
+  <input type="file" data-rte-picker multiple accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.html,.htm,.zip" hidden>
+</div>
+<script src="/static/richtext.js?v=<%= assetV %>" defer></script>
+<template data-rte-icons><span data-i="mic"><%- icon('mic', 16) %></span><span data-i="file-text"><%- icon('file-text', 16) %></span><span data-i="x"><%- icon('x', 14) %></span></template>

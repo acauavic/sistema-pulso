@@ -2,7 +2,7 @@
   <p class="auth-tag">As conversas que estão movimentando a saúde.</p>
   <div class="card auth-card">
     <span class="kicker">Gestão · Acesso da equipe</span>
-    <h1 style="margin-bottom:20px">Entrar</h1>
+    <h1 class="mb-20">Entrar</h1>
     <% if (notice) { %><div class="flash flash-ok"><%= notice %></div><% } %>
     <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
     <form method="post" action="/login" class="stack">
@@ -10,6 +10,6 @@
       <label>Senha<input type="password" name="password" autocomplete="current-password" required></label>
       <button class="btn primary lg" type="submit">Entrar</button>
     </form>
-    <p class="center small" style="margin:20px 0 0"><a href="/esqueci-senha">Esqueci minha senha</a></p>
+    <p class="center small mt-20 mb-0"><a href="/esqueci-senha">Esqueci minha senha</a></p>
   </div>
 <%- include('partials/foot') %>

@@ -1,7 +1,64 @@
 <%- include('partials/head') %>
-<div class="page-head"><div><span class="kicker">Sistema · Conexões</span><h1>Integrações</h1></div></div>
+<div class="page-head"><div><span class="kicker">Gestão · Conexões</span><h1>Integrações</h1></div></div>
+<%- include('partials/gestao-nav', { active: 'integracoes' }) %>
 <p class="lead">Status das integrações. Por segurança, chaves e senhas nunca aparecem aqui — elas ficam nas variáveis de ambiente do servidor.</p>
 <div class="grid-2 tight">
+  <section class="card" id="redes">
+    <h2>Redes sociais (publicação)</h2>
+    <p class="small muted">Por onde saem os vídeos, cortes, posts e carrosséis. Insights, comentários, directs e automações continuam pelo Upload-Post.</p>
+    <form method="post" action="/integracoes/redes" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <span class="kicker">Provedor em uso</span>
+      <ul class="plain provider-list">
+        <% social.providers.forEach(function (p) { %>
+        <li>
+          <label class="check provider-pick"><input type="radio" name="provedor" value="<%= p.id %>" <%= social.active === p.id ? 'checked' : '' %> <%= p.configured ? '' : 'disabled' %>>
+            <strong><%= p.label %></strong>
+            <% if (!p.configured) { %><span class="badge b-gray">sem chave</span><% } %>
+            <% if (social.active === p.id) { %><span class="mono small muted">em uso</span><% } %>
+          </label>
+          <% if (!p.configured) { %><span class="small muted provider-hint">Defina <span class="mono"><%= p.env %></span> no servidor.</span><% } %>
+        </li>
+        <% }) %>
+      </ul>
+      <div class="row"><button class="btn" type="submit">Usar o escolhido</button></div>
+    </form>
+
+    <span class="kicker top-gap">Publicar de verdade</span>
+    <ul class="plain provider-modes">
+      <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>
+      <li class="provider-mode">
+        <div class="provider-mode-head">
+          <strong><%= p.label %></strong>
+          <span class="badge <%= p.live ? 'b-green' : 'b-amber' %>"><%= p.live ? 'publica de verdade' : 'modo de teste' %></span>
+          <span class="mono small muted"><%= p.source === 'painel' ? 'definido aqui' : 'padrão do servidor (' + p.liveEnv + ')' %></span>
+        </div>
+        <% if (p.live) { %>
+        <form method="post" action="/integracoes/redes/modo" class="inline">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><input type="hidden" name="ligar" value="0">
+          <button class="btn sm" type="submit">Voltar ao modo de teste</button>
+        </form>
+        <% } else { %>
+        <p class="small muted m-0">No modo de teste o pedido é montado e conferido, mas nada sai para as redes<%= p.id === 'uploadpost' ? ' (nem as respostas das automações)' : '' %>.</p>
+        <details class="provider-live">
+          <summary class="small">Ligar a publicação de verdade</summary>
+          <form method="post" action="/integracoes/redes/modo" class="stack top-gap">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><input type="hidden" name="ligar" value="1">
+            <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi: o que for publicado pelo <%= p.label %><%= p.id === 'uploadpost' ? ' e as respostas das automações' : '' %> sai nas redes conectadas.</label>
+            <div><button class="btn sm" type="submit">Ligar publicação de verdade</button></div>
+          </form>
+        </details>
+        <% } %>
+      </li>
+      <% }) %>
+    </ul>
+
+    <div class="row top-gap">
+      <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>
+      <form method="post" action="/integracoes/redes/testar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><button class="btn sm ghost" type="submit">Testar <%= p.label %> (só leitura)</button></form>
+      <% }) %>
+    </div>
+  </section>
   <section class="card">
     <h2>E-mail transacional (Brevo SMTP)</h2>
     <p><span class="badge <%= smtp.ok ? 'b-green' : 'b-red' %>"><%= smtp.ok ? (smtp.dry ? 'Modo teste (não envia)' : 'Configurado') : 'Não configurado' %></span></p>
@@ -26,5 +83,55 @@
       <button class="btn" type="submit">Testar conexão (somente leitura)</button>
     </form>
   </section>
+  <section class="card">
+    <h2>InfinitePay (link de pagamento da plateia)</h2>
+    <p><span class="badge <%= infinitepay.ok ? 'b-green' : 'b-red' %>"><%= infinitepay.ok ? 'Configurado' : 'Não configurado' %></span></p>
+    <ul class="plain small">
+      <li>InfiniteTag: <code><%= infinitepay.handle ? '$' + infinitepay.handle : '—' %></code></li>
+      <% if (infinitepay.ok) { %><li>Webhook (já vai em cada link, não precisa cadastrar): <code class="raw"><%= infinitepay.webhook.replace(/\/[^/]+$/, '/…') %></code></li><% } %>
+      <li>O link nasce quando a produtora coloca o pedido em <strong>Em avaliação</strong>, com o valor da página (dá para alterar). Quando a InfinitePay avisa o pagamento, o pedido vira Selecionado e entra como recebido no Financeiro.</li>
+    </ul>
+    <% if (infinitepay.ok) { %>
+    <form method="post" action="/integracoes/infinitepay"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" type="submit">Gerar link de teste (R$ 1,00)</button></form>
+    <% } else { %><p class="small muted">Defina INFINITEPAY_HANDLE no servidor e ative o "checkout externo" no app da InfinitePay.</p><% } %>
+  </section>
+  <section class="card">
+    <h2>Google Agenda</h2>
+    <p><span class="badge <%= google.configured && google.validKey ? 'b-green' : 'b-red' %>"><%= google.configured ? (google.validKey ? 'Configurado' : 'Chave inválida') : 'Não configurado' %></span></p>
+    <ul class="plain small">
+      <li>Agenda: <code><%= google.calendarId || '—' %></code></li>
+      <li>Conta de serviço (compartilhe a agenda com este e-mail, com permissão para editar eventos): <code><%= google.serviceAccount || '—' %></code></li>
+      <li>Eventos no Google: <strong><%= google.synced %></strong><%= google.last ? ' · última atualização ' + fmt.formatDateTime(google.last) : '' %></li>
+      <li>Enviando: <strong><%= calTypes.filter(function (t) { return google.types[t.key].enabled; }).map(function (t) { return t.label; }).join(', ') || 'nada (tudo desligado)' %></strong>. A rotina confere a cada minuto e o painel atualiza o Google logo depois de qualquer alteração.</li>
+    </ul>
+    <% if (google.configured) { %>
+    <form method="post" action="/integracoes/google" class="row">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn" type="submit" name="acao" value="testar">Testar conexão (somente leitura)</button>
+      <button class="btn" type="submit" name="acao" value="sincronizar">Sincronizar agora</button>
+    </form>
+    <button class="btn" type="button" data-modal-open="modal-google">O que vai para a agenda</button>
+    <% } else { %><p class="small muted">Defina GOOGLE_CALENDAR_ID e a chave da conta de serviço no servidor (passo a passo no .env.example).</p><% } %>
+  </section>
 </div>
+<% if (google.configured) { %>
+<dialog class="modal" id="modal-google" aria-labelledby="mg-h">
+  <form method="post" action="/integracoes/google/tipos" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mg-h">O que vai para o Google Agenda</h2>
+    <p class="small muted">Marque o que entra na agenda. Gravações, lembretes e posts têm horário, então pedem uma duração; o resto entra como evento de dia inteiro. Desmarcar tira da agenda o que já foi enviado.</p>
+    <ul class="plain gcal-types">
+      <% calTypes.forEach(function (t) { %>
+      <li>
+        <label class="check"><input type="checkbox" name="on_<%= t.key %>" value="on" <%= google.types[t.key].enabled ? 'checked' : '' %>> <%= t.label %></label>
+        <% if (timed.has(t.key)) { %><label class="gcal-min small muted">Duração <input type="number" name="min_<%= t.key %>" min="15" max="720" step="5" value="<%= google.types[t.key].minutes %>"> min</label><% } else { %><span class="small muted mono">dia inteiro</span><% } %>
+      </li>
+      <% }) %>
+    </ul>
+    <label class="check"><input type="checkbox" name="invite" value="on" <%= inviteOn ? 'checked' : '' %>> Enviar o convite da gravação ao e-mail do convidado</label>
+    <p class="small muted">O convidado recebe um e-mail com o convite (Gmail, Outlook e Apple Calendário mostram "Adicionar"). Remarcou, vai a nova data; cancelou, vai o aviso. Quem já está agendado hoje <strong>não</strong> recebe e-mail: só os próximos agendamentos e as remarcações. Precisa do e-mail no cadastro do convidado.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <%- include('partials/foot') %>

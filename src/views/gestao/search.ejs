@@ -1,0 +1,84 @@
+<%- include('../partials/head') %>
+<% var KIND = { busca: ['b-amber', 'busca sem resultado'], pagina: ['b-gray', 'página nova'], dados: ['b-gray', 'dados novos'], frequente: ['b-gray', 'muito usado'] }; %>
+<div class="page-head"><div><span class="kicker">Gestão</span><h1>Busca global</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'busca' }) %>
+<p class="lead">A busca (Ctrl+K ou /) procura nos dados e em atalhos de ação. Conforme o sistema cresce, ela acompanha: aqui aparecem buscas que não encontraram nada, páginas novas sem atalho e dados novos que ainda não entram na busca.</p>
+
+<div class="grid-2 align-start">
+  <section class="card" id="sugestoes">
+    <h2>Sugestões<%= tips.length ? ' (' + tips.length + ')' : '' %></h2>
+    <% if (!tips.length) { %><p class="muted">Nada a sugerir agora. Tudo o que existe no sistema já está na busca.</p><% } %>
+    <% if (tips.length > 4) { %><p class="small muted">Mostrando as 4 primeiras. As outras ficam em "Ver mais".</p><% } %>
+    <ul class="plain tip-list">
+      <% tips.slice(0, 4).forEach(function (s) { %>
+      <li>
+        <div class="row"><span class="badge <%= KIND[s.kind][0] %>"><%= KIND[s.kind][1] %></span><strong><%= s.title %></strong></div>
+        <p class="small muted"><%= s.hint %></p>
+        <div class="row">
+          <% if (s.shortcut) { %><a class="btn sm" href="/gestao/busca?label=<%= encodeURIComponent(s.shortcut.label) %>&url=<%= encodeURIComponent(s.shortcut.url) %>&keywords=<%= encodeURIComponent(s.shortcut.keywords) %>&sugestao=<%= encodeURIComponent(s.key) %>#novo-atalho">Criar atalho</a><% } %>
+          <form method="post" action="/gestao/busca/dispensar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="key" value="<%= s.key %>"><button class="link small" type="submit">dispensar</button></form>
+        </div>
+      </li>
+      <% }) %>
+    </ul>
+    <% if (tips.length > 4) { %>
+    <details class="top-gap"><summary>Ver mais <%= tips.length - 4 %></summary>
+      <ul class="plain tip-list">
+        <% tips.slice(4).forEach(function (s) { %>
+      <li>
+        <div class="row"><span class="badge <%= KIND[s.kind][0] %>"><%= KIND[s.kind][1] %></span><strong><%= s.title %></strong></div>
+        <p class="small muted"><%= s.hint %></p>
+        <div class="row">
+          <% if (s.shortcut) { %><a class="btn sm" href="/gestao/busca?label=<%= encodeURIComponent(s.shortcut.label) %>&url=<%= encodeURIComponent(s.shortcut.url) %>&keywords=<%= encodeURIComponent(s.shortcut.keywords) %>&sugestao=<%= encodeURIComponent(s.key) %>#novo-atalho">Criar atalho</a><% } %>
+          <form method="post" action="/gestao/busca/dispensar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="key" value="<%= s.key %>"><button class="link small" type="submit">dispensar</button></form>
+        </div>
+      </li>
+        <% }) %>
+      </ul>
+    </details>
+    <% } %>
+  </section>
+
+  <div class="stack-lg">
+    <section class="card" id="novo-atalho">
+      <div class="row spread"><h2>Atalhos da equipe</h2><button class="btn sm" type="button" data-modal-open="modal-atalho"><%- icon('plus') %> Novo atalho</button></div>
+      <p class="small muted">Atalhos que a equipe cria aparecem na busca (Ctrl+K).</p>
+      <ul class="plain shortcut-list top-gap">
+        <% shortcuts.forEach(function (s) { %>
+        <li><div><strong><%= s.label %></strong> <span class="mono small"><%= s.url %></span><p class="small muted"><%= s.keywords || 'sem palavras-chave' %><%= s.perm ? ' · ' + s.perm : '' %><%= s.author ? ' · ' + s.author : '' %></p></div>
+          <form method="post" action="/gestao/busca/atalhos/<%= s.id %>/excluir" class="inline" data-confirm="Excluir este atalho?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger" type="submit">excluir</button></form></li>
+        <% }) %>
+        <% if (!shortcuts.length) { %><li class="muted small">Nenhum atalho criado pela equipe ainda.</li><% } %>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>O que mais buscam (30 dias)</h2>
+      <% if (!top.length) { %><p class="muted small">Ainda sem buscas registradas.</p><% } %>
+      <ul class="plain top-list"><% top.forEach(function (t) { %><li><span><%= t.q %></span><span class="mono"><%= t.n %></span></li><% }) %></ul>
+      <p class="small muted"><span class="mono"><%= misses %></span> buscas sem resultado no período.</p>
+    </section>
+
+    <section class="card">
+      <h2>O que a busca cobre</h2>
+      <p class="small muted">Dados: <%= providers.map(function (p) { return p.label; }).join(' · ') %>.</p>
+      <p class="small muted">Ações embutidas: <span class="mono"><%= actions.length %></span>. Para incluir dados novos, um provedor em <span class="mono">src/services/search.js</span>.</p>
+    </section>
+  </div>
+</div>
+<dialog class="modal modal-wide" id="modal-atalho" aria-labelledby="mat-h" <%= prefill.label || prefill.url ? 'data-open-on-load' : '' %>>
+  <h2 id="mat-h">Novo atalho</h2>
+      <form method="post" action="/gestao/busca/atalhos" class="stack">
+        <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="sugestao" value="<%= prefill.sugestao || '' %>">
+        <div class="grid-2 tight">
+          <label>Nome<input type="text" name="label" value="<%= prefill.label %>" maxlength="80" required placeholder="Ex.: Contratos de patrocínio"></label>
+          <label>Endereço<input type="text" name="url" value="<%= prefill.url %>" maxlength="300" required placeholder="/patrocinadores?etapa=ativo"></label>
+        </div>
+        <div class="grid-2 tight">
+          <label>Palavras-chave<input type="text" name="keywords" value="<%= prefill.keywords %>" maxlength="300" placeholder="contrato assinatura documento"></label>
+          <label>Quem vê<select name="perm"><option value="">Todo mundo</option><% perms.forEach(function (p) { %><option value="<%= p %>"><%= p %></option><% }) %></select></label>
+        </div>
+        <div class="row modal-actions"><button class="btn primary" type="submit">Criar atalho</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+      </form>
+</dialog>
+<%- include('../partials/foot') %>

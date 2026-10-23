@@ -1,0 +1,83 @@
+<%- include('../partials/head') %>
+<%- include('../partials/social-nav') %>
+<%
+  var items = tipo === 'video' ? clips : tipo === 'imagem' ? images.posts : tipo === 'story' ? images.stories : images.carousels;
+  var allowed = tipo === 'video' ? Object.keys(platforms).filter(function (k) { return platforms[k].clip; }) : (tipo === 'story' ? ['instagram'] : photoPlatforms);
+  var preset = tipo === 'video' ? defaults.clip : ['instagram'];
+  var hasConn = Object.keys(connected).length > 0;
+  var epLabel = function (x) { return (x.episode_number ? 'EP.' + String(x.episode_number).padStart(3, '0') + ' · ' : '') + (x.episode_title || ''); };
+  var dur = function (ms) { return ms ? Math.round(ms / 1000) + 's' : ''; };
+  var emptyText = { video: 'Todos os cortes prontos já foram publicados ou agendados. Envie novos em Conteúdo.', imagem: 'Nenhum post de imagem sem uso. Gere posts na finalização do episódio.', carrossel: 'Nenhum carrossel sem uso. Gere carrosséis na finalização do episódio.', story: 'Nenhuma imagem vertical sem uso (capas de Reels e posts verticais servem de story).' };
+%>
+<div class="toolbar">
+  <div class="seg" role="group" aria-label="Tipo de post">
+    <% [['video', 'Corte', clips.length], ['imagem', 'Post', images.posts.length], ['carrossel', 'Carrossel', images.carousels.length], ['story', 'Story', images.stories.length]].forEach(function (t) { %>
+    <a href="/social/novo?tipo=<%= t[0] %>" class="<%= tipo === t[0] ? 'on' : '' %>"><%= t[1] %> <span class="mono"><%= t[2] %></span></a>
+    <% }) %>
+  </div>
+</div>
+
+<% if (!items.length) { %>
+<div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nada sem uso aqui.</strong></p><p class="muted small"><%= emptyText[tipo] %></p></div>
+<% } else { %>
+<form method="post" action="/social/publicar" class="stack-lg" data-compose>
+  <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>">
+  <section>
+    <p class="small muted">Só aparece o que ainda não foi publicado nem agendado. Escolha <%= tipo === 'carrossel' ? 'um carrossel' : 'um item' %>.</p>
+    <div class="pick-grid">
+      <% if (tipo === 'video') { clips.forEach(function (c) { %>
+      <label class="pick">
+        <input type="radio" name="clip_id" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.post_title || c.title %>" data-caption="<%= c.caption || '' %>">
+        <% if (c.cover_id) { %><img src="/capas/<%= c.cover_id %>/imagem" alt="" loading="lazy"><% } else { %><span class="ph"><%- icon('film', 20) %></span><% } %>
+        <strong><%= c.post_title || c.title %></strong>
+        <span class="small muted"><%= epLabel(c) %><%= c.duration_ms ? ' · ' + dur(c.duration_ms) : '' %></span>
+        <% if (c.tested) { %><span class="badge b-gray">só testado</span><% } %>
+      </label>
+      <% }); } else if (tipo === 'carrossel') { images.carousels.forEach(function (g) { %>
+      <label class="pick">
+        <input type="radio" name="cover_ids" value="<%= g.slides.map(function (s) { return s.id; }).join(',') %>" data-episode="<%= g.episode_id || (g.slides[0] && g.slides[0].episode_id) || '' %>" required data-title="<%= g.label || 'Carrossel' %>">
+        <span class="slides"><% g.slides.slice(0, 3).forEach(function (s) { %><img src="/capas/<%= s.id %>/imagem" alt="" loading="lazy"><% }) %></span>
+        <strong><%= g.label || 'Carrossel' %></strong>
+        <span class="small muted"><%= epLabel(g) %> · <span class="mono"><%= g.slides.length %></span> slides</span>
+      </label>
+      <% }); } else { items.forEach(function (c) { %>
+      <label class="pick">
+        <input type="radio" name="cover_ids" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required data-title="<%= c.label || (tipo === 'story' ? 'Story' : 'Post') %>">
+        <img class="<%= tipo === 'imagem' ? 'sq' : '' %>" src="/capas/<%= c.id %>/imagem" alt="" loading="lazy">
+        <strong><%= c.label || (c.kind === 'post_quote' ? 'Frase' : c.kind === 'post_split' ? 'Tela dividida' : 'Capa vertical') %></strong>
+        <span class="small muted"><%= epLabel(c) %></span>
+      </label>
+      <% }); } %>
+    </div>
+  </section>
+
+  <% if (canPublish) { %>
+  <section class="card stack">
+    <h2>Onde e quando</h2>
+    <fieldset class="row wrap">
+      <legend>Redes</legend>
+      <% allowed.forEach(function (k) { var on = hasConn ? Boolean(connected[k]) && preset.indexOf(k) >= 0 : preset.indexOf(k) >= 0; %>
+      <label class="check"><input type="checkbox" name="platforms" value="<%= k %>" <%= on ? 'checked' : '' %>> <%= tipo === 'video' && platforms[k].clipLabel ? platforms[k].clipLabel : platforms[k].label %><% if (hasConn && !connected[k]) { %> <span class="small muted">(não conectada)</span><% } %></label>
+      <% }) %>
+    </fieldset>
+    <% if (tipo !== 'story') { %>
+    <%- include('../partials/ig-people', { episodeId: null, photo: tipo !== 'video' }) %>
+    <label><%= tipo === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" maxlength="300" data-fill="title"></label>
+    <label>Legenda<textarea name="description" rows="6" maxlength="5000" data-fill="caption"></textarea></label>
+    <% } else { %><input type="hidden" name="title" value="Story" data-fill="title"><% } %>
+    <label>Agendar <small class="muted">(vazio = <%= direct ? 'publicar agora' : 'publicar assim que a gestão aprovar' %>)</small><input type="datetime-local" name="agendar"></label>
+    <% if (direct) { %>
+    <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas</label>
+    <div><button class="btn primary" type="submit"><%- icon('send') %> Publicar</button></div>
+    <% } else { %>
+    <p class="small muted">O post vai para a revisão da gestão antes de sair. Você recebe um aviso quando ele for aprovado ou devolvido.</p>
+    <div><button class="btn primary" type="submit"><%- icon('send') %> Enviar para revisão</button></div>
+    <% } %>
+  </section>
+  <% } else { %>
+  <p class="muted small">Seu perfil não monta posts.</p>
+  <% } %>
+</form>
+<% } %>
+<script src="/static/social.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>
