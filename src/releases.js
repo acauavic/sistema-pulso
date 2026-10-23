@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.24.0', date: '2026-10-23', title: 'Aviso à gestão quando um corte fica disponível',
+    items: [
+      { kind: 'novo', text: 'Quando o editor sobe um corte e ele termina de ser preparado (capas sugeridas, título e legenda), a gestão recebe o aviso "Corte disponível", com o episódio, quem subiu e o que falta (atribuir ao episódio, escolher a capa e publicar). Vai uma vez por corte: "Ler de novo" não repete.' },
+      { kind: 'ajuste', text: 'O aviso entra no tipo "Etapas do episódio": dá para ligar o e-mail ou silenciar em Notificações, como os outros.' },
+    ],
+  },
+  {
     version: '1.23.2', date: '2026-10-22', title: 'Baixar a capa depois de editar',
     items: [
       { kind: 'correcao', text: 'Baixar uma capa logo depois de editá-la podia abrir uma página de erro ("NoSuchKey"): o navegador reaproveitava o endereço da imagem antiga, que é apagada ao salvar a edição. Agora o Baixar sempre pega a versão atual.' },

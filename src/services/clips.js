@@ -229,6 +229,7 @@ async function runProcess(job, { update }) {
     }
     await db.query("UPDATE episode_clips SET status = 'pronto', note = $2, error = NULL, updated_at = now() WHERE id = $1", [clip.id, notes.join(' ') || null]);
     await require('./notify').notify({ type: 'rotina', users: [clip.created_by], title: `${clip.title} está pronto`, body: notes.length ? notes.join(' ') : `${covers} capas sugeridas. Falta atribuir ao episódio e publicar.`, url: `/cortes/${clip.id}`, entity: { type: 'clip', id: clip.id } }).catch(() => {});
+    await announceToReview(clip, covers).catch((err) => console.error('[corte] aviso à gestão:', err.message));
     return { clip_id: clip.id, duration_ms: info.duration_ms, width: info.width, height: info.height, covers, transcript: Boolean(transcript) };
   } catch (err) {
     await db.query("UPDATE episode_clips SET status = 'erro', error = $2, updated_at = now() WHERE id = $1", [clip.id, String(err.message).slice(0, 500)]);
@@ -255,6 +256,25 @@ async function removeClip(clipId) {
 async function momentsFor(episodeId) {
   const { rows: [m] } = await db.query('SELECT suggestions FROM episode_metadata WHERE episode_id = $1', [episodeId]);
   return (m?.suggestions?.moments || []).filter((x) => Number.isFinite(x.start_ms) && Number.isFinite(x.end_ms));
+}
+
+// Corte disponível: a gestão (quem aprova e publica) fica sabendo uma vez por corte, na primeira vez que ele fica pronto
+// ("Ler de novo" não repete o aviso). Quem subiu já recebe o próprio "está pronto" e não entra aqui.
+async function announceToReview(clip, covers) {
+  const { can, ROLES } = require('../permissions');
+  const roles = Object.keys(ROLES).filter((r) => can(r, 'production.review'));
+  const { rows: users } = await db.query('SELECT id FROM users WHERE active AND role = ANY($1)', [roles]);
+  const { rows: [info] } = await db.query(
+    `SELECT u.name AS who, e.number, e.title AS ep_title FROM episode_clips c LEFT JOIN users u ON u.id = c.created_by
+       LEFT JOIN episodes e ON e.id = c.episode_id WHERE c.id = $1`, [clip.id]);
+  const ep = info?.ep_title ? ` · ${info.number ? `EP.${String(info.number).padStart(3, '0')} ` : ''}${info.ep_title}` : '';
+  const next = clip.episode_id ? 'Falta escolher a capa e publicar.' : 'Falta atribuir ao episódio, escolher a capa e publicar.';
+  await require('./notify').notify({
+    type: 'episodio', users: users.map((u) => u.id), actorId: clip.created_by,
+    title: `Corte disponível: ${clip.title}${ep}`,
+    body: `${info?.who ? `${info.who} subiu o corte. ` : ''}${covers ? `${covers} capas sugeridas. ` : ''}${next}`,
+    url: `/cortes/${clip.id}`, entity: { type: 'clip', id: clip.id }, dedupe: `corte-disponivel-${clip.id}`,
+  });
 }
 
 jobs.register('corte', runProcess);

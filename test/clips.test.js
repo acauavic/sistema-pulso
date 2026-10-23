@@ -236,6 +236,14 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
     const again = await clipRow(c.id);
     assert.equal(again.note, null);
     assert.equal((await h.db.query('SELECT count(*)::int n FROM episode_covers WHERE clip_id=$1', [c.id])).rows[0].n, 3);
+    // a gestão soube uma vez que o corte ficou disponível ("ler de novo" não repete); quem subiu não recebe esse aviso
+    const { rows: notes } = await h.db.query(
+      `SELECT u.role, n.title, n.body, n.url FROM notifications n JOIN users u ON u.id = n.user_id
+        WHERE n.type = 'episodio' AND n.entity_type = 'clip' AND n.entity_id = $1 ORDER BY n.id`, [c.id]);
+    assert.ok(notes.some((n) => n.role === 'gestao'), 'a gestão recebe');
+    assert.equal(notes.filter((n) => n.role === 'gestao').length, 1, 'uma vez só, mesmo lendo de novo');
+    assert.ok(!notes.some((n) => n.role === 'editor_video'), 'o editor que subiu não recebe');
+    assert.match(notes[0].title, new RegExp(`^Corte disponível: ${c.title}`)); assert.match(notes[0].body, /subiu o corte\. .*publicar\./); assert.equal(notes[0].url, `/cortes/${c.id}`);
   });
 
   it('um arquivo que não é vídeo de verdade vira erro claro (e dá para excluir)', async () => {

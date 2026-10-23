@@ -87,7 +87,7 @@ const NOTIFICATION_TYPES = {
   convite: { label: 'Respostas ao convite', hint: 'Convidado aceitou ou recusou o convite pelo link.' },
   lembrete: { label: 'Lembretes da gravação', hint: 'Hora de mandar o lembrete ao convidado agendado: 3 dias, 1 dia, no dia e 3 horas antes.' },
   financeiro: { label: 'Financeiro', hint: 'Contas vencendo ou atrasadas e estoque que precisa ser reposto.' },
-  episodio: { label: 'Etapas do episódio', hint: 'Episódio liberado para edição, enviado para revisão, com ajustes pedidos, aprovado, pronto ou publicado: cada aviso vai para quem precisa agir naquela etapa.' },
+  episodio: { label: 'Etapas do episódio', hint: 'Episódio liberado para edição, enviado para revisão, com ajustes pedidos, aprovado, pronto ou publicado, e corte disponível (o editor subiu e ficou pronto): cada aviso vai para quem precisa agir naquela etapa.' },
   cadencia: { label: 'Follow-ups', hint: 'Resumo do dia: convidados e patrocinadores com follow-up para hoje ou atrasado, e os que parecem perdidos por falta de resposta.' },
   alteracao: { label: 'Cadastro alterado', hint: 'Quem é responsável por um convidado, patrocinador, episódio, corte ou tarefa recebe um aviso quando outra pessoa altera o cadastro, com o que mudou.' },
   exclusao: { label: 'Cadastro excluído', hint: 'Quem era responsável por um convidado, patrocinador, episódio, corte ou tarefa recebe um aviso quando outra pessoa o exclui.' },
