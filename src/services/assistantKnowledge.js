@@ -141,7 +141,7 @@ const TOPICS = [
     steps: [
       'Social: publicações (a produtora pede e a gestão aprova), novo post, ideias por episódio (IA), insights e automações de comentários e directs. Conteúdo (cortes) guarda os cortes enviados, com título, legenda e capas sugeridos.',
       'No Instagram (Reels, post e carrossel) dá para convidar até 3 perfis para collab e marcar pessoas na janela de publicar: busca com sugestões (o convidado do episódio já vem no collab); em foto, toque na imagem para posicionar a marcação. Stories não têm collab.',
-      'As publicações saem pelo Upload-Post ou pela Zernio: a gestão escolhe em Integrações > Redes sociais (e testa a conexão). Cada publicação é acompanhada por onde saiu. Insights, comentários, directs e automações são do Upload-Post.',
+      'As publicações saem pelo Upload-Post ou pela Zernio: a gestão escolhe em Integrações > Redes sociais (e testa a conexão). Ali também liga ou desliga a publicação de verdade de cada um (no modo de teste o pedido é montado, mas nada sai). Cada publicação é acompanhada por onde saiu. Insights, comentários, directs e automações são do Upload-Post.',
       'Pelo assistente: "social" resume o que espera aprovação, agendados, com erro e sem uso.',
     ],
   },

@@ -71,6 +71,7 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
 
 // Envia uma publicação pendente (agora). Falhas viram status "erro" com o motivo, nunca ficam silenciosas.
 async function dispatch(pubId) {
+  await social.syncLive();
   const { rows: [pub] } = await db.query("UPDATE episode_publications SET status = 'enviando', updated_at = now() WHERE id = $1 AND status IN ('enviando','agendado') RETURNING *", [pubId]);
   if (!pub) return null;
   try {
@@ -161,6 +162,7 @@ async function refresh(pubId) {
 // Roda de tempos em tempos (rotina do sistema, uma réplica por vez): envia o que está agendado e vencido; atualiza o que está em andamento.
 // A reserva é atômica (agendado -> enviando com SKIP LOCKED): o mesmo agendamento nunca sai duas vezes.
 async function tick() {
+  await social.syncLive(); // o worker também respeita a chave de Integrações
   const { rows: due } = await db.query(
     `UPDATE episode_publications SET status = 'enviando', updated_at = now()
       WHERE id IN (SELECT id FROM episode_publications WHERE status = 'agendado' AND scheduled_at <= now() ORDER BY scheduled_at LIMIT 10 FOR UPDATE SKIP LOCKED)

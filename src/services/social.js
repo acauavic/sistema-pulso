@@ -290,6 +290,7 @@ let running = false;
 // Roda de tempos em tempos (index.js). Erros ficam na própria regra, à vista na tela.
 async function runRules() {
   if (running || !config.uploadPostConfigured) return 0;
+  await require('./socialApi').syncLive(); // responder de verdade ou só simular: chave de Integrações
   running = true;
   let total = 0;
   try {

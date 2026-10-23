@@ -362,7 +362,7 @@ imagem para posicionar cada marcação. Vai pelos dois provedores. Código: `src
 
 As publicações (episódio no YouTube, cortes, posts, carrosséis e stories) saem pelo provedor escolhido em **Integrações > Redes sociais**:
 **Upload-Post** (`UPLOAD_POST_KEY`, `UPLOAD_POST_LIVE`) ou **Zernio** (`ZERNIO_API_KEY`, opcional `ZERNIO_PROFILE_ID`, `ZERNIO_LIVE`). Sem a variável
-`*_LIVE=true` o provedor só simula. Cada publicação guarda por onde saiu e é acompanhada lá. Insights, comentários, directs, automações e a edição
+`*_LIVE=true` o provedor só simula, até a gestão ligar a **publicação de verdade** em Integrações > Redes sociais (a escolha do painel vale mais que a variável, na hora, com confirmação e auditoria). Cada publicação guarda por onde saiu e é acompanhada lá. Insights, comentários, directs, automações e a edição
 de um post já publicado continuam pelo Upload-Post. Código: `src/services/socialApi.js`, `src/services/zernio.js`.
 
 ## Envio de material: repetidos, retomada e armazenamento cheio

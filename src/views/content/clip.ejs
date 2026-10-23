@@ -102,7 +102,7 @@
       <button class="btn <%= publications.length ? '' : 'primary' %>" type="button" data-modal-open="modal-publicar"><%- icon('send') %> <%= perm.direct ? 'Publicar nas redes' : 'Pedir publicação' %></button>
       <dialog class="modal modal-wide" id="modal-publicar" aria-labelledby="mpub-h">
       <h2 id="mpub-h">Publicar nas redes</h2>
-      <% if (!uploadLive) { %><p class="notice small">Modo de teste: o pedido é montado e conferido, mas nada é enviado. Para ligar o envio de verdade: <span class="mono"><%= locals.provider ? provider.liveEnv : 'UPLOAD_POST_LIVE' %>=true</span>.</p><% } %>
+      <% if (!uploadLive) { %><p class="notice small">Modo de teste: o pedido é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
       <% if (social && !social.ok) { %><p class="notice small">Não consegui consultar as redes conectadas no <%= locals.provider ? provider.label : 'Upload-Post' %>: <%= social.error %></p><% } %>
       <form method="post" action="/cortes/<%= clip.id %>/publicar" class="stack">
         <input type="hidden" name="_csrf" value="<%= csrf %>">

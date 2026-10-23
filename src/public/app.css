@@ -1206,3 +1206,8 @@ dialog.modal.gallery[open] { display: flex; flex-direction: column; }
 .igp-dot { position: absolute; transform: translate(-50%, -50%); padding: 2px 8px; border-radius: var(--r-full); background: rgba(10, 10, 10, .78); color: var(--white); font: 500 11px var(--f-mono); white-space: nowrap; pointer-events: none; border: 1px solid rgba(250, 250, 250, .3); }
 .igp-dot.on { border-color: var(--lime); }
 .pub-people { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.provider-modes { display: grid; gap: 10px; margin: 6px 0 0; }
+.provider-mode { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-card); }
+.provider-mode-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.provider-live > summary { cursor: pointer; color: var(--text-2); font-weight: 600; } .provider-live > summary:hover { color: var(--text); }
+#redes .kicker { display: block; }

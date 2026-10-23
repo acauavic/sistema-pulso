@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.27.0', date: '2026-10-23', title: 'Publicação de verdade ligada pelo painel',
+    items: [
+      { kind: 'novo', text: 'Em Integrações > Redes sociais, a gestão liga e desliga a publicação de verdade de cada provedor (Upload-Post e Zernio), sem mexer no servidor. Ligar pede a confirmação e fica na auditoria; voltar ao modo de teste é um botão.' },
+      { kind: 'ajuste', text: 'A escolha vale na hora, inclusive para os agendamentos e para as respostas das automações (Upload-Post). Enquanto ninguém mexer no painel, vale o que está configurado no servidor, e a tela mostra de onde vem.' },
+    ],
+  },
+  {
     version: '1.26.0', date: '2026-10-23', title: 'Collab e marcação de pessoas no Instagram',
     items: [
       { kind: 'novo', text: 'Ao publicar no Instagram (Reels, post ou carrossel), dá para convidar até 3 perfis para collab e marcar pessoas. Cada campo tem busca com sugestões (o convidado do episódio, convidados com Instagram cadastrado e perfis já usados antes) e aceita vários perfis, inclusive um @ digitado ou colado.' },

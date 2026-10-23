@@ -42,6 +42,8 @@ function createApp() {
   app.use(require('./routes/sponsorPublic')); // media kit, formulário e portal do patrocinador (idem)
 
   app.use(mw.attachSession);
+  // modo de teste/publicação de verdade das redes (Integrações): relido do banco a cada 15 s, no máximo
+  app.use((req, res, next) => { require('./services/socialApi').syncLive().then(() => next(), next); });
   app.use(mw.verifyCsrf);
   app.use(require('./routes/auth'));
 

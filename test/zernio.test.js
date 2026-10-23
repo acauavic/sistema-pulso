@@ -76,7 +76,7 @@ describe('Zernio como alternativa ao Upload-Post', () => {
   it('escolher o provedor em Integrações: só com chave; Upload-Post continua o padrão até alguém trocar', async () => {
     assert.equal(await socialApi.activeId(), 'uploadpost');
     const page = (await as.gestao.get('/integracoes')).text;
-    assert.match(page, /Redes sociais \(publicação\)/); assert.match(page, /value="zernio"/); assert.match(page, /ZERNIO_LIVE=true/);
+    assert.match(page, /Redes sociais \(publicação\)/); assert.match(page, /value="zernio"/); assert.match(page, /padrão do servidor \(ZERNIO_LIVE\)/);
     h.config.zernioConfigured = false;
     const no = await as.gestao.act('/integracoes/redes', { provedor: 'zernio' }, { from: '/integracoes' });
     assert.equal(no.status, 302); assert.equal(await socialApi.activeId(), 'uploadpost', 'sem chave não troca');
@@ -93,7 +93,7 @@ describe('Zernio como alternativa ao Upload-Post', () => {
     const pub = await publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['instagram'], title: 'Post', description: 'Legenda do post', userId: u.gestao.id });
     assert.equal(pub.status, 'simulado'); assert.equal(pub.provider, 'zernio');
     assert.equal(calls.filter((c) => c.method === 'POST').length, 0, 'nenhum envio');
-    assert.match(socialApi.sentMessage(pub), /ZERNIO_LIVE não está ligado/);
+    assert.match(socialApi.sentMessage(pub), /NADA foi enviado pelo Zernio\. A publicação de verdade é ligada em Integrações/);
   });
 
   it('de verdade: envia com a conta conectada, guarda o id do post e acompanha até publicar', async () => {

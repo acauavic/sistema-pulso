@@ -8,22 +8,51 @@
     <p class="small muted">Por onde saem os vídeos, cortes, posts e carrosséis. Insights, comentários, directs e automações continuam pelo Upload-Post.</p>
     <form method="post" action="/integracoes/redes" class="stack">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <span class="kicker">Provedor em uso</span>
       <ul class="plain provider-list">
         <% social.providers.forEach(function (p) { %>
         <li>
           <label class="check provider-pick"><input type="radio" name="provedor" value="<%= p.id %>" <%= social.active === p.id ? 'checked' : '' %> <%= p.configured ? '' : 'disabled' %>>
             <strong><%= p.label %></strong>
-            <span class="badge <%= !p.configured ? 'b-gray' : p.live ? 'b-green' : 'b-amber' %>"><%= !p.configured ? 'sem chave' : p.live ? 'publica de verdade' : 'modo de teste' %></span>
+            <% if (!p.configured) { %><span class="badge b-gray">sem chave</span><% } %>
             <% if (social.active === p.id) { %><span class="mono small muted">em uso</span><% } %>
           </label>
-          <span class="small muted provider-hint"><% if (!p.configured) { %>Defina <span class="mono"><%= p.env %></span> no servidor.<% } else if (!p.live) { %>Para publicar de verdade: <span class="mono"><%= p.liveEnv %>=true</span>.<% } %></span>
+          <% if (!p.configured) { %><span class="small muted provider-hint">Defina <span class="mono"><%= p.env %></span> no servidor.</span><% } %>
         </li>
         <% }) %>
       </ul>
-      <div class="row">
-        <button class="btn" type="submit">Usar o escolhido</button>
-      </div>
+      <div class="row"><button class="btn" type="submit">Usar o escolhido</button></div>
     </form>
+
+    <span class="kicker top-gap">Publicar de verdade</span>
+    <ul class="plain provider-modes">
+      <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>
+      <li class="provider-mode">
+        <div class="provider-mode-head">
+          <strong><%= p.label %></strong>
+          <span class="badge <%= p.live ? 'b-green' : 'b-amber' %>"><%= p.live ? 'publica de verdade' : 'modo de teste' %></span>
+          <span class="mono small muted"><%= p.source === 'painel' ? 'definido aqui' : 'padrão do servidor (' + p.liveEnv + ')' %></span>
+        </div>
+        <% if (p.live) { %>
+        <form method="post" action="/integracoes/redes/modo" class="inline">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><input type="hidden" name="ligar" value="0">
+          <button class="btn sm" type="submit">Voltar ao modo de teste</button>
+        </form>
+        <% } else { %>
+        <p class="small muted m-0">No modo de teste o pedido é montado e conferido, mas nada sai para as redes<%= p.id === 'uploadpost' ? ' (nem as respostas das automações)' : '' %>.</p>
+        <details class="provider-live">
+          <summary class="small">Ligar a publicação de verdade</summary>
+          <form method="post" action="/integracoes/redes/modo" class="stack top-gap">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><input type="hidden" name="ligar" value="1">
+            <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi: o que for publicado pelo <%= p.label %><%= p.id === 'uploadpost' ? ' e as respostas das automações' : '' %> sai nas redes conectadas.</label>
+            <div><button class="btn sm" type="submit">Ligar publicação de verdade</button></div>
+          </form>
+        </details>
+        <% } %>
+      </li>
+      <% }) %>
+    </ul>
+
     <div class="row top-gap">
       <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>
       <form method="post" action="/integracoes/redes/testar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><button class="btn sm ghost" type="submit">Testar <%= p.label %> (só leitura)</button></form>

@@ -70,7 +70,7 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
     infinitepay: { ok: config.infinitepayConfigured, handle: config.infinitepay.handle, webhook: config.infinitepayConfigured ? require('../services/infinitePay').webhookUrl() : '' },
     appBaseUrl: config.appBaseUrl,
-    social: { active: await require('../services/socialApi').activeId(), providers: require('../services/socialApi').list().map((p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), env: p.env, liveEnv: p.liveEnv })) },
+    social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))) },
   });
 }));
 
@@ -82,6 +82,21 @@ router.post('/integracoes/redes', requirePerm('integrations.manage'), wrap(async
     await api.choose(String(req.body.provedor || ''));
     await audit(req, 'integracao.redes_provedor', 'system', null, { de: before, para: req.body.provedor });
     await req.flash('ok', `Publicações passam a sair pelo ${api.get(req.body.provedor).label}. As que já saíram continuam sendo acompanhadas por onde foram.`);
+  } catch (err) { await req.flash('error', err.message); }
+  res.redirect('/integracoes#redes');
+}));
+
+// Publicar de verdade ou só simular, por provedor. Ligar pede a confirmação na tela e fica na auditoria.
+router.post('/integracoes/redes/modo', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const api = require('../services/socialApi');
+  const id = String(req.body.provedor || ''); const on = req.body.ligar === '1';
+  try {
+    if (on && req.body.confirmar !== '1') throw new Error('Confirme que entende que a publicação passa a sair de verdade nas redes.');
+    await api.setLive(id, on);
+    await audit(req, on ? 'integracao.redes_publicar_de_verdade' : 'integracao.redes_modo_teste', 'system', null, { provedor: id });
+    await req.flash('ok', on
+      ? `${api.get(id).label}: publicação de verdade ligada. O que for publicado ${id === 'uploadpost' ? '(e as respostas das automações) ' : ''}sai nas redes.`
+      : `${api.get(id).label}: modo de teste. Os pedidos são montados e conferidos, mas nada sai para as redes.`);
   } catch (err) { await req.flash('error', err.message); }
   res.redirect('/integracoes#redes');
 }));
