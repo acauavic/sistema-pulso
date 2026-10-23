@@ -1,5 +1,5 @@
 // Conteúdo derivado do episódio, fora do card do episódio: cortes (o editor sobe vários vídeos, o sistema lê e o editor atribui a um
-// episódio já gravado), posts e carrosséis; e a publicação nas redes (Upload-Post). Cortar/atribuir: gestão e editor. Publicar: só gestão.
+// episódio já gravado), posts e carrosséis; e a publicação nas redes (Upload-Post ou Zernio, ver socialApi). Cortar/atribuir: gestão e editor. Publicar: só gestão.
 const express = require('express');
 const db = require('../db/pool');
 const config = require('../config');
@@ -8,6 +8,7 @@ const jobs = require('../services/jobs');
 const clips = require('../services/clips');
 const publishing = require('../services/publishing');
 const up = require('../services/uploadPost');
+const socialApi = require('../services/socialApi');
 const L = require('../services/platformLimits');
 const fmt = require('../utils/format');
 const C = require('../constants');
@@ -141,12 +142,13 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     eligibleEpisodes(),
     c.episode_id ? db.query('SELECT e.id, e.number, e.title, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.id = $1', [c.episode_id]) : { rows: [] },
   ]);
-  const social = canPublish(req.user.role) && config.uploadPostConfigured ? await up.connected() : null;
+  const provider = await socialApi.active();
+  const social = canPublish(req.user.role) && provider.configured() ? await provider.connected() : null;
   const thread = await require('../services/comments').list('clip', c.id);
   res.render('content/clip', {
     comments: thread,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
-    uploadPost: up, uploadLive: config.uploadPost.live, L, C,
+    uploadPost: up, uploadLive: provider.live(), provider, L, C,
     running: ['enviando', 'processando'].includes(c.status) || pubs.rows.some((p) => p.status === 'enviando'),
     perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role) },
   });
@@ -238,10 +240,7 @@ async function publish(req, res, { episodeId, clipId }) {
     const pub = await publishing.create({ episodeId, clipId, ...form, userId: req.user.id, review });
     await audit(req, 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, simulado: pub.status === 'simulado' });
     if (wantsJson(req)) return res.json({ ok: true, publication: pub });
-    await req.flash(pub.status === 'erro' ? 'error' : 'ok',
-      pub.status === 'revisao' ? 'Enviado para a revisão da gestão. Você recebe um aviso quando for aprovado ou devolvido.'
-        : pub.status === 'simulado' ? 'Modo de teste: o pedido foi montado e conferido, mas NADA foi enviado (UPLOAD_POST_LIVE não está ligado).'
-        : pub.status === 'agendado' ? 'Publicação agendada.' : pub.status === 'erro' ? `Não foi possível enviar: ${pub.error}` : 'Enviado ao Upload-Post. O andamento aparece abaixo.');
+    await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub, { trail: ' O andamento aparece abaixo.' }));
   } catch (err) {
     return fail(err.message);
   }

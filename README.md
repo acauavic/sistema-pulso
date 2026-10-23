@@ -352,6 +352,13 @@ Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`
 - **Visualizações**: combinações salvas de modo, tipos, responsável e concluídos. Da casa: **Tudo**, **Meu trabalho** (semana, só os meus e os do meu perfil, sem concluídos), **Produção** e **Dinheiro** (só para quem vê o financeiro). Qualquer pessoa salva as suas ("Salvar esta visualização" aparece quando os filtros não batem com nenhuma); **Gestão e Superadmin** (`calendar.share`) também compartilham com a equipe e apagam as dos outros. A visualização da equipe abre para cada perfil já limitada ao que ele enxerga.
 - O **assistente de IA** consulta o calendário (`calendario`): "o que tenho esta semana?".
 
+## Redes sociais: Upload-Post ou Zernio
+
+As publicações (episódio no YouTube, cortes, posts, carrosséis e stories) saem pelo provedor escolhido em **Integrações > Redes sociais**:
+**Upload-Post** (`UPLOAD_POST_KEY`, `UPLOAD_POST_LIVE`) ou **Zernio** (`ZERNIO_API_KEY`, opcional `ZERNIO_PROFILE_ID`, `ZERNIO_LIVE`). Sem a variável
+`*_LIVE=true` o provedor só simula. Cada publicação guarda por onde saiu e é acompanhada lá. Insights, comentários, directs, automações e a edição
+de um post já publicado continuam pelo Upload-Post. Código: `src/services/socialApi.js`, `src/services/zernio.js`.
+
 ## Envio de material: repetidos, retomada e armazenamento cheio
 
 - **Arquivos repetidos**: ao escolher arquivos, o sistema confere pelo nome o que já existe no episódio. O que tinha parado no meio **continua de onde parou**; para os que já subiram inteiros, a pessoa escolhe **não enviar de novo** (padrão), **substituir** (o antigo sai só quando o novo termina) ou **manter os dois**.

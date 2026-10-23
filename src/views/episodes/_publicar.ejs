@@ -10,7 +10,7 @@
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h2 id="mpb-h">Publicar no YouTube</h2>
     <p class="muted small">O episódio inteiro vai só para o YouTube, com o título, a descrição, as tags e a thumbnail aprovada.<%= thumb ? '' : ' Nenhuma thumbnail aprovada: o YouTube vai escolher um quadro.' %></p>
-    <% if (!uploadLive) { %><p class="notice small">Modo de teste: o pedido é montado e conferido, mas nada é enviado. Para ligar o envio de verdade: <span class="mono">UPLOAD_POST_LIVE=true</span>.</p><% } %>
+    <% if (!uploadLive) { %><p class="notice small">Modo de teste: o pedido é montado e conferido, mas nada é enviado. Para ligar o envio de verdade: <span class="mono"><%= locals.provider ? provider.liveEnv : 'UPLOAD_POST_LIVE' %>=true</span>.</p><% } %>
     <label class="check <%= ytLinked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="youtube" checked <%= ytLinked ? '' : 'disabled' %>> YouTube<% if (social && social.ok && social.platforms.youtube) { %> <span class="handle muted"><%= social.platforms.youtube.handle %></span><% } %></label>
     <label>Título <small class="counter" data-counter-for="ep-pt" data-max="<%= L.LIMITS.youtube.title.max %>" data-ideal="<%= L.LIMITS.youtube.title.ideal %>"></small><input type="text" id="ep-pt" name="title" value="<%= (meta && meta.yt_title) || ep.title %>" maxlength="100"></label>
     <details class="more">

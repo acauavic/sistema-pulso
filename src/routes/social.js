@@ -6,6 +6,7 @@ const config = require('../config');
 const social = require('../services/social');
 const publishing = require('../services/publishing');
 const up = require('../services/uploadPost');
+const socialApi = require('../services/socialApi');
 const tasksSvc = require('../services/tasks');
 const jobs = require('../services/jobs');
 const fmt = require('../utils/format');
@@ -17,7 +18,8 @@ const { wrap, isIntId } = require('../utils/wrap');
 const router = express.Router();
 const MEDIA = { video: 'Vídeo', imagem: 'Post', carrossel: 'Carrossel', story: 'Story' };
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Não encontrado.' });
-const live = () => config.uploadPost.live;
+const live = () => config.uploadPost.live; // automações e respostas (sempre pelo Upload-Post)
+const pubLive = async () => (await socialApi.active()).live(); // publicar (provedor escolhido)
 
 router.get('/social', requirePerm('social.read'), (req, res) => res.redirect('/social/publicacoes'));
 
@@ -30,7 +32,7 @@ router.get('/social/publicacoes', requirePerm('social.read'), wrap(async (req, r
     db.query('SELECT status, count(*)::int AS n FROM episode_publications GROUP BY status'),
   ]);
   res.render('social/publications', {
-    title: 'Social', tab: 'publicacoes', pubs, status, media, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: live(),
+    title: 'Social', tab: 'publicacoes', pubs, status, media, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: await pubLive(),
     counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])),
   });
 }));
@@ -48,8 +50,8 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   if (!pub) return notFound(res);
   const okPlatforms = (pub.results || []).filter((r) => r.ok).map((r) => r.platform);
   res.render('social/publication', {
-    title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: live(),
-    editable: okPlatforms.filter((p) => up.EDITABLE[p]), notEditable: okPlatforms.filter((p) => !up.EDITABLE[p]),
+    title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: socialApi.get(pub.provider).live(), provider: socialApi.get(pub.provider),
+    editable: socialApi.get(pub.provider).canEdit ? okPlatforms.filter((p) => up.EDITABLE[p]) : [], notEditable: socialApi.get(pub.provider).canEdit ? okPlatforms.filter((p) => !up.EDITABLE[p]) : okPlatforms,
     canPublish: can(req.user.role, 'social.publish'), mine: String(pub.created_by) === String(req.user.id),
   });
 }));
@@ -109,10 +111,11 @@ router.post('/social/publicacoes/:id/:acao(atualizar|repetir|cancelar)', require
 // ---------------------------------------------------------------- novo post (só o que ainda não foi usado)
 router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => {
   const tipo = MEDIA[req.query.tipo] ? req.query.tipo : 'video';
-  const [clips, images, conn] = await Promise.all([social.unusedClips(), social.unusedImages(), config.uploadPostConfigured ? up.connected() : { ok: false, platforms: {} }]);
+  const provider = await socialApi.active();
+  const [clips, images, conn] = await Promise.all([social.unusedClips(), social.unusedImages(), provider.configured() ? provider.connected() : { ok: false, platforms: {} }]);
   res.render('social/new', {
     title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
-    connected: conn.platforms || {}, live: live(), canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), pick: req.query.item || '',
+    connected: conn.platforms || {}, live: provider.live(), provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), pick: req.query.item || '',
   });
 }));
 
@@ -140,10 +143,7 @@ router.post('/social/publicar', requirePerm('social.request'), wrap(async (req, 
   try {
     const pub = await publishing.create({ ...target, media, platforms, title, description, scheduledAt, userId: req.user.id, review });
     await audit(req, review ? 'publicacao.pedida' : 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, tipo: media, simulado: pub.status === 'simulado' });
-    await req.flash(pub.status === 'erro' ? 'error' : 'ok',
-      pub.status === 'revisao' ? 'Enviado para a revisão da gestão. Você recebe um aviso quando for aprovado ou devolvido.'
-        : pub.status === 'simulado' ? 'Modo de teste: o pedido foi montado e conferido, mas NADA foi enviado (UPLOAD_POST_LIVE não está ligado).'
-        : pub.status === 'agendado' ? 'Publicação agendada.' : pub.status === 'erro' ? `Não foi possível enviar: ${pub.error}` : 'Enviado ao Upload-Post.');
+    await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub));
     return res.redirect(`/social/publicacoes/${pub.id}`);
   } catch (err) {
     return fail(err.message);

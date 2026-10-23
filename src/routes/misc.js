@@ -70,7 +70,29 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
     infinitepay: { ok: config.infinitepayConfigured, handle: config.infinitepay.handle, webhook: config.infinitepayConfigured ? require('../services/infinitePay').webhookUrl() : '' },
     appBaseUrl: config.appBaseUrl,
+    social: { active: await require('../services/socialApi').activeId(), providers: require('../services/socialApi').list().map((p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), env: p.env, liveEnv: p.liveEnv })) },
   });
+}));
+
+// Redes sociais: por qual provedor as publicações saem (Upload-Post ou Zernio) e teste de conexão (só leitura).
+router.post('/integracoes/redes', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const api = require('../services/socialApi');
+  try {
+    const before = await api.activeId();
+    await api.choose(String(req.body.provedor || ''));
+    await audit(req, 'integracao.redes_provedor', 'system', null, { de: before, para: req.body.provedor });
+    await req.flash('ok', `Publicações passam a sair pelo ${api.get(req.body.provedor).label}. As que já saíram continuam sendo acompanhadas por onde foram.`);
+  } catch (err) { await req.flash('error', err.message); }
+  res.redirect('/integracoes#redes');
+}));
+
+router.post('/integracoes/redes/testar', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const api = require('../services/socialApi');
+  const p = api.get(String(req.body.provedor || ''));
+  const conn = await p.connected({ force: true });
+  const names = Object.entries(conn.platforms || {}).map(([k, a]) => `${api.PLATFORMS[k]?.label || k}${a.handle ? ` (@${String(a.handle).replace(/^@/, '')})` : ''}${a.reauth ? ' — reconectar' : ''}`);
+  await req.flash(conn.ok ? 'ok' : 'error', conn.ok ? `${p.label} respondeu. Contas conectadas: ${names.join(', ') || 'nenhuma'}.` : `${p.label}: ${conn.error}`);
+  res.redirect('/integracoes#redes');
 }));
 
 // Link de teste de R$ 1,00 (só gera o link para conferir o handle; ninguém é cobrado se não pagar).

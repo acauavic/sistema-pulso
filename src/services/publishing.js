@@ -1,9 +1,9 @@
-// Publicação nas redes (Upload-Post): o episódio inteiro só no YouTube; cortes em TikTok, Shorts e Reels (ou o que estiver conectado).
+// Publicação nas redes (Upload-Post ou Zernio, ver socialApi): o episódio inteiro só no YouTube; cortes em TikTok, Shorts e Reels (ou o que estiver conectado).
 // Envio imediato ou agendado (o agendamento é nosso: o link do vídeo é gerado na hora de enviar, porque links assinados expiram).
 const db = require('../db/pool');
-const config = require('../config');
 const b2 = require('./b2');
-const up = require('./uploadPost');
+const up = require('./uploadPost'); // limites e validação (iguais para os dois provedores)
+const social = require('./socialApi');
 const L = require('./platformLimits');
 
 const addEvent = (episodeId, userId, message) => db.query("INSERT INTO episode_events (episode_id, user_id, type, message) VALUES ($1,$2,'publicacao',$3)", [episodeId, userId || null, message]);
@@ -47,17 +47,18 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
     ? up.validatePhotos({ media, platforms: list, title, description, scheduledAt, count: target.covers.length })
     : up.validate({ kind: target.kind, platforms: list, title, description, scheduledAt });
   if (!check.ok) { const err = new Error(check.issues[0]); err.issues = check.issues; throw err; }
-  if (config.uploadPost.live && !review) {
-    const conn = await up.connected();
+  const provider = await social.active();
+  if (provider.live() && !review) {
+    const conn = await provider.connected();
     if (!conn.ok) throw new Error(`Não foi possível consultar as redes conectadas: ${conn.error}`);
     const missing = list.filter((p) => !conn.platforms[p]);
-    if (missing.length) throw new Error(`Sem conta conectada no Upload-Post: ${missing.map((p) => up.PLATFORMS[p]?.label || p).join(', ')}.`);
+    if (missing.length) throw new Error(`Sem conta conectada no ${provider.label}: ${missing.map((p) => up.PLATFORMS[p]?.label || p).join(', ')}.`);
   }
   const { rows: [pub] } = await db.query(
-    `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
     [target.episode.id, target.kind === 'photo' ? null : clipId, list, L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')), description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings }),
-      target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, target.kind === 'photo' ? target.covers.map((c) => c.id) : []]);
+      target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, target.kind === 'photo' ? target.covers.map((c) => c.id) : [], provider.id]);
   const names = list.map((p) => up.PLATFORMS[p].label).join(', ');
   if (review) {
     await addEvent(target.episode.id, userId, `Publicação enviada para revisão da gestão (${names}): ${pub.title}`);
@@ -74,19 +75,21 @@ async function dispatch(pubId) {
   if (!pub) return null;
   try {
     const target = await loadTarget({ episodeId: pub.episode_id, clipId: pub.clip_id, media: pub.media, coverIds: pub.cover_ids });
-    if (target.kind === 'photo') return await dispatchPhotos(pub, target);
-    const conn = config.uploadPost.live ? await up.connected() : { platforms: {} };
+    // agendado/revisão: sai pelo provedor escolhido na hora de enviar (a gestão pode ter trocado nesse meio-tempo)
+    const provider = await social.active();
+    if (provider.id !== pub.provider) { await db.query('UPDATE episode_publications SET provider = $2 WHERE id = $1', [pub.id, provider.id]); pub.provider = provider.id; }
+    const conn = provider.live() ? await provider.connected() : { platforms: {} };
+    if (target.kind === 'photo') return await dispatchPhotos(pub, target, provider, conn);
     const videoUrl = await b2.presignGet(target.videoKey, { expires: up.MAX_LINK_SECONDS });
     let coverUrl = null;
     if (pub.cover_id) {
       const { rows: [cv] } = await db.query('SELECT storage_key FROM episode_covers WHERE id = $1', [pub.cover_id]);
       if (cv) coverUrl = await b2.presignGet(cv.storage_key, { expires: up.MAX_LINK_SECONDS });
     }
-    const fields = up.buildFields({
+    const sent = await provider.sendVideo({
       id: pub.id, kind: target.kind, platforms: pub.platforms, title: pub.title, description: pub.description, videoUrl,
       coverUrl: target.kind === 'clip' ? coverUrl : null, thumbnailUrl: target.kind === 'episode' ? coverUrl : null, tags: pub.options?.tags || [], accounts: conn.platforms,
     });
-    const sent = await up.send(fields);
     const state = sent.simulated ? 'simulado' : (sent.done ? finalState(sent.results) : 'enviando');
     const { rows: [saved] } = await db.query(
       `UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = NULL, updated_at = now() WHERE id = $1 RETURNING *`,
@@ -101,12 +104,11 @@ async function dispatch(pubId) {
   }
 }
 
-// Imagens: links assinados de cada imagem (na ordem do carrossel) -> /upload_photos.
-async function dispatchPhotos(pub, target) {
+// Imagens: links assinados de cada imagem (na ordem do carrossel) -> provedor.
+async function dispatchPhotos(pub, target, provider, conn) {
   const photoUrls = [];
   for (const c of target.covers) photoUrls.push(await b2.presignGet(c.storage_key, { expires: up.MAX_LINK_SECONDS }));
-  const fields = up.buildPhotoFields({ id: pub.id, media: pub.media, platforms: pub.platforms, title: pub.title, description: pub.description, photoUrls });
-  const sent = await up.sendPhotos(fields);
+  const sent = await provider.sendPhotos({ id: pub.id, media: pub.media, platforms: pub.platforms, title: pub.title, description: pub.description, photoUrls, accounts: conn.platforms });
   const state = sent.simulated ? 'simulado' : (sent.done ? finalState(sent.results) : 'enviando');
   const { rows: [saved] } = await db.query(
     'UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = NULL, updated_at = now() WHERE id = $1 RETURNING *',
@@ -138,12 +140,12 @@ async function tellCreator(pub, title, body) {
   await require('./notify').notify({ type: 'rotina', users: [pub.created_by], title, body, url: `/social/publicacoes/${pub.id}`, entity: { type: pub.clip_id ? 'clip' : 'episode', id: pub.clip_id || pub.episode_id }, dedupe: `pub-${pub.id}-${title.slice(0, 20)}` }).catch((err) => console.error('Aviso de publicação:', err.message));
 }
 
-// Atualiza o andamento de um envio que está no Upload-Post.
+// Atualiza o andamento de um envio que está no provedor (o mesmo pelo qual saiu).
 async function refresh(pubId) {
   const { rows: [pub] } = await db.query('SELECT * FROM episode_publications WHERE id = $1', [pubId]);
   if (!pub || pub.status !== 'enviando' || !(pub.request_id || pub.job_id)) return pub || null;
   try {
-    const st = await up.status({ request_id: pub.request_id, job_id: pub.request_id ? null : pub.job_id });
+    const st = await social.get(pub.provider).status({ request_id: pub.request_id, job_id: pub.job_id });
     const { rows: [saved] } = await db.query('UPDATE episode_publications SET status = $2, results = $3, error = $4, updated_at = now() WHERE id = $1 RETURNING *',
       [pub.id, st.state, JSON.stringify(st.results.length ? st.results : pub.results), st.error || null]);
     if (st.state === 'publicado' || st.state === 'parcial') await afterPublished(saved);

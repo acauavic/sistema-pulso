@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.25.0', date: '2026-10-23', title: 'Zernio como alternativa para publicar nas redes',
+    items: [
+      { kind: 'novo', text: 'As publicações (vídeo do episódio, cortes, posts, carrosséis e stories) podem sair pela Zernio em vez do Upload-Post. A gestão escolhe em Integrações > Redes sociais, vê qual está em uso e testa a conexão (lista as contas conectadas).' },
+      { kind: 'ajuste', text: 'Cada publicação lembra por onde saiu: trocar de provedor não atrapalha o que já foi enviado. Agendamentos saem pelo provedor escolhido na hora do envio.' },
+      { kind: 'ajuste', text: 'Insights, comentários, directs e automações continuam pelo Upload-Post. Editar um post depois de publicado continua só para o que saiu pelo Upload-Post.' },
+    ],
+  },
+  {
     version: '1.24.0', date: '2026-10-23', title: 'Aviso à gestão quando um corte fica disponível',
     items: [
       { kind: 'novo', text: 'Quando o editor sobe um corte e ele termina de ser preparado (capas sugeridas, título e legenda), a gestão recebe o aviso "Corte disponível", com o episódio, quem subiu e o que falta (atribuir ao episódio, escolher a capa e publicar). Vai uma vez por corte: "Ler de novo" não repete.' },

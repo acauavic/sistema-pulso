@@ -71,6 +71,7 @@ async function editPublication(pub, { title, description, scheduledAt }, user) {
     return { ok: true, message: pub.status === 'agendado' ? 'Agendamento atualizado.' : 'Pedido atualizado.' };
   }
   if (!['publicado', 'parcial', 'simulado'].includes(pub.status)) return { error: 'Só dá para editar o que ainda não saiu ou o que já foi publicado.' };
+  if (!require('./socialApi').get(pub.provider).canEdit) return { error: 'Esta publicação saiu pela Zernio: editar depois de publicado ainda não é feito pelo painel. Edite pelo app da rede.' };
   const results = []; const skipped = [];
   for (const r of (pub.results || []).filter((x) => x.ok)) {
     if (!up.EDITABLE[r.platform]) { skipped.push(up.PLATFORMS[r.platform]?.label || r.platform); continue; }

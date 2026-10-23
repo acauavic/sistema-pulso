@@ -3,6 +3,33 @@
 <%- include('partials/gestao-nav', { active: 'integracoes' }) %>
 <p class="lead">Status das integrações. Por segurança, chaves e senhas nunca aparecem aqui — elas ficam nas variáveis de ambiente do servidor.</p>
 <div class="grid-2 tight">
+  <section class="card" id="redes">
+    <h2>Redes sociais (publicação)</h2>
+    <p class="small muted">Por onde saem os vídeos, cortes, posts e carrosséis. Insights, comentários, directs e automações continuam pelo Upload-Post.</p>
+    <form method="post" action="/integracoes/redes" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <ul class="plain provider-list">
+        <% social.providers.forEach(function (p) { %>
+        <li>
+          <label class="check provider-pick"><input type="radio" name="provedor" value="<%= p.id %>" <%= social.active === p.id ? 'checked' : '' %> <%= p.configured ? '' : 'disabled' %>>
+            <strong><%= p.label %></strong>
+            <span class="badge <%= !p.configured ? 'b-gray' : p.live ? 'b-green' : 'b-amber' %>"><%= !p.configured ? 'sem chave' : p.live ? 'publica de verdade' : 'modo de teste' %></span>
+            <% if (social.active === p.id) { %><span class="mono small muted">em uso</span><% } %>
+          </label>
+          <span class="small muted provider-hint"><% if (!p.configured) { %>Defina <span class="mono"><%= p.env %></span> no servidor.<% } else if (!p.live) { %>Para publicar de verdade: <span class="mono"><%= p.liveEnv %>=true</span>.<% } %></span>
+        </li>
+        <% }) %>
+      </ul>
+      <div class="row">
+        <button class="btn" type="submit">Usar o escolhido</button>
+      </div>
+    </form>
+    <div class="row top-gap">
+      <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>
+      <form method="post" action="/integracoes/redes/testar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><button class="btn sm ghost" type="submit">Testar <%= p.label %> (só leitura)</button></form>
+      <% }) %>
+    </div>
+  </section>
   <section class="card">
     <h2>E-mail transacional (Brevo SMTP)</h2>
     <p><span class="badge <%= smtp.ok ? 'b-green' : 'b-red' %>"><%= smtp.ok ? (smtp.dry ? 'Modo teste (não envia)' : 'Configurado') : 'Não configurado' %></span></p>

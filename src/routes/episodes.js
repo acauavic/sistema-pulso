@@ -4,6 +4,7 @@ const express = require('express');
 const db = require('../db/pool');
 const config = require('../config');
 const uploadPost = require('../services/uploadPost');
+const socialApi = require('../services/socialApi');
 const richText = require('../services/richText');
 const attachmentsSvc = require('../services/attachments');
 const b2 = require('../services/b2');
@@ -257,7 +258,8 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
                      (SELECT count(*)::int FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND kind IN ('post_quote','post_split','carousel')) AS posts`, [ep.id]),
     db.query('SELECT * FROM episode_publications WHERE episode_id = $1 AND clip_id IS NULL ORDER BY created_at DESC, id DESC LIMIT 30', [ep.id]),
   ]);
-  const social = can(req.user.role, 'production.review') && config.uploadPostConfigured && ['pronto_publicar', 'publicado'].includes(ep.status) ? await uploadPost.connected() : null;
+  const provider = await socialApi.active();
+  const social = can(req.user.role, 'production.review') && provider.configured() && ['pronto_publicar', 'publicado'].includes(ep.status) ? await provider.connected() : null;
   const stageIndex = C.EPISODE_STAGES.findIndex((s) => s.key === ep.status);
   const openComments = comments.rows.filter((c) => !c.resolved).length;
   // Abas por etapa: a revisão só aparece enquanto o episódio está em revisão; a finalização, de "em finalização" em diante.
@@ -282,7 +284,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: await withReviewFiles(comments.rows),
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
     epComments: await commentsSvc.list('episode', ep.id),
-    content: { ...contentRows.rows[0], total: contentRows.rows[0].clips + contentRows.rows[0].posts }, tabs, defaultTab, publications: pubRows.rows, social, uploadPost, uploadLive: config.uploadPost.live,
+    content: { ...contentRows.rows[0], total: contentRows.rows[0].clips + contentRows.rows[0].posts }, tabs, defaultTab, publications: pubRows.rows, social, uploadPost, uploadLive: provider.live(), provider,
     covers: coverRows.rows, meta: meta.rows[0] || null, frames: frames.rows, job, transcript: transcript.rows[0] || null,
     aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,
     finData, fin: finSvc, money: fmt.formatBRL, today: finSvc.todayISO(), here: req.originalUrl,

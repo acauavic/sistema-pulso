@@ -58,6 +58,8 @@ const config = {
   // Confere se o vídeo editado do episódio é horizontal (ffprobe). Desligar só em teste.
   checkVideoFormat: String(env.VIDEO_FORMAT_CHECK ?? 'true').toLowerCase() !== 'false',
   // Upload-Post: publica nas redes. SEM UPLOAD_POST_LIVE=true nada é enviado (o painel monta e valida o pedido e marca como "simulado").
+  // Zernio: alternativa ao Upload-Post para publicar (a gestão escolhe em Integrações). Sem ZERNIO_LIVE=true, só simula.
+  zernio: { key: env.ZERNIO_API_KEY, base: (env.ZERNIO_BASE || 'https://zernio.com/api').replace(/\/+$/, ''), profileId: env.ZERNIO_PROFILE_ID || '', live: String(env.ZERNIO_LIVE).toLowerCase() === 'true' },
   uploadPost: { key: env.UPLOAD_POST_KEY, user: env.UPLOAD_POST_USER || 'default', live: String(env.UPLOAD_POST_LIVE).toLowerCase() === 'true', base: 'https://api.upload-post.com' },
 
   // Web Push (alertas com o painel fechado). Gere o par com `npx web-push generate-vapid-keys`.
@@ -90,6 +92,7 @@ config.storageConfigured = Boolean(config.b2.keyId && config.b2.appKey && config
 config.geminiConfigured = Boolean(config.gemini.key);
 config.groqConfigured = Boolean(config.groq.key);
 config.uploadPostConfigured = Boolean(config.uploadPost.key);
+config.zernioConfigured = Boolean(config.zernio.key);
 config.googleConfigured = Boolean(config.google.calendarId && config.google.serviceAccount);
 config.infinitepayConfigured = Boolean(config.infinitepay.handle);
 config.yourlsConfigured = Boolean(config.yourls.base && config.yourls.key);

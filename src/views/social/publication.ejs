@@ -15,7 +15,7 @@
   </div>
   <div class="row"><a class="btn ghost" href="/social/publicacoes"><%- icon('arrow-left') %> Publicações</a></div>
 </div>
-<% if (!live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: nada sai para as redes enquanto <span class="mono">UPLOAD_POST_LIVE</span> estiver desligado.</span></p><% } %>
+<% if (!live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: nada sai para as redes enquanto <span class="mono"><%= locals.provider ? provider.liveEnv : 'UPLOAD_POST_LIVE' %></span> estiver desligado.</span></p><% } %>
 
 <% if (pending) { %>
 <section class="card next-step">
