@@ -6,7 +6,7 @@
   const E = window.PulsoDesign;
   const data = JSON.parse(dataEl.textContent);
   let spec = data.spec;
-  let ctxData = data.ctx || { faces: [], blocks: [], insets: [] };
+  let ctxData = { faces: data.ctx?.faces || [], blocks: data.ctx?.blocks || [], insets: data.ctx?.insets || [] };
   const F = data.format;
   const csrf = document.querySelector('meta[name="csrf"]')?.content || '';
   const canvas = root.querySelector('[data-canvas]');
@@ -120,6 +120,26 @@
     });
   }
 
+  // Valor de uma propriedade do painel (algumas ficam em objetos: fonte, contorno, fundo do texto).
+  const TEXT_ONLY = ['text', 'family', 'align', 'lineHeight', 'tracking', 'shadow', 'upper', 'italic', 'highlight', 'shadowDistance', 'strokeWidth', 'chip'];
+  function propValue(l, key) {
+    if (key === 'family') return l.font?.family;
+    if (key === 'italic') return !!l.font?.italic;
+    if (key === 'highlight') return !!l.highlight;
+    if (key === 'strokeWidth') return l.stroke?.width || 0;
+    if (key === 'chip') return !!l.chip;
+    if (key === 'shadowDistance') return l.shadowDistance ?? 0.4;
+    return l[key];
+  }
+  const outText = (key, v) => (v == null ? '' : key === 'size' ? Number(v).toFixed(0) : key === 'strokeWidth' ? (Number(v) ? `${Math.round(Number(v) * 100)}%` : 'sem') : Number(v).toFixed(2));
+  const syncOuts = (l) => $$('[data-out]').forEach((o) => { if (['zoom', 'dim', 'scrim'].includes(o.dataset.out)) return; o.textContent = outText(o.dataset.out, propValue(l, o.dataset.out)); });
+  function swatchRow(box, current, onPick, list = SWATCHES) {
+    box.innerHTML = '';
+    list.forEach(([name, hex]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.title = name; b.setAttribute('aria-label', name); b.style.background = hex; b.className = (current || '').toLowerCase() === hex.toLowerCase() ? 'on' : '';
+      b.addEventListener('click', () => onPick(hex)); box.appendChild(b);
+    });
+  }
   function refreshProps() {
     const l = layerById(selectedId); const props = $('[data-props]');
     props.hidden = !l;
@@ -128,17 +148,23 @@
     $$('[data-p]').forEach((el) => {
       const key = el.dataset.p;
       const label = el.closest('label') || el;
-      const textOnly = ['text', 'family', 'align', 'lineHeight', 'tracking', 'shadow', 'upper', 'italic', 'highlight'].includes(key);
-      if (textOnly) label.hidden = !isText; else if (key === 'w') label.hidden = !(isText || l.type === 'rect');
-      let v;
-      if (key === 'family') v = l.font?.family; else if (key === 'italic') v = !!l.font?.italic; else if (key === 'highlight') v = !!l.highlight; else v = l[key];
+      if (TEXT_ONLY.includes(key)) label.hidden = !isText; else if (key === 'w') label.hidden = !(isText || l.type === 'rect');
+      const v = propValue(l, key);
       if (el.type === 'checkbox') el.checked = !!v; else if (document.activeElement !== el) el.value = v ?? '';
     });
-    $$('[data-out]').forEach((o) => { const v = l[o.dataset.out]; if (v != null) o.textContent = Number(v).toFixed(o.dataset.out === 'size' ? 0 : 2); });
-    const sw = $('[data-swatches]'); sw.innerHTML = '';
-    SWATCHES.forEach(([name, hex]) => {
-      const b = document.createElement('button'); b.type = 'button'; b.title = name; b.setAttribute('aria-label', name); b.style.background = hex; b.className = (l.color || '').toLowerCase() === hex.toLowerCase() ? 'on' : '';
-      b.addEventListener('click', () => { snapshot(); l.color = hex; commit(); }); sw.appendChild(b);
+    $$('[data-text-only]').forEach((g) => { g.hidden = !isText; });
+    syncOuts(l);
+    swatchRow($('[data-swatches]'), l.color, (hex) => { snapshot(); l.color = hex; commit(); });
+    if (!isText) return;
+    swatchRow($('[data-stroke-swatches]'), l.stroke?.color, (hex) => { snapshot(); l.stroke = { width: l.stroke?.width || 0.04, color: hex }; commit(); }, SWATCHES.filter(([n]) => ['Preto', 'Branco', 'Plum', 'Lime'].includes(n)));
+    $('[data-stroke-colors-wrap]').hidden = !(l.stroke?.width > 0);
+    // lado da sombra: o botão mais perto do ângulo atual (ou "em volta" quando a distância é zero)
+    const glow = l.shadowAngle != null && (l.shadowDistance ?? 0.4) === 0;
+    const ang = l.shadowAngle ?? 90;
+    $$('[data-shadow-dir]').forEach((b) => {
+      const d = b.dataset.shadowDir;
+      const on = glow ? d === 'glow' : d !== 'glow' && Math.abs((((Number(d) - ang) % 360) + 540) % 360 - 180) < 23;
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
     });
   }
 
@@ -153,6 +179,14 @@
     }
     const t = target ? target.bg : bg;
     const solid = bg.kind === 'solid';
+    $('[data-bg-adjust]').hidden = solid;
+    if (!solid) { // girar/espelhar e ajustes da foto do fundo (ou do painel escolhido)
+      $('[data-orient="flipX"]').classList.toggle('on', !!t.flipX); $('[data-orient="flipY"]').classList.toggle('on', !!t.flipY);
+      const adj = { brightness: 1, contrast: 1, saturate: 1, blur: 0, ...(t.adjust || {}) };
+      $$('[data-adj]').forEach((el) => { if (document.activeElement !== el) el.value = adj[el.dataset.adj]; });
+      $$('[data-out-adj]').forEach((o) => { const k = o.dataset.outAdj; o.textContent = k === 'blur' ? `${adj.blur} px` : `${Math.round(adj[k] * 100)}%`; });
+    }
+    renderPhotos();
     $$('[data-bg]').forEach((el) => {
       const k = el.dataset.bg; let v;
       if (k === 'dim') v = spec.dim || 0; else if (k === 'scrim') v = (spec.scrims[0] && spec.scrims[0].strength) || 0; else v = t[k];
@@ -161,14 +195,15 @@
     });
     $$('[data-out]').forEach((o) => { if (['zoom', 'dim', 'scrim'].includes(o.dataset.out)) { const el = $(`[data-bg="${o.dataset.out}"]`); if (el) o.textContent = Number(el.value).toFixed(2); } });
     const picker = $('[data-frame-picker]'); picker.innerHTML = '';
-    if (solid) return;
-    const current = target ? target.ref : bg.ref;
+    $('[data-frames-empty]').hidden = data.frames.length > 0;
+    const current = solid ? null : target ? target.ref : bg.ref;
     data.frames.slice().sort((a, b) => (b.score || 0) - (a.score || 0)).forEach((f) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = f.ref === current ? 'on' : '';
       const img = document.createElement('img'); img.src = `${data.imageBase}${f.id}`; img.alt = `Quadro em ${Math.round(f.at_ms / 1000)} s`; img.loading = 'lazy';
-      const cap = document.createElement('span'); cap.className = 'handle'; cap.textContent = f.analysis.custom ? 'enviada' : `${Math.floor(f.at_ms / 60000)}:${String(Math.floor((f.at_ms % 60000) / 1000)).padStart(2, '0')} · ${f.score != null ? Number(f.score).toFixed(1) : '—'}`;
+      const cap = document.createElement('span'); cap.className = 'handle'; cap.textContent = f.analysis.from_file ? 'fotografia' : f.analysis.custom ? 'enviada' : `${Math.floor(f.at_ms / 60000)}:${String(Math.floor((f.at_ms % 60000) / 1000)).padStart(2, '0')} · ${f.score != null ? Number(f.score).toFixed(1) : '—'}`;
       b.append(img, cap);
       b.addEventListener('click', async () => {
+        if (spec.bg.kind === 'solid') { await applyFrame(f); return; } // fundo liso: o quadro passa a ser o fundo
         snapshot(); await loadImage(f.ref);
         if (target) target.ref = f.ref; else bg.ref = f.ref;
         recomputeCtx(); commit();
@@ -203,9 +238,14 @@
       else if (key === 'text') l.text = val;
       else if (key === 'upper') l.upper = val;
       else if (key === 'align') l.align = val;
+      else if (key === 'strokeWidth') l.stroke = Number(val) > 0 ? { width: Number(val), color: l.stroke?.color || E.BRAND.black } : null;
+      else if (key === 'chip') l.chip = val ? { color: 'rgba(10,10,10,0.62)', padX: Math.round(l.size * 0.22), padY: Math.round(l.size * 0.12), radius: Math.round(l.size * 0.12) } : undefined;
+      else if (key === 'shadowDistance') { l.shadowDistance = Number(val); if (l.shadowAngle == null) l.shadowAngle = 90; if (!l.shadow) l.shadow = 0.6; }
       else l[key] = Number(val);
       if (key === 'family') l.font.weight = { 'Space Grotesk': 700, 'Instrument Serif': 400, Inter: 500, 'JetBrains Mono': 500 }[val] || 400;
-      dirty = true; draw(); renderLayerList(); $$('[data-out]').forEach((o) => { const v = l[o.dataset.out]; if (v != null) o.textContent = Number(v).toFixed(o.dataset.out === 'size' ? 0 : 2); }); setStatus('Alterações não salvas');
+      dirty = true; draw(); renderLayerList(); syncOuts(l);
+      if (['strokeWidth', 'shadowDistance'].includes(key)) refreshProps();
+      setStatus('Alterações não salvas');
     };
     el.addEventListener('input', apply);
     el.addEventListener('change', apply);
@@ -283,6 +323,92 @@
     if (moves) { e.preventDefault(); snapshot(); l.x += moves[0]; l.y += moves[1]; dirty = true; draw(); refreshProps(); setStatus('Alterações não salvas'); }
   });
 
+  // Imagem nova (enviada ou fotografia do episódio) vira o fundo (ou o painel escolhido), em tela cheia e sem giro/ajustes antigos.
+  async function applyFrame(f) {
+    if (!frameById[f.ref]) { data.frames.push(f); frameById[f.ref] = f; }
+    await loadImage(f.ref);
+    snapshot();
+    const target = spec.bg.kind === 'panels' ? spec.bg.panels[panelIndex] : null;
+    const fresh = { fit: 'cover', zoom: 1, cx: 0.5, cy: 0.5, align: 'center', rot: 0, flipX: false, flipY: false, adjust: undefined };
+    if (spec.bg.kind === 'solid') spec.bg = { kind: 'frame', ref: f.ref, ...fresh };
+    else { Object.assign(target ? target.bg : spec.bg, fresh); if (target) target.ref = f.ref; else spec.bg.ref = f.ref; }
+    recomputeCtx(); commit();
+  }
+
+  // ---------------------------------------------------------------- fundo: de onde vem (quadros, fotografias, enviar)
+  $$('[data-bg-src]').forEach((b) => b.addEventListener('click', () => {
+    $$('[data-bg-src]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', String(x === b)); });
+    $$('[data-bg-pane]').forEach((p) => { p.hidden = p.dataset.bgPane !== b.dataset.bgSrc; });
+  }));
+  const photos = data.photos || [];
+  // sem quadros do vídeo e com fotografias: já abre nas fotografias
+  if (!data.frames.length && photos.length) $('[data-bg-src="photos"]')?.click();
+  const countEl = $('[data-photo-count]'); if (countEl) countEl.textContent = photos.length ? String(photos.length) : '';
+  let photosBuilt = false;
+  function renderPhotos() {
+    const grid = $('[data-photo-picker]'); if (!grid) return;
+    if (!photos.length) { $('[data-photo-hint]').textContent = 'Este episódio ainda não tem fotografias no material bruto. Quando subirem (JPG, PNG ou WebP), aparecem aqui.'; return; }
+    const current = frameById[(spec.bg.kind === 'panels' ? spec.bg.panels[panelIndex]?.ref : spec.bg.ref) || '']?.analysis?.from_file;
+    if (!photosBuilt) {
+      photosBuilt = true;
+      photos.forEach((p) => {
+        const b = document.createElement('button'); b.type = 'button'; b.dataset.file = p.id; b.title = p.name;
+        const img = document.createElement('img'); img.src = p.thumb; img.alt = p.name; img.loading = 'lazy';
+        const cap = document.createElement('span'); cap.className = 'handle'; cap.textContent = p.kind === 'bastidor' ? 'bastidores' : p.name.replace(/\.[^.]+$/, '');
+        b.append(img, cap);
+        b.addEventListener('click', () => usePhoto(p, b));
+        grid.appendChild(b);
+      });
+    }
+    grid.querySelectorAll('button').forEach((b) => b.classList.toggle('on', String(b.dataset.file) === String(current)));
+  }
+  async function usePhoto(p, btn) {
+    const msg = $('[data-photo-msg]');
+    if (btn.classList.contains('busy')) return;
+    btn.classList.add('busy'); msg.textContent = `Preparando ${p.name}: deixando em pé e conferindo os rostos…`;
+    try {
+      const res = await fetch(data.photoUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'x-csrf-token': csrf }, body: new URLSearchParams({ arquivo: p.id }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || `erro ${res.status}`);
+      await applyFrame(json.frame);
+      msg.textContent = json.frame.analysis.unchecked ? 'Foto aplicada, mas os rostos não foram conferidos: veja se o texto não cobre ninguém.' : 'Foto aplicada. Ajuste o enquadramento abaixo, se precisar.';
+    } catch (err) { msg.textContent = `Não foi possível usar a foto: ${err.message}`; } finally { btn.classList.remove('busy'); }
+  }
+
+  // ---------------------------------------------------------------- girar, espelhar e ajustes da foto
+  const bgTarget = () => (spec.bg.kind === 'panels' ? spec.bg.panels[panelIndex].bg : spec.bg);
+  $$('[data-orient]').forEach((b) => b.addEventListener('click', () => {
+    if (spec.bg.kind === 'solid') return;
+    snapshot();
+    const t = bgTarget(); const k = b.dataset.orient;
+    if (k === 'rotL' || k === 'rotR') t.rot = (((t.rot || 0) + (k === 'rotR' ? 90 : -90)) % 360 + 360) % 360;
+    else t[k] = !t[k];
+    recomputeCtx(); commit();
+  }));
+  let adjArmed = false;
+  const setAdjust = (patch) => {
+    const t = bgTarget();
+    const a = { brightness: 1, contrast: 1, saturate: 1, blur: 0, ...(t.adjust || {}), ...patch };
+    t.adjust = a.brightness === 1 && a.contrast === 1 && a.saturate === 1 && !a.blur ? undefined : a;
+    dirty = true; draw(); refreshBg(); setStatus('Alterações não salvas');
+  };
+  $$('[data-adj]').forEach((el) => el.addEventListener('input', () => {
+    if (spec.bg.kind === 'solid') return;
+    if (!adjArmed) { snapshot(); adjArmed = true; setTimeout(() => { adjArmed = false; }, 600); }
+    setAdjust({ [el.dataset.adj]: Number(el.value) });
+  }));
+  $('[data-adj-mono]')?.addEventListener('click', () => { if (spec.bg.kind === 'solid') return; snapshot(); setAdjust({ saturate: 0, contrast: 1.1 }); });
+  $('[data-adj-reset]')?.addEventListener('click', () => { if (spec.bg.kind === 'solid') return; snapshot(); setAdjust({ brightness: 1, contrast: 1, saturate: 1, blur: 0 }); });
+
+  // ---------------------------------------------------------------- lado da sombra do texto
+  $$('[data-shadow-dir]').forEach((b) => b.addEventListener('click', () => {
+    const l = layerById(selectedId); if (!l || l.type !== 'text') return;
+    snapshot();
+    if (!l.shadow) l.shadow = 0.6;
+    if (b.dataset.shadowDir === 'glow') { l.shadowAngle = l.shadowAngle ?? 90; l.shadowDistance = 0; } else { l.shadowAngle = Number(b.dataset.shadowDir); if (!l.shadowDistance) l.shadowDistance = 0.4; }
+    commit();
+  }));
+
   // ---------------------------------------------------------------- imagem própria como fundo
   const upload = $('[data-upload]');
   upload?.addEventListener('change', async () => {
@@ -293,15 +419,8 @@
       const res = await fetch(data.uploadUrl, { method: 'POST', headers: { 'x-csrf-token': csrf, 'Content-Type': file.type || 'application/octet-stream', Accept: 'application/json' }, body: file });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || `erro ${res.status}`);
-      const f = json.frame; data.frames.push(f); frameById[f.ref] = f; await loadImage(f.ref);
-      snapshot();
-      const target = spec.bg.kind === 'panels' ? spec.bg.panels[panelIndex] : null;
-      if (spec.bg.kind === 'solid') spec.bg = { kind: 'frame', ref: f.ref, fit: 'cover', zoom: 1, cx: 0.5, cy: 0.5, align: 'center' };
-      else { // imagem própria: tela cheia (o recorte do vídeo vertical era "contain")
-        Object.assign(target ? target.bg : spec.bg, { fit: 'cover', zoom: 1, cx: 0.5, cy: 0.5, align: 'center' });
-        if (target) target.ref = f.ref; else spec.bg.ref = f.ref;
-      }
-      recomputeCtx(); commit();
+      const f = json.frame;
+      await applyFrame(f);
       msg.textContent = f.analysis.unchecked ? 'Imagem aplicada, mas os rostos não foram conferidos: olhe com atenção se o texto não cobre ninguém.' : 'Imagem aplicada.';
     } catch (err) { msg.textContent = `Não foi possível enviar: ${err.message}`; } finally { upload.value = ''; }
   });

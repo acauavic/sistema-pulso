@@ -85,7 +85,8 @@ async function attachSession(req, res, next) {
     res.locals.appVersion = releases.current().version;
     res.locals.releaseInfo = releases.current();
     res.locals.teamUsers = [];
-    res.locals.pushKey = req.user ? config.push.publicKey || '' : ''; // alertas no celular (pwa.js / push.js)
+    res.locals.pushKey = req.user ? config.push.publicKey || '' : '';
+    res.locals.aiOn = Boolean(req.user && config.geminiConfigured); // botão "Sugerir com IA" nos textos (partials/ai-assist.ejs) // alertas no celular (pwa.js / push.js)
 
     req.flash = async (type, message) => {
       if (req.session) await sessions.setFlash(req.session.tokenHash, type, message);
@@ -132,7 +133,7 @@ const staticDir = path.join(__dirname, 'public');
 // não use CSS/JS antigo do cache de 1h depois de um deploy.
 const ASSET_VERSION = (() => {
   const h = crypto.createHash('sha1');
-  for (const f of ['app.css', 'app.js', 'theme.js', 'patrocinador.css', 'brief.js', 'producao.js', 'editor.js', 'design/engine.js', 'collab.js', 'uploads.js', 'tarefa-voz.js', 'richtext.js', 'social.js', 'assistant.js', 'plateia.css', 'plateia.js', 'push.js', 'pwa.js', 'offline.html', 'igpeople.js']) {
+  for (const f of ['app.css', 'app.js', 'theme.js', 'patrocinador.css', 'brief.js', 'producao.js', 'editor.js', 'design/engine.js', 'collab.js', 'uploads.js', 'tarefa-voz.js', 'richtext.js', 'social.js', 'assistant.js', 'plateia.css', 'plateia.js', 'push.js', 'pwa.js', 'offline.html', 'igpeople.js', 'aiassist.js']) {
     try { h.update(fs.readFileSync(path.join(staticDir, f))); } catch { /* arquivo ausente: ignora */ }
   }
   return h.digest('hex').slice(0, 10);

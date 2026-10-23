@@ -13,6 +13,21 @@ const num = (v, lo, hi, def) => { const n = Number(v); return Number.isFinite(n)
 const color = (v, def) => (typeof v === 'string' && (HEX.test(v) || RGBA.test(v)) ? v : def);
 const bool = (v) => v === true;
 
+// Giro, espelho e ajustes da foto (iguais para o fundo inteiro e para cada painel).
+function orientation(b) {
+  const out = {};
+  const rot = ((Math.round(Number(b?.rot) / 90) * 90) % 360 + 360) % 360;
+  if (rot) out.rot = rot;
+  if (b?.flipX === true) out.flipX = true;
+  if (b?.flipY === true) out.flipY = true;
+  const a = b?.adjust;
+  if (a && typeof a === 'object') {
+    const adj = { brightness: num(a.brightness, 0.4, 1.8, 1), contrast: num(a.contrast, 0.4, 1.8, 1), saturate: num(a.saturate, 0, 2, 1), blur: num(a.blur, 0, 24, 0) };
+    if (adj.brightness !== 1 || adj.contrast !== 1 || adj.saturate !== 1 || adj.blur) out.adjust = adj;
+  }
+  return out;
+}
+
 function sanitizeSpec(input, { allowedRefs }) {
   const errors = [];
   if (!input || typeof input !== 'object') throw new Error('Spec inválido.');
@@ -27,13 +42,13 @@ function sanitizeSpec(input, { allowedRefs }) {
   else if (bgIn.kind === 'panels') {
     const panels = (Array.isArray(bgIn.panels) ? bgIn.panels : []).slice(0, 3).filter((p) => refOk(p.ref) && p.rect).map((p) => ({
       ref: p.ref, rect: { x: num(p.rect.x, 0, W, 0), y: num(p.rect.y, 0, H, 0), w: num(p.rect.w, 10, W, W), h: num(p.rect.h, 10, H, H) },
-      bg: { kind: 'frame', fit: p.bg?.fit === 'contain' ? 'contain' : 'cover', zoom: num(p.bg?.zoom, 1, 3, 1), cx: num(p.bg?.cx, 0, 1, 0.5), cy: num(p.bg?.cy, 0, 1, 0.5), align: ['left', 'right', 'center'].includes(p.bg?.align) ? p.bg.align : 'center' },
+      bg: { kind: 'frame', fit: p.bg?.fit === 'contain' ? 'contain' : 'cover', zoom: num(p.bg?.zoom, 1, 3, 1), cx: num(p.bg?.cx, 0, 1, 0.5), cy: num(p.bg?.cy, 0, 1, 0.5), align: ['left', 'right', 'center'].includes(p.bg?.align) ? p.bg.align : 'center', ...orientation(p.bg) },
     }));
     if (!panels.length) errors.push('Nenhum quadro válido nos painéis.');
     bg = { kind: 'panels', panels };
   } else {
     if (!refOk(bgIn.ref)) throw new Error('O fundo usa um quadro que não é deste episódio.');
-    bg = { kind: 'frame', ref: bgIn.ref, fit: bgIn.fit === 'contain' ? 'contain' : 'cover', zoom: num(bgIn.zoom, 1, 3, 1), cx: num(bgIn.cx, 0, 1, 0.5), cy: num(bgIn.cy, 0, 1, 0.5), align: ['left', 'right', 'center'].includes(bgIn.align) ? bgIn.align : 'center' };
+    bg = { kind: 'frame', ref: bgIn.ref, fit: bgIn.fit === 'contain' ? 'contain' : 'cover', zoom: num(bgIn.zoom, 1, 3, 1), cx: num(bgIn.cx, 0, 1, 0.5), cy: num(bgIn.cy, 0, 1, 0.5), align: ['left', 'right', 'center'].includes(bgIn.align) ? bgIn.align : 'center', ...orientation(bgIn) };
   }
 
   const scrims = (Array.isArray(input.scrims) ? input.scrims : []).slice(0, 6).filter((s) => SCRIM_SIDES.has(s.side)).map((s) => {
@@ -58,6 +73,8 @@ function sanitizeSpec(input, { allowedRefs }) {
         font: { family: FONT_FAMILIES.has(fam) ? fam : 'Space Grotesk', weight: num(l.font?.weight, 300, 900, 700), italic: bool(l.font?.italic) },
         color: color(l.color, engine.BRAND.white), align: ['left', 'center', 'right'].includes(l.align) ? l.align : 'left', lineHeight: num(l.lineHeight, 0.8, 2, 1.05),
         tracking: num(l.tracking, -0.1, 0.4, 0), upper: bool(l.upper), shadow: num(l.shadow, 0, 1, 0),
+        ...(l.shadowAngle != null && Number.isFinite(Number(l.shadowAngle)) ? { shadowAngle: num(l.shadowAngle, -360, 360, 90), shadowDistance: num(l.shadowDistance, 0, 1, 0.4) } : {}),
+        ...(l.stroke && num(l.stroke.width, 0, 0.25, 0) > 0 ? { stroke: { width: num(l.stroke.width, 0, 0.25, 0), color: color(l.stroke.color, engine.BRAND.black) } } : {}),
         highlight: l.highlight && color(l.highlight.color, null) ? { color: l.highlight.color, lines: l.highlight.lines === 'last' ? 'last' : Math.round(num(l.highlight.lines, 0, 20, 0)) } : null,
         chip: l.chip ? { color: color(l.chip.color, 'rgba(10,10,10,0.62)'), padX: num(l.chip.padX, 0, 60, 14), padY: num(l.chip.padY, 0, 60, 8), radius: num(l.chip.radius, 0, 40, 8) } : undefined,
       });

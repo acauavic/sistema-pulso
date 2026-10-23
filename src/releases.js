@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.28.0', date: '2026-10-23', title: 'Fotografias como fundo, mais edição de capa e IA nos textos',
+    items: [
+      { kind: 'novo', text: 'No editor de capa, a aba Fundo tem três origens: quadros do vídeo, fotografias do episódio (as que subiram no material bruto, inclusive bastidores) e enviar uma imagem. A foto entra em pé, na resolução certa, e a IA confere os rostos.' },
+      { kind: 'novo', text: 'Girar 90°, espelhar e inverter a foto do fundo, e ajustes de brilho, contraste, saturação e desfoque, com atalho para preto e branco. As zonas de rosto acompanham o giro.' },
+      { kind: 'novo', text: 'Texto da capa com sombra para qualquer lado (ou brilho em volta), distância da sombra, contorno com cor e fundo escuro atrás do texto. As opções ficam em seções que abrem, para o painel não virar um formulário enorme.' },
+      { kind: 'novo', text: '"Sugerir com IA" embaixo do texto da capa, do título e da legenda dos cortes, do Novo post e do título e da descrição do YouTube: atalhos (outras opções, mais curto, em pergunta, frase do convidado…) ou um pedido do seu jeito. Vêm 3 opções a partir da conversa; tocar troca o texto e dá para desfazer.' },
+    ],
+  },
+  {
     version: '1.27.0', date: '2026-10-23', title: 'Publicação de verdade ligada pelo painel',
     items: [
       { kind: 'novo', text: 'Em Integrações > Redes sociais, a gestão liga e desliga a publicação de verdade de cada provedor (Upload-Post e Zernio), sem mexer no servidor. Ligar pede a confirmação e fica na auditoria; voltar ao modo de teste é um botão.' },

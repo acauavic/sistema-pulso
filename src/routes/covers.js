@@ -30,6 +30,22 @@ async function findCover(req) {
   return c;
 }
 
+const frameOut = (f) => ({ id: f.id, ref: `f${f.id}`, width: f.width, height: f.height, at_ms: f.at_ms, score: f.score, analysis: { rostos: f.analysis.rostos || [], caixas_de_texto: f.analysis.caixas_de_texto || [], custom: true, unchecked: Boolean(f.analysis.unchecked), from_file: f.analysis.from_file || null } });
+const PHOTO_EXT = /\.(jpe?g|png|webp)$/i; // o que o servidor consegue abrir para virar fundo (HEIC/RAW não)
+// De qual episódio são as fotografias que a capa pode usar (capa de corte: o episódio do corte).
+async function episodeOfCover(c) {
+  if (c.episode_id) return c.episode_id;
+  if (!c.clip_id) return null;
+  const { rows: [cl] } = await db.query('SELECT episode_id FROM episode_clips WHERE id = $1', [c.clip_id]);
+  return cl?.episode_id || null;
+}
+async function episodePhotos(episodeId) {
+  if (!episodeId) return [];
+  const { rows } = await db.query(
+    "SELECT id, kind, label, filename, size_bytes FROM episode_files WHERE episode_id = $1 AND kind IN ('foto', 'bastidor') AND status = 'pronto' ORDER BY kind DESC, created_at, id", [episodeId]);
+  return rows.filter((f) => PHOTO_EXT.test(f.filename)).map((f) => ({ id: f.id, name: f.filename, kind: f.kind, thumb: `/episodios/${episodeId}/arquivos/${f.id}/previa` }));
+}
+
 const fileName = (ep, c) => `${ep?.number ? `ep${String(ep.number).padStart(3, '0')}` : (c.clip_id ? `corte${c.clip_id}` : 'episodio')}-${c.kind.replace(/_/g, '-')}-${c.position + 1}.jpg`;
 // Para onde voltar depois de aprovar/excluir: cada tipo de capa mora num lugar.
 const homeOf = (c) => (c.clip_id ? `/cortes/${c.clip_id}` : (c.kind === 'youtube_thumb' ? `/episodios/${c.episode_id}#capas` : `/conteudo?episodio=${c.episode_id}#posts`));
@@ -72,7 +88,10 @@ router.get(both('/editar'), requirePerm('episodes.read'), wrap(async (req, res) 
   res.render('episodes/editor', {
     title: `Editar — ${KINDS[c.kind]}`, ep, cover: c, kindLabel: KINDS[c.kind], siblings: siblings.rows, backUrl: homeOf(c),
     backLabel: c.clip_id ? 'Voltar ao corte' : (c.kind === 'youtube_thumb' ? 'Voltar ao episódio' : 'Voltar ao conteúdo'),
-    editorData: { spec: c.spec, ctx: c.ctx, lint: c.lint, frames, format: engine.FORMATS[c.spec.format], saveUrl: `/capas/${c.id}`, uploadUrl: c.clip_id ? `/capas/imagem?corte=${c.clip_id}` : `/capas/imagem?episodio=${c.episode_id}`, imageBase: '/quadros/', brand: engine.BRAND },
+    editorData: {
+      spec: c.spec, ctx: c.ctx, lint: c.lint, frames, format: engine.FORMATS[c.spec.format], saveUrl: `/capas/${c.id}`, uploadUrl: c.clip_id ? `/capas/imagem?corte=${c.clip_id}` : `/capas/imagem?episodio=${c.episode_id}`,
+      imageBase: '/quadros/', brand: engine.BRAND, photos: await episodePhotos(await episodeOfCover(c)), photoUrl: `/capas/${c.id}/foto`,
+    },
   });
 }));
 
@@ -95,6 +114,32 @@ router.post(['/episodios/:id/capas/imagem', '/capas/imagem'], requirePerm('episo
   if (frame.error) return res.status(400).json({ ok: false, error: frame.error });
   await prod.addEvent(episodeId, req.user.id, 'capas', 'Imagem enviada para usar como fundo de capa');
   res.json({ ok: true, frame: { id: frame.id, ref: `f${frame.id}`, width: frame.width, height: frame.height, at_ms: frame.at_ms, score: frame.score, analysis: frame.analysis } });
+}));
+
+// Fotografia do episódio (material bruto) como fundo: vira um "quadro" da capa (em pé, rostos conferidos pela IA).
+// A mesma foto usada de novo é reaproveitada, sem baixar e analisar outra vez.
+router.post(both('/foto'), requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canDesign(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não edita capas.' });
+  const c = await findCover(req);
+  if (!c) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
+  const episodeId = await episodeOfCover(c);
+  const fileId = String(req.body.arquivo || '');
+  if (!episodeId || !isIntId(fileId)) return res.status(400).json({ ok: false, error: 'Escolha uma fotografia do episódio.' });
+  const { rows: [file] } = await db.query("SELECT * FROM episode_files WHERE id = $1 AND episode_id = $2 AND kind IN ('foto', 'bastidor') AND status = 'pronto'", [fileId, episodeId]);
+  if (!file || !PHOTO_EXT.test(file.filename)) return res.status(404).json({ ok: false, error: 'Fotografia não encontrada (ou em formato que não abre aqui, como HEIC).' });
+  const { rows: [same] } = await db.query(
+    "SELECT * FROM episode_frames WHERE (analysis->>'from_file')::int = $1 AND clip_id IS NOT DISTINCT FROM $2 AND (clip_id IS NOT NULL OR episode_id = $3) ORDER BY id DESC LIMIT 1", [file.id, c.clip_id || null, episodeId]);
+  if (same) {
+    const [f] = (await store.loadFrames(c.episode_id, { clipId: c.clip_id ?? null, custom: true })).filter((x) => x.id === same.id);
+    if (f) return res.json({ ok: true, reused: true, frame: frameOut(f) });
+  }
+  if (Number(file.size_bytes) > 60 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'Fotografia grande demais para virar fundo (limite de 60 MB).' });
+  const obj = await b2.getObject(file.storage_key);
+  if (!obj) return res.status(404).json({ ok: false, error: 'A fotografia não está no armazenamento.' });
+  const frame = await store.addCustomImage(episodeId, { buffer: Buffer.from(await obj.arrayBuffer()), clipId: c.clip_id || null, fromFile: file.id });
+  if (frame.error) return res.status(400).json({ ok: false, error: frame.error });
+  await prod.addEvent(episodeId, req.user.id, 'capas', `Fotografia usada como fundo de capa: ${file.filename}`);
+  res.json({ ok: true, reused: false, frame: frameOut(frame) });
 }));
 
 router.post(both(), requirePerm('episodes.read'), wrap(async (req, res) => {

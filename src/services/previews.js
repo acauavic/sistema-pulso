@@ -53,7 +53,7 @@ function jpegOrientation(buf) {
 }
 
 // Reduz para caber em `side` (sem aumentar), aplica a rotação e devolve JPEG.
-async function shrink(buf, side, orientation = 1) {
+async function shrink(buf, side, orientation = 1, quality = 82) {
   const { createCanvas, loadImage } = require('@napi-rs/canvas');
   const img = await loadImage(buf);
   const turned = orientation >= 5;
@@ -65,7 +65,7 @@ async function shrink(buf, side, orientation = 1) {
   const T = { 2: [-1, 0, 0, 1, w, 0], 3: [-1, 0, 0, -1, w, h], 4: [1, 0, 0, -1, 0, h], 5: [0, 1, 1, 0, 0, 0], 6: [0, 1, -1, 0, h, 0], 7: [0, -1, -1, 0, h, w], 8: [0, -1, 1, 0, 0, w] }[orientation];
   if (T) ctx.transform(...T);
   ctx.drawImage(img, 0, 0, w, h);
-  return canvas.encode('jpeg', 82);
+  return canvas.encode('jpeg', quality);
 }
 
 async function imageBytes(file) {

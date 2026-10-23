@@ -12,10 +12,10 @@
     <p class="muted small">O episódio inteiro vai só para o YouTube, com o título, a descrição, as tags e a thumbnail aprovada.<%= thumb ? '' : ' Nenhuma thumbnail aprovada: o YouTube vai escolher um quadro.' %></p>
     <% if (!uploadLive) { %><p class="notice small">Modo de teste: o pedido é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
     <label class="check <%= ytLinked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="youtube" checked <%= ytLinked ? '' : 'disabled' %>> YouTube<% if (social && social.ok && social.platforms.youtube) { %> <span class="handle muted"><%= social.platforms.youtube.handle %></span><% } %></label>
-    <label>Título <small class="counter" data-counter-for="ep-pt" data-max="<%= L.LIMITS.youtube.title.max %>" data-ideal="<%= L.LIMITS.youtube.title.ideal %>"></small><input type="text" id="ep-pt" name="title" value="<%= (meta && meta.yt_title) || ep.title %>" maxlength="100"></label>
+    <label>Título <small class="counter" data-counter-for="ep-pt" data-max="<%= L.LIMITS.youtube.title.max %>" data-ideal="<%= L.LIMITS.youtube.title.ideal %>"></small><input type="text" id="ep-pt" name="title" data-ai="titulo_youtube" data-ai-episode="<%= ep.id %>" value="<%= (meta && meta.yt_title) || ep.title %>" maxlength="100"></label>
     <details class="more">
       <summary>Descrição (vem dos textos de publicação)</summary>
-      <label class="top-gap">Descrição <small class="counter" data-counter-for="ep-pd" data-max-bytes="<%= L.LIMITS.youtube.descriptionBytes %>"></small><textarea id="ep-pd" name="description" rows="10"><%= (meta && meta.yt_description) || '' %></textarea></label>
+      <label class="top-gap">Descrição <small class="counter" data-counter-for="ep-pd" data-max-bytes="<%= L.LIMITS.youtube.descriptionBytes %>"></small><textarea id="ep-pd" name="description" data-ai="descricao_youtube" data-ai-episode="<%= ep.id %>" rows="10"><%= (meta && meta.yt_description) || '' %></textarea></label>
     </details>
     <label>Agendar <small class="muted">(opcional, horário de Brasília)</small><input type="datetime-local" name="agendar"></label>
     <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica no YouTube.</label>

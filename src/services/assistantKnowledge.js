@@ -80,6 +80,8 @@ const TOPICS = [
       'Na aba Material, os arquivos aparecem em pastas: Vídeos do episódio, Áudios, Bastidores, Fotografias e Outros (com subpastas pelo rótulo), e o vídeo editado tem uma pasta por versão, com os comentários de revisão daquela versão.',
       'O editor assume a edição, sobe o vídeo editado (horizontal) e envia para revisão. A gestão revisa com comentários na minutagem (texto, imagem, áudio), pede ajustes ou aprova.',
       'Finalização usa IA (transcrição, quadros, títulos, descrições, capas e posts), depois publica. Cortes são enviados em Conteúdo e ligados ao episódio.',
+      'No editor de capa, aba Fundo: quadros do vídeo, Fotografias (as fotos e bastidores do material bruto do episódio; HEIC não abre, use JPG/PNG/WebP) ou Enviar uma imagem. Dá para girar, espelhar, inverter, ajustar brilho/contraste/saturação/desfoque e deixar em preto e branco. Na aba Camadas, a sombra do texto vai para qualquer lado, com contorno e fundo escuro.',
+      'Botão "Sugerir com IA" embaixo do texto da capa, do título e da legenda dos cortes, do Novo post e do título/descrição do YouTube: atalhos (outras opções, mais curto, em pergunta, frase do convidado, com número, mais sério, mais leve, com hashtags na legenda) ou um pedido livre. Vêm 3 opções; tocar aplica e "Desfazer" volta.',
       'O editor de vídeo tem um Início próprio (fila para assumir, o que está com ele e ajustes pedidos) e recebe avisos de cada etapa.',
       'Pelo assistente: "episodios" mostra a etapa e o que falta; "avancar_episodio" move a etapa quando o perfil pode e nada falta.',
     ],

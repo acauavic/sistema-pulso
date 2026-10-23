@@ -62,8 +62,8 @@
     </fieldset>
     <% if (tipo !== 'story') { %>
     <%- include('../partials/ig-people', { episodeId: null, photo: tipo !== 'video' }) %>
-    <label><%= tipo === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" maxlength="300" data-fill="title"></label>
-    <label>Legenda<textarea name="description" rows="6" maxlength="5000" data-fill="caption"></textarea></label>
+    <label><%= tipo === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" maxlength="300" data-fill="title" data-ai="titulo" data-ai-scope="form"></label>
+    <label>Legenda<textarea name="description" rows="6" maxlength="5000" data-fill="caption" data-ai="descricao" data-ai-scope="form"></textarea></label>
     <% } else { %><input type="hidden" name="title" value="Story" data-fill="title"><% } %>
     <label>Agendar <small class="muted">(vazio = <%= direct ? 'publicar agora' : 'publicar assim que a gestão aprovar' %>)</small><input type="datetime-local" name="agendar"></label>
     <% if (direct) { %>
@@ -80,4 +80,5 @@
 </form>
 <% } %>
 <script src="/static/social.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>

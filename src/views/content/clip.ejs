@@ -112,8 +112,8 @@
           <% }) %>
         </fieldset>
         <%- include('../partials/ig-people', { episodeId: clip.episode_id, photo: false }) %>
-        <label>Título <small class="counter" data-counter-for="pub_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" id="pub_title" name="title" value="<%= clip.post_title || clip.title %>" maxlength="100"></label>
-        <label>Legenda <small class="counter" data-counter-for="pub_desc" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea id="pub_desc" name="description" rows="5"><%= clip.caption || '' %></textarea></label>
+        <label>Título <small class="counter" data-counter-for="pub_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" id="pub_title" name="title" data-ai="titulo" data-ai-clip="<%= clip.id %>" value="<%= clip.post_title || clip.title %>" maxlength="100"></label>
+        <label>Legenda <small class="counter" data-counter-for="pub_desc" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea id="pub_desc" name="description" data-ai="descricao" data-ai-clip="<%= clip.id %>" rows="5"><%= clip.caption || '' %></textarea></label>
         <label>Agendar (opcional, horário de Brasília)<input type="datetime-local" name="agendar"></label>
         <% if (perm.direct) { %>
         <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas.</label>
@@ -165,12 +165,13 @@
       <form method="post" action="/cortes/<%= clip.id %>" class="stack">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <label>Nome interno<input type="text" name="title" value="<%= clip.title %>" maxlength="80"></label>
-        <label>Título para as redes <small class="counter" data-counter-for="post_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" name="post_title" value="<%= clip.post_title || '' %>" maxlength="100"></label>
-        <label>Legenda <small class="counter" data-counter-for="caption" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea name="caption" rows="6"><%= clip.caption || '' %></textarea></label>
+        <label>Título para as redes <small class="counter" data-counter-for="post_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" name="post_title" data-ai="titulo" data-ai-clip="<%= clip.id %>" value="<%= clip.post_title || '' %>" maxlength="100"></label>
+        <label>Legenda <small class="counter" data-counter-for="caption" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea name="caption" rows="6" data-ai="descricao" data-ai-clip="<%= clip.id %>"><%= clip.caption || '' %></textarea></label>
         <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
       </form>
 </dialog>
 <% } %>
 <div class="top-gap"><%- include('../partials/comments', { type: 'clip', id: clip.id, items: comments, back: '/cortes/' + clip.id }) %></div>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>

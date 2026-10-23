@@ -120,14 +120,52 @@
   };
   const grow = (r, m) => ({ x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m });
 
-  // Leva uma caixa normalizada (0–1) do quadro original para o canvas, conforme o enquadramento do fundo.
+  // ---- girar e espelhar o fundo (bg.rot: 0/90/180/270 no sentido horário; bg.flipX/flipY). Primeiro espelha, depois gira.
+  const rotOf = (bg) => ((Math.round((bg?.rot || 0) / 90) * 90) % 360 + 360) % 360;
+  // Tamanho da imagem já girada (90/270 trocam largura e altura).
+  const orientedSize = (img, bg) => { const r = rotOf(bg); return r === 90 || r === 270 ? { w: img.h, h: img.w } : { w: img.w, h: img.h }; };
+  // Caixa normalizada (0–1) do quadro original -> a mesma caixa na imagem espelhada/girada.
+  function orientBox(box, bg) {
+    let { x, y, w, h } = box;
+    if (bg?.flipX) x = 1 - x - w;
+    if (bg?.flipY) y = 1 - y - h;
+    const r = rotOf(bg);
+    if (r === 90) return { x: 1 - y - h, y: x, w: h, h: w };
+    if (r === 180) return { x: 1 - x - w, y: 1 - y - h, w, h };
+    if (r === 270) return { x: y, y: 1 - x - w, w: h, h: w };
+    return { x, y, w, h };
+  }
+  // Ajustes da foto como filtro de canvas (o mesmo no navegador e no servidor).
+  function photoFilter(bg, scale = 1) {
+    const a = bg?.adjust; if (!a) return 'none';
+    const parts = [];
+    if (a.brightness != null && a.brightness !== 1) parts.push(`brightness(${a.brightness})`);
+    if (a.contrast != null && a.contrast !== 1) parts.push(`contrast(${a.contrast})`);
+    if (a.saturate != null && a.saturate !== 1) parts.push(`saturate(${a.saturate})`);
+    if (a.blur) parts.push(`blur(${Math.round(a.blur * scale * 10) / 10}px)`);
+    return parts.length ? parts.join(' ') : 'none';
+  }
+  // Desenha a imagem (espelhada, girada, com ajustes) no retângulo (x, y, w, h) já calculado para a imagem girada.
+  function drawOriented(ctx, im, bg, x, y, w, h) {
+    const r = rotOf(bg); const f = photoFilter(bg, Math.max(w, h) / 1080);
+    ctx.save();
+    if (f !== 'none') ctx.filter = f;
+    ctx.translate(x + w / 2, y + h / 2); ctx.rotate((r * Math.PI) / 180); ctx.scale(bg?.flipX ? -1 : 1, bg?.flipY ? -1 : 1);
+    const [dw, dh] = r === 90 || r === 270 ? [h, w] : [w, h];
+    ctx.drawImage(im, -dw / 2, -dh / 2, dw, dh);
+    ctx.restore();
+  }
+
+  // Leva uma caixa normalizada (0–1) do quadro original para o canvas, conforme o enquadramento do fundo (e o giro/espelho).
   function mapBox(box, img, bg, W, H) {
+    const o = orientBox(box, bg); const sz = orientedSize(img, bg);
     const t = bgTransform(img, bg, W, H);
-    return { x: t.dx + box.x * img.w * t.s, y: t.dy + box.y * img.h * t.s, w: box.w * img.w * t.s, h: box.h * img.h * t.s };
+    return { x: t.dx + o.x * sz.w * t.s, y: t.dy + o.y * sz.h * t.s, w: o.w * sz.w * t.s, h: o.h * sz.h * t.s };
   }
 
   // Como a imagem é posicionada no canvas: cover (zoom e foco ajustáveis) ou "contain" (cabe inteira).
-  function bgTransform(img, bg, W, H) {
+  function bgTransform(img0, bg, W, H) {
+    const img = orientedSize(img0, bg);
     const zoom = bg?.zoom || 1;
     const fit = bg?.fit === 'contain' ? Math.min(W / img.w, H / img.h) : Math.max(W / img.w, H / img.h);
     const s = fit * zoom;
@@ -327,10 +365,22 @@
       const x = layer.align === 'center' ? layer.x + (layer.w - lineW) / 2 : layer.align === 'right' ? layer.x + layer.w - lineW : layer.x;
       const y = layer.y + i * lh + (lh - layer.size) / 2 - layer.size * 0.08;
       const isHl = hl && (hl.lines === 'last' ? i === box.lines.length - 1 : hl.lines === i);
-      if (layer.shadow) {
-        ctx.save(); ctx.shadowColor = `rgba(0,0,0,${0.55 * layer.shadow})`; ctx.shadowBlur = layer.size * 0.12 * layer.shadow; ctx.shadowOffsetY = layer.size * 0.025 * layer.shadow;
-        ctx.fillStyle = isHl ? hl.color : layer.color; ctx.fillText(line, x, y); ctx.restore();
-      } else { ctx.fillStyle = isHl ? hl.color : layer.color; ctx.fillText(line, x, y); }
+      const fill = isHl ? hl.color : layer.color;
+      const strokeW = layer.stroke && layer.stroke.width > 0 ? layer.stroke.width * layer.size : 0;
+      const withShadow = (fn) => {
+        if (!layer.shadow) { fn(); return; }
+        ctx.save(); ctx.shadowColor = `rgba(0,0,0,${0.55 * layer.shadow})`; ctx.shadowBlur = layer.size * 0.12 * layer.shadow;
+        if (layer.shadowAngle == null) ctx.shadowOffsetY = layer.size * 0.025 * layer.shadow; // sombra clássica, um pouco abaixo
+        else { // direção escolhida (graus: 0 = direita, 90 = baixo) e distância (0 = brilho em volta)
+          const d = layer.size * 0.1 * (layer.shadowDistance ?? 0.4); const rad = (layer.shadowAngle * Math.PI) / 180;
+          ctx.shadowOffsetX = Math.cos(rad) * d; ctx.shadowOffsetY = Math.sin(rad) * d;
+        }
+        fn(); ctx.restore();
+      };
+      if (strokeW) { // contorno: desenhado antes (com a sombra) e o preenchimento por cima, limpo
+        withShadow(() => { ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.lineWidth = strokeW * 2; ctx.strokeStyle = layer.stroke.color || BRAND.black; ctx.strokeText(line, x, y); });
+        ctx.fillStyle = fill; ctx.fillText(line, x, y);
+      } else withShadow(() => { ctx.fillStyle = fill; ctx.fillText(line, x, y); });
     });
     return box;
   }
@@ -360,7 +410,7 @@
           ctx.fillStyle = g; ctx.fillRect(p.rect.x, p.rect.y, p.rect.w, p.rect.h);
         }
         const t = bgTransform({ w: im.width, h: im.height }, p.bg, p.rect.w, p.rect.h);
-        ctx.drawImage(im, p.rect.x + t.dx, p.rect.y + t.dy, t.iw, t.ih);
+        drawOriented(ctx, im, p.bg, p.rect.x + t.dx, p.rect.y + t.dy, t.iw, t.ih);
         ctx.restore();
       }
       return;
@@ -375,7 +425,7 @@
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     }
     const t = bgTransform(size, bg, W, H);
-    ctx.drawImage(img, t.dx, t.dy, t.iw, t.ih);
+    drawOriented(ctx, img, bg, t.dx, t.dy, t.iw, t.ih);
   }
 
   function drawScrims(ctx, spec) {
@@ -502,7 +552,7 @@
   }
 
   return {
-    BRAND, FONTS, FORMATS, fontString, setFont, wrap, balance, fitText, overlap, grow, mapBox, bgTransform, freeBands, autoText,
+    orientBox, orientedSize, photoFilter, BRAND, FONTS, FORMATS, fontString, setFont, wrap, balance, fitText, overlap, grow, mapBox, bgTransform, freeBands, autoText,
     emptyRects, layerBox, render, lint, uncoveredBlocks, visibleArea, framings, placeSmall, luminance, hexToRgb, contrast, clamp,
   };
 }));

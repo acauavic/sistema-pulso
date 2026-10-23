@@ -110,27 +110,26 @@ async function updateCover(cover, spec, ctx, userId) {
 
 // Imagem enviada pela equipe para ser o fundo de uma capa. Reduz para no máximo 2400 px, guarda como JPEG e tenta ler os rostos
 // com a IA; se a IA não estiver disponível, a imagem é aceita mas marcada como "não conferida" (o editor avisa).
-async function addCustomImage(episodeId, { buffer, clipId = null }) {
-  const { createCanvas, loadImage } = require('@napi-rs/canvas');
+// fromFile: id da fotografia do episódio de onde a imagem veio (para reaproveitar se usarem a mesma foto de novo).
+async function addCustomImage(episodeId, { buffer, clipId = null, fromFile = null }) {
+  const { loadImage } = require('@napi-rs/canvas');
+  const previews = require('./previews');
+  const raw = Buffer.from(buffer);
   let img;
-  try { img = await loadImage(Buffer.from(buffer)); } catch { return { error: 'Não consegui abrir esta imagem. Use JPG, PNG ou WebP.' }; }
+  try { img = await loadImage(raw); } catch { return { error: 'Não consegui abrir esta imagem. Use JPG, PNG ou WebP (HEIC e RAW não abrem aqui).' }; }
   if (img.width < 400 || img.height < 400) return { error: 'A imagem é muito pequena (mínimo 400 px de cada lado).' };
-  const draw = (maxSide) => {
-    const s = Math.min(1, maxSide / Math.max(img.width, img.height));
-    const c = createCanvas(Math.round(img.width * s), Math.round(img.height * s));
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    return c;
-  };
-  const big = draw(2400);
-  const jpeg = big.toBuffer('image/jpeg', 92);
-  let analysis = { rostos: [], caixas_de_texto: [], custom: true, unchecked: true };
+  const orientation = previews.jpegOrientation(raw); // foto de câmera/celular: já entra em pé
+  const jpeg = await previews.shrink(raw, 2400, orientation, 92);
+  const dims = await loadImage(jpeg);
+  const big = { width: dims.width, height: dims.height };
+  let analysis = { rostos: [], caixas_de_texto: [], custom: true, unchecked: true, ...(fromFile ? { from_file: Number(fromFile) } : {}) };
   if (config.geminiConfigured) {
     const dir = await media.tempDir('pulso-img-');
     try {
       const small = path.join(dir, 'small.jpg');
-      fs.writeFileSync(small, draw(768).toBuffer('image/jpeg', 80));
+      fs.writeFileSync(small, await previews.shrink(raw, 768, orientation, 80));
       const [a] = await require('./finalization').analyzeFrames([{ small, at_ms: 0, width: big.width, height: big.height }], { attempts: 2, timeoutMs: 25_000 }); // resposta rápida: se a IA estiver ocupada, segue sem conferir
-      if (a) analysis = { ...a, custom: true };
+      if (a) analysis = { ...a, custom: true, ...(fromFile ? { from_file: Number(fromFile) } : {}) };
     } catch (err) {
       console.error('Imagem enviada sem leitura da IA:', err.message);
     } finally { await media.rmDir(dir); }

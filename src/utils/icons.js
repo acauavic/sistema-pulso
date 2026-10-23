@@ -1,6 +1,8 @@
 // Ícones Lucide (ISC, https://lucide.dev) embutidos: traço 2px, sem CDN (a CSP só aceita recursos locais).
 // Uso nas views: <%- icon('users') %> (16px no desktop) ou <%- icon('users', 20) %> (20px no mobile).
 const PATHS = {
+  "flip-horizontal": "<path d=\"M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3\" /> <path d=\"M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3\" /> <path d=\"M12 20v2\" /> <path d=\"M12 14v2\" /> <path d=\"M12 8v2\" /> <path d=\"M12 2v2\" />",
+  "flip-vertical": "<path d=\"M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3\" /> <path d=\"M21 16v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3\" /> <path d=\"M4 12H2\" /> <path d=\"M10 12H8\" /> <path d=\"M16 12h-2\" /> <path d=\"M22 12h-2\" />",
   "folder": "<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\" />",
   "smartphone": "<rect width=\"14\" height=\"20\" x=\"5\" y=\"2\" rx=\"2\" ry=\"2\" /> <path d=\"M12 18h.01\" />",
   "share": "<path d=\"M12 2v13\" /> <path d=\"m16 6-4-4-4 4\" /> <path d=\"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8\" />",

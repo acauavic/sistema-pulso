@@ -29,55 +29,116 @@
     <div data-pane="layers">
       <ul class="plain layer-list" data-layer-list></ul>
       <div class="row">
-        <button type="button" class="btn sm" data-add="text">+ Texto</button>
-        <button type="button" class="btn sm" data-add="wordmark">+ Logotipo</button>
-        <button type="button" class="btn sm" data-add="line">+ Linha lime</button>
-        <button type="button" class="btn sm danger" data-delete>Excluir camada</button>
+        <button type="button" class="btn sm" data-add="text"><%- icon('plus', 14) %> Texto</button>
+        <button type="button" class="btn sm" data-add="wordmark"><%- icon('plus', 14) %> Logotipo</button>
+        <button type="button" class="btn sm" data-add="line"><%- icon('plus', 14) %> Linha lime</button>
+        <button type="button" class="icon-btn danger-ic" data-delete aria-label="Excluir a camada escolhida" title="Excluir camada"><%- icon('trash-2', 16) %></button>
       </div>
       <div class="props" data-props hidden>
-        <label>Texto<textarea data-p="text" rows="3"></textarea></label>
-        <div class="grid-2 tight">
-          <label>Fonte
-            <select data-p="family">
-              <option value="Space Grotesk">Space Grotesk (títulos)</option>
-              <option value="Instrument Serif">Instrument Serif (voz)</option>
-              <option value="Inter">Inter (texto)</option>
-              <option value="JetBrains Mono">JetBrains Mono (dados)</option>
-            </select>
-          </label>
-          <label>Alinhamento
-            <select data-p="align"><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select>
-          </label>
-        </div>
-        <label>Tamanho <span class="handle muted" data-out="size"></span><input type="range" data-p="size" min="20" max="320" step="1"></label>
-        <label>Entrelinha <span class="handle muted" data-out="lineHeight"></span><input type="range" data-p="lineHeight" min="0.85" max="1.6" step="0.01"></label>
-        <label>Espaçamento <span class="handle muted" data-out="tracking"></span><input type="range" data-p="tracking" min="-0.08" max="0.2" step="0.005"></label>
-        <label>Sombra <span class="handle muted" data-out="shadow"></span><input type="range" data-p="shadow" min="0" max="1" step="0.05"></label>
-        <div><span class="small muted">Cor</span><div class="swatches" data-swatches></div></div>
-        <div class="row">
-          <label class="check"><input type="checkbox" data-p="upper"> Caixa alta</label>
-          <label class="check"><input type="checkbox" data-p="italic"> Itálico</label>
-          <label class="check"><input type="checkbox" data-p="highlight"> Última linha em lime</label>
-        </div>
-        <div class="grid-2 tight">
-          <label>Largura da caixa<input type="number" data-p="w" min="60" max="2400" step="4"></label>
-          <label>Posição X / Y<span class="row"><input type="number" data-p="x" step="2"><input type="number" data-p="y" step="2"></span></label>
-        </div>
+        <label>Texto<textarea data-p="text" rows="3" data-ai="capa" data-ai-kind="<%= cover.kind %>" data-ai-episode="<%= ep ? ep.id : '' %>" data-ai-clip="<%= cover.clip_id || '' %>"></textarea></label>
+        <details class="prop-group" open>
+          <summary>Fonte e cor</summary>
+          <div class="prop-body">
+            <div class="grid-2 tight">
+              <label>Fonte
+                <select data-p="family">
+                  <option value="Space Grotesk">Space Grotesk (títulos)</option>
+                  <option value="Instrument Serif">Instrument Serif (voz)</option>
+                  <option value="Inter">Inter (texto)</option>
+                  <option value="JetBrains Mono">JetBrains Mono (dados)</option>
+                </select>
+              </label>
+              <label>Alinhamento
+                <select data-p="align"><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select>
+              </label>
+            </div>
+            <label>Tamanho <span class="handle muted" data-out="size"></span><input type="range" data-p="size" min="20" max="320" step="1"></label>
+            <div><span class="small muted">Cor</span><div class="swatches" data-swatches></div></div>
+            <div class="row">
+              <label class="check"><input type="checkbox" data-p="upper"> Caixa alta</label>
+              <label class="check"><input type="checkbox" data-p="italic"> Itálico</label>
+              <label class="check"><input type="checkbox" data-p="highlight"> Última linha em lime</label>
+            </div>
+            <label>Entrelinha <span class="handle muted" data-out="lineHeight"></span><input type="range" data-p="lineHeight" min="0.85" max="1.6" step="0.01"></label>
+            <label>Espaçamento <span class="handle muted" data-out="tracking"></span><input type="range" data-p="tracking" min="-0.08" max="0.2" step="0.005"></label>
+          </div>
+        </details>
+        <details class="prop-group" data-text-only>
+          <summary>Sombra, contorno e fundo</summary>
+          <div class="prop-body">
+            <label>Sombra <span class="handle muted" data-out="shadow"></span><input type="range" data-p="shadow" min="0" max="1" step="0.05"></label>
+            <div class="shadow-ctl">
+              <span class="small muted">Lado da sombra</span>
+              <div class="shadow-dirs" role="group" aria-label="Lado da sombra" data-shadow-dirs>
+                <% [[-135, 'arrow-left', 'em cima e à esquerda', 'tl'], [-90, 'chevron-up', 'em cima', 't'], [-45, 'arrow-right', 'em cima e à direita', 'tr'], [180, 'chevron-left', 'à esquerda', 'l'], ['glow', 'sun', 'em volta (brilho)', 'c'], [0, 'chevron-right', 'à direita', 'r'], [135, 'arrow-left', 'embaixo e à esquerda', 'bl'], [90, 'chevron-down', 'embaixo', 'b'], [45, 'arrow-right', 'embaixo e à direita', 'br']].forEach(function (d) { %>
+                <button type="button" class="shadow-dir d-<%= d[3] %>" data-shadow-dir="<%= d[0] %>" aria-label="Sombra <%= d[2] %>" title="Sombra <%= d[2] %>"><% if (d[0] === 'glow') { %><%- icon('sun', 14) %><% } else { %><span class="dot-mark" aria-hidden="true"></span><% } %></button>
+                <% }) %>
+              </div>
+            </div>
+            <label>Distância da sombra <span class="handle muted" data-out="shadowDistance"></span><input type="range" data-p="shadowDistance" min="0" max="1" step="0.05"></label>
+            <label>Contorno <span class="handle muted" data-out="strokeWidth"></span><input type="range" data-p="strokeWidth" min="0" max="0.2" step="0.005"></label>
+            <div data-stroke-colors-wrap><span class="small muted">Cor do contorno</span><div class="swatches" data-stroke-swatches></div></div>
+            <label class="check"><input type="checkbox" data-p="chip"> Fundo escuro atrás do texto</label>
+          </div>
+        </details>
+        <details class="prop-group">
+          <summary>Posição e largura</summary>
+          <div class="prop-body grid-2 tight">
+            <label>Largura da caixa<input type="number" data-p="w" min="60" max="2400" step="4"></label>
+            <label>Posição X / Y<span class="row"><input type="number" data-p="x" step="2"><input type="number" data-p="y" step="2"></span></label>
+          </div>
+        </details>
       </div>
     </div>
 
     <div data-pane="bg" hidden>
       <div data-bg-panels></div>
-      <label>Zoom <span class="handle muted" data-out="zoom"></span><input type="range" data-bg="zoom" min="1" max="2.4" step="0.01"></label>
-      <label>Posição horizontal<input type="range" data-bg="cx" min="0" max="1" step="0.005"></label>
-      <label>Posição vertical<input type="range" data-bg="cy" min="0" max="1" step="0.005"></label>
+      <div class="bg-src seg" role="tablist" aria-label="De onde vem o fundo" data-bg-srcs>
+        <button type="button" class="on" data-bg-src="frames" role="tab"><%- icon('film', 14) %> Quadros do vídeo</button>
+        <button type="button" data-bg-src="photos" role="tab"><%- icon('image', 14) %> Fotografias <span class="mono small" data-photo-count></span></button>
+        <button type="button" data-bg-src="upload" role="tab"><%- icon('upload', 14) %> Enviar</button>
+      </div>
+      <div data-bg-pane="frames">
+        <p class="small muted">Trocar o quadro refaz as zonas de rosto e legenda.</p>
+        <p class="small muted" data-frames-empty hidden>Ainda não há quadros do vídeo. Use uma fotografia do episódio ou envie uma imagem.</p>
+        <div class="frame-grid small-frames" data-frame-picker></div>
+      </div>
+      <div data-bg-pane="photos" hidden>
+        <p class="small muted" data-photo-hint>Fotografias que subiram no material do episódio. Ao escolher, a foto entra em pé e a IA confere os rostos.</p>
+        <div class="frame-grid small-frames photo-picker" data-photo-picker></div>
+        <p class="small" data-photo-msg role="status"></p>
+      </div>
+      <div data-bg-pane="upload" hidden>
+        <p class="small muted">Uma imagem sua como fundo (JPG, PNG ou WebP, até 12 MB). A IA tenta achar os rostos; se não conseguir, o editor avisa.</p>
+        <label class="btn sm"><%- icon('upload', 14) %> Escolher imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-upload hidden></label>
+        <p class="small" data-upload-msg role="status"></p>
+      </div>
+
+      <div class="bg-adjust" data-bg-adjust>
+        <span class="kicker">Enquadramento</span>
+        <label>Zoom <span class="handle muted" data-out="zoom"></span><input type="range" data-bg="zoom" min="1" max="2.4" step="0.01"></label>
+        <label>Posição horizontal<input type="range" data-bg="cx" min="0" max="1" step="0.005"></label>
+        <label>Posição vertical<input type="range" data-bg="cy" min="0" max="1" step="0.005"></label>
+        <div class="orient-row" role="group" aria-label="Girar e espelhar o fundo">
+          <button type="button" class="btn sm icon-only" data-orient="rotL" title="Girar 90° para a esquerda" aria-label="Girar 90° para a esquerda"><%- icon('rotate-ccw', 14) %></button>
+          <button type="button" class="btn sm icon-only" data-orient="rotR" title="Girar 90° para a direita" aria-label="Girar 90° para a direita"><%- icon('rotate-cw', 14) %></button>
+          <button type="button" class="btn sm" data-orient="flipX" title="Espelhar (esquerda e direita)"><%- icon('flip-horizontal', 14) %> Espelhar</button>
+          <button type="button" class="btn sm" data-orient="flipY" title="Inverter (de cabeça para baixo)"><%- icon('flip-vertical', 14) %> Inverter</button>
+        </div>
+        <details class="prop-group">
+          <summary>Ajustes da foto</summary>
+          <div class="prop-body">
+            <label>Brilho <span class="handle muted" data-out-adj="brightness"></span><input type="range" data-adj="brightness" min="0.4" max="1.8" step="0.02"></label>
+            <label>Contraste <span class="handle muted" data-out-adj="contrast"></span><input type="range" data-adj="contrast" min="0.4" max="1.8" step="0.02"></label>
+            <label>Saturação <span class="handle muted" data-out-adj="saturate"></span><input type="range" data-adj="saturate" min="0" max="2" step="0.05"></label>
+            <label>Desfoque <span class="handle muted" data-out-adj="blur"></span><input type="range" data-adj="blur" min="0" max="24" step="0.5"></label>
+            <div class="row"><button type="button" class="btn sm ghost" data-adj-mono>Preto e branco</button><button type="button" class="btn sm ghost" data-adj-reset>Restaurar</button></div>
+          </div>
+        </details>
+      </div>
+      <span class="kicker">Leitura do texto</span>
       <label>Escurecer tudo <span class="handle muted" data-out="dim"></span><input type="range" data-bg="dim" min="0" max="0.6" step="0.01"></label>
       <label>Faixa de contraste <span class="handle muted" data-out="scrim"></span><input type="range" data-bg="scrim" min="0" max="1" step="0.02"></label>
-      <p class="small muted">Trocar o quadro refaz as zonas de rosto e legenda. Escolha o quadro:</p>
-      <div class="frame-grid small-frames" data-frame-picker></div>
-      <p class="small muted top-gap">Ou use uma imagem sua como fundo (JPG, PNG ou WebP, até 12 MB). A IA tenta achar os rostos; se não conseguir, o editor avisa.</p>
-      <label class="btn sm">Enviar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-upload hidden></label>
-      <p class="small" data-upload-msg></p>
     </div>
 
     <div data-pane="zones" hidden>
@@ -91,7 +152,7 @@
 
     <div class="row editor-actions">
       <button type="button" class="btn primary" data-save>Salvar imagem</button>
-      <button type="button" class="btn" data-undo>Desfazer</button>
+      <button type="button" class="btn" data-undo title="Desfazer (Ctrl+Z)"><%- icon('rotate-ccw', 14) %> Desfazer</button>
       <a class="btn" href="/episodios/<%= ep.id %>/capas/<%= cover.id %>/imagem?baixar=1">Baixar</a>
       <span class="small" data-status role="status"></span>
     </div>
@@ -100,4 +161,5 @@
 <script type="application/json" id="editor-data"><%- JSON.stringify(editorData).replace(/</g, '\\u003c') %></script>
 <script src="/static/design/engine.js?v=<%= assetV %>"></script>
 <script src="/static/editor.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>
