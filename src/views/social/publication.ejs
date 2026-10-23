@@ -57,7 +57,12 @@
         <dt><%= pub.status === 'agendado' ? 'Agendado para' : 'Enviado em' %></dt><dd class="mono"><%= fmt.formatDateTime(pub.status === 'agendado' ? pub.scheduled_at : pub.created_at) %></dd>
         <% if (pub.edited_at) { %><dt>Editado em</dt><dd class="mono"><%= fmt.formatDateTime(pub.edited_at) %></dd><% } %>
         <dt>Por</dt><dd><%= pub.created_by_name || '—' %></dd>
+        <% if (pub.provider) { %><dt>Saiu pelo</dt><dd><%= provider ? provider.label : pub.provider %></dd><% } %>
+        <% var igo = pub.options && pub.options.instagram; %>
+        <% if (igo && igo.collaborators && igo.collaborators.length) { %><dt>Collab no Instagram</dt><dd class="pub-people mono"><% igo.collaborators.forEach(function (h) { %><span>@<%= h %></span><% }) %></dd><% } %>
+        <% if (igo && igo.tags && igo.tags.length) { %><dt>Marcados</dt><dd class="pub-people mono"><% igo.tags.forEach(function (t) { %><span>@<%= t.username %></span><% }) %></dd><% } %>
       </dl>
+      <% if (igo && igo.collaborators && igo.collaborators.length) { %><p class="small muted">O convite de collab chega para cada perfil no Instagram: o post só aparece no perfil deles depois que aceitarem.</p><% } %>
       <ul class="plain results top-gap">
         <% pub.platforms.forEach(function (k) { var r = (pub.results || []).find(function (x) { return x.platform === k; }) || {}; %>
         <li>

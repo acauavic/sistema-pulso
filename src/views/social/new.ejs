@@ -27,7 +27,7 @@
     <div class="pick-grid">
       <% if (tipo === 'video') { clips.forEach(function (c) { %>
       <label class="pick">
-        <input type="radio" name="clip_id" value="<%= c.id %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.post_title || c.title %>" data-caption="<%= c.caption || '' %>">
+        <input type="radio" name="clip_id" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.post_title || c.title %>" data-caption="<%= c.caption || '' %>">
         <% if (c.cover_id) { %><img src="/capas/<%= c.cover_id %>/imagem" alt="" loading="lazy"><% } else { %><span class="ph"><%- icon('film', 20) %></span><% } %>
         <strong><%= c.post_title || c.title %></strong>
         <span class="small muted"><%= epLabel(c) %><%= c.duration_ms ? ' · ' + dur(c.duration_ms) : '' %></span>
@@ -35,14 +35,14 @@
       </label>
       <% }); } else if (tipo === 'carrossel') { images.carousels.forEach(function (g) { %>
       <label class="pick">
-        <input type="radio" name="cover_ids" value="<%= g.slides.map(function (s) { return s.id; }).join(',') %>" required data-title="<%= g.label || 'Carrossel' %>">
+        <input type="radio" name="cover_ids" value="<%= g.slides.map(function (s) { return s.id; }).join(',') %>" data-episode="<%= g.episode_id || (g.slides[0] && g.slides[0].episode_id) || '' %>" required data-title="<%= g.label || 'Carrossel' %>">
         <span class="slides"><% g.slides.slice(0, 3).forEach(function (s) { %><img src="/capas/<%= s.id %>/imagem" alt="" loading="lazy"><% }) %></span>
         <strong><%= g.label || 'Carrossel' %></strong>
         <span class="small muted"><%= epLabel(g) %> · <span class="mono"><%= g.slides.length %></span> slides</span>
       </label>
       <% }); } else { items.forEach(function (c) { %>
       <label class="pick">
-        <input type="radio" name="cover_ids" value="<%= c.id %>" required data-title="<%= c.label || (tipo === 'story' ? 'Story' : 'Post') %>">
+        <input type="radio" name="cover_ids" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required data-title="<%= c.label || (tipo === 'story' ? 'Story' : 'Post') %>">
         <img class="<%= tipo === 'imagem' ? 'sq' : '' %>" src="/capas/<%= c.id %>/imagem" alt="" loading="lazy">
         <strong><%= c.label || (c.kind === 'post_quote' ? 'Frase' : c.kind === 'post_split' ? 'Tela dividida' : 'Capa vertical') %></strong>
         <span class="small muted"><%= epLabel(c) %></span>
@@ -61,6 +61,7 @@
       <% }) %>
     </fieldset>
     <% if (tipo !== 'story') { %>
+    <%- include('../partials/ig-people', { episodeId: null, photo: tipo !== 'video' }) %>
     <label><%= tipo === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" maxlength="300" data-fill="title"></label>
     <label>Legenda<textarea name="description" rows="6" maxlength="5000" data-fill="caption"></textarea></label>
     <% } else { %><input type="hidden" name="title" value="Story" data-fill="title"><% } %>

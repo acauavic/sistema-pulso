@@ -40,7 +40,7 @@ async function loadTarget({ episodeId, clipId, media = 'video', coverIds = [] })
 
 // Cria a publicação (já conferida) e envia na hora, ou deixa agendada.
 // review = true: quem pediu não publica direto (produtora); fica "em revisão" até a gestão aprovar ou recusar.
-async function create({ episodeId, clipId = null, media = 'video', coverIds = [], platforms, title, description = '', scheduledAt = null, tags = [], userId = null, review = false }) {
+async function create({ episodeId, clipId = null, media = 'video', coverIds = [], platforms, title, description = '', scheduledAt = null, tags = [], userId = null, review = false, instagram = null }) {
   const target = await loadTarget({ episodeId, clipId, media, coverIds });
   const list = [...new Set(platforms || [])];
   const check = target.kind === 'photo'
@@ -57,7 +57,7 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
   const { rows: [pub] } = await db.query(
     `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-    [target.episode.id, target.kind === 'photo' ? null : clipId, list, L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')), description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings }),
+    [target.episode.id, target.kind === 'photo' ? null : clipId, list, L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')), description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
       target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, target.kind === 'photo' ? target.covers.map((c) => c.id) : [], provider.id]);
   const names = list.map((p) => up.PLATFORMS[p].label).join(', ');
   if (review) {
@@ -89,6 +89,7 @@ async function dispatch(pubId) {
     const sent = await provider.sendVideo({
       id: pub.id, kind: target.kind, platforms: pub.platforms, title: pub.title, description: pub.description, videoUrl,
       coverUrl: target.kind === 'clip' ? coverUrl : null, thumbnailUrl: target.kind === 'episode' ? coverUrl : null, tags: pub.options?.tags || [], accounts: conn.platforms,
+      instagram: pub.options?.instagram || null,
     });
     const state = sent.simulated ? 'simulado' : (sent.done ? finalState(sent.results) : 'enviando');
     const { rows: [saved] } = await db.query(
@@ -108,7 +109,7 @@ async function dispatch(pubId) {
 async function dispatchPhotos(pub, target, provider, conn) {
   const photoUrls = [];
   for (const c of target.covers) photoUrls.push(await b2.presignGet(c.storage_key, { expires: up.MAX_LINK_SECONDS }));
-  const sent = await provider.sendPhotos({ id: pub.id, media: pub.media, platforms: pub.platforms, title: pub.title, description: pub.description, photoUrls, accounts: conn.platforms });
+  const sent = await provider.sendPhotos({ id: pub.id, media: pub.media, platforms: pub.platforms, title: pub.title, description: pub.description, photoUrls, accounts: conn.platforms, instagram: pub.options?.instagram || null });
   const state = sent.simulated ? 'simulado' : (sent.done ? finalState(sent.results) : 'enviando');
   const { rows: [saved] } = await db.query(
     'UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = NULL, updated_at = now() WHERE id = $1 RETURNING *',

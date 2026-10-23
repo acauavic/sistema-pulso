@@ -235,9 +235,11 @@ async function publish(req, res, { episodeId, clipId }) {
   const form = readPublishForm(req);
   const fail = async (msg) => { if (wantsJson(req)) return res.status(422).json({ ok: false, error: msg }); await req.flash('error', msg); return res.redirect(home); };
   if (form.scheduledAt === 'invalid') return fail('Data de agendamento inválida.');
+  const ig = require('../services/igPeople').parse(req.body, { media: 'video', platforms: form.platforms });
+  if (ig.error) return fail(ig.error);
   if (req.body.confirmar !== '1' && !review) return fail('Confirme o envio marcando "Entendi que isto publica nas redes escolhidas".');
   try {
-    const pub = await publishing.create({ episodeId, clipId, ...form, userId: req.user.id, review });
+    const pub = await publishing.create({ episodeId, clipId, ...form, userId: req.user.id, review, instagram: clipId ? ig.instagram : null });
     await audit(req, 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, simulado: pub.status === 'simulado' });
     if (wantsJson(req)) return res.json({ ok: true, publication: pub });
     await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub, { trail: ' O andamento aparece abaixo.' }));

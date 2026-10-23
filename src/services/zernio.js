@@ -50,7 +50,7 @@ async function connected({ force = false } = {}) {
 const resetCache = () => { cache = { at: 0, value: null }; };
 
 // Opções de cada rede (platformSpecificData) e o texto de cada uma.
-function platformEntry(p, { kind, media, title, description, coverUrl, accounts }) {
+function platformEntry(p, { kind, media, title, description, coverUrl, accounts, instagram = null }) {
   const entry = { platform: TO_ZERNIO[p], accountId: accounts[p]?.accountId || null };
   const caption = description || title;
   const psd = {};
@@ -60,6 +60,7 @@ function platformEntry(p, { kind, media, title, description, coverUrl, accounts 
   } else if (p === 'instagram') {
     if (media === 'story') psd.contentType = 'story';
     else if (kind !== 'photo') { psd.shareToFeed = true; if (coverUrl) psd.instagramThumbnail = coverUrl; }
+    if (media !== 'story') Object.assign(psd, require('./igPeople').zernioData(instagram, { photo: kind === 'photo' })); // collab e marcação
     entry.customContent = caption;
   } else if (p === 'tiktok') {
     Object.assign(psd, { privacyLevel: 'PUBLIC_TO_EVERYONE', allowComment: true, contentPreviewConfirmed: true, expressConsentGiven: true });
@@ -74,12 +75,12 @@ function platformEntry(p, { kind, media, title, description, coverUrl, accounts 
 }
 
 // Corpo do POST /v1/posts para um vídeo (episódio ou corte).
-function buildPost({ id, kind, platforms, title, description, videoUrl, coverUrl, thumbnailUrl, tags = [], accounts = {} }) {
+function buildPost({ id, kind, platforms, title, description, videoUrl, coverUrl, thumbnailUrl, tags = [], accounts = {}, instagram = null }) {
   const video = { type: 'video', url: videoUrl };
   if (kind === 'episode' && thumbnailUrl) video.thumbnail = thumbnailUrl; // capa do YouTube (vídeo longo); Shorts não aceitam
   return {
     title, content: description || title, mediaItems: [video],
-    platforms: platforms.map((p) => platformEntry(p, { kind, title, description, coverUrl: kind === 'clip' ? coverUrl : null, accounts })),
+    platforms: platforms.map((p) => platformEntry(p, { kind, title, description, coverUrl: kind === 'clip' ? coverUrl : null, accounts, instagram })),
     scheduledFor: new Date(Date.now() + 60_000).toISOString(), timezone: 'America/Sao_Paulo',
     tags: tags.slice(0, 30), metadata: { pulso_publicacao: String(id) },
     idempotency: `pulso-${id}-${crypto.randomBytes(4).toString('hex')}`,
@@ -87,10 +88,10 @@ function buildPost({ id, kind, platforms, title, description, videoUrl, coverUrl
 }
 
 // Imagens: post (1), carrossel (2 a 10) ou story (só Instagram).
-function buildPhotoPost({ id, media, platforms, title, description, photoUrls, accounts = {} }) {
+function buildPhotoPost({ id, media, platforms, title, description, photoUrls, accounts = {}, instagram = null }) {
   return {
     title: title || '', content: media === 'story' ? '' : (description || title || ''), mediaItems: photoUrls.map((url) => ({ type: 'image', url })),
-    platforms: platforms.map((p) => platformEntry(p, { kind: 'photo', media, title, description, accounts })),
+    platforms: platforms.map((p) => platformEntry(p, { kind: 'photo', media, title, description, accounts, instagram })),
     scheduledFor: new Date(Date.now() + 60_000).toISOString(), timezone: 'America/Sao_Paulo', metadata: { pulso_publicacao: String(id) },
     idempotency: `pulso-${id}-${crypto.randomBytes(4).toString('hex')}`,
   };

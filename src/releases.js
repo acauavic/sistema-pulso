@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.26.0', date: '2026-10-23', title: 'Collab e marcação de pessoas no Instagram',
+    items: [
+      { kind: 'novo', text: 'Ao publicar no Instagram (Reels, post ou carrossel), dá para convidar até 3 perfis para collab e marcar pessoas. Cada campo tem busca com sugestões (o convidado do episódio, convidados com Instagram cadastrado e perfis já usados antes) e aceita vários perfis, inclusive um @ digitado ou colado.' },
+      { kind: 'novo', text: 'O @ do convidado do episódio já vem no collab (dá para tirar). Em post e carrossel, toque na imagem para posicionar cada marcação; quem não for posicionado vai para a base da imagem. Em vídeo, a marcação vai só com o @.' },
+      { kind: 'ajuste', text: 'Funciona pelo Upload-Post e pela Zernio. A página da publicação mostra quem foi convidado e quem foi marcado. Stories não têm collab (limite do Instagram).' },
+    ],
+  },
+  {
     version: '1.25.0', date: '2026-10-23', title: 'Zernio como alternativa para publicar nas redes',
     items: [
       { kind: 'novo', text: 'As publicações (vídeo do episódio, cortes, posts, carrosséis e stories) podem sair pela Zernio em vez do Upload-Post. A gestão escolhe em Integrações > Redes sociais, vê qual está em uso e testa a conexão (lista as contas conectadas).' },

@@ -111,6 +111,7 @@
           <label class="check <%= p.linked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="<%= p.key %>" <%= p.checked ? 'checked' : '' %> <%= p.linked ? '' : 'disabled' %>> <%= p.label %><% if (p.handle) { %> <span class="handle muted"><%= p.handle %></span><% } %><% if (!p.linked) { %> <span class="handle muted">não conectado</span><% } %></label>
           <% }) %>
         </fieldset>
+        <%- include('../partials/ig-people', { episodeId: clip.episode_id, photo: false }) %>
         <label>Título <small class="counter" data-counter-for="pub_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" id="pub_title" name="title" value="<%= clip.post_title || clip.title %>" maxlength="100"></label>
         <label>Legenda <small class="counter" data-counter-for="pub_desc" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea id="pub_desc" name="description" rows="5"><%= clip.caption || '' %></textarea></label>
         <label>Agendar (opcional, horário de Brasília)<input type="datetime-local" name="agendar"></label>

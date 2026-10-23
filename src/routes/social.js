@@ -119,6 +119,12 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
   });
 }));
 
+// Instagram: alternativas para collab e marcação (convidado do episódio primeiro, convidados com @ e perfis já usados).
+router.get('/social/instagram/sugestoes', requirePerm('social.read'), wrap(async (req, res) => {
+  const episodeId = isIntId(String(req.query.episodio || '')) ? Number(req.query.episodio) : null;
+  res.set('Cache-Control', 'private, max-age=30').json({ ok: true, items: await require('../services/igPeople').suggest({ q: req.query.q, episodeId }) });
+}));
+
 router.post('/social/publicar', requirePerm('social.request'), wrap(async (req, res) => {
   const review = !can(req.user.role, 'social.publish'); // produtora: vai para a revisão da gestão
   const media = MEDIA[req.body.tipo] ? req.body.tipo : 'video';
@@ -140,8 +146,10 @@ router.post('/social/publicar', requirePerm('social.request'), wrap(async (req, 
     const ids = String(req.body.cover_ids || '').split(',').map(Number).filter(Number.isInteger);
     target = { coverIds: ids };
   }
+  const ig = require('../services/igPeople').parse(req.body, { media, platforms });
+  if (ig.error) return fail(ig.error);
   try {
-    const pub = await publishing.create({ ...target, media, platforms, title, description, scheduledAt, userId: req.user.id, review });
+    const pub = await publishing.create({ ...target, media, platforms, title, description, scheduledAt, userId: req.user.id, review, instagram: ig.instagram });
     await audit(req, review ? 'publicacao.pedida' : 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, tipo: media, simulado: pub.status === 'simulado' });
     await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub));
     return res.redirect(`/social/publicacoes/${pub.id}`);

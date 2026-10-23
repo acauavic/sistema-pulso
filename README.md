@@ -352,6 +352,12 @@ Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`
 - **Visualizações**: combinações salvas de modo, tipos, responsável e concluídos. Da casa: **Tudo**, **Meu trabalho** (semana, só os meus e os do meu perfil, sem concluídos), **Produção** e **Dinheiro** (só para quem vê o financeiro). Qualquer pessoa salva as suas ("Salvar esta visualização" aparece quando os filtros não batem com nenhuma); **Gestão e Superadmin** (`calendar.share`) também compartilham com a equipe e apagam as dos outros. A visualização da equipe abre para cada perfil já limitada ao que ele enxerga.
 - O **assistente de IA** consulta o calendário (`calendario`): "o que tenho esta semana?".
 
+## Instagram: collab e marcação
+
+Na janela de publicar (corte, post, carrossel), com o Instagram marcado: **Collab** (até 3 perfis) e **Marcar pessoas**, com busca e sugestões (o convidado do
+episódio já vem no collab; convidados com Instagram e perfis já usados aparecem na lista; dá para digitar ou colar vários @). Em post/carrossel, toque na
+imagem para posicionar cada marcação. Vai pelos dois provedores. Código: `src/services/igPeople.js`, `src/views/partials/ig-people.ejs`, `src/public/igpeople.js`.
+
 ## Redes sociais: Upload-Post ou Zernio
 
 As publicações (episódio no YouTube, cortes, posts, carrosséis e stories) saem pelo provedor escolhido em **Integrações > Redes sociais**:

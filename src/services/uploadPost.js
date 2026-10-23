@@ -74,7 +74,7 @@ function validate({ kind, platforms, title, description, scheduledAt }) {
 }
 
 // Campos do formulário enviado ao Upload-Post (lista de pares, porque platform[] se repete).
-function buildFields({ id, kind, platforms, title, description, videoUrl, coverUrl, thumbnailUrl, tags = [], accounts = {} }) {
+function buildFields({ id, kind, platforms, title, description, videoUrl, coverUrl, thumbnailUrl, tags = [], accounts = {}, instagram = null }) {
   const f = [['user', config.uploadPost.user], ['title', title], ['async_upload', 'true'], ['request_id', `pulso-${id}-${crypto.randomBytes(4).toString('hex')}`], ['external_id', `pulso-pub-${id}`], ['video', videoUrl]];
   if (description) f.push(['description', description]);
   for (const p of platforms) f.push(['platform[]', p]);
@@ -88,6 +88,7 @@ function buildFields({ id, kind, platforms, title, description, videoUrl, coverU
   if (platforms.includes('instagram')) {
     f.push(['instagram_title', description || title], ['media_type', 'REELS'], ['share_to_feed', 'true']);
     if (coverUrl) f.push(['cover_url', coverUrl]);
+    f.push(...require('./igPeople').uploadPostFields(instagram)); // collab e marcação (só o @ em vídeo)
   }
   if (platforms.includes('tiktok')) {
     f.push(['tiktok_title', description || title]);
@@ -161,7 +162,7 @@ function validatePhotos({ media, platforms, title, description, scheduledAt, cou
   return { ok: issues.length === 0, issues, warnings };
 }
 
-function buildPhotoFields({ id, media, platforms, title, description, photoUrls }) {
+function buildPhotoFields({ id, media, platforms, title, description, photoUrls, instagram = null }) {
   const f = [['user', config.uploadPost.user], ['async_upload', 'true'], ['request_id', `pulso-${id}-${crypto.randomBytes(4).toString('hex')}`], ['external_id', `pulso-pub-${id}`]];
   if (title) f.push(['title', title]);
   if (description) f.push(['description', description]);
@@ -169,7 +170,7 @@ function buildPhotoFields({ id, media, platforms, title, description, photoUrls 
   for (const u of photoUrls) f.push(['photos[]', u]);
   if (platforms.includes('instagram')) {
     if (media === 'story') f.push(['media_type', 'STORIES']);
-    else f.push(['instagram_title', description || title]);
+    else { f.push(['instagram_title', description || title]); f.push(...require('./igPeople').uploadPostFields(instagram, { photo: true })); }
   }
   return f;
 }
