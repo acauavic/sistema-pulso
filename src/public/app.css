@@ -1282,3 +1282,4 @@ dialog.modal.gallery[open] { display: flex; flex-direction: column; }
 .delivery-grid figcaption { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; }
 .next-step { display: grid; gap: 10px; }
 .req-video { display: grid; gap: 8px; } .req-video video { width: 100%; max-height: 360px; border-radius: var(--r-card); background: var(--bg); } .req-video video.tall { max-width: 240px; }
+.past-note { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; }

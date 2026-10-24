@@ -6,7 +6,7 @@
   var tabs = [{ key: 'inscricoes', label: 'Pedidos', n: counts.novos }, { key: 'agenda', label: 'Agenda', n: agenda.length }, { key: 'resultados', label: 'Resultados' }];
   if (canManage) tabs.push({ key: 'ajustes', label: 'Ajustes' });
   var here = '/plateia/painel' + (view === 'quadro' || guestFilter ? '?' + [view === 'quadro' ? 'vista=quadro' : '', guestFilter ? 'convidado=' + guestFilter : ''].filter(Boolean).join('&') : '');
-  var qs = function (over) { var o = Object.assign({ vista: view, convidado: guestFilter || '', status: statusFilter, q: q, origem: origin }, over || {}); return '/plateia/painel?' + Object.keys(o).filter(function (k) { return o[k]; }).map(function (k) { return k + '=' + encodeURIComponent(o[k]); }).join('&'); };
+  var qs = function (over) { var o = Object.assign({ vista: view, convidado: guestFilter || '', status: statusFilter, q: q, origem: origin, anteriores: pastToggle ? '1' : '' }, over || {}); return '/plateia/painel?' + Object.keys(o).filter(function (k) { return o[k]; }).map(function (k) { return k + '=' + encodeURIComponent(o[k]); }).join('&'); };
   var COLS = [['novo', 'b-gray'], ['em_atendimento', 'b-amber'], ['confirmado', 'b-green'], ['nao_selecionado', 'b-gray'], ['desistiu', 'b-red']];
   var brl = function (c) { return (Number(c) / 100).toFixed(2).replace('.', ','); };
   var fillJson = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
@@ -63,7 +63,7 @@
       <% }; %>
     <div class="pbar">
       <form method="get" action="/plateia/painel" class="pbar-filters">
-        <input type="hidden" name="vista" value="<%= view %>">
+        <input type="hidden" name="vista" value="<%= view %>"><% if (pastToggle) { %><input type="hidden" name="anteriores" value="1"><% } %>
         <label class="pbar-search"><%- icon('search', 16) %><input type="search" name="q" value="<%= q %>" placeholder="Buscar nome, WhatsApp ou convidado" aria-label="Buscar pedidos"></label>
         <select name="convidado" aria-label="Episódio" data-autosubmit>
           <option value="">Todos os episódios</option>
@@ -92,6 +92,12 @@
       </div>
     </div>
 
+    <% if (past.n && !guestFilter && !q) { %>
+    <p class="small muted past-note"><%- icon(pastToggle ? 'eye' : 'eye-off', 14) %>
+      <% if (!pastToggle) { %><span><span class="mono"><%= past.n %></span> <%= past.n === 1 ? 'pessoa' : 'pessoas' %> de gravações que já passaram <%= past.n === 1 ? 'está oculta' : 'estão ocultas' %> (<%= past.names %>).</span> <a href="<%= qs({ anteriores: '1' }) %>">Mostrar</a>
+      <% } else { %><span>Mostrando também as gravações que já passaram.</span> <a href="<%= qs({ anteriores: '' }) %>">Ocultar</a><% } %>
+    </p>
+    <% } %>
     <% if (!leads.length && filtersOn) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido com esses filtros</strong></p><p class="muted small"><a href="<%= qs({ q: '', convidado: '', status: '', origem: '' }) %>">Limpar filtros</a></p></div>
     <% } else if (!leads.length) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma inscrição por aqui</strong></p><p class="muted small">Quando alguém pedir para participar pela página pública, o pedido aparece aqui com o WhatsApp e a origem do clique. A seleção da plateia é sua. Quem você já combinou por fora entra em "Adicionar pessoa".</p></div><% } %>
 

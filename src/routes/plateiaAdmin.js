@@ -44,6 +44,11 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
   const q = clean(req.query.q, 80) || '';
   const origin = ['equipe', 'pagina'].includes(req.query.origem) ? req.query.origem : '';
   const where = []; const p = [];
+  // Gravações que já passaram poluem a lista: as pessoas delas ficam ocultas de primeira (dá para mostrar).
+  // Não esconde quando a pessoa filtra um episódio ou busca um nome.
+  const PAST = `l.guest_id IN (SELECT id FROM guests WHERE proposed_at IS NOT NULL AND (proposed_at AT TIME ZONE 'America/Sao_Paulo')::date < (now() AT TIME ZONE 'America/Sao_Paulo')::date)`;
+  const showPast = req.query.anteriores === '1' || Boolean(guestFilter) || Boolean(q);
+  if (!showPast) where.push(`NOT (l.guest_id IS NOT NULL AND ${PAST})`);
   if (guestFilter) { p.push(guestFilter); where.push(`l.guest_id = $${p.length}`); }
   if (statusFilter) { p.push(statusFilter); where.push(`l.status = $${p.length}`); }
   if (origin) where.push(origin === 'equipe' ? 'l.added_by IS NOT NULL' : 'l.added_by IS NULL');
@@ -63,9 +68,10 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
     audience.agenda(),
   ]);
   const { rows: [counts] } = await db.query("SELECT count(*) FILTER (WHERE status = 'novo')::int AS novos, count(*)::int AS total FROM plateia_leads");
+  const { rows: [past] } = await db.query(`SELECT count(*)::int AS n, string_agg(DISTINCT l.guest_name, ', ') AS names FROM plateia_leads l WHERE l.guest_id IS NOT NULL AND ${PAST}`);
   const { rows: recordings } = await db.query("SELECT id, name, proposed_at FROM guests WHERE status = 'agendado' AND proposed_at IS NOT NULL AND proposed_at > now() - interval '1 day' ORDER BY proposed_at, id");
   res.render('plateia/admin', {
-    title: 'Plateia', view, q, origin, recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
+    title: 'Plateia', view, q, origin, past, showPast, pastToggle: req.query.anteriores === '1', recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
     canManage: can(req.user.role, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, COUNTRY_BY_CODE: audience.COUNTRY_BY_CODE, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
   });
 }));

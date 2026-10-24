@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.29.1', date: '2026-10-23', title: 'Plateia sem as gravações que já passaram',
+    items: [
+      { kind: 'ajuste', text: 'Na Plateia, as pessoas de gravações que já passaram ficam ocultas na lista e no quadro. Um aviso diz quantas são e de quais convidados, com "Mostrar" para ver todo mundo. Filtrar pelo episódio ou buscar um nome continua encontrando qualquer pessoa.' },
+    ],
+  },
+  {
     version: '1.29.0', date: '2026-10-23', title: 'Conteúdo vira a linha de produção: pedidos ao editor e quadro até o post publicado',
     items: [
       { kind: 'novo', text: 'Conteúdo abre num quadro com cada peça (pedidos, cortes, posts, carrosséis e stories) na etapa em que está: Pedido, Em produção, Em revisão, Pronto para postar, Na fila e Publicado. Já publicado mostra em quais redes e quando; dá para filtrar por vídeos, imagens ou pedidos.' },
