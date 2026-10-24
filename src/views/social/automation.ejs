@@ -12,7 +12,7 @@
   </div>
   <div class="row"><a class="btn ghost" href="/social/automacoes"><%- icon('arrow-left') %> Automações</a></div>
 </div>
-<% if (!live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: a automação lê comentários e directs de verdade, mas só registra o que responderia. Nada é enviado enquanto <span class="mono">UPLOAD_POST_LIVE</span> estiver desligado.</span></p><% } %>
+<% if (!live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: a automação lê comentários e directs de verdade, mas só registra o que responderia. Nada é enviado até a gestão ligar a publicação de verdade em Integrações &gt; Redes sociais.</span></p><% } %>
 <% if (rule.last_error) { %><p class="flash flash-error">Última leitura falhou: <%= rule.last_error %></p><% } %>
 
 <section class="card next-step">

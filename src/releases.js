@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.29.0', date: '2026-10-23', title: 'Conteúdo vira a linha de produção: pedidos ao editor e quadro até o post publicado',
+    items: [
+      { kind: 'novo', text: 'Conteúdo abre num quadro com cada peça (pedidos, cortes, posts, carrosséis e stories) na etapa em que está: Pedido, Em produção, Em revisão, Pronto para postar, Na fila e Publicado. Já publicado mostra em quais redes e quando; dá para filtrar por vídeos, imagens ou pedidos.' },
+      { kind: 'novo', text: 'Pedir conteúdo ao editor: trailer do canal, vídeo avulso, corte específico, post, carrossel ou story, com ou sem episódio, briefing com anexos, formato, responsável e prazo. O editor é avisado, começa, envia a entrega (vídeo ou imagens) e manda para a revisão; a gestão aprova ou pede ajustes com um recado. Aprovado, vai direto para o Social.' },
+      { kind: 'novo', text: 'O Início do editor mostra os pedidos dele (e os livres, que qualquer editor pode pegar). O episódio mostra quantas peças já foram publicadas.' },
+      { kind: 'ajuste', text: 'Novo post (Social) mostra só o que ainda não saiu, com os sugeridos primeiro (do episódio que foi ao ar mais recentemente), e tem "Ver também os já publicados". Story mostra só o que foi feito para story: capas de corte e thumbnails não entram mais; um post 4:5 pode virar story, à parte.' },
+      { kind: 'ajuste', text: 'Cartões de corte trocam o "pronto" por "pronto para postar", "agendado" ou "publicado" com as redes. Conteúdo avulso (como o trailer) publica sem episódio.' },
+    ],
+  },
+  {
     version: '1.28.0', date: '2026-10-23', title: 'Fotografias como fundo, mais edição de capa e IA nos textos',
     items: [
       { kind: 'novo', text: 'No editor de capa, a aba Fundo tem três origens: quadros do vídeo, fotografias do episódio (as que subiram no material bruto, inclusive bastidores) e enviar uma imagem. A foto entra em pé, na resolução certa, e a IA confere os rostos.' },

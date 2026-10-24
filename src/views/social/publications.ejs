@@ -31,7 +31,7 @@
       <tr>
         <td class="mono nowrap"><%= p.scheduled_at && p.status === 'agendado' ? fmt.formatDateTime(p.scheduled_at) : fmt.formatDateTime(p.created_at) %></td>
         <td><span class="tag-mono">[ <%= MEDIA[p.media].toUpperCase() %> ]</span></td>
-        <td><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><div class="small muted"><%= p.episode_number ? 'EP.' + String(p.episode_number).padStart(3, '0') + ' · ' : '' %><%= p.episode_title %></div></td>
+        <td><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><div class="small muted"><%= p.episode_id ? (p.episode_number ? 'EP.' + String(p.episode_number).padStart(3, '0') + ' · ' : '') + p.episode_title : 'Conteúdo avulso' %></div></td>
         <td class="small"><%= p.platforms.map(function (k) { return platforms[k] ? platforms[k].label : k; }).join(', ') %></td>
         <td><span class="badge <%= badge[p.status] %>"><%= statusLabel[p.status] %></span></td>
       </tr>

@@ -1,0 +1,162 @@
+<%- include('../partials/head') %>
+<%
+  var k = K[r.kind]; var isVideo = k.media === 'video';
+  var badge = { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao', aprovado: 'b-st-pronto_publicar', cancelado: 'b-st-cancelado' }[r.status];
+  var iso = function (d) { return d ? new Date(d).toISOString().slice(0, 10) : ''; };
+  var br = function (d) { var s = iso(d); return s ? s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4) : ''; }; // datas (prazo)
+  var when = function (d) { return d ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(d)) : ''; }; // momentos
+  var late = r.due_on && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0 && iso(r.due_on) < today;
+  var readyVideos = videos.filter(function (v) { return v.status === 'pronto'; });
+  var hasDelivery = readyVideos.length + images.length > 0;
+  var chipOf = function (pub) { return pub ? '<span class="badge ' + (pub.stage === 'publicado' ? 'b-st-publicado' : 'b-st-agendado') + '">' + pub.label + '</span><span class="handle muted">' + pub.platforms.join(' · ') + '</span>' : '<span class="badge b-st-pronto_publicar">pronto para postar</span>'; };
+  var publishHref = function () {
+    if (isVideo) { var v = readyVideos.find(function (x) { return !x.pub; }) || readyVideos[0]; return v ? '/social/novo?tipo=video&item=' + v.id : null; }
+    if (!images.length) return null;
+    if (k.publish === 'carrossel') return '/social/novo?tipo=carrossel&item=' + images.map(function (i) { return i.id; }).join(',');
+    var i = images.find(function (x) { return !x.pub; }) || images[0]; return '/social/novo?tipo=' + k.publish + '&item=' + i.id;
+  };
+  var allPublished = r.status === 'aprovado' && (isVideo ? readyVideos.length && readyVideos.every(function (v) { return v.pub && v.pub.stage === 'publicado'; }) : images.length && images.every(function (i) { return i.pub && i.pub.stage === 'publicado'; }));
+%>
+<div class="page-head">
+  <div>
+    <span class="kicker">Pedido de conteúdo · <%= k.label %></span>
+    <h1><%= r.title %> <span class="badge <%= badge %>"><%= S[r.status] %></span></h1>
+    <p class="handle muted top-gap">
+      <%= r.assignee_name ? 'Para ' + r.assignee_name : 'Para qualquer editor' %>
+      <% if (r.due_on) { %> · <span class="<%= late ? 'err' : '' %>">entregar até <%= br(r.due_on) %><%= late ? ' (atrasado)' : '' %></span><% } %>
+      <% if (r.format) { %> · <%= F[r.format] %><% } %>
+      · pedido por <%= r.creator_name || '—' %> em <%= when(r.created_at) %>
+    </p>
+    <% if (r.episode_id) { %><p class="small top-gap"><span class="muted">Episódio:</span> <a href="/episodios/<%= r.episode_id %>"><%= r.episode_number ? 'EP.' + String(r.episode_number).padStart(3, '0') + ' · ' : '' %><%= r.episode_title %></a></p><% } %>
+  </div>
+  <div class="row">
+    <a class="btn ghost" href="/conteudo?vista=pedidos"><%- icon('arrow-left') %> Conteúdo</a>
+    <% if (perm.edit && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %><button class="btn" type="button" data-modal-open="modal-pedido-editar"><%- icon('pencil', 14) %> Editar</button><% } %>
+  </div>
+</div>
+
+<div class="grid-2 top-gap">
+  <section class="card next-step" data-cortes data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
+    <% if (r.status === 'pedido') { %>
+      <h2>Próximo passo</h2>
+      <% if (perm.mine || (perm.work && !r.assignee_id)) { %>
+      <p class="small muted">Leia o briefing ao lado. Ao começar, o pedido fica com você e quem pediu vê que está em produção.</p>
+      <form method="post" action="/conteudo/pedidos/<%= r.id %>/comecar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn primary" type="submit"><%- icon('play', 14) %> Começar</button></form>
+      <% } else { %><p class="muted">Esperando <%= r.assignee_name || 'um editor' %> começar.</p><% } %>
+
+    <% } else if (r.status === 'producao') { %>
+      <h2><%= perm.work ? 'Entrega' : 'Em produção' %></h2>
+      <% if (r.rounds && r.review_note) { %><div class="req-note"><span class="kicker">Ajustes pedidos · <%= r.rounds %>ª volta</span><p><%= r.review_note %></p></div><% } %>
+      <% if (perm.work) { %>
+        <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } else if (isVideo) { %>
+        <p class="small muted">Envie o vídeo pronto (pode ser mais de um, como versões). Ele sobe em segundo plano; dá para continuar usando o sistema.</p>
+        <div class="uploader" data-uploader data-base="/conteudo/pedidos/<%= r.id %>/cortes/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="<%= r.title %>" data-hash="">
+          <input type="file" multiple accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
+          <button class="btn <%= hasDelivery ? '' : 'primary' %>" type="button" data-start><%- icon('upload') %> Enviar vídeo</button>
+          <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+          <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
+        </div>
+        <% } else { %>
+        <p class="small muted"><%= r.kind === 'carrossel' ? 'Envie os slides na ordem (selecione todos de uma vez).' : r.kind === 'story' ? 'Envie a imagem do story (vertical, 1080×1920).' : 'Envie a imagem do post (4:5, 1080×1350).' %> JPG, PNG ou WebP, até 15 MB cada.</p>
+        <div class="row" data-req-images data-url="/conteudo/pedidos/<%= r.id %>/imagens" data-csrf="<%= csrf %>">
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp" data-files>
+          <button class="btn <%= hasDelivery ? '' : 'primary' %>" type="button" data-start><%- icon('upload') %> Enviar imagens</button>
+          <p class="small" data-msg role="status"></p>
+        </div>
+        <% } %>
+      <% } else { %><p class="muted">Com <%= r.assignee_name || 'o editor' %>. Você recebe um aviso quando a entrega chegar.</p><% } %>
+
+    <% } else if (r.status === 'revisao') { %>
+      <h2><%= perm.review ? 'Revisar a entrega' : 'Em revisão' %></h2>
+      <% if (perm.review) { %>
+      <p class="small muted">Confira abaixo. Aprovado, vai direto para o Social, pronto para publicar.</p>
+      <div class="row">
+        <form method="post" action="/conteudo/pedidos/<%= r.id %>/aprovar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn primary" type="submit"><%- icon('check', 14) %> Aprovar</button></form>
+        <button class="btn" type="button" data-modal-open="modal-ajustes"><%- icon('rotate-ccw', 14) %> Pedir ajustes</button>
+      </div>
+      <% } else { %><p class="muted">Entregue em <%= when(r.delivered_at) %>. Esperando a gestão aprovar.</p><% } %>
+
+    <% } else if (r.status === 'aprovado') { %>
+      <h2><%= allPublished ? 'Publicado' : 'Pronto para postar' %></h2>
+      <p class="small muted">Aprovado em <%= when(r.approved_at) %>. <%= allPublished ? 'Já saiu nas redes.' : 'Está disponível no Social, em Novo post.' %></p>
+      <% if (perm.publish && !allPublished && publishHref()) { %><div><a class="btn primary" href="<%= publishHref() %>"><%- icon('send', 14) %> Publicar no Social</a></div><% } %>
+
+    <% } else { %>
+      <h2>Cancelado</h2>
+      <% if (perm.edit) { %><form method="post" action="/conteudo/pedidos/<%= r.id %>/reabrir"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" type="submit">Reabrir pedido</button></form><% } %>
+    <% } %>
+
+    <% if (videos.length || images.length) { %>
+    <div class="top-gap">
+      <span class="kicker">Entregue</span>
+      <% if (videos.length) { %>
+      <ul class="plain stack top-gap">
+        <% videos.forEach(function (v) { %>
+        <li class="<%= v.status === 'pronto' ? 'req-video' : 'clip-card' %>" data-clip="<%= v.id %>">
+          <% if (v.status === 'pronto') { %><video controls preload="metadata" playsinline src="/cortes/<%= v.id %>/video"<%- v.cover_id ? ' poster="/capas/' + v.cover_id + '/imagem"' : '' %> class="<%= v.height > v.width ? 'tall' : '' %>"></video><% } else { %>
+          <a class="clip-poster" href="/cortes/<%= v.id %>"><span class="poster-empty"><%- icon('film', 28) %></span></a><% } %>
+          <div class="clip-body">
+            <div class="row spread"><a href="/cortes/<%= v.id %>"><strong><%= v.title %></strong></a>
+              <% if (v.status === 'pronto') { %><% if (r.status === 'aprovado') { %><span class="row small"><%- chipOf(v.pub) %></span><% } %><% } else { %><span class="badge <%= v.status === 'erro' ? 'b-red' : 'b-amber' %>"><%= v.status === 'erro' ? 'erro' : v.status === 'enviando' ? 'enviando' : 'lendo' %></span><% } %>
+            </div>
+            <p class="handle muted"><%= v.duration_ms ? fmt.formatClock(v.duration_ms) : '—' %><%= v.width ? ' · ' + v.width + '×' + v.height : '' %></p>
+            <% if (v.status === 'enviando' || v.status === 'processando') { %><div class="bar"><i data-clip-bar data-w="0"></i></div><p class="small muted" data-clip-msg>Na fila…</p><% } %>
+            <% if (v.status === 'erro') { %><p class="small err"><%= v.error %></p><% } %>
+            <p class="row small"><a href="/cortes/<%= v.id %>">Abrir o vídeo, título e legenda</a>
+              <% if (r.status === 'producao' && perm.work && v.status !== 'enviando') { %><form method="post" action="/cortes/<%= v.id %>/excluir" class="inline" data-confirm="Tirar este vídeo da entrega? Ele é apagado."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn" type="submit" title="Tirar da entrega" aria-label="Tirar da entrega"><%- icon('trash-2', 14) %></button></form><% } %></p>
+          </div>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+      <% if (images.length) { %>
+      <div class="delivery-grid top-gap">
+        <% images.forEach(function (im, i) { %>
+        <figure>
+          <a href="/capas/<%= im.id %>/imagem" target="_blank" rel="noopener"><img src="/capas/<%= im.id %>/imagem?v=<%= new Date(im.updated_at).getTime() %>" alt="<%= r.kind === 'carrossel' ? 'Slide ' + (i + 1) : 'Imagem entregue' %>" loading="lazy" width="<%= im.width %>" height="<%= im.height %>"></a>
+          <figcaption>
+            <span class="handle muted"><%= r.kind === 'carrossel' ? (i + 1) + ' · ' : '' %><%= im.width %>×<%= im.height %></span>
+            <% if (r.status === 'aprovado' && k.publish !== 'carrossel') { %><span class="row small"><%- chipOf(im.pub) %></span><% } %>
+            <% if (r.status === 'producao' && perm.work) { %><form method="post" action="/conteudo/pedidos/<%= r.id %>/imagens/<%= im.id %>/excluir" class="inline" data-confirm="Tirar esta imagem da entrega?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn" type="submit" title="Tirar da entrega" aria-label="Tirar da entrega"><%- icon('trash-2', 14) %></button></form><% } %>
+          </figcaption>
+        </figure>
+        <% }) %>
+      </div>
+      <% if (r.status === 'aprovado' && k.publish === 'carrossel') { %><p class="row small top-gap"><%- chipOf(images[0].pub) %></p><% } %>
+      <% } %>
+    </div>
+    <% } %>
+
+    <% if (r.status === 'producao' && perm.work && hasDelivery) { %>
+    <form method="post" action="/conteudo/pedidos/<%= r.id %>/entregar" class="top-gap"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn primary" type="submit"><%- icon('send', 14) %> Enviar para revisão</button></form>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <h2>Briefing</h2>
+    <% if (r.briefing_html || r.briefing) { %><div class="rich-content"><%- fmt.richHtml(r.briefing_html, r.briefing) %></div><% } else { %><p class="muted">Sem briefing. <%= perm.edit ? 'Use “Editar” para explicar o que precisa.' : '' %></p><% } %>
+    <% if (docs.length) { %><div class="field top-gap"><span class="field-label">Anexos</span>
+      <ul class="plain task-docs"><% docs.forEach(function (d) { %><li><span class="rte-ic"><%- icon('file-text', 16) %></span><a class="doc-name" href="/anexos/<%= d.id %>/baixar"><%= d.filename %></a><span class="mono small muted"><%= fmt.formatBytes(d.size_bytes) %></span></li><% }) %></ul></div><% } %>
+  </section>
+</div>
+
+<div class="top-gap" id="comentarios"><%- include('../partials/comments', { type: 'content_request', id: r.id, items: comments, back: '/conteudo/pedidos/' + r.id }) %></div>
+
+<% if (perm.edit && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %>
+<%- include('_request_form', { id: 'modal-pedido-editar', r: r, preset: {}, openOnLoad: false }) %>
+<form method="post" action="/conteudo/pedidos/<%= r.id %>/cancelar" class="top-gap" data-confirm="Cancelar este pedido? O editor deixa de vê-lo como pendente."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">cancelar pedido</button></form>
+<% } %>
+<% if (perm.review && r.status === 'revisao') { %>
+<dialog class="modal" id="modal-ajustes" aria-labelledby="ma-h">
+  <form method="post" action="/conteudo/pedidos/<%= r.id %>/ajustes" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="ma-h">Pedir ajustes</h2>
+    <label>O que mudar<textarea name="nota" rows="4" maxlength="1000" required placeholder="Ex.: encurtar para 45 s e trocar a música do final"></textarea></label>
+    <p class="small muted">O pedido volta para <%= r.assignee_name || 'o editor' %>, com o seu recado no topo. Para comentar um ponto específico, use também os comentários do vídeo.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Pedir ajustes</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<script src="/static/pedidos.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

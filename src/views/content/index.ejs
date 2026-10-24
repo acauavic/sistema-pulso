@@ -7,35 +7,63 @@
   var postCount = postGroups.reduce(function (n, g) { return n + g.covers.length; }, 0);
 %>
 <div class="page-head">
-  <div><span class="kicker">Cortes, posts e carrosséis</span><h1>Conteúdo<%= onlyEpisode ? ' · ' + epLabel(onlyEpisode) : '' %></h1></div>
+  <div><span class="kicker">Do pedido ao post publicado</span><h1>Conteúdo<%= onlyEpisode ? ' · ' + epLabel(onlyEpisode) : '' %></h1></div>
   <div class="row">
     <% if (only) { %><a class="btn ghost" href="/episodios/<%= only %>"><%- icon('arrow-left') %> Voltar ao episódio</a><a class="btn" href="/conteudo">Ver tudo</a><% } %>
+    <% if (perm.cut && storageReady) { %><button class="btn <%= perm.request ? '' : 'primary' %>" type="button" data-modal-open="modal-cortes"><%- icon('upload') %> Enviar cortes</button><% } %>
+    <% if (perm.request) { %><button class="btn primary" type="button" data-modal-open="modal-pedido"><%- icon('plus') %> Pedir conteúdo</button><% } %>
   </div>
 </div>
-<p class="lead">O que sai de cada episódio fica aqui, fora do card do episódio. O editor envia os cortes (vários vídeos de uma vez); o sistema lê cada um e sugere título, legenda e capas; depois cada corte é atribuído a um episódio já gravado.</p>
+<p class="lead">Tudo o que sai do podcast passa por aqui: pedidos para o editor, cortes, posts e carrosséis. Cada peça mostra em que ponto está, até ser publicada no Social.</p>
 
-<div class="tabs-wrap" data-tabs data-default="cortes">
-  <div class="tabbar" role="tablist" aria-label="Tipos de conteúdo">
+<%
+  var colBadge = { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao', pronto: 'b-st-pronto_publicar', fila: 'b-st-agendado', publicado: 'b-st-publicado' };
+  var dayShort = function (d) { return d ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }).format(new Date(d)) : ''; };
+  var dueShort = function (d) { if (!d) return ''; var iso = new Date(d).toISOString().slice(0, 10); return iso.slice(8, 10) + '/' + iso.slice(5, 7); };
+  var boardHref = function (t) { return '/conteudo?vista=quadro' + (t ? '&tipo=' + t : '') + (only ? '&episodio=' + only : ''); };
+%>
+<div class="tabs-wrap" data-tabs data-default="<%= vista %>">
+  <div class="tabbar" role="tablist" aria-label="Conteúdo">
+    <button type="button" role="tab" data-tab-btn="quadro" aria-controls="pane-quadro"><%- icon('columns-3', 14) %> Quadro</button>
     <button type="button" role="tab" data-tab-btn="cortes" aria-controls="pane-cortes">Cortes <span class="count"><%= clips.length %></span></button>
     <button type="button" role="tab" data-tab-btn="posts" aria-controls="pane-posts">Posts e carrosséis <span class="count"><%= postCount %></span></button>
+    <button type="button" role="tab" data-tab-btn="pedidos" aria-controls="pane-pedidos">Pedidos <span class="count"><%= openRequests.length %></span></button>
+  </div>
+
+  <div class="pane" id="pane-quadro" data-pane-id="quadro">
+    <div class="board-filter">
+      <div class="seg" role="group" aria-label="Filtrar o quadro">
+        <% [['', 'Tudo'], ['video', 'Vídeos'], ['imagem', 'Imagens'], ['pedido', 'Pedidos']].forEach(function (f) { %><a class="<%= tipo === f[0] ? 'on' : '' %>" href="<%= boardHref(f[0]) %>"><%= f[1] %></a><% }) %>
+      </div>
+      <% if (hiddenOld) { %><a class="link small" href="<%= boardHref(tipo) %>&publicados=todos">Ver publicados há mais de 60 dias <span class="mono">(<%= hiddenOld %>)</span></a><% } %>
+    </div>
+    <div class="board board-wide pboard">
+      <% columns.forEach(function (col) { %>
+      <section class="column" data-stage="<%= col.key %>">
+        <header><span class="badge <%= colBadge[col.key] %>" title="<%= col.hint %>"><%= col.label %></span><span class="count"><%= col.cards.length %></span></header>
+        <div class="cards">
+          <% if (!col.cards.length) { %><p class="small muted col-hint"><%= col.key === 'pedido' && perm.request ? 'Peça um trailer, um vídeo avulso ou um post no botão “Pedir conteúdo”.' : col.hint %></p><% } %>
+          <% col.cards.forEach(function (k) { %>
+          <a class="kcard has-thumb" href="<%= k.href %>">
+            <% if (k.thumb) { %><img class="kthumb <%= k.media === 'video' && k.vertical === false ? '' : (k.media !== 'video' && k.type !== 'story' ? 'wide' : '') %>" src="<%= k.thumb %>" alt="" loading="lazy"><% } else { %><span class="kthumb ph"><%- icon(k.media === 'video' ? 'film' : 'image', 16) %></span><% } %>
+            <span class="ktype"><%= k.kind %><%= k.episode ? ' · ' + k.episode.split(' · ')[0] : (k.type !== 'pedido' && k.media === 'video' && !k.warn ? ' · avulso' : '') %></span>
+            <strong><%= k.title %></strong>
+            <span class="meta">
+              <% if (k.type === 'pedido') { %><span><%- icon('user', 12) %><%= k.who %></span><% if (k.due) { %><span class="<%= k.late ? 'late' : '' %>"><%- icon('calendar', 12) %><%= dueShort(k.due) %><%= k.late ? ' · atrasado' : '' %></span><% } %><% if (k.rounds) { %><span><%= k.rounds %>ª volta</span><% } %><% } %>
+              <% if (k.chip) { %><span class="<%= k.chip === 'erro' ? 'late' : '' %>"><%= k.chip %></span><% } %>
+              <% if (k.warn) { %><span class="warn"><%= k.warn %></span><% } %>
+              <% if (k.slides) { %><span><%= k.slides %> slides</span><% } %>
+              <% if (k.pub) { %><span class="nets"><%= k.pub.stage === 'fila' ? k.pub.label + ' · ' : '' %><%= k.pub.platforms.join(' · ') %><%= k.pub.at ? ' · ' + dayShort(k.pub.at) : '' %></span><% } %>
+            </span>
+          </a>
+          <% }) %>
+        </div>
+      </section>
+      <% }) %>
+    </div>
   </div>
 
   <div class="pane" id="pane-cortes" data-pane-id="cortes" data-cortes data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
-    <% if (perm.cut) { %>
-    <section class="card">
-      <h2>Enviar cortes</h2>
-      <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } else { %>
-      <p class="small muted">Selecione vários vídeos de uma vez (MP4, MOV, M4V, WebM ou MKV). Cada um recebe um nome interno (Corte 1, Corte 2…) que você pode trocar.<%= aiReady ? '' : ' A leitura por IA (fala, rostos, título e capas) não está completa neste servidor.' %></p>
-      <div class="uploader" data-uploader data-base="/cortes/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="Cortes" data-hash="cortes">
-        <input type="file" multiple accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
-        <button class="btn primary" type="button" data-start><%- icon('upload') %> Enviar cortes</button>
-        <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
-        <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
-      </div>
-      <% } %>
-    </section>
-    <% } %>
-
     <% if (moments && moments.length) { %>
     <section class="card top-gap">
       <h2>Momentos que a IA sugere cortar</h2>
@@ -47,7 +75,7 @@
     <% } %>
 
     <% if (!clips.length) { %>
-    <div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhum corte <%= only ? 'neste episódio' : 'ainda' %>.</strong></p><p class="muted small">Envie os vídeos editados acima. Eles aparecem aqui já com título, legenda e capas sugeridos.</p></div>
+    <div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhum corte <%= only ? 'neste episódio' : 'ainda' %>.</strong></p><p class="muted small">Os vídeos editados aparecem aqui já com título, legenda e capas sugeridos.</p><% if (perm.cut && storageReady) { %><p><button class="btn sm" type="button" data-modal-open="modal-cortes"><%- icon('upload', 14) %> Enviar cortes</button></p><% } %></div>
     <% } %>
 
     <% if (unassigned.length) { %>
@@ -113,6 +141,49 @@
     </section>
     <% }) %>
   </div>
+
+  <div class="pane" id="pane-pedidos" data-pane-id="pedidos" hidden>
+    <% var closed = requests.filter(function (r) { return openRequests.indexOf(r) < 0; }); %>
+    <% if (!openRequests.length) { %>
+    <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido em aberto.</strong></p><p class="muted small">Trailer do canal, vídeo avulso, um corte específico, post ou story: peça ao editor por aqui, com briefing e prazo. A entrega volta para você aprovar e já fica pronta no Social.</p><% if (perm.request) { %><p><button class="btn sm" type="button" data-modal-open="modal-pedido"><%- icon('plus', 14) %> Pedir conteúdo</button></p><% } %></div>
+    <% } else { %>
+    <div class="req-list">
+      <% openRequests.forEach(function (r) { var late = isLate(r, today); %>
+      <a class="req-row" href="/conteudo/pedidos/<%= r.id %>">
+        <span><span class="ktype mono small muted"><%= K[r.kind].label %><%= r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '' %></span><br><strong><%= r.title %></strong>
+          <span class="meta"><span><%- icon('user', 12) %><%= r.assignee_name || 'qualquer editor' %></span><% if (r.due_on) { %><span class="<%= late ? 'err' : '' %>"><%- icon('calendar', 12) %><%= dueShort(r.due_on) %><%= late ? ' · atrasado' : '' %></span><% } %><% if (r.rounds) { %><span><%= r.rounds %>ª volta</span><% } %></span></span>
+        <span class="badge <%= { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao' }[r.status] %>"><%= S[r.status] %></span>
+      </a>
+      <% }) %>
+    </div>
+    <% } %>
+    <% if (closed.length) { %>
+    <details class="top-gap"><summary>Aprovados e cancelados <span class="mono muted"><%= closed.length %></span></summary>
+      <div class="req-list top-gap">
+        <% closed.slice(0, 40).forEach(function (r) { %>
+        <a class="req-row" href="/conteudo/pedidos/<%= r.id %>"><span><span class="ktype mono small muted"><%= K[r.kind].label %></span><br><strong><%= r.title %></strong></span><span class="badge <%= r.status === 'aprovado' ? 'b-st-pronto_publicar' : 'b-st-cancelado' %>"><%= S[r.status] %></span></a>
+        <% }) %>
+      </div>
+    </details>
+    <% } %>
+  </div>
 </div>
+
+<% if (perm.request) { %><%- include('_request_form', { id: 'modal-pedido', r: null, preset: { kind: pedir, episode: only }, openOnLoad: Boolean(pedir) }) %><% } %>
+<% if (perm.cut && storageReady) { %>
+<dialog class="modal modal-wide" id="modal-cortes" aria-labelledby="mc-h">
+  <div class="stack">
+    <h2 id="mc-h">Enviar cortes</h2>
+    <p class="small muted">Selecione vários vídeos de uma vez (MP4, MOV, M4V, WebM ou MKV). Cada um recebe um nome interno (Corte 1, Corte 2…) que você pode trocar.<%= aiReady ? ' O sistema lê cada vídeo e sugere título, legenda e capas.' : ' A leitura por IA (fala, rostos, título e capas) não está completa neste servidor.' %> Para um pedido (trailer, vídeo avulso), envie pela página do pedido.</p>
+    <div class="uploader" data-uploader data-base="/cortes/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="Cortes" data-hash="cortes">
+      <input type="file" multiple accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
+      <button class="btn primary" type="button" data-start><%- icon('upload') %> Enviar</button>
+      <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+      <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
+    </div>
+    <div class="row modal-actions"><button class="btn ghost" type="button" data-modal-close>Fechar</button></div>
+  </div>
+</dialog>
+<% } %>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/foot') %>

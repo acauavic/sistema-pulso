@@ -14,7 +14,7 @@ const { wrap, isIntId } = require('../utils/wrap');
 
 const router = express.Router();
 const MAX_IMAGE = 12 * 1024 * 1024;
-const KINDS = { youtube_thumb: 'Thumbnail do YouTube', reel_cover: 'Capa de Reels/TikTok', post_quote: 'Post de frase', post_split: 'Tela dividida', carousel: 'Carrossel' };
+const KINDS = { youtube_thumb: 'Thumbnail do YouTube', reel_cover: 'Capa de Reels/TikTok', post_quote: 'Post de frase', post_split: 'Tela dividida', carousel: 'Carrossel', entrega: 'Imagem entregue' };
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Capa não encontrada.' });
 const canDesign = (role) => can(role, 'production.review') || can(role, 'production.edit'); // gestão e editor; a produtora só sobe material bruto
 const deny = (res) => res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita capas e posts.' });
@@ -80,6 +80,7 @@ router.get(both('/editar'), requirePerm('episodes.read'), wrap(async (req, res) 
   if (!canDesign(req.user.role)) return deny(res);
   const c = await findCover(req);
   if (!c) return notFound(res);
+  if (c.kind === 'entrega') return res.redirect(`/conteudo/pedidos/${c.request_id}`); // imagem pronta do editor: não passa pelo editor de capa
   const { rows: [ep] } = c.episode_id ? await db.query('SELECT id, number, title FROM episodes WHERE id = $1', [c.episode_id]) : { rows: [] };
   const frames = (await store.loadFrames(c.episode_id, { clipId: c.clip_id ?? null, custom: true })).map((f) => ({ id: f.id, ref: f.ref, width: f.width, height: f.height, at_ms: f.at_ms, score: f.score, analysis: { rostos: f.analysis.rostos || [], caixas_de_texto: f.analysis.caixas_de_texto || [], custom: Boolean(f.analysis.custom), unchecked: Boolean(f.analysis.unchecked) } }));
   const siblings = c.clip_id

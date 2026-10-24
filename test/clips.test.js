@@ -195,7 +195,7 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
     assert.notEqual((await clipRow(v.id)).cover_id, null);
     assert.match((await as.gestao.get(`/conteudo?episodio=${ep.id}`)).text, /Momentos que a IA sugere cortar/, 'com o filtro do episódio, aparecem os momentos da análise como dica');
     const epPage = (await as.gestao.get(`/episodios/${ep.id}`)).text;
-    assert.match(epPage, /Conteúdo \(1\)/, 'o episódio só mostra o resumo e o link');
+    assert.match(epPage, /Conteúdo <span class="mono small">0\/1<\/span>/, 'o episódio só mostra o resumo (publicados/total) e o link');
     assert.doesNotMatch(epPage, /cover-pick/, 'cortes não ficam dentro do card do episódio');
   });
 

@@ -1,5 +1,7 @@
 <%# Cartão de um corte. Variáveis: c, perm, csrf, episodes, fmt %>
-<% var st = { enviando: ['b-amber', 'enviando'], processando: ['b-amber', 'lendo'], pronto: ['b-green', 'pronto'], erro: ['b-red', 'erro'] }[c.status];
+<% var st = { enviando: ['b-amber', 'enviando'], processando: ['b-amber', 'lendo'], pronto: ['b-st-pronto_publicar', 'pronto para postar'], erro: ['b-red', 'erro'] }[c.status];
+   if (c.status === 'pronto' && c.pub) st = c.pub.stage === 'publicado' ? ['b-st-publicado', 'publicado'] : ['b-st-agendado', c.pub.label];
+   if (c.status === 'pronto' && !c.episode_id && !c.request_id) st = ['b-gray', 'sem episódio'];
    var chosen = c.covers.find(function (x) { return x.id === c.cover_id; }) || c.covers[0]; %>
 <article class="clip-card" data-clip="<%= c.id %>">
   <a class="clip-poster" href="/cortes/<%= c.id %>" aria-label="Abrir <%= c.title %>">
@@ -11,10 +13,13 @@
       <%= c.duration_ms ? fmt.formatClock(c.duration_ms) : '—' %><%= c.width ? ' · ' + c.width + '×' + c.height : '' %><%= c.size_bytes ? ' · ' + fmt.formatBytes(c.size_bytes) : '' %>
     </p>
     <% if (c.post_title) { %><p class="small"><%= c.post_title %></p><% } %>
+    <% if (c.pub) { %><p class="handle muted"><%= c.pub.platforms.join(' · ') %></p><% } %>
+    <% if (c.request_id) { %><p class="small"><span class="muted">Pedido:</span> <a href="/conteudo/pedidos/<%= c.request_id %>"><%= c.request_title || 'ver pedido' %></a></p><% } %>
     <% if (c.status === 'enviando' || c.status === 'processando') { %><div class="bar"><i data-clip-bar data-w="0"></i></div><p class="small muted" data-clip-msg><%= c.status === 'enviando' ? 'Enviando…' : 'Na fila…' %></p><% } %>
     <% if (c.status === 'erro') { %><p class="small err"><%= c.error %></p><% } %>
     <% if (c.episode_id) { %>
       <p class="small"><span class="muted">Episódio:</span> <a href="/episodios/<%= c.episode_id %>"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.ep_title %></a></p>
+    <% } else if (c.request_id) { %>
     <% } else if (perm.cut && c.status === 'pronto') { %>
       <form method="post" action="/cortes/<%= c.id %>/atribuir" class="assign-row">
         <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="lista">

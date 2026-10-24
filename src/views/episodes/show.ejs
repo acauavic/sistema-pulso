@@ -20,7 +20,7 @@
   </div>
   <div class="row">
     <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
-    <a class="btn" href="/conteudo?episodio=<%= ep.id %>"><%- icon('layers') %> Conteúdo<%= content.total ? ' (' + content.total + ')' : '' %></a>
+    <a class="btn" href="/conteudo?episodio=<%= ep.id %>" title="<%= content.total ? content.total + ' peças, ' + content.published + ' publicadas' + (content.requests ? ', ' + content.requests + ' pedido(s) em aberto' : '') : 'Cortes, posts e pedidos deste episódio' %>"><%- icon('layers') %> Conteúdo<% if (content.total || content.requests) { %> <span class="mono small"><%= content.published %>/<%= content.total %></span><% } %></a>
     <% if (ep.guest_id && can('guests.read')) { %><a class="btn" href="/convidados/<%= ep.guest_id %>"><%- icon('mic') %> Convidado</a><% } %>
     <% if (perm.write) { %><a class="btn" href="/episodios/<%= ep.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
   </div>

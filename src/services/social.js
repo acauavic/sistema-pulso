@@ -12,38 +12,62 @@ const jobs = require('./jobs');
 // Publicação que "gasta" o conteúdo. Simulado, erro e devolvido não contam (o corte continua disponível); em revisão já reserva.
 const USED = "('publicado','parcial','agendado','enviando','revisao')";
 
-// ---------------------------------------------------------------- conteúdo disponível
-async function unusedClips() {
-  const { rows } = await db.query(
-    `SELECT c.id, c.title, c.post_title, c.caption, c.duration_ms, c.cover_id, c.episode_id, e.number AS episode_number, e.title AS episode_title,
+// ---------------------------------------------------------------- conteúdo para postar
+// Cada item traz `pub` (o que já aconteceu no Social: publicado ou na fila) e `sugerido` (os primeiros a postar). Por padrão só
+// vem o que ainda não saiu; includeUsed traz também o já publicado/agendado, marcado. Ordem de sugestão: do episódio que já foi
+// ao ar mais recentemente (os cortes ajudam o episódio), entregas de pedidos aprovadas, imagens aprovadas, e o mais novo.
+const SUGGEST = 3;
+function rank(list, includeUsed) {
+  const out = includeUsed ? list : list.filter((x) => !x.pub);
+  out.sort((a, b) => (Boolean(a.pub) - Boolean(b.pub)) || (b.score - a.score) || (new Date(b.created_at) - new Date(a.created_at)));
+  out.filter((x) => !x.pub).slice(0, SUGGEST).forEach((x) => { x.sugerido = true; });
+  return out;
+}
+const scoreOf = (r) => (r.episode_status === 'publicado' ? 2e13 + new Date(r.published_at || r.aired_on || 0).getTime() / 100 : 0) + (r.approved_at ? 1e13 + new Date(r.approved_at).getTime() / 100 : 0) + (r.approved ? 5e12 : 0);
+
+async function availableClips({ includeUsed = false } = {}) {
+  const board = require('./contentBoard');
+  const [{ rows }, idx] = await Promise.all([db.query(
+    `SELECT c.id, c.title, c.post_title, c.caption, c.duration_ms, c.cover_id, c.episode_id, c.request_id, c.created_at, c.width, c.height,
+            e.number AS episode_number, e.title AS episode_title, e.status AS episode_status, e.published_at, e.aired_on, r.title AS request_title, r.kind AS request_kind, r.approved_at,
             EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status = 'simulado') AS tested
-       FROM episode_clips c JOIN episodes e ON e.id = c.episode_id
+       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id
       WHERE c.status = 'pronto' AND c.storage_key IS NOT NULL
-        AND NOT EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status IN ${USED})
-      ORDER BY c.created_at DESC LIMIT 200`);
-  return rows;
+        AND ((c.request_id IS NULL AND c.episode_id IS NOT NULL) OR r.status = 'aprovado')
+      ORDER BY c.created_at DESC LIMIT 300`), board.publicationIndex()]);
+  return rank(rows.map((r) => ({ ...r, pub: board.stateOf(idx.byClip.get(r.id)), score: scoreOf(r) })), includeUsed);
 }
 
-// Imagens do editor de capas que ainda não foram publicadas. Carrossel = slides do mesmo group_key.
-async function unusedImages() {
-  const { rows } = await db.query(
-    `SELECT c.id, c.kind, c.group_key, c.position, c.label, c.width, c.height, c.approved, coalesce(c.episode_id, cl.episode_id) AS episode_id,
-            e.number AS episode_number, e.title AS episode_title
-       FROM episode_covers c LEFT JOIN episode_clips cl ON cl.id = c.clip_id LEFT JOIN episodes e ON e.id = coalesce(c.episode_id, cl.episode_id)
-      WHERE c.kind IN ('post_quote', 'post_split', 'carousel', 'reel_cover') AND coalesce(c.episode_id, cl.episode_id) IS NOT NULL
-        AND NOT EXISTS (SELECT 1 FROM episode_publications p WHERE c.id = ANY(p.cover_ids) AND p.status IN ${USED})
-      ORDER BY c.created_at DESC, c.group_key, c.position LIMIT 300`);
-  const posts = rows.filter((r) => r.kind === 'post_quote' || r.kind === 'post_split');
-  const stories = rows.filter((r) => r.height > r.width); // vertical serve de story (capas de Reels, posts verticais)
+// Imagens para postar. Story é só o que foi feito para story (entrega de pedido "Story"): capas de corte e thumbnails nunca
+// entram (são capa, não post). Os posts 4:5 aparecem à parte como "post que também serve de story".
+async function availableImages({ includeUsed = false } = {}) {
+  const board = require('./contentBoard');
+  const [{ rows }, idx] = await Promise.all([db.query(
+    `SELECT c.id, c.kind, c.group_key, c.position, c.label, c.width, c.height, c.approved, c.created_at, c.updated_at, c.episode_id, c.request_id,
+            e.number AS episode_number, e.title AS episode_title, e.status AS episode_status, e.published_at, e.aired_on, r.kind AS request_kind, r.title AS request_title, r.approved_at
+       FROM episode_covers c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id
+      WHERE c.clip_id IS NULL AND ((c.kind IN ('post_quote', 'post_split', 'carousel') AND c.request_id IS NULL AND c.episode_id IS NOT NULL) OR (c.kind = 'entrega' AND r.status = 'aprovado'))
+      ORDER BY c.created_at DESC, c.group_key, c.position LIMIT 400`), board.publicationIndex()]);
+  const item = (r) => ({ ...r, label: r.request_title || r.label, pub: board.stateOf(idx.byCover.get(r.id)), score: scoreOf(r) });
+  const isPost = (r) => r.kind === 'post_quote' || r.kind === 'post_split' || (r.kind === 'entrega' && r.request_kind === 'post');
+  const posts = rank(rows.filter(isPost).map(item), includeUsed);
+  const stories = rank(rows.filter((r) => r.kind === 'entrega' && r.request_kind === 'story').map(item), includeUsed);
   const groups = new Map();
-  for (const r of rows.filter((x) => x.kind === 'carousel')) {
+  for (const r of rows.filter((x) => x.kind === 'carousel' || (x.kind === 'entrega' && x.request_kind === 'carrossel'))) {
     const key = r.group_key || `c${r.id}`;
-    if (!groups.has(key)) groups.set(key, { key, episode_id: r.episode_id, episode_number: r.episode_number, episode_title: r.episode_title, label: r.label, slides: [] });
+    if (!groups.has(key)) groups.set(key, { key, episode_id: r.episode_id, episode_number: r.episode_number, episode_title: r.episode_title, label: r.request_title || r.label, created_at: r.created_at, score: scoreOf(r), slides: [] });
     groups.get(key).slides.push(r);
   }
-  for (const g of groups.values()) g.slides.sort((a, b) => a.position - b.position);
-  return { posts, stories, carousels: [...groups.values()].filter((g) => g.slides.length >= 2) };
+  const carousels = [...groups.values()].filter((g) => g.slides.length >= 2).map((g) => {
+    g.slides.sort((a, b) => a.position - b.position);
+    return { ...g, pub: board.stateOfCovers(idx, g.slides.map((x) => x.id)) };
+  });
+  return { posts, stories, storyPosts: posts.filter((p) => !p.pub), carousels: rank(carousels, includeUsed) };
 }
+
+// O que ainda não foi usado (resumo do assistente, contagens).
+const unusedClips = () => availableClips();
+const unusedImages = () => availableImages();
 
 const STATUS_LABEL = { revisao: 'Em revisão', recusado: 'Devolvido', simulado: 'Simulado', enviando: 'Enviando', agendado: 'Agendado', publicado: 'Publicado', parcial: 'Parcial', erro: 'Erro' };
 async function listPublications({ status = '', media = '', limit = 200 } = {}) {
@@ -53,7 +77,7 @@ async function listPublications({ status = '', media = '', limit = 200 } = {}) {
   params.push(limit);
   const { rows } = await db.query(
     `SELECT p.*, e.number AS episode_number, e.title AS episode_title, c.title AS clip_title, u.name AS created_by_name
-       FROM episode_publications p JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN users u ON u.id = p.created_by
+       FROM episode_publications p LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN users u ON u.id = p.created_by
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY coalesce(p.scheduled_at, p.created_at) DESC LIMIT $${params.length}`, params);
   return rows;
@@ -79,7 +103,7 @@ async function editPublication(pub, { title, description, scheduledAt }, user) {
     try { results.push({ platform: r.platform, ...(await up.editPost({ platform: r.platform, postId: r.post_id, title: t, description: d })) }); } catch (err) { return { error: err.message }; }
   }
   await db.query('UPDATE episode_publications SET title = $2, description = $3, edited_at = now(), updated_at = now() WHERE id = $1', [pub.id, t, d]);
-  await db.query("INSERT INTO episode_events (episode_id, user_id, type, message) VALUES ($1,$2,'publicacao',$3)", [pub.episode_id, user.id, `Publicação editada: ${t}`]);
+  if (pub.episode_id) await db.query("INSERT INTO episode_events (episode_id, user_id, type, message) VALUES ($1,$2,'publicacao',$3)", [pub.episode_id, user.id, `Publicação editada: ${t}`]);
   const simulated = results.some((r) => r.simulated) || !config.uploadPost.live;
   const parts = [];
   if (results.length) parts.push(simulated ? 'Edição registrada (modo de teste: nada foi alterado nas redes).' : `Editado em ${results.map((r) => up.PLATFORMS[r.platform].label).join(', ')}.`);
@@ -355,6 +379,6 @@ async function ourActivity() {
 }
 
 module.exports = {
-  USED, STATUS_LABEL, IDEA_KINDS, METRICS, unusedClips, unusedImages, listPublications, editPublication,
+  USED, STATUS_LABEL, IDEA_KINDS, METRICS, unusedClips, unusedImages, availableClips, availableImages, listPublications, editPublication,
   fingerprint, similar, doneFor, generateIdeas, has, runRules, runCommentRule, runDirectRule, insights, ourActivity,
 };

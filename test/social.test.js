@@ -70,7 +70,9 @@ describe('Social', () => {
       assert.match((await as.gestao.get('/social/novo?tipo=imagem')).text, new RegExp(`/capas/${quote.id}/imagem`));
       t = (await as.gestao.get('/social/novo?tipo=carrossel')).text;
       assert.match(t, new RegExp(`value="${slides.map((s) => s.id).join(',')}"`), 'carrossel = slides na ordem');
-      assert.match((await as.gestao.get('/social/novo?tipo=story')).text, new RegExp(`/capas/${story.id}/imagem`), 'capa vertical serve de story');
+      const st = (await as.gestao.get('/social/novo?tipo=story')).text;
+      assert.doesNotMatch(st, new RegExp(`/capas/${story.id}/imagem`), 'capa de corte não é story');
+      assert.match(st, /Usar um post 4:5 como story/); assert.match(st, new RegExp(`/capas/${quote.id}/imagem`), 'post de frase pode virar story, à parte');
     });
 
     it('corte publicado em modo de teste continua disponível (marcado como testado); agendado sai da lista', async () => {

@@ -48,6 +48,18 @@
 </div>
 
 <section class="card top-gap">
+  <div class="today-head"><h2>Pedidos de conteúdo</h2><a class="small" href="/conteudo?vista=pedidos">Ver todos</a></div>
+  <% if (!requests.length) { %><p class="small muted">Nenhum pedido com você. Trailers, vídeos avulsos e posts pedidos pela gestão aparecem aqui.</p><% } else { %>
+  <ul class="plain today-list two-col">
+    <% requests.forEach(function (r) { var iso = r.due_on ? new Date(r.due_on).toISOString().slice(0, 10) : ''; var late = iso && iso < today; %>
+    <li><span><a href="/conteudo/pedidos/<%= r.id %>"><strong><%= r.title %></strong></a><br><span class="mono small <%= late ? 'err' : 'muted' %>"><%= requestKinds[r.kind].label.toUpperCase() %> · <%= iso ? 'ATÉ ' + iso.slice(8, 10) + '/' + iso.slice(5, 7) : 'SEM PRAZO' %></span></span>
+      <% if (r.status === 'producao' && r.rounds) { %><span class="badge b-red">ajustes pedidos</span><% } else { %><span class="badge <%= { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao' }[r.status] %>"><%= r.status === 'pedido' ? (r.assignee_id ? 'para começar' : 'livre') : r.status === 'producao' ? 'em produção' : 'em revisão' %></span><% } %></li>
+    <% }) %>
+  </ul>
+  <% } %>
+</section>
+
+<section class="card top-gap">
   <div class="today-head"><h2>Minhas tarefas</h2><a class="small" href="/tarefas">Ver todas</a></div>
   <% if (!tasks.length) { %><p class="small muted">Nenhuma tarefa aberta com você.</p><% } else { %>
   <ul class="plain today-list two-col">

@@ -41,7 +41,7 @@ async function findPub(id) {
   if (!isIntId(id)) return null;
   const { rows: [p] } = await db.query(
     `SELECT p.*, e.number AS episode_number, e.title AS episode_title, c.title AS clip_title, u.name AS created_by_name
-       FROM episode_publications p JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN users u ON u.id = p.created_by WHERE p.id = $1`, [id]);
+       FROM episode_publications p LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN users u ON u.id = p.created_by WHERE p.id = $1`, [id]);
   return p || null;
 }
 
@@ -112,9 +112,10 @@ router.post('/social/publicacoes/:id/:acao(atualizar|repetir|cancelar)', require
 router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => {
   const tipo = MEDIA[req.query.tipo] ? req.query.tipo : 'video';
   const provider = await socialApi.active();
-  const [clips, images, conn] = await Promise.all([social.unusedClips(), social.unusedImages(), provider.configured() ? provider.connected() : { ok: false, platforms: {} }]);
+  const showUsed = req.query.publicados === '1';
+  const [clips, images, conn] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), provider.configured() ? provider.connected() : { ok: false, platforms: {} }]);
   res.render('social/new', {
-    title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
+    title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
     connected: conn.platforms || {}, live: provider.live(), provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), pick: req.query.item || '',
   });
 }));

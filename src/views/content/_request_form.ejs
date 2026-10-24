@@ -1,0 +1,34 @@
+<%# Janela "Pedir conteúdo" (nova) ou "Editar pedido". Variáveis: id, r (pedido ou null), people, episodeList, K, F, preset ({ kind, episode }), openOnLoad %>
+<%
+  var cur = r || {}; var p = locals.preset || {};
+  var kind = cur.kind || p.kind || 'trailer';
+  var dueIso = cur.due_on ? new Date(cur.due_on).toISOString().slice(0, 10) : '';
+  var epId = cur.episode_id || p.episode || '';
+  var videoKinds = Object.keys(K).filter(function (k) { return K[k].media === 'video'; }).join(' ');
+%>
+<dialog class="modal modal-wide" id="<%= id %>" aria-labelledby="<%= id %>-h" <%= locals.openOnLoad ? 'data-open-on-load' : '' %>>
+  <form method="post" action="<%= r ? '/conteudo/pedidos/' + r.id : '/conteudo/pedidos' %>" class="stack" data-when-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="<%= id %>-h"><%= r ? 'Editar pedido' : 'Pedir conteúdo ao editor' %></h2>
+    <fieldset class="kind-pick">
+      <legend class="field-label">O que é</legend>
+      <div class="chips-radio">
+        <% Object.keys(K).forEach(function (k) { %><label class="chip-radio"><input type="radio" name="kind" value="<%= k %>" <%= k === kind ? 'checked' : '' %> required><span><%= K[k].label %></span></label><% }) %>
+      </div>
+    </fieldset>
+    <label>Nome do pedido<input type="text" name="title" maxlength="160" required value="<%= cur.title || '' %>" placeholder="Ex.: trailer da temporada para o canal"></label>
+    <div class="field"><span class="field-label">Briefing <small class="muted">(o que você quer, referências, tom, duração)</small></span>
+      <%- include('../partials/rich-editor', { name: 'briefing_html', attach: 'attachment_ids', html: r ? fmt.richHtml(r.briefing_html, r.briefing) : '', placeholder: 'Descreva o que precisa. Cole imagens de referência, anexe arquivos, links com miniatura…', label: 'Briefing', size: 'sm' }) %>
+    </div>
+    <div class="grid-2 tight">
+      <label data-when="kind=<%= videoKinds %>">Formato<select name="format"><option value="">— tanto faz —</option><% Object.keys(F).forEach(function (f) { %><option value="<%= f %>" <%= cur.format === f ? 'selected' : '' %>><%= F[f] %></option><% }) %></select></label>
+      <label>Episódio<select name="episode_id"><option value="">— nenhum (avulso) —</option><% episodeList.forEach(function (e) { %><option value="<%= e.id %>" <%= String(epId) === String(e.id) ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %></select></label>
+      <label>Para quem<select name="assignee_id"><option value="">— qualquer editor —</option><% people.forEach(function (u) { %><option value="<%= u.id %>" <%= String(cur.assignee_id || '') === String(u.id) ? 'selected' : '' %>><%= u.name %></option><% }) %></select></label>
+      <label>Entregar até<input type="date" name="due_on" value="<%= dueIso %>"></label>
+    </div>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit"><%- icon(r ? 'check' : 'send') %> <%= r ? 'Salvar' : 'Pedir' %></button>
+      <button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+    </div>
+  </form>
+</dialog>

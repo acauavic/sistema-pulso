@@ -10,4 +10,4 @@
 <nav class="subnav" aria-label="Social">
   <% socialTabs.forEach(function (t) { %><a href="<%= t[1] %>" class="<%= tab === t[0] ? 'on' : '' %>"<%- tab === t[0] ? ' aria-current="page"' : '' %>><%= t[2] %></a><% }) %>
 </nav>
-<% if (typeof live !== 'undefined' && !live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: posts, respostas e directs são montados e conferidos, mas nada sai para as redes enquanto <span class="mono">UPLOAD_POST_LIVE</span> estiver desligado.</span></p><% } %>
+<% if (typeof live !== 'undefined' && !live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: posts, respostas e directs são montados e conferidos, mas nada sai para as redes. A publicação de verdade é ligada pela gestão em Integrações &gt; Redes sociais.</span></p><% } %>

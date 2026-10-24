@@ -255,7 +255,9 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     db.query('SELECT duration_ms, length(text) AS chars, jsonb_array_length(segments) AS segments FROM episode_transcripts WHERE episode_id = $1', [ep.id]),
     db.query('SELECT id, kind, group_key, position, label, lint, width, height, size_bytes, approved, auto, updated_at FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL ORDER BY kind, group_key, position, id', [ep.id]),
     db.query(`SELECT (SELECT count(*)::int FROM episode_clips WHERE episode_id = $1) AS clips,
-                     (SELECT count(*)::int FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND kind IN ('post_quote','post_split','carousel')) AS posts`, [ep.id]),
+                     (SELECT count(*)::int FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND kind IN ('post_quote','post_split','carousel')) AS posts,
+                     (SELECT count(*)::int FROM episode_publications WHERE episode_id = $1 AND status IN ('publicado','parcial') AND (clip_id IS NOT NULL OR media <> 'video')) AS published,
+                     (SELECT count(*)::int FROM content_requests WHERE episode_id = $1 AND status IN ('pedido','producao','revisao')) AS requests`, [ep.id]),
     db.query('SELECT * FROM episode_publications WHERE episode_id = $1 AND clip_id IS NULL ORDER BY created_at DESC, id DESC LIMIT 30', [ep.id]),
   ]);
   const provider = await socialApi.active();

@@ -11,6 +11,7 @@ const ENTITIES = {
   sponsor: { perm: 'sponsors.read', label: 'patrocinador', load: (id) => q1('SELECT id, company AS title, owner_id AS responsible FROM sponsors WHERE id = $1', [id]), url: (id) => `/patrocinadores/${id}#comentarios` },
   episode: { perm: 'episodes.read', label: 'episódio', load: (id) => q1("SELECT id, coalesce('EP.' || lpad(number::text, 3, '0') || ' · ', '') || title AS title, editor_id AS responsible FROM episodes WHERE id = $1", [id]), url: (id) => `/episodios/${id}#comentarios` },
   clip: { perm: 'episodes.read', label: 'corte', load: (id) => q1('SELECT id, title, created_by AS responsible FROM episode_clips WHERE id = $1', [id]), url: (id) => `/cortes/${id}#comentarios` },
+  content_request: { perm: 'episodes.read', label: 'pedido de conteúdo', load: (id) => q1('SELECT id, title, assignee_id AS responsible, created_by AS creator FROM content_requests WHERE id = $1', [id]), url: (id) => `/conteudo/pedidos/${id}#comentarios` },
   task: { perm: 'tasks.read', label: 'tarefa', load: (id) => q1('SELECT id, title, assignee_id AS responsible, created_by AS creator FROM tasks WHERE id = $1', [id]), url: (id) => `/tarefas/${id}#comentarios` },
 };
 async function q1(sql, params) { const { rows } = await db.query(sql, params); return rows[0] || null; }

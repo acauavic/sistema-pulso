@@ -697,3 +697,11 @@
     }));
   }
 })();
+
+// Quadro do Conteúdo no celular: abre na primeira coluna que tem algo (as primeiras costumam estar vazias).
+(function () {
+  const board = document.querySelector('#pane-quadro .board');
+  if (!board || window.matchMedia('(min-width: 861px)').matches) return;
+  const first = [...board.querySelectorAll('.column')].find((c) => c.querySelector('.kcard'));
+  if (first) board.scrollLeft = first.offsetLeft - board.offsetLeft;
+}());

@@ -11,7 +11,7 @@
   <div>
     <span class="kicker">Social · <%= MEDIA[pub.media] %></span>
     <h1><%= pub.title %> <span class="badge <%= badge[pub.status] %>"><%= statusLabel[pub.status] %></span></h1>
-    <p class="muted top-gap"><a href="/episodios/<%= pub.episode_id %>"><%= pub.episode_number ? 'EP.' + String(pub.episode_number).padStart(3, '0') + ' · ' : '' %><%= pub.episode_title %></a><% if (pub.clip_id) { %> · <a href="/cortes/<%= pub.clip_id %>"><%= pub.clip_title || 'corte' %></a><% } %></p>
+    <p class="muted top-gap"><% if (pub.episode_id) { %><a href="/episodios/<%= pub.episode_id %>"><%= pub.episode_number ? 'EP.' + String(pub.episode_number).padStart(3, '0') + ' · ' : '' %><%= pub.episode_title %></a><% } else { %>Conteúdo avulso<% } %><% if (pub.clip_id) { %> · <a href="/cortes/<%= pub.clip_id %>"><%= pub.clip_title || 'corte' %></a><% } %></p>
   </div>
   <div class="row"><a class="btn ghost" href="/social/publicacoes"><%- icon('arrow-left') %> Publicações</a></div>
 </div>

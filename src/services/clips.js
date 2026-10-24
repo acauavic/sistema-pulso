@@ -23,14 +23,15 @@ const ELIGIBLE_STATUSES = ['gravado', 'disponivel_edicao', 'em_edicao', 'em_revi
 const NOT_CUSTOM = "NOT (coalesce(analysis, '{}'::jsonb) ? 'custom')";
 
 // ---------------------------------------------------------------- envio em partes (mesmo esquema dos arquivos do episódio)
-async function startUpload({ filename, size, contentType, userId }) {
+// requestId/episodeId: entrega de um pedido de conteúdo (o vídeo já nasce ligado ao pedido e, se houver, ao episódio).
+async function startUpload({ filename, size, contentType, userId, requestId = null, episodeId = null }) {
   const type = String(contentType || 'video/mp4').split(';')[0].trim().toLowerCase().slice(0, 100) || 'video/mp4';
   const name = prod.safeName(filename);
   const ext = (name.match(/\.([A-Za-z0-9]{1,6})$/)?.[1] || 'mp4').toLowerCase();
   const partSize = prod.partSizeFor(size);
   const { rows: [clip] } = await db.query(
-    "INSERT INTO episode_clips (title, source, status, filename, content_type, part_size, size_bytes, created_by) VALUES ('Corte', 'upload', 'enviando', $1, $2, $3, $4, $5) RETURNING id",
-    [name, type, partSize, size, userId]);
+    "INSERT INTO episode_clips (title, source, status, filename, content_type, part_size, size_bytes, created_by, request_id, episode_id) VALUES ('Corte', 'upload', 'enviando', $1, $2, $3, $4, $5, $6, $7) RETURNING id",
+    [name, type, partSize, size, userId, requestId, episodeId]);
   const key = await b2.keyFor('cortes', clip.id, `video-${crypto.randomBytes(6).toString('hex')}.${ext}`);
   let uploadId;
   try { uploadId = await b2.createMultipart(key, type); } catch (err) { await db.query('DELETE FROM episode_clips WHERE id = $1', [clip.id]); throw err; }

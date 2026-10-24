@@ -97,7 +97,7 @@ async function forComments(commentIds) {
 async function canView(user, att) {
   if (!att.entity_id) return String(att.uploaded_by) === String(user.id);
   if (att.entity_type === 'task') return can(user.role, 'tasks.read');
-  if (att.entity_type === 'review') return can(user.role, 'episodes.read');
+  if (att.entity_type === 'review' || att.entity_type === 'content_request') return can(user.role, 'episodes.read');
   const { rows: [c] } = await db.query('SELECT entity_type FROM comments WHERE id = $1', [att.entity_id]);
   return Boolean(c) && require('./comments').canSee(user.role, c.entity_type);
 }

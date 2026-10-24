@@ -6,27 +6,33 @@ const up = require('./uploadPost'); // limites e validação (iguais para os doi
 const social = require('./socialApi');
 const L = require('./platformLimits');
 
-const addEvent = (episodeId, userId, message) => db.query("INSERT INTO episode_events (episode_id, user_id, type, message) VALUES ($1,$2,'publicacao',$3)", [episodeId, userId || null, message]);
+// Linha do tempo do episódio (conteúdo avulso, como o trailer do canal, não tem episódio: não registra).
+const addEvent = (episodeId, userId, message) => (!episodeId ? Promise.resolve() : db.query("INSERT INTO episode_events (episode_id, user_id, type, message) VALUES ($1,$2,'publicacao',$3)", [episodeId, userId || null, message]));
 
 async function loadTarget({ episodeId, clipId, media = 'video', coverIds = [] }) {
   if (media !== 'video') { // imagens geradas no editor de capas (post, carrossel, story)
     const ids = [...new Set((coverIds || []).map(Number).filter(Number.isInteger))];
     if (!ids.length) throw new Error('Escolha a imagem.');
     const { rows } = await db.query(
-      `SELECT c.*, coalesce(c.episode_id, cl.episode_id) AS ep_id FROM episode_covers c LEFT JOIN episode_clips cl ON cl.id = c.clip_id
+      `SELECT c.*, coalesce(c.episode_id, cl.episode_id) AS ep_id, r.status AS request_status FROM episode_covers c LEFT JOIN episode_clips cl ON cl.id = c.clip_id
+         LEFT JOIN content_requests r ON r.id = c.request_id
         WHERE c.id = ANY($1::int[]) ORDER BY array_position($1::int[], c.id)`, [ids]);
     if (rows.length !== ids.length) throw new Error('Imagem não encontrada.');
+    if (rows.some((c) => c.request_id && c.request_status !== 'aprovado')) throw new Error('A entrega deste pedido ainda não foi aprovada.');
     const epId = rows[0].ep_id;
-    if (!epId) throw new Error('Atribua o corte a um episódio antes de publicar a imagem.');
-    const { rows: [episode] } = await db.query('SELECT * FROM episodes WHERE id = $1', [epId]);
+    if (!epId && !rows[0].request_id) throw new Error('Atribua o corte a um episódio antes de publicar a imagem.');
+    const { rows: [episode] } = epId ? await db.query('SELECT * FROM episodes WHERE id = $1', [epId]) : { rows: [null] };
     return { kind: 'photo', media, episode, clip: null, covers: rows };
   }
   if (clipId) {
     const { rows: [clip] } = await db.query('SELECT * FROM episode_clips WHERE id = $1', [clipId]);
     if (!clip) throw new Error('Corte não encontrado.');
     if (clip.status !== 'pronto' || !clip.storage_key) throw new Error('O corte ainda não está pronto.');
-    if (!clip.episode_id) throw new Error('Atribua o corte a um episódio antes de publicar.');
-    const { rows: [episode] } = await db.query('SELECT * FROM episodes WHERE id = $1', [clip.episode_id]);
+    if (clip.request_id) { // entrega de pedido (trailer, vídeo avulso): só depois de aprovada; pode não ter episódio
+      const { rows: [r] } = await db.query('SELECT status FROM content_requests WHERE id = $1', [clip.request_id]);
+      if (r?.status !== 'aprovado') throw new Error('A entrega deste pedido ainda não foi aprovada.');
+    } else if (!clip.episode_id) throw new Error('Atribua o corte a um episódio antes de publicar.');
+    const { rows: [episode] } = clip.episode_id ? await db.query('SELECT * FROM episodes WHERE id = $1', [clip.episode_id]) : { rows: [null] };
     return { kind: 'clip', episode, clip, videoKey: clip.storage_key, coverId: clip.cover_id };
   }
   const { rows: [episode] } = await db.query('SELECT * FROM episodes WHERE id = $1', [episodeId]);
@@ -57,15 +63,15 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
   const { rows: [pub] } = await db.query(
     `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-    [target.episode.id, target.kind === 'photo' ? null : clipId, list, L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')), description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
+    [target.episode?.id || null, target.kind === 'photo' ? null : clipId, list, L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')), description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
       target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, target.kind === 'photo' ? target.covers.map((c) => c.id) : [], provider.id]);
   const names = list.map((p) => up.PLATFORMS[p].label).join(', ');
   if (review) {
-    await addEvent(target.episode.id, userId, `Publicação enviada para revisão da gestão (${names}): ${pub.title}`);
+    await addEvent(target.episode?.id, userId, `Publicação enviada para revisão da gestão (${names}): ${pub.title}`);
     await askReview(pub, userId);
     return pub;
   }
-  await addEvent(target.episode.id, userId, scheduledAt ? `Publicação agendada (${names}): ${pub.title}` : `Publicação enviada (${names}): ${pub.title}`);
+  await addEvent(target.episode?.id, userId, scheduledAt ? `Publicação agendada (${names}): ${pub.title}` : `Publicação enviada (${names}): ${pub.title}`);
   return scheduledAt ? pub : dispatch(pub.id);
 }
 

@@ -76,7 +76,8 @@
   <div class="stack-lg">
     <section class="card">
       <h2>Episódio</h2>
-      <% if (episode) { %><p><a href="/episodios/<%= episode.id %>"><strong><%= epLabel(episode) %></strong></a><%= episode.guest_name ? ' · ' + episode.guest_name : '' %></p><% } else { %><p class="muted">Este corte ainda não pertence a nenhum episódio.</p><% } %>
+      <% if (request) { %><p class="small"><span class="muted">Entrega do pedido:</span> <a href="/conteudo/pedidos/<%= request.id %>"><strong><%= request.title %></strong></a> <span class="badge <%= request.status === 'aprovado' ? 'b-st-pronto_publicar' : 'b-st-em_revisao' %>"><%= request.status === 'aprovado' ? 'aprovado' : 'aguardando aprovação' %></span></p><% } %>
+      <% if (episode) { %><p><a href="/episodios/<%= episode.id %>"><strong><%= epLabel(episode) %></strong></a><%= episode.guest_name ? ' · ' + episode.guest_name : '' %></p><% } else if (request) { %><p class="muted">Conteúdo avulso (sem episódio).</p><% } else { %><p class="muted">Este corte ainda não pertence a nenhum episódio.</p><% } %>
       <% if (perm.cut && clip.status !== 'enviando' && episode) { %><button class="btn sm top-gap" type="button" data-modal-open="modal-episodio">Mudar de episódio</button><% } %>
       <% if (perm.cut && clip.status !== 'enviando') { %>
       <% if (episode) { %><dialog class="modal" id="modal-episodio" aria-labelledby="mep-h"><h2 id="mep-h">Mudar de episódio</h2><% } %>
@@ -96,7 +97,8 @@
     <% if (ready && perm.publish) { %>
     <section class="card" id="publicar">
       <h2>Publicar nas redes</h2>
-      <% if (!episode) { %><p class="muted">Atribua o corte a um episódio antes de publicar.</p>
+      <% if (request && request.status !== 'aprovado') { %><p class="muted">Publica depois que a entrega do pedido for aprovada.</p>
+      <% } else if (!episode && !request) { %><p class="muted">Atribua o corte a um episódio antes de publicar.</p>
       <% } else { %>
       <p class="small muted">Escolha as redes, o texto e o horário na janela. <%= perm.direct ? '' : 'O post vai para a revisão da gestão antes de sair.' %></p>
       <button class="btn <%= publications.length ? '' : 'primary' %>" type="button" data-modal-open="modal-publicar"><%- icon('send') %> <%= perm.direct ? 'Publicar nas redes' : 'Pedir publicação' %></button>
@@ -134,9 +136,9 @@
           <% if (p.error) { %><p class="small err"><%= p.error %></p><% } %>
           <p class="row small">
             <a href="/social/publicacoes/<%= p.id %>">ver no Social</a>
-            <% if (p.status === 'enviando') { %><form method="post" action="/episodios/<%= p.episode_id %>/publicacoes/<%= p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
-            <% if (p.status === 'erro') { %><form method="post" action="/episodios/<%= p.episode_id %>/publicacoes/<%= p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">tentar de novo</button></form><% } %>
-            <% if (p.status === 'agendado') { %><form method="post" action="/episodios/<%= p.episode_id %>/publicacoes/<%= p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
+            <% if (p.status === 'enviando') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
+            <% if (p.status === 'erro') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">tentar de novo</button></form><% } %>
+            <% if (p.status === 'agendado') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
           </p>
         </li>
         <% }) %>
