@@ -19,7 +19,7 @@ const router = express.Router();
 const MEDIA = { video: 'Vídeo', imagem: 'Post', carrossel: 'Carrossel', story: 'Story' };
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Não encontrado.' });
 const live = () => config.uploadPost.live; // automações e respostas (sempre pelo Upload-Post)
-const pubLive = async () => (await socialApi.active()).live(); // publicar (provedor escolhido)
+const pubLive = () => socialApi.liveState(); // publicar: algum provedor em uso (padrão ou rota) em modo de teste?
 
 router.get('/social', requirePerm('social.read'), (req, res) => res.redirect('/social/publicacoes'));
 
@@ -32,7 +32,7 @@ router.get('/social/publicacoes', requirePerm('social.read'), wrap(async (req, r
     db.query('SELECT status, count(*)::int AS n FROM episode_publications GROUP BY status'),
   ]);
   res.render('social/publications', {
-    title: 'Social', tab: 'publicacoes', pubs, status, media, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: await pubLive(),
+    title: 'Social', tab: 'publicacoes', pubs, status, media, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, ...(await pubLive()),
     counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])),
   });
 }));
@@ -49,9 +49,14 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   const pub = await findPub(req.params.id);
   if (!pub) return notFound(res);
   const okPlatforms = (pub.results || []).filter((r) => r.ok).map((r) => r.platform);
+  const providers = socialApi.providersOf(pub); // um, ou vários quando as redes foram divididas entre provedores
+  const viaOf = (p) => socialApi.get((pub.results || []).find((r) => r.platform === p)?.provider || pub.options?.routes?.[p] || pub.provider);
+  const canEditNet = (p) => viaOf(p).canEdit && up.EDITABLE[p];
   res.render('social/publication', {
-    title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: socialApi.get(pub.provider).live(), provider: socialApi.get(pub.provider),
-    editable: socialApi.get(pub.provider).canEdit ? okPlatforms.filter((p) => up.EDITABLE[p]) : [], notEditable: socialApi.get(pub.provider).canEdit ? okPlatforms.filter((p) => !up.EDITABLE[p]) : okPlatforms,
+    title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: providers.every((p) => p.live()), provider: providers[0], providers,
+    providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
+    testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
+    editable: okPlatforms.filter(canEditNet), notEditable: okPlatforms.filter((p) => !canEditNet(p)),
     canPublish: can(req.user.role, 'social.publish'), mine: String(pub.created_by) === String(req.user.id),
   });
 }));
@@ -113,10 +118,10 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
   const tipo = MEDIA[req.query.tipo] ? req.query.tipo : 'video';
   const provider = await socialApi.active();
   const showUsed = req.query.publicados === '1';
-  const [clips, images, conn] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), provider.configured() ? provider.connected() : { ok: false, platforms: {} }]);
+  const [clips, images, conn, ls] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), socialApi.connectedAll(), socialApi.liveState()]);
   res.render('social/new', {
     title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
-    connected: conn.platforms || {}, live: provider.live(), provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), pick: req.query.item || '',
+    connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), pick: req.query.item || '',
   });
 }));
 

@@ -157,13 +157,14 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     c.episode_id ? db.query('SELECT e.id, e.number, e.title, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.id = $1', [c.episode_id]) : { rows: [] },
   ]);
   const provider = await socialApi.active();
-  const social = canPublish(req.user.role) && provider.configured() ? await provider.connected() : null;
+  const ls = await socialApi.liveState();
+  const social = canPublish(req.user.role) ? await socialApi.connectedAll() : null; // cada rede com a conta do provedor dela
   const thread = await require('../services/comments').list('clip', c.id);
   const request = c.request_id ? await require('../services/contentRequests').get(c.request_id) : null;
   res.render('content/clip', {
     comments: thread, request,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
-    uploadPost: up, uploadLive: provider.live(), provider, L, C,
+    uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C,
     running: ['enviando', 'processando'].includes(c.status) || pubs.rows.some((p) => p.status === 'enviando'),
     perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role) },
   });

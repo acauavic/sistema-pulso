@@ -1283,3 +1283,11 @@ dialog.modal.gallery[open] { display: flex; flex-direction: column; }
 .next-step { display: grid; gap: 10px; }
 .req-video { display: grid; gap: 8px; } .req-video video { width: 100%; max-height: 360px; border-radius: var(--r-card); background: var(--bg); } .req-video video.tall { max-width: 240px; }
 .past-note { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; }
+
+/* ============ contas das redes: alerta, lista e rotas por rede ============ */
+.conn-alert { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--bad); background: var(--surface); border-radius: 0 var(--r-card) var(--r-card) 0; color: var(--text-2); }
+.conn-alert .icon { margin-top: 2px; color: var(--bad); flex: none; } .conn-alert strong { color: var(--text); }
+.acct-list { display: grid; gap: 6px; margin: 4px 0 0; }
+.acct-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--raised); }
+.acct-state { display: flex; align-items: center; gap: 10px; flex: none; }
+.route-list { display: grid; gap: 8px; margin: 0; } .route-list li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; align-items: center; } .route-list label { margin: 0; }

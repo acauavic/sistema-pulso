@@ -24,6 +24,44 @@
       <div class="row"><button class="btn" type="submit">Usar o escolhido</button></div>
     </form>
 
+    <span class="kicker top-gap">Contas das redes</span>
+    <% social.problems.forEach(function (pr) { %><p class="conn-alert small" role="alert"><%- icon('unlink', 14) %> <span><strong><%= pr.text %>.</strong> Reconecte no <a href="<%= pr.dashboard %>" target="_blank" rel="noopener noreferrer">painel <%= pr.of %></a> e confira com "Verificar agora".</span></p><% }) %>
+    <% var inUseRows = social.accounts.filter(function (a) { return a.inUse; }); var otherRows = social.accounts.filter(function (a) { return !a.inUse; });
+       var chip = { ok: 'b-gray', reauth: 'b-red', sumiu: 'b-red', sem: 'b-amber' }; %>
+    <ul class="plain acct-list">
+      <% inUseRows.forEach(function (a) { %>
+      <li class="acct-row">
+        <span><strong><%= a.networkLabel %></strong><% if (a.handle) { %> <span class="mono small">@<%= String(a.handle).replace(/^@/, '') %></span><% } %><br><span class="mono small muted"><%= a.providerLabel.toUpperCase() %><%= a.since && a.status !== 'ok' ? ' · DESDE ' + fmt.formatDayShort(a.since).toUpperCase() : '' %></span></span>
+        <span class="acct-state"><span class="badge <%= chip[a.status] %>"><%= a.statusLabel %></span><% if (a.status !== 'ok') { %><a class="small" href="<%= a.dashboard %>" target="_blank" rel="noopener noreferrer"><%= a.status === 'sem' ? 'Conectar' : 'Reconectar' %></a><% } %></span>
+      </li>
+      <% }) %>
+      <% if (!inUseRows.length) { %><li class="small muted">Nenhuma conta conhecida ainda. Use "Verificar agora".</li><% } %>
+    </ul>
+    <% if (otherRows.length) { %><details class="provider-live"><summary class="small">Contas em provedores que não publicam essas redes <span class="mono muted"><%= otherRows.length %></span></summary>
+      <ul class="plain acct-list top-gap"><% otherRows.forEach(function (a) { %><li class="acct-row"><span><strong><%= a.networkLabel %></strong><% if (a.handle) { %> <span class="mono small">@<%= String(a.handle).replace(/^@/, '') %></span><% } %><br><span class="mono small muted"><%= a.providerLabel.toUpperCase() %></span></span><span class="badge <%= chip[a.status] %>"><%= a.statusLabel %></span></li><% }) %></ul>
+    </details><% } %>
+    <form method="post" action="/integracoes/redes/verificar" class="top-gap"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('refresh-cw', 14) %> Verificar agora</button> <span class="small muted">O painel também confere sozinho a cada 15 minutos e avisa a gestão quando uma conta cai.</span></form>
+
+    <span class="kicker top-gap">Cada rede por um provedor</span>
+    <p class="small m-0"><%= Object.keys(social.overrides).length ? Object.keys(social.overrides).map(function (n) { return social.networks[n] + ' sai ' + social.providers.filter(function (p) { return p.id === social.overrides[n]; }).map(function (p) { return p.by; })[0]; }).join('; ') + '. As demais saem pelo provedor em uso.' : 'Todas as redes saem pelo provedor em uso.' %></p>
+    <details class="provider-live">
+      <summary class="small">Mandar uma rede por outro provedor</summary>
+      <form method="post" action="/integracoes/redes/rotas" class="stack top-gap">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <ul class="plain route-list">
+          <% Object.keys(social.networks).forEach(function (n) { %>
+          <li><label for="rota-<%= n %>"><%= social.networks[n] %></label>
+            <select id="rota-<%= n %>" name="rota_<%= n %>">
+              <option value="padrao">Padrão (<%= social.providers.filter(function (p) { return p.id === social.active; })[0].label %>)</option>
+              <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %><option value="<%= p.id %>" <%= social.overrides[n] === p.id ? 'selected' : '' %>><%= p.label %></option><% }) %>
+            </select></li>
+          <% }) %>
+        </ul>
+        <p class="small muted m-0">Uma publicação para várias redes é dividida: cada provedor recebe só as redes dele. Conecte a conta da rede no painel do provedor escolhido antes de trocar.</p>
+        <div><button class="btn sm" type="submit">Salvar</button></div>
+      </form>
+    </details>
+
     <span class="kicker top-gap">Publicar de verdade</span>
     <ul class="plain provider-modes">
       <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>

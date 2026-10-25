@@ -18,6 +18,7 @@ const runsWorker = ROLE !== 'web';
 function registerRoutines() {
   const scheduler = require('./services/scheduler');
   scheduler.every('publicacoes', 30_000, () => require('./services/publishing').tick());
+  scheduler.every('contas-redes', 15 * 60_000, () => require('./services/socialHealth').tick(), { delayMs: 60_000 }); // vigia contas desconectadas e avisa a gestão
   scheduler.every('fila-travada', 60_000, () => require('./services/jobs').recoverStuck());
   scheduler.every('tarefas-vencendo', 15 * 60_000, () => require('./services/tasks').dueTick(), { delayMs: 20_000 });
   scheduler.every('lembretes', 5 * 60_000, () => require('./services/reminders').tick(), { delayMs: 30_000 });

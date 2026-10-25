@@ -95,11 +95,12 @@ async function editPublication(pub, { title, description, scheduledAt }, user) {
     return { ok: true, message: pub.status === 'agendado' ? 'Agendamento atualizado.' : 'Pedido atualizado.' };
   }
   if (!['publicado', 'parcial', 'simulado'].includes(pub.status)) return { error: 'Só dá para editar o que ainda não saiu ou o que já foi publicado.' };
-  const via = require('./socialApi').get(pub.provider);
-  if (!via.canEdit) return { error: `Esta publicação saiu ${via.by}, que não edita post depois de publicado. Edite pelo app da rede (o texto aqui no painel não muda o que já está no ar).` };
+  const api = require('./socialApi');
+  const providers = api.providersOf(pub);
+  if (!providers.some((p) => p.canEdit)) return { error: `Esta publicação saiu ${api.joinNames(providers.map((p) => p.by))}, que não ${providers.length > 1 ? 'editam' : 'edita'} post depois de publicado. Edite pelo app da rede (o texto aqui no painel não muda o que já está no ar).` };
   const results = []; const skipped = [];
   for (const r of (pub.results || []).filter((x) => x.ok)) {
-    if (!up.EDITABLE[r.platform]) { skipped.push(up.PLATFORMS[r.platform]?.label || r.platform); continue; }
+    if (!up.EDITABLE[r.platform] || !api.get(r.provider || pub.provider).canEdit) { skipped.push(up.PLATFORMS[r.platform]?.label || r.platform); continue; }
     if (pub.status === 'simulado' || !r.post_id) { results.push({ platform: r.platform, simulated: true }); continue; }
     try { results.push({ platform: r.platform, ...(await up.editPost({ platform: r.platform, postId: r.post_id, title: t, description: d })) }); } catch (err) { return { error: err.message }; }
   }

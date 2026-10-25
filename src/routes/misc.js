@@ -75,7 +75,9 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
     infinitepay: { ok: config.infinitepayConfigured, handle: config.infinitepay.handle, webhook: config.infinitepayConfigured ? require('../services/infinitePay').webhookUrl() : '' },
     appBaseUrl: config.appBaseUrl,
-    social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))), outstandTiktok: await require('../services/outstand').tiktokMode(), outstandProcess: await require('../services/outstand').processMedia() },
+    social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), by: p.by, env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))), outstandTiktok: await require('../services/outstand').tiktokMode(), outstandProcess: await require('../services/outstand').processMedia(),
+      routeMap: await require('../services/socialApi').routeMap(), overrides: await require('../services/socialApi').routes(), networks: Object.fromEntries(Object.entries(require('../services/socialApi').PLATFORMS).map(([k, v]) => [k, v.label])),
+      accounts: await require('../services/socialHealth').overview(), problems: await require('../services/socialHealth').problems() },
   });
 }));
 
@@ -121,8 +123,35 @@ router.post('/integracoes/redes/testar', requirePerm('integrations.manage'), wra
   const api = require('../services/socialApi');
   const p = api.get(String(req.body.provedor || ''));
   const conn = await p.connected({ force: true });
+  if (conn.ok) await require('../services/socialHealth').check({ only: [p.id] }); // também atualiza o estado das contas (e avisa se alguma caiu)
   const names = Object.entries(conn.platforms || {}).map(([k, a]) => `${api.PLATFORMS[k]?.label || k}${a.handle ? ` (@${String(a.handle).replace(/^@/, '')})` : ''}${a.reauth ? ' — reconectar' : ''}`);
   await req.flash(conn.ok ? 'ok' : 'error', conn.ok ? `${p.label} respondeu. Contas conectadas: ${names.join(', ') || 'nenhuma'}.` : `${p.label}: ${conn.error}`);
+  res.redirect('/integracoes#redes');
+}));
+
+// Verifica agora as contas de todos os provedores configurados (o worker faz isto sozinho a cada 15 min) e avisa a gestão do que caiu.
+router.post('/integracoes/redes/verificar', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const r = await require('../services/socialHealth').check();
+  const bits = [];
+  if (r.problems.length) bits.push(`Precisam de atenção: ${r.problems.map((x) => x.text).join('; ')}.`);
+  if (r.errors.length) bits.push(`Sem resposta: ${r.errors.map((e) => `${e.label} (${e.error})`).join('; ')}.`);
+  await audit(req, 'integracao.redes_verificar', 'system', null, { problemas: r.problems.length, sem_resposta: r.errors.length });
+  await req.flash(bits.length ? 'error' : 'ok', bits.length ? bits.join(' ') : 'Todas as contas conectadas estão funcionando.');
+  res.redirect('/integracoes#redes');
+}));
+
+// Cada rede por um provedor: o padrão é o provedor em uso; aqui a gestão manda redes específicas por outro (ex.: X pela Zernio).
+router.post('/integracoes/redes/rotas', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const api = require('../services/socialApi');
+  try {
+    const map = {};
+    for (const net of Object.keys(api.PLATFORMS)) { const v = String(req.body[`rota_${net}`] || ''); if (v && v !== 'padrao') map[net] = v; }
+    const before = await api.routes();
+    const saved = await api.setRoutes(map);
+    await audit(req, 'integracao.redes_rotas', 'system', null, { antes: before, depois: saved });
+    await require('../services/socialHealth').check({ notify: false }).catch(() => {});
+    await req.flash('ok', Object.keys(saved).length ? `Redes por outro provedor: ${Object.entries(saved).map(([n, id]) => `${api.PLATFORMS[n].label} ${api.get(id).by}`).join(', ')}. As demais saem pelo provedor em uso.` : 'Todas as redes saem pelo provedor em uso.');
+  } catch (err) { await req.flash('error', err.message); }
   res.redirect('/integracoes#redes');
 }));
 

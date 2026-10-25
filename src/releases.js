@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.31.0', date: '2026-10-25', title: 'Cada rede pelo seu provedor e aviso de conta desconectada',
+    items: [
+      { kind: 'novo', text: 'Em Integrações > Redes sociais, "Cada rede por um provedor": o padrão é o provedor em uso, e dá para mandar redes específicas por outro (por exemplo, o X pela Zernio e o resto pela Outstand). Uma publicação para várias redes é dividida sozinha entre os provedores, e a página dela mostra por onde cada rede saiu.' },
+      { kind: 'novo', text: 'O painel agora vigia as contas das redes: de 15 em 15 minutos pergunta a cada provedor se as contas continuam conectadas. Conta que cai (acesso vencido ou desconectada) vira "Reconectar" e a gestão recebe um aviso, com lembrete depois de 1 dia (até 3 avisos). Quando a conta volta, chega um aviso de que foi reconectada.' },
+      { kind: 'novo', text: 'A lista "Contas das redes" em Integrações mostra cada conta com o estado (Conectada, Reconectar, Desconectada ou Sem conta), desde quando e um atalho para o painel do provedor. "Verificar agora" confere na hora. O alerta também aparece nas telas do Social e no Início da gestão.' },
+      { kind: 'ajuste', text: 'No Novo post e nas janelas de publicar, a rede com conta para reconectar fica desabilitada e avisa em qual provedor reconectar. A publicação recusa o envio dessa rede com a explicação, em vez de falhar sem aviso. A configuração dos avisos fica em Gestão > Notificações ("Contas das redes").' },
+    ],
+  },
+  {
     version: '1.30.0', date: '2026-10-25', title: 'Outstand como terceira via para publicar nas redes',
     items: [
       { kind: 'novo', text: 'Vídeos do episódio, cortes, posts, carrosséis e stories também podem sair pela Outstand. A gestão escolhe em Integrações > Redes sociais (junto com Upload-Post e Zernio), testa a conexão (lista as contas e avisa se alguma precisa reconectar) e liga a publicação de verdade com confirmação.' },

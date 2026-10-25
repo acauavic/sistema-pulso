@@ -1,7 +1,8 @@
 <%# Publicação do episódio inteiro (só YouTube). Variáveis: ep, meta, publications, social, uploadPost, uploadLive, perm, csrf, fmt, L, latestEdited, covers %>
 <% var UP2 = uploadPost.PLATFORMS; var epPubs = publications.filter(function (p) { return !p.clip_id; });
    var ready = latestEdited && (ep.status === 'pronto_publicar' || ep.status === 'publicado');
-   var ytLinked = !social || !social.ok || social.platforms.youtube;
+   var ytAcc = social && social.platforms.youtube;
+   var ytLinked = !social || (ytAcc ? !ytAcc.reauth : !social.ok);
    var thumb = meta && meta.thumb_cover_id ? covers.find(function (c) { return c.id === meta.thumb_cover_id; }) : null;
    var PUB2 = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-amber', 'agendado'], publicado: ['b-green', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] }; %>
 <% if (perm.review && ready) { %>
@@ -10,8 +11,8 @@
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h2 id="mpb-h">Publicar no YouTube</h2>
     <p class="muted small">O episódio inteiro vai só para o YouTube, com o título, a descrição, as tags e a thumbnail aprovada.<%= thumb ? '' : ' Nenhuma thumbnail aprovada: o YouTube vai escolher um quadro.' %></p>
-    <% if (!uploadLive) { %><p class="notice small">Modo de teste: o pedido é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
-    <label class="check <%= ytLinked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="youtube" checked <%= ytLinked ? '' : 'disabled' %>> YouTube<% if (social && social.ok && social.platforms.youtube) { %> <span class="handle muted"><%= social.platforms.youtube.handle %></span><% } %></label>
+    <% if (!uploadLive) { %><p class="notice small">Modo de teste <%= locals.testAt || '' %>: o que sair por aí é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
+    <label class="check <%= ytLinked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="youtube" checked <%= ytLinked ? '' : 'disabled' %>> YouTube<% if (ytAcc && ytAcc.reauth) { %> <span class="handle bad-text">reconectar</span><% } %><% if (ytAcc) { %> <span class="handle muted"><%= ytAcc.handle %></span><% } %></label>
     <label>Título <small class="counter" data-counter-for="ep-pt" data-max="<%= L.LIMITS.youtube.title.max %>" data-ideal="<%= L.LIMITS.youtube.title.ideal %>"></small><input type="text" id="ep-pt" name="title" data-ai="titulo_youtube" data-ai-episode="<%= ep.id %>" value="<%= (meta && meta.yt_title) || ep.title %>" maxlength="100"></label>
     <details class="more">
       <summary>Descrição (vem dos textos de publicação)</summary>

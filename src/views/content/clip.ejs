@@ -9,8 +9,9 @@
   var boxes = [];
   Object.keys(UP).forEach(function (key) {
     if (!UP[key].clip) return;
-    var linked = !social || !social.ok || social.platforms[key];
-    boxes.push({ key: key, label: UP[key].clipLabel || UP[key].label, linked: linked, checked: uploadPost.DEFAULTS.clip.indexOf(key) >= 0 && linked, handle: social && social.ok && social.platforms[key] ? social.platforms[key].handle : '' });
+    var acc = social && social.platforms[key];
+    var linked = !social || (acc ? !acc.reauth : !social.ok); // reconectar também bloqueia: o envio falharia
+    boxes.push({ key: key, label: UP[key].clipLabel || UP[key].label, linked: linked, reauth: Boolean(acc && acc.reauth), checked: uploadPost.DEFAULTS.clip.indexOf(key) >= 0 && linked, handle: acc ? acc.handle : '' });
   });
 %>
 <div class="page-head" data-cortes data-single="<%= clip.id %>" data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
@@ -104,13 +105,13 @@
       <button class="btn <%= publications.length ? '' : 'primary' %>" type="button" data-modal-open="modal-publicar"><%- icon('send') %> <%= perm.direct ? 'Publicar nas redes' : 'Pedir publicação' %></button>
       <dialog class="modal modal-wide" id="modal-publicar" aria-labelledby="mpub-h">
       <h2 id="mpub-h">Publicar nas redes</h2>
-      <% if (!uploadLive) { %><p class="notice small">Modo de teste: o pedido é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
-      <% if (social && !social.ok) { %><p class="notice small">Não consegui consultar as redes conectadas no <%= locals.provider ? provider.label : 'Upload-Post' %>: <%= social.error %></p><% } %>
+      <% if (!uploadLive) { %><p class="notice small">Modo de teste <%= locals.testAt || '' %>: o que sair por aí é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
+      <% if (social && !social.ok) { %><p class="notice small">Não consegui consultar as redes conectadas: <%= social.error %></p><% } %>
       <form method="post" action="/cortes/<%= clip.id %>/publicar" class="stack">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <fieldset class="channels"><legend>Redes</legend>
           <% boxes.forEach(function (p) { %>
-          <label class="check <%= p.linked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="<%= p.key %>" <%= p.checked ? 'checked' : '' %> <%= p.linked ? '' : 'disabled' %>> <%= p.label %><% if (p.handle) { %> <span class="handle muted"><%= p.handle %></span><% } %><% if (!p.linked) { %> <span class="handle muted">não conectado</span><% } %></label>
+          <label class="check <%= p.linked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="<%= p.key %>" <%= p.checked ? 'checked' : '' %> <%= p.linked ? '' : 'disabled' %>> <%= p.label %><% if (p.handle) { %> <span class="handle muted"><%= p.handle %></span><% } %><% if (!p.linked) { %> <span class="handle <%= p.reauth ? 'bad-text' : 'muted' %>"><%= p.reauth ? 'reconectar' : 'não conectado' %></span><% } %></label>
           <% }) %>
         </fieldset>
         <%- include('../partials/ig-people', { episodeId: clip.episode_id, photo: false }) %>

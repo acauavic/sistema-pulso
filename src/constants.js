@@ -91,6 +91,7 @@ const NOTIFICATION_TYPES = {
   cadencia: { label: 'Follow-ups', hint: 'Resumo do dia: convidados e patrocinadores com follow-up para hoje ou atrasado, e os que parecem perdidos por falta de resposta.' },
   alteracao: { label: 'Cadastro alterado', hint: 'Quem é responsável por um convidado, patrocinador, episódio, corte ou tarefa recebe um aviso quando outra pessoa altera o cadastro, com o que mudou.' },
   exclusao: { label: 'Cadastro excluído', hint: 'Quem era responsável por um convidado, patrocinador, episódio, corte ou tarefa recebe um aviso quando outra pessoa o exclui.' },
+  integracao: { label: 'Contas das redes', hint: 'Uma conta do Instagram, TikTok, YouTube, X ou outra rede foi desconectada ou precisa ser reconectada no provedor (Upload-Post, Zernio ou Outstand). Enquanto isso, as publicações nessa rede falham.' },
   rotina: { label: 'Rotinas do sistema', hint: 'Análise por IA pronta ou com erro, corte lido, publicação concluída, patrocinador respondeu o formulário.' },
 };
 // Momentos que disparam rotinas de tarefas.

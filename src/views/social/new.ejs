@@ -80,8 +80,8 @@
     <h2>Onde e quando</h2>
     <fieldset class="row wrap">
       <legend>Redes</legend>
-      <% allowed.forEach(function (k) { var on = hasConn ? Boolean(connected[k]) && preset.indexOf(k) >= 0 : preset.indexOf(k) >= 0; %>
-      <label class="check"><input type="checkbox" name="platforms" value="<%= k %>" <%= on ? 'checked' : '' %>> <%= tipo === 'video' && platforms[k].clipLabel ? platforms[k].clipLabel : platforms[k].label %><% if (hasConn && !connected[k]) { %> <span class="small muted">(não conectada)</span><% } %></label>
+      <% allowed.forEach(function (k) { var acc = connected[k]; var stale = Boolean(acc && acc.reauth); var on = hasConn ? Boolean(acc) && !stale && preset.indexOf(k) >= 0 : preset.indexOf(k) >= 0; %>
+      <label class="check <%= stale ? 'off' : '' %>"><input type="checkbox" name="platforms" value="<%= k %>" <%= on ? 'checked' : '' %> <%= stale ? 'disabled' : '' %>> <%= tipo === 'video' && platforms[k].clipLabel ? platforms[k].clipLabel : platforms[k].label %><% if (stale) { %> <span class="small bad-text">(reconectar na <%= providerNames[acc.provider] || 'plataforma' %>)</span><% } else if (hasConn && !acc) { %> <span class="small muted">(não conectada)</span><% } %></label>
       <% }) %>
     </fieldset>
     <% if (tipo !== 'story') { %>

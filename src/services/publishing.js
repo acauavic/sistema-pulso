@@ -4,6 +4,7 @@ const db = require('../db/pool');
 const b2 = require('./b2');
 const up = require('./uploadPost'); // limites e validação (iguais para os dois provedores)
 const social = require('./socialApi');
+const health = require('./socialHealth');
 const L = require('./platformLimits');
 
 // Linha do tempo do episódio (conteúdo avulso, como o trailer do canal, não tem episódio: não registra).
@@ -53,17 +54,24 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
     ? up.validatePhotos({ media, platforms: list, title, description, scheduledAt, count: target.covers.length })
     : up.validate({ kind: target.kind, platforms: list, title, description, scheduledAt });
   if (!check.ok) { const err = new Error(check.issues[0]); err.issues = check.issues; throw err; }
-  const provider = await social.active();
-  if (provider.live() && !review) {
-    const conn = await provider.connected();
-    if (!conn.ok) throw new Error(`Não foi possível consultar as redes conectadas: ${conn.error}`);
-    const missing = list.filter((p) => !conn.platforms[p]);
-    if (missing.length) throw new Error(`Sem conta conectada ${provider.at}: ${missing.map((p) => up.PLATFORMS[p]?.label || p).join(', ')}.`);
+  const groups = await social.plan(list); // cada rede sai pelo provedor dela (padrão ou rota); pode haver mais de um provedor
+  if (!review) {
+    for (const g of groups) {
+      if (!g.provider.live()) continue;
+      const conn = await g.provider.connected();
+      if (!conn.ok) throw new Error(`Não foi possível consultar as redes conectadas ${g.provider.at}: ${conn.error}`);
+      const missing = g.platforms.filter((p) => !conn.platforms[p]);
+      if (missing.length) throw new Error(`Sem conta conectada ${g.provider.at}: ${missing.map((p) => up.PLATFORMS[p]?.label || p).join(', ')}.`);
+      const stale = [...new Set([...g.platforms.filter((p) => conn.platforms[p]?.reauth), ...await health.reauthOf(g.provider.id, g.platforms)])];
+      if (stale.length) throw new Error(`Reconecte ${stale.map((p) => up.PLATFORMS[p]?.label || p).join(', ')} ${g.provider.at}: o acesso da conta venceu e a publicação falharia.`);
+    }
   }
+  const provider = groups[0].provider;
+  const routesMap = groups.length > 1 ? Object.fromEntries(groups.flatMap((g) => g.platforms.map((p) => [p, g.provider.id]))) : null;
   const { rows: [pub] } = await db.query(
     `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-    [target.episode?.id || null, target.kind === 'photo' ? null : clipId, list, L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')), description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
+    [target.episode?.id || null, target.kind === 'photo' ? null : clipId, list, L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')), description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(routesMap ? { routes: routesMap } : {}), ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
       target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, target.kind === 'photo' ? target.covers.map((c) => c.id) : [], provider.id]);
   const names = list.map((p) => up.PLATFORMS[p].label).join(', ');
   if (review) {
@@ -76,34 +84,36 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
 }
 
 // Envia uma publicação pendente (agora). Falhas viram status "erro" com o motivo, nunca ficam silenciosas.
+// Cada rede sai pelo provedor dela: se forem vários, cada um recebe só as suas redes (um envio por provedor) e o andamento é
+// acompanhado em cada um (options.parts). Se um provedor falhar ao enviar e outro não, a publicação segue e mostra qual rede falhou.
 async function dispatch(pubId) {
   await social.syncLive();
   const { rows: [pub] } = await db.query("UPDATE episode_publications SET status = 'enviando', updated_at = now() WHERE id = $1 AND status IN ('enviando','agendado') RETURNING *", [pubId]);
   if (!pub) return null;
   try {
     const target = await loadTarget({ episodeId: pub.episode_id, clipId: pub.clip_id, media: pub.media, coverIds: pub.cover_ids });
-    // agendado/revisão: sai pelo provedor escolhido na hora de enviar (a gestão pode ter trocado nesse meio-tempo)
-    const provider = await social.active();
-    if (provider.id !== pub.provider) { await db.query('UPDATE episode_publications SET provider = $2 WHERE id = $1', [pub.id, provider.id]); pub.provider = provider.id; }
-    const conn = provider.live() ? await provider.connected() : { platforms: {} };
-    if (target.kind === 'photo') return await dispatchPhotos(pub, target, provider, conn);
-    const videoUrl = await b2.presignGet(target.videoKey, { expires: up.MAX_LINK_SECONDS });
-    let coverUrl = null;
-    if (pub.cover_id) {
-      const { rows: [cv] } = await db.query('SELECT storage_key FROM episode_covers WHERE id = $1', [pub.cover_id]);
-      if (cv) coverUrl = await b2.presignGet(cv.storage_key, { expires: up.MAX_LINK_SECONDS });
+    // agendado/revisão: sai pelos provedores atuais na hora de enviar (a gestão pode ter trocado nesse meio-tempo)
+    const groups = await social.plan(pub.platforms);
+    const routesMap = groups.length > 1 ? Object.fromEntries(groups.flatMap((g) => g.platforms.map((p) => [p, g.provider.id]))) : null;
+    const first = groups[0].provider.id;
+    if (first !== pub.provider) { await db.query('UPDATE episode_publications SET provider = $2 WHERE id = $1', [pub.id, first]); pub.provider = first; }
+    const media = await mediaLinks(pub, target);
+    const outcomes = [];
+    for (const g of groups) {
+      try {
+        const conn = g.provider.live() ? await g.provider.connected() : { platforms: {} };
+        const sent = target.kind === 'photo'
+          ? await g.provider.sendPhotos({ id: pub.id, media: pub.media, platforms: g.platforms, title: pub.title, description: pub.description, photoUrls: media.photoUrls, accounts: conn.platforms, instagram: pub.options?.instagram || null })
+          : await g.provider.sendVideo({
+            id: pub.id, kind: target.kind, platforms: g.platforms, title: pub.title, description: pub.description, videoUrl: media.videoUrl,
+            coverUrl: target.kind === 'clip' ? media.coverUrl : null, thumbnailUrl: target.kind === 'episode' ? media.coverUrl : null, tags: pub.options?.tags || [], accounts: conn.platforms,
+            instagram: pub.options?.instagram || null,
+          });
+        outcomes.push({ g, sent });
+      } catch (err) { outcomes.push({ g, error: err }); }
     }
-    const sent = await provider.sendVideo({
-      id: pub.id, kind: target.kind, platforms: pub.platforms, title: pub.title, description: pub.description, videoUrl,
-      coverUrl: target.kind === 'clip' ? coverUrl : null, thumbnailUrl: target.kind === 'episode' ? coverUrl : null, tags: pub.options?.tags || [], accounts: conn.platforms,
-      instagram: pub.options?.instagram || null,
-    });
-    const state = sent.simulated ? 'simulado' : (sent.done ? finalState(sent.results) : 'enviando');
-    const { rows: [saved] } = await db.query(
-      `UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = NULL, updated_at = now() WHERE id = $1 RETURNING *`,
-      [pub.id, state, sent.request_id || null, sent.job_id || null, JSON.stringify(sent.results || []), JSON.stringify({ fields: sent.fieldNames, ...(sent.warnings?.length ? { provider_warnings: sent.warnings } : {}) })]);
-    if (state === 'publicado' || state === 'parcial') await afterPublished(saved);
-    return saved;
+    if (outcomes.every((o) => o.error)) throw outcomes[0].error; // nenhum provedor aceitou: erro, como sempre
+    return await saveSent(pub, outcomes, routesMap);
   } catch (err) {
     const { rows: [failed] } = await db.query("UPDATE episode_publications SET status = 'erro', error = $2, updated_at = now() WHERE id = $1 RETURNING *", [pub.id, String(err.message).slice(0, 500)]);
     await addEvent(pub.episode_id, pub.created_by, `Falha ao publicar: ${err.message}`);
@@ -112,15 +122,49 @@ async function dispatch(pubId) {
   }
 }
 
-// Imagens: links assinados de cada imagem (na ordem do carrossel) -> provedor.
-async function dispatchPhotos(pub, target, provider, conn) {
-  const photoUrls = [];
-  for (const c of target.covers) photoUrls.push(await b2.presignGet(c.storage_key, { expires: up.MAX_LINK_SECONDS }));
-  const sent = await provider.sendPhotos({ id: pub.id, media: pub.media, platforms: pub.platforms, title: pub.title, description: pub.description, photoUrls, accounts: conn.platforms, instagram: pub.options?.instagram || null });
-  const state = sent.simulated ? 'simulado' : (sent.done ? finalState(sent.results) : 'enviando');
+// Links assinados do material (o provedor baixa de lá): vídeo e capa, ou as imagens na ordem do carrossel.
+async function mediaLinks(pub, target) {
+  if (target.kind === 'photo') {
+    const photoUrls = [];
+    for (const c of target.covers) photoUrls.push(await b2.presignGet(c.storage_key, { expires: up.MAX_LINK_SECONDS }));
+    return { photoUrls };
+  }
+  const videoUrl = await b2.presignGet(target.videoKey, { expires: up.MAX_LINK_SECONDS });
+  let coverUrl = null;
+  if (pub.cover_id) {
+    const { rows: [cv] } = await db.query('SELECT storage_key FROM episode_covers WHERE id = $1', [pub.cover_id]);
+    if (cv) coverUrl = await b2.presignGet(cv.storage_key, { expires: up.MAX_LINK_SECONDS });
+  }
+  return { videoUrl, coverUrl };
+}
+
+// Junta o que cada provedor respondeu: resultados (com o provedor de cada rede), onde acompanhar cada envio e o que falhou ao enviar.
+async function saveSent(pub, outcomes, routesMap) {
+  const results = []; const parts = []; const sendErrors = []; const warnings = []; const fields = new Set();
+  for (const o of outcomes) {
+    const pid = o.g.provider.id;
+    if (o.error) {
+      const msg = String(o.error.message).slice(0, 300);
+      for (const p of o.g.platforms) { sendErrors.push({ platform: p, provider: pid, error: msg }); results.push({ platform: p, ok: false, skipped: false, status: 'failed', url: null, error: msg, provider: pid }); }
+      await addEvent(pub.episode_id, pub.created_by, `Falha ao enviar ${o.g.platforms.map((p) => up.PLATFORMS[p]?.label || p).join(', ')} ${o.g.provider.by}: ${msg}`);
+      continue;
+    }
+    const s = o.sent;
+    results.push(...(s.results || []).map((r) => ({ ...r, provider: pid })));
+    (s.fieldNames || []).forEach((f) => fields.add(f));
+    warnings.push(...(s.warnings || []));
+    if (!s.simulated) parts.push({ provider: pid, request_id: s.request_id || null, job_id: s.job_id || null, platforms: o.g.platforms, done: Boolean(s.done) });
+  }
+  const real = results.filter((r) => !r.simulated);
+  let state;
+  if (!parts.length) state = sendErrors.length ? 'erro' : 'simulado'; // nada foi realmente enviado
+  else if (outcomes.every((o) => o.error || o.sent.simulated || o.sent.done)) state = finalState(real);
+  else state = 'enviando';
+  const first = parts[0] || {};
+  const options = { fields: [...fields], ...(routesMap ? { routes: routesMap } : {}), ...(parts.length ? { parts } : {}), ...(sendErrors.length ? { send_errors: sendErrors } : {}), ...(warnings.length ? { provider_warnings: warnings } : {}) };
   const { rows: [saved] } = await db.query(
-    'UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = NULL, updated_at = now() WHERE id = $1 RETURNING *',
-    [pub.id, state, sent.request_id || null, sent.job_id || null, JSON.stringify(sent.results || []), JSON.stringify({ fields: sent.fieldNames, ...(sent.warnings?.length ? { provider_warnings: sent.warnings } : {}) })]);
+    `UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = $7, updated_at = now() WHERE id = $1 RETURNING *`,
+    [pub.id, state, first.request_id || null, first.job_id || null, JSON.stringify(results), JSON.stringify(options), state === 'erro' ? (sendErrors[0]?.error || 'O envio falhou.') : null]);
   if (state === 'publicado' || state === 'parcial') await afterPublished(saved);
   return saved;
 }
@@ -148,16 +192,34 @@ async function tellCreator(pub, title, body) {
   await require('./notify').notify({ type: 'rotina', users: [pub.created_by], title, body, url: `/social/publicacoes/${pub.id}`, entity: { type: pub.clip_id ? 'clip' : 'episode', id: pub.clip_id || pub.episode_id }, dedupe: `pub-${pub.id}-${title.slice(0, 20)}` }).catch((err) => console.error('Aviso de publicação:', err.message));
 }
 
-// Atualiza o andamento de um envio que está no provedor (o mesmo pelo qual saiu).
+// Atualiza o andamento de um envio que está no provedor (o mesmo pelo qual saiu; cada provedor, se foram vários).
 async function refresh(pubId) {
   const { rows: [pub] } = await db.query('SELECT * FROM episode_publications WHERE id = $1', [pubId]);
   if (!pub || pub.status !== 'enviando' || !(pub.request_id || pub.job_id)) return pub || null;
+  const parts = pub.options?.parts?.length ? pub.options.parts : [{ provider: pub.provider, request_id: pub.request_id, job_id: pub.job_id, platforms: pub.platforms }];
   try {
-    const st = await social.get(pub.provider).status({ request_id: pub.request_id, job_id: pub.job_id });
+    const sts = [];
+    for (const part of parts) sts.push({ part, st: await social.get(part.provider).status({ request_id: part.request_id, job_id: part.job_id }) });
+    const sendErrors = pub.options?.send_errors || [];
+    let results = [
+      ...sts.flatMap(({ part, st }) => (st.results || []).map((r) => ({ ...r, provider: part.provider }))),
+      ...sendErrors.map((e) => ({ platform: e.platform, ok: false, skipped: false, status: 'failed', url: null, error: e.error, provider: e.provider })),
+      ...(pub.results || []).filter((r) => r.simulated),
+    ];
+    if (!results.length) results = pub.results;
+    let state; let error = null;
+    if (parts.length === 1 && !sendErrors.length) { state = sts[0].st.state; error = sts[0].st.error || null; } else {
+      const states = sts.map(({ st }) => st.state);
+      if (states.includes('enviando')) state = 'enviando';
+      else if (states.every((x) => x === 'publicado') && !sendErrors.length) state = 'publicado';
+      else if (states.some((x) => x === 'publicado' || x === 'parcial')) state = 'parcial';
+      else state = 'erro';
+      if (state === 'erro') error = sts.map(({ st }) => st.error).find(Boolean) || sendErrors[0]?.error || 'O envio falhou.';
+    }
     const { rows: [saved] } = await db.query('UPDATE episode_publications SET status = $2, results = $3, error = $4, updated_at = now() WHERE id = $1 RETURNING *',
-      [pub.id, st.state, JSON.stringify(st.results.length ? st.results : pub.results), st.error || null]);
-    if (st.state === 'publicado' || st.state === 'parcial') await afterPublished(saved);
-    if (st.state === 'erro') { await addEvent(pub.episode_id, pub.created_by, `Falha ao publicar: ${st.error}`); await tellCreator(pub, `Falha ao publicar: ${pub.title}`, st.error); }
+      [pub.id, state, JSON.stringify(results), error]);
+    if (state === 'publicado' || state === 'parcial') await afterPublished(saved);
+    if (state === 'erro') { await addEvent(pub.episode_id, pub.created_by, `Falha ao publicar: ${error}`); await tellCreator(pub, `Falha ao publicar: ${pub.title}`, error); }
     return saved;
   } catch (err) {
     console.error(`[publicação ${pub.id}] não consegui consultar o status:`, err.message);
@@ -180,7 +242,7 @@ async function tick() {
 
 // "Mandar de novo" depois de um erro: volta para a fila e envia.
 async function retry(pubId) {
-  const { rows: [pub] } = await db.query("UPDATE episode_publications SET status = 'enviando', error = NULL, request_id = NULL, job_id = NULL, updated_at = now() WHERE id = $1 AND status = 'erro' RETURNING *", [pubId]);
+  const { rows: [pub] } = await db.query("UPDATE episode_publications SET status = 'enviando', error = NULL, request_id = NULL, job_id = NULL, options = options - 'parts' - 'send_errors' - 'provider_warnings', updated_at = now() WHERE id = $1 AND status = 'erro' RETURNING *", [pubId]);
   return pub ? dispatch(pub.id) : null;
 }
 
