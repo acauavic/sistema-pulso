@@ -4,7 +4,7 @@
 // As alternativas da busca vêm do que o sistema já conhece: convidados com Instagram, perfis já usados antes e o convidado do episódio.
 const db = require('../db/pool');
 
-const MAX_COLLAB = 3; // limite da Zernio (o Upload-Post não informa limite): o menor vale para os dois
+const MAX_COLLAB = 3; // limite da Zernio e da Outstand (o Upload-Post não informa limite): o menor vale para todos
 const MAX_TAGS = 20; // limite do Instagram por imagem
 const HANDLE = /^[a-z0-9._]{1,30}$/;
 

@@ -93,7 +93,7 @@ describe('Zernio como alternativa ao Upload-Post', () => {
     const pub = await publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['instagram'], title: 'Post', description: 'Legenda do post', userId: u.gestao.id });
     assert.equal(pub.status, 'simulado'); assert.equal(pub.provider, 'zernio');
     assert.equal(calls.filter((c) => c.method === 'POST').length, 0, 'nenhum envio');
-    assert.match(socialApi.sentMessage(pub), /NADA foi enviado pelo Zernio\. A publicação de verdade é ligada em Integrações/);
+    assert.match(socialApi.sentMessage(pub), /NADA foi enviado pela Zernio\. A publicação de verdade é ligada em Integrações/);
   });
 
   it('de verdade: envia com a conta conectada, guarda o id do post e acompanha até publicar', async () => {
@@ -112,7 +112,7 @@ describe('Zernio como alternativa ao Upload-Post', () => {
       const done = await publishing.refresh(pub.id);
       assert.equal(done.status, 'publicado'); assert.equal(done.results[0].url, 'https://instagram.com/p/abc'); assert.equal(done.results[0].platform, 'instagram');
       // rede sem conta conectada: recusa antes de enviar, com o nome do provedor
-      await assert.rejects(publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['facebook'], title: 'P', description: 'L', userId: u.gestao.id }), /Sem conta conectada no Zernio: Facebook/);
+      await assert.rejects(publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['facebook'], title: 'P', description: 'L', userId: u.gestao.id }), /Sem conta conectada na Zernio: Facebook/);
       // a Zernio recusa: vira erro com o motivo
       zstate.fail = 'Media URL not reachable';
       const bad = await publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['instagram'], title: 'P3', description: 'L3', userId: u.gestao.id });

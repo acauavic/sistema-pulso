@@ -58,7 +58,7 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
     const conn = await provider.connected();
     if (!conn.ok) throw new Error(`Não foi possível consultar as redes conectadas: ${conn.error}`);
     const missing = list.filter((p) => !conn.platforms[p]);
-    if (missing.length) throw new Error(`Sem conta conectada no ${provider.label}: ${missing.map((p) => up.PLATFORMS[p]?.label || p).join(', ')}.`);
+    if (missing.length) throw new Error(`Sem conta conectada ${provider.at}: ${missing.map((p) => up.PLATFORMS[p]?.label || p).join(', ')}.`);
   }
   const { rows: [pub] } = await db.query(
     `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
@@ -101,7 +101,7 @@ async function dispatch(pubId) {
     const state = sent.simulated ? 'simulado' : (sent.done ? finalState(sent.results) : 'enviando');
     const { rows: [saved] } = await db.query(
       `UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = NULL, updated_at = now() WHERE id = $1 RETURNING *`,
-      [pub.id, state, sent.request_id || null, sent.job_id || null, JSON.stringify(sent.results || []), JSON.stringify({ fields: sent.fieldNames })]);
+      [pub.id, state, sent.request_id || null, sent.job_id || null, JSON.stringify(sent.results || []), JSON.stringify({ fields: sent.fieldNames, ...(sent.warnings?.length ? { provider_warnings: sent.warnings } : {}) })]);
     if (state === 'publicado' || state === 'parcial') await afterPublished(saved);
     return saved;
   } catch (err) {
@@ -120,7 +120,7 @@ async function dispatchPhotos(pub, target, provider, conn) {
   const state = sent.simulated ? 'simulado' : (sent.done ? finalState(sent.results) : 'enviando');
   const { rows: [saved] } = await db.query(
     'UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = NULL, updated_at = now() WHERE id = $1 RETURNING *',
-    [pub.id, state, sent.request_id || null, sent.job_id || null, JSON.stringify(sent.results || []), JSON.stringify({ fields: sent.fieldNames })]);
+    [pub.id, state, sent.request_id || null, sent.job_id || null, JSON.stringify(sent.results || []), JSON.stringify({ fields: sent.fieldNames, ...(sent.warnings?.length ? { provider_warnings: sent.warnings } : {}) })]);
   if (state === 'publicado' || state === 'parcial') await afterPublished(saved);
   return saved;
 }

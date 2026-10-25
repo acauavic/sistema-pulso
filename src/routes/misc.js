@@ -75,18 +75,18 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
     infinitepay: { ok: config.infinitepayConfigured, handle: config.infinitepay.handle, webhook: config.infinitepayConfigured ? require('../services/infinitePay').webhookUrl() : '' },
     appBaseUrl: config.appBaseUrl,
-    social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))) },
+    social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))), outstandTiktok: await require('../services/outstand').tiktokMode(), outstandProcess: await require('../services/outstand').processMedia() },
   });
 }));
 
-// Redes sociais: por qual provedor as publicações saem (Upload-Post ou Zernio) e teste de conexão (só leitura).
+// Redes sociais: por qual provedor as publicações saem (Upload-Post, Zernio ou Outstand) e teste de conexão (só leitura).
 router.post('/integracoes/redes', requirePerm('integrations.manage'), wrap(async (req, res) => {
   const api = require('../services/socialApi');
   try {
     const before = await api.activeId();
     await api.choose(String(req.body.provedor || ''));
     await audit(req, 'integracao.redes_provedor', 'system', null, { de: before, para: req.body.provedor });
-    await req.flash('ok', `Publicações passam a sair pelo ${api.get(req.body.provedor).label}. As que já saíram continuam sendo acompanhadas por onde foram.`);
+    await req.flash('ok', `Publicações passam a sair ${api.get(req.body.provedor).by}. As que já saíram continuam sendo acompanhadas por onde foram.`);
   } catch (err) { await req.flash('error', err.message); }
   res.redirect('/integracoes#redes');
 }));
@@ -103,6 +103,17 @@ router.post('/integracoes/redes/modo', requirePerm('integrations.manage'), wrap(
       ? `${api.get(id).label}: publicação de verdade ligada. O que for publicado ${id === 'uploadpost' ? '(e as respostas das automações) ' : ''}sai nas redes.`
       : `${api.get(id).label}: modo de teste. Os pedidos são montados e conferidos, mas nada sai para as redes.`);
   } catch (err) { await req.flash('error', err.message); }
+  res.redirect('/integracoes#redes');
+}));
+
+// Outstand: o TikTok sai direto ou como rascunho na caixa do TikTok (a pessoa termina no app) e se o vídeo é ajustado para cada rede.
+router.post('/integracoes/redes/outstand', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const ost = require('../services/outstand');
+  const mode = req.body.modo === 'rascunho' ? 'rascunho' : 'direto';
+  const adjust = req.body.ajustar === '1';
+  await ost.setTiktokMode(mode); await ost.setProcessMedia(adjust);
+  await audit(req, 'integracao.redes_outstand_opcoes', 'system', null, { provedor: 'outstand', tiktok: mode, ajustar_video: adjust });
+  await req.flash('ok', `Outstand: TikTok ${mode === 'direto' ? 'publica direto na conta' : 'vai como rascunho na caixa do TikTok (quem publica termina no app)'}; ${adjust ? 'o vídeo é ajustado para cada rede quando precisa' : 'o vídeo vai como está'}.`);
   res.redirect('/integracoes#redes');
 }));
 

@@ -44,7 +44,7 @@
           <summary class="small">Ligar a publicação de verdade</summary>
           <form method="post" action="/integracoes/redes/modo" class="stack top-gap">
             <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><input type="hidden" name="ligar" value="1">
-            <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi: o que for publicado pelo <%= p.label %><%= p.id === 'uploadpost' ? ' e as respostas das automações' : '' %> sai nas redes conectadas.</label>
+            <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi: o que for publicado <%= p.by %><%= p.id === 'uploadpost' ? ' e as respostas das automações' : '' %> sai nas redes conectadas.</label>
             <div><button class="btn sm" type="submit">Ligar publicação de verdade</button></div>
           </form>
         </details>
@@ -52,6 +52,21 @@
       </li>
       <% }) %>
     </ul>
+
+ <% if (social.providers.some(function (p) { return p.id === 'outstand' && p.configured; })) { %>
+    <span class="kicker top-gap">Opções da Outstand</span>
+    <form method="post" action="/integracoes/redes/outstand" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="chips-radio">
+        <label class="chip-radio"><input type="radio" name="modo" value="direto" <%= social.outstandTiktok === 'direto' ? 'checked' : '' %>><span>Publicar direto</span></label>
+        <label class="chip-radio"><input type="radio" name="modo" value="rascunho" <%= social.outstandTiktok === 'rascunho' ? 'checked' : '' %>><span>Enviar como rascunho</span></label>
+      </div>
+      <p class="small muted m-0">Direto: o vídeo vai ao ar na hora, se o TikTok liberar publicação pública para a conta (senão o painel avisa o motivo). Rascunho: cai na caixa do TikTok e quem publica termina no app, escolhendo legenda e privacidade; não depende de liberação do TikTok.</p>
+      <label class="check"><input type="checkbox" name="ajustar" value="1" <%= social.outstandProcess ? 'checked' : '' %>> Ajustar o vídeo para cada rede antes de publicar</label>
+      <p class="small muted m-0">A Outstand só refaz o arquivo se precisar (por exemplo, o Instagram recusa vídeo com "edit list") e cobra US$ 0,30 por minuto de vídeo refeito. Desligado, o vídeo vai exatamente como foi enviado e o painel mostra os avisos dela.</p>
+      <div><button class="btn sm" type="submit">Salvar</button></div>
+    </form>
+    <% } %>
 
     <div class="row top-gap">
       <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>

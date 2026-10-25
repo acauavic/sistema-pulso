@@ -1,4 +1,4 @@
-// Provedor de publicação nas redes: Upload-Post ou Zernio, escolhido pela gestão em Integrações (app_settings.social_provider).
+// Provedor de publicação nas redes: Upload-Post, Zernio ou Outstand, escolhido pela gestão em Integrações (app_settings.social_provider).
 // As telas e a publicação usam só esta camada; cada publicação guarda por qual provedor saiu (episode_publications.provider),
 // e o andamento é consultado sempre nele, mesmo que a escolha mude depois.
 // Insights, comentários, directs e automações continuam pelo Upload-Post.
@@ -6,10 +6,11 @@ const config = require('../config');
 const settings = require('./settings');
 const up = require('./uploadPost');
 const zn = require('./zernio');
+const ost = require('./outstand');
 
 const PROVIDERS = {
   uploadpost: {
-    id: 'uploadpost', label: 'Upload-Post', env: 'UPLOAD_POST_KEY', liveEnv: 'UPLOAD_POST_LIVE',
+    id: 'uploadpost', label: 'Upload-Post', by: 'pelo Upload-Post', to: 'ao Upload-Post', at: 'no Upload-Post', env: 'UPLOAD_POST_KEY', liveEnv: 'UPLOAD_POST_LIVE',
     configured: () => config.uploadPostConfigured, live: () => config.uploadPost.live,
     connected: (o) => up.connected(o), resetCache: () => up.resetCache(),
     sendVideo: (args) => up.send(up.buildFields(args)),
@@ -17,8 +18,17 @@ const PROVIDERS = {
     status: ({ request_id, job_id }) => up.status({ request_id, job_id: request_id ? null : job_id }),
     canEdit: true,
   },
+  outstand: {
+    id: 'outstand', label: 'Outstand', by: 'pela Outstand', to: 'à Outstand', at: 'na Outstand', env: 'OUTSTAND_API_KEY', liveEnv: 'OUTSTAND_LIVE',
+    configured: () => config.outstandConfigured, live: () => config.outstand.live,
+    connected: (o) => ost.connected(o), resetCache: () => ost.resetCache(),
+    sendVideo: async (args) => ost.send(ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: await ost.processMedia() })),
+    sendPhotos: async (args) => ost.send(ost.buildPhotoPost({ ...args, tiktokMode: await ost.tiktokMode() })),
+    status: ({ request_id, job_id }) => ost.status({ request_id, job_id }),
+    canEdit: false, // a Outstand só edita post que ainda não saiu (e o agendamento é nosso): depois de publicado, edite pelo app da rede
+  },
   zernio: {
-    id: 'zernio', label: 'Zernio', env: 'ZERNIO_API_KEY', liveEnv: 'ZERNIO_LIVE',
+    id: 'zernio', label: 'Zernio', by: 'pela Zernio', to: 'à Zernio', at: 'na Zernio', env: 'ZERNIO_API_KEY', liveEnv: 'ZERNIO_LIVE',
     configured: () => config.zernioConfigured, live: () => config.zernio.live,
     connected: (o) => zn.connected(o), resetCache: () => zn.resetCache(),
     sendVideo: (args) => zn.send(zn.buildPost(args)),
@@ -27,7 +37,7 @@ const PROVIDERS = {
     canEdit: false, // editar um post já publicado ainda não é feito pela Zernio: edite pelo app da rede
   },
 };
-const ORDER = ['uploadpost', 'zernio'];
+const ORDER = ['uploadpost', 'zernio', 'outstand'];
 
 const get = (id) => PROVIDERS[id] || PROVIDERS.uploadpost;
 
@@ -55,9 +65,9 @@ async function choose(id) {
 const list = () => ORDER.map((id) => PROVIDERS[id]);
 
 // ---- publicar de verdade ou só simular: controlado pela gestão em Integrações (app_settings.social_live_<provedor>).
-// A variável de ambiente (UPLOAD_POST_LIVE / ZERNIO_LIVE) é só o padrão enquanto ninguém mexeu no painel.
+// A variável de ambiente (UPLOAD_POST_LIVE / ZERNIO_LIVE / OUTSTAND_LIVE) é só o padrão enquanto ninguém mexeu no painel.
 // O valor efetivo fica em config.*.live; cada processo (painel e worker) relê o banco a cada 15 s, e na hora em quem mudou.
-const LIVE_TARGET = { uploadpost: config.uploadPost, zernio: config.zernio };
+const LIVE_TARGET = { uploadpost: config.uploadPost, zernio: config.zernio, outstand: config.outstand };
 const liveKey = (id) => `social_live_${id}`;
 let syncedAt = 0;
 async function syncLive({ force = false } = {}) {
@@ -84,10 +94,10 @@ async function setLive(id, on) {
 function sentMessage(pub, { trail = '' } = {}) {
   const p = get(pub.provider);
   if (pub.status === 'revisao') return 'Enviado para a revisão da gestão. Você recebe um aviso quando for aprovado ou devolvido.';
-  if (pub.status === 'simulado') return `Modo de teste: o pedido foi montado e conferido, mas NADA foi enviado pelo ${p.label}. A publicação de verdade é ligada em Integrações > Redes sociais.`;
+  if (pub.status === 'simulado') return `Modo de teste: o pedido foi montado e conferido, mas NADA foi enviado ${p.by}. A publicação de verdade é ligada em Integrações > Redes sociais.`;
   if (pub.status === 'agendado') return 'Publicação agendada.';
   if (pub.status === 'erro') return `Não foi possível enviar: ${pub.error}`;
-  return `Enviado ao ${p.label}.${trail}`;
+  return `Enviado ${p.to}.${trail}`;
 }
 
 module.exports = { syncLive, setLive, liveSource, sentMessage, PROVIDERS, PLATFORMS: up.PLATFORMS, DEFAULTS: up.DEFAULTS, MAX_LINK_SECONDS: up.MAX_LINK_SECONDS, get, active, activeId, state, choose, list };

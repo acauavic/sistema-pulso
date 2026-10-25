@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.30.0', date: '2026-10-25', title: 'Outstand como terceira via para publicar nas redes',
+    items: [
+      { kind: 'novo', text: 'Vídeos do episódio, cortes, posts, carrosséis e stories também podem sair pela Outstand. A gestão escolhe em Integrações > Redes sociais (junto com Upload-Post e Zernio), testa a conexão (lista as contas e avisa se alguma precisa reconectar) e liga a publicação de verdade com confirmação.' },
+      { kind: 'novo', text: 'Funciona com o que já existia: collab (até 3 perfis) e marcação de pessoas no Instagram, capa do Reels, Shorts e capa do vídeo no YouTube, Reel no Facebook. O envio não duplica: se a rede falhar no meio, o painel repete com a mesma chave.' },
+      { kind: 'novo', text: 'TikTok pela Outstand: "publicar direto" (o painel confere as opções de privacidade da conta antes) ou "enviar como rascunho" para a caixa do TikTok, onde quem publica termina no app. O resultado mostra "Rascunho" e o que falta fazer.' },
+      { kind: 'ajuste', text: 'Avisos da Outstand aparecem na página da publicação (por exemplo, vídeo que o Instagram pode recusar). Em Integrações há a opção de ajustar o vídeo para cada rede, desligada por padrão porque a Outstand cobra por minuto de vídeo refeito.' },
+      { kind: 'ajuste', text: 'A Outstand só edita post que ainda não saiu; depois de publicado o texto se edita no app da rede, e a página da publicação explica isso em vez de mostrar um botão que não funcionaria. Agendados continuam editáveis aqui.' },
+    ],
+  },
+  {
     version: '1.29.1', date: '2026-10-23', title: 'Plateia sem as gravações que já passaram',
     items: [
       { kind: 'ajuste', text: 'Na Plateia, as pessoas de gravações que já passaram ficam ocultas na lista e no quadro. Um aviso diz quantas são e de quais convidados, com "Mostrar" para ver todo mundo. Filtrar pelo episódio ou buscar um nome continua encontrando qualquer pessoa.' },

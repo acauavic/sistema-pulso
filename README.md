@@ -358,12 +358,14 @@ Na janela de publicar (corte, post, carrossel), com o Instagram marcado: **Colla
 episódio já vem no collab; convidados com Instagram e perfis já usados aparecem na lista; dá para digitar ou colar vários @). Em post/carrossel, toque na
 imagem para posicionar cada marcação. Vai pelos dois provedores. Código: `src/services/igPeople.js`, `src/views/partials/ig-people.ejs`, `src/public/igpeople.js`.
 
-## Redes sociais: Upload-Post ou Zernio
+## Redes sociais: Upload-Post, Zernio ou Outstand
 
 As publicações (episódio no YouTube, cortes, posts, carrosséis e stories) saem pelo provedor escolhido em **Integrações > Redes sociais**:
-**Upload-Post** (`UPLOAD_POST_KEY`, `UPLOAD_POST_LIVE`) ou **Zernio** (`ZERNIO_API_KEY`, opcional `ZERNIO_PROFILE_ID`, `ZERNIO_LIVE`). Sem a variável
+**Upload-Post** (`UPLOAD_POST_KEY`, `UPLOAD_POST_LIVE`), **Zernio** (`ZERNIO_API_KEY`, opcional `ZERNIO_PROFILE_ID`, `ZERNIO_LIVE`) ou **Outstand** (`OUTSTAND_API_KEY`, `OUTSTAND_LIVE`). Sem a variável
 `*_LIVE=true` o provedor só simula, até a gestão ligar a **publicação de verdade** em Integrações > Redes sociais (a escolha do painel vale mais que a variável, na hora, com confirmação e auditoria). Cada publicação guarda por onde saiu e é acompanhada lá. Insights, comentários, directs, automações e a edição
-de um post já publicado continuam pelo Upload-Post. Código: `src/services/socialApi.js`, `src/services/zernio.js`.
+de um post já publicado continuam pelo Upload-Post. Código: `src/services/socialApi.js`, `src/services/zernio.js`, `src/services/outstand.js`.
+
+**Outstand** (`api.outstand.so`, docs em outstand.so/docs): contas conectadas no painel deles (OAuth; chaves gerenciadas para Instagram, TikTok, YouTube, Facebook, Threads e LinkedIn). O painel envia na hora (o agendamento é nosso; a Outstand só agenda até 30 dias e não reagenda), com `Idempotency-Key` (repetir após falha de rede não duplica) e acompanha por `GET /v1/posts/:id`. Collab e marcação vão em `instagram.collaborators` / `userTags` (x e y obrigatórios). **TikTok**: o modo padrão da Outstand é rascunho (a pessoa termina no app); aqui a gestão escolhe "publicar direto" (exige a privacidade vinda de `creator-info`) ou "rascunho", em Integrações. **Editar**: o `PATCH /v1/posts/:id` só vale para post que ainda não saiu (409 depois de publicado), por isso o provedor tem `canEdit: false`; depois de publicado, edita-se no app da rede. Ajustar o vídeo (`processMedia`) é opcional e cobrado (US$ 0,30 por minuto refeito).
 
 ## Envio de material: repetidos, retomada e armazenamento cheio
 

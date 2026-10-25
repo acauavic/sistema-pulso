@@ -49,7 +49,7 @@ const md5 = (buf) => require('crypto').createHash('md5').update(buf).digest('hex
 // ---- Groq simulado ----
 const groqCalls = [];
 let groqFail = false;
-const BLOCKED = /(backblazeb2\.com|groq\.com|upload-post\.com|generativelanguage\.googleapis\.com)/;
+const BLOCKED = /(backblazeb2\.com|groq\.com|upload-post\.com|outstand\.so|zernio\.com|generativelanguage\.googleapis\.com)/;
 // ---- Upload-Post simulado: guarda os pedidos e responde conforme o teste configurar ----
 const uploadPostCalls = [];
 const uploadPostState = {

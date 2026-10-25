@@ -61,6 +61,8 @@ const config = {
   // Zernio: alternativa ao Upload-Post para publicar (a gestão escolhe em Integrações). Sem ZERNIO_LIVE=true, só simula.
   zernio: { key: env.ZERNIO_API_KEY, base: (env.ZERNIO_BASE || 'https://zernio.com/api').replace(/\/+$/, ''), profileId: env.ZERNIO_PROFILE_ID || '', live: String(env.ZERNIO_LIVE).toLowerCase() === 'true' },
   uploadPost: { key: env.UPLOAD_POST_KEY, user: env.UPLOAD_POST_USER || 'default', live: String(env.UPLOAD_POST_LIVE).toLowerCase() === 'true', base: 'https://api.upload-post.com' },
+  // Outstand (https://www.outstand.so/docs): terceira via para publicar. Sem OUTSTAND_LIVE=true, só simula.
+  outstand: { key: env.OUTSTAND_API_KEY, base: (env.OUTSTAND_BASE || 'https://api.outstand.so').replace(/\/+$/, ''), live: String(env.OUTSTAND_LIVE).toLowerCase() === 'true' },
 
   // Web Push (alertas com o painel fechado). Gere o par com `npx web-push generate-vapid-keys`.
   push: {
@@ -93,6 +95,7 @@ config.geminiConfigured = Boolean(config.gemini.key);
 config.groqConfigured = Boolean(config.groq.key);
 config.uploadPostConfigured = Boolean(config.uploadPost.key);
 config.zernioConfigured = Boolean(config.zernio.key);
+config.outstandConfigured = Boolean(config.outstand.key);
 config.googleConfigured = Boolean(config.google.calendarId && config.google.serviceAccount);
 config.infinitepayConfigured = Boolean(config.infinitepay.handle);
 config.yourlsConfigured = Boolean(config.yourls.base && config.yourls.key);

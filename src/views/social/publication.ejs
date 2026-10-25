@@ -5,7 +5,9 @@
   var label = function (k) { return platforms[k] ? (pub.media === 'video' && pub.clip_id && platforms[k].clipLabel ? platforms[k].clipLabel : platforms[k].label) : k; };
   var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
   var pending = ['revisao', 'recusado'].indexOf(pub.status) >= 0;
-  var canEdit = (canPublish && ['agendado', 'publicado', 'parcial', 'simulado', 'revisao', 'recusado'].indexOf(pub.status) >= 0) || (mine && pending);
+  var notYetOut = ['agendado', 'revisao', 'recusado'].indexOf(pub.status) >= 0; // ainda não saiu: o texto muda aqui
+  var viaCanEdit = !provider || provider.canEdit; // Zernio e Outstand não editam post já publicado
+  var canEdit = (canPublish && ['agendado', 'publicado', 'parcial', 'simulado', 'revisao', 'recusado'].indexOf(pub.status) >= 0 && (viaCanEdit || notYetOut)) || (mine && pending);
 %>
 <div class="page-head">
   <div>
@@ -15,7 +17,7 @@
   </div>
   <div class="row"><a class="btn ghost" href="/social/publicacoes"><%- icon('arrow-left') %> Publicações</a></div>
 </div>
-<% if (!live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: nada sai para as redes pelo <%= locals.provider ? provider.label : 'Upload-Post' %>. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</span></p><% } %>
+<% if (!live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste: nada sai para as redes <%= locals.provider ? provider.by : 'pelo Upload-Post' %>. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</span></p><% } %>
 
 <% if (pending) { %>
 <section class="card next-step">
@@ -63,13 +65,15 @@
         <% if (igo && igo.tags && igo.tags.length) { %><dt>Marcados</dt><dd class="pub-people mono"><% igo.tags.forEach(function (t) { %><span>@<%= t.username %></span><% }) %></dd><% } %>
       </dl>
       <% if (igo && igo.collaborators && igo.collaborators.length) { %><p class="small muted">O convite de collab chega para cada perfil no Instagram: o post só aparece no perfil deles depois que aceitarem.</p><% } %>
+      <% (pub.options && pub.options.provider_warnings || []).forEach(function (w) { %><p class="notice small"><%- icon('info', 14) %> Aviso <%= pub.provider === 'outstand' ? 'da Outstand' : 'do provedor' %>: <%= w %></p><% }) %>
       <ul class="plain results top-gap">
         <% pub.platforms.forEach(function (k) { var r = (pub.results || []).find(function (x) { return x.platform === k; }) || {}; %>
         <li>
           <strong><%= label(k) %></strong>
-          <span class="badge <%= r.ok ? (r.simulated ? 'b-gray' : 'b-green') : (r.error ? 'b-red' : 'b-amber') %>"><%= r.simulated ? 'Simulado' : r.ok ? 'No ar' : r.error ? 'Erro' : (pub.status === 'agendado' ? 'Agendado' : pending ? 'Não enviado' : 'Aguardando') %></span>
+          <span class="badge <%= r.draft ? 'b-amber' : r.ok ? (r.simulated ? 'b-gray' : 'b-green') : (r.error ? 'b-red' : 'b-amber') %>"><%= r.simulated ? 'Simulado' : r.draft ? 'Rascunho' : r.ok ? 'No ar' : r.error ? 'Erro' : (pub.status === 'agendado' ? 'Agendado' : pending ? 'Não enviado' : 'Aguardando') %></span>
           <% if (r.url) { %><a class="small" href="<%= r.url %>" target="_blank" rel="noopener noreferrer">abrir <%- icon('external-link', 14) %></a><% } %>
           <% if (r.error) { %><span class="small bad-text"><%= r.error %></span><% } %>
+          <% if (r.note) { %><span class="small muted"><%= r.note %></span><% } %>
         </li>
         <% }) %>
       </ul>
@@ -97,7 +101,9 @@
     <p><strong><%= pub.title %></strong></p>
     <p class="small muted top-gap"><%= pub.media === 'video' ? 'Descrição / legenda' : 'Legenda' %></p>
     <p class="pre"><%= pub.description || 'Sem legenda.' %></p>
-    <% if (canEdit && ['agendado', 'revisao', 'recusado'].indexOf(pub.status) < 0) { %>
+    <% if (!viaCanEdit && !notYetOut && ['publicado', 'parcial', 'simulado'].indexOf(pub.status) >= 0) { %>
+      <p class="small warn top-gap">Saiu <%= provider.by %>, que só edita post que ainda não foi publicado. Para mudar o texto, edite pelo app da rede.</p>
+    <% } else if (canEdit && ['agendado', 'revisao', 'recusado'].indexOf(pub.status) < 0) { %>
       <% if (editable.length) { %><p class="small muted top-gap">Ao editar, a mudança vai para: <%= editable.map(label).join(', ') %>.</p><% } %>
       <% if (notEditable.length) { %><p class="small warn"><%= notEditable.map(label).join(', ') %> não <%= notEditable.length > 1 ? 'deixam' : 'deixa' %> editar um post publicado pela API: lá é pelo app da rede.</p><% } %>
     <% } %>
