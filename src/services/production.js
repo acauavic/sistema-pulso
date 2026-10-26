@@ -272,7 +272,14 @@ async function createEpisode({ title, guestId = null, recordedOn = null, userId 
 }
 
 // ---------------------------------------------------------------- arquivos (Backblaze, envio em partes)
-const partSizeFor = (size) => Math.max(config.uploadPartBytes, Math.ceil(size / 9000)); // B2: mínimo 5 MB por parte e até 10.000 partes
+// Tamanho de cada parte do envio (B2: mínimo 5 MB e até 10.000 partes). Parte maior rende mais por conexão (a conexão leva tempo para "esquentar" e o
+// navegador só abre 6 conexões com o Backblaze, que fala HTTP/1.1): com o envio direto ligado, arquivo grande usa partes de até 64 MB (cabem nos 70 MB
+// que o servidor aceita, caso a fila volte ao caminho pelo servidor) e arquivo médio é dividido em ~12 partes para manter as conexões ocupadas.
+const DIRECT_PART_MAX = 64 * 1024 * 1024; const DIRECT_PARTS = 12;
+const partSizeFor = (size) => {
+  const base = config.uploadDirect ? Math.max(config.uploadPartBytes, Math.min(DIRECT_PART_MAX, Math.ceil(size / DIRECT_PARTS))) : config.uploadPartBytes;
+  return Math.max(base, Math.ceil(size / 9000));
+};
 
 const safeName = (name) => String(name || 'arquivo').normalize('NFC').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 180);
 

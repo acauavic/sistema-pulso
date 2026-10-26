@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.32.1', date: '2026-10-26', title: 'Envio direto com partes maiores',
+    items: [
+      { kind: 'ajuste', text: 'No envio direto, arquivos grandes agora são enviados em partes de até 64 MB (antes 16 MB): cada conexão com o Backblaze rende cerca de duas vezes mais com partes maiores. A fila usa as 6 conexões que o navegador abre com o Backblaze. Vale para os envios novos; os que já estão em andamento continuam com as partes que começaram.' },
+    ],
+  },
+  {
     version: '1.32.0', date: '2026-10-26', title: 'Envio de arquivos grandes bem mais rápido',
     items: [
       { kind: 'novo', text: 'Os arquivos grandes (material bruto, vídeo editado e cortes) agora podem ir direto do navegador para o Backblaze, sem passar pelo servidor, que fica na Europa. Em teste, o envio direto chegou a cerca de 27 MB/s contra uns 3 MB/s do caminho antigo. Em Integrações > Armazenamento (Backblaze), a gestão liga isso com um clique ("Ligar envio direto"); sem isso, tudo continua passando pelo servidor, sem perder nada.' },

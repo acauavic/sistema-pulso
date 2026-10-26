@@ -126,4 +126,18 @@ describe('envio direto do navegador ao Backblaze: link assinado por parte e regi
       assert.match((await as.gestao.get('/integracoes')).text, /não deixou ligar o CORS[\s\S]*CORS Rules/);
     } finally { h.b2Cors.denied = false; }
   });
+
+  it('o tamanho da parte cresce com o arquivo (até 64 MB) e, sem envio direto, fica como sempre foi', () => {
+    const prod = require('../src/services/production'); const MB = 1024 * 1024;
+    const base = h.config.uploadPartBytes; h.config.uploadPartBytes = 16 * MB;
+    try {
+      assert.equal(prod.partSizeFor(100 * MB), 16 * MB, 'arquivo pequeno: parte mínima');
+      assert.equal(prod.partSizeFor(500 * MB), Math.ceil(500 * MB / 12), 'médio: ~12 partes, para as conexões ficarem ocupadas');
+      assert.equal(prod.partSizeFor(14 * 1024 * MB), 64 * MB); assert.equal(prod.partSizeFor(43 * 1024 * MB), 64 * MB);
+      assert.ok(prod.partSizeFor(43 * 1024 * MB) <= 70 * MB, 'cabe no limite da rota do servidor');
+      assert.ok(Math.ceil(5 * 1024 * 1024 * MB / prod.partSizeFor(5 * 1024 * 1024 * MB)) <= 10000, 'nunca passa de 10.000 partes');
+      h.config.uploadDirect = false;
+      assert.equal(prod.partSizeFor(43 * 1024 * MB), 16 * MB, 'sem envio direto: como sempre foi');
+    } finally { h.config.uploadDirect = true; h.config.uploadPartBytes = base; }
+  });
 });
