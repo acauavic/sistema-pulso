@@ -96,6 +96,18 @@ describe('infraestrutura: fila, rotinas, tempo real e limitador', () => {
       assert.equal(r.ok, false); assert.equal(r.error, 'quebrou'); assert.equal(r.runs, 2);
     });
 
+    it('muitas rotinas na mesma hora não esgotam as conexões (o worker travava e a fila parava)', async () => {
+      // cada rotina segura uma conexão (a trava) e ainda precisa de outra para consultar o banco: sem limite, 10+ juntas se travam
+      const names = Array.from({ length: 14 }, (_, i) => `junta-${i}`);
+      const done = [];
+      const all = Promise.all(names.map((n) => scheduler.runOnce(n, async () => { await h.db.query('SELECT pg_sleep(0.05)'); done.push(n); })));
+      const outcome = await Promise.race([all.then(() => 'ok'), new Promise((r) => setTimeout(() => r('travou'), 8000))]);
+      assert.equal(outcome, 'ok', 'as rotinas simultâneas ficaram esperando conexão para sempre');
+      assert.equal(done.length, names.length);
+      const { rows } = await h.db.query("SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted AND pid IN (SELECT pid FROM pg_stat_activity WHERE datname = current_database())");
+      assert.equal(rows.length, 0, 'nenhuma trava ficou presa');
+    });
+
     it('agendado vencido sai uma vez só, mesmo com duas rodadas ao mesmo tempo', async () => {
       const { rows: [g] } = await h.db.query("INSERT INTO episodes (number, title, status) VALUES (1, 'Ep', 'gravado') RETURNING id");
       h.b2Store.set('pp/x.jpg', { body: Buffer.from('j'), contentType: 'image/jpeg' });

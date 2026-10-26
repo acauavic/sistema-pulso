@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.32.2', date: '2026-10-26', title: 'Fila de cortes e tarefas em segundo plano deixa de travar',
+    items: [
+      { kind: 'correcao', text: 'Corrigido o travamento do processador em segundo plano: a cada 30 minutos várias rotinas começavam juntas e esgotavam as conexões com o banco, e o processador parava de vez. Com isso, cortes enviados ficavam em "processando" para sempre (e também ficavam parados o tratamento de vídeo, a IA e os e-mails). Agora as rotinas esperam a vez e a fila continua andando.' },
+    ],
+  },
+  {
     version: '1.32.1', date: '2026-10-26', title: 'Envio direto com partes maiores',
     items: [
       { kind: 'ajuste', text: 'No envio direto, arquivos grandes agora são enviados em partes de até 64 MB (antes 16 MB): cada conexão com o Backblaze rende cerca de duas vezes mais com partes maiores. A fila usa as 6 conexões que o navegador abre com o Backblaze. Vale para os envios novos; os que já estão em andamento continuam com as partes que começaram.' },
