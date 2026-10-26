@@ -112,6 +112,27 @@
       <% }) %>
     </div>
   </section>
+  <% if (storage) { %>
+  <section class="card" id="armazenamento">
+    <h2>Armazenamento (Backblaze)</h2>
+    <% var cors = storage.cors; %>
+    <p class="m-0"><span class="kicker">Envio direto do navegador</span><br>
+      <% if (!storage.direct) { %><span class="badge b-gray">desligado no servidor</span> <span class="mono small muted">UPLOAD_DIRECT=false</span>
+      <% } else if (cors.state === 'ligado') { %><span class="badge b-green">ligado</span>
+      <% } else if (cors.state === 'erro') { %><span class="badge b-red">não consegui conferir</span>
+      <% } else { %><span class="badge b-amber"><%= cors.state === 'outra' ? 'bucket com outras regras' : 'desligado no bucket' %></span><% } %></p>
+    <p class="small muted">Os arquivos grandes (material bruto, cortes) podem ir <strong>direto do navegador para o Backblaze</strong>, sem passar pelo servidor, que fica na Europa. Em teste isso foi cerca de 10 vezes mais rápido. Para isso o bucket precisa permitir o painel (CORS): só <span class="mono">PUT</span> a partir de <span class="mono"><%= storage.origin %></span>. Sem isso, tudo continua passando pelo servidor, sem perder nada.</p>
+    <% if (cors.error) { %><p class="small bad-text"><%= cors.error %></p><% } %>
+    <% if (storage.direct && cors.state !== 'ligado') { %>
+    <form method="post" action="/integracoes/armazenamento/cors" <%- cors.state === 'outra' ? 'data-confirm="O bucket já tem outras regras de CORS. Ligar o envio direto substitui as regras atuais por uma que permite o painel. Continuar?"' : '' %>>
+      <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value="ligar">
+      <button class="btn" type="submit"><%- icon('zap', 14) %> Ligar envio direto</button>
+    </form>
+    <% } else if (cors.state === 'ligado') { %>
+    <form method="post" action="/integracoes/armazenamento/cors" data-confirm="Desligar o envio direto? Os arquivos voltam a passar pelo servidor (mais lento)."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value="desligar"><button class="link small" type="submit">Desligar o envio direto</button></form>
+    <% } %>
+  </section>
+  <% } %>
   <section class="card">
     <h2>E-mail transacional (Brevo SMTP)</h2>
     <p><span class="badge <%= smtp.ok ? 'b-green' : 'b-red' %>"><%= smtp.ok ? (smtp.dry ? 'Modo teste (não envia)' : 'Configurado') : 'Não configurado' %></span></p>

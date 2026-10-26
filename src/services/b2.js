@@ -71,14 +71,14 @@ function b2Error(message, status, body = '') {
   return err;
 }
 
-async function request(method, key, { body, contentType, query = {}, timeout = 60_000 } = {}) {
+async function request(method, key, { body, contentType, query = {}, timeout = 60_000, bucketLevel = false, headers = {} } = {}) {
   if (!config.storageConfigured) throw new Error('Armazenamento não configurado (BB_KEY_ID, BB_APPLICATION_KEY, BUCKET_NAME).');
   const base = new URL(await endpoint());
   const region = base.hostname.match(/^s3\.([a-z0-9-]+)\./)?.[1] || 'us-east-005';
-  const path = `/${config.b2.bucket}/${key}`;
+  const path = bucketLevel ? `/${config.b2.bucket}` : `/${config.b2.bucket}/${key}`;
   const payloadHash = body ? sha256(body) : EMPTY_HASH;
   const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
-  const extra = contentType ? { 'content-type': contentType } : {};
+  const extra = { ...(contentType ? { 'content-type': contentType } : {}), ...headers };
   const { authorization } = signRequest({
     method, host: base.host, path, query, headers: extra, payloadHash, accessKey: config.b2.keyId, secretKey: config.b2.appKey, region, amzDate,
   });
@@ -135,6 +135,44 @@ async function presignGet(key, { expires = 900, download = null, contentType = n
   return `${base.origin}${encodePath(path)}?${signed}`;
 }
 
+// ---- CORS do bucket: é o que deixa o NAVEGADOR enviar as partes direto ao Backblaze (ver presignPart e services/directUpload.js) ----
+// Regra única: a origem do painel pode fazer PUT e ler o ETag. Estado: 'ligado' | 'desligado' | 'outra' (há regras, mas não a nossa) | 'erro'.
+const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function corsRulesXml(origin) {
+  return `<CORSConfiguration><CORSRule><AllowedOrigin>${xmlEsc(origin)}</AllowedOrigin><AllowedMethod>PUT</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>`;
+}
+async function corsStatus(origin) {
+  try {
+    const res = await request('GET', '', { bucketLevel: true, query: { cors: '' }, timeout: 15_000 });
+    const text = await res.text();
+    if (res.status === 404 || /NoSuchCorsConfiguration/.test(text)) return { state: 'desligado' };
+    if (!res.ok) return { state: 'erro', error: `${res.status}: ${text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160)}` };
+    const rules = [...text.matchAll(/<CORSRule>([\s\S]*?)<\/CORSRule>/g)].map((m) => m[1]);
+    const ours = rules.some((r) => (r.includes(`<AllowedOrigin>${origin}</AllowedOrigin>`) || r.includes('<AllowedOrigin>*</AllowedOrigin>')) && /<AllowedMethod>PUT<\/AllowedMethod>/.test(r) && /<ExposeHeader>ETag<\/ExposeHeader>/i.test(r));
+    return { state: ours ? 'ligado' : (rules.length ? 'outra' : 'desligado') };
+  } catch (err) { return { state: 'erro', error: err.message }; }
+}
+async function putCors(origin) {
+  const body = Buffer.from(corsRulesXml(origin));
+  const res = await request('PUT', '', { bucketLevel: true, query: { cors: '' }, body, contentType: 'application/xml', headers: { 'content-md5': crypto.createHash('md5').update(body).digest('base64') }, timeout: 20_000 });
+  if (!res.ok) throw b2Error('O Backblaze não deixou ligar o CORS do bucket', res.status, (await res.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+}
+async function deleteCors() {
+  const res = await request('DELETE', '', { bucketLevel: true, query: { cors: '' }, timeout: 20_000 });
+  if (!res.ok && res.status !== 404) throw b2Error('O Backblaze não deixou desligar o CORS do bucket', res.status, (await res.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+}
+
+// Link temporário para o NAVEGADOR enviar uma parte direto ao bucket (sem passar pelo servidor): PUT assinado, válido por `expires` s.
+// Exige CORS no bucket (PUT, expondo o cabeçalho ETag) para a origem do painel; sem ele o navegador recusa e o painel volta ao envio pelo servidor.
+async function presignPart(key, uploadId, partNumber, { expires = 6 * 3600 } = {}) {
+  const base = new URL(await endpoint());
+  const region = base.hostname.match(/^s3\.([a-z0-9-]+)\./)?.[1] || 'us-east-005';
+  const path = `/${config.b2.bucket}/${key}`;
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const { query: signed } = presignUrl({ method: 'PUT', host: base.host, path, query: { partNumber: String(partNumber), uploadId }, expires, accessKey: config.b2.keyId, secretKey: config.b2.appKey, region, amzDate });
+  return `${base.origin}${encodePath(path)}?${signed}`;
+}
+
 // ---- upload em partes (arquivos grandes: 5 MB a 5 GB por parte, no máximo 10.000 partes) ----
 const xmlValue = (xml, tag) => xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))?.[1];
 
@@ -174,4 +212,4 @@ async function headObject(key) {
   return { size: Number(res.headers.get('content-length')), contentType: res.headers.get('content-type') };
 }
 
-module.exports = { b2Error, presignUrl, presignGet, createMultipart, uploadPart, completeMultipart, abortMultipart, headObject, signRequest, uriEncode, putObject, getObject, deleteObject, endpoint, keyFor };
+module.exports = { b2Error, presignUrl, presignGet, presignPart, corsRulesXml, corsStatus, putCors, deleteCors, createMultipart, uploadPart, completeMultipart, abortMultipart, headObject, signRequest, uriEncode, putObject, getObject, deleteObject, endpoint, keyFor };

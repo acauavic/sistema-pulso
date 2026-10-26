@@ -304,6 +304,14 @@ async function receivePart(file, number, body) {
   return etag;
 }
 
+// Parte enviada direto pelo navegador ao bucket: só registra o que ele informou (o bucket confere o ETag ao fechar o arquivo).
+async function registerPart(file, number, etag, size) {
+  await db.query(
+    `INSERT INTO episode_file_parts (file_id, part_number, etag, size_bytes) VALUES ($1,$2,$3,$4)
+     ON CONFLICT (file_id, part_number) DO UPDATE SET etag = EXCLUDED.etag, size_bytes = EXCLUDED.size_bytes`, [file.id, number, etag, size]);
+  await db.query('UPDATE episode_files SET last_part_at = now() WHERE id = $1', [file.id]);
+}
+
 // Confere as partes (quantidade, tamanhos, soma) e fecha o objeto no bucket.
 async function finishUpload(file) {
   const { rows: parts } = await db.query('SELECT part_number, etag, size_bytes FROM episode_file_parts WHERE file_id = $1 ORDER BY part_number', [file.id]);
@@ -405,7 +413,7 @@ module.exports = {
   addFileEvent,
   MB, addEvent, ensureChecklists, openRequired, TRANSITIONS, availableMoves, move,
   createTasks, syncFromGuest, createEpisode,
-  partSizeFor, safeName, startUpload, receivePart, finishUpload, checkEditedVideo, cancelUpload, deleteFile, purgeEpisodeFiles,
+  partSizeFor, safeName, startUpload, receivePart, registerPart, finishUpload, checkEditedVideo, cancelUpload, deleteFile, purgeEpisodeFiles,
   STALL_MS, isStalled, STORAGE_FULL_MSG, storageFull,
   sponsorAssets,
 };

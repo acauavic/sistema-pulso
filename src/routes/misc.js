@@ -75,10 +75,26 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
     infinitepay: { ok: config.infinitepayConfigured, handle: config.infinitepay.handle, webhook: config.infinitepayConfigured ? require('../services/infinitePay').webhookUrl() : '' },
     appBaseUrl: config.appBaseUrl,
+    storage: config.storageConfigured ? { direct: config.uploadDirect, origin: new URL(config.appBaseUrl).origin, cors: await require('../services/b2').corsStatus(new URL(config.appBaseUrl).origin) } : null,
     social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), by: p.by, env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))), outstandTiktok: await require('../services/outstand').tiktokMode(), outstandProcess: await require('../services/outstand').processMedia(),
       routeMap: await require('../services/socialApi').routeMap(), overrides: await require('../services/socialApi').routes(), networks: Object.fromEntries(Object.entries(require('../services/socialApi').PLATFORMS).map(([k, v]) => [k, v.label])),
       accounts: await require('../services/socialHealth').overview(), problems: await require('../services/socialHealth').problems() },
   });
+}));
+
+// Envio direto ao Backblaze: liga ou desliga o CORS do bucket (a regra que deixa o navegador enviar as partes sem passar pelo servidor).
+router.post('/integracoes/armazenamento/cors', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const b2 = require('../services/b2');
+  const origin = new URL(config.appBaseUrl).origin;
+  const on = req.body.acao === 'ligar';
+  try {
+    if (on) await b2.putCors(origin); else await b2.deleteCors();
+    await audit(req, on ? 'integracao.cors_ligado' : 'integracao.cors_desligado', 'system', null, { origem: origin });
+    await req.flash('ok', on ? 'Envio direto ligado: a partir do próximo envio, os arquivos vão do navegador direto ao Backblaze.' : 'Envio direto desligado: os arquivos voltam a passar pelo servidor.');
+  } catch (err) {
+    await req.flash('error', `${err.message}. Se a chave do Backblaze não pode mudar o bucket, ligue em Buckets > ${config.b2.bucket} > CORS Rules (permitir PUT de ${origin} e expor o cabeçalho ETag).`);
+  }
+  res.redirect('/integracoes#armazenamento');
 }));
 
 // Redes sociais: por qual provedor as publicações saem (Upload-Post, Zernio ou Outstand) e teste de conexão (só leitura).

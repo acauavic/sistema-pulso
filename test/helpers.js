@@ -62,8 +62,18 @@ const uploadPostState = {
 };
 
 let b2Full = false; // simula a conta do Backblaze sem espaço (Caps & Alerts)
+const b2Cors = { xml: null, denied: false }; // CORS do bucket (nível do bucket, ?cors)
 global.fetch = async (url, opts = {}) => {
   const u = String(url);
+  if (/^https:\/\/s3\.test-region\.backblazeb2\.com\/test-bucket\?cors=?$/.test(u)) {
+    const method = opts.method || 'GET';
+    b2Calls.push({ method, key: '(bucket)', query: { cors: '' }, authorization: opts.headers?.Authorization, md5: opts.headers?.['content-md5'] });
+    if (!/^AWS4-HMAC-SHA256 Credential=test-key-id\//.test(opts.headers?.Authorization || '')) return new Response('<Error><Code>SignatureDoesNotMatch</Code></Error>', { status: 403 });
+    if (method === 'GET') return b2Cors.xml ? new Response(b2Cors.xml, { status: 200 }) : new Response('<Error><Code>NoSuchCorsConfiguration</Code></Error>', { status: 404 });
+    if (b2Cors.denied) return new Response('<Error><Code>AccessDenied</Code><Message>not entitled</Message></Error>', { status: 403 });
+    if (method === 'PUT') { b2Cors.xml = Buffer.from(opts.body).toString(); return new Response('', { status: 200 }); }
+    if (method === 'DELETE') { b2Cors.xml = null; return new Response('', { status: 204 }); }
+  }
   if (u.startsWith('https://s3.test-region.backblazeb2.com/test-bucket/')) {
     const parsed = new URL(u);
     const key = decodeURIComponent(parsed.pathname.slice('/test-bucket/'.length));
@@ -221,4 +231,4 @@ function client(base) {
   return api;
 }
 
-module.exports = { uploadPostCalls, uploadPostState, b2Store, b2Calls, b2Multipart, groqCalls, setGroqFail: (v) => { groqFail = v; }, setB2Full: (v) => { b2Full = v; }, db, config, mailer, resetDb, createUser, startServer, client, yourlsCalls, setCollisions: (n) => { collideNext = n; } };
+module.exports = { uploadPostCalls, uploadPostState, b2Store, b2Cors, b2Calls, b2Multipart, groqCalls, setGroqFail: (v) => { groqFail = v; }, setB2Full: (v) => { b2Full = v; }, db, config, mailer, resetDb, createUser, startServer, client, yourlsCalls, setCollisions: (n) => { collideNext = n; } };

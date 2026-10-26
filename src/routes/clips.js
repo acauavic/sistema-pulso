@@ -118,6 +118,22 @@ router.put(['/cortes/:id/parte/:n', '/conteudo/pedidos/:pid/cortes/:id/parte/:n'
   await clips.receivePart(clip, n, req.body);
   res.json({ ok: true });
 }));
+// Envio direto ao Backblaze (ver services/directUpload.js)
+router.get(['/cortes/:id/urls', '/conteudo/pedidos/:pid/cortes/:id/urls'], requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canCut(req.user.role)) return uploadError(res, 403, 'Sem permissão.');
+  const clip = await uploadingClip(req);
+  if (!clip) return uploadError(res, 404, 'Envio não encontrado ou já concluído.');
+  res.set('Cache-Control', 'no-store').json(await require('../services/directUpload').urls({ key: clip.storage_key, uploadId: clip.upload_id, size: clip.size_bytes, partSize: clip.part_size, query: req.query.partes }));
+}));
+router.post(['/cortes/:id/parte/:n/ok', '/conteudo/pedidos/:pid/cortes/:id/parte/:n/ok'], requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canCut(req.user.role)) return uploadError(res, 403, 'Sem permissão.');
+  const clip = await uploadingClip(req);
+  if (!clip) return uploadError(res, 404, 'Envio não encontrado ou já concluído.');
+  const c = require('../services/directUpload').confirm({ size: clip.size_bytes, partSize: clip.part_size, number: req.params.n, body: req.body });
+  if (c.error) return uploadError(res, c.status, c.error);
+  await clips.registerPart(clip, Number(req.params.n), c.etag, c.size);
+  res.json({ ok: true });
+}));
 router.post(['/cortes/:id/concluir', '/conteudo/pedidos/:pid/cortes/:id/concluir'], requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!canCut(req.user.role)) return uploadError(res, 403, 'Sem permissão.');
   const clip = await findClip(req);

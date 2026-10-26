@@ -18,7 +18,10 @@
   }
 
   const FILE_LIMIT = 4; // arquivos ao mesmo tempo
-  const PART_LIMIT = 4; // partes em voo no total
+  const PART_LIMIT = 8; // partes em voo no total (a viagem até o servidor é longa: mais partes ao mesmo tempo enchem o canal)
+  // Envio direto ao Backblaze: o navegador envia cada parte para um link assinado do bucket, sem passar pelo servidor, e só avisa o
+  // painel depois. Depende de CORS no bucket. 'unknown' até a primeira parte; se o navegador recusar, tudo volta a passar pelo servidor.
+  let directState = 'unknown'; // 'unknown' | 'yes' | 'no'
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmtBytes = (n) => {
     const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; let x = n;
@@ -86,23 +89,71 @@
   // ---------------------------------------------------------------- um arquivo
   const partBytes = (it, n) => (n < it.totalParts ? it.partSize : it.file.size - it.partSize * (it.totalParts - 1));
 
+  // PUT de uma parte direto no bucket (link assinado). Devolve o ETag, que o painel guarda para fechar o arquivo.
+  function putDirect(it, url, blob, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      it.xhrs.add(xhr);
+      xhr.open('PUT', url);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded); };
+      xhr.onload = () => {
+        it.xhrs.delete(xhr);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const etag = xhr.getResponseHeader('ETag');
+          if (etag) resolve(etag); else reject(new HttpError('o bucket não expôs o ETag (CORS)', 0, 'direct_cors'));
+        } else reject(new HttpError(`o bucket recusou a parte (${xhr.status})`, xhr.status, 'direct_status'));
+      };
+      xhr.onerror = () => { it.xhrs.delete(xhr); reject(new HttpError('sem conexão com o bucket', 0, 'direct_network')); };
+      xhr.onabort = () => { it.xhrs.delete(xhr); reject(new HttpError('cancelado', -1)); };
+      xhr.send(blob);
+    });
+  }
+
+  // Link assinado da parte n (pede um lote das próximas pendentes de uma vez). null = o painel mandou usar o servidor.
+  async function directUrl(it, n) {
+    it.urls = it.urls || {};
+    if (!it.urls[n]) {
+      const want = [];
+      for (let k = n; k <= it.totalParts && want.length < 16; k += 1) if (!(it.have && it.have.has(k)) && !it.urls[k]) want.push(k);
+      const r = await json(it, `${it.ctx.base}${it.serverId}/urls?partes=${want.join(',')}`);
+      if (!r.direct) return null;
+      Object.assign(it.urls, r.urls);
+    }
+    return it.urls[n] || null;
+  }
+
   async function sendPart(it, n) {
     const start = (n - 1) * it.partSize;
     const blob = it.file.slice(start, Math.min(it.file.size, start + it.partSize));
     for (let attempt = 1; ; attempt += 1) {
       if (it.aborted) throw new HttpError('cancelado', -1);
       await acquire();
+      let direct = false;
       try {
         it.live[n] = 0;
-        await put(it, `${it.ctx.base}${it.serverId}/parte/${n}`, blob, (loaded) => { it.live[n] = loaded; changed(); });
+        const onProgress = (loaded) => { it.live[n] = loaded; changed(); };
+        const url = directState === 'no' ? null : await directUrl(it, n).catch((err) => { if (err.status === 404 || err.status === 403) return null; throw err; });
+        if (url) {
+          direct = true;
+          const etag = await putDirect(it, url, blob, onProgress);
+          await json(it, `${it.ctx.base}${it.serverId}/parte/${n}/ok`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ etag, size: blob.size }) });
+          directState = 'yes';
+        } else {
+          if (directState === 'unknown') directState = 'no'; // o painel não oferece envio direto (desligado ou não suportado aqui)
+          await put(it, `${it.ctx.base}${it.serverId}/parte/${n}`, blob, onProgress);
+        }
         it.doneBytes += blob.size;
         delete it.live[n];
         return;
       } catch (err) {
         delete it.live[n];
         if (it.aborted || err.status === -1) throw new HttpError('cancelado', -1);
+        if (direct && it.urls) delete it.urls[n]; // o link pode ter expirado: pede outro na próxima tentativa
+        // Direto sem nunca ter funcionado (CORS desligado no bucket, sem ETag ou rede bloqueada): volta ao envio pelo servidor, sem contar tentativa.
+        if (direct && directState !== 'yes' && (err.status === 0 || err.status === 403 || err.code === 'direct_cors')) { directState = 'no'; attempt -= 1; continue; }
         if (isFull(err)) throw err;
-        if (err.status >= 400 && err.status < 500 && err.status !== 429 && err.status !== 408) throw err; // erro do pedido: repetir não adianta
+        if (direct && err.code === 'direct_status' && err.status === 403 && attempt < 3) { await sleep(500); continue; } // assinatura vencida
+        if (err.status >= 400 && err.status < 500 && err.status !== 429 && err.status !== 408 && err.code !== 'direct_status') throw err; // erro do pedido: repetir não adianta
         if (!navigator.onLine) { it.note = 'sem internet, retoma sozinho'; changed(); await online(); attempt -= 1; continue; }
         if (attempt >= 5) throw err;
         it.note = `reenviando parte ${n} (tentativa ${attempt + 1})`; changed();
@@ -133,7 +184,7 @@
       });
       it.serverId = init.id; it.partSize = init.partSize; it.totalParts = init.totalParts;
     }
-    it.doneBytes = 0; it.live = {};
+    it.doneBytes = 0; it.live = {}; it.have = have;
     const pending = [];
     for (let n = 1; n <= it.totalParts; n += 1) { if (have.has(n)) it.doneBytes += partBytes(it, n); else pending.push(n); }
     it.status = 'sending'; changed();

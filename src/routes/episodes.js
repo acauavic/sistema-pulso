@@ -519,6 +519,21 @@ router.put('/episodios/:id/arquivos/:fid/parte/:n', uploadAccess, express.raw({ 
   return storageGuard(res, async () => { await prod.receivePart(file, n, req.body); res.json({ ok: true }); });
 }));
 
+// Envio direto ao Backblaze: o navegador pede o link assinado de cada parte e confirma a parte depois de enviá-la.
+router.get('/episodios/:id/arquivos/:fid/urls', uploadAccess, wrap(async (req, res) => {
+  const file = await loadOwnFile(req);
+  if (!file || file.status !== 'enviando') return uploadError(res, 404, 'Envio não encontrado ou já concluído.');
+  res.set('Cache-Control', 'no-store').json(await require('../services/directUpload').urls({ key: file.storage_key, uploadId: file.upload_id, size: file.size_bytes, partSize: file.part_size, query: req.query.partes }));
+}));
+router.post('/episodios/:id/arquivos/:fid/parte/:n/ok', uploadAccess, wrap(async (req, res) => {
+  const file = await loadOwnFile(req);
+  if (!file || file.status !== 'enviando') return uploadError(res, 404, 'Envio não encontrado ou já concluído.');
+  const c = require('../services/directUpload').confirm({ size: file.size_bytes, partSize: file.part_size, number: req.params.n, body: req.body });
+  if (c.error) return uploadError(res, c.status, c.error);
+  await prod.registerPart(file, Number(req.params.n), c.etag, c.size);
+  res.json({ ok: true });
+}));
+
 router.get('/episodios/:id/arquivos/:fid/partes', uploadAccess, wrap(async (req, res) => {
   const file = await loadOwnFile(req);
   if (!file) return uploadError(res, 404, 'Arquivo não encontrado.');

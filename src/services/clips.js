@@ -39,6 +39,13 @@ async function startUpload({ filename, size, contentType, userId, requestId = nu
   return { clip: row, partSize, totalParts: Math.max(1, Math.ceil(size / partSize)) };
 }
 
+// Parte enviada direto pelo navegador ao bucket: só registra.
+async function registerPart(clip, number, etag, size) {
+  await db.query(
+    `INSERT INTO clip_upload_parts (clip_id, part_number, etag, size_bytes) VALUES ($1,$2,$3,$4)
+     ON CONFLICT (clip_id, part_number) DO UPDATE SET etag = EXCLUDED.etag, size_bytes = EXCLUDED.size_bytes`, [clip.id, number, etag, size]);
+}
+
 async function receivePart(clip, number, body) {
   const etag = await b2.uploadPart(clip.storage_key, clip.upload_id, number, body);
   await db.query(
@@ -279,4 +286,4 @@ async function announceToReview(clip, covers) {
 }
 
 jobs.register('corte', runProcess);
-module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, finishUpload, cancelUpload, writeTexts, buildCovers, assign, runProcess, removeClip, momentsFor, cleanCoverText };
+module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, writeTexts, buildCovers, assign, runProcess, removeClip, momentsFor, cleanCoverText };

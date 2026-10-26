@@ -95,6 +95,8 @@ config.geminiConfigured = Boolean(config.gemini.key);
 config.groqConfigured = Boolean(config.groq.key);
 config.uploadPostConfigured = Boolean(config.uploadPost.key);
 config.zernioConfigured = Boolean(config.zernio.key);
+// Envio direto do navegador ao Backblaze (mais rápido: não passa pelo servidor). UPLOAD_DIRECT=false desliga e tudo volta a passar pelo servidor.
+config.uploadDirect = String(env.UPLOAD_DIRECT ?? 'true').toLowerCase() !== 'false';
 config.outstandConfigured = Boolean(config.outstand.key);
 config.googleConfigured = Boolean(config.google.calendarId && config.google.serviceAccount);
 config.infinitepayConfigured = Boolean(config.infinitepay.handle);

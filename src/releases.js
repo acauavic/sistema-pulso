@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.32.0', date: '2026-10-26', title: 'Envio de arquivos grandes bem mais rápido',
+    items: [
+      { kind: 'novo', text: 'Os arquivos grandes (material bruto, vídeo editado e cortes) agora podem ir direto do navegador para o Backblaze, sem passar pelo servidor, que fica na Europa. Em teste, o envio direto chegou a cerca de 27 MB/s contra uns 3 MB/s do caminho antigo. Em Integrações > Armazenamento (Backblaze), a gestão liga isso com um clique ("Ligar envio direto"); sem isso, tudo continua passando pelo servidor, sem perder nada.' },
+      { kind: 'ajuste', text: 'A fila de envio manda 8 partes ao mesmo tempo (eram 4), o que já acelera também o caminho pelo servidor, porque a viagem até a Europa é longa. Se o envio direto falhar na primeira tentativa (por exemplo, a regra do bucket ainda não está ligada), a fila volta sozinha ao caminho pelo servidor e segue de onde parou.' },
+    ],
+  },
+  {
     version: '1.31.0', date: '2026-10-25', title: 'Cada rede pelo seu provedor e aviso de conta desconectada',
     items: [
       { kind: 'novo', text: 'Em Integrações > Redes sociais, "Cada rede por um provedor": o padrão é o provedor em uso, e dá para mandar redes específicas por outro (por exemplo, o X pela Zernio e o resto pela Outstand). Uma publicação para várias redes é dividida sozinha entre os provedores, e a página dela mostra por onde cada rede saiu.' },
