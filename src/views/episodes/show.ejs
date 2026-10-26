@@ -151,7 +151,8 @@
         <% var canRaw = perm.upload && storageReady;
            var where = epNo + ' · ' + ep.title;
            var fileRow = function (f) { %>
-            <li>
+            <li<% if (f.status === 'pronto') { %> data-dl-item data-href="<%= fileBase + f.id %>/baixar" data-name="<%= f.filename %>" data-bytes="<%= Number(f.size_bytes || 0) %>"<% } %>>
+              <% if (f.status === 'pronto') { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= f.filename %>"><% } %>
               <span>
                 <%= f.label ? f.label + ' · ' : '' %><span class="mono small"><%= f.filename %></span>
                 <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %></span>
@@ -175,7 +176,7 @@
            var hasReview = tabs.some(function (t) { return t.key === 'revisao'; });
            var galItem = function (f, title) {
              var ok = f.status === 'pronto';
-             return { id: f.id, name: f.filename, title: title || f.label || '', size: fmt.formatBytes(f.size_bytes), when: fmt.formatDay(f.created_at), type: mediaType(f),
+             return { id: f.id, name: f.filename, title: title || f.label || '', size: fmt.formatBytes(f.size_bytes), bytes: Number(f.size_bytes || 0), when: fmt.formatDay(f.created_at), type: mediaType(f),
                       thumb: ok && hasPreview(f) ? fileBase + f.id + '/previa' : null, big: fileBase + f.id + '/previa?t=p', view: fileBase + f.id + '/ver', down: fileBase + f.id + '/baixar' };
            };
            var gallery = folders.map(function (g) { return { key: g.kind, title: g.title, items: g.list.filter(function (f) { return f.status === 'pronto'; }).map(function (f) { return galItem(f); }) }; })
@@ -221,12 +222,30 @@
             <% }) %>
           </div>
           <% folders.forEach(function (g) { %>
-          <div class="folder-panel" data-folder-panel="<%= g.kind %>" hidden>
+          <% var readyList = g.list.filter(function (f) { return f.status === 'pronto'; }); %>
+          <div class="folder-panel" data-folder-panel="<%= g.kind %>" data-dl hidden>
             <div class="folder-crumb">
               <button class="icon-btn" type="button" data-folder-back aria-label="Voltar às pastas" title="Voltar às pastas"><%- icon('arrow-left', 16) %></button>
               <span class="muted small">Material bruto /</span>
               <h3 class="folder-title"><%= g.title %> <span class="mono small muted"><%= g.list.length %> · <%= fmt.formatBytes(g.size) %></span></h3>
+              <% if (readyList.length > 1) { %>
+              <span class="row dl-actions">
+                <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
+                <button class="btn sm" type="button" data-dl-everything title="Baixa todos os <%= readyList.length %> arquivos desta pasta, um depois do outro"><%- icon('download', 14) %> Baixar tudo</button>
+              </span>
+              <% } %>
             </div>
+            <% if (readyList.length > 1) { %>
+            <div class="dl-bar" data-dl-bar role="group" aria-label="Baixar vários arquivos" hidden>
+              <span class="mono small" data-dl-count aria-live="polite">Nenhum arquivo marcado</span>
+              <span class="row">
+                <button class="btn sm ghost" type="button" data-dl-all>Selecionar todos</button>
+                <button class="btn sm primary" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar selecionados</button>
+                <button class="btn sm ghost" type="button" data-dl-cancel>Cancelar</button>
+              </span>
+            </div>
+            <p class="small muted dl-note" data-dl-note role="status" aria-live="polite" hidden></p>
+            <% } %>
             <% var labels = g.labelled ? g.list.reduce(function (a, f) { var k = f.label || ''; if (a.indexOf(k) < 0) a.push(k); return a; }, []) : ['']; %>
             <% labels.forEach(function (lb) { var sub = g.list.filter(function (f) { return (g.labelled ? (f.label || '') : '') === lb; }); %>
             <% if (labels.length > 1 && lb) { %><h4 class="folder-sub"><%- icon('folder', 14) %> <%= lb %> <span class="mono small muted"><%= sub.length %></span></h4><% } %>
@@ -241,9 +260,22 @@
       <dialog class="modal gallery" id="modal-galeria" aria-labelledby="gal-h" data-gallery>
         <div class="gal-head">
           <div><span class="kicker"><%= epNo %> · <%= ep.title %></span><h2 id="gal-h">Galeria</h2></div>
+          <span class="gal-tools">
+            <button class="btn sm ghost" type="button" data-g-select><%- icon('check-square', 14) %> Selecionar</button>
+            <button class="btn sm" type="button" data-g-everything title="Baixa todos os arquivos desta pasta, um depois do outro"><%- icon('download', 14) %> Baixar pasta</button>
+          </span>
           <button class="icon-btn" type="button" data-modal-close aria-label="Fechar a galeria" title="Fechar"><%- icon('x', 18) %></button>
         </div>
         <div class="gal-folders" role="tablist" aria-label="Pastas" data-g-folders></div>
+        <div class="gal-bulk" data-g-bar role="group" aria-label="Baixar vários arquivos" hidden>
+          <span class="mono small" data-g-count aria-live="polite">Nenhum item marcado</span>
+          <span class="row">
+            <button class="btn sm ghost" type="button" data-g-all>Selecionar todos</button>
+            <button class="btn sm primary" type="button" data-g-go disabled><%- icon('download', 14) %> Baixar selecionados</button>
+            <button class="btn sm ghost" type="button" data-g-cancel>Cancelar</button>
+          </span>
+        </div>
+        <p class="gal-note small muted" data-g-note role="status" aria-live="polite" hidden></p>
         <div class="gal-grid" data-g-grid></div>
         <div class="gal-view" data-g-view hidden>
           <div class="gal-bar">
@@ -257,7 +289,7 @@
           <button class="gal-nav gal-next" type="button" data-g-next aria-label="Próximo" title="Próximo (→)"><%- icon('chevron-right', 22) %></button>
         </div>
         <script type="application/json" data-g-data><%- JSON.stringify(gallery).replace(/</g, '\\u003c') %></script>
-        <template data-g-icons><span data-i="play"><%- icon('play', 22) %></span><span data-i="file"><%- icon('file-text', 28) %></span><span data-i="audio"><%- icon('mic', 28) %></span><span data-i="video"><%- icon('film', 28) %></span><span data-i="image"><%- icon('image', 28) %></span></template>
+        <template data-g-icons><span data-i="play"><%- icon('play', 22) %></span><span data-i="file"><%- icon('file-text', 28) %></span><span data-i="audio"><%- icon('mic', 28) %></span><span data-i="video"><%- icon('film', 28) %></span><span data-i="image"><%- icon('image', 28) %></span><span data-i="check"><%- icon('check', 14) %></span></template>
       </dialog>
       <% } %>
       <% if (perm.upload && storageReady) { %>
@@ -489,6 +521,7 @@
   </form>
 </dialog>
 <% } %>
+<script src="/static/baixar.js?v=<%= assetV %>" defer></script>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
 <% if (perm.manage) { %>
 <dialog class="modal modal-wide" id="modal-obs" aria-labelledby="mo-h">

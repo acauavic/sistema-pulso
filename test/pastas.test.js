@@ -46,6 +46,27 @@ describe('episódio: material bruto e vídeo editado em pastas', () => {
     assert.doesNotMatch(page.match(/data-folder-panel="bruto_video"[\s\S]*?data-folder-panel="foto"/)[0], /Remover o arquivo/);
   });
 
+  it('baixar vários: selecionar e "Baixar tudo" só onde há mais de um arquivo pronto; cada arquivo leva o link de sempre, e a galeria também seleciona', async () => {
+    const a = await file('bastidor', null, 'bast-1.jpg'); const b = await file('bastidor', null, 'a "b" & <c>.jpg'); await file('bastidor', null, 'bast-3.jpg', { status: 'enviando' });
+    const page = (await as.gestao.get(`/episodios/${ep}`)).text;
+    const panel = (kind) => page.match(new RegExp(`data-folder-panel="${kind}"[\\s\\S]*?(?=<div class="folder-panel"|<\\/section>)`))[0];
+    const bast = panel('bastidor');
+    assert.match(bast, /data-dl\b/); assert.match(bast, /data-dl-select/); assert.match(bast, /data-dl-everything/);
+    assert.match(bast, /data-dl-bar[^>]*hidden/, 'a barra de seleção só aparece depois de "Selecionar"');
+    assert.match(bast, new RegExp(`data-dl-item data-href="/episodios/${ep}/arquivos/${a}/baixar" data-name="bast-1.jpg" data-bytes="1048576"`));
+    assert.match(bast, /data-name="a &#34;b&#34; &amp; &lt;c&gt;\.jpg"/, 'o nome do arquivo vai escapado');
+    assert.doesNotMatch(bast, /<c>/);
+    assert.equal((bast.match(/data-dl-item/g) || []).length, 2, 'o arquivo que ainda está enviando não entra na seleção');
+    assert.match(bast, new RegExp(`aria-label="Selecionar bast-1.jpg"`));
+    assert.doesNotMatch(panel('foto'), /data-dl-select|data-dl-everything/, 'um arquivo só: o botão Baixar da linha basta');
+    assert.match(page, /data-g-select/); assert.match(page, /data-g-everything/); assert.match(page, /"bytes":1048576/, 'a galeria conhece o tamanho de cada arquivo');
+    assert.doesNotMatch(page, /data-bulk/, 'não repete os nomes da edição em massa de Convidados');
+    assert.ok(page.indexOf('/static/baixar.js') > 0 && page.indexOf('/static/baixar.js') < page.indexOf('/static/producao.js'), 'baixar.js carrega antes do producao.js');
+    const js = await as.gestao.get('/static/baixar.js');
+    assert.equal(js.status, 200); assert.match(js.text, /window\.PulsoBaixar/);
+    assert.ok(b > a);
+  });
+
   it('vídeo editado: uma pasta por versão (a mais nova é a atual) com os comentários de revisão daquela versão', async () => {
     const v1 = await file('editado', null, 'ep_v1.mp4', { version: 1 }); const v2 = await file('editado', null, 'ep_v2.mp4', { version: 2 });
     await q("INSERT INTO episode_comments (episode_id, file_id, at_ms, body, author_id) VALUES ($1,$2,1000,'a',$4), ($1,$2,2000,'b',$4), ($1,$3,3000,'c',$4)", [ep, v1, v2, u.gestao.id]);

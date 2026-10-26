@@ -621,14 +621,41 @@
     const ic = (k) => gal.querySelector('template[data-g-icons]')?.content.querySelector(`[data-i="${k}"]`)?.innerHTML || '';
     let folder = data[0]?.key; let idx = -1;
     const items = () => (data.find((f) => f.key === folder) || { items: [] }).items;
+    // baixar vários: "Selecionar" troca o clique da miniatura por marcar/desmarcar; "Baixar pasta" baixa tudo da pasta (baixar.js)
+    const bar = gal.querySelector('[data-g-bar]'); const countEl = gal.querySelector('[data-g-count]'); const noteEl = gal.querySelector('[data-g-note]');
+    const goBtn = gal.querySelector('[data-g-go]'); const allBtn = gal.querySelector('[data-g-all]'); const selBtn = gal.querySelector('[data-g-select]'); const everyBtn = gal.querySelector('[data-g-everything]');
+    const dl = window.PulsoBaixar;
+    let selecting = false; const sel = new Set();
+    const asDownload = (it) => ({ href: it.down, name: it.name, bytes: it.bytes });
+    const say = (t) => { noteEl.textContent = t; noteEl.hidden = !t; };
+    function syncBar() {
+      const list = items(); const chosen = list.filter((it) => sel.has(it.id));
+      countEl.textContent = chosen.length ? `${dl.plural(chosen.length, 'selecionado', 'selecionados')} · ${dl.bytesText(chosen.reduce((t, it) => t + (Number(it.bytes) || 0), 0))}` : 'Nenhum item marcado';
+      goBtn.disabled = !chosen.length; allBtn.textContent = chosen.length === list.length ? 'Limpar seleção' : 'Selecionar todos';
+      gridEl.querySelectorAll('.g-tile').forEach((t, n) => { const on = sel.has(list[n]?.id); t.classList.toggle('sel', on); t.setAttribute('aria-pressed', selecting ? String(on) : 'false'); });
+    }
+    function setSelecting(on) {
+      selecting = on; if (!on) sel.clear(); bar.hidden = !on; gridEl.classList.toggle('selecting', on); say('');
+      selBtn.lastChild.textContent = on ? ' Cancelar seleção' : ' Selecionar'; syncBar();
+    }
+    async function runDownload(list) {
+      const started = await dl.start(list.map(asDownload), (n, total) => say(`Iniciando ${n} de ${total}…`));
+      if (started) say(`${dl.plural(started, 'download iniciado', 'downloads iniciados')}. Acompanhe na barra de downloads do navegador; se ele perguntar, permita baixar vários arquivos.`);
+    }
+    selBtn.addEventListener('click', () => setSelecting(!selecting));
+    gal.querySelector('[data-g-cancel]').addEventListener('click', () => setSelecting(false));
+    allBtn.addEventListener('click', () => { const list = items(); const all = list.some((it) => !sel.has(it.id)); list.forEach((it) => (all ? sel.add(it.id) : sel.delete(it.id))); syncBar(); });
+    goBtn.addEventListener('click', () => runDownload(items().filter((it) => sel.has(it.id))));
+    everyBtn.addEventListener('click', () => runDownload(items()));
     const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-    const fallback = (box, type) => { box.replaceChildren(); const f = mk('span', 'g-fallback'); f.innerHTML = ic(type === 'video' ? 'video' : type === 'audio' ? 'audio' : type === 'image' ? 'image' : 'file'); box.appendChild(f); };
+    const fallbackEl = (type) => { const f = mk('span', 'g-fallback'); f.innerHTML = ic(type === 'video' ? 'video' : type === 'audio' ? 'audio' : type === 'image' ? 'image' : 'file'); return f; };
+    const fallback = (box, type) => { box.replaceChildren(fallbackEl(type)); };
 
     function drawTabs() {
       tabsEl.replaceChildren(...data.map((f) => {
         const b = mk('button', `gal-tab${f.key === folder ? ' on' : ''}`); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(f.key === folder));
         b.append(mk('span', '', f.title), mk('span', 'mono small muted', String(f.items.length)));
-        b.addEventListener('click', () => { folder = f.key; closeView(false); drawTabs(); drawGrid(); });
+        b.addEventListener('click', () => { folder = f.key; sel.clear(); say(''); closeView(false); drawTabs(); drawGrid(); });
         return b;
       }));
     }
@@ -638,16 +665,18 @@
         const pic = mk('span', 'g-pic');
         if (it.thumb) {
           const img = document.createElement('img'); img.loading = 'lazy'; img.decoding = 'async'; img.alt = ''; img.src = it.thumb;
-          img.addEventListener('error', () => fallback(pic, it.type), { once: true });
+          img.addEventListener('error', () => img.replaceWith(fallbackEl(it.type)), { once: true }); // só a imagem: o play e a marca de seleção ficam
           pic.appendChild(img);
         } else fallback(pic, it.type);
         if (it.type === 'video') { const play = mk('span', 'g-play'); play.innerHTML = ic('play'); pic.appendChild(play); }
+        const mark = mk('span', 'g-check'); mark.innerHTML = ic('check'); pic.appendChild(mark);
         b.append(pic, mk('span', 'g-cap', it.title ? `${it.title} · ${it.name}` : it.name));
-        b.addEventListener('click', () => openView(n));
+        b.addEventListener('click', () => { if (selecting) { if (sel.has(it.id)) sel.delete(it.id); else sel.add(it.id); syncBar(); } else openView(n); });
         return b;
       }));
-      gridEl.scrollTop = 0;
+      gridEl.scrollTop = 0; syncBar();
     }
+    const toolsHide = (hide) => { selBtn.hidden = hide; everyBtn.hidden = hide; bar.hidden = hide || !selecting; noteEl.hidden = hide || !noteEl.textContent; };
     function openView(n) {
       const list = items(); if (!list[n]) return;
       idx = n; const it = list[n];
@@ -669,12 +698,12 @@
       posEl.textContent = `${n + 1} / ${list.length}`;
       downEl.href = it.down;
       prevBtn.disabled = n === 0; nextBtn.disabled = n === list.length - 1;
-      view.hidden = false; gridEl.hidden = true;
+      view.hidden = false; gridEl.hidden = true; toolsHide(true);
       gal.querySelector('[data-g-back]').focus();
     }
     function closeView(focus = true) {
       stage.querySelectorAll('video, audio').forEach((m) => m.pause());
-      stage.replaceChildren(); view.hidden = true; gridEl.hidden = false;
+      stage.replaceChildren(); view.hidden = true; gridEl.hidden = false; toolsHide(false);
       if (focus && idx >= 0) gridEl.children[idx]?.focus();
       idx = -1;
     }
@@ -686,13 +715,13 @@
       if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
     });
     gal.addEventListener('cancel', (e) => { if (!view.hidden) { e.preventDefault(); closeView(); } }); // Esc na foto volta à pasta; na pasta, fecha
-    gal.addEventListener('close', () => closeView(false));
+    gal.addEventListener('close', () => { closeView(false); setSelecting(false); });
     let x0 = null; // deslizar no celular
     stage.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
     stage.addEventListener('touchend', (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 60) step(dx < 0 ? 1 : -1); });
     document.querySelectorAll('[data-gallery-open]').forEach((b) => b.addEventListener('click', () => {
       folder = data.some((f) => f.key === b.dataset.folder) ? b.dataset.folder : data[0]?.key;
-      drawTabs(); drawGrid(); closeView(false);
+      setSelecting(false); drawTabs(); drawGrid(); closeView(false);
       if (!gal.open) gal.showModal();
     }));
   }

@@ -135,7 +135,7 @@ const staticDir = path.join(__dirname, 'public');
 // não use CSS/JS antigo do cache de 1h depois de um deploy.
 const ASSET_VERSION = (() => {
   const h = crypto.createHash('sha1');
-  for (const f of ['app.css', 'app.js', 'theme.js', 'patrocinador.css', 'brief.js', 'producao.js', 'editor.js', 'design/engine.js', 'collab.js', 'uploads.js', 'tarefa-voz.js', 'richtext.js', 'social.js', 'assistant.js', 'plateia.css', 'plateia.js', 'push.js', 'pwa.js', 'offline.html', 'igpeople.js', 'aiassist.js', 'pedidos.js']) {
+  for (const f of ['app.css', 'app.js', 'theme.js', 'patrocinador.css', 'brief.js', 'producao.js', 'baixar.js', 'editor.js', 'design/engine.js', 'collab.js', 'uploads.js', 'tarefa-voz.js', 'richtext.js', 'social.js', 'assistant.js', 'plateia.css', 'plateia.js', 'push.js', 'pwa.js', 'offline.html', 'igpeople.js', 'aiassist.js', 'pedidos.js']) {
     try { h.update(fs.readFileSync(path.join(staticDir, f))); } catch { /* arquivo ausente: ignora */ }
   }
   return h.digest('hex').slice(0, 10);

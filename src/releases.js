@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.33.0', date: '2026-10-27', title: 'Baixar vários arquivos de uma vez',
+    items: [
+      { kind: 'novo', text: 'No material do episódio, dentro de cada pasta (Bastidores, Vídeos, Fotografias…), "Selecionar" deixa marcar vários arquivos e baixar só os escolhidos, e "Baixar tudo" baixa a pasta inteira. O mesmo vale na galeria ("Selecionar" e "Baixar pasta"). O botão Baixar de cada arquivo continua como sempre.' },
+      { kind: 'ajuste', text: 'Os downloads saem um depois do outro, direto do armazenamento, e o navegador pode pedir permissão para baixar vários arquivos: permita. Acima de 2 GB o sistema pergunta antes, para não baixar o que não era para baixar.' },
+    ],
+  },
+  {
     version: '1.32.3', date: '2026-10-26', title: 'TikTok pela Outstand e reenvio só do que falhou',
     items: [
       { kind: 'correcao', text: 'O TikTok recusava o vídeo ("domínio não verificado") quando o corte saía pela Outstand, porque o TikTok só baixa vídeo de domínio verificado. Agora, nos posts com TikTok, o vídeo vai antes para o armazenamento da própria Outstand e o TikTok baixa de lá.' },
