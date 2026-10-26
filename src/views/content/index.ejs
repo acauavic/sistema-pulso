@@ -99,7 +99,8 @@
     <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum post ainda.</strong></p><p class="muted small">Quando o episódio for analisado pela IA (ao entrar em finalização), o sistema monta posts de frase, tela dividida e carrossel.</p></div>
     <% } %>
     <% postGroups.forEach(function (g) { %>
-    <section class="card top-gap">
+    <% var postCount = g.covers.length; var epTag = g.episode.number ? 'ep' + String(g.episode.number).padStart(3, '0') : 'episodio'; %>
+    <section class="card top-gap"<%- postCount > 1 ? ' data-dl' : '' %>>
       <div class="row spread">
         <div><span class="kicker"><%= g.episode.number ? 'EP.' + String(g.episode.number).padStart(3, '0') : 'Episódio' %></span><h2><a href="/episodios/<%= g.episode.id %>"><%= g.episode.title %></a></h2><% if (g.episode.guest_name) { %><p class="small muted"><%= g.episode.guest_name %></p><% } %></div>
         <% if (perm.cut && g.canGenerate && aiReady) { %>
@@ -111,12 +112,28 @@
         <% } %>
       </div>
       <% if (!g.covers.length) { %><p class="muted">Ainda sem posts.</p><% } %>
+      <% if (postCount > 1) { %>
+      <div class="row dl-toolbar">
+        <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
+        <button class="btn sm" type="button" data-dl-everything title="Baixa as <%= postCount %> imagens deste episódio, uma depois da outra"><%- icon('download', 14) %> Baixar tudo</button>
+      </div>
+      <div class="dl-bar" data-dl-bar role="group" aria-label="Baixar vários posts" hidden>
+        <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
+        <span class="row">
+          <button class="btn sm ghost" type="button" data-dl-all>Selecionar todos</button>
+          <button class="btn sm primary" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar selecionados</button>
+          <button class="btn sm ghost" type="button" data-dl-cancel>Cancelar</button>
+        </span>
+      </div>
+      <p class="small muted dl-note" data-dl-note role="status" aria-live="polite" hidden></p>
+      <% } %>
       <% ['post_quote', 'post_split', 'carousel'].forEach(function (kind) { var list = g.covers.filter(function (c) { return c.kind === kind; }); if (!list.length) return; %>
       <h3 class="capas-kind"><%= KINDS[kind] %></h3>
       <div class="cover-grid">
         <% list.forEach(function (c) { var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
-        <figure class="cover-card <%= c.approved ? 'approved' : '' %>">
-          <a href="/capas/<%= c.id %>/imagem" target="_blank" rel="noopener"><img src="/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
+        <figure class="cover-card <%= c.approved ? 'approved' : '' %>"<% if (postCount > 1) { %> data-dl-item data-href="/capas/<%= c.id %>/imagem?baixar=1" data-name="<%= epTag + '-' + c.kind.replace(/_/g, '-') + '-' + (c.position + 1) + '.jpg' %>" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %>>
+          <% if (postCount > 1) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.label || KINDS[kind] %>"><% } %>
+          <a href="/capas/<%= c.id %>/imagem" target="_blank" rel="noopener" data-dl-pick><img src="/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
           <figcaption>
             <span class="small"><%= c.label || '' %></span>
             <span class="row small">
@@ -185,5 +202,6 @@
   </div>
 </dialog>
 <% } %>
+<script src="/static/baixar.js?v=<%= assetV %>" defer></script>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/foot') %>

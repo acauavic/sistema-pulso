@@ -1145,6 +1145,12 @@ input.dl-check { display: none; flex: 0 0 auto; width: 18px; height: 18px; margi
 .g-tile.sel .g-pic { outline: 3px solid var(--text); outline-offset: -3px; }
 .g-tile.sel .g-check { background: var(--text); border-color: var(--text); color: var(--bg); }
 [data-dl].selecting [data-dl-item] { cursor: pointer; }
+.dl-toolbar { gap: 8px; margin: 10px 0 0; justify-content: flex-end; }
+.cover-card[data-dl-item] { position: relative; }
+.cover-card input.dl-check { position: absolute; top: 16px; left: 16px; z-index: 2; }
+.cover-card.picked { box-shadow: none; outline: 2px solid var(--text); outline-offset: -1px; }
+.dl-bar { position: sticky; top: 8px; z-index: 5; }
+@media (max-width: 860px) { .dl-bar { top: 64px; } }
 @media (max-width: 640px) { .gal-head { flex-wrap: wrap; } .gal-head > div:first-child { flex: 1 1 0; } .gal-tools { order: 3; flex: 1 0 100%; justify-content: flex-start; } input.dl-check { width: 22px; height: 22px; } .gal-bulk, .gal-note { margin-left: 16px; margin-right: 16px; } .bulk-actions { margin-left: 0; width: 100%; } }
 
 /* ---- envio de material: arquivos repetidos, envios parados e armazenamento cheio ---- */

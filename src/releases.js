@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.34.0', date: '2026-10-27', title: 'Baixar vários posts de uma vez',
+    items: [
+      { kind: 'novo', text: 'Em Conteúdo > Posts, cada episódio com 2 ou mais imagens ganhou "Selecionar" e "Baixar tudo". Em "Selecionar" dá para marcar os posts (também clicando na própria imagem) e baixar só os escolhidos; os arquivos saem com o nome do episódio, o tipo e o número, como ep012-post-quote-1.jpg. A barra de seleção fica fixa no topo enquanto você rola. O botão Baixar de cada post continua como antes.' },
+    ],
+  },
+  {
     version: '1.33.0', date: '2026-10-27', title: 'Baixar vários arquivos de uma vez',
     items: [
       { kind: 'novo', text: 'No material do episódio, dentro de cada pasta (Bastidores, Vídeos, Fotografias…), "Selecionar" deixa marcar vários arquivos e baixar só os escolhidos, e "Baixar tudo" baixa a pasta inteira. O mesmo vale na galeria ("Selecionar" e "Baixar pasta"). O botão Baixar de cada arquivo continua como sempre.' },

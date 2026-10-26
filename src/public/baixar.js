@@ -53,7 +53,7 @@
     const say = (text) => { if (note) { note.textContent = text; note.hidden = !text; } };
     const refresh = () => {
       const sel = picked();
-      if (count) count.textContent = sel.length ? `${plural(sel.length, 'selecionado', 'selecionados')} · ${bytesText(sum(sel.map(itemOf)))}` : 'Nenhum arquivo marcado';
+      if (count) count.textContent = sel.length ? `${plural(sel.length, 'selecionado', 'selecionados')} · ${bytesText(sum(sel.map(itemOf)))}` : 'Nenhum item marcado';
       if (go) go.disabled = !sel.length;
       if (allBtn) allBtn.textContent = sel.length === rows().length ? 'Limpar seleção' : 'Selecionar todos';
       rows().forEach((r) => r.classList.toggle('picked', Boolean(r.querySelector('[data-dl-check]')?.checked)));
@@ -76,6 +76,8 @@
       if (e.target.closest('[data-dl-everything]')) { run(rows().map(itemOf)); return; }
       if (e.target.closest('[data-dl-all]')) { const all = picked().length !== rows().length; checks().forEach((c) => { c.checked = all; }); refresh(); return; }
       if (e.target.closest('[data-dl-go]')) { run(picked().map(itemOf)); return; }
+      const pick = box.classList.contains('selecting') ? e.target.closest('[data-dl-pick]') : null; // a imagem do cartão: em vez de abrir, marca
+      if (pick) { e.preventDefault(); pick.closest('[data-dl-item]')?.querySelector('[data-dl-check]')?.click(); return; }
       const row = box.classList.contains('selecting') && !e.target.closest('a, button, form, input, label') ? e.target.closest('[data-dl-item]') : null;
       if (row) { row.querySelector('[data-dl-check]')?.click(); return; } // tocar na linha marca/desmarca (o clique na caixa cai no tratamento abaixo)
       const c = e.target.closest('[data-dl-check]');
