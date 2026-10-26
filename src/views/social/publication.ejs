@@ -79,7 +79,7 @@
       <% if (pub.error) { %><p class="flash flash-error top-gap"><%= pub.error %></p><% } %>
       <div class="row top-gap">
         <% if (pub.status === 'enviando') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/atualizar" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw') %> Atualizar andamento</button></form><% } %>
-        <% if (canPublish && pub.status === 'erro') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline"><%- csrfField %><button class="btn sm" type="submit">Tentar de novo</button></form><% } %>
+        <% if (canPublish && (pub.status === 'erro' || pub.status === 'parcial')) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%= pub.status === 'parcial' ? 'Reenviar as que falharam' : 'Tentar de novo' %></button></form><% } %>
         <% if (canPublish && pub.status === 'agendado') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><%- csrfField %><button class="btn sm ghost" type="submit">Cancelar agendamento</button></form><% } %>
       </div>
     </section>

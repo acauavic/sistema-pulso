@@ -138,7 +138,7 @@
           <p class="row small">
             <a href="/social/publicacoes/<%= p.id %>">ver no Social</a>
             <% if (p.status === 'enviando') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
-            <% if (p.status === 'erro') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">tentar de novo</button></form><% } %>
+            <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
             <% if (p.status === 'agendado') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
           </p>
         </li>

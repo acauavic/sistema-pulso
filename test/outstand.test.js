@@ -27,6 +27,8 @@ describe('Outstand como terceira via para publicar nas redes', () => {
     Object.assign(h.config.outstand, { key: 'ost_teste', base: 'https://outstand.test', live: false }); h.config.outstandConfigured = true;
     global.fetch = async (url, opts = {}) => {
       const s = String(url);
+      if (s.startsWith('https://upload.outstand.test/')) { calls.push({ method: opts.method, path: s.replace('https://upload.outstand.test', 'UPLOAD'), headers: opts.headers, bytes: opts.body ? 'stream' : null }); if (opts.body && opts.body.getReader) await opts.body.cancel().catch(() => {}); return new Response(null, { status: 200 }); }
+      if (s.startsWith('https://s3.test-region.backblazeb2.com/') && (opts.method || 'GET') === 'GET') return new Response('video-bytes', { status: 200, headers: { 'content-length': '11' } });
       if (!s.startsWith('https://outstand.test')) return realFetch(url, opts);
       const method = opts.method || 'GET'; const path = s.replace('https://outstand.test', '');
       const body = opts.body ? JSON.parse(opts.body) : null;
@@ -36,6 +38,8 @@ describe('Outstand como terceira via para publicar nas redes', () => {
       let m;
       if (method === 'GET' && (m = path.match(/^\/v1\/social-accounts\/([^/]+)\/health$/))) return Response.json({ success: true, data: { id: m[1], healthy: state.health[m[1]] !== false } });
       if (method === 'GET' && path.match(/^\/v1\/tiktok\/accounts\/[^/]+\/creator-info$/)) return Response.json({ success: true, data: { privacy_level_options: state.tiktokOptions, max_video_post_duration_sec: 600 } });
+      if (method === 'POST' && path === '/v1/media/upload') return Response.json({ success: true, data: { id: 'm1', upload_url: 'https://upload.outstand.test/put/m1', expires_in: 3600 } });
+      if (method === 'POST' && path === '/v1/media/m1/confirm') return Response.json({ success: true, data: { id: 'm1', url: 'https://media.outstand.test/m1/corte.mp4', status: 'active' } });
       if (method === 'POST' && path === '/v1/posts') {
         if (state.flaky > 0) { state.flaky -= 1; return Response.json({ error: 'Internal server error' }, { status: 500 }); }
         if (state.failWith) return Response.json({ success: false, error: state.failWith }, { status: 400 });
@@ -170,6 +174,39 @@ describe('Outstand como terceira via para publicar nas redes', () => {
       assert.match(done.results.find((r) => r.platform === 'tiktok').error, /reached_active_user_cap/);
       assert.equal((await q('SELECT youtube_url FROM episodes WHERE id = $1', [ep.id]))[0].youtube_url, null, 'link de corte não vira o link do episódio');
     } finally { h.config.outstand.live = false; }
+  });
+
+  it('reenvio parcial: só TikTok e YouTube saem de novo (o Instagram que já saiu fica como está) e o TikTok vai pelo armazenamento da Outstand', async () => {
+    h.config.outstand.live = true; ost.resetCache(); state.accounts = ACCOUNTS();
+    try {
+      calls.length = 0;
+      const pub = await publishing.create({ clipId: clip.id, platforms: ['youtube', 'tiktok', 'instagram'], title: 'Corte parcial', description: 'Legenda', userId: u.gestao.id });
+      assert.equal(sent().body.containers[0].media[0].url.startsWith('https://media.outstand.test/'), true, 'o TikTok não baixa do Backblaze: o vídeo foi hospedado na Outstand');
+      assert.ok(calls.some((c) => c.path === 'UPLOAD/put/m1' && c.method === 'PUT') && calls.some((c) => c.path === '/v1/media/m1/confirm'));
+      state.post.socialAccounts = state.post.socialAccounts.map((a) => (a.network === 'instagram' ? { ...a, status: 'published', platformPostId: 'ig7', platformPostUrl: 'https://www.instagram.com/reel/ok/' } : { ...a, status: 'failed', error: a.network === 'youtube' ? 'Shared YouTube upload capacity is waiting for the next release.' : 'TikTok API error (url_ownership_unverified)' }));
+      const partial = await publishing.refresh(pub.id);
+      assert.equal(partial.status, 'parcial');
+      calls.length = 0;
+      const again = await publishing.retry(pub.id);
+      assert.equal(again.status, 'enviando');
+      assert.deepEqual(sent().body.accounts.sort(), ['TT1', 'YT1'], 'só as que falharam');
+      assert.equal(sent().body.instagram, undefined);
+      state.post.socialAccounts = state.post.socialAccounts.map((a) => ({ ...a, status: 'published', platformPostId: `n-${a.network}` }));
+      const done = await publishing.refresh(pub.id);
+      assert.equal(done.status, 'publicado');
+      assert.deepEqual(done.results.map((r) => r.platform).sort(), ['instagram', 'tiktok', 'youtube']);
+      assert.equal(done.results.find((r) => r.platform === 'instagram').url, 'https://www.instagram.com/reel/ok/', 'o que já tinha saído não é refeito');
+      assert.ok(done.results.every((r) => r.ok));
+      // se o reenvio também falhar, continua parcial (o Instagram segue no ar) e não vira "erro"
+      const pub2 = await publishing.create({ clipId: clip.id, platforms: ['youtube', 'instagram'], title: 'Corte parcial 2', description: 'Legenda', userId: u.gestao.id });
+      state.post.socialAccounts = state.post.socialAccounts.map((a) => (a.network === 'instagram' ? { ...a, status: 'published', platformPostId: 'ig8', platformPostUrl: 'https://www.instagram.com/reel/ok2/' } : { ...a, status: 'failed', error: 'fila do YouTube' }));
+      assert.equal((await publishing.refresh(pub2.id)).status, 'parcial');
+      state.failWith = 'indisponível';
+      const failedAgain = await publishing.retry(pub2.id);
+      state.failWith = null;
+      assert.equal(failedAgain.status, 'parcial');
+      assert.equal(failedAgain.results.find((r) => r.platform === 'instagram').ok, true);
+    } finally { h.config.outstand.live = false; state.failWith = null; }
   });
 
   it('TikTok: só aceita privado => recusa com o motivo; rascunho vai como MEDIA_UPLOAD e o resultado avisa que falta publicar no app', async () => {

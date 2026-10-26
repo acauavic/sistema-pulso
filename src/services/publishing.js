@@ -86,17 +86,19 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
 // Envia uma publicação pendente (agora). Falhas viram status "erro" com o motivo, nunca ficam silenciosas.
 // Cada rede sai pelo provedor dela: se forem vários, cada um recebe só as suas redes (um envio por provedor) e o andamento é
 // acompanhado em cada um (options.parts). Se um provedor falhar ao enviar e outro não, a publicação segue e mostra qual rede falhou.
-async function dispatch(pubId) {
+// `only`: reenvia só estas redes (as que falharam); `keep`: resultados das que já saíram, que ficam como estão.
+async function dispatch(pubId, { only = null, keep = [] } = {}) {
   await social.syncLive();
   const { rows: [pub] } = await db.query("UPDATE episode_publications SET status = 'enviando', updated_at = now() WHERE id = $1 AND status IN ('enviando','agendado') RETURNING *", [pubId]);
   if (!pub) return null;
   try {
     const target = await loadTarget({ episodeId: pub.episode_id, clipId: pub.clip_id, media: pub.media, coverIds: pub.cover_ids });
     // agendado/revisão: sai pelos provedores atuais na hora de enviar (a gestão pode ter trocado nesse meio-tempo)
-    const groups = await social.plan(pub.platforms);
-    const routesMap = groups.length > 1 ? Object.fromEntries(groups.flatMap((g) => g.platforms.map((p) => [p, g.provider.id]))) : null;
+    const groups = await social.plan(only || pub.platforms);
+    const planned = Object.fromEntries(groups.flatMap((g) => g.platforms.map((p) => [p, g.provider.id])));
+    const routesMap = only ? { ...(pub.options?.routes || {}), ...planned } : (groups.length > 1 ? planned : null);
     const first = groups[0].provider.id;
-    if (first !== pub.provider) { await db.query('UPDATE episode_publications SET provider = $2 WHERE id = $1', [pub.id, first]); pub.provider = first; }
+    if (!only && first !== pub.provider) { await db.query('UPDATE episode_publications SET provider = $2 WHERE id = $1', [pub.id, first]); pub.provider = first; }
     const media = await mediaLinks(pub, target);
     const outcomes = [];
     for (const g of groups) {
@@ -113,9 +115,10 @@ async function dispatch(pubId) {
       } catch (err) { outcomes.push({ g, error: err }); }
     }
     if (outcomes.every((o) => o.error)) throw outcomes[0].error; // nenhum provedor aceitou: erro, como sempre
-    return await saveSent(pub, outcomes, routesMap);
+    return await saveSent(pub, outcomes, routesMap, keep);
   } catch (err) {
-    const { rows: [failed] } = await db.query("UPDATE episode_publications SET status = 'erro', error = $2, updated_at = now() WHERE id = $1 RETURNING *", [pub.id, String(err.message).slice(0, 500)]);
+    // reenvio parcial que falhou por inteiro: as redes que já saíram continuam no ar, então volta a "parcial" (e não a "erro")
+    const { rows: [failed] } = await db.query('UPDATE episode_publications SET status = $3, error = $2, updated_at = now() WHERE id = $1 RETURNING *', [pub.id, String(err.message).slice(0, 500), only ? 'parcial' : 'erro']);
     await addEvent(pub.episode_id, pub.created_by, `Falha ao publicar: ${err.message}`);
     await tellCreator(pub, `Falha ao publicar: ${pub.title}`, String(err.message).slice(0, 300));
     return failed;
@@ -139,8 +142,8 @@ async function mediaLinks(pub, target) {
 }
 
 // Junta o que cada provedor respondeu: resultados (com o provedor de cada rede), onde acompanhar cada envio e o que falhou ao enviar.
-async function saveSent(pub, outcomes, routesMap) {
-  const results = []; const parts = []; const sendErrors = []; const warnings = []; const fields = new Set();
+async function saveSent(pub, outcomes, routesMap, keep = []) {
+  const results = [...keep]; const parts = []; const sendErrors = []; const warnings = []; const fields = new Set();
   for (const o of outcomes) {
     const pid = o.g.provider.id;
     if (o.error) {
@@ -157,14 +160,14 @@ async function saveSent(pub, outcomes, routesMap) {
   }
   const real = results.filter((r) => !r.simulated);
   let state;
-  if (!parts.length) state = sendErrors.length ? 'erro' : 'simulado'; // nada foi realmente enviado
+  if (!parts.length) state = sendErrors.length ? (keep.length ? 'parcial' : 'erro') : 'simulado'; // nada foi realmente enviado
   else if (outcomes.every((o) => o.error || o.sent.simulated || o.sent.done)) state = finalState(real);
   else state = 'enviando';
   const first = parts[0] || {};
-  const options = { fields: [...fields], ...(routesMap ? { routes: routesMap } : {}), ...(parts.length ? { parts } : {}), ...(sendErrors.length ? { send_errors: sendErrors } : {}), ...(warnings.length ? { provider_warnings: warnings } : {}) };
+  const options = { fields: [...fields], ...(routesMap ? { routes: routesMap } : {}), ...(parts.length || keep.length ? { parts } : {}), ...(keep.length ? { kept_results: keep } : {}), ...(sendErrors.length ? { send_errors: sendErrors } : {}), ...(warnings.length ? { provider_warnings: warnings } : {}) };
   const { rows: [saved] } = await db.query(
     `UPDATE episode_publications SET status = $2, request_id = $3, job_id = $4, results = $5, options = options || $6, error = $7, updated_at = now() WHERE id = $1 RETURNING *`,
-    [pub.id, state, first.request_id || null, first.job_id || null, JSON.stringify(results), JSON.stringify(options), state === 'erro' ? (sendErrors[0]?.error || 'O envio falhou.') : null]);
+    [pub.id, state, first.request_id || null, first.job_id || null, JSON.stringify(results), JSON.stringify(options), state === 'erro' || (state === 'parcial' && !parts.length) ? (sendErrors[0]?.error || 'O envio falhou.') : null]);
   if (state === 'publicado' || state === 'parcial') await afterPublished(saved);
   return saved;
 }
@@ -201,7 +204,9 @@ async function refresh(pubId) {
     const sts = [];
     for (const part of parts) sts.push({ part, st: await social.get(part.provider).status({ request_id: part.request_id, job_id: part.job_id }) });
     const sendErrors = pub.options?.send_errors || [];
+    const kept = pub.options?.kept_results || []; // o que já tinha saído antes de um reenvio parcial
     let results = [
+      ...kept,
       ...sts.flatMap(({ part, st }) => (st.results || []).map((r) => ({ ...r, provider: part.provider }))),
       ...sendErrors.map((e) => ({ platform: e.platform, ok: false, skipped: false, status: 'failed', url: null, error: e.error, provider: e.provider })),
       ...(pub.results || []).filter((r) => r.simulated),
@@ -216,6 +221,7 @@ async function refresh(pubId) {
       else state = 'erro';
       if (state === 'erro') error = sts.map(({ st }) => st.error).find(Boolean) || sendErrors[0]?.error || 'O envio falhou.';
     }
+    if (kept.length && state === 'erro') state = 'parcial'; // as que já saíram continuam no ar
     const { rows: [saved] } = await db.query('UPDATE episode_publications SET status = $2, results = $3, error = $4, updated_at = now() WHERE id = $1 RETURNING *',
       [pub.id, state, JSON.stringify(results), error]);
     if (state === 'publicado' || state === 'parcial') await afterPublished(saved);
@@ -240,9 +246,16 @@ async function tick() {
   for (const p of running) await refresh(p.id);
 }
 
-// "Mandar de novo" depois de um erro: volta para a fila e envia.
+// "Mandar de novo": depois de um erro, envia tudo; numa publicação parcial, reenvia só as redes que falharam (as que saíram ficam como estão).
 async function retry(pubId) {
-  const { rows: [pub] } = await db.query("UPDATE episode_publications SET status = 'enviando', error = NULL, request_id = NULL, job_id = NULL, options = options - 'parts' - 'send_errors' - 'provider_warnings', updated_at = now() WHERE id = $1 AND status = 'erro' RETURNING *", [pubId]);
+  const { rows: [cur] } = await db.query("SELECT * FROM episode_publications WHERE id = $1 AND status = 'parcial'", [pubId]);
+  if (cur) {
+    const failed = (cur.results || []).filter((r) => !r.ok && !r.skipped).map((r) => r.platform);
+    if (!failed.length) return null;
+    const { rows: [claimed] } = await db.query("UPDATE episode_publications SET status = 'enviando', error = NULL, options = options - 'parts' - 'send_errors' - 'provider_warnings', updated_at = now() WHERE id = $1 AND status = 'parcial' RETURNING *", [pubId]);
+    return claimed ? dispatch(claimed.id, { only: failed, keep: (cur.results || []).filter((r) => !failed.includes(r.platform)) }) : null;
+  }
+  const { rows: [pub] } = await db.query("UPDATE episode_publications SET status = 'enviando', error = NULL, request_id = NULL, job_id = NULL, options = options - 'parts' - 'send_errors' - 'provider_warnings' - 'kept_results', updated_at = now() WHERE id = $1 AND status = 'erro' RETURNING *", [pubId]);
   return pub ? dispatch(pub.id) : null;
 }
 

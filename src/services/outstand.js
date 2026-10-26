@@ -226,6 +226,27 @@ async function send(body) {
   return { simulated: false, request_id: post.id, job_id: rascunho ? 'tiktok-rascunho' : null, results: normalizeResults(post, { draft: rascunho }), done: false, fieldNames: names, warnings: json.warnings || [] };
 }
 
+// O TikTok só busca vídeo de domínio verificado no app dele (erro `url_ownership_unverified` com o link do Backblaze). A Outstand
+// guarda o arquivo no armazenamento dela (POST /v1/media/upload -> PUT -> confirm, 60 dias) e devolve um link que o TikTok aceita.
+// O servidor baixa do Backblaze e repassa em fluxo (sem guardar em disco). Devolve o link da Outstand.
+async function hostMedia(sourceUrl, { filename = 'video.mp4', contentType = 'video/mp4' } = {}) {
+  const { json: created } = await call('POST', '/v1/media/upload', { body: { filename, content_type: contentType }, timeout: 30_000, retries: 1 });
+  const slot = created.data || created;
+  if (!slot.id || !slot.upload_url) throw new Error('A Outstand não devolveu o endereço de envio do arquivo.');
+  const src = await fetch(sourceUrl, { signal: AbortSignal.timeout(10 * 60_000) });
+  if (!src.ok || !src.body) throw new Error(`Não consegui ler o vídeo no armazenamento (${src.status}).`);
+  const size = Number(src.headers.get('content-length')) || 0;
+  const put = await fetch(slot.upload_url, {
+    method: 'PUT', headers: { 'Content-Type': contentType, ...(size ? { 'Content-Length': String(size) } : {}) },
+    body: src.body, duplex: 'half', signal: AbortSignal.timeout(15 * 60_000),
+  });
+  if (!put.ok) throw new Error(`A Outstand recusou o arquivo (${put.status}).`);
+  const { json: done } = await call('POST', `/v1/media/${encodeURIComponent(slot.id)}/confirm`, { body: size ? { size } : {}, timeout: 60_000, retries: 1 });
+  const url = (done.data || done).url;
+  if (!url) throw new Error('A Outstand não confirmou o arquivo enviado.');
+  return url;
+}
+
 // Andamento: GET /v1/posts/{id}. state: enviando | publicado | parcial | erro.
 async function status({ request_id, job_id = null }) {
   let json;
@@ -239,4 +260,4 @@ async function status({ request_id, job_id = null }) {
   return { state, results, error };
 }
 
-module.exports = { NETWORKS, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason };
+module.exports = { NETWORKS, hostMedia, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason };

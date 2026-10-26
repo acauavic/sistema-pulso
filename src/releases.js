@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.32.3', date: '2026-10-26', title: 'TikTok pela Outstand e reenvio só do que falhou',
+    items: [
+      { kind: 'correcao', text: 'O TikTok recusava o vídeo ("domínio não verificado") quando o corte saía pela Outstand, porque o TikTok só baixa vídeo de domínio verificado. Agora, nos posts com TikTok, o vídeo vai antes para o armazenamento da própria Outstand e o TikTok baixa de lá.' },
+      { kind: 'novo', text: 'Numa publicação parcial (algumas redes saíram, outras não), o botão "Reenviar as que falharam" manda de novo só as redes com erro. As que já estão no ar não são refeitas nem duplicadas.' },
+    ],
+  },
+  {
     version: '1.32.2', date: '2026-10-26', title: 'Fila de cortes e tarefas em segundo plano deixa de travar',
     items: [
       { kind: 'correcao', text: 'Corrigido o travamento do processador em segundo plano: a cada 30 minutos várias rotinas começavam juntas e esgotavam as conexões com o banco, e o processador parava de vez. Com isso, cortes enviados ficavam em "processando" para sempre (e também ficavam parados o tratamento de vídeo, a IA e os e-mails). Agora as rotinas esperam a vez e a fila continua andando.' },

@@ -22,7 +22,13 @@ const PROVIDERS = {
     id: 'outstand', label: 'Outstand', by: 'pela Outstand', to: 'à Outstand', at: 'na Outstand', of: 'da Outstand', env: 'OUTSTAND_API_KEY', liveEnv: 'OUTSTAND_LIVE',
     configured: () => config.outstandConfigured, live: () => config.outstand.live,
     connected: (o) => ost.connected(o), resetCache: () => ost.resetCache(),
-    sendVideo: async (args) => ost.send(ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: await ost.processMedia() })),
+    sendVideo: async (args) => {
+      // o TikTok não baixa do Backblaze (domínio não verificado no app dele): o vídeo vai antes para o armazenamento da Outstand
+      if (config.outstand.live && args.platforms.includes('tiktok') && args.videoUrl) {
+        try { args = { ...args, videoUrl: await ost.hostMedia(args.videoUrl, { filename: ost.fileOf(args.videoUrl, 'corte.mp4') }) }; } catch (err) { console.error('[outstand] não consegui hospedar o vídeo para o TikTok:', err.message); }
+      }
+      return ost.send(ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: await ost.processMedia() }));
+    },
     sendPhotos: async (args) => ost.send(ost.buildPhotoPost({ ...args, tiktokMode: await ost.tiktokMode() })),
     status: ({ request_id, job_id }) => ost.status({ request_id, job_id }),
     canEdit: false, // a Outstand só edita post que ainda não saiu (e o agendamento é nosso): depois de publicado, edite pelo app da rede

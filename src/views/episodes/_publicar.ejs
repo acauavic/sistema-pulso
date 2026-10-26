@@ -33,7 +33,7 @@
     <% if (p.error) { %><p class="small err"><%= p.error %></p><% } %>
     <% if (perm.review) { %><p class="row small">
       <% if (p.status === 'enviando') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
-      <% if (p.status === 'erro') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">tentar de novo</button></form><% } %>
+      <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
       <% if (p.status === 'agendado') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
     </p><% } %>
   </li>
