@@ -143,6 +143,10 @@ function networkBlocks(platforms, { kind, media, title, description, coverUrl, t
   }
   if (platforms.includes('facebook') && kind === 'clip') out.facebook = { publishAsReel: true };
   if (platforms.includes('facebook') && media === 'story') out.facebook = { publishAsStory: true };
+  // X (280) e Threads (500) recebem a versão que cabe; no Threads, texto maior faria a Outstand recusar o post inteiro (400)
+  for (const net of ['x', 'threads']) {
+    if (platforms.includes(net) && caption && L.textLength(net, caption) > L.TEXT_MAX[net]) out[net] = { ...(out[net] || {}), content: L.fitText(caption, net) };
+  }
   return out;
 }
 

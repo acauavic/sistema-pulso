@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.35.2', date: '2026-10-27', title: 'Texto do X e do Threads no tamanho certo',
+    items: [
+      { kind: 'correcao', text: 'O X recusou um corte porque a legenda tinha 283 caracteres (o limite é 280). Agora o X e o Threads (limite de 500) recebem a versão que cabe, com parágrafos ou frases inteiras, sem cortar palavra. A tela avisa na hora de publicar. No Threads, texto acima do limite fazia a Outstand recusar o post inteiro, em todas as redes.' },
+      { kind: 'ajuste', text: 'Fila do YouTube na Outstand: a nova tentativa agora chega segundos depois de a vaga abrir. Antes chegava 1 a 2 minutos depois, quando a vaga já tinha ido para outro cliente.' },
+      { kind: 'ajuste', text: 'O link do post no TikTok, que às vezes chega só depois de o post sair, é buscado de novo nas horas seguintes e aparece na publicação.' },
+    ],
+  },
+  {
     version: '1.35.1', date: '2026-10-27', title: 'Publicar não duplica com clique repetido',
     items: [
       { kind: 'correcao', text: 'Como o vídeo sobe para o provedor antes de publicar, "Publicar", "Aprovar e publicar" e "Reenviar agora" levam alguns segundos. Agora o botão mostra "Enviando…" e trava enquanto isso. E se o mesmo pedido chegar de novo em até 2 minutos (clique duplo), o sistema usa a publicação que já existe e nada sai duas vezes.' },

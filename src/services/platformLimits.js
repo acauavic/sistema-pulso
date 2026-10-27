@@ -174,6 +174,35 @@ function parseChapters(text, { durationMs = null, titleMax = LIMITS.spotify.chap
 }
 const formatChapters = (chapters) => chapters.map((c) => `${toClock(c.at_ms)} ${c.title}`).join('\n');
 
+// Texto de rede com limite curto. O X conta como o twitter-text: link vale 23 e caractere fora do latim e da pontuação comum (emoji,
+// por exemplo) vale 2. Contamos cada ponto de código, o que pode dar a mais num emoji composto, nunca a menos. O Threads aceita 500
+// e, acima disso, a Outstand recusa o post INTEIRO.
+const TEXT_MAX = { x: 280, threads: 500 };
+function xLength(text) {
+  let n = 0;
+  const rest = String(text ?? '').replace(/https?:\/\/\S+/g, () => { n += 23; return ''; });
+  for (const ch of rest) {
+    const c = ch.codePointAt(0);
+    n += c <= 4351 || (c >= 8192 && c <= 8205) || (c >= 8208 && c <= 8223) || (c >= 8242 && c <= 8247) ? 1 : 2;
+  }
+  return n;
+}
+const textLength = (network, text) => (network === 'x' ? xLength(text) : [...tidy(text)].length);
+// Cabe no limite da rede: parágrafos inteiros, senão frases inteiras do primeiro, senão palavras com reticências. Nunca corta palavra.
+function fitText(text, network) {
+  const max = TEXT_MAX[network]; const s = tidy(text);
+  if (!max || textLength(network, s) <= max) return s;
+  const fits = (t) => textLength(network, t) <= max;
+  const paras = s.split(/\n{2,}/);
+  let out = '';
+  for (const p of paras) { const next = out ? `${out}\n\n${p}` : p; if (fits(next)) out = next; else break; }
+  if (out) return out;
+  for (const se of paras[0].match(/[^.!?…]+[.!?…]+["”)]*\s*|[^.!?…]+$/g) || []) { const next = `${out}${se}`; if (fits(next.trim())) out = next; else break; }
+  if (out.trim()) return out.trim();
+  for (const w of paras[0].split(/\s+/)) { const next = out ? `${out} ${w}` : w; if (fits(`${next}…`)) out = next; else break; }
+  return `${out.replace(/[\s,;:\-–—]+$/, '')}…`;
+}
+
 // Duração aceita para cortes (vídeo vertical), em segundos [mínimo, máximo]. Fora disso a Outstand recusa o post INTEIRO (422), e
 // nenhuma rede recebe: por isso conferimos antes de agendar. Fontes: documentação da Outstand (Reels do Facebook 3 a 90 s; Reels do
 // Instagram 3 s a 15 min; Threads até 5 min), YouTube Shorts até 3 min, TikTok até 10 min (a conta pode ter menos: conferido no envio),
@@ -195,7 +224,7 @@ function checkClipDuration(platforms, durationMs, labelOf = (p) => p) {
 }
 
 module.exports = {
-  LIMITS, CLIP_SECONDS, utf8, tidy, stripAngles, balanceQuotes, fitWords, fitBytes, capsRatio, check, hashtagsIn, fitTags, thumbnailLines,
+  LIMITS, CLIP_SECONDS, TEXT_MAX, utf8, tidy, stripAngles, balanceQuotes, fitWords, fitBytes, fitText, xLength, textLength, capsRatio, check, hashtagsIn, fitTags, thumbnailLines,
   checkYoutubeTitle, checkYoutubeDescription, checkSpotifyTitle, checkSpotifyDescription, checkInstagramCaption, checkTiktokCaption, checkClipDuration,
   toClock, parseClock, parseChapters, formatChapters,
 };

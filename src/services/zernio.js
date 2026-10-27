@@ -89,7 +89,7 @@ function platformEntry(p, { kind, media, title, description, coverUrl, accounts,
   } else if (p === 'facebook') {
     if (kind !== 'photo') psd.contentType = 'reel';
     entry.customContent = caption;
-  } else entry.customContent = caption;
+  } else entry.customContent = L.fitText(caption, p); // X (280) e Threads (500): a versão que cabe, sem cortar palavra
   if (Object.keys(psd).length) entry.platformSpecificData = psd;
   return entry;
 }

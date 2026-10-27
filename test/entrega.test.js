@@ -262,6 +262,36 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     assert.match(page, /action="\/social\/publicar" class="stack-lg" data-compose data-busy="Enviando…"/, 'o botão mostra o andamento e trava o formulário');
   });
 
+  it('o link que chega depois (TikTok) é buscado de novo nas horas seguintes', async () => {
+    const clip = await mkClip('pp/cortes/42/video-o.mp4');
+    const pub = await publishing.create({ clipId: clip.id, platforms: ['tiktok', 'instagram'], title: 'Link depois', description: 'L', userId: u.gestao.id });
+    setO(pub.request_id, { tiktok: ['published', null, 'publish_abc'], instagram: ['published'] });
+    const done = await publishing.refresh(pub.id);
+    assert.equal(done.status, 'publicado'); assert.equal(done.results.find((r) => r.platform === 'tiktok').url, null, 'o TikTok ainda não deu o link');
+    const tt = st.oPosts[pub.request_id].socialAccounts.find((a) => a.network === 'tiktok');
+    Object.assign(tt, { platformPostId: '7701363240067976466', platformPostUrl: 'https://www.tiktok.com/@podcast.pulso/video/7701363240067976466' });
+    await publishing.fillLinks();
+    assert.equal((await pubRow(pub.id)).results.find((r) => r.platform === 'tiktok').url, 'https://www.tiktok.com/@podcast.pulso/video/7701363240067976466');
+    calls.length = 0; await publishing.fillLinks();
+    assert.ok(!calls.some((c) => c.path === `/v1/posts/${pub.request_id}`), 'com o link no lugar, não consulta mais');
+  });
+
+  it('texto curto no X (280) e no Threads (500): cada um recebe a versão que cabe, sem cortar palavra, e quem publica é avisado', async () => {
+    const clip = await mkClip('pp/cortes/41/video-n.mp4');
+    const legenda = `${'Falar que tem a licença é diferente de comprovar. '.repeat(4).trim()}\n\n${'Antes de atender, exija os documentos do espaço. '.repeat(10).trim()}\n\nEpisódio completo no nosso canal do YouTube!`;
+    calls.length = 0;
+    const pub = await publishing.create({ clipId: clip.id, platforms: ['instagram', 'threads', 'x'], title: 'Texto longo', description: legenda, userId: u.gestao.id });
+    assert.equal(pub.status, 'enviando');
+    assert.ok(pub.options.warnings.some((w) => /^X: a legenda tem \d+ caracteres e a rede aceita 280; lá vai a versão curta/.test(w)));
+    assert.ok(pub.options.warnings.some((w) => /^Threads: a legenda tem \d+ caracteres e a rede aceita 500/.test(w)));
+    const o = lastPost();
+    assert.equal(o.containers[0].content, legenda, 'o Instagram leva a legenda inteira');
+    assert.ok([...o.threads.content].length <= 500 && legenda.startsWith(o.threads.content), 'o Threads leva o começo que cabe (senão a Outstand recusaria o post inteiro)');
+    const xText = posts('zernio').at(-1).body.platforms.find((p) => p.platform === 'twitter').customContent;
+    assert.equal(xText, 'Falar que tem a licença é diferente de comprovar. Falar que tem a licença é diferente de comprovar. Falar que tem a licença é diferente de comprovar. Falar que tem a licença é diferente de comprovar.', 'o X leva o primeiro parágrafo, que cabe em 280');
+    assert.equal(E.classify("Tweet text is too long (283 characters). Twitter's limit is 280 characters.").code, 'texto_longo');
+  });
+
   it('duração por rede: corte de 2 min não agenda Reels do Facebook (a Outstand recusaria o post inteiro); no X é só aviso', async () => {
     const clip = await mkClip('pp/cortes/10/video-h.mp4', { durationMs: 120_000 });
     await assert.rejects(publishing.create({ clipId: clip.id, platforms: ['facebook', 'instagram'], title: 'Longo', description: 'L', userId: u.gestao.id }), /Facebook Reels: o vídeo tem 2 min e a rede aceita até 1 min 30 s/);

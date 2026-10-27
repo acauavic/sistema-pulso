@@ -23,8 +23,9 @@ const YT_REASON = {
 
 // Regras na ordem: a primeira que casa decide. wait(tries, m) devolve ms de espera ou um Date absoluto.
 const RULES = [
+  // a vaga sai na hora exata e é disputada por todos os clientes da Outstand (cerca de uma a cada 15 min): chegar logo depois dela
   { re: /\[youtube_upload_error:([a-z_]+)(?:;\s*retryAt=([0-9T:.\-+Z]+))?\]/i, code: 'youtube_fila', kind: 'espera',
-    wait: (tries, m) => { const t = m[2] && Date.parse(m[2]); return Number.isFinite(t) && t > Date.now() ? new Date(t + 90_000 + Math.floor(Math.random() * 60_000)) : 15 * MIN; },
+    wait: (tries, m) => { const t = m[2] && Date.parse(m[2]); return Number.isFinite(t) && t > Date.now() ? new Date(t + 3_000 + Math.floor(Math.random() * 7_000)) : 15 * MIN; },
     hint: (m) => YT_REASON[m[1]] || 'Fila do YouTube na Outstand' },
   { re: /shared youtube upload capacity|youtube upload capacity/i, code: 'youtube_fila', kind: 'espera', wait: () => 15 * MIN, hint: () => 'Fila compartilhada do YouTube na Outstand' },
   { re: /url_ownership_unverified/i, code: 'tiktok_dominio', kind: 'arquivo', wait: () => 2 * MIN, hint: () => 'O TikTok só busca vídeo de endereço verificado: a próxima tentativa manda o vídeo pelo armazenamento da Outstand' },
@@ -37,6 +38,7 @@ const RULES = [
   { re: /access_token_invalid|scope_not_authorized|token (?:has )?expired|expired token|access token|re-?auth|reconnect|session has been invalidated|oauthexception|invalid_grant|unauthori[sz]ed|\b401\b|not authorized|needs? reconnection/i,
     code: 'conta', kind: 'conta', hint: () => 'A conta desta rede precisa ser reconectada em Integrações > Redes sociais' },
   { re: /duplicate|already been posted|identical content|content already exists/i, code: 'repetido', kind: 'conteudo', hint: () => 'A rede recusou por ser conteúdo repetido' },
+  { re: /text is too long|too many characters|character limit|limit is \d+ characters|exceeds? the (?:maximum )?(?:length|number of characters)/i, code: 'texto_longo', kind: 'conteudo', hint: () => 'O texto passou do limite de caracteres da rede: reenvie (vai a versão curta) ou encurte a legenda' },
   { re: /rate.?limit|too many requests|\b429\b|\(#(?:4|17|32|613)\)|limit reached|quota/i, code: 'limite', kind: 'limite', wait: (t) => Math.max(30 * MIN, backoff(t)), hint: () => 'A rede limitou os envios por agora' },
   { re: /aspect ratio|too long|too short|duration|unsupported|not supported|invalid (?:video|media|image|file|format)|codec|resolution|file (?:is )?too large|\b2207\d{3}\b/i,
     code: 'formato', kind: 'conteudo', hint: () => 'A rede recusou o formato do arquivo' },

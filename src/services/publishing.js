@@ -75,6 +75,11 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
     check.issues.push(...d.issues); check.warnings.push(...d.warnings);
     if (d.issues.length) check.ok = false;
   }
+  const caption = description || title;
+  for (const net of ['x', 'threads']) { // texto curto nessas redes: vai a versão que cabe (L.fitText), e quem publica fica sabendo
+    const n = caption && list.includes(net) && media !== 'story' ? L.textLength(net, caption) : 0;
+    if (n > L.TEXT_MAX[net]) check.warnings.push(`${labelOf(net)}: a legenda tem ${n} caracteres e a rede aceita ${L.TEXT_MAX[net]}; lá vai a versão curta, até onde cabe sem cortar palavra.`);
+  }
   if (!check.ok) { const err = new Error(check.issues[0]); err.issues = check.issues; throw err; }
   const groups = await social.plan(list); // cada rede sai pelo provedor dela (padrão ou rota); pode haver mais de um provedor
   if (!review) {
@@ -253,7 +258,7 @@ async function saveSent(pub, outcomes, routesMap, keep, attempt) {
       continue;
     }
     const s = o.sent;
-    results.push(...(s.results || []).map((r) => ({ ...r, provider: pid })));
+    results.push(...(s.results || []).map((r) => ({ ...r, provider: pid, ref: s.request_id || null })));
     for (const f of s.preFailed || []) sendErrors.push({ platform: f.platform, provider: pid, error: String(f.error).slice(0, 300), code: f.code || null });
     (s.fieldNames || []).forEach((f) => fields.add(f));
     warnings.push(...(s.warnings || []));
@@ -325,6 +330,9 @@ async function finalize(pub, results, attempt) {
   await finishAttempt(attempt, out);
   const failed = out.filter((r) => inAttempt.includes(r.platform) && !r.ok && !r.skipped);
   if (failed.length) console.warn(`[publicação ${pub.id}] ${failed.map((r) => `${r.platform}: ${r.code}${r.retry_at ? ` → nova tentativa ${r.retry_at}` : ' → precisa de ação'} (${String(r.error).slice(0, 160)})`).join(' | ')}`);
+  // fila do YouTube: a vaga sai na hora exata e quem chega 30 s depois perde; além da rotina (a cada 30 s), um despertador neste processo
+  const ytIn = failed.filter((r) => r.code === 'youtube_fila' && r.retry_at).map((r) => Date.parse(r.retry_at) - Date.now()).filter((ms) => ms > 0 && ms < 20 * 60_000);
+  if (ytIn.length) setTimeout(() => retryDue().catch((err) => console.error('[fila do YouTube]', err.message)), Math.min(...ytIn)).unref();
   await tell(saved, out, failed, { inAttempt, auto: attempt?.trigger === 'automatico' });
   return saved;
 }
@@ -392,7 +400,7 @@ async function refresh(pubId) {
     const errNets = new Set(sendErrors.map((e) => e.platform));
     let results = [
       ...kept,
-      ...sts.flatMap(({ part, st }) => (st.results || []).filter((r) => !errNets.has(r.platform)).map((r) => ({ ...r, provider: part.provider }))),
+      ...sts.flatMap(({ part, st }) => (st.results || []).filter((r) => !errNets.has(r.platform)).map((r) => ({ ...r, provider: part.provider, ref: part.request_id || null }))),
       ...sendErrors.map((e) => ({ platform: e.platform, ok: false, skipped: false, status: 'failed', url: null, error: e.error, code: e.code || null, provider: e.provider })),
       ...(pub.results || []).filter((r) => r.simulated),
     ];
@@ -448,6 +456,29 @@ async function tick() {
   await recoverInterrupted();
   await giveUpSilent();
   await precheckScheduled();
+  await fillLinks();
+}
+
+// O link de algumas redes (o TikTok, por exemplo) chega depois que o post já saiu: nas 6 h seguintes, confere de novo a cada 10 min
+// as redes no ar sem link (rascunho do TikTok não tem link até alguém publicar no app).
+async function fillLinks() {
+  const { rows } = await db.query(
+    `SELECT * FROM episode_publications WHERE status IN ('publicado','parcial') AND updated_at > now() - interval '6 hours'
+        AND jsonb_path_exists(results, '$[*] ? (@.ok == true && @.url == null && @.ref != null && !(@.draft == true))')
+        AND coalesce((options->>'links_at')::timestamptz, 'epoch') < now() - interval '10 minutes'
+      ORDER BY id LIMIT 3`);
+  for (const pub of rows) {
+    const results = pub.results.map((r) => ({ ...r }));
+    for (const ref of [...new Set(results.filter((r) => r.ok && !r.url && r.ref && !r.draft).map((r) => `${r.provider}|${r.ref}`))]) {
+      const [provider, id] = ref.split('|');
+      try {
+        const st = await social.get(provider).status({ request_id: id });
+        for (const r of results) if (r.ok && !r.url && r.ref === id) r.url = (st.results || []).find((x) => x.platform === r.platform && x.url)?.url || null;
+      } catch (err) { console.warn(`[publicação ${pub.id}] link ainda não veio: ${err.message}`); }
+    }
+    await db.query('UPDATE episode_publications SET results = $2, options = options || $3 WHERE id = $1', [pub.id, JSON.stringify(results), JSON.stringify({ links_at: new Date().toISOString() })]);
+  }
+  return rows.length;
 }
 
 // Novas tentativas marcadas que venceram: reenvia só as redes cuja hora chegou (as outras seguem esperando a delas).
@@ -610,4 +641,4 @@ async function resubmit(pubId, user) {
   return pub || null;
 }
 
-module.exports = { loadTarget, create, dispatch, refresh, tick, retry, retryDue, stopRetries, recoverInterrupted, precheckScheduled, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };
+module.exports = { loadTarget, create, dispatch, refresh, tick, retry, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };
