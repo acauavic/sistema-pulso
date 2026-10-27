@@ -16,6 +16,14 @@ function formatDateTime(v) {
   return valid(d) ? dateTimeFmt.format(d).replace(',', '') : '—';
 }
 
+// Hora de algo que acontece logo (nova tentativa de publicação): "11:15" se for hoje, "28/10 04:01" em outro dia. Horário de Brasília.
+const hourFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+function formatSoon(v) {
+  const d = toDate(v);
+  if (!valid(d)) return '';
+  return dateFmt.format(d) === dateFmt.format(new Date()) ? hourFmt.format(d) : `${dateFmt.format(d).slice(0, 5)} ${hourFmt.format(d)}`;
+}
+
 function formatDate(v) {
   const d = toDate(v);
   return valid(d) ? dateFmt.format(d) : '—';
@@ -165,7 +173,7 @@ const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice
 
 module.exports = { escHtml, richHtml, commentHtml, initials, relativeDays,
   formatBRL, parseBRL, parseInputDate, toInputDate, formatDay, formatDayShort, formatDayLong, timeParts, formatTime, toInputTime, formatDue, formatDueShort, formatBytes, formatClock,
-  TZ, formatDateTime, formatDate, formatLong, toInputValue, parseInputDateTime,
+  TZ, formatDateTime, formatDate, formatSoon, formatLong, toInputValue, parseInputDateTime,
   shortDate, monthShort, dayNum, todayLabel, greeting,
   slugify, firstName, clean, isEmail,
 };

@@ -4,6 +4,19 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.35.0', date: '2026-10-27', title: 'Publicação com entrega garantida',
+    items: [
+      { kind: 'correcao', text: 'Um corte saiu pela metade no Instagram e falhou nas outras redes porque o armazenamento (Backblaze) parou de entregar uma parte do vídeo, e cada rede baixou só o começo. Agora o vídeo é conferido do começo ao fim antes de ir para qualquer rede: se o arquivo não vem inteiro, nada é enviado, e a publicação espera e tenta de novo sozinha.' },
+      { kind: 'novo', text: 'A rede que falha por motivo passageiro tenta de novo sozinha na hora certa (em 2 min, 10 min, 30 min, 1 h, 3 h e 6 h). A fila compartilhada do YouTube na Outstand volta no horário que ela informa. Só a rede que falhou é reenviada: o que já está no ar fica como está.' },
+      { kind: 'novo', text: 'Cada rede mostra o motivo em português, a hora da nova tentativa ou o que fazer (por exemplo, reconectar a conta). Quem pediu recebe um aviso quando a publicação vai tentar de novo e outro quando sai. Quando precisa de ação, quem pediu e a gestão também são avisados. "Parar novas tentativas" interrompe as tentativas automáticas.' },
+      { kind: 'novo', text: 'A publicação ganhou o "Histórico de envio": cada tentativa, por que começou, o que foi feito com o vídeo e o que cada rede respondeu. Em Gestão > Sistema, "Publicações nas redes" mostra o que está no provedor, o que tem nova tentativa marcada e o que precisa de ação.' },
+      { kind: 'ajuste', text: 'O vídeo dos cortes e as imagens vão pelo armazenamento da Outstand para todas as redes (antes, só para o TikTok). A cópia é reaproveitada nas novas tentativas, sem depender do Backblaze de novo. Para agendados das próximas 3 horas, o material é conferido antes: se estiver ruim, a equipe é avisada com antecedência.' },
+      { kind: 'ajuste', text: 'A duração do corte é conferida por rede antes de agendar: Reels do Facebook vão até 1 min 30 s, Shorts até 3 min, Threads até 5 min, e o TikTok respeita o limite da conta. Antes, um corte longo demais para uma rede fazia a Outstand recusar o post inteiro.' },
+      { kind: 'correcao', text: 'O TikTok não sai mais com o link do Backblaze quando a hospedagem falha: a publicação espera e tenta de novo. Uma rede sem conta reconhecida ou com o TikTok indisponível falha só ela, e as outras saem. Envio que o servidor interrompeu no meio volta sozinho, e envio que ficou sem resposta repete com a mesma chave, sem publicar duas vezes.' },
+      { kind: 'novo', text: 'Vigia do sistema: se o processo que publica e roda a fila parar, ou uma publicação agendada atrasar, a gestão recebe um aviso. Se o banco parar de responder ao processo, ele se reinicia sozinho.' },
+    ],
+  },
+  {
     version: '1.34.0', date: '2026-10-27', title: 'Baixar vários posts de uma vez',
     items: [
       { kind: 'novo', text: 'Em Conteúdo > Posts, cada episódio com 2 ou mais imagens ganhou "Selecionar" e "Baixar tudo". Em "Selecionar" dá para marcar os posts (também clicando na própria imagem) e baixar só os escolhidos; os arquivos saem com o nome do episódio, o tipo e o número, como ep012-post-quote-1.jpg. A barra de seleção fica fixa no topo enquanto você rola. O botão Baixar de cada post continua como antes.' },

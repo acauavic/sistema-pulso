@@ -17,6 +17,7 @@ describe('Zernio como alternativa ao Upload-Post', () => {
     for (const [k, role] of [['gestao', 'gestao'], ['editor', 'editor_video']]) { u[k] = await h.createUser({ name: k, email: `${k}@t.com`, role }); as[k] = h.client(app.base); await as[k].login(`${k}@t.com`); }
     [ep] = await q("INSERT INTO episodes (number, title, status) VALUES (12, 'Episódio Zernio', 'publicado') RETURNING *");
     [cover] = await q("INSERT INTO episode_covers (episode_id, kind, position, spec, storage_key, mime, width, height, size_bytes) VALUES ($1, 'post_quote', 0, '{}', 'pp/capas/a.jpg', 'image/jpeg', 1080, 1350, 1000) RETURNING *", [ep.id]);
+    h.b2Store.set('pp/capas/a.jpg', { body: Buffer.from('jpg'), contentType: 'image/jpeg' }); // o envio confere a imagem no armazenamento
     Object.assign(h.config.zernio, { key: 'zk-test', base: 'https://zernio.test/api', live: false });
     h.config.zernioConfigured = true;
     // a Zernio de mentira: contas, criar post e consultar post

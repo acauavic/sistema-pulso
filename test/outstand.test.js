@@ -27,7 +27,10 @@ describe('Outstand como terceira via para publicar nas redes', () => {
     Object.assign(h.config.outstand, { key: 'ost_teste', base: 'https://outstand.test', live: false }); h.config.outstandConfigured = true;
     global.fetch = async (url, opts = {}) => {
       const s = String(url);
-      if (s.startsWith('https://upload.outstand.test/')) { calls.push({ method: opts.method, path: s.replace('https://upload.outstand.test', 'UPLOAD'), headers: opts.headers, bytes: opts.body ? 'stream' : null }); if (opts.body && opts.body.getReader) await opts.body.cancel().catch(() => {}); return new Response(null, { status: 200 }); }
+      if (s.startsWith('https://upload.outstand.test/')) { // o PUT lê o arquivo inteiro (como o armazenamento de verdade)
+        let n = 0; if (opts.body?.getReader) { const r = opts.body.getReader(); for (;;) { const { done, value } = await r.read(); if (done) break; n += value.byteLength; } }
+        calls.push({ method: opts.method, path: s.replace('https://upload.outstand.test', 'UPLOAD'), headers: opts.headers, bytes: n }); return new Response(null, { status: 200 });
+      }
       if (s.startsWith('https://s3.test-region.backblazeb2.com/') && (opts.method || 'GET') === 'GET') return new Response('video-bytes', { status: 200, headers: { 'content-length': '11' } });
       if (!s.startsWith('https://outstand.test')) return realFetch(url, opts);
       const method = opts.method || 'GET'; const path = s.replace('https://outstand.test', '');
@@ -145,7 +148,7 @@ describe('Outstand como terceira via para publicar nas redes', () => {
       assert.equal(pub.status, 'enviando'); assert.equal(pub.provider, 'outstand'); assert.equal(pub.request_id, 'op1');
       const req = sent();
       assert.equal(req.headers.Authorization, 'Bearer ost_teste'); assert.ok(req.headers['Idempotency-Key'].startsWith(`pulso-${pub.id}-`));
-      assert.deepEqual(req.body.accounts, ['IG1']); assert.match(req.body.containers[0].media[0].url, /X-Amz-Signature/); assert.equal(req.body.scheduledAt, undefined, 'envio imediato: o agendamento é nosso');
+      assert.deepEqual(req.body.accounts, ['IG1']); assert.match(req.body.containers[0].media[0].url, /^https:\/\/media\.outstand\.test\//, 'a imagem vai pelo armazenamento da Outstand, conferida ao subir'); assert.equal(req.body.scheduledAt, undefined, 'envio imediato: o agendamento é nosso');
       assert.deepEqual(req.body.instagram.collaborators, ['lia.prado']); assert.deepEqual(req.body.instagram.userTags, [{ username: 'ana', x: 0.1, y: 0.9 }]);
       assert.deepEqual(pub.options.provider_warnings, ['instagram rejects videos containing edit lists.']);
       assert.equal((await publishing.refresh(pub.id)).status, 'enviando', 'ainda publicando');
@@ -153,7 +156,7 @@ describe('Outstand como terceira via para publicar nas redes', () => {
       const done = await publishing.refresh(pub.id);
       assert.equal(done.status, 'publicado'); assert.equal(done.results[0].url, 'https://www.instagram.com/p/abc/'); assert.equal(done.results[0].platform, 'instagram');
       const page = (await as.gestao.get(`/social/publicacoes/${pub.id}`)).text;
-      assert.match(page, /Aviso da Outstand: instagram rejects videos/);
+      assert.match(page, /Aviso da Outstand: o vídeo tem lista de edição \(edit list\), que o Instagram às vezes recusa/, 'o aviso conhecido aparece em português');
     } finally { h.config.outstand.live = false; }
   });
 
@@ -180,9 +183,10 @@ describe('Outstand como terceira via para publicar nas redes', () => {
     h.config.outstand.live = true; ost.resetCache(); state.accounts = ACCOUNTS();
     try {
       calls.length = 0;
+      await h.db.query('DELETE FROM hosted_media');
       const pub = await publishing.create({ clipId: clip.id, platforms: ['youtube', 'tiktok', 'instagram'], title: 'Corte parcial', description: 'Legenda', userId: u.gestao.id });
       assert.equal(sent().body.containers[0].media[0].url.startsWith('https://media.outstand.test/'), true, 'o TikTok não baixa do Backblaze: o vídeo foi hospedado na Outstand');
-      assert.ok(calls.some((c) => c.path === 'UPLOAD/put/m1' && c.method === 'PUT') && calls.some((c) => c.path === '/v1/media/m1/confirm'));
+      assert.ok(calls.some((c) => c.path === 'UPLOAD/put/m1' && c.method === 'PUT' && c.bytes === 11) && calls.some((c) => c.path === '/v1/media/m1/confirm'), 'subiu o arquivo inteiro e confirmou');
       state.post.socialAccounts = state.post.socialAccounts.map((a) => (a.network === 'instagram' ? { ...a, status: 'published', platformPostId: 'ig7', platformPostUrl: 'https://www.instagram.com/reel/ok/' } : { ...a, status: 'failed', error: a.network === 'youtube' ? 'Shared YouTube upload capacity is waiting for the next release.' : 'TikTok API error (url_ownership_unverified)' }));
       const partial = await publishing.refresh(pub.id);
       assert.equal(partial.status, 'parcial');
@@ -215,6 +219,7 @@ describe('Outstand como terceira via para publicar nas redes', () => {
       state.tiktokOptions = ['SELF_ONLY'];
       const bad = await publishing.create({ clipId: clip.id, platforms: ['tiktok'], title: 'T', description: 'D', userId: u.gestao.id });
       assert.equal(bad.status, 'erro'); assert.match(bad.error, /só aceita publicar como SELF_ONLY pela Outstand.*rascunho/);
+      assert.equal(bad.retry_at, null, 'precisa de ação: não tenta de novo sozinho'); assert.match(bad.results[0].hint, /só publica como privado: em Integrações, mande o TikTok como rascunho/);
       await ost.setTiktokMode('rascunho'); calls.length = 0;
       const pub = await publishing.create({ clipId: clip.id, platforms: ['tiktok'], title: 'T2', description: 'D2', userId: u.gestao.id });
       assert.equal(sent().body.tiktok.postMode, 'MEDIA_UPLOAD'); assert.equal(sent().body.tiktok.privacyLevel, undefined);
@@ -243,9 +248,16 @@ describe('Outstand como terceira via para publicar nas redes', () => {
       const requeued = await publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['instagram'], title: 'P3', description: 'L3', userId: u.gestao.id });
       assert.equal(requeued.status, 'enviando'); assert.ok(calls.some((c) => c.method === 'PATCH' && c.body.scheduledAt), 'reagendou para entrar na fila');
       state.notScheduled = false;
+      // a Outstand descartou a conta do YouTube em silêncio: o post saiu para o Instagram, então SÓ o YouTube fica com erro
+      // (antes virava "erro" na publicação inteira e o reenvio duplicava o Instagram)
       state.accounts = ACCOUNTS(); state.drop = true;
       const dropped = await publishing.create({ clipId: clip.id, platforms: ['youtube', 'instagram'], title: 'D', description: 'D', userId: u.gestao.id });
-      assert.equal(dropped.status, 'erro'); assert.match(dropped.error, /não reconheceu uma das contas conectadas/);
+      assert.equal(dropped.status, 'enviando'); assert.match(dropped.results.find((r) => r.platform === 'youtube').error, /não reconheceu a conta conectada/);
+      state.post.socialAccounts[0] = { ...state.post.socialAccounts[0], status: 'published', platformPostId: 'igd' };
+      const after = await publishing.refresh(dropped.id);
+      assert.equal(after.status, 'parcial');
+      const yt = after.results.find((r) => r.platform === 'youtube');
+      assert.equal(yt.code, 'sem_conta'); assert.equal(yt.retry_at, null); assert.match(yt.hint, /reconectada|conta conectada/);
       state.drop = false;
       await assert.rejects(publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['threads'], title: 'P', description: 'L', userId: u.gestao.id }), /Sem conta conectada na Outstand: Threads/);
       assert.equal((await ost.status({ request_id: 'nope' })).state, 'erro');

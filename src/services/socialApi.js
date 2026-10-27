@@ -22,13 +22,9 @@ const PROVIDERS = {
     id: 'outstand', label: 'Outstand', by: 'pela Outstand', to: 'à Outstand', at: 'na Outstand', of: 'da Outstand', env: 'OUTSTAND_API_KEY', liveEnv: 'OUTSTAND_LIVE',
     configured: () => config.outstandConfigured, live: () => config.outstand.live,
     connected: (o) => ost.connected(o), resetCache: () => ost.resetCache(),
-    sendVideo: async (args) => {
-      // o TikTok não baixa do Backblaze (domínio não verificado no app dele): o vídeo vai antes para o armazenamento da Outstand
-      if (config.outstand.live && args.platforms.includes('tiktok') && args.videoUrl) {
-        try { args = { ...args, videoUrl: await ost.hostMedia(args.videoUrl, { filename: ost.fileOf(args.videoUrl, 'corte.mp4') }) }; } catch (err) { console.error('[outstand] não consegui hospedar o vídeo para o TikTok:', err.message); }
-      }
-      return ost.send(ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: await ost.processMedia() }));
-    },
+    // o vídeo e as imagens chegam aqui já hospedados no armazenamento da Outstand (publishing.prepareMedia): o TikTok só busca de
+    // domínio verificado, e se a hospedagem falha a publicação espera e tenta de novo (nunca sai com o link do Backblaze)
+    sendVideo: async (args) => ost.send({ ...ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: await ost.processMedia() }), _durationSec: args.durationSec || null }),
     sendPhotos: async (args) => ost.send(ost.buildPhotoPost({ ...args, tiktokMode: await ost.tiktokMode() })),
     status: ({ request_id, job_id }) => ost.status({ request_id, job_id }),
     canEdit: false, // a Outstand só edita post que ainda não saiu (e o agendamento é nosso): depois de publicado, edite pelo app da rede
@@ -157,6 +153,7 @@ function sentMessage(pub, { trail = '' } = {}) {
   if (pub.status === 'revisao') return 'Enviado para a revisão da gestão. Você recebe um aviso quando for aprovado ou devolvido.';
   if (pub.status === 'simulado') return `Modo de teste: o pedido foi montado e conferido, mas NADA foi enviado ${joinNames(ps.map((x) => x.by))}. A publicação de verdade é ligada em Integrações > Redes sociais.`;
   if (pub.status === 'agendado') return 'Publicação agendada.';
+  if (pub.status === 'erro' && pub.retry_at) return `Ainda não saiu. ${pub.error}`;
   if (pub.status === 'erro') return `Não foi possível enviar: ${pub.error}`;
   return `Enviado ${joinNames(ps.map((x) => x.to))}.${trail}`;
 }

@@ -26,14 +26,14 @@
 <% } %>
 <% if (epPubs.length) { %>
 <ul class="pubs">
-  <% epPubs.forEach(function (p) { var b = PUB2[p.status]; %>
+  <% epPubs.forEach(function (p) { var b = p.retry_at && PUB2[p.status] ? ['b-amber', 'nova tentativa às ' + fmt.formatSoon(p.retry_at)] : PUB2[p.status]; %>
   <li>
     <div class="row"><span class="badge <%= b[0] %>"><%= b[1] %></span><strong><%= p.title %></strong><span class="handle muted"><%= fmt.formatDateTime(p.scheduled_at && p.status === 'agendado' ? p.scheduled_at : p.created_at) %></span></div>
-    <% (p.results || []).forEach(function (r) { %><p class="small <%= r.ok ? '' : 'err' %>"><%= UP2[r.platform] ? UP2[r.platform].label : r.platform %>: <%= r.simulated ? 'simulado, nada enviado' : (r.ok ? (r.url ? '' : (r.note || 'ok')) : (r.error || r.status)) %><% if (r.url && /^https?:\/\//.test(r.url)) { %> <a href="<%= r.url %>" target="_blank" rel="noopener">abrir no YouTube</a><% } %></p><% }) %>
-    <% if (p.error) { %><p class="small err"><%= p.error %></p><% } %>
+    <% (p.results || []).forEach(function (r) { %><p class="small <%= r.ok || r.retry_at ? '' : 'err' %>"><%= UP2[r.platform] ? UP2[r.platform].label : r.platform %>: <%= r.simulated ? 'simulado, nada enviado' : (r.ok ? (r.url ? '' : (r.note || 'ok')) : (r.hint || r.error || r.status)) %><% if (r.url && /^https?:\/\//.test(r.url)) { %> <a href="<%= r.url %>" target="_blank" rel="noopener">abrir no YouTube</a><% } %></p><% }) %>
+    <% if (p.error && !(p.results || []).some(function (r) { return r.hint; })) { %><p class="small err"><%= p.error %></p><% } %>
     <% if (perm.review) { %><p class="row small">
       <% if (p.status === 'enviando') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
-      <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
+      <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.retry_at ? 'reenviar agora' : p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
       <% if (p.status === 'agendado') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
     </p><% } %>
   </li>

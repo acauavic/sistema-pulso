@@ -607,8 +607,12 @@ span.dot:not([data-dot]) { cursor: default; }
 .rule-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .rule-row:last-child { border-bottom: 0; } .rule-row h3 { margin: 0 0 2px; font-size: 15px; }
 .pub-media { display: flex; gap: 8px; flex-wrap: wrap; } .pub-media img { width: 140px; border-radius: 4px; background: var(--raised); }
-.results li { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); } .results li:last-child { border-bottom: 0; }
+.results li { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--line); } .results li:last-child { border-bottom: 0; }
 .bad-text { color: var(--bad); }
+/* Histórico de envio da publicação: uma tentativa por linha (data em mono, motivo, o que foi feito com o arquivo, chip por rede) */
+.attempt-list { margin: 0; padding: 0; display: grid; gap: 0; }
+.attempt-list > li { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); } .attempt-list > li:first-child { border-top: 0; }
+.attempt-list p { margin: 0; }
 .p-0 { padding: 0; }
 dialog.modal.modal-wide { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; }
 

@@ -174,8 +174,28 @@ function parseChapters(text, { durationMs = null, titleMax = LIMITS.spotify.chap
 }
 const formatChapters = (chapters) => chapters.map((c) => `${toClock(c.at_ms)} ${c.title}`).join('\n');
 
+// Duração aceita para cortes (vídeo vertical), em segundos [mínimo, máximo]. Fora disso a Outstand recusa o post INTEIRO (422), e
+// nenhuma rede recebe: por isso conferimos antes de agendar. Fontes: documentação da Outstand (Reels do Facebook 3 a 90 s; Reels do
+// Instagram 3 s a 15 min; Threads até 5 min), YouTube Shorts até 3 min, TikTok até 10 min (a conta pode ter menos: conferido no envio),
+// LinkedIn 3 s a 10 min (conservador). O X aceita 2 min e 20 s em conta comum: é só aviso (pode ser conta Premium).
+const CLIP_SECONDS = { instagram: [3, 900], facebook: [3, 90], threads: [1, 300], youtube: [1, 180], tiktok: [3, 600], linkedin: [3, 600] };
+const X_SECONDS = 140;
+function checkClipDuration(platforms, durationMs, labelOf = (p) => p) {
+  const issues = []; const warnings = [];
+  const s = Number(durationMs) / 1000;
+  if (!Number.isFinite(s) || s <= 0) return { issues, warnings };
+  const clock = (n) => (n >= 60 ? `${Math.floor(n / 60)} min${n % 60 ? ` ${Math.round(n % 60)} s` : ''}` : `${Math.round(n)} s`);
+  for (const p of platforms) {
+    if (p === 'x') { if (s > X_SECONDS) warnings.push(`X: o vídeo tem ${clock(s)}; conta comum aceita até ${clock(X_SECONDS)}.`); continue; }
+    const lim = CLIP_SECONDS[p]; if (!lim) continue;
+    if (s < lim[0]) issues.push(`${labelOf(p)}: o vídeo tem ${clock(s)} e a rede pede pelo menos ${clock(lim[0])}.`);
+    if (s > lim[1]) issues.push(`${labelOf(p)}: o vídeo tem ${clock(s)} e a rede aceita até ${clock(lim[1])}. Tire esta rede ou use um corte mais curto.`);
+  }
+  return { issues, warnings };
+}
+
 module.exports = {
-  LIMITS, utf8, tidy, stripAngles, balanceQuotes, fitWords, fitBytes, capsRatio, check, hashtagsIn, fitTags, thumbnailLines,
-  checkYoutubeTitle, checkYoutubeDescription, checkSpotifyTitle, checkSpotifyDescription, checkInstagramCaption, checkTiktokCaption,
+  LIMITS, CLIP_SECONDS, utf8, tidy, stripAngles, balanceQuotes, fitWords, fitBytes, capsRatio, check, hashtagsIn, fitTags, thumbnailLines,
+  checkYoutubeTitle, checkYoutubeDescription, checkSpotifyTitle, checkSpotifyDescription, checkInstagramCaption, checkTiktokCaption, checkClipDuration,
   toClock, parseClock, parseChapters, formatChapters,
 };

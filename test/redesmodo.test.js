@@ -14,6 +14,7 @@ describe('Integrações: ligar e desligar a publicação de verdade pelo painel'
     for (const [k, role] of [['gestao', 'gestao'], ['admin', 'superadmin'], ['prod', 'produtora']]) { u[k] = await h.createUser({ name: k, email: `${k}@t.com`, role }); as[k] = h.client(app.base); await as[k].login(`${k}@t.com`); }
     [ep] = await q("INSERT INTO episodes (number, title, status) VALUES (30, 'Ep modo', 'publicado') RETURNING *");
     [cover] = await q("INSERT INTO episode_covers (episode_id, kind, position, spec, storage_key, mime, width, height, size_bytes) VALUES ($1, 'post_quote', 0, '{}', 'pp/capas/m.jpg', 'image/jpeg', 1080, 1350, 1000) RETURNING *", [ep.id]);
+    h.b2Store.set('pp/capas/m.jpg', { body: Buffer.from('jpg'), contentType: 'image/jpeg' }); // o envio confere a imagem no armazenamento
     h.uploadPostState.accounts = { instagram: { handle: 'pulso', display_name: 'Pulso' } };
   });
   after(async () => { h.config.uploadPost.live = false; await app.close(); await h.db.close(); });

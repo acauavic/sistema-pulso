@@ -45,9 +45,28 @@ async function findPub(id) {
   return p || null;
 }
 
+// Histórico de envio: por que a tentativa começou e o que foi feito com o arquivo (hospedado na Outstand, conferido no Backblaze).
+const TRIGGER = { agora: 'Envio na hora', agendado: 'No horário agendado', aprovado: 'Aprovado pela gestão', manual: 'Reenvio pedido', automatico: 'Nova tentativa automática', retomado: 'Retomado' };
+function mediaText(media) {
+  const files = media?.files || [];
+  return files.map((f) => {
+    if (f.erro) return `${f.arquivo}: ilegível, saiu sem`;
+    const size = f.bytes ? ` (${fmt.formatBytes(f.bytes)})` : '';
+    if (f.onde === 'outstand') return `${f.arquivo}${size} ${f.reaproveitado ? 'já estava na Outstand' : `hospedado na Outstand${f.ms ? ` em ${Math.max(1, Math.round(f.ms / 1000))} s` : ''}`}`;
+    return `${f.arquivo}${size} conferido no Backblaze${f.conferido === 'partes' ? ' parte a parte' : ''}`;
+  }).join(' · ');
+}
+// Avisos que a Outstand manda em inglês, traduzidos (os conhecidos) para a equipe.
+function warningText(w) {
+  if (/edit lists?/i.test(w)) return 'o vídeo tem lista de edição (edit list), que o Instagram às vezes recusa. Até agora ele tem aceitado; se recusar, ligue "Ajustar o vídeo para cada rede" em Integrações.';
+  if (/moov|faststart/i.test(w)) return 'o índice do vídeo está no fim do arquivo, o que o Instagram recusa. Exporte com "início rápido" (faststart) ou ligue "Ajustar o vídeo para cada rede" em Integrações.';
+  return w;
+}
+
 router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (req, res) => {
   const pub = await findPub(req.params.id);
   if (!pub) return notFound(res);
+  const attempts = (await publishing.attemptsOf(pub.id)).map((a) => ({ ...a, triggerLabel: TRIGGER[a.trigger] || a.trigger, mediaText: mediaText(a.media) }));
   const okPlatforms = (pub.results || []).filter((r) => r.ok).map((r) => r.platform);
   const providers = socialApi.providersOf(pub); // um, ou vários quando as redes foram divididas entre provedores
   const viaOf = (p) => socialApi.get((pub.results || []).find((r) => r.platform === p)?.provider || pub.options?.routes?.[p] || pub.provider);
@@ -57,7 +76,7 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
     providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
     testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
     editable: okPlatforms.filter(canEditNet), notEditable: okPlatforms.filter((p) => !canEditNet(p)),
-    canPublish: can(req.user.role, 'social.publish'), mine: String(pub.created_by) === String(req.user.id),
+    canPublish: can(req.user.role, 'social.publish'), mine: String(pub.created_by) === String(req.user.id), attempts, warningText,
   });
 }));
 
@@ -102,13 +121,14 @@ router.post('/social/publicacoes/:id/recusar', requirePerm('social.publish'), wr
   res.redirect(`/social/publicacoes/${pub.id}`);
 }));
 
-router.post('/social/publicacoes/:id/:acao(atualizar|repetir|cancelar)', requirePerm('social.read'), wrap(async (req, res) => {
+router.post('/social/publicacoes/:id/:acao(atualizar|repetir|parar|cancelar)', requirePerm('social.read'), wrap(async (req, res) => {
   const pub = await findPub(req.params.id);
   if (!pub) return notFound(res);
-  if (req.params.acao === 'repetir' && !can(req.user.role, 'social.publish')) return forbidden(res);
+  if (['repetir', 'parar'].includes(req.params.acao) && !can(req.user.role, 'social.publish')) return forbidden(res);
   if (req.params.acao === 'cancelar' && !canTouch(req, pub)) return forbidden(res);
   if (req.params.acao === 'atualizar') await publishing.refresh(pub.id);
-  if (req.params.acao === 'repetir') await publishing.retry(pub.id);
+  if (req.params.acao === 'repetir') { const r = await publishing.retry(pub.id); await audit(req, 'publicacao.reenviada', 'publication', pub.id); if (r) await req.flash(r.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(r)); }
+  if (req.params.acao === 'parar') { if (await publishing.stopRetries(pub.id)) { await audit(req, 'publicacao.tentativas_paradas', 'publication', pub.id); await req.flash('ok', 'Novas tentativas automáticas paradas. Reenvie quando quiser.'); } }
   if (req.params.acao === 'cancelar') { await publishing.cancel(pub.id); await req.flash('ok', pub.status === 'agendado' ? 'Agendamento cancelado.' : 'Pedido retirado.'); return res.redirect('/social/publicacoes'); }
   res.redirect(`/social/publicacoes/${pub.id}`);
 }));

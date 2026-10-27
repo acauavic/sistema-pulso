@@ -26,6 +26,8 @@ describe('Uma rede por provedor (X pela Zernio, o resto pela Outstand) e vigia d
     [ep] = await q("INSERT INTO episodes (number, title, status) VALUES (41, 'Episódio rotas', 'publicado') RETURNING *");
     [cover] = await q("INSERT INTO episode_covers (episode_id, kind, position, spec, storage_key, mime, width, height, size_bytes) VALUES ($1, 'post_quote', 0, '{}', 'pp/capas/r.jpg', 'image/jpeg', 1080, 1350, 1000) RETURNING *", [ep.id]);
     [clip] = await q("INSERT INTO episode_clips (title, source, status, episode_id, storage_key, width, height, duration_ms) VALUES ('Corte R', 'upload', 'pronto', $1, 'pp/r.mp4', 1080, 1920, 30000) RETURNING *", [ep.id]);
+    h.b2Store.set('pp/r.mp4', { body: Buffer.from('video-corte'), contentType: 'video/mp4' }); // o envio confere o arquivo no armazenamento
+    h.b2Store.set('pp/capas/r.jpg', { body: Buffer.from('jpg'), contentType: 'image/jpeg' });
     Object.assign(h.config.outstand, { key: 'ost_t', base: 'https://outstand.test', live: false }); h.config.outstandConfigured = true;
     Object.assign(h.config.zernio, { key: 'zk_t', base: 'https://zernio.test/api', live: false }); h.config.zernioConfigured = true;
     st.oAccounts = [oAcc('IG1', 'instagram', 'podcastpulso'), oAcc('YT1', 'youtube', 'pulsobr')];
@@ -45,8 +47,11 @@ describe('Uma rede por provedor (X pela Zernio, o resto pela Outstand) e vigia d
           return Response.json({ success: true, post: st.oPost });
         }
         if (method === 'GET' && path === '/v1/posts/op9') return Response.json({ success: true, post: st.oPost });
+        if (method === 'POST' && path === '/v1/media/upload') return Response.json({ success: true, data: { id: 'mr1', upload_url: 'https://upload.outstand.test/put/mr1', expires_in: 3600 } });
+        if (method === 'POST' && path === '/v1/media/mr1/confirm') return Response.json({ success: true, data: { id: 'mr1', url: `https://media.outstand.test/mr1/${body?.size || 0}`, status: 'active' } });
         return Response.json({ error: 'sem rota' }, { status: 404 });
       }
+      if (s.startsWith('https://upload.outstand.test/')) { const r = opts.body.getReader(); for (;;) { const { done } = await r.read(); if (done) break; } return new Response(null, { status: 200 }); }
       if (s.startsWith('https://zernio.test/api')) {
         const path = s.replace('https://zernio.test/api', ''); calls.push({ who: 'zernio', method, path, body, headers: opts.headers });
         if (st.zDown) return Response.json({ error: 'fora do ar' }, { status: 503 });

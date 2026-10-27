@@ -76,6 +76,9 @@ async function main() {
     }).listen(config.port, () => console.log(`Pulso Gestão (worker) rodando a fila e as rotinas; saúde em :${config.port}/healthz`));
   }
 
+  // Vigia: o painel avisa a gestão se o worker parar ou um agendado atrasar; o worker se reinicia se o banco parar de responder.
+  require('./services/watchdog').start({ web: runsWeb, worker: runsWorker });
+
   // Encerramento: para de pegar trabalho novo, espera o atual (até 8 s) e fecha as conexões.
   const shutdown = async (signal) => {
     console.log(`${signal} recebido, encerrando...`);

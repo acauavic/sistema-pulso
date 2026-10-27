@@ -64,24 +64,42 @@
         <% if (igo && igo.tags && igo.tags.length) { %><dt>Marcados</dt><dd class="pub-people mono"><% igo.tags.forEach(function (t) { %><span>@<%= t.username %></span><% }) %></dd><% } %>
       </dl>
       <% if (igo && igo.collaborators && igo.collaborators.length) { %><p class="small muted">O convite de collab chega para cada perfil no Instagram: o post só aparece no perfil deles depois que aceitarem.</p><% } %>
-      <% (pub.options && pub.options.provider_warnings || []).forEach(function (w) { %><p class="notice small"><%- icon('info', 14) %> Aviso <%= providers.some(function (p) { return p.id === 'outstand'; }) ? 'da Outstand' : 'do provedor' %>: <%= w %></p><% }) %>
+      <% (pub.options && pub.options.provider_warnings || []).forEach(function (w) { %><p class="notice small"><%- icon('info', 14) %> Aviso <%= providers.some(function (p) { return p.id === 'outstand'; }) ? 'da Outstand' : 'do provedor' %>: <%= warningText(w) %></p><% }) %>
+      <% if (pub.retry_at) { %><p class="notice small top-gap"><%- icon('refresh-cw', 14) %> <span>Nova tentativa automática às <span class="mono"><%= fmt.formatSoon(pub.retry_at) %></span>. Quem pediu recebe um aviso quando sair.</span></p><% } %>
       <ul class="plain results top-gap">
-        <% pub.platforms.forEach(function (k) { var r = (pub.results || []).find(function (x) { return x.platform === k; }) || {}; %>
+        <% pub.platforms.forEach(function (k) { var r = (pub.results || []).find(function (x) { return x.platform === k; }) || {}; var again = !r.ok && r.retry_at; %>
         <li>
           <strong><%= label(k) %></strong>
-          <span class="badge <%= r.draft ? 'b-amber' : r.ok ? (r.simulated ? 'b-gray' : 'b-green') : (r.error ? 'b-red' : 'b-amber') %>"><%= r.simulated ? 'Simulado' : r.draft ? 'Rascunho' : r.ok ? 'No ar' : r.error ? 'Erro' : (pub.status === 'agendado' ? 'Agendado' : pending ? 'Não enviado' : 'Aguardando') %></span>
+          <span class="badge <%= r.draft ? 'b-amber' : r.ok ? (r.simulated ? 'b-gray' : 'b-green') : again ? 'b-amber' : (r.error ? 'b-red' : 'b-amber') %>"><%= r.simulated ? 'Simulado' : r.draft ? 'Rascunho' : r.ok ? 'No ar' : again ? 'Nova tentativa' : r.error ? (r.action ? 'Precisa de ação' : 'Erro') : (pub.status === 'agendado' ? 'Agendado' : pending ? 'Não enviado' : 'Aguardando') %></span>
+          <% if (again) { %><span class="mono small">às <%= fmt.formatSoon(r.retry_at) %></span><% } %>
           <% if (r.url) { %><a class="small" href="<%= r.url %>" target="_blank" rel="noopener noreferrer">abrir <%- icon('external-link', 14) %></a><% } %>
-          <% if (r.error) { %><span class="small bad-text"><%= r.error %></span><% } %>
+          <% if (!r.ok && r.hint) { %><span class="small <%= again ? '' : 'bad-text' %>"><%= r.hint %></span><span class="small muted">Resposta: <%= r.error %></span><% } else if (r.error) { %><span class="small bad-text"><%= r.error %></span><% } %>
           <% if (r.note) { %><span class="small muted"><%= r.note %></span><% } %>
         </li>
         <% }) %>
       </ul>
-      <% if (pub.error) { %><p class="flash flash-error top-gap"><%= pub.error %></p><% } %>
+      <% if (pub.error && !(pub.results || []).some(function (r) { return r.hint; })) { %><p class="flash flash-error top-gap"><%= pub.error %></p><% } %>
       <div class="row top-gap">
         <% if (pub.status === 'enviando') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/atualizar" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw') %> Atualizar andamento</button></form><% } %>
-        <% if (canPublish && (pub.status === 'erro' || pub.status === 'parcial')) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%= pub.status === 'parcial' ? 'Reenviar as que falharam' : 'Tentar de novo' %></button></form><% } %>
+        <% if (canPublish && (pub.status === 'erro' || pub.status === 'parcial')) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%= pub.retry_at ? 'Reenviar agora' : pub.status === 'parcial' ? 'Reenviar as que falharam' : 'Tentar de novo' %></button></form><% } %>
+        <% if (canPublish && pub.retry_at) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/parar" class="inline" data-confirm="Parar as novas tentativas automáticas? A publicação fica como está e você reenvia quando quiser."><%- csrfField %><button class="link small" type="submit">Parar novas tentativas</button></form><% } %>
         <% if (canPublish && pub.status === 'agendado') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><%- csrfField %><button class="btn sm ghost" type="submit">Cancelar agendamento</button></form><% } %>
       </div>
+      <% if (attempts.length) { %>
+      <details class="attempts top-gap">
+        <summary>Histórico de envio <span class="mono muted"><%= attempts.length %></span></summary>
+        <ol class="plain attempt-list">
+          <% attempts.forEach(function (a) { %>
+          <li>
+            <div class="row"><span class="mono small"><%= fmt.formatDateTime(a.started_at) %></span><span class="small muted"><%= a.triggerLabel %></span><% if (!a.finished_at) { %><span class="small muted">· em andamento</span><% } %></div>
+            <% if (a.mediaText) { %><p class="small muted"><%= a.mediaText %></p><% } %>
+            <% if (a.error) { %><p class="small bad-text"><%= a.error %></p><% } %>
+            <% if ((a.outcome || []).length) { %><div class="row attempt-nets"><% a.outcome.forEach(function (o) { %><span class="badge <%= o.ok ? 'b-gray' : o.retry_at ? 'b-amber' : 'b-red' %>"><%= label(o.platform) %> · <%= o.ok ? 'saiu' : o.retry_at ? 'de novo às ' + fmt.formatSoon(o.retry_at) : 'falhou' %></span><% }) %></div><% } %>
+          </li>
+          <% }) %>
+        </ol>
+      </details>
+      <% } %>
     </section>
     <% if (images.length) { %>
     <section class="card">

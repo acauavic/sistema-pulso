@@ -13,10 +13,19 @@
 // - Editar: PATCH /v1/posts/:id só vale para post que AINDA NÃO saiu (409 depois de publicado). Como o agendamento é nosso, editar agendado
 //   já é feito aqui; depois de publicado, edite no app da rede (o provedor informa canEdit: false).
 // - POST /v1/posts aceita Idempotency-Key (24 h): a mesma chave repetida devolve o mesmo post, então é seguro repetir em falha de rede.
+// - Docs relidas em 27/10/2026 (llms-full.txt): o envio às redes é assíncrono e cada conta falha sozinha (parcial é normal); falha
+//   "terminal" não é repetida por eles, e para repetir cria-se um post NOVO só com as contas que falharam. YouTube por chaves gerenciadas
+//   usa uma fila compartilhada (100 envios por dia para todos, liberados a cada 15 min, 5 por organização antes das 4 h finais do dia
+//   do Pacífico; agendar não reserva vaga; o erro traz [youtube_upload_error:<motivo>; retryAt=<ISO>]). A Outstand só confere o
+//   cabeçalho do vídeo (probe): um arquivo que o armazenamento entrega pela metade passa e as redes recebem só o começo, por isso
+//   conferimos e hospedamos antes (publishing.prepareMedia). Apagar na rede (DELETE /v1/posts/:id/remote) não vale para Instagram
+//   nem TikTok. A mídia hospedada vence em 60 dias.
 const crypto = require('crypto');
 const config = require('../config');
+const db = require('../db/pool');
 const settings = require('./settings');
 const L = require('./platformLimits');
+const { cause, mediaError, mb } = require('./mediaCheck');
 
 const NETWORKS = ['youtube', 'tiktok', 'instagram', 'facebook', 'threads', 'linkedin', 'x']; // os mesmos nomes do painel
 const api = (path) => `${config.outstand.base}${path}`;
@@ -30,8 +39,12 @@ function reason(json, status) {
   if (e?.message) return e.message;
   return json?.message || (status === 402 ? 'assinatura da Outstand inativa' : status === 401 ? 'chave da Outstand inválida' : 'erro desconhecido');
 }
-const fail = (res, json) => Object.assign(new Error(`Outstand recusou (${res.status}): ${reason(json, res.status)}`), { status: res.status });
+// code (ver publishErrors): chave/assinatura (401/402/403) para e pede ação; 5xx é passageiro; 400/422 é o pedido recusado.
+const CODE_OF = (s) => (s === 401 || s === 402 || s === 403 ? 'provedor_chave' : s >= 500 ? 'provedor_fora' : s === 400 || s === 422 ? 'recusado' : undefined);
+const fail = (res, json) => Object.assign(new Error(`Outstand recusou (${res.status}): ${reason(json, res.status)}`), { status: res.status, code: CODE_OF(res.status) });
 
+// ambiguous: o POST pode ter criado o post mesmo sem resposta (rede caiu, 5xx, tempo esgotado). Quem chama guarda a chave e
+// repete com ELA (a Outstand devolve o mesmo post por 24 h), em vez de criar outro e publicar duas vezes.
 async function call(method, path, { body = null, idempotency = null, timeout = 30_000, retries = 0 } = {}) {
   if (!config.outstandConfigured) throw new Error('OUTSTAND_API_KEY não configurada.');
   let last;
@@ -42,12 +55,13 @@ async function call(method, path, { body = null, idempotency = null, timeout = 3
         body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(timeout),
       });
       const json = await res.json().catch(() => ({}));
-      if (res.status >= 500 && attempt < retries) { last = fail(res, json); continue; } // 5xx: repete com a MESMA chave (sem duplicar)
-      if (!res.ok) throw fail(res, json);
+      if (res.status >= 500 && attempt < retries) { last = Object.assign(fail(res, json), { ambiguous: Boolean(idempotency) }); continue; } // 5xx: repete com a MESMA chave (sem duplicar)
+      if (!res.ok) throw Object.assign(fail(res, json), { ambiguous: Boolean(idempotency) && res.status >= 500 });
       return { status: res.status, json, replayed: res.headers.get('idempotency-replayed') === 'true' };
     } catch (err) {
-      if (err.status || attempt >= retries) throw err; // erro da API (4xx) não se repete; falha de rede, sim
-      last = err;
+      if (err.status) throw err; // erro da API (4xx) não se repete; falha de rede, sim
+      last = Object.assign(new Error(`Outstand sem resposta: ${cause(err)}`), { code: 'provedor_fora', ambiguous: Boolean(idempotency) });
+      if (attempt >= retries) throw last;
     }
   }
   throw last;
@@ -135,10 +149,11 @@ function networkBlocks(platforms, { kind, media, title, description, coverUrl, t
 const idempotencyKey = (id) => `pulso-${id}-${crypto.randomBytes(6).toString('hex')}`;
 const accountIds = (platforms, accounts) => platforms.map((p) => accounts[p]?.accountId).filter(Boolean);
 const missingOf = (platforms, accounts) => platforms.filter((p) => !accounts[p]?.accountId);
+const accountMap = (platforms, accounts) => Object.fromEntries(platforms.filter((p) => accounts[p]?.accountId).map((p) => [p, accounts[p].accountId]));
 const fileOf = (url, fallback) => { try { const n = decodeURIComponent(new URL(url).pathname.split('/').pop() || ''); return /\.[A-Za-z0-9]{2,4}$/.test(n) ? n : fallback; } catch { return fallback; } };
 
-// Corpo do POST /v1/posts para um vídeo (episódio ou corte).
-function buildPost({ id, kind, platforms, title, description, videoUrl, coverUrl, thumbnailUrl, tags = [], accounts = {}, instagram = null, tiktokMode: mode = 'direto', scheduledAt = null, processMedia: process = false }) {
+// Corpo do POST /v1/posts para um vídeo (episódio ou corte). idempotencyKey: a chave de um envio anterior sem resposta (repete sem duplicar).
+function buildPost({ id, kind, platforms, title, description, videoUrl, coverUrl, thumbnailUrl, tags = [], accounts = {}, instagram = null, tiktokMode: mode = 'direto', scheduledAt = null, processMedia: process = false, idempotencyKey: key = null }) {
   const caption = description || title;
   const tiktokPostMode = mode === 'rascunho' ? 'MEDIA_UPLOAD' : 'DIRECT_POST';
   return {
@@ -147,19 +162,19 @@ function buildPost({ id, kind, platforms, title, description, videoUrl, coverUrl
     ...(process ? { processMedia: true } : {}),
     ...(scheduledAt ? { scheduledAt } : {}), // só para testes: o agendamento do painel é nosso e o envio é imediato
     ...networkBlocks(platforms, { kind, media: 'video', title, description, coverUrl, thumbnailUrl, tags, instagram, tiktokPostMode }),
-    _missing: missingOf(platforms, accounts), _networks: platforms, _tiktok: accounts.tiktok?.accountId, idempotency: idempotencyKey(id),
+    _missing: missingOf(platforms, accounts), _networks: platforms, _accountOf: accountMap(platforms, accounts), _tiktok: accounts.tiktok?.accountId, idempotency: key || idempotencyKey(id),
   };
 }
 
 // Imagens: post (1), carrossel (2 a 10, um contêiner com várias mídias) ou story (só Instagram/Facebook, sem legenda).
-function buildPhotoPost({ id, media, platforms, title, description, photoUrls, accounts = {}, instagram = null, tiktokMode: mode = 'direto', scheduledAt = null }) {
+function buildPhotoPost({ id, media, platforms, title, description, photoUrls, accounts = {}, instagram = null, tiktokMode: mode = 'direto', scheduledAt = null, idempotencyKey: key = null }) {
   const story = media === 'story';
   const caption = description || title || '';
   const container = { ...(story ? {} : { content: caption }), media: photoUrls.map((url, i) => ({ url, filename: fileOf(url, `imagem-${i + 1}.jpg`) })) };
   return {
     accounts: accountIds(platforms, accounts), containers: [container], ...(scheduledAt ? { scheduledAt } : {}),
     ...networkBlocks(platforms, { kind: 'photo', media, title, description, instagram, tiktokPostMode: mode === 'rascunho' ? 'MEDIA_UPLOAD' : 'DIRECT_POST' }),
-    _missing: missingOf(platforms, accounts), _networks: platforms, _tiktok: accounts.tiktok?.accountId, idempotency: idempotencyKey(id),
+    _missing: missingOf(platforms, accounts), _networks: platforms, _accountOf: accountMap(platforms, accounts), _tiktok: accounts.tiktok?.accountId, idempotency: key || idempotencyKey(id),
   };
 }
 
@@ -194,58 +209,109 @@ function stateOf(results) {
   return ok === results.length ? 'publicado' : ok ? 'parcial' : 'erro';
 }
 
-// Privacidade do TikTok no envio direto: precisa vir das opções do criador (creator-info). Prefere "público".
-async function tiktokPrivacy(accountId) {
+// Opções do criador no TikTok (creator-info): a privacidade do envio direto (prefere "público") e a duração máxima de vídeo da conta.
+async function tiktokCreator(accountId) {
   let data;
   try { ({ json: { data } } = await call('GET', `/v1/tiktok/accounts/${encodeURIComponent(accountId)}/creator-info`, { timeout: 20_000 })); } catch (err) {
-    throw new Error(`TikTok: não consegui ler as opções de publicação da conta (${err.message}). Em Integrações, escolha enviar o TikTok como rascunho.`);
+    // 400/403/404: a conexão do TikTok precisa ser refeita (doc do creator-info); 401: a nossa chave; 429 e 5xx: passageiro
+    const code = [400, 403, 404].includes(err.status) ? 'sem_conta' : err.status === 401 ? 'provedor_chave' : err.status === 429 ? undefined : 'provedor_fora';
+    throw Object.assign(new Error(`TikTok: não consegui ler as opções de publicação da conta (${err.message}). Em Integrações, dá para enviar o TikTok como rascunho.`), { code });
   }
   const options = data?.privacy_level_options || [];
-  if (options.includes('PUBLIC_TO_EVERYONE')) return 'PUBLIC_TO_EVERYONE';
-  throw new Error(`TikTok: esta conta só aceita publicar como ${options.join(' ou ') || 'privado'} pela Outstand. Em Integrações, escolha enviar o TikTok como rascunho (você publica no app) ou conecte um app do TikTok auditado.`);
+  if (!options.includes('PUBLIC_TO_EVERYONE')) {
+    throw Object.assign(new Error(`TikTok: esta conta só aceita publicar como ${options.join(' ou ') || 'privado'} pela Outstand. Em Integrações, escolha enviar o TikTok como rascunho (você publica no app) ou conecte um app do TikTok auditado.`), { code: 'tiktok_privado' });
+  }
+  return { privacyLevel: 'PUBLIC_TO_EVERYONE', maxSeconds: Number(data?.max_video_post_duration_sec) || null };
 }
 
-// Envia. Devolve { simulated, request_id (id do post na Outstand), job_id, results, done, fieldNames, warnings }. Sem OUTSTAND_LIVE não chama nada.
+// Envia. Devolve { simulated, request_id (id do post na Outstand), job_id, results, preFailed, done, fieldNames, warnings }. Sem OUTSTAND_LIVE não chama nada.
+// A rede que não dá para mandar (sem conta, TikTok sem a privacidade ou com vídeo longo demais) falha SÓ ela: as outras seguem.
 async function send(body) {
-  const { idempotency, _missing: missing = [], _networks: networks = [], _tiktok: tiktokId = null, ...payload } = body;
+  const { idempotency, _missing: missing = [], _networks: networks = [], _tiktok: tiktokId = null, _accountOf: accountOf = {}, _durationSec: durationSec = null, ...payload } = body;
   const names = Object.keys(payload);
   const rascunho = payload.tiktok?.postMode === 'MEDIA_UPLOAD';
   if (!config.outstand.live) return { simulated: true, status: 'simulado', fieldNames: names, results: networks.map((p) => ({ platform: p, ok: true, simulated: true, status: 'simulado', url: null, error: null })) };
-  if (missing.length) throw new Error(`Sem conta conectada na Outstand: ${missing.join(', ')}.`);
-  if (payload.tiktok?.postMode === 'DIRECT_POST' && tiktokId) payload.tiktok = { ...payload.tiktok, privacyLevel: await tiktokPrivacy(tiktokId) };
+  const preFailed = missing.map((p) => ({ platform: p, code: 'sem_conta', error: `Sem conta conectada na Outstand para ${p}.` }));
+  const drop = (p, code, error) => { preFailed.push({ platform: p, code, error }); payload.accounts = payload.accounts.filter((a) => a !== accountOf[p]); delete payload[p]; };
+  if (payload.tiktok && tiktokId && payload.accounts.includes(tiktokId)) {
+    try {
+      const creator = rascunho ? null : await tiktokCreator(tiktokId);
+      if (creator) payload.tiktok = { ...payload.tiktok, privacyLevel: creator.privacyLevel };
+      if (creator?.maxSeconds && durationSec && durationSec > creator.maxSeconds) drop('tiktok', 'formato', `TikTok: o vídeo tem ${Math.round(durationSec)} s e esta conta aceita até ${creator.maxSeconds} s.`);
+    } catch (err) { drop('tiktok', err.code, err.message); }
+  }
+  if (!payload.accounts.length) throw Object.assign(new Error(preFailed[0]?.error || 'Nenhuma rede para enviar.'), { code: preFailed[0]?.code || 'sem_conta', preFailed });
   const { json } = await call('POST', '/v1/posts', { body: payload, idempotency, timeout: 90_000, retries: 2 });
   let post = json.post || json;
   if (post.scheduled === false) { // criado mas não entrou na fila (falha passageira deles): reenfileira agendando para daqui a 1 minuto
     const patched = await call('PATCH', `/v1/posts/${encodeURIComponent(post.id)}`, { body: { scheduledAt: new Date(Date.now() + 60_000).toISOString() }, timeout: 30_000 });
     post = patched.json.post || post;
   }
+  // a Outstand descarta em silêncio a conta que não resolve: o post SAIU para as outras, então só essa rede fica com erro
   const got = new Set((post.socialAccounts || []).map((a) => a.id));
-  const asked = new Set(payload.accounts);
-  const dropped = [...asked].filter((a) => !got.has(a)); // a Outstand descarta em silêncio o que não resolve
-  if (dropped.length) throw new Error('A Outstand não reconheceu uma das contas conectadas. Teste a conexão em Integrações e reconecte a conta.');
-  return { simulated: false, request_id: post.id, job_id: rascunho ? 'tiktok-rascunho' : null, results: normalizeResults(post, { draft: rascunho }), done: false, fieldNames: names, warnings: json.warnings || [] };
+  for (const [p, id] of Object.entries(accountOf)) {
+    if (payload.accounts.includes(id) && !got.has(id)) preFailed.push({ platform: p, code: 'sem_conta', error: 'A Outstand não reconheceu a conta conectada desta rede. Teste a conexão em Integrações e reconecte a conta.' });
+  }
+  const failedRows = preFailed.map((f) => ({ platform: f.platform, ok: false, skipped: false, status: 'failed', url: null, post_id: null, error: f.error, code: f.code || null }));
+  return { simulated: false, request_id: post.id, job_id: rascunho ? 'tiktok-rascunho' : null, results: [...normalizeResults(post, { draft: rascunho }), ...failedRows], preFailed, done: false, fieldNames: names, warnings: json.warnings || [] };
 }
 
-// O TikTok só busca vídeo de domínio verificado no app dele (erro `url_ownership_unverified` com o link do Backblaze). A Outstand
-// guarda o arquivo no armazenamento dela (POST /v1/media/upload -> PUT -> confirm, 60 dias) e devolve um link que o TikTok aceita.
-// O servidor baixa do Backblaze e repassa em fluxo (sem guardar em disco). Devolve o link da Outstand.
-async function hostMedia(sourceUrl, { filename = 'video.mp4', contentType = 'video/mp4' } = {}) {
+// O arquivo vai antes para o armazenamento da Outstand (POST /v1/media/upload -> PUT -> confirm, 60 dias): o TikTok só busca de domínio
+// verificado, e as redes baixam de lá (CDN deles) em vez do Backblaze. O servidor repassa em fluxo, sem guardar em disco, CONTANDO os
+// bytes: se o Backblaze parar no meio, falha aqui (erro arquivo_indisponivel) e nada vai às redes. size: o tamanho registrado no banco.
+async function hostMedia(sourceUrl, { filename = 'video.mp4', contentType = 'video/mp4', size = null } = {}) {
   const { json: created } = await call('POST', '/v1/media/upload', { body: { filename, content_type: contentType }, timeout: 30_000, retries: 1 });
   const slot = created.data || created;
-  if (!slot.id || !slot.upload_url) throw new Error('A Outstand não devolveu o endereço de envio do arquivo.');
-  const src = await fetch(sourceUrl, { signal: AbortSignal.timeout(10 * 60_000) });
-  if (!src.ok || !src.body) throw new Error(`Não consegui ler o vídeo no armazenamento (${src.status}).`);
-  const size = Number(src.headers.get('content-length')) || 0;
-  const put = await fetch(slot.upload_url, {
-    method: 'PUT', headers: { 'Content-Type': contentType, ...(size ? { 'Content-Length': String(size) } : {}) },
-    body: src.body, duplex: 'half', signal: AbortSignal.timeout(15 * 60_000),
+  if (!slot.id || !slot.upload_url) throw Object.assign(new Error('A Outstand não devolveu o endereço de envio do arquivo.'), { code: 'provedor_fora' });
+  let src;
+  try { src = await fetch(sourceUrl, { signal: AbortSignal.timeout(10 * 60_000) }); } catch (err) { throw mediaError('arquivo_indisponivel', `Não consegui ler o arquivo no armazenamento: ${cause(err)}.`); }
+  if (!src.ok || !src.body) throw src.status === 404 ? mediaError('arquivo_sumiu', 'O arquivo não está no armazenamento.') : mediaError('arquivo_indisponivel', `O armazenamento respondeu ${src.status} ao ler o arquivo.`, { status: src.status });
+  const declared = Number(src.headers.get('content-length')) || 0;
+  if (size && declared && declared !== Number(size)) { await src.body.cancel().catch(() => {}); throw mediaError('arquivo_incompleto', `O arquivo no armazenamento tem ${mb(declared)}, mas o envio registrou ${mb(size)}.`); }
+  const expected = Number(size) || declared || 0;
+  let sent = 0; let sourceError = null;
+  const reader = src.body.getReader();
+  const body = new ReadableStream({
+    async pull(ctl) {
+      try { const { done, value } = await reader.read(); if (done) ctl.close(); else { sent += value.byteLength; ctl.enqueue(value); } } catch (err) { sourceError = err; ctl.error(err); }
+    },
+    cancel(why) { reader.cancel(why).catch(() => {}); },
   });
-  if (!put.ok) throw new Error(`A Outstand recusou o arquivo (${put.status}).`);
-  const { json: done } = await call('POST', `/v1/media/${encodeURIComponent(slot.id)}/confirm`, { body: size ? { size } : {}, timeout: 60_000, retries: 1 });
-  const url = (done.data || done).url;
-  if (!url) throw new Error('A Outstand não confirmou o arquivo enviado.');
-  return url;
+  const lost = (err) => mediaError('arquivo_indisponivel', `O armazenamento parou de entregar o arquivo em ${mb(sent)}${expected ? ` de ${mb(expected)}` : ''}: ${cause(err)}.`, { bytes: sent, total: expected });
+  let put;
+  try {
+    put = await fetch(slot.upload_url, { method: 'PUT', headers: { 'Content-Type': contentType, ...(expected ? { 'Content-Length': String(expected) } : {}) }, body, duplex: 'half', signal: AbortSignal.timeout(15 * 60_000) });
+  } catch (err) {
+    if (sourceError || (expected && sent < expected)) throw lost(sourceError || err);
+    throw Object.assign(new Error(`Não consegui enviar o arquivo à Outstand: ${cause(err)}.`), { code: 'provedor_fora' });
+  }
+  if (sourceError) throw lost(sourceError);
+  if (!put.ok) throw Object.assign(new Error(`A Outstand recusou o arquivo (${put.status}).`), { code: 'provedor_fora' });
+  if (expected && sent !== expected) throw lost(new Error(`chegaram ${sent} bytes`));
+  const { json: done } = await call('POST', `/v1/media/${encodeURIComponent(slot.id)}/confirm`, { body: sent ? { size: sent } : {}, timeout: 60_000, retries: 1 });
+  const data = done.data || done;
+  if (!data.url) throw Object.assign(new Error('A Outstand não confirmou o arquivo enviado.'), { code: 'provedor_fora' });
+  return { url: data.url, id: data.id || slot.id, size: sent || null, expiresAt: data.expires_at || null };
 }
+
+// O mesmo arquivo já hospedado (vale 60 dias; usamos até 3 dias antes de vencer): reaproveita nas novas tentativas e em outro post do
+// mesmo corte, sem depender do Backblaze de novo. sourceUrl pode ser uma função (o link só é assinado se precisar subir).
+async function hosted(key, { sourceUrl, filename, contentType, size = null }) {
+  const { rows: [h] } = await db.query(
+    `SELECT * FROM hosted_media WHERE storage_key = $1 AND provider = 'outstand' AND (expires_at IS NULL OR expires_at > now() + interval '3 days')
+        AND ($2::bigint IS NULL OR size_bytes IS NULL OR size_bytes = $2)`, [key, size ? Number(size) : null]);
+  if (h) return { url: h.url, reused: true, bytes: Number(h.size_bytes) || null, ms: 0 };
+  const t0 = Date.now();
+  const up = await hostMedia(typeof sourceUrl === 'function' ? await sourceUrl() : sourceUrl, { filename, contentType, size });
+  const expires = up.expiresAt && Number.isFinite(Date.parse(up.expiresAt)) ? new Date(up.expiresAt) : new Date(Date.now() + 60 * 86_400_000);
+  await db.query(
+    `INSERT INTO hosted_media (storage_key, provider, url, media_id, size_bytes, expires_at) VALUES ($1, 'outstand', $2, $3, $4, $5)
+     ON CONFLICT (storage_key, provider) DO UPDATE SET url = EXCLUDED.url, media_id = EXCLUDED.media_id, size_bytes = EXCLUDED.size_bytes, expires_at = EXCLUDED.expires_at, created_at = now()`,
+    [key, up.url, up.id, up.size, expires]);
+  return { url: up.url, reused: false, bytes: up.size, ms: Date.now() - t0 };
+}
+// A rede não conseguiu baixar a cópia hospedada: a próxima tentativa sobe de novo.
+const forgetHosted = (keys) => db.query("DELETE FROM hosted_media WHERE provider = 'outstand' AND storage_key = ANY($1::text[])", [[].concat(keys).filter(Boolean)]);
 
 // Andamento: GET /v1/posts/{id}. state: enviando | publicado | parcial | erro.
 async function status({ request_id, job_id = null }) {
@@ -260,4 +326,4 @@ async function status({ request_id, job_id = null }) {
   return { state, results, error };
 }
 
-module.exports = { NETWORKS, hostMedia, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason };
+module.exports = { NETWORKS, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator };

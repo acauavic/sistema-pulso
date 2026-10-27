@@ -46,6 +46,28 @@
 </div>
 
 <section class="card top-gap">
+  <div class="row spread"><h2>Publicações nas redes</h2><a class="small" href="/social/publicacoes">Ver todas</a></div>
+  <p class="small muted">O arquivo é conferido antes de sair; a rede que falha por motivo passageiro tenta de novo sozinha (2 min, 10 min, 30 min, 1 h, 3 h, 6 h; a fila do YouTube, no horário que a Outstand informa) e a que precisa de ação avisa quem pediu e a gestão.</p>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">No provedor agora</span><span class="stat-n"><%= pubSending.length %></span></div>
+    <div class="stat"><span class="stat-label">Nova tentativa marcada</span><span class="stat-n"><%= pubWaiting.length %></span></div>
+    <div class="stat"><span class="stat-label">Precisam de ação</span><span class="stat-n"><%= pubAction.length %></span><span class="delta">últimos 14 dias</span></div>
+  </div>
+  <% if (!pubSending.length && !pubWaiting.length && !pubAction.length) { %><p class="muted small">Nada pendente: tudo o que foi enviado já saiu.</p><% } %>
+  <ul class="plain results">
+    <% pubWaiting.forEach(function (p) { var w = (p.results || []).filter(function (r) { return !r.ok && r.retry_at; }); %>
+    <li><span class="badge b-amber">Nova tentativa</span><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><span class="small muted"><%= w.map(function (r) { return netLabel(r.platform); }).join(', ') %> às <span class="mono"><%= fmt.formatSoon(p.retry_at) %></span> · <span class="mono"><%= p.attempts %></span> tentativas</span><% if (w[0] && w[0].hint) { %><span class="small"><%= w[0].hint %></span><% } %></li>
+    <% }) %>
+    <% pubAction.forEach(function (p) { var a = (p.results || []).filter(function (r) { return r.action; }); %>
+    <li><span class="badge b-red">Precisa de ação</span><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><% a.forEach(function (r) { %><span class="small bad-text"><%= netLabel(r.platform) %>: <%= r.hint || r.error %></span><% }) %></li>
+    <% }) %>
+    <% pubSending.forEach(function (p) { %>
+    <li><span class="badge b-gray">No provedor</span><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><span class="small muted"><%= p.platforms.map(netLabel).join(', ') %><%= p.since ? ' · enviado ' + age(p.since) : '' %></span></li>
+    <% }) %>
+  </ul>
+</section>
+
+<section class="card top-gap">
   <h2>Falharam de vez</h2>
   <p class="small muted">Já esgotaram as tentativas automáticas (falha passageira tenta de novo sozinha: 30 s, 2 min, 8 min; cota da IA, 15 min).</p>
   <% if (!failed.length) { %><p class="muted small">Nenhuma falha. </p><% } else { %>
