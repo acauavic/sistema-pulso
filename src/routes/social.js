@@ -127,7 +127,10 @@ router.post('/social/publicacoes/:id/:acao(atualizar|repetir|parar|cancelar)', r
   if (['repetir', 'parar'].includes(req.params.acao) && !can(req.user.role, 'social.publish')) return forbidden(res);
   if (req.params.acao === 'cancelar' && !canTouch(req, pub)) return forbidden(res);
   if (req.params.acao === 'atualizar') await publishing.refresh(pub.id);
-  if (req.params.acao === 'repetir') { const r = await publishing.retry(pub.id); await audit(req, 'publicacao.reenviada', 'publication', pub.id); if (r) await req.flash(r.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(r)); }
+  if (req.params.acao === 'repetir') { // só registra o reenvio que aconteceu (clique repetido no meio de um envio não faz nada)
+    const r = await publishing.retry(pub.id);
+    if (r) { await audit(req, 'publicacao.reenviada', 'publication', pub.id); await req.flash(r.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(r)); }
+  }
   if (req.params.acao === 'parar') { if (await publishing.stopRetries(pub.id)) { await audit(req, 'publicacao.tentativas_paradas', 'publication', pub.id); await req.flash('ok', 'Novas tentativas automáticas paradas. Reenvie quando quiser.'); } }
   if (req.params.acao === 'cancelar') { await publishing.cancel(pub.id); await req.flash('ok', pub.status === 'agendado' ? 'Agendamento cancelado.' : 'Pedido retirado.'); return res.redirect('/social/publicacoes'); }
   res.redirect(`/social/publicacoes/${pub.id}`);

@@ -26,7 +26,7 @@
     <p class="muted"><%= pub.created_by_name || 'Alguém da equipe' %> pediu para publicar em <%= pub.platforms.map(label).join(', ') %><%= pub.scheduled_at ? ', ' + fmt.formatDateTime(pub.scheduled_at) : ', assim que aprovado' %>.<%= !canPublish ? ' Você recebe um aviso quando for aprovado ou devolvido.' : '' %></p>
     <% if (canPublish) { %>
     <div class="next-actions">
-      <form method="post" action="/social/publicacoes/<%= pub.id %>/aprovar" class="inline"><%- csrfField %><button class="btn primary" type="submit"><%- icon('check') %> <%= pub.scheduled_at && new Date(pub.scheduled_at) > new Date() ? 'Aprovar e agendar' : 'Aprovar e publicar' %></button></form>
+      <form method="post" action="/social/publicacoes/<%= pub.id %>/aprovar" class="inline" data-busy="Enviando…"><%- csrfField %><button class="btn primary" type="submit"><%- icon('check') %> <%= pub.scheduled_at && new Date(pub.scheduled_at) > new Date() ? 'Aprovar e agendar' : 'Aprovar e publicar' %></button></form>
       <button class="btn" type="button" data-modal-open="modal-devolver">Devolver com ajustes</button>
     </div>
     <% } %>
@@ -81,7 +81,7 @@
       <% if (pub.error && !(pub.results || []).some(function (r) { return r.hint; })) { %><p class="flash flash-error top-gap"><%= pub.error %></p><% } %>
       <div class="row top-gap">
         <% if (pub.status === 'enviando') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/atualizar" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw') %> Atualizar andamento</button></form><% } %>
-        <% if (canPublish && (pub.status === 'erro' || pub.status === 'parcial')) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%= pub.retry_at ? 'Reenviar agora' : pub.status === 'parcial' ? 'Reenviar as que falharam' : 'Tentar de novo' %></button></form><% } %>
+        <% if (canPublish && (pub.status === 'erro' || pub.status === 'parcial')) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline" data-busy="Enviando…"><%- csrfField %><button class="btn sm" type="submit"><%= pub.retry_at ? 'Reenviar agora' : pub.status === 'parcial' ? 'Reenviar as que falharam' : 'Tentar de novo' %></button></form><% } %>
         <% if (canPublish && pub.retry_at) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/parar" class="inline" data-confirm="Parar as novas tentativas automáticas? A publicação fica como está e você reenvia quando quiser."><%- csrfField %><button class="link small" type="submit">Parar novas tentativas</button></form><% } %>
         <% if (canPublish && pub.status === 'agendado') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><%- csrfField %><button class="btn sm ghost" type="submit">Cancelar agendamento</button></form><% } %>
       </div>

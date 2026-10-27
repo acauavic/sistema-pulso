@@ -64,7 +64,7 @@
 - **Seleção**: checkbox/radio com `accent-color` lime; controle segmentado (Lista | Quadro | Calendário) é `.seg`.
 - **Tag/eixo**: mono caixa alta entre colchetes quando for tema (`[ NEGÓCIOS ]`). **Avatar**: círculo; host em plum, convidado em grafite.
 - **Métrica**: rótulo mono caixa alta + valor em Space Grotesk 40 + delta mono (▲ lime, ▼ vermelho, neutro muted). `.stat`.
-- **Feedback**: `.flash` com filete lateral (lime ok / vermelho erro). Estado vazio: linha de pulso plana + título + frase útil (`partials/pulse-line.ejs`, classe `.empty`).
+- **Feedback**: `.flash` com filete lateral (lime ok / vermelho erro). Estado vazio: linha de pulso plana + título + frase útil (`partials/pulse-line.ejs`, classe `.empty`). Ação que leva alguns segundos (publicar, aprovar e publicar, reenviar): `<form data-busy="Enviando…">`, o botão clicado mostra o andamento e o formulário trava até a página seguinte, para o clique não se repetir.
 - **Tabela**: cabeçalho mono caixa alta muted; linha com hover `raised`; colunas de data/número em mono; ações à direita.
 - **Menu recolhível**: no computador o botão do topo leva a barra lateral a **76px, só ícones** (nome na dica, "p." no lugar do logo, contadores viram um ponto no canto do ícone); a escolha persiste (`localStorage`). Só a lista de itens rola; rodapé fixo.
 - **Painel de gestão**: menu em dois níveis. Em cima, os grupos (`.subnav-groups`: Visão geral · Equipe · Operação · Convites e parcerias · Sistema); embaixo, as abas do grupo como pílulas (`.subnav-inner`), só quando o grupo tem mais de uma. Página nova de gestão entra em um grupo existente em `partials/gestao-nav.ejs`.

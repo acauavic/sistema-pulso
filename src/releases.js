@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.35.1', date: '2026-10-27', title: 'Publicar não duplica com clique repetido',
+    items: [
+      { kind: 'correcao', text: 'Como o vídeo sobe para o provedor antes de publicar, "Publicar", "Aprovar e publicar" e "Reenviar agora" levam alguns segundos. Agora o botão mostra "Enviando…" e trava enquanto isso. E se o mesmo pedido chegar de novo em até 2 minutos (clique duplo), o sistema usa a publicação que já existe e nada sai duas vezes.' },
+    ],
+  },
+  {
     version: '1.35.0', date: '2026-10-27', title: 'Publicação com entrega garantida',
     items: [
       { kind: 'correcao', text: 'Um corte saiu pela metade no Instagram e falhou nas outras redes porque o armazenamento (Backblaze) parou de entregar uma parte do vídeo, e cada rede baixou só o começo. Agora o vídeo é conferido do começo ao fim antes de ir para qualquer rede: se o arquivo não vem inteiro, nada é enviado, e a publicação espera e tenta de novo sozinha.' },

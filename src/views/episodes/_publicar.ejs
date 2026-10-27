@@ -7,7 +7,7 @@
    var PUB2 = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-amber', 'agendado'], publicado: ['b-green', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] }; %>
 <% if (perm.review && ready) { %>
 <dialog class="modal modal-wide" id="modal-publicar" aria-labelledby="mpb-h">
-  <form method="post" action="/episodios/<%= ep.id %>/publicar" class="stack">
+  <form method="post" action="/episodios/<%= ep.id %>/publicar" class="stack" data-busy="Enviando…">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h2 id="mpb-h">Publicar no YouTube</h2>
     <p class="muted small">O episódio inteiro vai só para o YouTube, com o título, a descrição, as tags e a thumbnail aprovada.<%= thumb ? '' : ' Nenhuma thumbnail aprovada: o YouTube vai escolher um quadro.' %></p>
@@ -33,7 +33,7 @@
     <% if (p.error && !(p.results || []).some(function (r) { return r.hint; })) { %><p class="small err"><%= p.error %></p><% } %>
     <% if (perm.review) { %><p class="row small">
       <% if (p.status === 'enviando') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
-      <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.retry_at ? 'reenviar agora' : p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
+      <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/repetir" class="inline" data-busy="enviando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.retry_at ? 'reenviar agora' : p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
       <% if (p.status === 'agendado') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
     </p><% } %>
   </li>

@@ -90,11 +90,31 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
   }
   const provider = groups[0].provider;
   const routesMap = groups.length > 1 ? Object.fromEntries(groups.flatMap((g) => g.platforms.map((p) => [p, g.provider.id]))) : null;
-  const { rows: [pub] } = await db.query(
-    `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-    [target.episode?.id || null, target.kind === 'photo' ? null : clipId, list, L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')), description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(routesMap ? { routes: routesMap } : {}), ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
-      target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, target.kind === 'photo' ? target.covers.map((c) => c.id) : [], provider.id]);
+  const row = {
+    episodeId: target.episode?.id || null, clipId: target.kind === 'photo' ? null : clipId, title: L.tidy(title || (target.kind === 'photo' ? MEDIA_LABEL[media] : '')),
+    coverIds: target.kind === 'photo' ? target.covers.map((c) => c.id) : [],
+  };
+  // Clique repetido em "Publicar" (o envio leva alguns segundos enquanto o vídeo sobe): o mesmo pedido da mesma pessoa nos últimos
+  // 2 minutos devolve a publicação que já existe, em vez de publicar duas vezes. A trava da transação enfileira os pedidos simultâneos.
+  const client = await db.getPool().connect();
+  let pub; let repeated = false;
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`publicar:${userId || ''}:${row.clipId || ''}:${row.episodeId || ''}:${row.coverIds.join(',')}`]);
+    const { rows: [same] } = await client.query(
+      `SELECT * FROM episode_publications WHERE created_by IS NOT DISTINCT FROM $1 AND clip_id IS NOT DISTINCT FROM $2 AND episode_id IS NOT DISTINCT FROM $3
+          AND media = $4 AND cover_ids = $5::int[] AND platforms = $6::text[] AND title = $7 AND created_at > now() - interval '2 minutes' ORDER BY id DESC LIMIT 1`,
+      [userId, row.clipId, row.episodeId, media, row.coverIds, list, row.title]);
+    if (same) { pub = same; repeated = true; } else {
+      ({ rows: [pub] } = await client.query(
+        `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        [row.episodeId, row.clipId, list, row.title, description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(routesMap ? { routes: routesMap } : {}), ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
+          target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, row.coverIds, provider.id]));
+    }
+    await client.query('COMMIT');
+  } catch (err) { await client.query('ROLLBACK').catch(() => {}); throw err; } finally { client.release(); }
+  if (repeated) { console.warn(`[publicação ${pub.id}] pedido repetido em menos de 2 min: devolvi a que já existe`); return pub; }
   if (review) {
     await addEvent(target.episode?.id, userId, `Publicação enviada para revisão da gestão (${names(list)}): ${pub.title}`);
     await askReview(pub, userId);

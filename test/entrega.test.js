@@ -249,6 +249,19 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     assert.equal((await pubRow(pub.id)).status, 'enviando');
   });
 
+  it('clique repetido em "Publicar" (o vídeo leva alguns segundos para subir): o mesmo pedido em 2 minutos devolve a publicação que já existe', async () => {
+    const clip = await mkClip('pp/cortes/40/video-m.mp4');
+    calls.length = 0;
+    const args = { clipId: clip.id, platforms: ['instagram'], title: 'Duplo clique', description: 'L', userId: u.gestao.id };
+    const [a, b] = await Promise.all([publishing.create(args), publishing.create(args)]);
+    assert.equal(a.id, b.id, 'dois cliques ao mesmo tempo: uma publicação');
+    assert.equal(posts('outstand').length, 1, 'um post só na Outstand');
+    assert.equal((await publishing.create(args)).id, a.id, 'e logo depois também');
+    assert.notEqual((await publishing.create({ ...args, title: 'Outro título' })).id, a.id, 'pedido diferente é outra publicação');
+    const page = (await as.gestao.get('/social/novo')).text;
+    assert.match(page, /action="\/social\/publicar" class="stack-lg" data-compose data-busy="Enviando…"/, 'o botão mostra o andamento e trava o formulário');
+  });
+
   it('duração por rede: corte de 2 min não agenda Reels do Facebook (a Outstand recusaria o post inteiro); no X é só aviso', async () => {
     const clip = await mkClip('pp/cortes/10/video-h.mp4', { durationMs: 120_000 });
     await assert.rejects(publishing.create({ clipId: clip.id, platforms: ['facebook', 'instagram'], title: 'Longo', description: 'L', userId: u.gestao.id }), /Facebook Reels: o vídeo tem 2 min e a rede aceita até 1 min 30 s/);

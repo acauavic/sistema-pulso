@@ -36,6 +36,26 @@
     if (msg && !window.confirm(msg)) e.preventDefault();
   });
 
+  // envio que demora (publicar, reenviar: o vídeo sobe antes para o provedor): <form data-busy="Enviando…"> mostra o andamento no
+  // botão e trava o formulário, para o clique não se repetir. Os botões são travados depois do envio montado (o clicado leva o valor).
+  document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (e.defaultPrevented || !form.matches || !form.matches('form[data-busy]')) return;
+    if (form.dataset.sent) { e.preventDefault(); return; }
+    form.dataset.sent = '1'; form.setAttribute('aria-busy', 'true');
+    const btn = e.submitter && form.contains(e.submitter) ? e.submitter : form.querySelector('button[type=submit], button:not([type])');
+    if (btn) { btn.idleNodes = [...btn.childNodes]; btn.textContent = form.dataset.busy; }
+    setTimeout(() => form.querySelectorAll('button').forEach((b) => { b.disabled = true; }), 0);
+  });
+  // voltar pelo navegador (página guardada): o formulário volta a funcionar
+  window.addEventListener('pageshow', (ev) => {
+    if (!ev.persisted) return;
+    document.querySelectorAll('form[data-busy][data-sent]').forEach((f) => {
+      delete f.dataset.sent; f.removeAttribute('aria-busy');
+      f.querySelectorAll('button').forEach((b) => { b.disabled = false; if (b.idleNodes) { b.replaceChildren(...b.idleNodes); b.idleNodes = null; } });
+    });
+  });
+
   // copiar: <button data-copy="texto">
   document.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-copy]');

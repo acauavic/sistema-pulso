@@ -107,7 +107,7 @@
       <h2 id="mpub-h">Publicar nas redes</h2>
       <% if (!uploadLive) { %><p class="notice small">Modo de teste <%= locals.testAt || '' %>: o que sair por aí é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
       <% if (social && !social.ok) { %><p class="notice small">Não consegui consultar as redes conectadas: <%= social.error %></p><% } %>
-      <form method="post" action="/cortes/<%= clip.id %>/publicar" class="stack">
+      <form method="post" action="/cortes/<%= clip.id %>/publicar" class="stack" data-busy="Enviando…">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <fieldset class="channels"><legend>Redes</legend>
           <% boxes.forEach(function (p) { %>
@@ -138,7 +138,7 @@
           <p class="row small">
             <a href="/social/publicacoes/<%= p.id %>">ver no Social</a>
             <% if (p.status === 'enviando') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
-            <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/repetir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.retry_at ? 'reenviar agora' : p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
+            <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/repetir" class="inline" data-busy="enviando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.retry_at ? 'reenviar agora' : p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
             <% if (p.status === 'agendado') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
           </p>
         </li>
