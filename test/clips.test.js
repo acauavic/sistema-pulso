@@ -255,6 +255,7 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
     assert.match((await as.editor.get(`/cortes/${c.id}`)).text, /Não consegui ler este vídeo/);
     await post(as.editor, `/cortes/${c.id}/excluir`);
     assert.equal((await h.db.query('SELECT count(*)::int n FROM episode_clips WHERE id=$1', [c.id])).rows[0].n, 0);
+    await h.emptyTrash();
     assert.ok(!h.b2Store.has(c.storage_key));
   });
 
@@ -362,6 +363,8 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
       const keys = [clip.storage_key, ...(await h.db.query('SELECT storage_key FROM episode_covers WHERE clip_id=$1', [clip.id])).rows.map((r) => r.storage_key), ...(await h.db.query('SELECT storage_key FROM episode_frames WHERE clip_id=$1', [clip.id])).rows.map((r) => r.storage_key)];
       assert.ok(keys.length >= 10);
       assert.equal((await call(as.gestao, 'POST', `/cortes/${clip.id}/excluir`)).status, 302);
+      assert.ok(keys.every((k) => h.b2Store.has(k)), 'na lixeira, os arquivos ficam');
+      await h.emptyTrash();
       assert.ok(keys.every((k) => !h.b2Store.has(k)), 'nada sobrou no bucket');
       assert.equal((await h.db.query('SELECT count(*)::int n FROM episode_covers WHERE clip_id=$1', [clip.id])).rows[0].n, 0);
     });

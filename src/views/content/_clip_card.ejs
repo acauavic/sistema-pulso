@@ -1,10 +1,12 @@
-<%# Cartão de um corte. Variáveis: c, perm, csrf, episodes, fmt %>
+<%# Cartão de um corte. Variáveis: c, perm, csrf, episodes, fmt; pick: marcável para as ações em massa (Conteúdo > Cortes) %>
 <% var st = { enviando: ['b-amber', 'enviando'], processando: ['b-amber', 'lendo'], pronto: ['b-st-pronto_publicar', 'pronto para postar'], erro: ['b-red', 'erro'] }[c.status];
    if (c.status === 'pronto' && c.pub) st = c.pub.stage === 'publicado' ? ['b-st-publicado', 'publicado'] : ['b-st-agendado', c.pub.label];
    if (c.status === 'pronto' && !c.episode_id && !c.request_id) st = ['b-gray', 'sem episódio'];
    var chosen = c.covers.find(function (x) { return x.id === c.cover_id; }) || c.covers[0]; %>
-<article class="clip-card" data-clip="<%= c.id %>">
-  <a class="clip-poster" href="/cortes/<%= c.id %>" aria-label="Abrir <%= c.title %>">
+<% var pick = typeof pick !== 'undefined' && pick; %>
+<article class="clip-card" data-clip="<%= c.id %>"<% if (pick) { %> data-dl-item data-id="<%= c.id %>"<% if (c.status === 'pronto' && c.storage_key) { %> data-href="/cortes/<%= c.id %>/video?baixar=1" data-name="<%= c.title %>.mp4" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %><% } %>>
+  <% if (pick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.title %>"><% } %>
+  <a class="clip-poster" href="/cortes/<%= c.id %>" aria-label="Abrir <%= c.title %>"<%- pick ? ' data-dl-pick' : '' %>>
     <% if (chosen) { %><img src="/capas/<%= chosen.id %>/imagem?v=<%= new Date(chosen.updated_at).getTime() %>" alt="Capa de <%= c.title %>" loading="lazy" width="108" height="192"><% } else { %><span class="poster-empty"><%- icon('film', 28) %></span><% } %>
   </a>
   <div class="clip-body">

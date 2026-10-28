@@ -48,6 +48,7 @@ const ACTIONS = {
   'contacts.manage': { text: 'mudar o WhatsApp da produção (botões do convite do convidado) e o do comercial (media kit e portal do patrocinador), e as mensagens prontas que abrem nele', where: 'Gestão > WhatsApp dos convites' },
   'outreach.manage': { text: 'configurar a cadência de follow-up (intervalos entre abordagens e meta diária de patrocinadores) e acompanhar o painel de abordagens por canal e por pessoa', where: 'Gestão > Cadência' },
   'audit.read': { text: 'consultar os logs de auditoria', where: 'Gestão > Logs' },
+  'trash.manage': { text: 'ver tudo o que a equipe apagou, restaurar qualquer item e apagar de vez antes dos 15 dias', where: 'Gestão > Sistema > Lixeira' },
   'integrations.manage': { text: 'ver o status das integrações (e-mail, links curtos, armazenamento, IA, redes, Google Agenda), escolher o que vai para o Google Agenda e a duração de cada tipo, e ver a saúde do sistema', where: 'Gestão > Integrações e Sistema' },
 };
 

@@ -943,6 +943,7 @@ describe('central de patrocinadores', () => {
 
       assert.equal((await as.gestao.act(`/patrocinadores/${id}/excluir`, {}, { from: '/patrocinadores' })).status, 302);
       assert.equal((await sponsor(id)), undefined);
+      await h.emptyTrash();
       for (const k of keys) assert.equal(h.b2Store.has(k.storage_key), false, 'arquivo apagado do bucket');
       assert.equal((await anon().get(`/patrocinador/${token}/portal`)).status, 404, 'link morre junto');
       assert.equal((await ec.get('/patrocinador/portal')).status, 401, 'e a sessão também');

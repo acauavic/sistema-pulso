@@ -149,9 +149,9 @@ router.post('/financeiro/lancamentos/:id/excluir', requirePerm('finance.write'),
   if (!e) return notFound(res, 'Lançamento');
   const to = backTo(req, '/financeiro/lancamentos');
   if (e.status === 'pago' || e.auto_key) { await req.flash('error', e.status === 'pago' ? 'Desfaça o pagamento antes de excluir.' : 'Lançamento automático não se exclui: cancele.'); return res.redirect(to); }
-  await db.query('DELETE FROM fin_entries WHERE id = $1', [e.id]);
+  const t = await require('../services/trash').remove('fin_entry', e.id, { user: req.user });
   await audit(req, 'financeiro.excluido', 'fin_entry', e.id, { description: e.description });
-  await req.flash('ok', 'Lançamento excluído.');
+  await req.flash('ok', 'Lançamento na lixeira.', t && { undo: t.batch });
   res.redirect(to);
 }));
 

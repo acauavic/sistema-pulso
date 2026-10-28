@@ -153,6 +153,7 @@ const TOPICS = [
       'Pelo assistente: "social" resume o que espera aprovação, agendados, com erro e sem uso.',
       'Conteúdo abre num quadro com cada peça na sua etapa (Pedido, Em produção, Em revisão, Pronto para postar, Na fila, Publicado). Para pedir algo ao editor que não é tarefa comum (trailer do canal, vídeo avulso, post, carrossel, story), use "Pedir conteúdo": briefing, prazo e responsável; a entrega volta para a gestão aprovar ou pedir ajustes e, aprovada, aparece no Social.',
       'Conteúdos do episódio: ao criar o episódio, marque o que pedir ao editor (Cortes, Q&A, Bastidores, Conteúdo extra). Cada um vira um pedido de conteúdo com prazo e responsável das rotinas, e a entrega sobe no sistema, sem Drive. Q&A e Bastidores são prioridade. Os cortes são um pedido contínuo: cada corte sobe quando fica pronto e já pode ser publicado. No fim, "Concluir cortes" encerra a leva, e "Retomar" reabre.',
+      'Ações em massa no Conteúdo: em Cortes, Posts e carrosséis ou Pedidos, toque em "Selecionar", marque os itens (Shift marca um intervalo) e use a barra: cortes podem ser atribuídos ao episódio, baixados ou excluídos; posts aprovados, baixados ou excluídos; pedidos mudam responsável, prazo e prioridade, são cancelados ou excluídos. O que vai para a lixeira dá para desfazer.',
       'No Novo post do Social só aparece o que ainda não saiu, com os sugeridos primeiro; "Ver também os já publicados" mostra o resto, marcado. Story é só o que foi feito para story (capas de corte não entram).',
     ],
   },
@@ -160,8 +161,18 @@ const TOPICS = [
     key: 'gestao', title: 'Painel de gestão', words: ['gestão', 'gestao', 'configurar', 'configuração', 'ajustes', 'usuários', 'usuarios', 'logs', 'auditoria', 'integrações', 'integracoes', 'rotinas', 'busca global', 'saúde do sistema', 'whatsapp dos convites'],
     where: '/gestao', perm: 'users.read',
     steps: [
-      'O menu de Gestão tem grupos com abas: Visão geral; Equipe (Usuários, Logs); Operação (Cadência de follow-up, Lembretes da gravação, Rotinas de tarefas, Notificações); Convites e parcerias (WhatsApp dos convites, Planos de patrocínio, Galeria do media kit); Sistema (Integrações, Busca global, Saúde do sistema).',
+      'O menu de Gestão tem grupos com abas: Visão geral; Equipe (Usuários, Logs); Operação (Cadência de follow-up, Lembretes da gravação, Rotinas de tarefas, Notificações); Convites e parcerias (WhatsApp dos convites, Planos de patrocínio, Galeria do media kit); Sistema (Integrações, Busca global, Saúde do sistema, Lixeira).',
       'Cada aba aparece só para quem tem a permissão dela.',
+    ],
+  },
+  {
+    key: 'lixeira', title: 'Lixeira (restaurar o que foi apagado)', words: ['lixeira', 'restaurar', 'recuperar', 'apaguei', 'apagado', 'excluído', 'excluido', 'desfazer', 'voltar item', 'deletei'],
+    where: '/lixeira', perm: null,
+    steps: [
+      'O que se apaga no sistema (episódio, convidado, patrocinador, tarefa, corte, post, pedido de conteúdo, arquivo do episódio ou do patrocinador, lançamento) vai para a Lixeira e fica 15 dias. Restaurar devolve o item como estava, com comentários, imagens e arquivos, no mesmo endereço.',
+      'Logo depois de apagar, o aviso no topo da página tem o botão "Desfazer" (numa exclusão em massa, devolve todos). Depois, abra a Lixeira no rodapé do menu e use "Restaurar".',
+      'Cada pessoa vê e restaura o que ela apagou. A gestão vê tudo (Gestão > Sistema > Lixeira), restaura qualquer item e pode "apagar de vez" antes do prazo. Passados 15 dias, o item e os arquivos saem de vez sozinhos.',
+      'Se o item dependia de algo que também foi apagado (um corte de um episódio apagado), a Lixeira avisa para restaurar o outro antes.',
     ],
   },
   {

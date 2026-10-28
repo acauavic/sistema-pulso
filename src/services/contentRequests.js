@@ -192,10 +192,9 @@ async function addImage(r, buffer) {
   return { ok: true, image: c };
 }
 
-async function removeImage(r, coverId) {
-  const { rows: [c] } = await db.query('DELETE FROM episode_covers WHERE id = $1 AND request_id = $2 RETURNING storage_key', [coverId, r.id]);
-  if (c) await b2.deleteObject(c.storage_key).catch((err) => console.error('[pedidos] apagar imagem:', err.message));
-  return Boolean(c);
+async function removeImage(r, coverId, user = null) { // vai para a lixeira (dá para desfazer)
+  const { rows: [c] } = await db.query('SELECT id FROM episode_covers WHERE id = $1 AND request_id = $2', [coverId, r.id]);
+  return c ? require('./trash').remove('cover', c.id, { user }) : null;
 }
 
 const isLate = (r, today) => Boolean(r.due_on) && OPEN.includes(r.status) && String(r.due_on instanceof Date ? r.due_on.toISOString() : r.due_on).slice(0, 10) < today;

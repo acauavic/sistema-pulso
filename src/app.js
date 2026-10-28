@@ -58,6 +58,7 @@ function createApp() {
   app.use(require('./routes/releases')); // Novidades: versões do sistema e aviso de atualização
   app.use(require('./routes/calendar')); // Calendário: tudo que tem data, com filtros e visualizações salvas
   app.use(require('./routes/gestao'));
+  app.use(require('./routes/trash')); // Lixeira: o que foi apagado fica 15 dias e pode voltar
   app.use(require('./routes/plans')); // Gestão > Planos de patrocínio
   app.use(require('./routes/plateiaAdmin')); // Plateia: inscrições, resultados e ajustes (e controles no convidado)
   app.use(require('./routes/finance')); // Financeiro: contas, estoque e custos automáticos (antes de episódios e patrocinadores)
@@ -66,6 +67,7 @@ function createApp() {
   app.use(require('./routes/guests'));
   app.use(require('./routes/sponsors'));
   app.use(require('./routes/covers')); // /episodios/:id/capas/*: antes das rotas genéricas do episódio
+  app.use(require('./routes/contentBulk')); // Conteúdo: atribuir, aprovar, mudar responsável e excluir vários de uma vez
   app.use(require('./routes/requests')); // Conteúdo > pedidos para o editor (trailer, vídeo avulso, post, story…)
   app.use(require('./routes/clips')); // cortes e publicação nas redes
   app.use(require('./routes/social')); // Social: publicações, novo post, ideias, insights e automações

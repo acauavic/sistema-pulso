@@ -390,6 +390,7 @@ describe('capas e posts do episódio (rotas, B2 e permissões)', () => {
     assert.equal(data.saveUrl, `/capas/${c.id}`);
     const del = await as.gestao.post(`/episodios/${ep.id}/capas/${c.id}/excluir`, { _csrf: await as.gestao.csrf('/episodios') });
     assert.equal(del.status, 302);
+    await h.emptyTrash();
     assert.ok(!h.b2Store.has(c.storage_key));
     assert.equal((await covers()).some((x) => x.id === c.id), false);
   });

@@ -24,7 +24,7 @@ describe('Conteúdo > Posts: selecionar e baixar vários posts gerados', () => {
     assert.match(sec, /data-dl-select/); assert.match(sec, /data-dl-everything/); assert.match(sec, /Baixa as 3 imagens/);
     assert.match(sec, /data-dl-bar[^>]*hidden/, 'a barra só aparece depois de Selecionar');
     assert.equal((sec.match(/data-dl-item/g) || []).length, 3);
-    assert.match(sec, new RegExp(`data-dl-item data-href="/capas/${a}/imagem\\?baixar=1" data-name="ep014-post-quote-1\\.jpg" data-bytes="400000"`));
+    assert.match(sec, new RegExp(`data-dl-item data-id="${a}" data-href="/capas/${a}/imagem\\?baixar=1" data-name="ep014-post-quote-1\\.jpg" data-bytes="400000"`));
     assert.match(sec, new RegExp(`data-href="/capas/${c3}/imagem\\?baixar=1" data-name="ep014-carousel-3\\.jpg" data-bytes="123456"`));
     assert.match(sec, /<a href="\/capas\/\d+\/imagem" target="_blank" rel="noopener" data-dl-pick>/, 'a imagem abre em outra aba, mas no modo seleção marca o cartão');
     assert.match(sec, /Baixar<\/a>/, 'o Baixar de cada cartão continua');

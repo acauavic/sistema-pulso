@@ -1,6 +1,6 @@
 <%# Painel de gestão em dois níveis: grupos (linha de cima) e abas do grupo (linha de baixo). Variável: active (chave da aba). %>
 <%
-  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage'];
+  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage', 'trash.manage'];
   var groups = [
     { label: 'Visão geral', tabs: [['geral', '/gestao', 'Visão geral', ANY]] },
     { label: 'Equipe', tabs: [
@@ -22,6 +22,7 @@
       ['integracoes', '/integracoes', 'Integrações', ['integrations.manage']],
       ['busca', '/gestao/busca', 'Busca global', ['search.manage']],
       ['sistema', '/gestao/sistema', 'Saúde do sistema', ['integrations.manage']],
+      ['lixeira', '/lixeira', 'Lixeira', ['trash.manage']],
     ] },
   ];
   groups.forEach(function (g) { g.shown = g.tabs.filter(function (t) { return t[3].some(function (p) { return can(p); }); }); g.on = g.tabs.some(function (t) { return t[0] === active; }); });

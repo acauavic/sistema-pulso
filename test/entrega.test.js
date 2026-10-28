@@ -169,7 +169,7 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     const yt = p.results.find((r) => r.platform === 'youtube');
     assert.equal(yt.code, 'youtube_fila');
     assert.ok(Date.parse(yt.retry_at) > Date.parse(retryAt) && Date.parse(yt.retry_at) < Date.parse(retryAt) + 3 * 60_000, 'logo depois da hora informada');
-    assert.match(yt.hint, /Fila compartilhada do YouTube na Outstand: a próxima vaga abre às \d{2}:\d{2}\./);
+    assert.match(yt.hint, /Fila compartilhada do YouTube na Outstand: a próxima vaga abre às (\d{2}\/\d{2} )?\d{2}:\d{2}\./);
     calls.length = 0;
     await publishing.tick();
     assert.equal(posts('outstand').length, 0, 'antes da vaga não tenta (cada tentativa gasta da cota do dia)');
@@ -327,7 +327,7 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
       assert.equal(r.ok, false); assert.equal(r.code, 'arquivo_indisponivel');
       const n = await notes('Atenção antes de publicar: Agendado ruim');
       assert.deepEqual(n.map((x) => x.name).sort(), ['admin', 'gestao', 'prod']);
-      assert.match(n[0].body, /Agendado para \d{2}:\d{2}\. O armazenamento \(Backblaze\) não entregou o arquivo inteiro/);
+      assert.match(n[0].body, /Agendado para (\d{2}\/\d{2} )?\d{2}:\d{2}\. O armazenamento \(Backblaze\) não entregou o arquivo inteiro/);
       assert.equal(await publishing.precheckScheduled(), null, 'na mesma hora não confere de novo');
       assert.equal((await pubRow(pub.id)).status, 'agendado', 'segue agendado: na hora, só sai se o arquivo estiver bom');
     } finally { st.broken.delete(key); await h.db.query('DELETE FROM episode_publications WHERE id = $1', [pub.id]); }
@@ -339,8 +339,8 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     setO(pub.request_id, { instagram: ['published'], youtube: ['failed', `Shared YouTube upload capacity is waiting for the next release. [youtube_upload_error:release_pending; retryAt=${new Date(Date.now() + 15 * 60_000).toISOString()}]`] });
     await publishing.refresh(pub.id);
     let page = (await as.gestao.get(`/social/publicacoes/${pub.id}`)).text;
-    assert.match(page, /Nova tentativa automática às <span class="mono">\d{2}:\d{2}<\/span>/);
-    assert.match(page, /Fila compartilhada do YouTube na Outstand: a próxima vaga abre às \d{2}:\d{2}\./);
+    assert.match(page, /Nova tentativa automática às <span class="mono">(\d{2}\/\d{2} )?\d{2}:\d{2}<\/span>/);
+    assert.match(page, /Fila compartilhada do YouTube na Outstand: a próxima vaga abre às (\d{2}\/\d{2} )?\d{2}:\d{2}\./);
     assert.match(page, /Resposta: Shared YouTube upload capacity/, 'a resposta original fica logo abaixo, para quem precisar');
     assert.match(page, /Histórico de envio/); assert.match(page, /Envio na hora/); assert.match(page, /vídeo \([^)]+\) hospedado na Outstand/);
     assert.match(page, /Reenviar agora/); assert.match(page, /Parar novas tentativas/);

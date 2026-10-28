@@ -259,6 +259,7 @@ describe('produção de episódios', () => {
       const { rows: [f] } = await h.db.query('SELECT storage_key FROM episode_files WHERE id=$1', [r.id]);
       assert.ok(h.b2Store.has(f.storage_key));
       assert.equal((await as.prod.act(`/episodios/${epId}/arquivos/${r.id}/excluir`, {}, { from: `/episodios/${epId}` })).status, 302);
+      await h.emptyTrash();
       assert.equal(h.b2Store.has(f.storage_key), false);
     });
   });
@@ -642,6 +643,8 @@ describe('produção de episódios', () => {
       assert.equal(h.b2Multipart.size, 1);
       assert.equal((await as.prod.act(`/episodios/${id}/excluir`, {}, { from: '/episodios' })).status, 403);
       assert.equal((await as.gestao.act(`/episodios/${id}/excluir`, {}, { from: '/episodios' })).status, 302);
+      assert.equal(h.b2Multipart.size, 0, 'envio pela metade é abortado na hora');
+      await h.emptyTrash();
       assert.equal(h.b2Store.has(f.storage_key), false, 'arquivo pronto saiu do bucket');
       assert.equal(h.b2Multipart.size, 0, 'envio pela metade foi abortado');
       assert.equal((await ep(id)), undefined);

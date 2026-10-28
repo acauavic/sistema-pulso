@@ -155,6 +155,9 @@
 <%- include('_request_form', { id: 'modal-pedido-editar', r: r, preset: {}, openOnLoad: false }) %>
 <form method="post" action="/conteudo/pedidos/<%= r.id %>/cancelar" class="top-gap" data-confirm="Cancelar este pedido? O editor deixa de vê-lo como pendente."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">cancelar pedido</button></form>
 <% } %>
+<% if (perm.edit) { %>
+<form method="post" action="/conteudo/pedidos/<%= r.id %>/excluir" class="<%= ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0 ? '' : 'top-gap' %>" data-confirm="Excluir este pedido? Ele fica <%= 15 %> dias na lixeira, com as imagens entregues e os comentários. Os vídeos entregues continuam em Cortes."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">excluir pedido</button></form>
+<% } %>
 <% if (perm.review && r.status === 'revisao') { %>
 <dialog class="modal" id="modal-ajustes" aria-labelledby="ma-h">
   <form method="post" action="/conteudo/pedidos/<%= r.id %>/ajustes" class="stack">

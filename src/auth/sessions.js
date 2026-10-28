@@ -74,8 +74,8 @@ async function destroyUserSessions(userId, exceptHash = null) {
   await db.query('DELETE FROM sessions WHERE user_id = $1 AND token_hash IS DISTINCT FROM $2', [userId, exceptHash]);
 }
 
-async function setFlash(tokenHash, type, message) {
-  await db.query('UPDATE sessions SET flash = $2 WHERE token_hash = $1', [tokenHash, JSON.stringify({ type, message })]);
+async function setFlash(tokenHash, type, message, extra = null) {
+  await db.query('UPDATE sessions SET flash = $2 WHERE token_hash = $1', [tokenHash, JSON.stringify({ type, message, ...(extra || {}) })]);
 }
 
 async function clearFlash(tokenHash) {

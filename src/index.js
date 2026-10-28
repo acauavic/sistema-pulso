@@ -34,6 +34,7 @@ function registerRoutines() {
     await require('./auth/rateLimit').purge();
     await require('./services/attachments').purge();
     await require('./services/linkPreview').purge();
+    await require('./services/trash').purge(); // lixeira: o que passou de 15 dias sai de vez (com os arquivos)
     await db.query("DELETE FROM jobs WHERE status = 'done' AND finished_at < now() - interval '30 days'");
     await db.query("DELETE FROM worker_heartbeats WHERE seen_at < now() - interval '1 day'");
   }, { delayMs: 120_000 });

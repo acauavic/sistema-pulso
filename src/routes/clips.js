@@ -85,7 +85,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     pedir, today: new Date().toISOString().slice(0, 10), isLate: R.isLate, stageLabel: board.STAGE_LABEL,
     title: 'Conteúdo', clips: list, episodes: episodes.rows, postGroups, only, onlyEpisode: only ? byEpisode[only] || null : null,
     moments, running, storageReady: config.storageConfigured, aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,
-    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role), request: R.canRequest(req.user.role) }, C,
+    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role), request: R.canRequest(req.user.role), review: R.canReview(req.user.role), approve: can(req.user.role, 'production.review') || can(req.user.role, 'production.manage') }, C,
   });
 }));
 
@@ -226,8 +226,11 @@ router.post('/cortes/:id/excluir', requirePerm('episodes.read'), wrap(async (req
   if (!canCut(req.user.role)) return deny(req, res);
   const c = await findClip(req); if (!c) return notFound(res);
   const gone = await recordChanges.snapshot('clip', c.id);
-  await clips.removeClip(c.id);
+  let t = null;
+  if (c.status === 'enviando') await clips.removeClip(c.id); // envio pela metade: cancela de vez
+  else t = await require('../services/trash').remove('clip', c.id, { user: req.user });
   await recordChanges.deleted({ type: 'clip', row: gone, actor: req.user });
+  if (t) await req.flash('ok', `${c.title} foi para a lixeira.`, { undo: t.batch });
   await audit(req, 'corte.excluido', 'clip', c.id, { episodio: c.episode_id });
   res.redirect(c.request_id ? `/conteudo/pedidos/${c.request_id}` : '/conteudo');
 }));

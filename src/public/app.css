@@ -1322,3 +1322,19 @@ dialog.modal.gallery[open] { display: flex; flex-direction: column; }
 .acct-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--raised); }
 .acct-state { display: flex; align-items: center; gap: 10px; flex: none; }
 .route-list { display: grid; gap: 8px; margin: 0; } .route-list li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; align-items: center; } .route-list label { margin: 0; }
+
+/* Lixeira: "Desfazer" no aviso depois de apagar e a lista do que pode voltar */
+.flash-undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+a.icon-btn { text-decoration: none; } a.icon-btn.on { background: var(--raised); color: var(--text); }
+.trash-actions { gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 640px) { .trash-row { grid-template-columns: 1fr; } .trash-actions { justify-content: flex-start; } }
+
+/* Conteúdo: seleção em massa de cortes e pedidos (mesma barra de baixar.js) */
+.clip-card[data-dl-item] { position: relative; }
+.clip-card input.dl-check { position: absolute; top: 18px; left: 18px; z-index: 2; }
+.clip-card.picked { box-shadow: none; outline: 2px solid var(--text); outline-offset: -1px; }
+.req-pick { display: flex; align-items: center; gap: 10px; }
+.req-pick > .req-row { flex: 1 1 0; min-width: 0; }
+.req-pick.picked { background: none; box-shadow: none; }
+.req-pick.picked > .req-row { background: var(--raised); border-color: var(--text); }
+.dl-bar .link { padding: 0 4px; }

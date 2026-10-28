@@ -144,6 +144,7 @@ describe('material: repetidos, envios parados, armazenamento cheio e galeria', (
     assert.equal((await fetch(`${app.base}/episodios/${epId}/arquivos/999999/previa`, { headers: { cookie: as.gestao.cookie() } })).status, 404);
     // remover a foto apaga as miniaturas do disco
     await as.prod.act(`/episodios/${epId}/arquivos/${photoId}/excluir`, {}, { from: `/episodios/${epId}` });
+    await h.emptyTrash(); // na lixeira a miniatura fica (a foto pode voltar)
     assert.equal(previews.stored(ph, 't'), null); assert.equal(previews.stored(ph, 'p'), null);
   });
 

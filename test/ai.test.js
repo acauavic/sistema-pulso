@@ -372,6 +372,8 @@ describe('trabalho de finalização (FFmpeg real, IA simulada)', { skip: hasFfmp
     const { rows: frames } = await h.db.query('SELECT storage_key FROM episode_frames WHERE episode_id=$1', [ep.id]);
     assert.ok(frames.length && frames.every((f) => h.b2Store.has(f.storage_key)));
     await as.gestao.act(`/episodios/${ep.id}/excluir`, {}, { from: '/episodios' });
+    assert.ok(frames.every((f) => h.b2Store.has(f.storage_key)), 'na lixeira, os quadros ficam');
+    await h.emptyTrash();
     assert.ok(frames.every((f) => !h.b2Store.has(f.storage_key)));
   });
 });

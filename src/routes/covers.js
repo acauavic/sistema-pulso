@@ -188,8 +188,8 @@ router.post(both('/excluir'), requirePerm('episodes.read'), wrap(async (req, res
   if (!canDesign(req.user.role)) return deny(res);
   const c = await findCover(req);
   if (!c) return notFound(res);
-  await db.query('DELETE FROM episode_covers WHERE id = $1', [c.id]);
-  await b2.deleteObject(c.storage_key).catch(() => {});
+  const t = await require('../services/trash').remove('cover', c.id, { user: req.user });
+  if (t) await req.flash('ok', 'Imagem na lixeira.', { undo: t.batch });
   res.redirect(homeOf(c));
 }));
 

@@ -83,6 +83,7 @@ async function attachSession(req, res, next) {
     res.locals.icon = icon;
     res.locals.podcastName = config.podcastName;
     res.locals.currentPath = req.path;
+    res.locals.currentUrl = req.originalUrl; // com a busca (?vista=…): o Desfazer volta para a mesma aba
     res.locals.navCounts = null;
     res.locals.appVersion = releases.current().version;
     res.locals.releaseInfo = releases.current();
@@ -90,8 +91,8 @@ async function attachSession(req, res, next) {
     res.locals.pushKey = req.user ? config.push.publicKey || '' : '';
     res.locals.aiOn = Boolean(req.user && config.geminiConfigured); // botão "Sugerir com IA" nos textos (partials/ai-assist.ejs) // alertas no celular (pwa.js / push.js)
 
-    req.flash = async (type, message) => {
-      if (req.session) await sessions.setFlash(req.session.tokenHash, type, message);
+    req.flash = async (type, message, extra = null) => { // extra: { undo: lote da lixeira } mostra o botão "Desfazer"
+      if (req.session) await sessions.setFlash(req.session.tokenHash, type, message, extra);
     };
     next();
   } catch (err) {

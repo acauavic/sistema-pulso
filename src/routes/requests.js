@@ -86,6 +86,16 @@ router.post('/conteudo/pedidos/:id/:acao(comecar|entregar|aprovar|ajustes|cancel
   res.redirect(req.params.acao === 'cancelar' ? '/conteudo?vista=pedidos' : R.url(r.id));
 }));
 
+// Excluir o pedido: vai para a lixeira com as imagens entregues e os comentários; os vídeos entregues continuam em Cortes.
+router.post('/conteudo/pedidos/:id/excluir', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const r = await load(req); if (!r) return notFound(res);
+  if (!canEdit(req.user, r)) return deny(req, res, 'Só quem pediu e a gestão excluem o pedido.');
+  const t = await require('../services/trash').remove('request', r.id, { user: req.user });
+  await audit(req, 'pedido.excluido', 'content_request', r.id, { titulo: r.title });
+  await req.flash('ok', `Pedido na lixeira: ${r.title}.`, t && { undo: t.batch });
+  res.redirect('/conteudo?vista=pedidos');
+}));
+
 // ---------------------------------------------------------------- entrega em vídeo (mesma fila de envio dos cortes)
 router.post('/conteudo/pedidos/:pid/cortes/iniciar', requirePerm('episodes.read'), wrap(async (req, res) => {
   const r = await load(req);
@@ -121,7 +131,8 @@ router.post('/conteudo/pedidos/:id/imagens', requirePerm('episodes.read'), expre
 router.post('/conteudo/pedidos/:id/imagens/:cid/excluir', requirePerm('episodes.read'), wrap(async (req, res) => {
   const r = await load(req); if (!r) return notFound(res);
   if (!R.canWork(req.user, r) || r.status !== 'producao' || !isIntId(req.params.cid)) return deny(req, res, 'Só dá para tirar imagens enquanto o pedido está em produção.');
-  await R.removeImage(r, Number(req.params.cid));
+  const t = await R.removeImage(r, Number(req.params.cid), req.user);
+  if (t) await req.flash('ok', 'Imagem na lixeira.', { undo: t.batch });
   res.redirect(R.url(r.id));
 }));
 

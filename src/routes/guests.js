@@ -472,12 +472,14 @@ router.post('/convidados/:id/excluir', requirePerm('guests.delete'), wrap(async 
   const guest = await findGuest(req.params.id);
   if (!guest) return notFound(res);
   await audit(req, 'convidado.excluido', 'guest', guest.id, { name: guest.name });
-  await require('../services/finance').onGuestDeleted(guest.id);
-  if (guest.photo_key) await require('../services/b2').deleteObject(guest.photo_key).catch(() => {});
   const gone = await recordChanges.snapshot('guest', guest.id);
-  await db.query('DELETE FROM guests WHERE id = $1', [guest.id]);
+  const t = await require('../services/trash').remove('guest', guest.id, {
+    user: req.user,
+    states: [{ table: 'fin_entries', where: 'guest_id = $1 AND episode_id IS NULL AND auto_key IS NOT NULL', params: [guest.id] }],
+    before: () => require('../services/finance').onGuestDeleted(guest.id),
+  });
   await recordChanges.deleted({ type: 'guest', row: gone, actor: req.user });
-  await req.flash('ok', `${guest.name} foi removido(a).`);
+  await req.flash('ok', `${guest.name} foi para a lixeira.`, t && { undo: t.batch });
   res.redirect('/convidados');
 }));
 

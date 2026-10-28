@@ -168,10 +168,10 @@ router.post('/tarefas/:id/excluir', requirePerm('tasks.write'), wrap(async (req,
   if (!task) return notFound(res);
   if (!can(req.user.role, 'tasks.manage') && String(task.created_by) !== String(req.user.id)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem criou (ou a gestão) apaga a tarefa.' });
   const gone = await recordChanges.snapshot('task', task.id);
-  await db.query('DELETE FROM tasks WHERE id = $1', [task.id]);
+  const t = await require('../services/trash').remove('task', task.id, { user: req.user }); // leva os comentários e anexos junto
   await recordChanges.deleted({ type: 'task', row: gone, actor: req.user });
-  await db.query("DELETE FROM comments WHERE entity_type = 'task' AND entity_id = $1", [task.id]);
   await audit(req, 'tarefa.excluida', 'task', task.id, { titulo: task.title });
+  if (t && !wantsJson(req)) await req.flash('ok', 'Tarefa na lixeira.', { undo: t.batch });
   res.redirect(backTo(req, '/tarefas'));
 }));
 

@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.37.0', date: '2026-10-28', title: 'Lixeira e ações em massa no Conteúdo',
+    items: [
+      { kind: 'novo', text: 'Lixeira: o que se apaga no sistema (episódio, convidado, patrocinador, tarefa, corte, post, pedido, arquivo, lançamento) fica 15 dias guardado e volta do jeito que estava, com comentários, imagens e arquivos. Logo depois de apagar, o aviso no topo traz o botão "Desfazer". A Lixeira fica no rodapé do menu: cada pessoa vê o que apagou; a gestão vê tudo e pode apagar de vez antes do prazo.' },
+      { kind: 'novo', text: 'Em Conteúdo, "Selecionar" agora serve para mais que baixar. Em Cortes: atribuir vários ao episódio, baixar ou mandar para a lixeira. Em Posts e carrosséis: aprovar, tirar aprovação, baixar ou excluir. Em Pedidos: mudar responsável, prazo e prioridade de uma vez, cancelar ou excluir.' },
+      { kind: 'ajuste', text: 'Pedido de conteúdo agora pode ser excluído (vai para a lixeira). Os vídeos entregues continuam em Cortes.' },
+    ],
+  },
+  {
     version: '1.36.0', date: '2026-10-28', title: 'Conteúdos do episódio viram pedidos',
     items: [
       { kind: 'novo', text: 'Ao criar o episódio, "Pedir ao editor junto com o episódio" mostra Cortes, Q&A, Bastidores e Conteúdo extra para marcar. Cada um marcado vira um pedido de conteúdo, com prazo e responsável, e a entrega sobe aqui no sistema, sem link do Drive. Q&A e Bastidores são prioridade, porque saem no começo da semana para anunciar o episódio. Episódio criado a partir do convidado gravado já nasce com os que vêm marcados.' },

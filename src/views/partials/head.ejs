@@ -58,6 +58,7 @@
     </a>
     <div class="foot-actions">
       <button class="icon-btn" type="button" data-pwa-install hidden><%- icon('smartphone') %><span>Instalar o app</span></button>
+      <a class="icon-btn<%= currentPath.startsWith('/lixeira') ? ' on' : '' %>" href="/lixeira"><%- icon('trash-2') %><span>Lixeira</span></a>
       <button class="icon-btn" type="button" data-theme-toggle aria-label="Alternar tema claro/escuro"><span class="theme-moon"><%- icon('moon') %></span><span class="theme-sun"><%- icon('sun') %></span><span>Tema</span></button>
       <form method="post" action="/logout" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn" type="submit"><%- icon('log-out') %><span>Sair</span></button></form>
     </div>
@@ -84,4 +85,4 @@
     <%- include('pulse-line') %>
   </div>
 <% } %>
-<% if (flash) { %><div class="flash <%= flash.type === 'ok' ? 'flash-ok' : 'flash-error' %>" role="status"><%= flash.message %></div><% } %>
+<% if (flash) { %><div class="flash <%= flash.type === 'ok' ? 'flash-ok' : 'flash-error' %><%= flash.undo ? ' flash-undo' : '' %>" role="status"><span><%= flash.message %></span><% if (flash.undo) { %><form method="post" action="/lixeira/lote/<%= flash.undo %>/restaurar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentUrl %>"><button class="btn sm" type="submit"><%- icon('rotate-ccw', 14) %> Desfazer</button></form><% } %></div><% } %>

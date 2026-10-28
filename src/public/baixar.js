@@ -3,6 +3,9 @@
 // navegador faz os downloads em paralelo, direto do armazenamento (nada passa pelo servidor, nada é compactado).
 // Marcação de uma lista: um contêiner [data-dl] com itens [data-dl-item data-href data-name data-bytes] (cada um com um
 // [data-dl-check]), os botões [data-dl-select] e [data-dl-everything] e a barra [data-dl-bar].
+// Ações em massa na mesma seleção (Conteúdo: atribuir, aprovar, excluir…): cada item leva data-id; na barra,
+// [data-dl-do="acao"] envia o formulário [data-dl-form] do contêiner (com data-confirm, pergunta antes; {n} vira a contagem) e
+// [data-dl-open="id-da-janela"] abre uma janela cujo formulário recebe os ids marcados em [data-dl-ids] ({n} em [data-dl-n]).
 (function () {
   const GAP_MS = 900; // intervalo entre um download e o seguinte: o navegador aceita melhor e o Backblaze não recebe tudo de uma vez
   const CONFIRM_BYTES = 2 * 1024 ** 3; // acima disso, pergunta antes (evita baixar 100 GB por engano)
@@ -53,8 +56,10 @@
     const say = (text) => { if (note) { note.textContent = text; note.hidden = !text; } };
     const refresh = () => {
       const sel = picked();
-      if (count) count.textContent = sel.length ? `${plural(sel.length, 'selecionado', 'selecionados')} · ${bytesText(sum(sel.map(itemOf)))}` : 'Nenhum item marcado';
+      const bytes = sum(sel.map(itemOf));
+      if (count) count.textContent = sel.length ? `${plural(sel.length, 'selecionado', 'selecionados')}${bytes ? ` · ${bytesText(bytes)}` : ''}` : 'Nenhum item marcado';
       if (go) go.disabled = !sel.length;
+      box.querySelectorAll('[data-dl-do], [data-dl-open]').forEach((b) => { b.disabled = !sel.length; });
       if (allBtn) allBtn.textContent = sel.length === rows().length ? 'Limpar seleção' : 'Selecionar todos';
       rows().forEach((r) => r.classList.toggle('picked', Boolean(r.querySelector('[data-dl-check]')?.checked)));
     };
@@ -70,12 +75,35 @@
       if (started) say(doneNote(started));
     };
 
+    // ids marcados viram campos "ids" do formulário que vai para o servidor
+    const fill = (form, holder) => {
+      (holder || form).querySelectorAll('input[data-dl-id]').forEach((i) => i.remove());
+      picked().forEach((r) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = 'ids'; i.value = r.dataset.id; i.dataset.dlId = ''; (holder || form).appendChild(i); });
+    };
+    const act = (btn) => {
+      const n = picked().length; if (!n) return;
+      if (btn.dataset.dlOpen) {
+        const dlg = document.getElementById(btn.dataset.dlOpen); const form = dlg?.querySelector('form'); if (!form) return;
+        fill(form, form.querySelector('[data-dl-ids]'));
+        dlg.querySelectorAll('[data-dl-n]').forEach((el) => { el.textContent = String(n); });
+        dlg.showModal(); return;
+      }
+      const form = box.querySelector('[data-dl-form]'); if (!form) return;
+      if (btn.dataset.confirm && !window.confirm(btn.dataset.confirm.replace('{n}', n))) return;
+      form.querySelector('input[name="acao"]').value = btn.dataset.dlDo;
+      fill(form);
+      btn.disabled = true; if (btn.dataset.busy) btn.textContent = btn.dataset.busy;
+      form.submit();
+    };
+
     box.addEventListener('click', (e) => {
+      const action = e.target.closest('[data-dl-do], [data-dl-open]');
+      if (action) { act(action); return; }
       if (e.target.closest('[data-dl-select]')) { mode(!box.classList.contains('selecting')); return; }
       if (e.target.closest('[data-dl-cancel]')) { mode(false); return; }
-      if (e.target.closest('[data-dl-everything]')) { run(rows().map(itemOf)); return; }
+      if (e.target.closest('[data-dl-everything]')) { run(rows().map(itemOf).filter((i) => i.href)); return; }
       if (e.target.closest('[data-dl-all]')) { const all = picked().length !== rows().length; checks().forEach((c) => { c.checked = all; }); refresh(); return; }
-      if (e.target.closest('[data-dl-go]')) { run(picked().map(itemOf)); return; }
+      if (e.target.closest('[data-dl-go]')) { run(picked().map(itemOf).filter((i) => i.href)); return; } // corte ainda sem vídeo pronto não baixa
       const pick = box.classList.contains('selecting') ? e.target.closest('[data-dl-pick]') : null; // a imagem do cartão: em vez de abrir, marca
       if (pick) { e.preventDefault(); pick.closest('[data-dl-item]')?.querySelector('[data-dl-check]')?.click(); return; }
       const row = box.classList.contains('selecting') && !e.target.closest('a, button, form, input, label') ? e.target.closest('[data-dl-item]') : null;

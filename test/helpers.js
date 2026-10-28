@@ -231,4 +231,11 @@ function client(base) {
   return api;
 }
 
-module.exports = { uploadPostCalls, uploadPostState, b2Store, b2Cors, b2Calls, b2Multipart, groqCalls, setGroqFail: (v) => { groqFail = v; }, setB2Full: (v) => { b2Full = v; }, db, config, mailer, resetDb, createUser, startServer, client, yourlsCalls, setCollisions: (n) => { collideNext = n; } };
+// Lixeira vencida: apaga de vez o que foi excluído (os arquivos só saem do bucket aqui).
+async function emptyTrash() {
+  await db.query("UPDATE trash_items SET purge_after = now() - interval '1 minute'");
+  const trash = require('../src/services/trash');
+  while (await trash.purge() > 0) { /* em lotes */ }
+}
+
+module.exports = { emptyTrash, uploadPostCalls, uploadPostState, b2Store, b2Cors, b2Calls, b2Multipart, groqCalls, setGroqFail: (v) => { groqFail = v; }, setB2Full: (v) => { b2Full = v; }, db, config, mailer, resetDb, createUser, startServer, client, yourlsCalls, setCollisions: (n) => { collideNext = n; } };

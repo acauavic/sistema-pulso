@@ -62,6 +62,7 @@ const PERMISSIONS = {
   'contacts.manage': ['superadmin', 'gestao'],          // WhatsApp para onde vão os botões dos convites e do media kit, e as mensagens prontas
   'outreach.manage': ['superadmin', 'gestao'],          // cadência de abordagem: intervalos, metas diárias e o painel de follow-ups
   'audit.read': ['superadmin', 'gestao'],
+  'trash.manage': ['superadmin', 'gestao'], // ver e restaurar tudo da lixeira e apagar de vez (cada pessoa vê e restaura o que ela apagou)
   'integrations.manage': ['superadmin', 'gestao'], // ver status e testar Brevo/YOURLS
 };
 

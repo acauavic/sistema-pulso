@@ -496,7 +496,8 @@ router.post('/patrocinadores/:id/arquivos/:fid/excluir', requirePerm('sponsors.w
   if (!isIntId(req.params.id) || !isIntId(req.params.fid)) return notFound(res);
   const { rows: [file] } = await db.query('SELECT * FROM sponsor_files WHERE id = $1 AND sponsor_id = $2', [req.params.fid, req.params.id]);
   if (!file) return notFound(res);
-  await sponsorsSvc.deleteFile(file);
+  const t = await require('../services/trash').remove('sponsor_file', file.id, { user: req.user });
+  await req.flash('ok', 'Arquivo na lixeira.', t && { undo: t.batch });
   await sponsorsSvc.addEvent(file.sponsor_id, req.user.id, 'arquivo', `Arquivo removido: ${file.kind}${file.filename ? ` (${file.filename})` : ''}`);
   res.redirect(back(file.sponsor_id, '#arquivos'));
 }));
@@ -505,14 +506,15 @@ router.post('/patrocinadores/:id/arquivos/:fid/excluir', requirePerm('sponsors.w
 router.post('/patrocinadores/:id/excluir', requirePerm('sponsors.delete'), wrap(async (req, res) => {
   const sponsor = await findSponsor(req.params.id);
   if (!sponsor) return notFound(res);
-  const { rows: files } = await db.query('SELECT * FROM sponsor_files WHERE sponsor_id = $1', [sponsor.id]);
   await audit(req, 'patrocinador.excluido', 'sponsor', sponsor.id, { company: sponsor.company });
-  await require('../services/finance').onSponsorDeleted(sponsor.id);
   const gone = await recordChanges.snapshot('sponsor', sponsor.id);
-  await db.query('DELETE FROM sponsors WHERE id = $1', [sponsor.id]);
+  // o que ainda ia entrar do patrocínio sai junto (finance.onSponsorDeleted) e volta se ele for restaurado
+  const t = await require('../services/trash').remove('sponsor', sponsor.id, {
+    user: req.user,
+    extra: [{ table: 'fin_entries', where: "sponsor_id = $1 AND direction = 'entrada' AND status = 'previsto' AND source = 'patrocinio'", params: [sponsor.id] }],
+  });
   await recordChanges.deleted({ type: 'sponsor', row: gone, actor: req.user });
-  for (const f of files) await require('../services/b2').deleteObject(f.storage_key).catch((err) => console.error('Falha ao apagar arquivo:', err.message));
-  await req.flash('ok', `${sponsor.company} foi removido(a).`);
+  await req.flash('ok', `${sponsor.company} foi para a lixeira.`, t && { undo: t.batch });
   res.redirect('/patrocinadores');
 }));
 

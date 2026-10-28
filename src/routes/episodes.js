@@ -12,6 +12,7 @@ const prod = require('../services/production');
 const sponsorsSvc = require('../services/sponsors');
 const { audit } = require('../services/audit');
 const recordChanges = require('../services/recordChanges');
+const trash = require('../services/trash');
 const { requirePerm } = require('../middleware');
 const { can } = require('../permissions');
 const C = require('../constants');
@@ -328,12 +329,19 @@ router.post('/episodios/:id/excluir', requirePerm('episodes.delete'), wrap(async
   const ep = await findEpisode(req.params.id);
   if (!ep) return notFound(res);
   await audit(req, 'episodio.excluido', 'episode', ep.id, { title: ep.title });
-  await prod.purgeEpisodeFiles(ep.id);
-  await require('../services/finance').onEpisodeDeleted(ep.id);
   const gone = await recordChanges.snapshot('episode', ep.id);
-  await db.query('DELETE FROM episodes WHERE id = $1', [ep.id]);
+  // envio pela metade não tem o que restaurar: cancela de vez (aborta no Backblaze) antes
+  for (const f of (await db.query("SELECT * FROM episode_files WHERE episode_id = $1 AND status = 'enviando'", [ep.id])).rows) await prod.deleteFile(f);
+  for (const c of (await db.query("SELECT id FROM episode_clips WHERE episode_id = $1 AND status = 'enviando'", [ep.id])).rows) await require('../services/clips').removeClip(c.id);
+  // vai para a lixeira com tudo o que é dele; o financeiro cancela o que era automático (e volta como estava ao restaurar)
+  const t = await trash.remove('episode', ep.id, {
+    user: req.user,
+    extra: [{ table: 'fin_stock_moves', where: "episode_id = $1 AND reason = 'episodio'", params: [ep.id] }],
+    states: [{ table: 'fin_entries', where: 'episode_id = $1 AND auto_key IS NOT NULL', params: [ep.id] }],
+    before: () => require('../services/finance').onEpisodeDeleted(ep.id),
+  });
   await recordChanges.deleted({ type: 'episode', row: gone, actor: req.user });
-  await req.flash('ok', 'Episódio removido.');
+  await req.flash('ok', `Episódio na lixeira por ${trash.DAYS} dias.`, t && { undo: t.batch });
   res.redirect('/episodios');
 }));
 
@@ -609,7 +617,11 @@ router.post('/episodios/:id/arquivos/:fid/excluir', uploadAccess, wrap(async (re
   const file = await loadFile(req);
   if (!file) return notFound(res);
   if (!fileAccess(req.user, file.kind)) return res.status(403).render('error', { title: 'Sem permissão', message: file.kind === 'editado' ? 'Só quem edita remove o vídeo editado.' : 'O material bruto é removido pela produção.' });
-  await prod.deleteFile(file);
+  if (file.status === 'enviando') await prod.deleteFile(file); // envio pela metade: cancela de vez (não há o que restaurar)
+  else {
+    const t = await trash.remove('episode_file', file.id, { user: req.user });
+    await req.flash('ok', `${file.filename} foi para a lixeira.`, t && { undo: t.batch });
+  }
   await prod.addEvent(file.episode_id, req.user.id, 'arquivo', `Arquivo removido: ${file.filename}`);
   res.redirect(back(file.episode_id, '#material'));
 }));
@@ -759,7 +771,9 @@ router.post('/episodios/:id/tarefas/:tid', requirePerm('episodes.read'), wrap(as
 
 router.post('/episodios/:id/tarefas/:tid/excluir', requirePerm('production.manage'), wrap(async (req, res) => {
   if (!isIntId(req.params.id) || !isIntId(req.params.tid)) return notFound(res);
-  await db.query('DELETE FROM tasks WHERE id = $1 AND episode_id = $2', [req.params.tid, req.params.id]);
+  const { rows: [task] } = await db.query('SELECT id FROM tasks WHERE id = $1 AND episode_id = $2', [req.params.tid, req.params.id]);
+  const t = task ? await trash.remove('task', task.id, { user: req.user }) : null;
+  if (t) await req.flash('ok', 'Tarefa na lixeira.', { undo: t.batch });
   res.redirect(back(req.params.id, '#tarefas'));
 }));
 

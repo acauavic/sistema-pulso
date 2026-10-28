@@ -78,20 +78,40 @@
     <div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhum corte <%= only ? 'neste episódio' : 'ainda' %>.</strong></p><p class="muted small">Os vídeos editados aparecem aqui já com título, legenda e capas sugeridos.</p><% if (perm.cut && storageReady) { %><p><button class="btn sm" type="button" data-modal-open="modal-cortes"><%- icon('upload', 14) %> Enviar cortes</button></p><% } %></div>
     <% } %>
 
+    <% var clipPick = perm.cut && clips.length > 1; %>
+    <div<%- clipPick ? ' data-dl' : '' %>>
+    <% if (clipPick) { %>
+    <div class="row dl-toolbar">
+      <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
+    </div>
+    <div class="dl-bar" data-dl-bar role="group" aria-label="Ações nos cortes marcados" hidden>
+      <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
+      <span class="row dl-actions">
+        <button class="btn sm ghost" type="button" data-dl-all>Selecionar todos</button>
+        <button class="btn sm" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar</button>
+        <button class="btn sm primary" type="button" data-dl-open="modal-massa-cortes" disabled>Atribuir ao episódio</button>
+        <button class="link small danger-link" type="button" data-dl-do="excluir" data-confirm="Mandar {n} corte(s) para a lixeira? Ficam 15 dias lá e dá para restaurar." disabled>excluir</button>
+        <button class="btn sm ghost" type="button" data-dl-cancel>Cancelar</button>
+      </span>
+    </div>
+    <p class="small muted dl-note" data-dl-note role="status" aria-live="polite" hidden></p>
+    <form method="post" action="/conteudo/em-massa/cortes" data-dl-form hidden><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value=""><input type="hidden" name="episodio" value="<%= only || '' %>"></form>
+    <% } %>
     <% if (unassigned.length) { %>
     <h2 class="top-gap">Sem episódio (<%= unassigned.length %>)</h2>
     <p class="small muted">Escolha o episódio de cada corte. Só aparecem episódios que já foram gravados.</p>
     <div class="clip-grid">
-      <% unassigned.forEach(function (c) { %><%- include('_clip_card', { c: c }) %><% }) %>
+      <% unassigned.forEach(function (c) { %><%- include('_clip_card', { c: c, pick: clipPick }) %><% }) %>
     </div>
     <% } %>
 
     <% if (assigned.length) { %>
     <h2 class="top-gap">Atribuídos (<%= assigned.length %>)</h2>
     <div class="clip-grid">
-      <% assigned.forEach(function (c) { %><%- include('_clip_card', { c: c }) %><% }) %>
+      <% assigned.forEach(function (c) { %><%- include('_clip_card', { c: c, pick: clipPick }) %><% }) %>
     </div>
     <% } %>
+    </div>
   </div>
 
   <div class="pane" id="pane-posts" data-pane-id="posts" hidden>
@@ -117,21 +137,24 @@
         <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
         <button class="btn sm" type="button" data-dl-everything title="Baixa as <%= postCount %> imagens deste episódio, uma depois da outra"><%- icon('download', 14) %> Baixar tudo</button>
       </div>
-      <div class="dl-bar" data-dl-bar role="group" aria-label="Baixar vários posts" hidden>
+      <div class="dl-bar" data-dl-bar role="group" aria-label="Ações nos posts marcados" hidden>
         <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
-        <span class="row">
+        <span class="row dl-actions">
           <button class="btn sm ghost" type="button" data-dl-all>Selecionar todos</button>
+          <% if (perm.approve) { %><button class="btn sm" type="button" data-dl-do="aprovar" disabled>Aprovar</button><button class="link small" type="button" data-dl-do="desaprovar" disabled>tirar aprovação</button><% } %>
           <button class="btn sm primary" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar selecionados</button>
+          <% if (perm.cut) { %><button class="link small danger-link" type="button" data-dl-do="excluir" data-confirm="Mandar {n} post(s) para a lixeira? Ficam 15 dias lá e dá para restaurar." disabled>excluir</button><% } %>
           <button class="btn sm ghost" type="button" data-dl-cancel>Cancelar</button>
         </span>
       </div>
       <p class="small muted dl-note" data-dl-note role="status" aria-live="polite" hidden></p>
+      <form method="post" action="/conteudo/em-massa/posts" data-dl-form hidden><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value=""><input type="hidden" name="episodio" value="<%= only || '' %>"></form>
       <% } %>
       <% ['post_quote', 'post_split', 'carousel'].forEach(function (kind) { var list = g.covers.filter(function (c) { return c.kind === kind; }); if (!list.length) return; %>
       <h3 class="capas-kind"><%= KINDS[kind] %></h3>
       <div class="cover-grid">
         <% list.forEach(function (c) { var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
-        <figure class="cover-card <%= c.approved ? 'approved' : '' %>"<% if (postCount > 1) { %> data-dl-item data-href="/capas/<%= c.id %>/imagem?baixar=1" data-name="<%= epTag + '-' + c.kind.replace(/_/g, '-') + '-' + (c.position + 1) + '.jpg' %>" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %>>
+        <figure class="cover-card <%= c.approved ? 'approved' : '' %>"<% if (postCount > 1) { %> data-dl-item data-id="<%= c.id %>" data-href="/capas/<%= c.id %>/imagem?baixar=1" data-name="<%= epTag + '-' + c.kind.replace(/_/g, '-') + '-' + (c.position + 1) + '.jpg' %>" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %>>
           <% if (postCount > 1) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.label || KINDS[kind] %>"><% } %>
           <a href="/capas/<%= c.id %>/imagem" target="_blank" rel="noopener" data-dl-pick><img src="/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
           <figcaption>
@@ -164,14 +187,36 @@
     <% if (!openRequests.length) { %>
     <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido em aberto.</strong></p><p class="muted small">Trailer do canal, vídeo avulso, um corte específico, post ou story: peça ao editor por aqui, com briefing e prazo. A entrega volta para você aprovar e já fica pronta no Social.</p><% if (perm.request) { %><p><button class="btn sm" type="button" data-modal-open="modal-pedido"><%- icon('plus', 14) %> Pedir conteúdo</button></p><% } %></div>
     <% } else { %>
-    <div class="req-list">
-      <% openRequests.forEach(function (r) { var late = isLate(r, today); %>
-      <a class="req-row" href="/conteudo/pedidos/<%= r.id %>">
+    <% var reqPick = openRequests.length > 1 && openRequests.some(function (r) { return perm.review || String(r.created_by) === String(currentUser.id); }); %>
+    <div<%- reqPick ? ' data-dl' : '' %>>
+    <% if (reqPick) { %>
+    <div class="row dl-toolbar">
+      <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
+    </div>
+    <div class="dl-bar" data-dl-bar role="group" aria-label="Ações nos pedidos marcados" hidden>
+      <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
+      <span class="row dl-actions">
+        <button class="btn sm ghost" type="button" data-dl-all>Selecionar todos</button>
+        <button class="btn sm primary" type="button" data-dl-open="modal-massa-pedidos" disabled><%- icon('pencil', 14) %> Responsável e prazo</button>
+        <button class="link small" type="button" data-dl-do="cancelar" data-confirm="Cancelar {n} pedido(s)? O editor deixa de vê-los como pendentes." disabled>cancelar pedidos</button>
+        <button class="link small danger-link" type="button" data-dl-do="excluir" data-confirm="Mandar {n} pedido(s) para a lixeira? Ficam 15 dias lá e dá para restaurar." disabled>excluir</button>
+        <button class="btn sm ghost" type="button" data-dl-cancel>Fechar</button>
+      </span>
+    </div>
+    <form method="post" action="/conteudo/em-massa/pedidos" data-dl-form hidden><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value=""><input type="hidden" name="episodio" value="<%= only || '' %>"></form>
+    <% } %>
+    <div class="req-list<%= reqPick ? ' top-gap' : '' %>">
+      <% openRequests.forEach(function (r) { var late = isLate(r, today); var mayPick = reqPick && (perm.review || String(r.created_by) === String(currentUser.id)); %>
+      <div class="req-pick"<% if (mayPick) { %> data-dl-item data-id="<%= r.id %>"<% } %>>
+      <% if (mayPick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= r.title %>"><% } %>
+      <a class="req-row" href="/conteudo/pedidos/<%= r.id %>"<%- mayPick ? ' data-dl-pick' : '' %>>
         <span><span class="ktype mono small muted"><%= K[r.kind].label %><%= r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '' %></span><br><strong><%= r.title %></strong>
           <span class="meta"><span><%- icon('user', 12) %><%= r.assignee_name || 'qualquer editor' %></span><% if (r.due_on) { %><span class="<%= late ? 'err' : '' %>"><%- icon('calendar', 12) %><%= dueShort(r.due_on) %><%= late ? ' · atrasado' : '' %></span><% } %><% if (r.rounds) { %><span><%= r.rounds %>ª volta</span><% } %></span></span>
         <span class="badge <%= { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao' }[r.status] %>"><%= S[r.status] %></span>
       </a>
+      </div>
       <% }) %>
+    </div>
     </div>
     <% } %>
     <% if (closed.length) { %>
@@ -187,6 +232,46 @@
 </div>
 
 <% if (perm.request) { %><%- include('_request_form', { id: 'modal-pedido', r: null, preset: { kind: pedir, episode: only }, openOnLoad: Boolean(pedir) }) %><% } %>
+<% if (perm.cut && clips.length > 1) { %>
+<dialog class="modal" id="modal-massa-cortes" aria-labelledby="mmc-h">
+  <form method="post" action="/conteudo/em-massa/cortes" class="stack" data-busy="Atribuindo…">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value="atribuir"><input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
+    <h2 id="mmc-h">Atribuir <span class="mono" data-dl-n>0</span> corte(s)</h2>
+    <label>Episódio
+      <select name="episode_id" required>
+        <option value="">Escolha…</option>
+        <% episodes.forEach(function (e) { %><option value="<%= e.id %>"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
+      </select>
+    </label>
+    <p class="small muted">Só aparecem episódios já gravados. Os cortes que já tinham episódio mudam para este, e as capas são refeitas.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Atribuir</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (openRequests.length > 1) { %>
+<dialog class="modal" id="modal-massa-pedidos" aria-labelledby="mmp-h">
+  <form method="post" action="/conteudo/em-massa/pedidos" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value="alterar"><input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
+    <h2 id="mmp-h">Mudar <span class="mono" data-dl-n>0</span> pedido(s)</h2>
+    <p class="small muted">Só muda o que você escolher; o resto fica como está em cada pedido.</p>
+    <label>Responsável
+      <select name="assignee_id">
+        <option value="">Manter</option>
+        <option value="ninguem">Qualquer editor</option>
+        <% people.forEach(function (p) { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+      </select>
+    </label>
+    <div class="row">
+      <label>Novo prazo<input type="date" name="due_on"></label>
+      <label class="check"><input type="checkbox" name="sem_prazo" value="1"> Tirar o prazo</label>
+    </div>
+    <label>Prioridade
+      <select name="priority"><option value="">Manter</option><option value="1">Prioritário</option><option value="0">Normal</option></select>
+    </label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <% if (perm.cut && storageReady) { %>
 <dialog class="modal modal-wide" id="modal-cortes" aria-labelledby="mc-h">
   <div class="stack">
