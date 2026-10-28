@@ -35,6 +35,9 @@ const RULES = [
   { re: /privacy_level_option_mismatch/i, code: 'tiktok_privacidade', kind: 'rede', wait: () => 2 * MIN, hint: () => 'As opções de privacidade do TikTok mudaram: a próxima tentativa lê de novo' },
   { re: /unaudited_client_can_only_post_to_private_accounts/i, code: 'tiktok_privado', kind: 'conta', hint: () => 'O app do TikTok só publica como privado: em Integrações, mande o TikTok como rascunho' },
   { re: /spam_risk_user_banned_from_posting/i, code: 'tiktok_bloqueado', kind: 'conta', hint: () => 'O TikTok bloqueou esta conta de publicar: só o suporte do TikTok resolve' },
+  // perfil no collab ou marcado que o Instagram não acha (privado ou nome errado): vem como OAuthException 110, mas a conta está boa
+  { re: /2207018|private profile or invalid username|user\(s\) cannot be accessed/i, code: 'ig_perfil', kind: 'conteudo',
+    hint: (m) => { const who = (m.input.match(/cannot be accessed:\s*([\w.,@ ]+)/i)?.[1] || '').split(/[,\s]+/).filter(Boolean).map((h) => `@${h.replace(/^@/, '')}`); return `O Instagram não encontrou ${who.length ? (who.length > 1 ? `os perfis ${who.join(', ')}` : `o perfil ${who[0]}`) : 'um perfil'} do collab ou da marcação (conta privada ou nome errado). A conta do Pulso está conectada: tire ou corrija esse perfil e publique de novo no Instagram`; } },
   { re: /access_token_invalid|scope_not_authorized|token (?:has )?expired|expired token|access token|re-?auth|reconnect|session has been invalidated|oauthexception|invalid_grant|unauthori[sz]ed|\b401\b|not authorized|needs? reconnection/i,
     code: 'conta', kind: 'conta', hint: () => 'A conta desta rede precisa ser reconectada em Integrações > Redes sociais' },
   { re: /duplicate|already been posted|identical content|content already exists/i, code: 'repetido', kind: 'conteudo', hint: () => 'A rede recusou por ser conteúdo repetido' },

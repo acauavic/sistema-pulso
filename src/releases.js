@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.37.1', date: '2026-10-28', title: 'Perfil do collab que o Instagram não acha',
+    items: [
+      { kind: 'correcao', text: 'Quando o Instagram recusa um perfil do collab ou da marcação (conta privada ou nome errado), a publicação dizia para reconectar a conta, que estava boa. Agora diz qual perfil o Instagram não encontrou e pede para tirar ou corrigir esse perfil antes de publicar de novo.' },
+    ],
+  },
+  {
     version: '1.37.0', date: '2026-10-28', title: 'Lixeira e ações em massa no Conteúdo',
     items: [
       { kind: 'novo', text: 'Lixeira: o que se apaga no sistema (episódio, convidado, patrocinador, tarefa, corte, post, pedido, arquivo, lançamento) fica 15 dias guardado e volta do jeito que estava, com comentários, imagens e arquivos. Logo depois de apagar, o aviso no topo traz o botão "Desfazer". A Lixeira fica no rodapé do menu: cada pessoa vê o que apagou; a gestão vê tudo e pode apagar de vez antes do prazo.' },

@@ -290,6 +290,10 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     const xText = posts('zernio').at(-1).body.platforms.find((p) => p.platform === 'twitter').customContent;
     assert.equal(xText, 'Falar que tem a licença é diferente de comprovar. Falar que tem a licença é diferente de comprovar. Falar que tem a licença é diferente de comprovar. Falar que tem a licença é diferente de comprovar.', 'o X leva o primeiro parágrafo, que cabe em 280');
     assert.equal(E.classify("Tweet text is too long (283 characters). Twitter's limit is 280 characters.").code, 'texto_longo');
+    // pub 8 (28/10): collab com perfil privado ou inexistente vem como OAuthException, mas não é a conta
+    const ig = E.classify('Error publishing Instagram post: Failed to create Instagram media container: 400 - {"error":{"message":"Invalid user id","type":"OAuthException","code":110,"error_subcode":2207018,"is_transient":false,"error_user_title":"Cannot load user with a private profile or invalid username","error_user_msg":"The following user(s) cannot be accessed: acauvic"}}');
+    assert.equal(ig.code, 'ig_perfil'); assert.equal(ig.terminal, true);
+    assert.match(ig.hint, /não encontrou o perfil @acauvic do collab ou da marcação/);
   });
 
   it('duração por rede: corte de 2 min não agenda Reels do Facebook (a Outstand recusaria o post inteiro); no X é só aviso', async () => {
