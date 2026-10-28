@@ -1,9 +1,9 @@
 <%#
   Instagram: collab (até 3) e marcação de pessoas, com busca e seleção múltipla. Só aparece quando o Instagram está marcado
   (o JS liga e desliga). Variáveis: episodeId (sugere o @ do convidado), photo (true = post/carrossel: marcação com posição na imagem),
-  img (endereço da imagem para posicionar; no "Novo post" vem do item escolhido).
+  img (endereço da imagem para posicionar; no "Novo post" vem do item escolhido), initial (collab e marcações atuais, ao reenviar).
 %>
-<fieldset class="igp" data-ig-people data-episode="<%= locals.episodeId || '' %>" data-photo="<%= locals.photo ? '1' : '0' %>" data-img="<%= locals.img || '' %>" hidden>
+<fieldset class="igp" data-ig-people data-episode="<%= locals.episodeId || '' %>" data-photo="<%= locals.photo ? '1' : '0' %>" data-img="<%= locals.img || '' %>"<% if (locals.initial) { %> data-initial="<%= JSON.stringify(locals.initial) %>"<% } %> hidden>
   <legend><%- icon('instagram', 14) %> Instagram</legend>
   <div class="igp-field" data-igp="collab" data-max="3">
     <div class="igp-head"><strong>Collab</strong><span class="small muted">até 3 perfis · o post aparece também no perfil de quem aceitar o convite</span></div>

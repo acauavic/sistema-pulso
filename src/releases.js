@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.38.0', date: '2026-10-28', title: 'Corrigir e reenviar uma rede',
+    items: [
+      { kind: 'novo', text: 'Na publicação, "Corrigir e reenviar" abre uma janela com as redes que falharam já marcadas, o motivo de cada uma, o texto e o collab do Instagram para corrigir. O texto novo vale só para as redes reenviadas; o que já está no ar não muda e não pode ser marcado de novo, para nada sair duplicado. Cada rede com erro também tem o atalho "Corrigir e reenviar só" ela.' },
+      { kind: 'novo', text: 'Publicação que já saiu ganhou "Publicar em outra rede": manda o mesmo corte ou imagem para uma rede que ainda não recebeu, com texto próprio se quiser.' },
+      { kind: 'ajuste', text: 'Quando a falha é passageira, o botão principal continua sendo reenviar como está. Quando reenviar igual não resolveria (perfil do collab, formato, conta), o principal passa a ser corrigir.' },
+    ],
+  },
+  {
     version: '1.37.1', date: '2026-10-28', title: 'Perfil do collab que o Instagram não acha',
     items: [
       { kind: 'correcao', text: 'Quando o Instagram recusa um perfil do collab ou da marcação (conta privada ou nome errado), a publicação dizia para reconectar a conta, que estava boa. Agora diz qual perfil o Instagram não encontrou e pede para tirar ou corrigir esse perfil antes de publicar de novo.' },

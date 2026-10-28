@@ -404,6 +404,54 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     } finally { global.fetch = prev; }
   });
 
+  it('corrigir e reenviar: só a rede que falhou, com o collab e o texto editados; o que já saiu não muda; dá para mandar para outra rede', async () => {
+    const clip = await mkClip('pp/cortes/28/video-collab.mp4');
+    const pub = await publishing.create({ clipId: clip.id, platforms: ['instagram', 'facebook'], title: 'Mitos e verdades', description: 'Legenda original', userId: u.gestao.id, instagram: { collaborators: ['marirvabo', 'acauvic'], tags: [] } });
+    const opId = Object.keys(st.oPosts).at(-1);
+    setO(opId, { facebook: ['published'], instagram: ['failed', 'Failed to create Instagram media container: 400 - {"error":{"message":"Invalid user id","type":"OAuthException","code":110,"error_subcode":2207018,"error_user_msg":"The following user(s) cannot be accessed: acauvic"}}'] });
+    await publishing.refresh(pub.id);
+    let p = await pubRow(pub.id);
+    assert.equal(p.status, 'parcial');
+    assert.equal(p.results.find((r) => r.platform === 'instagram').code, 'ig_perfil');
+
+    const page = (await as.gestao.get(`/social/publicacoes/${pub.id}`)).text;
+    assert.match(page, /data-resend-net="">[\s\S]*?Corrigir e reenviar/);
+    assert.match(page, /Corrigir e reenviar só Reels do Instagram|Corrigir e reenviar só Instagram/);
+    assert.match(page, /id="modal-reenviar"/);
+    assert.match(page, /data-failed="instagram"/);
+    assert.match(page, /value="facebook" disabled/, 'a rede que já está no ar não entra');
+    assert.match(page, /data-initial="[^"]*acauvic/, 'o collab atual vem preenchido para corrigir');
+    assert.equal((await as.prod.act(`/social/publicacoes/${pub.id}/reenviar`, { platforms: 'instagram' }, { from: `/social/publicacoes/${pub.id}` })).status, 403);
+
+    calls.length = 0;
+    const r = await as.gestao.act(`/social/publicacoes/${pub.id}/reenviar`, { platforms: ['instagram', 'facebook'], title: 'Mitos e verdades', description: 'Legenda nova só para o Instagram', ig_collab: ['marirvabo', '@acauavic'] }, { from: `/social/publicacoes/${pub.id}` });
+    assert.equal(r.status, 302);
+    const sent = lastPost();
+    assert.deepEqual(sent.accounts, ['IG1'], 'só o Instagram: o Facebook já estava no ar');
+    assert.deepEqual(sent.instagram.collaborators, ['marirvabo', 'acauavic']);
+    assert.equal(sent.containers[0].content, 'Legenda nova só para o Instagram');
+    p = await pubRow(pub.id);
+    assert.equal(p.description, 'Legenda original', 'o texto da publicação (o que saiu no Facebook) fica');
+    assert.deepEqual(p.options.texts.instagram, { title: 'Mitos e verdades', description: 'Legenda nova só para o Instagram' });
+    assert.ok(p.results.find((r2) => r2.platform === 'facebook').ok, 'o Facebook continua no ar');
+    setO(Object.keys(st.oPosts).at(-1), { instagram: ['published'] });
+    await publishing.refresh(pub.id);
+    p = await pubRow(pub.id);
+    assert.equal(p.status, 'publicado');
+    assert.match((await as.gestao.get(`/social/publicacoes/${pub.id}`)).text, /Com texto próprio desta rede/);
+
+    // publicada em tudo: dá para mandar para outra rede que ainda não recebeu
+    assert.match((await as.gestao.get(`/social/publicacoes/${pub.id}`)).text, /Publicar em outra rede/);
+    const again = await publishing.resend(pub.id, { platforms: ['instagram'] });
+    assert.match(again.error, /pelo menos uma rede que ainda não está no ar/);
+    calls.length = 0;
+    await as.gestao.act(`/social/publicacoes/${pub.id}/reenviar`, { platforms: 'threads', title: 'Mitos e verdades', description: 'Legenda original' }, { from: `/social/publicacoes/${pub.id}` });
+    assert.deepEqual(lastPost().accounts, ['TH1']);
+    p = await pubRow(pub.id);
+    assert.deepEqual(p.platforms, ['instagram', 'facebook', 'threads']);
+    assert.equal(p.options.texts.threads, undefined, 'mesmo texto da publicação: sem texto próprio');
+  });
+
   it('cada resposta que já vimos vira um código, a frase certa e a decisão certa (tentar de novo ou pedir ação)', () => {
     const cases = [
       ['Error publishing post to Facebook: Failed to upload Facebook video for publishing: 500 - Request failed with status code 500', 'rede', true],

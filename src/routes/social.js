@@ -63,6 +63,27 @@ function warningText(w) {
   return w;
 }
 
+// Reenviar editando: as redes que a publicação pode receber e o estado de cada uma (no ar não entra; falhou vem marcada;
+// rede que ainda não recebeu fica disponível; sem conta, desabilitada), e o texto que vai (o próprio da primeira que falhou).
+async function resendChoices(pub) {
+  const nets = pub.media === 'story' ? ['instagram'] : pub.media !== 'video' ? up.PHOTO_PLATFORMS : pub.clip_id ? Object.keys(up.PLATFORMS).filter((k) => up.PLATFORMS[k].clip) : ['youtube'];
+  const conn = await socialApi.connectedAll().catch(() => ({ platforms: {} }));
+  const hasConn = Object.keys(conn.platforms || {}).length > 0;
+  const results = pub.results || [];
+  const list = nets.map((k) => {
+    const r = results.find((x) => x.platform === k);
+    const acc = conn.platforms?.[k];
+    const state = r?.ok && !r.simulated ? 'ar' : r && !r.ok ? (r.retry_at ? 'tentando' : 'falhou') : pub.platforms.includes(k) ? 'aguardando' : 'nova';
+    return { key: k, state, hint: r && !r.ok ? r.hint || r.error : null, noAccount: hasConn && (!acc || acc.reauth) };
+  });
+  const failed = list.filter((n) => ['falhou', 'tentando', 'aguardando'].includes(n.state) && !n.noAccount).map((n) => n.key);
+  const text = publishing.textOf(pub, failed[0] || '');
+  // falha que reenviar igual não resolve (perfil, formato, conta): a ação principal passa a ser corrigir
+  const E = require('../services/publishErrors');
+  const needsFix = results.some((r) => !r.ok && r.error && !r.retry_at && E.classify(r.error, { code: r.code }).terminal);
+  return { needsFix, list, failed, text, open: list.some((n) => n.state !== 'ar' && !n.noAccount), photo: pub.media !== 'video', img: (pub.cover_ids && pub.cover_ids[0]) || pub.cover_id || null };
+}
+
 router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (req, res) => {
   const pub = await findPub(req.params.id);
   if (!pub) return notFound(res);
@@ -71,7 +92,10 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   const providers = socialApi.providersOf(pub); // um, ou vários quando as redes foram divididas entre provedores
   const viaOf = (p) => socialApi.get((pub.results || []).find((r) => r.platform === p)?.provider || pub.options?.routes?.[p] || pub.provider);
   const canEditNet = (p) => viaOf(p).canEdit && up.EDITABLE[p];
+  const canResend = can(req.user.role, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
+  const resend = canResend ? await resendChoices(pub) : null;
   res.render('social/publication', {
+    resend,
     title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: providers.every((p) => p.live()), provider: providers[0], providers,
     providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
     testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
@@ -97,6 +121,24 @@ router.post('/social/publicacoes/:id', requirePerm('social.request'), wrap(async
     if (pub.status === 'recusado' && req.body.reenviar === '1') { await publishing.resubmit(pub.id, req.user); await req.flash('ok', 'Ajustado e reenviado para a revisão da gestão.'); } else await req.flash('ok', r.message);
   }
   res.redirect(`/social/publicacoes/${pub.id}`);
+}));
+
+// Reenviar editando: só as redes marcadas, com o texto e o collab do Instagram desta vez (o que já saiu não muda).
+router.post('/social/publicacoes/:id/reenviar', requirePerm('social.publish'), wrap(async (req, res) => {
+  const pub = await findPub(req.params.id);
+  if (!pub) return notFound(res);
+  const back = `/social/publicacoes/${pub.id}`;
+  const platforms = [].concat(req.body.platforms || []).map(String).filter((p) => up.PLATFORMS[p]);
+  const ig = require('../services/igPeople').parse(req.body, { media: pub.media, platforms });
+  if (ig.error) { await req.flash('error', ig.error); return res.redirect(back); }
+  const out = await publishing.resend(pub.id, {
+    platforms, title: fmt.clean(req.body.title, 300), description: String(req.body.description ?? '').replace(/\r/g, '').trim(),
+    instagram: platforms.includes('instagram') ? ig.instagram : undefined,
+  });
+  if (!out || out.error) { await req.flash('error', out?.error || 'Esta publicação já está sendo enviada.'); return res.redirect(back); }
+  await audit(req, 'publicacao.reenviada', 'publication', pub.id, { redes: platforms, editado: true });
+  await req.flash(out.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(out));
+  res.redirect(back);
 }));
 
 // revisão da gestão

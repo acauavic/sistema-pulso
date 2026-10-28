@@ -139,15 +139,15 @@ const openAttempt = (pubId) => db.query('SELECT * FROM publication_attempts WHER
 // Chave de idempotência de um envio que ficou sem resposta (as mesmas redes, no mesmo provedor, nas últimas 23 h): repetir com ela
 // devolve o post que talvez já tenha sido criado, em vez de publicar duas vezes.
 function keyFor(pub, g) {
-  const p = pub.options?.pending_keys?.[g.provider.id];
+  const p = pub.options?.pending_keys?.[g.keyName || g.provider.id];
   const same = p && p.platforms.join() === [...g.platforms].sort().join() && Date.now() - Date.parse(p.at) < 23 * 3600_000;
   return same ? p.key : `pulso-${pub.id}-${crypto.randomBytes(6).toString('hex')}`;
 }
 function pendingKeys(pub, outcomes) {
   const keys = { ...(pub.options?.pending_keys || {}) };
   for (const o of outcomes) {
-    if (o.error?.ambiguous) keys[o.g.provider.id] = { key: o.key, platforms: [...o.g.platforms].sort(), at: new Date().toISOString() };
-    else delete keys[o.g.provider.id];
+    if (o.error?.ambiguous) keys[o.g.keyName || o.g.provider.id] = { key: o.key, platforms: [...o.g.platforms].sort(), at: new Date().toISOString() };
+    else delete keys[o.g.keyName || o.g.provider.id];
   }
   return keys;
 }
@@ -157,6 +157,23 @@ function pendingKeys(pub, outcomes) {
 // e o andamento é acompanhado em cada um (options.parts). Se um provedor falhar ao enviar e outro não, a publicação segue.
 // `only`: reenvia só estas redes (as que falharam); `keep`: resultados das demais, que ficam como estão.
 // trigger: agora | agendado | aprovado | manual | automatico | retomado (vai para o histórico de tentativas).
+// Texto próprio de uma rede (reenvio editado: options.texts[rede] = { title, description }); sem ele, o texto da publicação.
+const textOf = (pub, net) => ({ title: pub.options?.texts?.[net]?.title ?? pub.title, description: pub.options?.texts?.[net]?.description ?? pub.description });
+// Divide cada grupo de provedor pelas redes que levam o mesmo texto (cada variação é um envio, com a sua chave de repetição).
+function byText(pub, groups) {
+  const out = [];
+  for (const g of groups) {
+    const buckets = new Map();
+    for (const net of g.platforms) {
+      const t = textOf(pub, net); const k = JSON.stringify(t);
+      if (!buckets.has(k)) buckets.set(k, { ...t, platforms: [] });
+      buckets.get(k).platforms.push(net);
+    }
+    [...buckets.values()].forEach((b, i) => out.push({ provider: g.provider, platforms: b.platforms, title: b.title, description: b.description, keyName: i ? `${g.provider.id}:${b.platforms.slice().sort().join('+')}` : g.provider.id }));
+  }
+  return out;
+}
+
 async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {}) {
   await social.syncLive();
   const { rows: [pub] } = await db.query(
@@ -175,14 +192,14 @@ async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {
     if (!only && first !== pub.provider) { await db.query('UPDATE episode_publications SET provider = $2 WHERE id = $1', [pub.id, first]); pub.provider = first; }
     const media = await prepareMedia(pub, target, groups); // arquivo ilegível para tudo aqui: nada vai às redes pela metade
     await noteAttempt(attempt, { media: media.info });
-    for (const g of groups) {
+    for (const g of byText(pub, groups)) {
       const key = keyFor(pub, g);
       try {
         const conn = g.provider.live() ? await g.provider.connected() : { platforms: {} };
         const sent = target.kind === 'photo'
-          ? await g.provider.sendPhotos({ id: pub.id, media: pub.media, platforms: g.platforms, title: pub.title, description: pub.description, photoUrls: media.photosFor(g), accounts: conn.platforms, instagram: pub.options?.instagram || null, idempotencyKey: key })
+          ? await g.provider.sendPhotos({ id: pub.id, media: pub.media, platforms: g.platforms, title: g.title, description: g.description, photoUrls: media.photosFor(g), accounts: conn.platforms, instagram: pub.options?.instagram || null, idempotencyKey: key })
           : await g.provider.sendVideo({
-            id: pub.id, kind: target.kind, platforms: g.platforms, title: pub.title, description: pub.description, videoUrl: media.videoFor(g),
+            id: pub.id, kind: target.kind, platforms: g.platforms, title: g.title, description: g.description, videoUrl: media.videoFor(g),
             coverUrl: target.kind === 'clip' ? media.coverFor(g) : null, thumbnailUrl: target.kind === 'episode' ? media.coverFor(g) : null, tags: pub.options?.tags || [], accounts: conn.platforms,
             instagram: pub.options?.instagram || null, durationSec: target.durationMs ? target.durationMs / 1000 : null, idempotencyKey: key,
           });
@@ -565,12 +582,50 @@ async function retry(pubId) {
   const failed = results.filter((r) => !r.ok && !r.skipped).map((r) => r.platform);
   const targets = [...new Set([...failed, ...cur.platforms.filter((p) => !results.some((r) => r.platform === p))])];
   if (!targets.length) return null;
+  return sendAgain(cur, targets, {}, ['parcial', 'erro']);
+}
+
+// Reenvia só as redes escolhidas (as que falharam ou que ainda não receberam o post), com o texto e o collab editados.
+// O texto novo vale só para essas redes (options.texts): o que já saiu continua como saiu. Rede que já está no ar não entra (duplicaria).
+// changes: { platforms, title, description, instagram } (instagram: undefined = manter). Devolve { error } ou a publicação.
+const RESEND_FROM = ['parcial', 'erro', 'publicado', 'simulado'];
+async function resend(pubId, { platforms = [], title, description, instagram } = {}) {
+  const { rows: [cur] } = await db.query('SELECT * FROM episode_publications WHERE id = $1', [pubId]);
+  if (!cur) return { error: 'Publicação não encontrada.' };
+  if (!RESEND_FROM.includes(cur.status)) return { error: cur.status === 'enviando' ? 'Esta publicação ainda está sendo enviada: espere terminar.' : 'Esta publicação ainda não saiu: edite o texto e o horário no próprio agendamento.' };
+  const live = new Set((cur.results || []).filter((r) => r.ok && !r.simulated).map((r) => r.platform));
+  const targets = [...new Set(platforms)].filter((p) => !live.has(p));
+  if (!targets.length) return { error: 'Escolha pelo menos uma rede que ainda não está no ar.' };
+  // a mesma conferência de quando se publica, só para as redes que vão agora
+  const nt = String(title ?? cur.title); const nd = String(description ?? cur.description ?? '');
+  let target;
+  try { target = await loadTarget({ episodeId: cur.episode_id, clipId: cur.clip_id, media: cur.media, coverIds: cur.cover_ids }); } catch (err) { return { error: err.message }; }
+  const check = target.kind === 'photo'
+    ? up.validatePhotos({ media: cur.media, platforms: targets, title: nt, description: nd, scheduledAt: null, count: target.covers.length })
+    : up.validate({ kind: target.kind, platforms: targets, title: nt, description: nd, scheduledAt: null });
+  if (target.kind === 'clip') check.issues.push(...L.checkClipDuration(targets, target.durationMs, (p) => up.PLATFORMS[p]?.clipLabel || labelOf(p)).issues);
+  if (check.issues.length) return { error: check.issues[0] };
+  const texts = { ...(cur.options?.texts || {}) };
+  const t = String(title ?? '').trim(); const d = String(description ?? '').replace(/\r/g, '').trim();
+  for (const p of targets) {
+    if (title === undefined && description === undefined) continue;
+    if (t === cur.title && d === (cur.description || '')) delete texts[p]; else texts[p] = { title: t || cur.title, description: d };
+  }
+  const extra = { texts };
+  if (instagram !== undefined && targets.includes('instagram')) extra.instagram = instagram;
+  return sendAgain(cur, targets, extra, RESEND_FROM);
+}
+
+async function sendAgain(cur, targets, extra, from) {
   const tries = { ...(cur.options?.tries || {}) }; for (const p of targets) tries[p] = 0;
+  const platforms = [...cur.platforms, ...targets.filter((p) => !cur.platforms.includes(p))];
   const { rows: [claimed] } = await db.query(
-    "UPDATE episode_publications SET status = 'enviando', error = NULL, retry_at = NULL, options = (options - 'parts' - 'send_errors' - 'provider_warnings' - 'kept_results') || $2, updated_at = now() WHERE id = $1 AND status IN ('parcial','erro') RETURNING *",
-    [pubId, JSON.stringify({ tries })]);
+    `UPDATE episode_publications SET status = 'enviando', error = NULL, retry_at = NULL, platforms = $4,
+            options = (options - 'parts' - 'send_errors' - 'provider_warnings' - 'kept_results') || $2, updated_at = now()
+      WHERE id = $1 AND status = ANY($3) RETURNING *`,
+    [cur.id, JSON.stringify({ tries, ...extra }), from, platforms]);
   if (!claimed) return null;
-  const keep = results.filter((r) => !targets.includes(r.platform));
+  const keep = (cur.results || []).filter((r) => !targets.includes(r.platform));
   return dispatch(claimed.id, { only: keep.length ? targets : null, keep, trigger: 'manual' });
 }
 
@@ -641,4 +696,4 @@ async function resubmit(pubId, user) {
   return pub || null;
 }
 
-module.exports = { loadTarget, create, dispatch, refresh, tick, retry, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };
+module.exports = { loadTarget, create, dispatch, refresh, tick, retry, resend, textOf, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };

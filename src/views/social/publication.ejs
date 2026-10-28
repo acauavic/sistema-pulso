@@ -75,13 +75,18 @@
           <% if (r.url) { %><a class="small" href="<%= r.url %>" target="_blank" rel="noopener noreferrer">abrir <%- icon('external-link', 14) %></a><% } %>
           <% if (!r.ok && r.hint) { %><span class="small <%= again ? '' : 'bad-text' %>"><%= r.hint %></span><span class="small muted">Resposta: <%= r.error %></span><% } else if (r.error) { %><span class="small bad-text"><%= r.error %></span><% } %>
           <% if (r.note) { %><span class="small muted"><%= r.note %></span><% } %>
+          <% if (pub.options && pub.options.texts && pub.options.texts[k]) { %><span class="small muted">Com texto próprio desta rede (editado no reenvio).</span><% } %>
+          <% if (resend && !r.ok && r.error && !r.retry_at) { var rn = resend.list.find(function (n) { return n.key === k; }); if (rn && !rn.noAccount) { %><button class="link small" type="button" data-resend-net="<%= k %>">Corrigir e reenviar só <%= label(k) %></button><% } } %>
         </li>
         <% }) %>
       </ul>
       <% if (pub.error && !(pub.results || []).some(function (r) { return r.hint; })) { %><p class="flash flash-error top-gap"><%= pub.error %></p><% } %>
       <div class="row top-gap">
         <% if (pub.status === 'enviando') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/atualizar" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw') %> Atualizar andamento</button></form><% } %>
-        <% if (canPublish && (pub.status === 'erro' || pub.status === 'parcial')) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline" data-busy="Enviando…"><%- csrfField %><button class="btn sm" type="submit"><%= pub.retry_at ? 'Reenviar agora' : pub.status === 'parcial' ? 'Reenviar as que falharam' : 'Tentar de novo' %></button></form><% } %>
+        <% var needsFix = Boolean(resend && resend.needsFix); %>
+        <% if (resend && resend.open && (pub.status === 'erro' || pub.status === 'parcial')) { %><button class="btn sm <%= needsFix ? 'primary' : '' %>" type="button" data-resend-net=""><%- icon('pencil', 14) %> Corrigir e reenviar</button><% } %>
+        <% if (canPublish && (pub.status === 'erro' || pub.status === 'parcial')) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/repetir" class="inline" data-busy="Enviando…"><%- csrfField %><button class="btn sm <%= needsFix ? '' : 'primary' %>" type="submit"><%= pub.retry_at ? 'Reenviar agora' : needsFix ? 'Reenviar sem mudar' : pub.status === 'parcial' ? 'Reenviar as que falharam' : 'Tentar de novo' %></button></form><% } %>
+        <% if (resend && resend.open && (pub.status === 'publicado' || pub.status === 'simulado')) { %><button class="btn sm ghost" type="button" data-resend-net="" data-resend-title="Publicar em outra rede"><%- icon('plus', 14) %> Publicar em outra rede</button><% } %>
         <% if (canPublish && pub.retry_at) { %><form method="post" action="/social/publicacoes/<%= pub.id %>/parar" class="inline" data-confirm="Parar as novas tentativas automáticas? A publicação fica como está e você reenvia quando quiser."><%- csrfField %><button class="link small" type="submit">Parar novas tentativas</button></form><% } %>
         <% if (canPublish && pub.status === 'agendado') { %><form method="post" action="/social/publicacoes/<%= pub.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><%- csrfField %><button class="btn sm ghost" type="submit">Cancelar agendamento</button></form><% } %>
       </div>
@@ -142,5 +147,34 @@
     </div>
   </form>
 </dialog>
+<% } %>
+<% if (resend && resend.open) { var igNow = (pub.options && pub.options.instagram) || null; %>
+<dialog class="modal modal-wide" id="modal-reenviar" aria-labelledby="mr-h">
+  <form method="post" action="/social/publicacoes/<%= pub.id %>/reenviar" class="stack" data-resend data-busy="Enviando…" data-failed="<%= resend.failed.join(',') %>">
+    <%- csrfField %>
+    <h2 id="mr-h">Corrigir e reenviar</h2>
+    <fieldset class="stack">
+      <legend class="small muted">Para onde vai agora</legend>
+      <div class="chip-row resend-nets">
+        <% resend.list.forEach(function (n) { var off = n.state === 'ar' || n.noAccount; %>
+        <label class="chip-radio<%= off ? ' off' : '' %>"><input type="checkbox" name="platforms" value="<%= n.key %>" <%= off ? 'disabled' : '' %> <%= resend.failed.indexOf(n.key) >= 0 ? 'checked' : '' %>>
+          <span><%= label(n.key) %> <small class="mono"><%= n.state === 'ar' ? 'no ar' : n.noAccount ? 'sem conta' : n.state === 'nova' ? 'ainda não foi' : n.state === 'tentando' ? 'tentando' : n.state === 'aguardando' ? 'aguardando' : 'falhou' %></small></span></label>
+        <% }) %>
+      </div>
+      <% var why = resend.list.filter(function (n) { return n.hint && n.state === 'falhou'; }); if (why.length) { %>
+      <ul class="plain small resend-why"><% why.forEach(function (n) { %><li><strong><%= label(n.key) %>:</strong> <%= n.hint %></li><% }) %></ul>
+      <% } %>
+    </fieldset>
+    <label><%= pub.media === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" value="<%= resend.text.title %>" maxlength="300" required></label>
+    <label><%= pub.media === 'video' ? 'Descrição / legenda' : 'Legenda' %><textarea name="description" rows="6" maxlength="5000"><%= resend.text.description || '' %></textarea></label>
+    <p class="small muted">O texto vale só para as redes marcadas. O que já está no ar não muda.</p>
+    <% if (pub.media !== 'story') { %><%- include('../partials/ig-people', { episodeId: pub.episode_id, photo: resend.photo, img: resend.img ? '/capas/' + resend.img + '/imagem' : '', initial: igNow }) %><% } %>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit" data-resend-go>Reenviar</button>
+      <button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+    </div>
+  </form>
+</dialog>
+<script src="/static/reenviar.js?v=<%= assetV %>" defer></script>
 <% } %>
 <%- include('../partials/foot') %>

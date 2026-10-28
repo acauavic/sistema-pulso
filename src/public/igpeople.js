@@ -170,6 +170,16 @@
       } catch { /* sem sugestão */ }
     }
 
+    // ---- valores atuais (reenviar editando): o collab e as marcações que já estavam no post
+    let initial = null;
+    try { initial = JSON.parse(fs.dataset.initial || 'null'); } catch { initial = null; }
+    if (initial) {
+      autoCollab = false;
+      (initial.collaborators || []).forEach((h) => fields.collab?.add(h));
+      (initial.tags || []).forEach((t) => { if (!fields.tag?.add(t.username)) return; const it = tagItems.get(t.username); if (it && t.x != null) { it.x = t.x; it.y = t.y; it.hidden.value = `${t.username}|${t.x}|${t.y}`; } });
+      autoCollab = false; drawDots();
+    }
+
     // ---- aparece só com o Instagram marcado
     const ig = () => form.querySelector('input[name="platforms"][value="instagram"]');
     const toggle = () => { const on = Boolean(ig()?.checked); fs.hidden = !on; fs.disabled = !on; }; // desligado: nada vai no formulário
@@ -177,6 +187,6 @@
       if (e.target.matches('input[name="platforms"]')) toggle();
       if (e.target.matches('input[type="radio"][name="clip_id"], input[type="radio"][name="cover_ids"]')) { syncTarget(); suggestGuest(); }
     });
-    syncTarget(); toggle(); suggestGuest();
+    syncTarget(); toggle(); if (!initial) suggestGuest();
   });
 }());
