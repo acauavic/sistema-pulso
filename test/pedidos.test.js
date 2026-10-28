@@ -149,4 +149,47 @@ describe('Conteúdo: pedidos ao editor, quadro da linha de produção e o que j�
     assert.ok([200, 302].includes(r.status));
     assert.ok((await notes(u.editor)).some((n) => /pedido de conteúdo: Trailer da temporada/.test(n.title)));
   });
+  it('o episódio nasce com os pedidos marcados; cortes é contínuo: cada corte vai para o Social ao ficar pronto e o editor conclui a leva', async () => {
+    const production = require('../src/services/production');
+    const rot = Object.fromEntries((await q("SELECT kind, id FROM task_routines WHERE trigger='episodio_criado' AND target='pedido'")).map((x) => [x.kind, x.id]));
+    const e = await production.createEpisode({ title: 'Conversa com Bia', recordedOn: '2026-11-02', userId: u.gestao.id, requests: [rot.cortes, rot.qa] });
+    const reqs = await q('SELECT * FROM content_requests WHERE episode_id = $1 ORDER BY kind', [e.id]);
+    assert.deepEqual(reqs.map((r) => r.kind), ['cortes', 'qa'], 'só o que foi marcado');
+    assert.equal(reqs.find((r) => r.kind === 'qa').priority, true);
+    assert.equal(String(reqs.find((r) => r.kind === 'qa').due_on.toISOString()).slice(0, 10), '2026-11-05', 'Q&A: 3 dias depois da gravação');
+    assert.equal((await q('SELECT count(*)::int n FROM tasks WHERE episode_id = $1', [e.id]))[0].n, 0, 'nada de tarefa com link do Drive');
+    const cortes = reqs.find((r) => r.kind === 'cortes');
+    let page = (await as.editor.get(`/conteudo/pedidos/${cortes.id}`)).text;
+    assert.match(page, /Enviar corte/, 'o editor já sobe, sem precisar "Começar"');
+    assert.match((await as.gestao.get('/conteudo')).text, /prioridade/, 'o quadro marca o Q&A como prioridade');
+    // primeiro corte: o pedido entra em produção sozinho e o corte vira "Corte N" do episódio
+    const data = Buffer.alloc(1500, 3);
+    const init = await call(as.editor, 'POST', `/conteudo/pedidos/${cortes.id}/cortes/iniciar`, { json: { nome: 'c1.mp4', tamanho: data.length, tipo: 'video/mp4' } });
+    assert.equal(init.status, 200, init.text);
+    for (let n = 1; n <= init.json.totalParts; n += 1) await call(as.editor, 'PUT', `/conteudo/pedidos/${cortes.id}/cortes/${init.json.id}/parte/${n}`, { raw: data.subarray((n - 1) * init.json.partSize, n * init.json.partSize) });
+    await call(as.editor, 'POST', `/conteudo/pedidos/${cortes.id}/cortes/${init.json.id}/concluir`);
+    assert.equal((await reqRow(cortes.id)).status, 'producao'); assert.equal((await reqRow(cortes.id)).assignee_id, u.editor.id);
+    const [clip] = await q('SELECT * FROM episode_clips WHERE id = $1', [init.json.id]);
+    assert.equal(clip.title, 'Corte 1'); assert.equal(clip.episode_id, e.id); assert.equal(clip.request_id, cortes.id);
+    await q("UPDATE episode_clips SET status = 'pronto', width = 1080, height = 1920, duration_ms = 30000 WHERE id = $1", [clip.id]);
+    // cada corte já pode ser publicado, sem esperar a leva inteira
+    assert.match((await as.gestao.get('/social/novo')).text, new RegExp(`value="${clip.id}"`), 'o corte já aparece no Novo post');
+    const pub = await publishing.create({ clipId: clip.id, platforms: ['instagram'], title: 'Corte 1', userId: u.gestao.id });
+    assert.equal(pub.status, 'simulado');
+    // corte subido direto no episódio também conta na leva
+    await q("INSERT INTO episode_clips (title, source, status, episode_id, storage_key, width, height, duration_ms) VALUES ('Corte 2', 'upload', 'pronto', $1, 'pp/c2.mp4', 1080, 1920, 20000)", [e.id]);
+    page = (await as.editor.get(`/conteudo/pedidos/${cortes.id}`)).text;
+    assert.match(page, /Concluir cortes \(2\)/);
+    assert.equal((await act('prod', `/conteudo/pedidos/${cortes.id}/concluir`, {})).status, 403, 'quem conclui é quem faz');
+    await act('editor', `/conteudo/pedidos/${cortes.id}/concluir`, {});
+    assert.equal((await reqRow(cortes.id)).status, 'aprovado');
+    assert.ok((await notes(u.gestao)).some((n) => /Cortes concluídos/.test(n.title)));
+    page = (await as.editor.get(`/conteudo/pedidos/${cortes.id}`)).text;
+    assert.match(page, /Cortes concluídos/); assert.match(page, /Retomar para subir mais/);
+    await act('editor', `/conteudo/pedidos/${cortes.id}/retomar`, {});
+    assert.equal((await reqRow(cortes.id)).status, 'producao');
+    // pedir "cortes do episódio" à mão exige o episódio
+    assert.equal((await act('gestao', '/conteudo/pedidos', { kind: 'cortes', title: 'Cortes sem episódio' })).status, 302);
+    assert.equal((await q("SELECT count(*)::int n FROM content_requests WHERE title = 'Cortes sem episódio'"))[0].n, 0);
+  });
 });

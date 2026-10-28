@@ -38,9 +38,9 @@ router.post('/conteudo/pedidos', requirePerm('episodes.read'), wrap(async (req, 
 
 router.get('/conteudo/pedidos/:id', requirePerm('episodes.read'), wrap(async (req, res) => {
   const r = await load(req); if (!r) return notFound(res);
-  const [d, thread, files, ppl, eps] = await Promise.all([R.deliveries(r.id), require('../services/comments').list('content_request', r.id), attachments.forEntity('content_request', r.id), people(), episodeOptions()]);
+  const [d, thread, files, ppl, eps] = await Promise.all([R.deliveries(r), require('../services/comments').list('content_request', r.id), attachments.forEntity('content_request', r.id), people(), episodeOptions()]);
   const board = require('../services/contentBoard');
-  const idx = r.status === 'aprovado' ? await board.publicationIndex() : null;
+  const idx = r.status === 'aprovado' || R.KINDS[r.kind].continuous ? await board.publicationIndex() : null; // cortes: cada um sai assim que fica pronto
   const pubOf = (v) => (idx ? board.stateOf(idx.byClip.get(v.id)) : null);
   const imagesPub = idx && d.images.length ? (R.KINDS[r.kind].publish === 'carrossel' ? board.stateOfCovers(idx, d.images.map((i) => i.id)) : null) : null;
   res.render('content/request', {
@@ -71,8 +71,10 @@ const ACTIONS = {
   ajustes: { who: 'review', run: (r, u, b) => R.askChanges(r, u, b.nota), ok: 'Ajustes pedidos. O editor foi avisado.', audit: 'pedido.ajustes' },
   cancelar: { who: 'edit', run: (r) => R.cancel(r), ok: 'Pedido cancelado.', audit: 'pedido.cancelado' },
   reabrir: { who: 'edit', run: (r) => R.reopen(r), ok: 'Pedido reaberto.', audit: 'pedido.reaberto' },
+  concluir: { who: 'work', run: (r, u) => R.finishCortes(r, u), ok: 'Cortes concluídos. Quem pediu e a gestão foram avisados.', audit: 'pedido.cortes_concluidos' },
+  retomar: { who: 'work', run: (r) => R.resumeCortes(r), ok: 'Pedido de cortes retomado: suba os que faltam.', audit: 'pedido.cortes_retomados' },
 };
-router.post('/conteudo/pedidos/:id/:acao(comecar|entregar|aprovar|ajustes|cancelar|reabrir)', requirePerm('episodes.read'), wrap(async (req, res) => {
+router.post('/conteudo/pedidos/:id/:acao(comecar|entregar|aprovar|ajustes|cancelar|reabrir|concluir|retomar)', requirePerm('episodes.read'), wrap(async (req, res) => {
   const r = await load(req); if (!r) return notFound(res);
   const a = ACTIONS[req.params.acao];
   const allowed = { work: R.canWork(req.user, r), review: R.canReview(req.user.role), edit: canEdit(req.user, r) }[a.who];
@@ -89,14 +91,18 @@ router.post('/conteudo/pedidos/:pid/cortes/iniciar', requirePerm('episodes.read'
   const r = await load(req);
   if (!r) return res.status(404).json({ ok: false, error: 'Pedido não encontrado.' });
   if (!R.canWork(req.user, r) || !can(req.user.role, 'production.edit')) return res.status(403).json({ ok: false, error: 'Só quem faz o pedido envia a entrega.' });
-  if (r.status !== 'producao') return res.status(409).json({ ok: false, error: r.status === 'pedido' ? 'Comece o pedido antes de enviar.' : 'O pedido não está em produção.' });
+  const continuous = R.KINDS[r.kind].continuous;
+  if (continuous && r.status === 'pedido') await R.start(r, req.user); // cortes: o primeiro corte já põe o pedido em produção
+  else if (r.status !== 'producao') return res.status(409).json({ ok: false, error: r.status === 'pedido' ? 'Comece o pedido antes de enviar.' : 'O pedido não está em produção.' });
   if (!config.storageConfigured) return res.status(503).json({ ok: false, error: 'Armazenamento (Backblaze) não configurado.' });
   const filename = String(req.body.nome || ''); const size = Number(req.body.tamanho);
   if (!Number.isSafeInteger(size) || size <= 0) return res.status(400).json({ ok: false, error: 'Arquivo vazio.' });
   if (size > clips.MAX_BYTES) return res.status(400).json({ ok: false, error: 'Arquivo grande demais.' });
   if (!clips.VIDEO_EXT.includes(extOf(filename))) return res.status(400).json({ ok: false, error: `Envie vídeo (${clips.VIDEO_EXT.join(', ')}).` });
   const { clip, partSize, totalParts } = await clips.startUpload({ filename, size, contentType: req.body.tipo, userId: req.user.id, requestId: r.id, episodeId: await R.clipEpisode(r) });
-  await db.query('UPDATE episode_clips SET title = $2 WHERE id = $1', [clip.id, r.title.slice(0, 80)]);
+  // cortes: "Corte N" na ordem do episódio (como sempre foi); outros pedidos: o nome do pedido
+  const { rows: [n] } = continuous && r.episode_id ? await db.query('SELECT count(*)::int AS n FROM episode_clips WHERE episode_id = $1', [r.episode_id]) : { rows: [null] };
+  await db.query('UPDATE episode_clips SET title = $2 WHERE id = $1', [clip.id, n ? `Corte ${n.n}` : r.title.slice(0, 80)]);
   res.json({ ok: true, id: clip.id, partSize, totalParts });
 }));
 

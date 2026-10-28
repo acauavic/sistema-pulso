@@ -19,7 +19,15 @@ const KINDS = {
   carrossel: { label: 'Carrossel', media: 'image', publish: 'carrossel' },
   story: { label: 'Story', media: 'image', publish: 'story' },
   outro: { label: 'Outro', media: 'video', publish: 'video' },
+  // do episódio (nascem quando o episódio é criado, ver tasks.applyRoutines). Cortes é contínuo: cada corte vai para o Social assim que
+  // fica pronto, e o editor conclui o pedido quando termina a leva.
+  cortes: { label: 'Cortes do episódio', media: 'video', publish: 'video', continuous: true },
+  qa: { label: 'Q&A', media: 'video', publish: 'video' },
+  bastidores: { label: 'Bastidores', media: 'video', publish: 'video' },
+  extra: { label: 'Conteúdo extra', media: 'video', publish: 'video' },
 };
+// tipo da rotina (Gestão > Rotinas) -> tipo do pedido
+const FROM_ROUTINE = { cortes: 'cortes', qa: 'qa', bastidores: 'bastidores', extra: 'extra' };
 const STATUSES = { pedido: 'Pedido', producao: 'Em produção', revisao: 'Em revisão', aprovado: 'Aprovado', cancelado: 'Cancelado' };
 const FORMATS = { vertical: 'Vertical (9:16)', horizontal: 'Horizontal (16:9)', quadrado: 'Post (4:5)' };
 const OPEN = ['pedido', 'producao', 'revisao'];
@@ -56,6 +64,7 @@ function parse(body) {
   v.episode_id = /^\d+$/.test(String(body.episode_id || '')) ? Number(body.episode_id) : null;
   v.assignee_id = /^[0-9a-f-]{36}$/i.test(String(body.assignee_id || '')) ? body.assignee_id : null;
   if (body.due_on && !parseInputDate(body.due_on)) errors.push('Data de entrega inválida.');
+  if (v.kind && KINDS[v.kind].continuous && !v.episode_id) errors.push('Cortes do episódio precisam de um episódio.');
   v.due_on = body.due_on && parseInputDate(body.due_on) ? body.due_on : null;
   return { values: v, error: errors[0] || null };
 }
@@ -65,13 +74,14 @@ const tell = (args) => notify({ type: 'tarefa', ...args }).catch((err) => consol
 const reviewers = () => db.query("SELECT id FROM users WHERE active AND role IN ('superadmin','gestao')").then((r) => r.rows.map((x) => x.id));
 const kindLabel = (r) => KINDS[r.kind]?.label || 'Conteúdo';
 
+// user pode ser null (episódio criado sozinho, a partir do convidado gravado). priority/routine_id: pedidos que nascem com o episódio.
 async function create(values, user) {
   const { rows: [r] } = await db.query(
-    `INSERT INTO content_requests (kind, title, briefing, briefing_html, format, episode_id, assignee_id, due_on, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-    [values.kind, values.title, values.briefing || null, values.briefing_html || null, values.format, values.episode_id, values.assignee_id, values.due_on, user.id]);
-  if (values.assignee_id && values.assignee_id !== user.id) {
-    await tell({ users: [values.assignee_id], actorId: user.id, title: `Pedido de conteúdo: ${values.title}`, body: `${user.name} pediu: ${KINDS[values.kind].label}${values.due_on ? ` para ${values.due_on.split('-').reverse().join('/')}` : ''}.`, url: url(r.id), entity: { type: 'content_request', id: r.id }, dedupe: `pedido-${r.id}` });
+    `INSERT INTO content_requests (kind, title, briefing, briefing_html, format, episode_id, assignee_id, due_on, created_by, priority, routine_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+    [values.kind, values.title, values.briefing || null, values.briefing_html || null, values.format || null, values.episode_id, values.assignee_id, values.due_on, user?.id || null, Boolean(values.priority), values.routine_id || null]);
+  if (values.assignee_id && values.assignee_id !== user?.id) {
+    await tell({ users: [values.assignee_id], actorId: user?.id || null, title: `${values.priority ? 'Pedido prioritário' : 'Pedido de conteúdo'}: ${values.title}`, body: `${user?.name || 'Novo episódio'}: ${KINDS[values.kind].label}${values.due_on ? ` para ${String(values.due_on).slice(0, 10).split('-').reverse().join('/')}` : ''}.`, url: url(r.id), entity: { type: 'content_request', id: r.id }, dedupe: `pedido-${r.id}` });
   }
   return get(r.id);
 }
@@ -97,16 +107,37 @@ async function start(r, user) { // sem responsável: quem começa assume
   return row ? { ok: true } : { error: 'Este pedido já está em produção.' };
 }
 
-async function deliveries(id) {
+// Entrega do pedido. r: o pedido (ou só o id). Nos cortes do episódio contam também os cortes subidos direto no episódio.
+async function deliveries(r) {
+  const id = typeof r === 'object' ? r.id : r;
+  const all = typeof r === 'object' && KINDS[r.kind]?.continuous && r.episode_id;
   const [videos, images] = await Promise.all([
-    db.query('SELECT id, title, status, error, duration_ms, width, height, cover_id, episode_id, created_at FROM episode_clips WHERE request_id = $1 ORDER BY id', [id]),
+    db.query(`SELECT id, title, status, error, duration_ms, width, height, cover_id, episode_id, created_at FROM episode_clips
+               WHERE request_id = $1 ${all ? 'OR (episode_id = $2 AND request_id IS NULL)' : ''} ORDER BY id`, all ? [id, r.episode_id] : [id]),
     db.query('SELECT id, width, height, position, size_bytes, updated_at FROM episode_covers WHERE request_id = $1 ORDER BY position, id', [id]),
   ]);
   return { videos: videos.rows, images: images.rows };
 }
 
+// Cortes do episódio: quem faz conclui quando termina a leva (cada corte já foi para o Social ao ficar pronto); dá para retomar depois.
+async function finishCortes(r, user) {
+  if (!KINDS[r.kind]?.continuous) return { error: 'Só o pedido de cortes é concluído assim.' };
+  const d = await deliveries(r);
+  if (!d.videos.some((v) => v.status === 'pronto')) return { error: 'Suba pelo menos um corte antes de concluir.' };
+  if (d.videos.some((v) => ['enviando', 'processando'].includes(v.status))) return { error: 'Espere os cortes terminarem de subir e ser lidos.' };
+  const row = await move(r, ['pedido', 'producao'], 'aprovado', ', delivered_at = now(), approved_at = now()');
+  if (!row) return { error: 'Este pedido não está em produção.' };
+  const who = [...new Set([r.created_by, ...(await reviewers())])].filter((u) => u && u !== user.id);
+  await tell({ users: who, actorId: user.id, title: `Cortes concluídos: ${r.episode_number ? `EP.${String(r.episode_number).padStart(3, '0')}` : r.title}`, body: `${user.name} terminou a leva: ${d.videos.filter((v) => v.status === 'pronto').length} cortes.`, url: url(r.id), entity: { type: 'content_request', id: r.id }, dedupe: `pedido-cortes-${r.id}-${Date.now()}` });
+  return { ok: true };
+}
+async function resumeCortes(r) {
+  if (!KINDS[r.kind]?.continuous) return { error: 'Só o pedido de cortes é retomado assim.' };
+  return (await move(r, ['aprovado'], 'producao')) ? { ok: true } : { error: 'Este pedido não está concluído.' };
+}
+
 async function deliver(r, user) {
-  const d = await deliveries(r.id);
+  const d = await deliveries(r);
   const ready = d.videos.filter((v) => v.status === 'pronto').length + d.images.length;
   if (!ready) return { error: 'Envie a entrega antes de mandar para a revisão.' };
   if (d.videos.some((v) => ['enviando', 'processando'].includes(v.status))) return { error: 'Espere os vídeos terminarem de subir e ser lidos.' };
@@ -169,4 +200,4 @@ async function removeImage(r, coverId) {
 
 const isLate = (r, today) => Boolean(r.due_on) && OPEN.includes(r.status) && String(r.due_on instanceof Date ? r.due_on.toISOString() : r.due_on).slice(0, 10) < today;
 
-module.exports = { KINDS, STATUSES, FORMATS, OPEN, MAX_IMAGE, canRequest, canReview, canWork, isMine, get, list, parse, create, update, start, deliveries, deliver, approve, askChanges, cancel, reopen, clipEpisode, addImage, removeImage, isLate, url };
+module.exports = { KINDS, FROM_ROUTINE, finishCortes, resumeCortes, STATUSES, FORMATS, OPEN, MAX_IMAGE, canRequest, canReview, canWork, isMine, get, list, parse, create, update, start, deliveries, deliver, approve, askChanges, cancel, reopen, clipEpisode, addImage, removeImage, isLate, url };

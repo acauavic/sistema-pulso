@@ -33,7 +33,7 @@ async function availableClips({ includeUsed = false } = {}) {
             EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status = 'simulado') AS tested
        FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id
       WHERE c.status = 'pronto' AND c.storage_key IS NOT NULL
-        AND ((c.request_id IS NULL AND c.episode_id IS NOT NULL) OR r.status = 'aprovado')
+        AND ((c.request_id IS NULL AND c.episode_id IS NOT NULL) OR r.status = 'aprovado' OR (r.kind = 'cortes' AND c.episode_id IS NOT NULL))
       ORDER BY c.created_at DESC LIMIT 300`), board.publicationIndex()]);
   return rank(rows.map((r) => ({ ...r, pub: board.stateOf(idx.byClip.get(r.id)), score: scoreOf(r) })), includeUsed);
 }

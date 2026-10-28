@@ -76,7 +76,7 @@ const EPISODE_STAGE_BY_KEY = Object.fromEntries(EPISODE_STAGES.map((s) => [s.key
 const EPISODE_FILE_KINDS = {
   bruto_video: 'Vídeo bruto', bruto_audio: 'Áudio bruto', bastidor: 'Bastidores', foto: 'Fotografia', editado: 'Vídeo editado', outro: 'Outro',
 };
-const TASK_KINDS = { geral: 'Geral', cortes: 'Cortes', bastidores: 'Bastidores', extra: 'Conteúdo extra', outro: 'Outro' };
+const TASK_KINDS = { geral: 'Geral', cortes: 'Cortes', qa: 'Q&A', bastidores: 'Bastidores', extra: 'Conteúdo extra', outro: 'Outro' };
 const TASK_STATUSES = { a_fazer: 'A fazer', fazendo: 'Fazendo', feito: 'Feito', bloqueada: 'Bloqueada' };
 // Notificações: o que cada tipo cobre (mostrado na configuração da gestão).
 const NOTIFICATION_TYPES = {

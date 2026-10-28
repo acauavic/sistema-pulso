@@ -69,12 +69,14 @@ const echo = (body, v) => ({ ...body, ...v, number: body.number || '', aired_on:
 // Patrocinador: opcional com convidado, obrigatório só com os hosts; pode ser cadastrado aqui também.
 const ORIGINS = ['convidado', 'novo_convidado', 'hosts'];
 const formLocals = async (extra) => {
-  const [guests, sponsors] = await Promise.all([
+  const [guests, sponsors, pedidos] = await Promise.all([
     db.query(`SELECT g.id, g.name, g.status, g.sponsor_id FROM guests g WHERE NOT EXISTS (SELECT 1 FROM episodes e WHERE e.guest_id = g.id)
                AND g.status NOT IN ('perdido', 'cancelado') ORDER BY (g.status = 'agendado') DESC, lower(g.name) LIMIT 1000`),
     db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)"),
+    // conteúdos que o episódio pode pedir ao editor (Gestão > Rotinas, as que viram pedido)
+    db.query("SELECT id, title, kind, default_on, priority FROM task_routines WHERE active AND trigger = 'episodio_criado' AND target = 'pedido' ORDER BY position, id"),
   ]);
-  return { statuses: C.EPISODE_STATUSES, guests: guests.rows, sponsors: sponsors.rows, profiles: C.PROFILES, kinds: C.SPONSOR_KINDS, guestStatuses: C.STATUS_BY_KEY, ...extra };
+  return { pedidoRoutines: pedidos.rows, statuses: C.EPISODE_STATUSES, guests: guests.rows, sponsors: sponsors.rows, profiles: C.PROFILES, kinds: C.SPONSOR_KINDS, guestStatuses: C.STATUS_BY_KEY, ...extra };
 };
 
 async function parseNew(body) {
@@ -160,7 +162,8 @@ router.post('/episodios', requirePerm('episodes.write'), wrap(async (req, res) =
   }
   const recordedOn = v.recorded_on || tasksSvc.todayISO();
   const title = v.title || (guest ? `Conversa com ${guest.name}` : `Episódio ${v.sponsor.company}`);
-  const ep = await prod.createEpisode({ title, guestId: guest ? guest.id : null, recordedOn, userId: req.user.id, sponsor: v.sponsor || null, origin: guest ? `convidado ${guest.name}` : `patrocinador ${v.sponsor.company} (só os hosts)` });
+  const requests = req.body.pedir_ok ? [].concat(req.body.pedir || []).filter((x) => isIntId(String(x))).map(Number) : null; // marcados no formulário
+  const ep = await prod.createEpisode({ requests, title, guestId: guest ? guest.id : null, recordedOn, userId: req.user.id, sponsor: v.sponsor || null, origin: guest ? `convidado ${guest.name}` : `patrocinador ${v.sponsor.company} (só os hosts)` });
   await db.query('UPDATE episodes SET number = coalesce($2, number), aired_on = $3, notes = $4 WHERE id = $1', [ep.id, v.number, v.aired_on, v.notes]);
   if (v.sponsor) await sponsorsSvc2.addEvent(v.sponsor.id, req.user.id, 'episodio', `Episódio registrado: ${title} (${v.sponsor.role === 'exclusivo' ? 'exclusivo' : 'inserção'})`);
   await audit(req, 'episodio.criado', 'episode', ep.id, { title, origem: v.origin });

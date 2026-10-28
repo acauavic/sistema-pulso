@@ -1,6 +1,8 @@
 <%- include('../partials/head') %>
 <%
   var k = K[r.kind]; var isVideo = k.media === 'video';
+  var cont = Boolean(k.continuous); // cortes do episódio: chegam aos poucos, cada um já vai para o Social
+  var stage = cont && r.status === 'pedido' ? 'producao' : r.status; // nos cortes, o primeiro envio já começa o pedido
   var badge = { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao', aprovado: 'b-st-pronto_publicar', cancelado: 'b-st-cancelado' }[r.status];
   var iso = function (d) { return d ? new Date(d).toISOString().slice(0, 10) : ''; };
   var br = function (d) { var s = iso(d); return s ? s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4) : ''; }; // datas (prazo)
@@ -20,7 +22,7 @@
 <div class="page-head">
   <div>
     <span class="kicker">Pedido de conteúdo · <%= k.label %></span>
-    <h1><%= r.title %> <span class="badge <%= badge %>"><%= S[r.status] %></span></h1>
+    <h1><%= r.title %> <span class="badge <%= badge %>"><%= cont && r.status === 'aprovado' ? 'Concluído' : S[r.status] %></span><% if (r.priority && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %> <span class="badge b-amber">Prioridade</span><% } %></h1>
     <p class="handle muted top-gap">
       <%= r.assignee_name ? 'Para ' + r.assignee_name : 'Para qualquer editor' %>
       <% if (r.due_on) { %> · <span class="<%= late ? 'err' : '' %>">entregar até <%= br(r.due_on) %><%= late ? ' (atrasado)' : '' %></span><% } %>
@@ -37,22 +39,22 @@
 
 <div class="grid-2 top-gap">
   <section class="card next-step" data-cortes data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
-    <% if (r.status === 'pedido') { %>
+    <% if (stage === 'pedido') { %>
       <h2>Próximo passo</h2>
       <% if (perm.mine || (perm.work && !r.assignee_id)) { %>
       <p class="small muted">Leia o briefing ao lado. Ao começar, o pedido fica com você e quem pediu vê que está em produção.</p>
       <form method="post" action="/conteudo/pedidos/<%= r.id %>/comecar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn primary" type="submit"><%- icon('play', 14) %> Começar</button></form>
       <% } else { %><p class="muted">Esperando <%= r.assignee_name || 'um editor' %> começar.</p><% } %>
 
-    <% } else if (r.status === 'producao') { %>
-      <h2><%= perm.work ? 'Entrega' : 'Em produção' %></h2>
+    <% } else if (stage === 'producao') { %>
+      <h2><%= cont ? 'Cortes' : perm.work ? 'Entrega' : 'Em produção' %></h2>
       <% if (r.rounds && r.review_note) { %><div class="req-note"><span class="kicker">Ajustes pedidos · <%= r.rounds %>ª volta</span><p><%= r.review_note %></p></div><% } %>
       <% if (perm.work) { %>
         <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } else if (isVideo) { %>
-        <p class="small muted">Envie o vídeo pronto (pode ser mais de um, como versões). Ele sobe em segundo plano; dá para continuar usando o sistema.</p>
+        <p class="small muted"><%= cont ? 'Suba cada corte assim que ficar pronto: ele já aparece no Social para publicar. Quando terminar a leva do episódio, conclua o pedido.' : 'Envie o vídeo pronto (pode ser mais de um, como versões). Ele sobe em segundo plano; dá para continuar usando o sistema.' %></p>
         <div class="uploader" data-uploader data-base="/conteudo/pedidos/<%= r.id %>/cortes/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="<%= r.title %>" data-hash="">
           <input type="file" multiple accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
-          <button class="btn <%= hasDelivery ? '' : 'primary' %>" type="button" data-start><%- icon('upload') %> Enviar vídeo</button>
+          <button class="btn <%= hasDelivery ? '' : 'primary' %>" type="button" data-start><%- icon('upload') %> <%= cont ? 'Enviar corte' : 'Enviar vídeo' %></button>
           <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
           <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
         </div>
@@ -76,6 +78,11 @@
       </div>
       <% } else { %><p class="muted">Entregue em <%= when(r.delivered_at) %>. Esperando a gestão aprovar.</p><% } %>
 
+    <% } else if (r.status === 'aprovado' && cont) { %>
+      <h2>Cortes concluídos</h2>
+      <p class="small muted">Leva encerrada em <%= when(r.approved_at) %>: <span class="mono"><%= readyVideos.length %></span> cortes. Cada um sai pelo Social, a partir do próprio corte.</p>
+      <% if (perm.work) { %><form method="post" action="/conteudo/pedidos/<%= r.id %>/retomar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('upload', 14) %> Retomar para subir mais</button></form><% } %>
+
     <% } else if (r.status === 'aprovado') { %>
       <h2><%= allPublished ? 'Publicado' : 'Pronto para postar' %></h2>
       <p class="small muted">Aprovado em <%= when(r.approved_at) %>. <%= allPublished ? 'Já saiu nas redes.' : 'Está disponível no Social, em Novo post.' %></p>
@@ -97,7 +104,7 @@
           <a class="clip-poster" href="/cortes/<%= v.id %>"><span class="poster-empty"><%- icon('film', 28) %></span></a><% } %>
           <div class="clip-body">
             <div class="row spread"><a href="/cortes/<%= v.id %>"><strong><%= v.title %></strong></a>
-              <% if (v.status === 'pronto') { %><% if (r.status === 'aprovado') { %><span class="row small"><%- chipOf(v.pub) %></span><% } %><% } else { %><span class="badge <%= v.status === 'erro' ? 'b-red' : 'b-amber' %>"><%= v.status === 'erro' ? 'erro' : v.status === 'enviando' ? 'enviando' : 'lendo' %></span><% } %>
+              <% if (v.status === 'pronto') { %><% if (r.status === 'aprovado' || cont) { %><span class="row small"><%- chipOf(v.pub) %></span><% } %><% } else { %><span class="badge <%= v.status === 'erro' ? 'b-red' : 'b-amber' %>"><%= v.status === 'erro' ? 'erro' : v.status === 'enviando' ? 'enviando' : 'lendo' %></span><% } %>
             </div>
             <p class="handle muted"><%= v.duration_ms ? fmt.formatClock(v.duration_ms) : '—' %><%= v.width ? ' · ' + v.width + '×' + v.height : '' %></p>
             <% if (v.status === 'enviando' || v.status === 'processando') { %><div class="bar"><i data-clip-bar data-w="0"></i></div><p class="small muted" data-clip-msg>Na fila…</p><% } %>
@@ -127,7 +134,9 @@
     </div>
     <% } %>
 
-    <% if (r.status === 'producao' && perm.work && hasDelivery) { %>
+    <% if (cont && stage === 'producao' && perm.work && hasDelivery) { %>
+    <form method="post" action="/conteudo/pedidos/<%= r.id %>/concluir" class="top-gap" data-confirm="Concluir os cortes deste episódio? Dá para retomar depois se faltar algum."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" type="submit"><%- icon('check', 14) %> Concluir cortes (<%= readyVideos.length %>)</button></form>
+    <% } else if (!cont && r.status === 'producao' && perm.work && hasDelivery) { %>
     <form method="post" action="/conteudo/pedidos/<%= r.id %>/entregar" class="top-gap"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn primary" type="submit"><%- icon('send', 14) %> Enviar para revisão</button></form>
     <% } %>
   </section>

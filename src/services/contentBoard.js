@@ -61,7 +61,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     db.query(`SELECT c.id, c.title, c.post_title, c.status, c.error, c.duration_ms, c.width, c.height, c.cover_id, c.episode_id, c.request_id, c.created_at,
         cv.updated_at AS cover_at, e.number AS episode_number, e.title AS episode_title, r.status AS request_status, r.kind AS request_kind, r.title AS request_title
       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN episode_covers cv ON cv.id = c.cover_id LEFT JOIN content_requests r ON r.id = c.request_id
-      WHERE (c.request_id IS NULL OR r.status = 'aprovado')${epFilter('c.episode_id')}`),
+      WHERE (c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes')${epFilter('c.episode_id')}`),
     db.query(`SELECT c.id, c.kind, c.group_key, c.position, c.label, c.width, c.height, c.approved, c.updated_at, c.created_at, c.episode_id, c.request_id,
         e.number AS episode_number, e.title AS episode_title, r.kind AS request_kind, r.title AS request_title, r.status AS request_status
       FROM episode_covers c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id
@@ -73,7 +73,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     cards.push({
       key: `r${r.id}`, type: 'pedido', stage: r.status === 'pedido' ? 'pedido' : r.status === 'producao' ? 'producao' : 'revisao',
       title: r.title, href: requests.url(r.id), kind: requests.KINDS[r.kind].label, episode: epLabel(r.episode_number, r.episode_title), episodeId: r.episode_id,
-      who: r.assignee_name || 'sem responsável', due: r.due_on, late: requests.isLate(r, today), rounds: r.rounds, media: requests.KINDS[r.kind].media, at: r.updated_at,
+      who: r.assignee_name || 'sem responsável', priority: r.priority, due: r.due_on, late: requests.isLate(r, today), rounds: r.rounds, media: requests.KINDS[r.kind].media, at: r.updated_at,
     });
   }
   for (const c of clipRows.rows) {

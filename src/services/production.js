@@ -140,6 +140,8 @@ const EFFECTS = {
       // tarefas de rotina "do editor" sem ninguém passam para quem assumiu a edição
       await client.query(`UPDATE tasks t SET assignee_id = $2, updated_at = now() FROM task_routines r
                            WHERE t.routine_id = r.id AND r.assignee_mode = 'editor' AND t.episode_id = $1 AND t.assignee_id IS NULL AND t.status <> 'feito'`, [ep.id, user.id]);
+      await client.query(`UPDATE content_requests q SET assignee_id = $2, updated_at = now() FROM task_routines r
+                           WHERE q.routine_id = r.id AND r.assignee_mode = 'editor' AND q.episode_id = $1 AND q.assignee_id IS NULL AND q.status IN ('pedido','producao')`, [ep.id, user.id]);
     }
     await ensureChecklists(ep.id);
   },
@@ -212,8 +214,8 @@ async function move(ep, to, user) {
 
 // ---------------------------------------------------------------- convidado <-> episódio
 // As tarefas que nascem com o episódio vêm das rotinas (Gestão > Rotinas), com vencimento padrão.
-async function createTasks(episodeId, user = null) {
-  return require('./tasks').applyRoutines('episodio_criado', episodeId, user);
+async function createTasks(episodeId, user = null, requests = null) {
+  return require('./tasks').applyRoutines('episodio_criado', episodeId, user, { requests });
 }
 
 // Chamado depois de qualquer mudança de etapa do convidado. Idempotente.
@@ -246,7 +248,8 @@ const fmtWhen = (d) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao
 
 // O episódio nasce gravado. Reservas de patrocinador feitas para o convidado viram vínculos do episódio; as rotinas criam as tarefas.
 // Corridas (dois cliques, duas réplicas): convidado já com episódio devolve o existente; número repetido tenta o seguinte.
-async function createEpisode({ title, guestId = null, recordedOn = null, userId = null, origin = '', sponsor = null }) {
+// requests: rotinas de pedido marcadas no formulário (Q&A, bastidores…); null = as marcadas por padrão (episódio criado pelo convidado).
+async function createEpisode({ title, guestId = null, recordedOn = null, userId = null, origin = '', sponsor = null, requests = null }) {
   let ep = null;
   for (let attempt = 0; attempt < 3 && !ep; attempt += 1) {
     try {
@@ -265,7 +268,7 @@ async function createEpisode({ title, guestId = null, recordedOn = null, userId 
   }
   if (sponsor) await db.query('INSERT INTO sponsor_episodes (sponsor_id, episode_id, role) VALUES ($1, $2, $3) ON CONFLICT (sponsor_id, episode_id) DO UPDATE SET role = EXCLUDED.role', [sponsor.id, ep.id, sponsor.role || 'exclusivo']);
   const { rows: [actor] } = userId ? await db.query('SELECT id, name FROM users WHERE id = $1', [userId]) : { rows: [] };
-  await createTasks(ep.id, actor || null);
+  await createTasks(ep.id, actor || null, requests);
   try { await require('./finance').onEpisodeCreated(ep.id); } catch (err) { console.error('Financeiro (episódio):', err.message); }
   await addEvent(ep.id, userId, 'criado', `Episódio criado${origin ? ` a partir de ${origin}` : ''} (gravação feita)`);
   return ep;

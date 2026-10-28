@@ -47,8 +47,8 @@ async function loadTarget({ episodeId, clipId, media = 'video', coverIds = [] })
     if (!clip) throw targetError('removido', 'Corte não encontrado.');
     if (clip.status !== 'pronto' || !clip.storage_key) throw targetError(clip.status === 'erro' ? 'recusado' : 'em_preparo', 'O corte ainda não está pronto.');
     if (clip.request_id) { // entrega de pedido (trailer, vídeo avulso): só depois de aprovada; pode não ter episódio
-      const { rows: [r] } = await db.query('SELECT status FROM content_requests WHERE id = $1', [clip.request_id]);
-      if (r?.status !== 'aprovado') throw targetError('recusado', 'A entrega deste pedido ainda não foi aprovada.');
+      const { rows: [r] } = await db.query('SELECT status, kind FROM content_requests WHERE id = $1', [clip.request_id]);
+      if (r?.status !== 'aprovado' && r?.kind !== 'cortes') throw targetError('recusado', 'A entrega deste pedido ainda não foi aprovada.'); // cortes do episódio saem um a um
     } else if (!clip.episode_id) throw targetError('recusado', 'Atribua o corte a um episódio antes de publicar.');
     const { rows: [episode] } = clip.episode_id ? await db.query('SELECT * FROM episodes WHERE id = $1', [clip.episode_id]) : { rows: [null] };
     return { kind: 'clip', episode, clip, videoKey: clip.storage_key, coverId: clip.cover_id, size: clip.size_bytes, durationMs: clip.duration_ms, mime: clip.content_type || 'video/mp4' };

@@ -100,7 +100,7 @@ describe('produção de episódios', () => {
       assert.ok(notes.length >= 1, 'agendamento concluído avisa a equipe');
     });
 
-    it('Gravado faz o episódio nascer: número, título, data da gravação, 3 tarefas e histórico', async () => {
+    it('Gravado faz o episódio nascer: número, título, data da gravação, pedidos de conteúdo (cortes, Q&A, bastidores) e histórico', async () => {
       const csrf = await as.prod.csrf('/convidados');
       const r = await as.prod.post(`/convidados/${guestId}/status`, { status: 'gravado' }, { headers: { accept: 'application/json', 'x-csrf-token': csrf } });
       assert.equal(r.status, 200);
@@ -112,16 +112,18 @@ describe('produção de episódios', () => {
       assert.equal(rows[0].title, 'Conversa com Dr. Marcos Lima');
       assert.ok(rows[0].recorded_on, 'data da gravação');
       assert.equal(rows[0].aired_on, null, 'veiculação é outra data');
-      const { rows: tasks } = await h.db.query('SELECT kind, status FROM tasks WHERE episode_id=$1 ORDER BY id', [epId]);
-      assert.deepEqual(tasks.map((t) => t.kind), ['cortes', 'bastidores', 'extra']);
-      assert.ok(tasks.every((t) => t.status === 'a_fazer'));
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM tasks WHERE episode_id=$1', [epId])).rows[0].n, 0, 'não vira mais tarefa com link do Drive');
+      const { rows: reqs } = await h.db.query('SELECT kind, status, priority FROM content_requests WHERE episode_id=$1 ORDER BY kind', [epId]);
+      assert.deepEqual(reqs.map((t) => t.kind), ['bastidores', 'cortes', 'qa'], 'sem formulário: os marcados por padrão (conteúdo extra não)');
+      assert.ok(reqs.every((t) => t.status === 'pedido'));
+      assert.deepEqual(reqs.filter((t) => t.priority).map((t) => t.kind), ['bastidores', 'qa']);
       assert.equal((await h.db.query("SELECT count(*)::int n FROM episode_events WHERE episode_id=$1 AND type='criado'", [epId])).rows[0].n, 1);
     });
 
     it('é idempotente: salvar o convidado de novo não duplica o episódio', async () => {
       await as.prod.act(`/convidados/${guestId}`, guestFields({ ...scheduled, status: 'gravado', notes: 'ajuste' }), { from: `/convidados/${guestId}/editar` });
       assert.equal((await h.db.query('SELECT count(*)::int n FROM episodes WHERE guest_id=$1', [guestId])).rows[0].n, 1);
-      assert.equal((await h.db.query('SELECT count(*)::int n FROM tasks WHERE episode_id=$1', [epId])).rows[0].n, 3);
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM content_requests WHERE episode_id=$1', [epId])).rows[0].n, 3);
     });
 
     it('o quadro e a lista mostram o episódio; "só os meus" filtra pelo editor', async () => {
@@ -516,9 +518,11 @@ describe('produção de episódios', () => {
     });
 
     it('tarefas: andamento por quem produz, responsável e prazo só pela gestão da produção; apagar só gerência', async () => {
+      const { rows: [q] } = await h.db.query("SELECT assignee_id, due_on FROM content_requests WHERE episode_id=$1 AND kind='cortes'", [e]);
+      assert.ok(q.assignee_id, 'o pedido de cortes "do editor" passou para o primeiro editor definido (trocas depois não roubam)');
+      assert.ok(q.due_on, 'a rotina já define o prazo');
+      await h.db.query("INSERT INTO tasks (episode_id, kind, title, due_on, assignee_id) VALUES ($1, 'cortes', 'Separar os trechos', $2, $3)", [e, q.due_on, q.assignee_id]);
       const { rows: [t] } = await h.db.query("SELECT id, assignee_id, due_on FROM tasks WHERE episode_id=$1 AND kind='cortes'", [e]);
-      assert.ok(t.assignee_id, 'a rotina "do editor" passou para o primeiro editor definido (trocas depois não roubam a tarefa)');
-      assert.ok(t.due_on, 'a rotina já define o vencimento');
       await as.editor.act(`/episodios/${e}/tarefas/${t.id}`, { status: 'fazendo', kind: 'cortes', notes: 'Começando', assignee_id: editor.id, due_on: '2026-12-31' }, { from: `/episodios/${e}` });
       let row = (await h.db.query('SELECT status, notes, assignee_id, due_on FROM tasks WHERE id=$1', [t.id])).rows[0];
       assert.equal(row.status, 'fazendo');
@@ -530,12 +534,12 @@ describe('produção de episódios', () => {
       assert.equal(row.assignee_id, editor.id);
       assert.match(String(row.due_on), /2026/);
       await as.prod.act(`/episodios/${e}/tarefas`, { kind: 'extra', title: 'Reação do convidado ao ver o corte' }, { from: `/episodios/${e}` });
-      assert.equal((await h.db.query('SELECT count(*)::int n FROM tasks WHERE episode_id=$1', [e])).rows[0].n, 4);
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM tasks WHERE episode_id=$1', [e])).rows[0].n, 2);
       assert.equal((await as.editor.act(`/episodios/${e}/tarefas`, { title: 'x tarefa' }, { from: `/episodios/${e}` })).status, 403);
       const { rows: [extra] } = await h.db.query("SELECT id FROM tasks WHERE title LIKE 'Reação%'");
       assert.equal((await as.editor.act(`/episodios/${e}/tarefas/${extra.id}/excluir`, {}, { from: `/episodios/${e}` })).status, 403);
       assert.equal((await as.prod.act(`/episodios/${e}/tarefas/${extra.id}/excluir`, {}, { from: `/episodios/${e}` })).status, 302);
-      assert.match((await as.prod.get('/episodios')).text, /1\/3|0\/3|0\/4/);
+      assert.match((await as.prod.get('/episodios')).text, /0\/1|1\/1/);
     });
 
     it('o editor vê os patrocinadores do episódio com moldura, QR Code, oferta e o que não pode ser dito', async () => {
@@ -572,6 +576,10 @@ describe('produção de episódios', () => {
     it('novo episódio = gravação feita: convidado do CRM, convidado novo ou só os hosts (com patrocinador)', async () => {
       const page = (await as.prod.get('/episodios/novo')).text;
       assert.match(page, /Quem sentou à mesa/);
+      assert.match(page, /Pedir ao editor junto com o episódio/);
+      const rot = Object.fromEntries((await h.db.query("SELECT kind, id FROM task_routines WHERE trigger='episodio_criado' AND target='pedido'")).rows.map((x) => [x.kind, x.id]));
+      assert.match(page, new RegExp(`name="pedir" value="${rot.qa}" checked`), 'Q&A vem marcado');
+      assert.doesNotMatch(page, new RegExp(`name="pedir" value="${rot.extra}" checked`), 'conteúdo extra vem desmarcado');
       const post = (body) => as.prod.act('/episodios', body, { from: '/episodios/novo' });
       assert.match((await post({ title: 'Sem origem' })).text, /Escolha quem sentou à mesa/);
       assert.match((await post({ origem: 'hosts', title: 'Só hosts sem patrocínio' })).text, /precisa de um patrocinador/);
@@ -592,12 +600,14 @@ describe('produção de episódios', () => {
       assert.equal(sp.company, 'Clínica Nova');
       assert.equal(sp.stage, 'negociacao');
       assert.deepEqual((await h.db.query('SELECT role FROM sponsor_episodes WHERE episode_id=$1', [id])).rows, [{ role: 'exclusivo' }]);
-      assert.equal((await h.db.query('SELECT count(*)::int n FROM tasks WHERE episode_id=$1', [id])).rows[0].n, 3);
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM tasks WHERE episode_id=$1', [id])).rows[0].n, 0);
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM content_requests WHERE episode_id=$1', [id])).rows[0].n, 3, 'sem marcar nada no formulário antigo: os padrões');
       assert.match((await post({ origem: 'hosts', patrocinador: String(sp.id), number: '20' })).text, /Já existe o episódio 020/);
 
       // só os hosts, patrocinador existente
-      r = await post({ origem: 'hosts', patrocinador: String(sp.id), papel: 'insercao' });
+      r = await post({ origem: 'hosts', patrocinador: String(sp.id), papel: 'insercao', pedir_ok: '1', pedir: String(rot.extra) });
       id = r.location.split('/').pop().split('#')[0];
+      assert.deepEqual((await h.db.query('SELECT kind FROM content_requests WHERE episode_id=$1', [id])).rows.map((x) => x.kind), ['extra'], 'só o que foi marcado vira pedido');
       e = await ep(id);
       assert.equal(e.guest_id, null);
       assert.equal(e.title, 'Episódio Clínica Nova');

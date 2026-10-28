@@ -49,7 +49,7 @@
             <span class="ktype"><%= k.kind %><%= k.episode ? ' · ' + k.episode.split(' · ')[0] : (k.type !== 'pedido' && k.media === 'video' && !k.warn ? ' · avulso' : '') %></span>
             <strong><%= k.title %></strong>
             <span class="meta">
-              <% if (k.type === 'pedido') { %><span><%- icon('user', 12) %><%= k.who %></span><% if (k.due) { %><span class="<%= k.late ? 'late' : '' %>"><%- icon('calendar', 12) %><%= dueShort(k.due) %><%= k.late ? ' · atrasado' : '' %></span><% } %><% if (k.rounds) { %><span><%= k.rounds %>ª volta</span><% } %><% } %>
+              <% if (k.type === 'pedido') { %><% if (k.priority) { %><span class="warn">prioridade</span><% } %><span><%- icon('user', 12) %><%= k.who %></span><% if (k.due) { %><span class="<%= k.late ? 'late' : '' %>"><%- icon('calendar', 12) %><%= dueShort(k.due) %><%= k.late ? ' · atrasado' : '' %></span><% } %><% if (k.rounds) { %><span><%= k.rounds %>ª volta</span><% } %><% } %>
               <% if (k.chip) { %><span class="<%= k.chip === 'erro' ? 'late' : '' %>"><%= k.chip %></span><% } %>
               <% if (k.warn) { %><span class="warn"><%= k.warn %></span><% } %>
               <% if (k.slides) { %><span><%= k.slides %> slides</span><% } %>

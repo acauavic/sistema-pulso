@@ -358,6 +358,10 @@ Na janela de publicar (corte, post, carrossel), com o Instagram marcado: **Colla
 episódio já vem no collab; convidados com Instagram e perfis já usados aparecem na lista; dá para digitar ou colar vários @). Em post/carrossel, toque na
 imagem para posicionar cada marcação. Vai pelos dois provedores. Código: `src/services/igPeople.js`, `src/views/partials/ig-people.ejs`, `src/public/igpeople.js`.
 
+## Conteúdos do episódio (pedidos)
+
+Ao criar o episódio, quem cria marca o que pedir ao editor: **Cortes**, **Q&A**, **Bastidores** e **Conteúdo extra**. Vêm das rotinas "Episódio criado" de Gestão > Rotinas que estão como "pedido de conteúdo", com prazo, responsável, se vêm marcadas e se são prioridade. Cada marcado vira um pedido de conteúdo (`content_requests`), e a entrega sobe no sistema, sem Drive. O episódio criado a partir do convidado gravado usa os que vêm marcados. **Cortes** é um pedido contínuo: cada corte sobe quando fica pronto e já pode ser publicado no Social. O editor conclui a leva com "Concluir cortes", e "Retomar" reabre. Os outros pedidos seguem o fluxo de sempre: entrega, revisão, aprovado e Social.
+
 ## Redes sociais: Upload-Post, Zernio ou Outstand
 
 As publicações (episódio no YouTube, cortes, posts, carrosséis e stories) saem pelo provedor escolhido em **Integrações > Redes sociais**:

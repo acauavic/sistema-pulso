@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.36.0', date: '2026-10-28', title: 'Conteúdos do episódio viram pedidos',
+    items: [
+      { kind: 'novo', text: 'Ao criar o episódio, "Pedir ao editor junto com o episódio" mostra Cortes, Q&A, Bastidores e Conteúdo extra para marcar. Cada um marcado vira um pedido de conteúdo, com prazo e responsável, e a entrega sobe aqui no sistema, sem link do Drive. Q&A e Bastidores são prioridade, porque saem no começo da semana para anunciar o episódio. Episódio criado a partir do convidado gravado já nasce com os que vêm marcados.' },
+      { kind: 'novo', text: 'Os cortes do episódio são um pedido contínuo. O editor sobe cada corte quando fica pronto, sem precisar clicar em "Começar", e cada corte já aparece no Social para publicar, sem esperar a leva inteira. No fim, "Concluir cortes" encerra o pedido e avisa a gestão; "Retomar" reabre se faltar algum. Cortes subidos direto no episódio também contam.' },
+      { kind: 'ajuste', text: 'Em Gestão > Rotinas, as rotinas do episódio criado escolhem se viram tarefa ou pedido de conteúdo, se já vêm marcadas e se são prioridade. Quando o editor do episódio é definido, os pedidos "do editor" sem responsável vão para ele.' },
+    ],
+  },
+  {
     version: '1.35.2', date: '2026-10-27', title: 'Texto do X e do Threads no tamanho certo',
     items: [
       { kind: 'correcao', text: 'O X recusou um corte porque a legenda tinha 283 caracteres (o limite é 280). Agora o X e o Threads (limite de 500) recebem a versão que cabe, com parágrafos ou frases inteiras, sem cortar palavra. A tela avisa na hora de publicar. No Threads, texto acima do limite fazia a Outstand recusar o post inteiro, em todas as redes.' },

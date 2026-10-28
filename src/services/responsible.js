@@ -30,6 +30,8 @@ async function setResponsible({ type, id, userId, actor }) {
   if (type === 'episode' && user) { // tarefas de rotina "do editor" que ainda estavam sem ninguém passam para o novo editor
     await db.query(`UPDATE tasks t SET assignee_id = $2, updated_at = now() FROM task_routines r
                      WHERE t.routine_id = r.id AND r.assignee_mode = 'editor' AND t.episode_id = $1 AND t.assignee_id IS NULL AND t.status <> 'feito'`, [id, user.id]);
+    await db.query(`UPDATE content_requests q SET assignee_id = $2, updated_at = now() FROM task_routines r
+                     WHERE q.routine_id = r.id AND r.assignee_mode = 'editor' AND q.episode_id = $1 AND q.assignee_id IS NULL AND q.status IN ('pedido','producao')`, [id, user.id]);
   }
   if (user && String(user.id) !== String(item[def.col] || '')) {
     await notify({ type: def.notifType, users: [user.id], title: `${actor.name} colocou você como ${def.what}: ${item[def.title]}`, url: def.url(id), actorId: actor.id, entity: { type, id: Number(id) } });

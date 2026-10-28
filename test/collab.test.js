@@ -439,18 +439,27 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       const r = await as.prod.act('/convidados', { name: 'Dr. Rotina', instagram: '@rot', profile: 'medico', email: 'r@x.com', owner_id: u.editor2.id, status: 'gravado', proposed_at: '2025-12-01T10:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' }, { from: '/convidados/novo' });
       const gid = r.location.split('/').pop();
       const ep = (await h.db.query('SELECT * FROM episodes WHERE guest_id=$1', [gid])).rows[0];
-      const tasks = (await h.db.query("SELECT kind, due_on::text AS due, assignee_id FROM tasks WHERE episode_id=$1 ORDER BY kind", [ep.id])).rows;
-      const by = Object.fromEntries(tasks.map((x) => [x.kind, x]));
-      assert.equal(by.cortes.due, '2025-12-08'); assert.equal(by.bastidores.due, '2025-12-04'); assert.equal(by.extra.due, '2025-12-11');
+      // cortes, Q&A e bastidores nascem como pedidos de conteúdo (a entrega sobe no sistema), com o prazo da rotina
+      const reqs = (await h.db.query("SELECT kind, due_on::text AS due, assignee_id, priority FROM content_requests WHERE episode_id=$1 ORDER BY kind", [ep.id])).rows;
+      const by = Object.fromEntries(reqs.map((x) => [x.kind, x]));
+      assert.equal(by.cortes.due, '2025-12-08'); assert.equal(by.bastidores.due, '2025-12-04'); assert.equal(by.qa.due, '2025-12-04');
+      assert.equal(by.extra, undefined, 'conteúdo extra só se marcar');
       assert.equal(by.bastidores.assignee_id, u.editor2.id, 'bastidores: responsável pelo convidado');
+      assert.equal(by.qa.priority, true);
       assert.equal(by.cortes.assignee_id, null, 'cortes: editor ainda não definido');
       await json(as.prod, 'POST', '/responsavel', { tipo: 'episode', id: ep.id, user_id: u.editor.id });
-      assert.equal((await h.db.query("SELECT assignee_id FROM tasks WHERE episode_id=$1 AND kind='cortes'", [ep.id])).rows[0].assignee_id, u.editor.id, 'ao definir o editor, a tarefa "do editor" vai para ele');
+      assert.equal((await h.db.query("SELECT assignee_id FROM content_requests WHERE episode_id=$1 AND kind='cortes'", [ep.id])).rows[0].assignee_id, u.editor.id, 'ao definir o editor, o pedido "do editor" vai para ele');
     });
 
     it('a gestão cria, edita e apaga rotinas; uma rotina de etapa cria a tarefa quando o episódio chega lá', async () => {
       assert.equal((await as.editor.get('/gestao/rotinas')).status, 403);
-      assert.match((await as.gestao.get('/gestao/rotinas')).text, /Produzir os cortes do episódio/);
+      const page = (await as.gestao.get('/gestao/rotinas')).text;
+      assert.match(page, /Cortes do episódio/); assert.match(page, /pedido de conteúdo/); assert.match(page, /prioridade/);
+      // uma rotina do episódio pode virar pedido, prioritária e desmarcada por padrão
+      const { rows: [qa] } = await h.db.query("SELECT * FROM task_routines WHERE kind = 'qa'");
+      await form(as.gestao, `/gestao/rotinas/${qa.id}`, { trigger: 'episodio_criado', kind: 'qa', title: 'Q&A', anchor: 'gravacao', offset_days: '2', assignee_mode: 'editor', target: 'pedido', priority: '1', active: '1' });
+      const qa2 = (await h.db.query('SELECT target, priority, default_on, offset_days FROM task_routines WHERE id=$1', [qa.id])).rows[0];
+      assert.deepEqual([qa2.target, qa2.priority, qa2.default_on, qa2.offset_days], ['pedido', true, false, 2]);
       const r = await form(as.gestao, '/gestao/rotinas', { trigger: 'etapa:em_revisao', kind: 'geral', title: 'Revisar o vídeo editado', anchor: 'gatilho', offset_days: '2', assignee_mode: 'usuario', assignee_id: u.gestao.id, active: '1' });
       assert.equal(r.status, 302);
       const routine = (await h.db.query("SELECT * FROM task_routines WHERE title='Revisar o vídeo editado'")).rows[0];

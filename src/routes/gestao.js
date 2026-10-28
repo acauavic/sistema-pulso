@@ -125,6 +125,10 @@ function parseRoutine(body) {
     assignee_mode: C.ROUTINE_ASSIGNEES[body.assignee_mode] ? body.assignee_mode : 'ninguem',
     assignee_id: isUuid(body.assignee_id) ? body.assignee_id : null,
     active: body.active === '1',
+    // só no "episódio criado": vira pedido de conteúdo (entrega no sistema) em vez de tarefa, vem marcado no formulário, prioridade
+    target: body.trigger === 'episodio_criado' && body.target === 'pedido' ? 'pedido' : 'tarefa',
+    default_on: body.default_on === '1',
+    priority: body.priority === '1',
   };
   if (!v.trigger) return { error: 'Escolha quando a tarefa é criada.' };
   if (!v.title) return { error: 'Dê um título para a tarefa.' };
@@ -135,7 +139,7 @@ function parseRoutine(body) {
 
 router.get('/gestao/rotinas', requirePerm('routines.manage'), wrap(async (req, res) => {
   const [routines, users] = await Promise.all([
-    db.query(`SELECT r.*, u.name AS assignee_name, (SELECT count(*)::int FROM tasks t WHERE t.routine_id = r.id) AS created FROM task_routines r
+    db.query(`SELECT r.*, u.name AS assignee_name, (SELECT count(*)::int FROM tasks t WHERE t.routine_id = r.id) + (SELECT count(*)::int FROM content_requests q WHERE q.routine_id = r.id) AS created FROM task_routines r
                LEFT JOIN users u ON u.id = r.assignee_id ORDER BY r.trigger, r.position, r.id`),
     db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
   ]);
@@ -146,9 +150,9 @@ router.post('/gestao/rotinas', requirePerm('routines.manage'), wrap(async (req, 
   const { values: v, error } = parseRoutine({ active: '1', ...req.body });
   if (error) { await req.flash('error', error); return res.redirect('/gestao/rotinas'); }
   const { rows: [r] } = await db.query(
-    `INSERT INTO task_routines (trigger, kind, title, description, anchor, offset_days, assignee_mode, assignee_id, active, position)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, (SELECT coalesce(max(position),0)+1 FROM task_routines)) RETURNING id`,
-    [v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active]);
+    `INSERT INTO task_routines (trigger, kind, title, description, anchor, offset_days, assignee_mode, assignee_id, active, target, default_on, priority, position)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, (SELECT coalesce(max(position),0)+1 FROM task_routines)) RETURNING id`,
+    [v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active, v.target, v.default_on, v.priority]);
   await audit(req, 'rotina.criada', 'routine', r.id, { titulo: v.title });
   await req.flash('ok', 'Rotina criada. Vale para os próximos episódios que passarem por esse momento.');
   res.redirect('/gestao/rotinas');
@@ -158,8 +162,8 @@ router.post('/gestao/rotinas/:id', requirePerm('routines.manage'), wrap(async (r
   if (!isIntId(req.params.id)) return res.redirect('/gestao/rotinas');
   const { values: v, error } = parseRoutine(req.body);
   if (error) { await req.flash('error', error); return res.redirect(`/gestao/rotinas?editar=${req.params.id}`); }
-  await db.query(`UPDATE task_routines SET trigger=$2, kind=$3, title=$4, description=$5, anchor=$6, offset_days=$7, assignee_mode=$8, assignee_id=$9, active=$10, updated_at=now() WHERE id=$1`,
-    [req.params.id, v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active]);
+  await db.query(`UPDATE task_routines SET trigger=$2, kind=$3, title=$4, description=$5, anchor=$6, offset_days=$7, assignee_mode=$8, assignee_id=$9, active=$10, target=$11, default_on=$12, priority=$13, updated_at=now() WHERE id=$1`,
+    [req.params.id, v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active, v.target, v.default_on, v.priority]);
   await audit(req, 'rotina.editada', 'routine', req.params.id, { titulo: v.title });
   await req.flash('ok', 'Rotina salva. Tarefas já criadas não mudam (o vencimento delas é editado na própria tarefa).');
   res.redirect('/gestao/rotinas');

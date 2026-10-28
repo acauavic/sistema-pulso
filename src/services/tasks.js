@@ -123,7 +123,9 @@ async function update(task, values, user, { assigneeId } = {}) {
 const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
 // Cria as tarefas das rotinas ativas para este gatilho no episódio (não repete a mesma rotina no mesmo episódio).
-async function applyRoutines(trigger, episodeId, user = null) {
+// Rotina com target 'pedido' (cortes, Q&A, bastidores, conteúdo extra) vira pedido de conteúdo, e não tarefa: a entrega sobe no sistema.
+// requests: ids das rotinas de pedido marcadas ao criar o episódio; null (episódio criado sozinho) = as que vêm marcadas por padrão.
+async function applyRoutines(trigger, episodeId, user = null, { requests = null } = {}) {
   const { rows: routines } = await db.query('SELECT * FROM task_routines WHERE active AND trigger = $1 ORDER BY position, id', [trigger]);
   if (!routines.length) return [];
   const { rows: [ep] } = await db.query(
@@ -131,11 +133,22 @@ async function applyRoutines(trigger, episodeId, user = null) {
   if (!ep) return [];
   const made = [];
   for (const r of routines) {
-    const { rows: dup } = await db.query('SELECT 1 FROM tasks WHERE episode_id = $1 AND routine_id = $2', [episodeId, r.id]);
-    if (dup.length) continue;
     const base = r.anchor === 'gravacao' ? ep.recording_on : r.anchor === 'veiculacao' ? ep.aired_on : null;
     const baseIso = base ? (base instanceof Date ? base.toISOString().slice(0, 10) : String(base).slice(0, 10)) : todayISO();
     const assignee = { editor: ep.editor_id, responsavel_convidado: ep.guest_owner, usuario: r.assignee_id }[r.assignee_mode] || null;
+    if (r.target === 'pedido') {
+      if (requests ? !requests.map(Number).includes(r.id) : !r.default_on) continue;
+      const { rows: had } = await db.query('SELECT 1 FROM content_requests WHERE episode_id = $1 AND routine_id = $2', [episodeId, r.id]);
+      if (had.length) continue;
+      const R = require('./contentRequests');
+      made.push(await R.create({
+        kind: R.FROM_ROUTINE[r.kind] || 'outro', title: r.title, briefing: r.description || null, format: ['cortes', 'qa'].includes(r.kind) ? 'vertical' : null,
+        episode_id: episodeId, assignee_id: assignee, due_on: addDays(baseIso, r.offset_days), priority: r.priority, routine_id: r.id,
+      }, user));
+      continue;
+    }
+    const { rows: dup } = await db.query('SELECT 1 FROM tasks WHERE episode_id = $1 AND routine_id = $2', [episodeId, r.id]);
+    if (dup.length) continue;
     made.push(await create({
       values: { title: r.title, description: r.description, kind: r.kind, status: 'a_fazer', due_on: addDays(baseIso, r.offset_days) },
       user, assigneeId: assignee, links: { episodeId }, routineId: r.id,

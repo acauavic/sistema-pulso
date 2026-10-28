@@ -48,7 +48,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     db.query(
       `SELECT c.*, e.number AS ep_number, e.title AS ep_title, g.name AS guest_name, r.title AS request_title FROM episode_clips c
          LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN content_requests r ON r.id = c.request_id
-        WHERE (c.request_id IS NULL OR r.status = 'aprovado') ${only ? 'AND c.episode_id = $1' : ''} ORDER BY (c.episode_id IS NULL) DESC, c.created_at DESC, c.id DESC`, only ? [only] : []),
+        WHERE (c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes') ${only ? 'AND c.episode_id = $1' : ''} ORDER BY (c.episode_id IS NULL) DESC, c.created_at DESC, c.id DESC`, only ? [only] : []),
     db.query('SELECT id, clip_id, updated_at FROM episode_covers WHERE clip_id IS NOT NULL ORDER BY position'),
     eligibleEpisodes(),
     db.query(
