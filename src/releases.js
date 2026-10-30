@@ -6,7 +6,7 @@ module.exports = [
   {
     version: '1.43.1', date: '2026-10-30', title: 'Galeria e Spotify do portal',
     items: [
-      { kind: 'correcao', text: 'Portal do convidado: o player do Spotify não tocava (faltava a permissão de reprodução do player incorporado).' },
+      { kind: 'correcao', text: 'Portal do convidado: o player do Spotify encolhia e deixava um espaço vazio ao dar play (o episódio tem vídeo e o player estava na versão compacta). Agora ele vem no tamanho de vídeo do Spotify, com a permissão de reprodução.' },
       { kind: 'correcao', text: 'Galeria de fotos: a foto aparece inteira (vertical sem cortar a cabeça), só troca depois que a próxima carregou e a miniatura da foto atual fica sempre à vista.' },
       { kind: 'ajuste', text: '"Baixar todas" agora baixa um arquivo ZIP só, com todas as fotos, em vez de dezenas de downloads.' },
     ],
