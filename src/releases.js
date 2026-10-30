@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.40.2', date: '2026-10-30', title: 'Benefícios junto do vídeo da plateia',
+    items: [
+      { kind: 'ajuste', text: 'Na página da plateia, a lista do que se vive na gravação (networking, interação com o convidado, coffee break, bastidores) passou para a seção do vídeo, abaixo do texto. Sem vídeo, ela continua no topo.' },
+    ],
+  },
+  {
     version: '1.40.1', date: '2026-10-30', title: 'Vídeo dos bastidores tocando',
     items: [
       { kind: 'correcao', text: 'O vídeo dos bastidores aparecia na página da plateia, mas não tocava: a regra de segurança da página bloqueava o endereço do vídeo. Agora toca.' },

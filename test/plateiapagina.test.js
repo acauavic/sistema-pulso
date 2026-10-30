@@ -126,6 +126,8 @@ describe('Plateia: página do convidado e link de parceiro isento', () => {
     for (const path of ['/plateia', '/plateia/com/mari-vabo']) {
       const r = await anon.get(path);
       assert.match(r.text, /id="bastidores"/, path); assert.match(r.text, /Veja como é estar na plateia/);
+      assert.match(r.text, /Veja como é estar na plateia[\s\S]*?pl-benefits[\s\S]*?<video/, 'com vídeo, os benefícios vão para a seção do vídeo, abaixo do texto');
+      assert.equal((r.text.match(/class="pl-benefits"/g) || []).length, 1, 'uma lista só');
       assert.match(r.text, /<source src="\/plateia\/video\/bastidores\.webm" type="video\/webm">\s*<source src="\/plateia\/video\/bastidores\.mp4" type="video\/mp4">/);
       assert.match(r.text, /poster="\/plateia\/imagem\/bastidores"/);
       assert.match(r.headers.get('content-security-policy'), /media-src https:\/\/s3\.acauamedia\.com 'self' https:\/\/s3\.[^ ;]+backblazeb2\.com/);

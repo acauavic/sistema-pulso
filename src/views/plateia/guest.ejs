@@ -45,7 +45,7 @@
           <% if (g.arrival) { %><li><%- icon('clock', 16) %><span>Chegada da plateia: <strong><%= g.arrival %></strong> · gravação às <%= g.time %></span></li><% } else { %><li><%- icon('clock', 16) %><span>Horário previsto: <%= g.time %></span></li><% } %>
           <li><%- icon('map-pin', 16) %><span><%= s.location %></span></li>
         </ul>
-        <%- include('_benefits') %>
+        <% if (!hasReels) { %><%- include('_benefits') %><% } %>
         <% if (exempt) { %>
         <p class="pl-gift"><span class="pl-kicker">Convite de <%= partner.name %></span><strong>Participação isenta de cobrança.</strong> Se o seu pedido for selecionado, você não paga a vaga.</p>
         <% } else if (partnerFull) { %>

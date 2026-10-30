@@ -44,7 +44,7 @@
       <span class="pl-kicker">Pulso Podcast com Plateia · vagas limitadas</span>
       <h1>Conheça de perto quem move a saúde.</h1>
       <p class="pl-lede">E participe também da gravação do Pulso Podcast. Uma plateia pequena para conversas grandes: poucas pessoas, escolhidas pela produção por afinidade com o convidado e com o tema.</p>
-      <%- include('_benefits') %>
+      <% if (!hasReels) { %><%- include('_benefits') %><% } %>
       <a class="pl-btn" href="#agenda" data-track="agenda_click">Ver as próximas gravações</a>
     </div>
     <%- include('../partials/pulse-line') %>
