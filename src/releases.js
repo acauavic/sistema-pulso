@@ -6,7 +6,7 @@ module.exports = [
   {
     version: '1.43.2', date: '2026-10-30', title: 'Spotify tocando no portal',
     items: [
-      { kind: 'correcao', text: 'Portal do convidado: o primeiro clique no play do Spotify não fazia nada (o player ainda estava carregando quando a pessoa chegava nele). Agora ele carrega junto com a página.' },
+      { kind: 'correcao', text: 'Portal do convidado: o primeiro clique no play do Spotify não fazia nada. A galeria de fotos continuava trocando de foto fora da tela e atrapalhava; agora ela só passa sozinha quando está à vista, e o Spotify carrega junto com a página.' },
       { kind: 'ajuste', text: 'O vídeo do YouTube aparece como capa com o botão de play e só carrega quando a pessoa clica: a página abre mais rápido.' },
     ],
   },

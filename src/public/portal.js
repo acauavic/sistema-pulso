@@ -34,7 +34,7 @@ document.addEventListener('click', (ev) => {
   const note = document.querySelector('[data-gal-note]');
   const total = thumbs.length;
   const INTERVAL = 4500;
-  let at = 0; let timer = null; let hold = false;
+  let at = 0; let timer = null; let hold = false; let seen = false;
   let playing = total > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const strip = gal.querySelector('.pt-gal-thumbs');
@@ -47,7 +47,7 @@ document.addEventListener('click', (ev) => {
     down.href = t.dataset.down;
     thumbs.forEach((x, k) => { if (k === at) x.setAttribute('aria-current', 'true'); else x.removeAttribute('aria-current'); });
     // a miniatura da foto atual fica à vista na faixa (sem rolar a página)
-    if (strip) { const li = t.parentElement; const left = li.offsetLeft - (strip.clientWidth - li.offsetWidth) / 2; strip.scrollTo({ left: Math.max(0, left), behavior: 'smooth' }); }
+    if (strip) { const li = t.parentElement; const left = li.offsetLeft - (strip.clientWidth - li.offsetWidth) / 2; strip.scrollTo({ left: Math.max(0, left) }); }
     // troca só depois que a próxima carregou (sem tela vazia no meio)
     img.classList.add('is-loading');
     const next = new Image();
@@ -55,7 +55,9 @@ document.addEventListener('click', (ev) => {
     next.src = t.dataset.big;
     new Image().src = thumbs[(at + 1) % total].dataset.big; // a seguinte já fica carregada
   }
-  function tick() { clearTimeout(timer); if (playing && !hold && !document.hidden) timer = setTimeout(() => { show(at + 1); tick(); }, INTERVAL); }
+  // só passa sozinha com a galeria na tela: fora dela, nada troca nem rola (mexer na página enquanto a pessoa usa outra parte,
+  // como o player do Spotify, fazia o primeiro clique dele se perder)
+  function tick() { clearTimeout(timer); if (playing && seen && !hold && !document.hidden) timer = setTimeout(() => { show(at + 1); tick(); }, INTERVAL); }
   function setPlaying(v) { playing = v; if (play) { play.textContent = v ? 'Pausar' : 'Passar sozinha'; play.setAttribute('aria-pressed', String(v)); } tick(); }
 
   gal.querySelector('[data-gal-prev]')?.addEventListener('click', () => { show(at - 1); tick(); });
@@ -71,6 +73,8 @@ document.addEventListener('click', (ev) => {
     if (ev.key === 'ArrowRight') { show(at + 1); setPlaying(false); }
   });
   document.addEventListener('visibilitychange', tick);
+  if ('IntersectionObserver' in window) new IntersectionObserver((list) => { seen = list[0].isIntersecting; tick(); }, { threshold: 0.4 }).observe(gal);
+  else seen = true;
   setPlaying(playing);
 
 })();
