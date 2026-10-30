@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.43.2', date: '2026-10-30', title: 'Spotify tocando no portal',
+    items: [
+      { kind: 'correcao', text: 'Portal do convidado: o play do Spotify não respondia enquanto o vídeo do YouTube estava carregado na mesma página. Agora o vídeo do YouTube aparece como capa com o botão de play e só carrega quando a pessoa clica (a página também abre mais rápido).' },
+    ],
+  },
+  {
     version: '1.43.1', date: '2026-10-30', title: 'Galeria e Spotify do portal',
     items: [
       { kind: 'correcao', text: 'Portal do convidado: o player do Spotify encolhia e deixava um espaço vazio ao dar play (o episódio tem vídeo e o player estava na versão compacta). Agora ele vem no tamanho de vídeo do Spotify, com a permissão de reprodução.' },

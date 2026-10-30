@@ -66,10 +66,10 @@ describe('Portal do convidado', () => {
     assert.doesNotMatch(collab, /Post de frase/);
     const others = r.text.split('id="outros"')[1];
     assert.match(others, /Post de frase/); assert.match(others, /Episódio completo/); assert.doesNotMatch(others, /Rascunho/);
-    assert.match(r.text, /<iframe src="https:\/\/www\.youtube-nocookie\.com\/embed\/ep12abcdefg\?rel=0"/);
+    assert.match(r.text, /data-yt-src="https:\/\/www\.youtube-nocookie\.com\/embed\/ep12abcdefg\?rel=0&amp;autoplay=1"/); assert.match(r.text, /i\.ytimg\.com\/vi\/ep12abcdefg\/hqdefault\.jpg/);
     assert.match(r.text, /src="https:\/\/open\.spotify\.com\/embed\/episode\/4rOoJ6Egrf8K2IrywzwOMk"/);
     assert.match(r.headers.get('content-security-policy'), /frame-src https:\/\/www\.youtube-nocookie\.com https:\/\/open\.spotify\.com/);
-    assert.match(r.headers.get('content-security-policy'), /img-src 'self' data: https:\/\/s3\.test-region\.backblazeb2\.com/, 'capas redirecionadas para o Backblaze aparecem');
+    assert.match(r.headers.get('content-security-policy'), /img-src 'self' data: https:\/\/i\.ytimg\.com https:\/\/s3\.test-region\.backblazeb2\.com/, 'capas redirecionadas para o Backblaze aparecem');
     assert.match(collabPart(r.text), /Clique e veja:/); assert.match(collabPart(r.text), /aria-label="Ver no Instagram"/); assert.match(collabPart(r.text), /class="icon brand"/);
     assert.match(r.text, /Este material fica disponível por 60 dias/); assert.match(r.text, /https:\/\/instagram\.com\/reel\/EP/);
     assert.match(r.text, /Falar com a produção/);

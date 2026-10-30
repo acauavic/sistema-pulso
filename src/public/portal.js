@@ -7,6 +7,20 @@ document.addEventListener('click', (ev) => {
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {});
 });
 
+// Vídeo do YouTube: a capa vira o player só no clique (carregado de cara, ele travava o play do Spotify na mesma página).
+document.addEventListener('click', (ev) => {
+  const a = ev.target.closest('[data-yt-play]');
+  if (!a) return;
+  ev.preventDefault();
+  const box = a.closest('[data-yt-src]');
+  const f = document.createElement('iframe');
+  f.src = box.dataset.ytSrc; f.title = box.dataset.ytTitle || 'YouTube';
+  f.width = '560'; f.height = '315';
+  f.allow = 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+  f.referrerPolicy = 'strict-origin-when-cross-origin';
+  box.replaceChildren(f);
+});
+
 // Galeria das fotos: passa sozinha (pausa ao passar o mouse, ao focar, com a aba escondida ou com "reduzir movimento"),
 // setas, miniaturas e teclado. "Baixar todas" é um ZIP montado pelo servidor.
 (() => {

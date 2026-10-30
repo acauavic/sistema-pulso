@@ -95,6 +95,12 @@ a { color: inherit; }
 /* players do episódio */
 .pt-player { position: relative; margin-top: 16px; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: var(--text); }
 .pt-player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.pt-yt-cover { position: absolute; inset: 0; display: grid; place-items: center; }
+.pt-yt-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pt-yt-btn { position: relative; display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--surface); color: var(--text); transition: transform 160ms var(--ease); }
+.pt-yt-btn .icon { margin-left: 4px; }
+.pt-yt-cover:hover .pt-yt-btn { transform: scale(1.06); }
+.pt-yt-cover:focus-visible { outline: 3px solid var(--lime); outline-offset: -3px; }
 .pt-spotify { display: block; width: 100%; height: 352px; margin-top: 12px; border: 0; border-radius: 12px; }
 
 /* galeria */

@@ -31,7 +31,7 @@ function youtubeEmbed(link) {
     let id = null;
     if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
     else if (host === 'youtube.com') id = u.searchParams.get('v') || (u.pathname.match(/^\/(?:live|shorts|embed)\/([^/?#]+)/) || [])[1];
-    return id && /^[\w-]{6,20}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}?rel=0` : null;
+    return id && /^[\w-]{6,20}$/.test(id) ? { src: `https://www.youtube-nocookie.com/embed/${id}?rel=0&autoplay=1`, thumb: `https://i.ytimg.com/vi/${id}/hqdefault.jpg` } : null;
   } catch { return null; }
 }
 function spotifyEmbed(link) {
