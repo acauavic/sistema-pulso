@@ -1,0 +1,91 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker">Gestão</span><h1>Sistema</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'sistema' }) %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var alive = workers.filter(function (w) { return w.alive; });
+  var age = function (d) { if (!d) return '—'; var s = Math.round((Date.now() - new Date(d).getTime()) / 1000); return s < 90 ? 'agora' : s < 3600 ? 'há ' + Math.round(s / 60) + ' min' : fmt.formatDateTime(d); };
+%>
+<p class="lead">Trabalhos em segundo plano (leitura de cortes, IA, e-mails), os processos que rodam a fila e as rotinas automáticas.</p>
+<% if (!alive.length) { %><p class="flash flash-error">Nenhum processo rodando a fila agora: cortes, análises e e-mails ficam esperando. Confira o serviço <span class="mono">worker</span>.</p><% } %>
+
+<div class="stat-grid">
+  <div class="stat"><span class="stat-label">Na fila</span><span class="stat-n"><%= counts.queued || 0 %></span></div>
+  <div class="stat"><span class="stat-label">Rodando</span><span class="stat-n"><%= counts.running || 0 %></span></div>
+  <div class="stat"><span class="stat-label">Com erro</span><span class="stat-n"><%= counts.error || 0 %></span></div>
+  <div class="stat"><span class="stat-label">Feitos em 24 h</span><span class="stat-n"><%= counts.done || 0 %></span></div>
+  <div class="stat"><span class="stat-label">Abas conectadas</span><span class="stat-n"><%= sse %></span><span class="delta">avisos em tempo real (esta réplica)</span></div>
+</div>
+
+<div class="grid-2 align-start">
+  <section class="card">
+    <h2>Processos</h2>
+    <% if (!workers.length) { %><p class="muted small">Nenhum processo registrado ainda.</p><% } %>
+    <ul class="plain results">
+      <% workers.forEach(function (w) { %>
+      <li><span class="badge <%= w.alive ? 'b-green' : 'b-gray' %>"><%= w.alive ? 'Vivo' : 'Parado' %></span><span class="handle"><%= w.worker %></span><span class="small muted"><%= w.role %> · sinal <%= age(w.seen_at) %></span></li>
+      <% }) %>
+    </ul>
+    <h2 class="top-gap">Rotinas</h2>
+    <ul class="plain results">
+      <% runs.forEach(function (r) { %>
+      <li><span class="badge <%= r.ok === false ? 'b-red' : 'b-gray' %>"><%= r.ok === false ? 'Erro' : 'Ok' %></span><strong><%= r.name %></strong><span class="small muted">última <%= age(r.finished_at || r.started_at) %> · <span class="mono"><%= r.runs %></span> vezes</span><% if (r.error) { %><span class="small bad-text"><%= r.error %></span><% } %></li>
+      <% }) %>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Agora</h2>
+    <% if (!running.length) { %><p class="muted small">Nada rodando nem esperando.</p><% } %>
+    <ul class="plain results">
+      <% running.forEach(function (j) { %>
+      <li><span class="badge <%= j.status === 'running' ? 'b-amber' : 'b-gray' %>"><%= j.status === 'running' ? 'Rodando' : 'Na fila' %></span><strong><%= jobLabel[j.kind] || j.kind %></strong><span class="small muted"><%= j.message || '' %><%= j.attempts ? ' · tentativa ' + j.attempts + '/' + j.max_attempts : '' %><%= j.status === 'queued' && new Date(j.run_after) > new Date() ? ' · às ' + fmt.formatDateTime(j.run_after) : '' %></span></li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+
+<section class="card top-gap">
+  <div class="row spread"><h2>Publicações nas redes</h2><a class="small" href="/social/publicacoes">Ver todas</a></div>
+  <p class="small muted">O arquivo é conferido antes de sair; a rede que falha por motivo passageiro tenta de novo sozinha (2 min, 10 min, 30 min, 1 h, 3 h, 6 h; a fila do YouTube, no horário que a Outstand informa) e a que precisa de ação avisa quem pediu e a gestão.</p>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">No provedor agora</span><span class="stat-n"><%= pubSending.length %></span></div>
+    <div class="stat"><span class="stat-label">Nova tentativa marcada</span><span class="stat-n"><%= pubWaiting.length %></span></div>
+    <div class="stat"><span class="stat-label">Precisam de ação</span><span class="stat-n"><%= pubAction.length %></span><span class="delta">últimos 14 dias</span></div>
+  </div>
+  <% if (!pubSending.length && !pubWaiting.length && !pubAction.length) { %><p class="muted small">Nada pendente: tudo o que foi enviado já saiu.</p><% } %>
+  <ul class="plain results">
+    <% pubWaiting.forEach(function (p) { var w = (p.results || []).filter(function (r) { return !r.ok && r.retry_at; }); %>
+    <li><span class="badge b-amber">Nova tentativa</span><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><span class="small muted"><%= w.map(function (r) { return netLabel(r.platform); }).join(', ') %> às <span class="mono"><%= fmt.formatSoon(p.retry_at) %></span> · <span class="mono"><%= p.attempts %></span> tentativas</span><% if (w[0] && w[0].hint) { %><span class="small"><%= w[0].hint %></span><% } %></li>
+    <% }) %>
+    <% pubAction.forEach(function (p) { var a = (p.results || []).filter(function (r) { return r.action; }); %>
+    <li><span class="badge b-red">Precisa de ação</span><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><% a.forEach(function (r) { %><span class="small bad-text"><%= netLabel(r.platform) %>: <%= r.hint || r.error %></span><% }) %></li>
+    <% }) %>
+    <% pubSending.forEach(function (p) { %>
+    <li><span class="badge b-gray">No provedor</span><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><span class="small muted"><%= p.platforms.map(netLabel).join(', ') %><%= p.since ? ' · enviado ' + age(p.since) : '' %></span></li>
+    <% }) %>
+  </ul>
+</section>
+
+<section class="card top-gap">
+  <h2>Falharam de vez</h2>
+  <p class="small muted">Já esgotaram as tentativas automáticas (falha passageira tenta de novo sozinha: 30 s, 2 min, 8 min; cota da IA, 15 min).</p>
+  <% if (!failed.length) { %><p class="muted small">Nenhuma falha. </p><% } else { %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Quando</th><th>Trabalho</th><th>Erro</th><th></th></tr></thead>
+      <tbody>
+        <% failed.forEach(function (j) { %>
+        <tr>
+          <td class="mono nowrap"><%= fmt.formatDateTime(j.finished_at) %></td>
+          <td><strong><%= jobLabel[j.kind] || j.kind %></strong><div class="small muted mono"><%= j.episode_id ? 'EPISÓDIO ' + j.episode_id : '' %><%= j.ref_id ? ' REF ' + j.ref_id : '' %> · <%= j.attempts %>/<%= j.max_attempts %></div></td>
+          <td class="small"><%= j.error %></td>
+          <td class="actions"><form method="post" action="/gestao/sistema/trabalhos/<%= j.id %>/repetir" class="inline"><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw') %> Tentar de novo</button></form></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

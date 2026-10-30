@@ -1,0 +1,180 @@
+<%- include('../partials/head') %>
+<%
+  var ST = { enviando: ['b-amber', 'enviando'], processando: ['b-amber', 'lendo o vídeo'], pronto: ['b-green', 'pronto'], erro: ['b-red', 'erro'] }[clip.status];
+  var PUB = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-amber', 'agendado'], publicado: ['b-green', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] };
+  var UP = uploadPost.PLATFORMS;
+  var ready = clip.status === 'pronto';
+  var chosen = covers.find(function (x) { return x.id === clip.cover_id; });
+  var epLabel = function (e) { return (e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '') + e.title; };
+  var boxes = [];
+  Object.keys(UP).forEach(function (key) {
+    if (!UP[key].clip) return;
+    var acc = social && social.platforms[key];
+    var linked = !social || (acc ? !acc.reauth : !social.ok); // reconectar também bloqueia: o envio falharia
+    boxes.push({ key: key, label: UP[key].clipLabel || UP[key].label, linked: linked, reauth: Boolean(acc && acc.reauth), checked: uploadPost.DEFAULTS.clip.indexOf(key) >= 0 && linked, handle: acc ? acc.handle : '' });
+  });
+%>
+<div class="page-head" data-cortes data-single="<%= clip.id %>" data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
+  <div>
+    <span class="kicker">Corte · <%= episode ? epLabel(episode) : 'sem episódio ainda' %></span>
+    <h1><%= clip.title %> <span class="badge <%= ST[0] %>" data-clip-badge><%= ST[1] %></span></h1>
+    <p class="handle muted"><%= clip.duration_ms ? fmt.formatClock(clip.duration_ms) : '—' %><%= clip.width ? ' · ' + clip.width + '×' + clip.height : '' %><%= clip.size_bytes ? ' · ' + fmt.formatBytes(clip.size_bytes) : '' %><%= clip.filename ? ' · ' + clip.filename : '' %></p>
+  </div>
+  <div class="row">
+    <a class="btn ghost" href="/conteudo<%= episode ? '?episodio=' + episode.id : '' %>"><%- icon('arrow-left') %> Conteúdo</a>
+    <% if (episode) { %><a class="btn" href="/episodios/<%= episode.id %>">Episódio</a><% } %>
+    <% if (ready) { %><a class="btn" href="/cortes/<%= clip.id %>/video?baixar=1"><%- icon('download') %> Baixar</a><% } %>
+  </div>
+</div>
+
+<% if (clip.status === 'enviando' || clip.status === 'processando') { %>
+<section class="card"><div class="bar"><i data-clip-bar data-w="0"></i></div><p class="small muted" data-clip-msg><%= clip.status === 'enviando' ? 'Enviando…' : 'Lendo o vídeo, a fala e os quadros. Leva alguns minutos.' %></p></section>
+<% } %>
+<% if (clip.status === 'erro') { %><section class="card"><p class="err"><%= clip.error %></p></section><% } %>
+<% if (clip.note) { %><p class="notice small"><%= clip.note %></p><% } %>
+
+<div class="grid-2 align-start top-gap" data-clip="<%= clip.id %>">
+  <div class="stack-lg">
+    <% if (ready) { %>
+    <section class="card">
+      <h2>Vídeo e capa</h2>
+      <div class="clip-media">
+        <video controls preload="metadata" playsinline src="/cortes/<%= clip.id %>/video#t=0.1"></video>
+        <div>
+          <p class="kicker">Capa<%= covers.length ? '' : ' (ainda sem sugestões)' %></p>
+          <div class="clip-covers">
+            <% covers.forEach(function (cv) { %>
+            <form method="post" action="/cortes/<%= clip.id %>/capa" class="inline">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="cover_id" value="<%= cv.id %>">
+              <button type="<%= perm.cut ? 'submit' : 'button' %>" class="cover-pick <%= cv.id === clip.cover_id ? 'on' : '' %>" title="<%= cv.label %>" <%= perm.cut ? '' : 'disabled' %>>
+                <img src="/capas/<%= cv.id %>/imagem?v=<%= new Date(cv.updated_at).getTime() %>" alt="<%= cv.label %>" loading="lazy" width="108" height="192">
+                <span class="handle"><%= cv.id === clip.cover_id ? 'escolhida' : 'usar' %></span>
+              </button>
+            </form>
+            <% }) %>
+          </div>
+          <% if (chosen && perm.cut) { %><p class="row small"><a class="btn sm" href="/capas/<%= chosen.id %>/editar">Editar capa</a><span class="muted">Troque o quadro ou envie uma imagem sua.</span></p><% } %>
+        </div>
+      </div>
+    </section>
+    <% } %>
+
+    <% if (perm.cut) { %>
+    <section class="card">
+      <div class="row spread"><h2>Textos</h2><button class="btn sm" type="button" data-modal-open="modal-textos"><%- icon('pencil') %> Editar textos</button></div>
+      <dl class="kv">
+        <dt>Nome interno</dt><dd><%= clip.title %></dd>
+        <dt>Título nas redes</dt><dd><%= clip.post_title || '—' %></dd>
+        <dt>Legenda</dt><dd class="pre"><%= clip.caption || '—' %></dd>
+      </dl>
+      <% if (clip.transcript) { %><details class="top-gap"><summary>Transcrição</summary><p class="pre small"><%= clip.transcript %></p></details><% } %>
+    </section>
+    <% } else { %>
+    <section class="card"><h2>Textos</h2><dl class="kv"><dt>Título</dt><dd><%= clip.post_title || '—' %></dd><dt>Legenda</dt><dd class="pre"><%= clip.caption || '—' %></dd></dl></section>
+    <% } %>
+  </div>
+
+  <div class="stack-lg">
+    <section class="card">
+      <h2>Episódio</h2>
+      <% if (request) { %><p class="small"><span class="muted">Entrega do pedido:</span> <a href="/conteudo/pedidos/<%= request.id %>"><strong><%= request.title %></strong></a> <span class="badge <%= request.status === 'aprovado' ? 'b-st-pronto_publicar' : 'b-st-em_revisao' %>"><%= request.status === 'aprovado' ? 'aprovado' : 'aguardando aprovação' %></span></p><% } %>
+      <% if (episode) { %><p><a href="/episodios/<%= episode.id %>"><strong><%= epLabel(episode) %></strong></a><%= episode.guest_name ? ' · ' + episode.guest_name : '' %></p><% } else if (request) { %><p class="muted">Conteúdo avulso (sem episódio).</p><% } else { %><p class="muted">Este corte ainda não pertence a nenhum episódio.</p><% } %>
+      <% if (perm.cut && clip.status !== 'enviando' && episode) { %><button class="btn sm top-gap" type="button" data-modal-open="modal-episodio">Mudar de episódio</button><% } %>
+      <% if (perm.cut && clip.status !== 'enviando') { %>
+      <% if (episode) { %><dialog class="modal" id="modal-episodio" aria-labelledby="mep-h"><h2 id="mep-h">Mudar de episódio</h2><% } %>
+      <form method="post" action="/cortes/<%= clip.id %>/atribuir" class="assign-row top-gap">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <select name="episode_id" aria-label="Episódio" required>
+          <option value="">Escolher episódio gravado…</option>
+          <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= episode && episode.id === e.id ? 'selected' : '' %>><%= epLabel(e) %></option><% }) %>
+        </select>
+        <button class="btn sm <%= episode ? '' : 'primary' %>" type="submit"><%= episode ? 'Mudar' : 'Atribuir' %></button>
+      </form>
+      <p class="small muted">Ao atribuir, as capas são refeitas com o nome do convidado e o número do episódio.</p>
+      <% if (episode) { %><div class="row modal-actions"><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div></dialog><% } %>
+      <% } %>
+    </section>
+
+    <% if (ready && perm.publish) { %>
+    <section class="card" id="publicar">
+      <h2>Publicar nas redes</h2>
+      <% if (request && request.status !== 'aprovado') { %><p class="muted">Publica depois que a entrega do pedido for aprovada.</p>
+      <% } else if (!episode && !request) { %><p class="muted">Atribua o corte a um episódio antes de publicar.</p>
+      <% } else { %>
+      <p class="small muted">Escolha as redes, o texto e o horário na janela. <%= perm.direct ? '' : 'O post vai para a revisão da gestão antes de sair.' %></p>
+      <button class="btn <%= publications.length ? '' : 'primary' %>" type="button" data-modal-open="modal-publicar"><%- icon('send') %> <%= perm.direct ? 'Publicar nas redes' : 'Pedir publicação' %></button>
+      <dialog class="modal modal-wide" id="modal-publicar" aria-labelledby="mpub-h">
+      <h2 id="mpub-h">Publicar nas redes</h2>
+      <% if (!uploadLive) { %><p class="notice small">Modo de teste <%= locals.testAt || '' %>: o que sair por aí é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
+      <% if (social && !social.ok) { %><p class="notice small">Não consegui consultar as redes conectadas: <%= social.error %></p><% } %>
+      <form method="post" action="/cortes/<%= clip.id %>/publicar" class="stack" data-busy="Enviando…">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <fieldset class="channels"><legend>Redes</legend>
+          <% boxes.forEach(function (p) { %>
+          <label class="check <%= p.linked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="<%= p.key %>" <%= p.checked ? 'checked' : '' %> <%= p.linked ? '' : 'disabled' %>> <%= p.label %><% if (p.handle) { %> <span class="handle muted"><%= p.handle %></span><% } %><% if (!p.linked) { %> <span class="handle <%= p.reauth ? 'bad-text' : 'muted' %>"><%= p.reauth ? 'reconectar' : 'não conectado' %></span><% } %></label>
+          <% }) %>
+        </fieldset>
+        <%- include('../partials/ig-people', { episodeId: clip.episode_id, photo: false }) %>
+        <label>Título <small class="counter" data-counter-for="pub_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" id="pub_title" name="title" data-ai="titulo" data-ai-clip="<%= clip.id %>" value="<%= clip.post_title || clip.title %>" maxlength="100"></label>
+        <label>Legenda <small class="counter" data-counter-for="pub_desc" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea id="pub_desc" name="description" data-ai="descricao" data-ai-clip="<%= clip.id %>" rows="5"><%= clip.caption || '' %></textarea></label>
+        <label>Agendar (opcional, horário de Brasília)<input type="datetime-local" name="agendar"></label>
+        <% if (perm.direct) { %>
+        <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas.</label>
+        <div class="row modal-actions"><button class="btn primary" type="submit"><%= uploadLive ? 'Publicar' : 'Montar pedido (modo de teste)' %></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+        <% } else { %>
+        <p class="small muted">Vai para a revisão da gestão antes de sair.</p>
+        <div class="row modal-actions"><button class="btn primary" type="submit">Enviar para revisão</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+        <% } %>
+      </form>
+      </dialog>
+      <% } %>
+      <% if (publications.length) { %>
+      <ul class="pubs">
+        <% publications.forEach(function (p) { var b = p.retry_at && PUB[p.status] ? ['b-amber', 'nova tentativa às ' + fmt.formatSoon(p.retry_at)] : (PUB[p.status] || ['b-gray', p.status]); %>
+        <li>
+          <div class="row"><span class="badge <%= b[0] %>"><%= b[1] %></span><strong><%= p.platforms.map(function (k) { return UP[k] ? (UP[k].clipLabel || UP[k].label) : k; }).join(', ') %></strong><span class="handle muted"><%= p.scheduled_at && p.status === 'agendado' ? 'para ' + fmt.formatDateTime(p.scheduled_at) : fmt.formatDateTime(p.created_at) %></span></div>
+          <% (p.results || []).forEach(function (r) { %><p class="small <%= r.ok || r.retry_at ? '' : 'err' %>"><%= UP[r.platform] ? UP[r.platform].label : r.platform %>: <%= r.simulated ? 'simulado, nada enviado' : (r.ok ? (r.url ? '' : (r.note || 'ok')) : (r.hint || r.error || r.status)) %><% if (r.url && /^https?:\/\//.test(r.url)) { %> <a href="<%= r.url %>" target="_blank" rel="noopener">abrir publicação</a><% } %></p><% }) %>
+          <% if (p.error && !(p.results || []).some(function (r) { return r.hint; })) { %><p class="small err"><%= p.error %></p><% } %>
+          <p class="row small">
+            <a href="/social/publicacoes/<%= p.id %>">ver no Social</a>
+            <% if (p.status === 'enviando') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
+            <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/repetir" class="inline" data-busy="enviando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.retry_at ? 'reenviar agora' : p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
+            <% if (p.status === 'agendado') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
+          </p>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+    </section>
+    <% } %>
+
+    <% if (perm.cut) { %>
+    <section class="card">
+      <h2>Ações</h2>
+      <div class="row">
+        <% if (clip.status === 'pronto' || clip.status === 'erro') { %>
+        <form method="post" action="/cortes/<%= clip.id %>/reprocessar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit">Ler de novo</button></form>
+        <% } %>
+        <form method="post" action="/cortes/<%= clip.id %>/excluir" class="inline" data-confirm="Excluir este corte, as capas e o vídeo?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger" type="submit">excluir corte</button></form>
+      </div>
+      <p class="small muted">"Ler de novo" refaz fala, quadros, título e capas (usa a IA).</p>
+    </section>
+    <% } %>
+  </div>
+</div>
+<% if (perm.cut) { %>
+<dialog class="modal modal-wide" id="modal-textos" aria-labelledby="mtx-h">
+  <h2 id="mtx-h">Editar textos</h2>
+      <form method="post" action="/cortes/<%= clip.id %>" class="stack">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label>Nome interno<input type="text" name="title" value="<%= clip.title %>" maxlength="80"></label>
+        <label>Título para as redes <small class="counter" data-counter-for="post_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" name="post_title" data-ai="titulo" data-ai-clip="<%= clip.id %>" value="<%= clip.post_title || '' %>" maxlength="100"></label>
+        <label>Legenda <small class="counter" data-counter-for="caption" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea name="caption" rows="6" data-ai="descricao" data-ai-clip="<%= clip.id %>"><%= clip.caption || '' %></textarea></label>
+        <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+      </form>
+</dialog>
+<% } %>
+<div class="top-gap"><%- include('../partials/comments', { type: 'clip', id: clip.id, items: comments, back: '/cortes/' + clip.id }) %></div>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/ai-assist') %>
+<%- include('../partials/foot') %>

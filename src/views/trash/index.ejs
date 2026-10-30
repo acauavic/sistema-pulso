@@ -1,0 +1,43 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker"><%= all ? 'Gestão' : 'Fica ' + DAYS + ' dias' %></span><h1>Lixeira</h1></div></div>
+<% if (all) { %><%- include('../partials/gestao-nav', { active: 'lixeira' }) %><% } %>
+<p class="lead">O que se apaga no sistema fica aqui por <%= DAYS %> dias e volta do jeito que estava, com comentários, imagens e arquivos. Depois disso sai de vez.<%= all ? '' : ' Aqui aparece o que você apagou.' %></p>
+
+<% var shown = Object.keys(GROUPS).filter(function (k) { return counts[k]; }); var q = function (tipo, de) { var p = []; if (tipo) p.push('tipo=' + tipo); if (de) p.push('de=mim'); return '/lixeira' + (p.length ? '?' + p.join('&') : ''); }; %>
+<% if (total && (shown.length > 1 || all)) { %>
+<div class="board-filter">
+  <% if (shown.length > 1) { %>
+  <div class="seg" role="group" aria-label="Filtrar a lixeira">
+    <a class="<%= group ? '' : 'on' %>" href="<%= q('', all && mine) %>">Tudo <span class="mono"><%= total %></span></a>
+    <% shown.forEach(function (k) { %><a class="<%= group === k ? 'on' : '' %>" href="<%= q(k, all && mine) %>"><%= GROUPS[k].label %> <span class="mono"><%= counts[k] %></span></a><% }) %>
+  </div>
+  <% } %>
+  <% if (all) { %><a class="link small" href="<%= q(group, !mine) %>"><%= mine ? 'Ver o que todos apagaram' : 'Só o que eu apaguei' %></a><% } %>
+</div>
+<% } %>
+
+<% if (!items.length) { %>
+<div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong><%= total ? 'Nada deste tipo na lixeira.' : 'A lixeira está vazia.' %></strong></p><p class="muted small">Ao apagar um corte, um post, um pedido, um episódio ou um cadastro, ele fica aqui por <%= DAYS %> dias. Logo depois de apagar, o aviso no topo da página também tem o botão Desfazer.</p></div>
+<% } else { %>
+<div class="req-list top-gap">
+  <% items.forEach(function (t) { var left = daysLeft(t); %>
+  <div class="req-row trash-row">
+    <span>
+      <span class="ktype mono small muted"><%= KINDS[t.kind] ? KINDS[t.kind].label : t.kind %><%= t.context ? ' · ' + t.context : '' %></span><br>
+      <strong><%= t.title %></strong>
+      <span class="meta"><span><%- icon('trash-2', 12) %><%= t.deleted_by_name || 'sistema' %> · <%= fmt.formatDateTime(t.deleted_at) %></span><% if (t.files) { %><span><%= t.files %> arquivo<%= t.files > 1 ? 's' : '' %></span><% } %></span>
+    </span>
+    <span class="row trash-actions">
+      <span class="badge <%= left <= 2 ? 'b-amber' : 'b-gray' %>" title="Sai de vez em <%= fmt.formatDateTime(t.purge_after) %>"><%= left <= 0 ? 'sai hoje' : left === 1 ? 'sai amanhã' : left + ' dias' %></span>
+      <% if (canRestore(t)) { %>
+      <form method="post" action="/lixeira/<%= t.id %>/restaurar" class="inline" data-busy="Restaurando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('rotate-ccw', 14) %> Restaurar</button></form>
+      <% } %>
+      <% if (all) { %>
+      <form method="post" action="/lixeira/<%= t.id %>/apagar" class="inline" data-confirm="Apagar de vez “<%= t.title %>”? Os arquivos saem do armazenamento e não há como voltar."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentPath %><%= group ? '?tipo=' + group : '' %>"><button class="link small err" type="submit">apagar de vez</button></form>
+      <% } %>
+    </span>
+  </div>
+  <% }) %>
+</div>
+<% } %>
+<%- include('../partials/foot') %>

@@ -1,54 +1,141 @@
 <%- include('../partials/head') %>
-<div class="page-head"><div><span class="kicker">Convidados · CRM</span><h1><%= guest ? 'Editar convidado' : 'Novo convidado' %></h1></div></div>
+<%
+  var stageOf = function (stages) { return stages.split(' ').indexOf(values.status) >= 0 ? '' : 'hidden'; };
+  var PLANNING = 'em_agendamento agendado gravado';
+  var dt = typeof values.proposed_at === 'string' ? values.proposed_at : fmt.toInputValue(values.proposed_at);
+  var hasAbout = values.gender === 'f' || values.is_plural || values.invite_reason || values.company || values.job_title || values.positioning || values.topic || values.bio || values.notes;
+  var stageOpen = Boolean(error || (typeof notice !== 'undefined' && notice) || (guest && values.status !== guest.status));
+  var curStatus = (statuses.find(function (s) { return s.key === values.status; }) || {}).label;
+%>
+<div class="page-head"><div><span class="kicker">Convidados · CRM</span><h1><%= guest ? 'Editar ' + guest.name : 'Novo convidado' %></h1></div></div>
 <div class="card form-card wide">
   <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
-  <form method="post" action="<%= guest ? '/convidados/' + guest.id : '/convidados' %>" class="stack">
+  <% if (typeof notice !== 'undefined' && notice) { %><div class="flash flash-error"><%= notice %> Complete abaixo e salve.</div><% } %>
+  <form method="post" action="<%= guest ? '/convidados/' + guest.id : '/convidados' %>" class="stack" data-guest-form>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+    <h2 class="form-section">Cadastro</h2>
     <label>Nome * <small class="muted">(como aparece no convite; para dupla: "Dr. João e Dra. Maria")</small>
       <input type="text" name="name" value="<%= values.name || '' %>" maxlength="150" required autofocus>
     </label>
     <div class="grid-2 tight">
-      <label>Gênero (flexiona “convidado/convidada”)
-        <select name="gender">
-          <option value="m" <%= values.gender !== 'f' ? 'selected' : '' %>>Masculino</option>
-          <option value="f" <%= values.gender === 'f' ? 'selected' : '' %>>Feminino</option>
+      <label>Instagram *
+        <input type="text" name="instagram" value="<%= values.instagram || '' %>" maxlength="120" placeholder="@usuario" required>
+      </label>
+      <label>Perfil *
+        <select name="profile" required>
+          <option value="">Escolha…</option>
+          <% profiles.forEach(function (p) { %><option value="<%= p.key %>" <%= values.profile === p.key ? 'selected' : '' %>><%= p.label %></option><% }) %>
         </select>
       </label>
-      <label class="check"><input type="checkbox" name="is_plural" value="1" <%= values.is_plural ? 'checked' : '' %>> Convite para uma dupla (plural)</label>
-      <label>E-mail<input type="email" name="email" value="<%= values.email || '' %>" maxlength="254"></label>
-      <label>WhatsApp / telefone<input type="text" name="phone" value="<%= values.phone || '' %>" maxlength="40"></label>
-      <label>Instagram<input type="text" name="instagram" value="<%= values.instagram || '' %>" maxlength="80" placeholder="sem @"></label>
-      <label>Empresa / projeto<input type="text" name="company" value="<%= values.company || '' %>" maxlength="150"></label>
-      <label>Cargo / ocupação<input type="text" name="job_title" value="<%= values.job_title || '' %>" maxlength="150"></label>
-    </div>
-    <label>Tema / pauta do episódio<input type="text" name="topic" value="<%= values.topic || '' %>" maxlength="300"></label>
-    <label>Mini bio<textarea name="bio" rows="3" maxlength="2000"><%= values.bio || '' %></textarea></label>
-    <div class="grid-2 tight">
-      <label>Data e hora sugeridas da gravação
-        <input type="datetime-local" name="proposed_at" value="<%= typeof values.proposed_at === 'string' ? values.proposed_at : fmt.toInputValue(values.proposed_at) %>">
-      </label>
+      <label>WhatsApp <small class="muted">(opcional)</small><input type="text" name="phone" value="<%= values.phone || '' %>" maxlength="40"></label>
+      <label>E-mail <small class="muted">(opcional)</small><input type="email" name="email" value="<%= values.email || '' %>" maxlength="254"></label>
       <label>Responsável
         <select name="owner_id">
           <option value="">— ninguém —</option>
           <% owners.forEach(function (o) { %><option value="<%= o.id %>" <%= values.owner_id === o.id ? 'selected' : '' %>><%= o.name %></option><% }) %>
         </select>
       </label>
-      <label>Modelo de convite
-        <select name="template_id">
-          <option value="">Modelo padrão</option>
-          <% templates.forEach(function (t) { %><option value="<%= t.id %>" <%= Number(values.template_id) === t.id ? 'selected' : '' %>><%= t.name %><%= t.is_default ? ' (padrão)' : '' %></option><% }) %>
-        </select>
-      </label>
-      <label>Etapa
-        <select name="status">
-          <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= values.status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
-        </select>
-      </label>
     </div>
-    <label>Observações internas<textarea name="notes" rows="3" maxlength="4000"><%= values.notes || '' %></textarea></label>
+
+    <details <%= hasAbout ? 'open' : '' %>>
+      <summary>Sobre <%= guest ? 'o convidado' : 'o convidado (opcional)' %></summary>
+      <div class="stack">
+        <div class="grid-2 tight">
+          <label>Empresa / projeto<input type="text" name="company" value="<%= values.company || '' %>" maxlength="150"></label>
+          <label>Cargo / ocupação<input type="text" name="job_title" value="<%= values.job_title || '' %>" maxlength="150"></label>
+          <label>Gênero <small class="muted">(flexiona “convidado/convidada”)</small>
+            <select name="gender">
+              <option value="m" <%= values.gender !== 'f' ? 'selected' : '' %>>Masculino</option>
+              <option value="f" <%= values.gender === 'f' ? 'selected' : '' %>>Feminino</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" name="is_plural" value="1" <%= values.is_plural ? 'checked' : '' %>> Convite para uma dupla (plural)</label>
+        </div>
+        <label>Motivo do convite<textarea name="invite_reason" rows="2" maxlength="1000"><%= values.invite_reason || '' %></textarea></label>
+        <label>Posicionamento<textarea name="positioning" rows="2" maxlength="1000"><%= values.positioning || '' %></textarea></label>
+        <label>Temas<textarea name="topic" rows="2" maxlength="500" placeholder="Temas que vamos abordar"><%= values.topic || '' %></textarea></label>
+        <label>Biografia resumida<textarea name="bio" rows="3" maxlength="2000"><%= values.bio || '' %></textarea></label>
+        <label>Observações internas<textarea name="notes" rows="3" maxlength="4000"><%= values.notes || '' %></textarea></label>
+      </div>
+    </details>
+
+    <div class="stack" data-agenda data-stages="<%= PLANNING %>" <%= stageOf(PLANNING) %>>
+      <h2 class="form-section">Gravação</h2>
+      <label>Data e hora da gravação
+        <input type="datetime-local" name="proposed_at" value="<%= dt %>" data-agenda-date>
+      </label>
+      <p class="agenda-summary" data-agenda-summary <%= dt ? '' : 'hidden' %>>
+        <span data-agenda-state></span>
+        <button class="link small" type="button" data-agenda-review>Revisar confirmações</button>
+      </p>
+      <dialog class="modal" data-agenda-dialog aria-labelledby="m-confirm-h">
+        <div class="stack">
+          <h2 id="m-confirm-h">Confirmar a data</h2>
+          <p class="mono" data-agenda-when></p>
+          <p class="small muted">A data está acertada com quem? Com as três confirmações o convidado vai para Agendado ao salvar e o episódio entra na produção.</p>
+          <fieldset class="stack confirm-list">
+            <legend>Data acertada com</legend>
+            <label class="check"><input type="checkbox" name="scheduled_studio" value="1" data-agenda-check="estúdio" <%= values.scheduled_studio ? 'checked' : '' %>> Estúdio</label>
+            <label class="check"><input type="checkbox" name="scheduled_hosts" value="1" data-agenda-check="hosts" <%= values.scheduled_hosts ? 'checked' : '' %>> Hosts</label>
+            <label class="check"><input type="checkbox" name="scheduled_guest" value="1" data-agenda-check="convidado" <%= values.scheduled_guest ? 'checked' : '' %>> Convidado</label>
+          </fieldset>
+          <div class="row modal-actions">
+            <button class="btn primary" type="button" data-agenda-ok>Confirmar</button>
+            <button class="btn ghost" type="button" data-modal-close>Ainda não</button>
+          </div>
+        </div>
+      </dialog>
+    </div>
+
+    <details <%= values.sponsor_id ? 'open' : '' %>>
+      <summary>Ligado a um patrocinador<%= values.sponsor_id ? '' : ' (opcional)' %></summary>
+      <div class="stack">
+        <p class="small muted">Para episódio patrocinado com alguém do patrocinador ou indicado por ele. A gravação já fica reservada para o patrocinador e entra no portal dele.</p>
+        <div class="grid-2 tight">
+          <label>Patrocinador
+            <select name="sponsor_id">
+              <option value="">— nenhum —</option>
+              <% sponsors.forEach(function (sp) { %><option value="<%= sp.id %>" <%= String(values.sponsor_id) === String(sp.id) ? 'selected' : '' %>><%= sp.company %></option><% }) %>
+            </select>
+          </label>
+          <label>Quem é
+            <select name="sponsor_relation">
+              <option value="indicado" <%= values.sponsor_relation !== 'representante' ? 'selected' : '' %>>Indicado pelo patrocinador</option>
+              <option value="representante" <%= values.sponsor_relation === 'representante' ? 'selected' : '' %>>Pessoa do patrocinador</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </details>
+
+    <details <%= stageOpen ? 'open' : '' %>>
+      <summary>Etapa: <span data-stage-label><%= curStatus %></span><%= guest ? '' : ' (mude só se o convidado já estiver mais adiante)' %></summary>
+      <div class="stack">
+        <label>Etapa
+          <select name="status" data-stage-select>
+            <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= values.status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
+          </select>
+        </label>
+        <div class="stack" data-stages="perdido" <%= stageOf('perdido') %>>
+          <label>Motivo da perda
+            <select name="loss_reason" data-loss-select>
+              <option value="">Escolha o motivo</option>
+              <% Object.keys(lossReasons).forEach(function (k) { %><option value="<%= k %>" <%= values.loss_reason === k ? 'selected' : '' %>><%= lossReasons[k] %></option><% }) %>
+            </select>
+          </label>
+          <label data-loss-note <%= values.loss_reason === 'outros' ? '' : 'hidden' %>>Qual o motivo?<input type="text" name="loss_note" maxlength="500" value="<%= values.loss_note || '' %>"></label>
+        </div>
+        <% Object.keys(stageHints).forEach(function (key) { %>
+        <p class="stage-hint small" data-hint-for="<%= key %>" <%= values.status === key ? '' : 'hidden' %>><%- icon('info', 14) %> <%= stageHints[key] %></p>
+        <% }) %>
+        <p class="small muted">No dia a dia, a etapa anda pelos botões de "Próximo passo" na página do convidado.</p>
+      </div>
+    </details>
+
     <div class="row">
       <button class="btn primary" type="submit">Salvar</button>
-      <a class="btn" href="<%= guest ? '/convidados/' + guest.id : '/convidados' %>">Cancelar</a>
+      <a class="btn ghost" href="<%= guest ? '/convidados/' + guest.id : '/convidados' %>">Cancelar</a>
     </div>
   </form>
 </div>

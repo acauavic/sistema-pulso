@@ -1,0 +1,109 @@
+<%- include('../partials/head') %>
+<%
+  var v = values;
+  var checked = function (name, val) { return String(v[name] || '') === String(val) ? 'checked' : ''; };
+  var sel = function (name, val) { return String(v[name] || '') === String(val) ? 'selected' : ''; };
+  var agendados = guests.filter(function (g) { return g.status === 'agendado'; });
+  var outros = guests.filter(function (g) { return g.status !== 'agendado'; });
+%>
+<div class="page-head"><div><span class="kicker">Episódios</span><h1>Registrar episódio gravado</h1></div></div>
+<div class="card form-card wide">
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <p class="muted">O episódio nasce quando a conversa é gravada. Gravações marcadas ficam na agenda do convidado; aqui você registra o que já foi gravado.</p>
+  <form method="post" action="/episodios" class="stack" data-when-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+    <h2 class="form-section">Quem sentou à mesa</h2>
+    <div class="choice-row" role="radiogroup" aria-label="Quem sentou à mesa">
+      <label class="choice"><input type="radio" name="origem" value="convidado" <%= checked('origem', 'convidado') %>><span><strong>Convidado do CRM</strong><small class="muted">já cadastrado</small></span></label>
+      <label class="choice"><input type="radio" name="origem" value="novo_convidado" <%= checked('origem', 'novo_convidado') %>><span><strong>Convidado novo</strong><small class="muted">cadastrar agora</small></span></label>
+      <label class="choice"><input type="radio" name="origem" value="hosts" <%= checked('origem', 'hosts') %>><span><strong>Só os hosts</strong><small class="muted">episódio de patrocinador</small></span></label>
+    </div>
+
+    <div data-when="origem=convidado">
+      <label>Convidado
+        <select name="guest_id">
+          <option value="">Escolha…</option>
+          <% if (agendados.length) { %><optgroup label="Agendados"><% agendados.forEach(function (g) { %><option value="<%= g.id %>" <%= sel('guest_id', g.id) %>><%= g.name %></option><% }) %></optgroup><% } %>
+          <% if (outros.length) { %><optgroup label="Outros"><% outros.forEach(function (g) { %><option value="<%= g.id %>" <%= sel('guest_id', g.id) %>><%= g.name %> · <%= guestStatuses[g.status].label %></option><% }) %></optgroup><% } %>
+        </select>
+      </label>
+      <p class="small muted top-gap">O convidado passa para Gravado. Reservas de patrocinador feitas para essa gravação viram vínculo do episódio.</p>
+    </div>
+
+    <div class="grid-2 tight" data-when="origem=novo_convidado">
+      <label>Nome<input type="text" name="guest_name" value="<%= v.guest_name || '' %>" maxlength="150"></label>
+      <label>Instagram<input type="text" name="guest_instagram" value="<%= v.guest_instagram || '' %>" maxlength="120" placeholder="@usuario"></label>
+      <label>Perfil
+        <select name="guest_profile">
+          <option value="">Escolha…</option>
+          <% profiles.forEach(function (p) { %><option value="<%= p.key %>" <%= sel('guest_profile', p.key) %>><%= p.label %></option><% }) %>
+        </select>
+      </label>
+      <label>Ligação com o patrocinador
+        <select name="relacao">
+          <option value="">Nenhuma</option>
+          <option value="representante" <%= sel('relacao', 'representante') %>>Pessoa do patrocinador</option>
+          <option value="indicado" <%= sel('relacao', 'indicado') %>>Indicado pelo patrocinador</option>
+        </select>
+      </label>
+    </div>
+
+    <h2 class="form-section">Patrocínio <small class="muted" data-when="origem=convidado novo_convidado">(opcional)</small></h2>
+    <div class="grid-2 tight">
+      <label>Patrocinador
+        <select name="patrocinador">
+          <option value="" data-when="origem=convidado novo_convidado">Sem patrocinador</option>
+          <option value="" data-when="origem=hosts">Escolha o patrocinador…</option>
+          <% sponsors.forEach(function (sp) { %><option value="<%= sp.id %>" <%= sel('patrocinador', sp.id) %>><%= sp.company %></option><% }) %>
+          <option value="novo" <%= sel('patrocinador', 'novo') %>>+ Cadastrar patrocinador</option>
+        </select>
+      </label>
+      <label data-when="patrocinador!=">Papel no episódio
+        <select name="papel">
+          <option value="exclusivo" <%= sel('papel', 'exclusivo') %>>Episódio exclusivo</option>
+          <option value="insercao" <%= sel('papel', 'insercao') %>>Inserção</option>
+        </select>
+      </label>
+    </div>
+    <div class="grid-2 tight" data-when="patrocinador=novo">
+      <label>Nome da empresa<input type="text" name="sponsor_company" value="<%= v.sponsor_company || '' %>" maxlength="150"></label>
+      <label>Tipo
+        <select name="sponsor_kind">
+          <option value="">Escolha…</option>
+          <% Object.keys(kinds).forEach(function (k) { %><option value="<%= k %>" <%= sel('sponsor_kind', k) %>><%= kinds[k] %></option><% }) %>
+        </select>
+      </label>
+      <p class="small muted">Entra em Em negociação; cota, valor e responsável você completa na página dele.</p>
+    </div>
+
+    <h2 class="form-section">Episódio</h2>
+    <div class="grid-2 tight">
+      <label>Gravado em<input type="date" name="recorded_on" value="<%= v.recorded_on || '' %>"></label>
+      <label>Número (EP.)<input type="number" name="number" min="1" max="99999" value="<%= v.number || '' %>"></label>
+    </div>
+    <label>Título <small class="muted">(vazio: “Conversa com …”)</small><input type="text" name="title" value="<%= v.title || '' %>" maxlength="200"></label>
+    <% if (locals.pedidoRoutines && pedidoRoutines.length) { var marked = v.pedir_ok ? [].concat(v.pedir || []).map(String) : null; %>
+    <fieldset class="kind-pick">
+      <legend class="field-label">Pedir ao editor junto com o episódio</legend>
+      <input type="hidden" name="pedir_ok" value="1">
+      <div class="chips-radio">
+        <% pedidoRoutines.forEach(function (r) { var on = marked ? marked.indexOf(String(r.id)) >= 0 : r.default_on; %><label class="chip-radio"><input type="checkbox" name="pedir" value="<%= r.id %>" <%= on ? 'checked' : '' %>><span><%= r.title %><% if (r.priority) { %>&nbsp;<small class="mono muted">PRIORIDADE</small><% } %></span></label><% }) %>
+      </div>
+      <p class="small muted">Cada um vira um pedido de conteúdo para o editor, com prazo e responsável de Gestão &gt; Rotinas. A entrega sobe aqui no sistema. Os cortes chegam aos poucos e cada um já vai para o Social.</p>
+    </fieldset>
+    <% } %>
+    <details>
+      <summary>Mais detalhes</summary>
+      <div class="stack">
+        <label>Data de veiculação prevista<input type="date" name="aired_on" value="<%= v.aired_on || '' %>"></label>
+        <label>Observações<textarea name="notes" rows="3" maxlength="2000"><%= v.notes || '' %></textarea></label>
+      </div>
+    </details>
+    <div class="row">
+      <button class="btn primary" type="submit">Registrar episódio</button>
+      <a class="btn ghost" href="/episodios">Cancelar</a>
+    </div>
+  </form>
+</div>
+<%- include('../partials/foot') %>

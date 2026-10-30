@@ -1,0 +1,36 @@
+<%# Cartão de um corte. Variáveis: c, perm, csrf, episodes, fmt; pick: marcável para as ações em massa (Conteúdo > Cortes) %>
+<% var st = { enviando: ['b-amber', 'enviando'], processando: ['b-amber', 'lendo'], pronto: ['b-st-pronto_publicar', 'pronto para postar'], erro: ['b-red', 'erro'] }[c.status];
+   if (c.status === 'pronto' && c.pub) st = c.pub.stage === 'publicado' ? ['b-st-publicado', 'publicado'] : ['b-st-agendado', c.pub.label];
+   if (c.status === 'pronto' && !c.episode_id && !c.request_id) st = ['b-gray', 'sem episódio'];
+   var chosen = c.covers.find(function (x) { return x.id === c.cover_id; }) || c.covers[0]; %>
+<% var pick = typeof pick !== 'undefined' && pick; %>
+<article class="clip-card" data-clip="<%= c.id %>"<% if (pick) { %> data-dl-item data-id="<%= c.id %>"<% if (c.status === 'pronto' && c.storage_key) { %> data-href="/cortes/<%= c.id %>/video?baixar=1" data-name="<%= c.title %>.mp4" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %><% } %>>
+  <% if (pick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.title %>"><% } %>
+  <a class="clip-poster" href="/cortes/<%= c.id %>" aria-label="Abrir <%= c.title %>"<%- pick ? ' data-dl-pick' : '' %>>
+    <% if (chosen) { %><img src="/capas/<%= chosen.id %>/imagem?v=<%= new Date(chosen.updated_at).getTime() %>" alt="Capa de <%= c.title %>" loading="lazy" width="108" height="192"><% } else { %><span class="poster-empty"><%- icon('film', 28) %></span><% } %>
+  </a>
+  <div class="clip-body">
+    <div class="row spread"><a href="/cortes/<%= c.id %>"><strong><%= c.title %></strong></a><span class="badge <%= st[0] %>" data-clip-badge><%= st[1] %></span></div>
+    <p class="handle muted">
+      <%= c.duration_ms ? fmt.formatClock(c.duration_ms) : '—' %><%= c.width ? ' · ' + c.width + '×' + c.height : '' %><%= c.size_bytes ? ' · ' + fmt.formatBytes(c.size_bytes) : '' %>
+    </p>
+    <% if (c.post_title) { %><p class="small"><%= c.post_title %></p><% } %>
+    <% if (c.pub) { %><p class="handle muted"><%= c.pub.platforms.join(' · ') %></p><% } %>
+    <% if (c.request_id) { %><p class="small"><span class="muted">Pedido:</span> <a href="/conteudo/pedidos/<%= c.request_id %>"><%= c.request_title || 'ver pedido' %></a></p><% } %>
+    <% if (c.status === 'enviando' || c.status === 'processando') { %><div class="bar"><i data-clip-bar data-w="0"></i></div><p class="small muted" data-clip-msg><%= c.status === 'enviando' ? 'Enviando…' : 'Na fila…' %></p><% } %>
+    <% if (c.status === 'erro') { %><p class="small err"><%= c.error %></p><% } %>
+    <% if (c.episode_id) { %>
+      <p class="small"><span class="muted">Episódio:</span> <a href="/episodios/<%= c.episode_id %>"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.ep_title %></a></p>
+    <% } else if (c.request_id) { %>
+    <% } else if (perm.cut && c.status === 'pronto') { %>
+      <form method="post" action="/cortes/<%= c.id %>/atribuir" class="assign-row">
+        <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="lista">
+        <select name="episode_id" aria-label="Episódio de <%= c.title %>" required>
+          <option value="">Atribuir a um episódio…</option>
+          <% episodes.forEach(function (e) { %><option value="<%= e.id %>"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
+        </select>
+        <button class="btn sm" type="submit">Atribuir</button>
+      </form>
+    <% } else if (c.status === 'pronto') { %><p class="small muted">Sem episódio ainda.</p><% } %>
+  </div>
+</article>

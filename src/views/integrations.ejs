@@ -1,7 +1,138 @@
 <%- include('partials/head') %>
-<div class="page-head"><div><span class="kicker">Sistema · Conexões</span><h1>Integrações</h1></div></div>
+<div class="page-head"><div><span class="kicker">Gestão · Conexões</span><h1>Integrações</h1></div></div>
+<%- include('partials/gestao-nav', { active: 'integracoes' }) %>
 <p class="lead">Status das integrações. Por segurança, chaves e senhas nunca aparecem aqui — elas ficam nas variáveis de ambiente do servidor.</p>
 <div class="grid-2 tight">
+  <section class="card" id="redes">
+    <h2>Redes sociais (publicação)</h2>
+    <p class="small muted">Por onde saem os vídeos, cortes, posts e carrosséis. Insights, comentários, directs e automações continuam pelo Upload-Post.</p>
+    <form method="post" action="/integracoes/redes" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <span class="kicker">Provedor em uso</span>
+      <ul class="plain provider-list">
+        <% social.providers.forEach(function (p) { %>
+        <li>
+          <label class="check provider-pick"><input type="radio" name="provedor" value="<%= p.id %>" <%= social.active === p.id ? 'checked' : '' %> <%= p.configured ? '' : 'disabled' %>>
+            <strong><%= p.label %></strong>
+            <% if (!p.configured) { %><span class="badge b-gray">sem chave</span><% } %>
+            <% if (social.active === p.id) { %><span class="mono small muted">em uso</span><% } %>
+          </label>
+          <% if (!p.configured) { %><span class="small muted provider-hint">Defina <span class="mono"><%= p.env %></span> no servidor.</span><% } %>
+        </li>
+        <% }) %>
+      </ul>
+      <div class="row"><button class="btn" type="submit">Usar o escolhido</button></div>
+    </form>
+
+    <span class="kicker top-gap">Contas das redes</span>
+    <% social.problems.forEach(function (pr) { %><p class="conn-alert small" role="alert"><%- icon('unlink', 14) %> <span><strong><%= pr.text %>.</strong> Reconecte no <a href="<%= pr.dashboard %>" target="_blank" rel="noopener noreferrer">painel <%= pr.of %></a> e confira com "Verificar agora".</span></p><% }) %>
+    <% var inUseRows = social.accounts.filter(function (a) { return a.inUse; }); var otherRows = social.accounts.filter(function (a) { return !a.inUse; });
+       var chip = { ok: 'b-gray', reauth: 'b-red', sumiu: 'b-red', sem: 'b-amber' }; %>
+    <ul class="plain acct-list">
+      <% inUseRows.forEach(function (a) { %>
+      <li class="acct-row">
+        <span><strong><%= a.networkLabel %></strong><% if (a.handle) { %> <span class="mono small">@<%= String(a.handle).replace(/^@/, '') %></span><% } %><br><span class="mono small muted"><%= a.providerLabel.toUpperCase() %><%= a.since && a.status !== 'ok' ? ' · DESDE ' + fmt.formatDayShort(a.since).toUpperCase() : '' %></span></span>
+        <span class="acct-state"><span class="badge <%= chip[a.status] %>"><%= a.statusLabel %></span><% if (a.status !== 'ok') { %><a class="small" href="<%= a.dashboard %>" target="_blank" rel="noopener noreferrer"><%= a.status === 'sem' ? 'Conectar' : 'Reconectar' %></a><% } %></span>
+      </li>
+      <% }) %>
+      <% if (!inUseRows.length) { %><li class="small muted">Nenhuma conta conhecida ainda. Use "Verificar agora".</li><% } %>
+    </ul>
+    <% if (otherRows.length) { %><details class="provider-live"><summary class="small">Contas em provedores que não publicam essas redes <span class="mono muted"><%= otherRows.length %></span></summary>
+      <ul class="plain acct-list top-gap"><% otherRows.forEach(function (a) { %><li class="acct-row"><span><strong><%= a.networkLabel %></strong><% if (a.handle) { %> <span class="mono small">@<%= String(a.handle).replace(/^@/, '') %></span><% } %><br><span class="mono small muted"><%= a.providerLabel.toUpperCase() %></span></span><span class="badge <%= chip[a.status] %>"><%= a.statusLabel %></span></li><% }) %></ul>
+    </details><% } %>
+    <form method="post" action="/integracoes/redes/verificar" class="top-gap"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('refresh-cw', 14) %> Verificar agora</button> <span class="small muted">O painel também confere sozinho a cada 15 minutos e avisa a gestão quando uma conta cai.</span></form>
+
+    <span class="kicker top-gap">Cada rede por um provedor</span>
+    <p class="small m-0"><%= Object.keys(social.overrides).length ? Object.keys(social.overrides).map(function (n) { return social.networks[n] + ' sai ' + social.providers.filter(function (p) { return p.id === social.overrides[n]; }).map(function (p) { return p.by; })[0]; }).join('; ') + '. As demais saem pelo provedor em uso.' : 'Todas as redes saem pelo provedor em uso.' %></p>
+    <details class="provider-live">
+      <summary class="small">Mandar uma rede por outro provedor</summary>
+      <form method="post" action="/integracoes/redes/rotas" class="stack top-gap">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <ul class="plain route-list">
+          <% Object.keys(social.networks).forEach(function (n) { %>
+          <li><label for="rota-<%= n %>"><%= social.networks[n] %></label>
+            <select id="rota-<%= n %>" name="rota_<%= n %>">
+              <option value="padrao">Padrão (<%= social.providers.filter(function (p) { return p.id === social.active; })[0].label %>)</option>
+              <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %><option value="<%= p.id %>" <%= social.overrides[n] === p.id ? 'selected' : '' %>><%= p.label %></option><% }) %>
+            </select></li>
+          <% }) %>
+        </ul>
+        <p class="small muted m-0">Uma publicação para várias redes é dividida: cada provedor recebe só as redes dele. Conecte a conta da rede no painel do provedor escolhido antes de trocar.</p>
+        <div><button class="btn sm" type="submit">Salvar</button></div>
+      </form>
+    </details>
+
+    <span class="kicker top-gap">Publicar de verdade</span>
+    <ul class="plain provider-modes">
+      <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>
+      <li class="provider-mode">
+        <div class="provider-mode-head">
+          <strong><%= p.label %></strong>
+          <span class="badge <%= p.live ? 'b-green' : 'b-amber' %>"><%= p.live ? 'publica de verdade' : 'modo de teste' %></span>
+          <span class="mono small muted"><%= p.source === 'painel' ? 'definido aqui' : 'padrão do servidor (' + p.liveEnv + ')' %></span>
+        </div>
+        <% if (p.live) { %>
+        <form method="post" action="/integracoes/redes/modo" class="inline">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><input type="hidden" name="ligar" value="0">
+          <button class="btn sm" type="submit">Voltar ao modo de teste</button>
+        </form>
+        <% } else { %>
+        <p class="small muted m-0">No modo de teste o pedido é montado e conferido, mas nada sai para as redes<%= p.id === 'uploadpost' ? ' (nem as respostas das automações)' : '' %>.</p>
+        <details class="provider-live">
+          <summary class="small">Ligar a publicação de verdade</summary>
+          <form method="post" action="/integracoes/redes/modo" class="stack top-gap">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><input type="hidden" name="ligar" value="1">
+            <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi: o que for publicado <%= p.by %><%= p.id === 'uploadpost' ? ' e as respostas das automações' : '' %> sai nas redes conectadas.</label>
+            <div><button class="btn sm" type="submit">Ligar publicação de verdade</button></div>
+          </form>
+        </details>
+        <% } %>
+      </li>
+      <% }) %>
+    </ul>
+
+ <% if (social.providers.some(function (p) { return p.id === 'outstand' && p.configured; })) { %>
+    <span class="kicker top-gap">Opções da Outstand</span>
+    <form method="post" action="/integracoes/redes/outstand" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="chips-radio">
+        <label class="chip-radio"><input type="radio" name="modo" value="direto" <%= social.outstandTiktok === 'direto' ? 'checked' : '' %>><span>Publicar direto</span></label>
+        <label class="chip-radio"><input type="radio" name="modo" value="rascunho" <%= social.outstandTiktok === 'rascunho' ? 'checked' : '' %>><span>Enviar como rascunho</span></label>
+      </div>
+      <p class="small muted m-0">Direto: o vídeo vai ao ar na hora, se o TikTok liberar publicação pública para a conta (senão o painel avisa o motivo). Rascunho: cai na caixa do TikTok e quem publica termina no app, escolhendo legenda e privacidade; não depende de liberação do TikTok.</p>
+      <label class="check"><input type="checkbox" name="ajustar" value="1" <%= social.outstandProcess ? 'checked' : '' %>> Ajustar o vídeo para cada rede antes de publicar</label>
+      <p class="small muted m-0">A Outstand só refaz o arquivo se precisar (por exemplo, o Instagram recusa vídeo com "edit list") e cobra US$ 0,30 por minuto de vídeo refeito. Desligado, o vídeo vai exatamente como foi enviado e o painel mostra os avisos dela.</p>
+      <div><button class="btn sm" type="submit">Salvar</button></div>
+    </form>
+    <% } %>
+
+    <div class="row top-gap">
+      <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>
+      <form method="post" action="/integracoes/redes/testar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><button class="btn sm ghost" type="submit">Testar <%= p.label %> (só leitura)</button></form>
+      <% }) %>
+    </div>
+  </section>
+  <% if (storage) { %>
+  <section class="card" id="armazenamento">
+    <h2>Armazenamento (Backblaze)</h2>
+    <% var cors = storage.cors; %>
+    <p class="m-0"><span class="kicker">Envio direto do navegador</span><br>
+      <% if (!storage.direct) { %><span class="badge b-gray">desligado no servidor</span> <span class="mono small muted">UPLOAD_DIRECT=false</span>
+      <% } else if (cors.state === 'ligado') { %><span class="badge b-green">ligado</span>
+      <% } else if (cors.state === 'erro') { %><span class="badge b-red">não consegui conferir</span>
+      <% } else { %><span class="badge b-amber"><%= cors.state === 'outra' ? 'bucket com outras regras' : 'desligado no bucket' %></span><% } %></p>
+    <p class="small muted">Os arquivos grandes (material bruto, cortes) podem ir <strong>direto do navegador para o Backblaze</strong>, sem passar pelo servidor, que fica na Europa. Em teste isso foi cerca de 10 vezes mais rápido. Para isso o bucket precisa permitir o painel (CORS): só <span class="mono">PUT</span> a partir de <span class="mono"><%= storage.origin %></span>. Sem isso, tudo continua passando pelo servidor, sem perder nada.</p>
+    <% if (cors.error) { %><p class="small bad-text"><%= cors.error %></p><% } %>
+    <% if (storage.direct && cors.state !== 'ligado') { %>
+    <form method="post" action="/integracoes/armazenamento/cors" <%- cors.state === 'outra' ? 'data-confirm="O bucket já tem outras regras de CORS. Ligar o envio direto substitui as regras atuais por uma que permite o painel. Continuar?"' : '' %>>
+      <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value="ligar">
+      <button class="btn" type="submit"><%- icon('zap', 14) %> Ligar envio direto</button>
+    </form>
+    <% } else if (cors.state === 'ligado') { %>
+    <form method="post" action="/integracoes/armazenamento/cors" data-confirm="Desligar o envio direto? Os arquivos voltam a passar pelo servidor (mais lento)."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value="desligar"><button class="link small" type="submit">Desligar o envio direto</button></form>
+    <% } %>
+  </section>
+  <% } %>
   <section class="card">
     <h2>E-mail transacional (Brevo SMTP)</h2>
     <p><span class="badge <%= smtp.ok ? 'b-green' : 'b-red' %>"><%= smtp.ok ? (smtp.dry ? 'Modo teste (não envia)' : 'Configurado') : 'Não configurado' %></span></p>
@@ -26,5 +157,55 @@
       <button class="btn" type="submit">Testar conexão (somente leitura)</button>
     </form>
   </section>
+  <section class="card">
+    <h2>InfinitePay (link de pagamento da plateia)</h2>
+    <p><span class="badge <%= infinitepay.ok ? 'b-green' : 'b-red' %>"><%= infinitepay.ok ? 'Configurado' : 'Não configurado' %></span></p>
+    <ul class="plain small">
+      <li>InfiniteTag: <code><%= infinitepay.handle ? '$' + infinitepay.handle : '—' %></code></li>
+      <% if (infinitepay.ok) { %><li>Webhook (já vai em cada link, não precisa cadastrar): <code class="raw"><%= infinitepay.webhook.replace(/\/[^/]+$/, '/…') %></code></li><% } %>
+      <li>O link nasce quando a produtora coloca o pedido em <strong>Em avaliação</strong>, com o valor da página (dá para alterar). Quando a InfinitePay avisa o pagamento, o pedido vira Selecionado e entra como recebido no Financeiro.</li>
+    </ul>
+    <% if (infinitepay.ok) { %>
+    <form method="post" action="/integracoes/infinitepay"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" type="submit">Gerar link de teste (R$ 1,00)</button></form>
+    <% } else { %><p class="small muted">Defina INFINITEPAY_HANDLE no servidor e ative o "checkout externo" no app da InfinitePay.</p><% } %>
+  </section>
+  <section class="card">
+    <h2>Google Agenda</h2>
+    <p><span class="badge <%= google.configured && google.validKey ? 'b-green' : 'b-red' %>"><%= google.configured ? (google.validKey ? 'Configurado' : 'Chave inválida') : 'Não configurado' %></span></p>
+    <ul class="plain small">
+      <li>Agenda: <code><%= google.calendarId || '—' %></code></li>
+      <li>Conta de serviço (compartilhe a agenda com este e-mail, com permissão para editar eventos): <code><%= google.serviceAccount || '—' %></code></li>
+      <li>Eventos no Google: <strong><%= google.synced %></strong><%= google.last ? ' · última atualização ' + fmt.formatDateTime(google.last) : '' %></li>
+      <li>Enviando: <strong><%= calTypes.filter(function (t) { return google.types[t.key].enabled; }).map(function (t) { return t.label; }).join(', ') || 'nada (tudo desligado)' %></strong>. A rotina confere a cada minuto e o painel atualiza o Google logo depois de qualquer alteração.</li>
+    </ul>
+    <% if (google.configured) { %>
+    <form method="post" action="/integracoes/google" class="row">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn" type="submit" name="acao" value="testar">Testar conexão (somente leitura)</button>
+      <button class="btn" type="submit" name="acao" value="sincronizar">Sincronizar agora</button>
+    </form>
+    <button class="btn" type="button" data-modal-open="modal-google">O que vai para a agenda</button>
+    <% } else { %><p class="small muted">Defina GOOGLE_CALENDAR_ID e a chave da conta de serviço no servidor (passo a passo no .env.example).</p><% } %>
+  </section>
 </div>
+<% if (google.configured) { %>
+<dialog class="modal" id="modal-google" aria-labelledby="mg-h">
+  <form method="post" action="/integracoes/google/tipos" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mg-h">O que vai para o Google Agenda</h2>
+    <p class="small muted">Marque o que entra na agenda. Gravações, lembretes e posts têm horário, então pedem uma duração; o resto entra como evento de dia inteiro. Desmarcar tira da agenda o que já foi enviado.</p>
+    <ul class="plain gcal-types">
+      <% calTypes.forEach(function (t) { %>
+      <li>
+        <label class="check"><input type="checkbox" name="on_<%= t.key %>" value="on" <%= google.types[t.key].enabled ? 'checked' : '' %>> <%= t.label %></label>
+        <% if (timed.has(t.key)) { %><label class="gcal-min small muted">Duração <input type="number" name="min_<%= t.key %>" min="15" max="720" step="5" value="<%= google.types[t.key].minutes %>"> min</label><% } else { %><span class="small muted mono">dia inteiro</span><% } %>
+      </li>
+      <% }) %>
+    </ul>
+    <label class="check"><input type="checkbox" name="invite" value="on" <%= inviteOn ? 'checked' : '' %>> Enviar o convite da gravação ao e-mail do convidado</label>
+    <p class="small muted">O convidado recebe um e-mail com o convite (Gmail, Outlook e Apple Calendário mostram "Adicionar"). Remarcou, vai a nova data; cancelou, vai o aviso. Quem já está agendado hoje <strong>não</strong> recebe e-mail: só os próximos agendamentos e as remarcações. Precisa do e-mail no cadastro do convidado.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <%- include('partials/foot') %>

@@ -1,0 +1,17 @@
+<%# Um comentário da revisão do vídeo (na minutagem). Variáveis: c, ep, tickable %>
+<li class="comment <%= c.resolved ? 'resolved' : '' %>" data-at="<%= c.at_ms == null ? '' : c.at_ms %>" data-id="<%= c.id %>">
+  <div class="row">
+    <% if (c.at_ms != null) { %><button type="button" class="seek handle" data-seek="<%= c.at_ms %>"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></button><% } else { %><span class="badge b-gray">geral</span><% } %>
+    <span class="small muted"><%= c.author_name || '—' %> · <%= fmt.formatDateTime(c.created_at) %></span><% if (c.edited_at) { %><span class="cmt-edited" title="Editado em <%= fmt.formatDateTime(c.edited_at) %>" aria-label="Editado em <%= fmt.formatDateTime(c.edited_at) %>"><%- icon('pencil', 12) %></span><% } %>
+  </div>
+  <% if (c.body_html) { %><div class="rich-content comment-body"><%- c.body_html %></div><% } else if (c.body) { %><p class="pre"><%= c.body %></p><% } %>
+  <% if (c.attachments && c.attachments.length) { %><div class="cmt-media">
+    <% c.attachments.filter(function (a) { return a.kind === 'audio'; }).forEach(function (a) { %><div class="cmt-audio"><audio controls preload="none" src="/anexos/<%= a.id %>"></audio><% if (a.transcript) { %><details open><summary class="small muted">Transcrição</summary><p class="rte-transcript small"><%= a.transcript %></p></details><% } %></div><% }) %>
+    <div class="cmt-docs"><% c.attachments.filter(function (a) { return a.kind === 'file'; }).forEach(function (a) { %><a class="btn sm" href="/anexos/<%= a.id %>/baixar"><%- icon('file-text', 14) %> <%= a.filename %> <span class="mono small muted"><%= fmt.formatBytes(a.size_bytes) %></span></a><% }) %></div>
+  </div><% } %>
+  <div class="cmt-actions">
+    <% if (tickable) { %><button type="button" class="icon-btn" data-resolve="<%= c.resolved ? '0' : '1' %>" data-comment="<%= c.id %>" aria-label="<%= c.resolved ? 'Reabrir o comentário' : 'Marcar como resolvido' %>" title="<%= c.resolved ? 'Reabrir' : 'Marcar como resolvido' %>"><span class="ic-do"><%- icon('circle-check', 14) %></span><span class="ic-undo"><%- icon('rotate-ccw', 14) %></span></button><% } %>
+    <% if (tickable && currentUser && String(c.author_id) === String(currentUser.id)) { %><button type="button" class="icon-btn" data-comment-edit data-dialog="modal-review-edit" data-action="/episodios/<%= ep.id %>/comentarios/<%= c.id %>/editar" data-html="<%= c.body_html || '' %>" data-text="<%= c.body_html ? '' : (c.body || '') %>" data-files="<%= JSON.stringify((c.attachments || []).filter(function (a) { return a.kind !== 'image'; }).map(function (a) { return { id: a.id, name: a.filename }; })) %>" aria-label="Editar o comentário" title="Editar"><%- icon('pencil', 14) %></button><% } %>
+    <form method="post" action="/episodios/<%= ep.id %>/comentarios/<%= c.id %>/excluir" class="inline" data-confirm="Apagar este comentário?" data-comment-delete><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Apagar o comentário" title="Apagar"><%- icon('trash-2', 14) %></button></form>
+  </div>
+</li>

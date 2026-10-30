@@ -1,0 +1,5 @@
+<%# Abas de Notificações. Variáveis: tab ('avisos' | 'lembretes'), dueNow (lembretes na hora). %>
+<nav class="subnav" aria-label="Notificações">
+  <a href="/notificacoes" class="<%= tab === 'avisos' ? 'on' : '' %>"<%- tab === 'avisos' ? ' aria-current="page"' : '' %>>Avisos</a>
+  <a href="/notificacoes/lembretes" class="<%= tab === 'lembretes' ? 'on' : '' %>"<%- tab === 'lembretes' ? ' aria-current="page"' : '' %>>Lembretes da gravação<% if (dueNow) { %> <span class="nav-count"><%= dueNow %></span><% } %></a>
+</nav>

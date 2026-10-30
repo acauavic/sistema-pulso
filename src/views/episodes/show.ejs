@@ -1,0 +1,571 @@
+<%- include('../partials/head') %>
+<%
+  var epNo = ep.number ? 'EP.' + String(ep.number).padStart(3, '0') : 'EP.—';
+  var fileBase = '/episodios/' + ep.id + '/arquivos/';
+  var rawFiles = files.filter(function (f) { return f.kind !== 'editado'; });
+  var editedFiles = files.filter(function (f) { return f.kind === 'editado'; });
+  var editedDone = editedFiles.filter(function (f) { return f.status === 'pronto'; });
+  var itemsFor = function (gate) { return checklist.filter(function (i) { return i.gate === gate; }); };
+  var tickable = perm.manage || perm.edit || perm.review;
+  var inProduction = ['disponivel_edicao', 'em_edicao', 'em_revisao', 'em_finalizacao', 'pronto_publicar', 'publicado'].indexOf(ep.status) >= 0;
+  var openComments = comments.filter(function (c) { return !c.resolved; });
+  var rawTotal = rawFiles.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0);
+  var tabsBtn = function (t) { return '<button type="button" role="tab" data-tab-btn="' + t.key + '" aria-controls="pane-' + t.key + '">' + t.label + (t.badge ? ' <span class="count">' + t.badge + '</span>' : '') + '</button>'; };
+%>
+<div class="page-head">
+  <div>
+    <span class="kicker"><%= epNo %> · gravado <%= fmt.formatDay(ep.recorded_on) %><%= ep.aired_on ? ' · vai ao ar ' + fmt.formatDay(ep.aired_on) : '' %></span>
+    <h1><%= ep.title %> <span class="badge b-st-<%= ep.status %>"><%= C.EPISODE_STATUSES[ep.status] %></span></h1>
+    <p class="muted top-gap"><%= ep.guest_name ? ep.guest_name : (sponsors.length ? 'Só os hosts · ' + sponsors.map(function (s) { return s.company; }).join(', ') : 'Só os hosts') %><%= ep.editor_name ? ' · editor: ' + ep.editor_name : '' %></p>
+  </div>
+  <div class="row">
+    <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
+    <a class="btn" href="/conteudo?episodio=<%= ep.id %>" title="<%= content.total ? content.total + ' peças, ' + content.published + ' publicadas' + (content.requests ? ', ' + content.requests + ' pedido(s) em aberto' : '') : 'Cortes, posts e pedidos deste episódio' %>"><%- icon('layers') %> Conteúdo<% if (content.total || content.requests) { %> <span class="mono small"><%= content.published %>/<%= content.total %></span><% } %></a>
+    <% if (ep.guest_id && can('guests.read')) { %><a class="btn" href="/convidados/<%= ep.guest_id %>"><%- icon('mic') %> Convidado</a><% } %>
+    <% if (perm.write) { %><a class="btn" href="/episodios/<%= ep.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
+  </div>
+</div>
+
+<ol class="stepper s7" aria-label="Etapas da produção">
+  <% C.EPISODE_STAGES.forEach(function (s, i) { %>
+  <li class="<%= i < stageIndex ? 'done' : (i === stageIndex ? 'now' : '') %>"><span class="step-n mono"><%= String(i + 1).padStart(2, '0') %></span><span class="step-l"><%= s.label %></span></li>
+  <% }) %>
+</ol>
+
+<section class="card moves" id="etapa">
+  <span class="kicker">Próximo passo</span>
+  <div class="move-list">
+    <% if (!moves.length) { %><p class="muted">Este episódio está no fim da linha de produção.</p><% } %>
+    <% moves.filter(function (m) { return m.allowed; }).forEach(function (m) { %>
+    <div class="move">
+      <form method="post" action="/episodios/<%= ep.id %>/etapa" class="inline">
+        <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="to" value="<%= m.to %>">
+        <button class="btn <%= m.tone %>" type="submit"><%= m.label %></button>
+      </form>
+      <% if (m.missing.length) { %><span class="small blocked"><%- icon('info', 14) %> Antes: <%= m.missing.join(' · ') %></span><% } %>
+    </div>
+    <% }) %>
+    <% var others = moves.filter(function (m) { return !m.allowed; }); if (others.length) { var anyMine = moves.some(function (m) { return m.allowed; }); %>
+    <p class="small muted wait-line"><%- icon('clock', 14) %> <%= anyMine ? 'Outros passos desta etapa ficam com ' : 'Esta etapa está com ' %><%= Array.from(new Set(others.map(function (m) { return m.who; }))).join(' / ') %>: <%= others.map(function (m) { return m.label.toLowerCase(); }).join(' · ') %>.</p>
+    <% } %>
+  </div>
+</section>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="<%= defaultTab %>">
+  <div class="tabbar" role="tablist" aria-label="Seções do episódio">
+    <% tabs.forEach(function (t) { %><%- tabsBtn(t) %><% }) %>
+  </div>
+
+  <!-- ================= RESUMO ================= -->
+  <div class="pane" id="pane-resumo" data-pane-id="resumo">
+    <div class="grid-2 align-start">
+      <div class="stack-lg">
+        <section class="card" id="visao">
+          <h2>Visão geral</h2>
+          <dl class="kv">
+            <dt>Gravado em</dt><dd class="handle"><%= fmt.formatDay(ep.recorded_on) %></dd>
+            <dt>Veiculação</dt><dd class="handle"><%= fmt.formatDay(ep.aired_on) %></dd>
+            <dt>Convidado</dt><dd><%= ep.guest_name || '—' %><%= ep.guest_instagram ? ' · @' + ep.guest_instagram : '' %></dd>
+            <% if (ep.guest_positioning) { %><dt>Posicionamento</dt><dd class="pre"><%= ep.guest_positioning %></dd><% } %>
+            <dt>Editor</dt>
+            <dd>
+              <%- include('../partials/dot', { type: 'episode', id: ep.id, user: ep.editor_id ? { id: ep.editor_id, name: ep.editor_name } : null, editable: perm.manage, label: true }) %>
+            </dd>
+            <% if (ep.review_round) { %><dt>Revisões</dt><dd class="handle"><%= ep.review_round %></dd><% } %>
+            <dt>Patrocínio</dt>
+            <dd class="sponsor-line">
+              <% sponsors.forEach(function (sp) { var miss = [!sp.moldura && 'moldura', !sp.qrcode && 'QR Code'].filter(Boolean); %>
+              <<%= can('sponsors.read') ? 'a href="/patrocinadores/' + sp.id + '"' : 'span' %> class="chip-link" title="<%= (sp.role === 'exclusivo' ? 'Episódio exclusivo' : 'Inserção') + (miss.length ? ' · falta ' + miss.join(' e ') : '') %>"><strong><%= sp.company %></strong> <span class="mono"><%= sp.role === 'exclusivo' ? 'EXCL.' : 'INS.' %></span><% if (miss.length) { %> <span class="warn" aria-label="Faltam arquivos"><%- icon('triangle-alert', 12) %></span><% } %></<%= can('sponsors.read') ? 'a' : 'span' %>>
+              <% }) %>
+              <% if (perm.manage) { %><button class="link small" type="button" data-modal-open="modal-patrocinio"><%= sponsors.length ? 'trocar' : 'vincular patrocinador' %></button><% } else if (!sponsors.length) { %><span class="muted">—</span><% } %>
+            </dd>
+          </dl>
+          <% if (sponsors.length) { %>
+          <details class="top-gap" id="patrocinadores">
+            <summary>Material e restrições dos patrocinadores</summary>
+            <% sponsors.forEach(function (s) { %>
+            <div class="sponsor-box">
+              <strong><%= s.company %></strong>
+              <ul class="plain small asset-links">
+                <% if (s.logo) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.logo.id %>?baixar=1"><%- icon('arrow-right', 14) %> Logo (PNG)</a></li><% } %>
+                <% if (s.moldura) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.moldura.id %>?baixar=1"><%- icon('arrow-right', 14) %> Moldura</a></li><% } else { %><li class="muted">Moldura ainda não enviada</li><% } %>
+                <% if (s.qrcode) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.qrcode.id %>?baixar=1"><%- icon('arrow-right', 14) %> QR Code</a><%= s.qr_link ? ' → ' + s.qr_link : '' %></li><% } else { %><li class="muted">QR Code ainda não enviado</li><% } %>
+              </ul>
+              <% if (s.slogan) { %><p class="small"><span class="muted">Slogan:</span> <%= s.slogan %></p><% } %>
+              <% if (s.offer) { %><p class="small pre"><span class="muted">Oferta:</span> <%= s.offer %></p><% } %>
+              <% if (s.restrictions) { %><p class="small pre restrict"><span class="muted">Não comunicar:</span> <%= s.restrictions %></p><% } %>
+            </div>
+            <% }) %>
+          </details>
+          <% } %>
+          <div class="row spread top-gap">
+            <h3>Observações para o editor</h3>
+            <% if (perm.manage) { %><button class="btn sm" type="button" data-modal-open="modal-obs"><%- icon('pencil') %> <%= ep.editor_notes ? 'Editar' : 'Escrever' %></button><% } %>
+          </div>
+          <p class="pre<%= ep.editor_notes ? '' : ' muted small' %>"><%= ep.editor_notes || 'Nada por enquanto.' %></p>
+        </section>
+
+      </div>
+
+      <div class="stack-lg">
+      <section class="card" id="tarefas">
+        <div class="row spread">
+          <h2>Tarefas<%= tasks.length ? ' (' + tasks.filter(function (t) { return t.status === 'feito'; }).length + '/' + tasks.length + ')' : '' %></h2>
+          <% if (perm.manage) { %><button class="btn sm" type="button" data-modal-open="modal-task-new"><%- icon('plus') %> Nova tarefa</button><% } %>
+        </div>
+        <% if (!tasks.length) { %><p class="muted">Sem tarefas.</p><% } %>
+        <ul class="plain task-list">
+          <% tasks.forEach(function (t) { %>
+          <li class="task-row <%= t.status === 'feito' ? 'done' : '' %>">
+            <form method="post" action="/episodios/<%= ep.id %>/tarefas/<%= t.id %>" class="task-quick">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kind" value="<%= t.kind %>"><input type="hidden" name="notes" value="<%= t.notes || '' %>">
+              <input type="hidden" name="assignee_id" value="<%= t.assignee_id || '' %>"><input type="hidden" name="due_on" value="<%= fmt.toInputDate(t.due_on) %>"><input type="hidden" name="due_time" value="<%= fmt.toInputTime(t.due_time) %>">
+              <span class="task-title"><%= t.title %></span>
+              <select name="status" aria-label="Status de <%= t.title %>" data-status-select <%= tickable ? '' : 'disabled' %>>
+                <% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= t.status === k ? 'selected' : '' %>><%= C.TASK_STATUSES[k] %></option><% }) %>
+              </select>
+            </form>
+            <span class="task-meta small muted">
+              <%- include('../partials/dot', { type: 'task', id: t.id, user: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null, editable: perm.manage, label: true }) %><%= t.due_on ? ' · prazo ' + fmt.formatDueShort(t.due_on, t.due_time) : '' %><%= t.status === 'bloqueada' ? ' · bloqueada: ' + t.block_reason : '' %><%= t.notes ? ' · ' + t.notes : '' %>
+            </span>
+            <span class="row task-actions">
+              <% if (t.kind === 'cortes') { %><a class="small" href="/conteudo?episodio=<%= ep.id %>">abrir Conteúdo</a><% } %>
+            <a class="small" href="/tarefas/<%= t.id %>">abrir</a>
+            <% if (tickable) { %><button type="button" class="link small" data-modal-open="modal-task-edit"
+              data-task='<%= JSON.stringify({ id: t.id, title: t.title, kind: t.kind, status: t.status, assignee_id: t.assignee_id || "", due_on: fmt.toInputDate(t.due_on), due_time: fmt.toInputTime(t.due_time), notes: t.notes || "", block_reason: t.block_reason || "" }) %>'>detalhes</button><% } %>
+            </span>
+          </li>
+          <% }) %>
+        </ul>
+      </section>
+      <%- include('../partials/comments', { type: 'episode', id: ep.id, items: epComments, back: '/episodios/' + ep.id }) %>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MATERIAL ================= -->
+  <% if (tabs.some(function (t) { return t.key === 'material'; })) { %>
+  <div class="pane" id="pane-material" data-pane-id="material" hidden>
+    <div class="grid-2 align-start">
+      <section class="card" id="material"<%- perm.upload && storageReady ? ' data-material-drop' : '' %>>
+        <% var canRaw = perm.upload && storageReady;
+           var where = epNo + ' · ' + ep.title;
+           var fileRow = function (f) { %>
+            <li<% if (f.status === 'pronto') { %> data-dl-item data-href="<%= fileBase + f.id %>/baixar" data-name="<%= f.filename %>" data-bytes="<%= Number(f.size_bytes || 0) %>"<% } %>>
+              <% if (f.status === 'pronto') { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= f.filename %>"><% } %>
+              <span>
+                <%= f.label ? f.label + ' · ' : '' %><span class="mono small"><%= f.filename %></span>
+                <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %></span>
+                <% if (f.stalled) { %><span class="badge b-red" title="O envio parou no meio. Envie o mesmo arquivo de novo: continua de onde parou.">não terminou</span><% } else if (f.status === 'enviando') { %><span class="badge b-amber">enviando</span><% } %>
+              </span>
+              <span class="row">
+                <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
+                <% if (perm.upload) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo do armazenamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover o arquivo" title="Remover"><%- icon('trash-2', 14) %></button></form><% } %>
+              </span>
+            </li>
+        <% };
+           var groupDefs = [
+             { kind: 'bruto_video', title: 'Vídeos do episódio', labelled: true, ic: 'film' },
+             { kind: 'bruto_audio', title: 'Áudios', labelled: true, ic: 'mic' },
+             { kind: 'bastidor', title: 'Bastidores', labelled: false, ic: 'users' },
+             { kind: 'foto', title: 'Fotografias', labelled: false, ic: 'image' },
+             { kind: 'outro', title: 'Outros', labelled: true, ic: 'paperclip' },
+           ];
+           var sizeOf = function (list) { return list.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0); };
+           var folders = groupDefs.map(function (g) { var list = rawFiles.filter(function (f) { return f.kind === g.kind; }); return Object.assign({}, g, { list: list, size: sizeOf(list) }); }).filter(function (g) { return g.list.length; });
+           var hasReview = tabs.some(function (t) { return t.key === 'revisao'; });
+           var galItem = function (f, title) {
+             var ok = f.status === 'pronto';
+             return { id: f.id, name: f.filename, title: title || f.label || '', size: fmt.formatBytes(f.size_bytes), bytes: Number(f.size_bytes || 0), when: fmt.formatDay(f.created_at), type: mediaType(f),
+                      thumb: ok && hasPreview(f) ? fileBase + f.id + '/previa' : null, big: fileBase + f.id + '/previa?t=p', view: fileBase + f.id + '/ver', down: fileBase + f.id + '/baixar' };
+           };
+           var gallery = folders.map(function (g) { return { key: g.kind, title: g.title, items: g.list.filter(function (f) { return f.status === 'pronto'; }).map(function (f) { return galItem(f); }) }; })
+             .concat([{ key: 'editado', title: 'Vídeo editado', items: editedDone.map(function (f) { return galItem(f, 'Versão ' + f.version); }) }])
+             .filter(function (g) { return g.items.length; }); %>
+        <div class="row spread">
+          <div>
+            <h2>Material bruto</h2>
+            <% if (rawFiles.length) { %><span class="handle muted"><%= rawFiles.length %> arquivo<%= rawFiles.length > 1 ? 's' : '' %> · <%= fmt.formatBytes(rawTotal) %></span><% } %>
+          </div>
+          <div class="row">
+            <% if (gallery.length) { %><button class="btn icon-only" type="button" data-gallery-open aria-label="Abrir a galeria (fotos e vídeos com prévia)" title="Galeria"><%- icon('image', 16) %></button><% } %>
+            <% if (canRaw) { %><button class="btn" type="button" data-material-pick><%- icon('upload') %> Enviar material</button><% } %>
+          </div>
+        </div>
+        <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
+        <% if (canRaw) { %>
+        <div class="uploader quiet" data-material data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-where="<%= where %>" data-hash="material">
+          <input type="file" multiple hidden data-material-files aria-label="Escolher arquivos">
+          <p class="small muted"><%= rawFiles.length ? 'Arraste mais arquivos para cá ou use o botão.' : 'Vídeos de cada câmera, áudios, bastidores e fotografias: escolha tudo de uma vez ou arraste para cá.' %> Na próxima janela você diz o que é cada um. O envio segue em segundo plano: pode continuar usando o sistema.</p>
+          <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
+        </div>
+        <% } else if (!rawFiles.length) { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
+        <% var stalledAll = rawFiles.filter(function (f) { return f.stalled; }); %>
+        <% if (stalledAll.length) { %>
+        <div class="stalled-note" role="status">
+          <p class="small m-0"><strong><%= stalledAll.length %> arquivo<%= stalledAll.length > 1 ? 's não terminaram' : ' não terminou' %> de subir</strong> <span class="mono small muted">· <%= fmt.formatBytes(sizeOf(stalledAll)) %></span></p>
+          <p class="small muted m-0"><% if (canRaw) { %>Escolha os mesmos arquivos de novo em Enviar material: o sistema reconhece pelo nome e continua de onde parou. Os que já subiram inteiros não são enviados de novo.<% } else { %>Quem envia o material pode escolher os mesmos arquivos de novo: o sistema continua de onde parou.<% } %></p>
+          <% if (canRaw) { %><form method="post" action="<%= fileBase %>descartar-parados" class="inline" data-confirm="Descartar os <%= stalledAll.length %> envios que não terminaram? O que já tinha subido deles é apagado do armazenamento."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">Descartar os que não terminaram</button></form><% } %>
+        </div>
+        <% } %>
+        <% if (folders.length) { %>
+        <div class="folders" data-folders data-key="raw-<%= ep.id %>">
+          <div class="folder-grid" data-folder-grid>
+            <% folders.forEach(function (g) { %>
+            <button type="button" class="folder" data-folder-open="<%= g.kind %>" aria-label="Abrir a pasta <%= g.title %>, <%= g.list.length %> arquivo<%= g.list.length > 1 ? 's' : '' %>">
+              <span class="folder-ic"><%- icon('folder', 30) %></span>
+              <span class="folder-name"><%- icon(g.ic, 14) %><strong><%= g.title %></strong></span>
+              <span class="mono small muted"><%= g.list.length %> · <%= fmt.formatBytes(g.size) %></span>
+              <% var gStalled = g.list.filter(function (f) { return f.stalled; }).length; %>
+              <% if (gStalled) { %><span class="badge b-red"><%= gStalled %> não <%= gStalled > 1 ? 'terminaram' : 'terminou' %></span><% } else if (g.list.some(function (f) { return f.status === 'enviando'; })) { %><span class="badge b-amber">enviando</span><% } %>
+            </button>
+            <% }) %>
+          </div>
+          <% folders.forEach(function (g) { %>
+          <% var readyList = g.list.filter(function (f) { return f.status === 'pronto'; }); %>
+          <div class="folder-panel" data-folder-panel="<%= g.kind %>" data-dl hidden>
+            <div class="folder-crumb">
+              <button class="icon-btn" type="button" data-folder-back aria-label="Voltar às pastas" title="Voltar às pastas"><%- icon('arrow-left', 16) %></button>
+              <span class="muted small">Material bruto /</span>
+              <h3 class="folder-title"><%= g.title %> <span class="mono small muted"><%= g.list.length %> · <%= fmt.formatBytes(g.size) %></span></h3>
+              <% if (readyList.length > 1) { %>
+              <span class="row dl-actions">
+                <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
+                <button class="btn sm" type="button" data-dl-everything title="Baixa todos os <%= readyList.length %> arquivos desta pasta, um depois do outro"><%- icon('download', 14) %> Baixar tudo</button>
+              </span>
+              <% } %>
+            </div>
+            <% if (readyList.length > 1) { %>
+            <div class="dl-bar" data-dl-bar role="group" aria-label="Baixar vários arquivos" hidden>
+              <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
+              <span class="row">
+                <button class="btn sm ghost" type="button" data-dl-all>Selecionar todos</button>
+                <button class="btn sm primary" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar selecionados</button>
+                <button class="btn sm ghost" type="button" data-dl-cancel>Cancelar</button>
+              </span>
+            </div>
+            <p class="small muted dl-note" data-dl-note role="status" aria-live="polite" hidden></p>
+            <% } %>
+            <% var labels = g.labelled ? g.list.reduce(function (a, f) { var k = f.label || ''; if (a.indexOf(k) < 0) a.push(k); return a; }, []) : ['']; %>
+            <% labels.forEach(function (lb) { var sub = g.list.filter(function (f) { return (g.labelled ? (f.label || '') : '') === lb; }); %>
+            <% if (labels.length > 1 && lb) { %><h4 class="folder-sub"><%- icon('folder', 14) %> <%= lb %> <span class="mono small muted"><%= sub.length %></span></h4><% } %>
+            <ul class="plain file-list file-compact"><% sub.forEach(fileRow) %></ul>
+            <% }) %>
+          </div>
+          <% }) %>
+        </div>
+        <% } %>
+      </section>
+      <% if (gallery.length) { %>
+      <dialog class="modal gallery" id="modal-galeria" aria-labelledby="gal-h" data-gallery>
+        <div class="gal-head">
+          <div><span class="kicker"><%= epNo %> · <%= ep.title %></span><h2 id="gal-h">Galeria</h2></div>
+          <span class="gal-tools">
+            <button class="btn sm ghost" type="button" data-g-select><%- icon('check-square', 14) %> Selecionar</button>
+            <button class="btn sm" type="button" data-g-everything title="Baixa todos os arquivos desta pasta, um depois do outro"><%- icon('download', 14) %> Baixar pasta</button>
+          </span>
+          <button class="icon-btn" type="button" data-modal-close aria-label="Fechar a galeria" title="Fechar"><%- icon('x', 18) %></button>
+        </div>
+        <div class="gal-folders" role="tablist" aria-label="Pastas" data-g-folders></div>
+        <div class="gal-bulk" data-g-bar role="group" aria-label="Baixar vários arquivos" hidden>
+          <span class="mono small" data-g-count aria-live="polite">Nenhum item marcado</span>
+          <span class="row">
+            <button class="btn sm ghost" type="button" data-g-all>Selecionar todos</button>
+            <button class="btn sm primary" type="button" data-g-go disabled><%- icon('download', 14) %> Baixar selecionados</button>
+            <button class="btn sm ghost" type="button" data-g-cancel>Cancelar</button>
+          </span>
+        </div>
+        <p class="gal-note small muted" data-g-note role="status" aria-live="polite" hidden></p>
+        <div class="gal-grid" data-g-grid></div>
+        <div class="gal-view" data-g-view hidden>
+          <div class="gal-bar">
+            <button class="icon-btn" type="button" data-g-back aria-label="Voltar à pasta" title="Voltar à pasta"><%- icon('arrow-left', 16) %></button>
+            <div class="gal-info"><strong data-g-name></strong><span class="mono small muted" data-g-meta></span></div>
+            <span class="mono small muted" data-g-pos></span>
+            <a class="btn sm" data-g-down href="#"><%- icon('download', 14) %> Baixar</a>
+          </div>
+          <div class="gal-stage" data-g-stage></div>
+          <button class="gal-nav gal-prev" type="button" data-g-prev aria-label="Anterior" title="Anterior (←)"><%- icon('chevron-left', 22) %></button>
+          <button class="gal-nav gal-next" type="button" data-g-next aria-label="Próximo" title="Próximo (→)"><%- icon('chevron-right', 22) %></button>
+        </div>
+        <script type="application/json" data-g-data><%- JSON.stringify(gallery).replace(/</g, '\\u003c') %></script>
+        <template data-g-icons><span data-i="play"><%- icon('play', 22) %></span><span data-i="file"><%- icon('file-text', 28) %></span><span data-i="audio"><%- icon('mic', 28) %></span><span data-i="video"><%- icon('film', 28) %></span><span data-i="image"><%- icon('image', 28) %></span><span data-i="check"><%- icon('check', 14) %></span></template>
+      </dialog>
+      <% } %>
+      <% if (perm.upload && storageReady) { %>
+      <dialog class="modal modal-wide" data-material-dialog aria-labelledby="material-dlg-h">
+        <div class="stack">
+          <h2 id="material-dlg-h">Enviar material</h2>
+          <p class="small muted" data-m-summary></p>
+          <div class="stack" data-m-sections></div>
+          <div class="row modal-actions"><button class="btn primary" type="button" data-m-send>Enviar</button><button class="btn" type="button" data-m-more>Adicionar mais</button><button class="btn ghost" type="button" data-m-cancel>Cancelar</button></div>
+        </div>
+      </dialog>
+      <% } %>
+
+      <div class="stack-lg">
+        <section class="card" id="edicao">
+          <div class="row spread"><h2>Vídeo editado</h2><span class="row"><% if (editedDone.length) { %><button class="icon-btn" type="button" data-gallery-open data-folder="editado" aria-label="Ver as versões na galeria" title="Ver na galeria"><%- icon('image', 16) %></button><span class="badge b-st-em_edicao">v<%= editedDone[0].version %></span><% } %></span></div>
+          <% if (!inProduction) { %><p class="muted">A edição começa quando o material for liberado para o editor.</p><% } else { %>
+          <p class="small muted">O vídeo do episódio é <strong>horizontal</strong> (16:9). Vídeos verticais são cortes e vão em <a href="/conteudo">Conteúdo</a>.</p>
+          <% var editedUploader = function (label) { %>
+          <div class="uploader" data-uploader data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-edited="1" data-where="<%= epNo + ' · ' + ep.title %>" data-hash="edicao">
+            <input type="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
+            <button class="btn" type="button" data-start><%- icon('arrow-right') %> <%= label %></button>
+            <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+            <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
+          </div>
+          <% }; %>
+          <% var canSendEdited = perm.edit && storageReady && ep.status !== 'disponivel_edicao'; %>
+          <% if (!editedFiles.length) { %>
+            <% if (canSendEdited) { %><% editedUploader('Enviar vídeo editado') %><% } else if (ep.status === 'disponivel_edicao' && perm.edit) { %><p class="muted">Assuma a edição para enviar o vídeo editado.</p><% } else { %><p class="muted">Nenhuma versão enviada ainda.</p><% } %>
+          <% } else { %>
+          <div class="folders" data-folders data-key="edited-<%= ep.id %>">
+            <div class="folder-grid" data-folder-grid>
+              <% editedFiles.forEach(function (f, i) { var cm = comments.filter(function (c) { return String(c.file_id) === String(f.id); }); var open = cm.filter(function (c) { return !c.resolved; }).length; %>
+              <button type="button" class="folder <%= i > 0 ? 'older' : '' %>" data-folder-open="v<%= f.id %>" aria-label="Abrir a pasta da versão <%= f.version %>">
+                <span class="folder-ic"><%- icon('folder', 30) %></span>
+                <span class="folder-name"><%- icon('film', 14) %><strong>Versão <%= f.version %></strong><% if (i === 0) { %><span class="badge b-st-em_edicao">atual</span><% } %></span>
+                <span class="mono small muted"><%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDay(f.created_at) %></span>
+                <% if (f.status === 'enviando') { %><span class="badge b-amber">enviando</span><% } else if (cm.length) { %><span class="mono small <%= open ? 'warn' : 'muted' %>"><%- icon('message-square', 12) %> <%= open ? open + ' em aberto' : cm.length + (cm.length > 1 ? ' resolvidos' : ' resolvido') %></span><% } %>
+              </button>
+              <% }) %>
+            </div>
+            <% editedFiles.forEach(function (f, i) { var cm = comments.filter(function (c) { return String(c.file_id) === String(f.id); }); var open = cm.filter(function (c) { return !c.resolved; }).length; %>
+            <div class="folder-panel" data-folder-panel="v<%= f.id %>" hidden>
+              <div class="folder-crumb">
+                <button class="icon-btn" type="button" data-folder-back aria-label="Voltar às pastas" title="Voltar às pastas"><%- icon('arrow-left', 16) %></button>
+                <span class="muted small">Vídeo editado /</span>
+                <h3 class="folder-title">Versão <%= f.version %> <% if (i === 0) { %><span class="badge b-st-em_edicao">atual</span><% } %></h3>
+              </div>
+              <ul class="plain file-list file-compact">
+                <li>
+                  <span><span class="mono small"><%= f.filename %></span> <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDateTime(f.created_at) %><%= f.uploader ? ' · ' + f.uploader : '' %></span><% if (f.status === 'enviando') { %> <span class="badge b-amber">enviando</span><% } %></span>
+                  <span class="row">
+                    <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
+                    <% if (perm.edit) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover esta versão?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover a versão" title="Remover"><%- icon('trash-2', 14) %></button></form><% } %>
+                  </span>
+                </li>
+              </ul>
+              <% if (cm.length) { %><p class="small muted top-gap"><%- icon('message-square', 12) %> <%= cm.length %> comentário<%= cm.length > 1 ? 's' : '' %> de revisão nesta versão<%= open ? ' · ' + open + ' em aberto' : ' · todos resolvidos' %>.<% if (hasReview && i === 0) { %> <a href="#revisao">Abrir a revisão</a><% } %></p><% } %>
+            </div>
+            <% }) %>
+          </div>
+          <% if (canSendEdited) { %><details class="top-gap"><summary>Enviar nova versão</summary><% editedUploader('Enviar nova versão') %></details><% } %>
+          <% } %>
+          <% } %>
+        </section>
+
+        <% if (openComments.length && ['em_edicao', 'disponivel_edicao'].indexOf(ep.status) >= 0) { %>
+        <section class="card" id="ajustes">
+          <h2>Ajustes pedidos na revisão (<%= openComments.length %>)</h2>
+          <ul class="plain comment-list">
+            <% openComments.forEach(function (c) { %>
+            <li class="comment"><div class="row"><% if (c.at_ms != null) { %><span class="handle"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></span><% } else { %><span class="badge b-gray">geral</span><% } %><span class="small muted"><%= c.author_name || '—' %></span></div><p class="pre"><%= c.body %></p></li>
+            <% }) %>
+          </ul>
+        </section>
+        <% } %>
+
+        <% if (inProduction) { %>
+        <section class="card" id="checklists">
+          <h2>Checklist antes da revisão</h2>
+          <%- include('_checklist', { items: itemsFor('revisao'), gate: 'revisao', tickable: tickable }) %>
+        </section>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- ================= REVISÃO (só enquanto o episódio está em revisão) ================= -->
+  <% if (tabs.some(function (t) { return t.key === 'revisao'; })) { %>
+  <div class="pane" id="pane-revisao" data-pane-id="revisao" hidden>
+    <section class="card" id="revisao">
+      <h2>Revisão</h2>
+      <% if (!latestEdited) { %><p class="muted">Quando o editor enviar o vídeo, ele aparece aqui para a gestão assistir e comentar na minutagem.</p><% } else { %>
+      <p class="small muted">Versão <strong>v<%= latestEdited.version %></strong> · <%= latestEdited.filename %></p>
+      <div class="review" data-review data-csrf="<%= csrf %>" data-url="/episodios/<%= ep.id %>/comentarios" data-file="<%= latestEdited.id %>">
+        <video controls preload="metadata" playsinline src="<%= fileBase + latestEdited.id %>/ver#t=0.1" data-video></video>
+        <div class="review-timeline" data-timeline aria-label="Comentários na linha do tempo do vídeo (clique para ir até o ponto)"></div>
+        <div class="player-controls" role="group" aria-label="Controles do vídeo">
+          <button type="button" class="pc" data-skip="-10" title="Voltar 10 segundos (J)"><%- icon('rotate-ccw', 16) %> 10 s</button>
+          <button type="button" class="pc" data-skip="-5" title="Voltar 5 segundos (←)"><%- icon('rotate-ccw', 16) %> 5 s</button>
+          <button type="button" class="pc pc-play" data-playpause title="Reproduzir ou pausar (espaço)" aria-label="Reproduzir"><span data-pp-play><%- icon('play', 16) %></span><span data-pp-pause hidden><%- icon('pause', 16) %></span></button>
+          <button type="button" class="pc" data-skip="5" title="Avançar 5 segundos (→)">5 s <%- icon('rotate-cw', 16) %></button>
+          <button type="button" class="pc" data-skip="10" title="Avançar 10 segundos (L)">10 s <%- icon('rotate-cw', 16) %></button>
+          <label class="pc-speed" title="Velocidade">
+            <select data-speed aria-label="Velocidade do vídeo"><option value="0.5">0,5×</option><option value="0.75">0,75×</option><option value="1" selected>1×</option><option value="1.25">1,25×</option><option value="1.5">1,5×</option><option value="2">2×</option></select>
+          </label>
+          <span class="pc-time mono"><span data-cur>0:00</span> / <span data-dur>0:00</span></span>
+        </div>
+        <p class="small muted pc-hint">Atalhos: espaço pausa · ← → 5 s · J L 10 s · , . um quadro · C comenta neste ponto</p>
+        <% if (tickable) { %>
+        <form class="stack top-gap" data-comment-form>
+          <%- include('../partials/rich-editor', { name: 'body_html', attach: 'anexos', placeholder: 'Comente neste ponto do vídeo… cole imagens, anexe arquivos ou grave um áudio', label: 'Comentário', size: 'sm', audio: true, ctrlEnter: true }) %>
+          <div class="row">
+            <span class="handle muted">no ponto <strong data-now>0:00</strong></span>
+            <button class="btn primary icon-only" type="submit" aria-label="Comentar neste ponto" title="Comentar neste ponto"><%- icon('send', 16) %></button>
+            <button class="btn icon-only" type="button" data-general aria-label="Comentário geral (sem minutagem)" title="Comentário geral (sem minutagem)"><%- icon('message-square', 16) %></button>
+          </div>
+        </form>
+        <%- include('../partials/comment-edit', { review: true }) %>
+        <% } %>
+      </div>
+      <% } %>
+      <ul class="plain comment-list top-gap" data-comment-list>
+        <% comments.forEach(function (c) { %><%- include('_review_comment', { c: c, ep: ep, tickable: tickable }) %><% }) %>
+        <li class="muted" data-no-comments <%= comments.length ? 'hidden' : '' %>>Sem comentários.</li>
+      </ul>
+    </section>
+  </div>
+  <% } %>
+
+  <!-- ================= FINALIZAÇÃO ================= -->
+  <% if (tabs.some(function (t) { return t.key === 'finalizacao'; })) { %>
+  <div class="pane" id="pane-finalizacao" data-pane-id="finalizacao" hidden>
+    <%- include('_finalizacao', { itemsFor: itemsFor, tickable: tickable }) %>
+  </div>
+  <% } %>
+
+  <!-- ================= HISTÓRICO ================= -->
+  <% if (finData) { %>
+  <!-- ================= FINANCEIRO ================= -->
+  <div class="pane" id="pane-financeiro" data-pane-id="financeiro" hidden>
+    <section class="card" id="financeiro">
+      <div class="row spread">
+        <h2>Financeiro do episódio</h2>
+        <% if (can('finance.write')) { %><button class="btn" type="button" data-modal-open="modal-novo"><%- icon('plus') %> Lançar custo</button><% } %>
+      </div>
+      <dl class="kv">
+        <dt>Custo total</dt><dd class="mono"><strong><%= money(finData.total) %></strong> <span class="muted">· pago <%= money(finData.paid) %></span></dd>
+        <dt>Gravação</dt><dd><span class="mono"><%= ep.recording_minutes ? Math.floor(ep.recording_minutes / 60) + ' h ' + String(ep.recording_minutes % 60).padStart(2, '0') + ' min' : 'não registrada' %></span><span class="muted"><%= ep.recording_minutes ? '' : ' · o estúdio usa ' + finData.settings.studio_minutes + ' min até alguém registrar' %></span>
+          <% if (perm.write) { %> <button class="link small" type="button" data-modal-open="modal-duracao"><%= ep.recording_minutes ? 'Mudar' : 'Registrar duração' %></button><% } %></dd>
+        <% if (finData.stockCost) { %><dt>Material usado</dt><dd class="mono"><%= money(finData.stockCost) %> <span class="muted">· do estoque, já pago na compra</span></dd><% } %>
+      </dl>
+      <% if (!finData.entries.length) { %><p class="muted small top-gap">Nenhuma conta ligada a este episódio ainda. O estúdio e os custos automáticos aparecem aqui quando o episódio é gravado.</p><% } %>
+      <ul class="plain plan-list fin-list top-gap">
+        <% finData.entries.forEach(function (e) { %><%- include('../finance/_row', { e: e, here: here }) %><% }) %>
+      </ul>
+      <% if (finData.stock.length) { %>
+      <h3 class="top-gap">Saiu do estoque</h3>
+      <ul class="plain plan-list">
+        <% finData.stock.forEach(function (m) { %><li><div class="plan-list-main"><span><%= m.name %></span></div><span class="mono"><%= String(m.qty).replace('.', ',') %> <%= m.unit %></span><span></span></li><% }) %>
+      </ul>
+      <% } %>
+    </section>
+  </div>
+  <% } %>
+
+  <div class="pane" id="pane-historico" data-pane-id="historico" hidden>
+    <div class="grid-2 align-start">
+      <section class="card" id="historico">
+        <h2>Linha do tempo</h2>
+        <ol class="timeline">
+          <% events.forEach(function (e) { %>
+          <li class="ev ev-<%= e.type %>"><div class="ev-msg"><%= e.message %></div><div class="ev-meta small muted"><%= fmt.formatDateTime(e.created_at) %><%= e.user_name ? ' · ' + e.user_name : '' %></div></li>
+          <% }) %>
+        </ol>
+      </section>
+      <section class="card">
+        <h2>Comentários da revisão<%= comments.length ? ' (' + comments.length + ')' : '' %></h2>
+        <% if (!comments.length) { %><p class="muted">Nenhum comentário.</p><% } %>
+        <ul class="plain comment-list">
+          <% comments.forEach(function (c) { %>
+          <li class="comment <%= c.resolved ? 'resolved' : '' %>">
+            <div class="row"><% if (c.at_ms != null) { %><span class="handle"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></span><% } else { %><span class="badge b-gray">geral</span><% } %>
+              <span class="small muted"><%= c.author_name || '—' %> · <%= fmt.formatDateTime(c.created_at) %></span><% if (c.resolved) { %><span class="badge b-green">resolvido</span><% } %></div>
+            <p class="pre"><%= c.body %></p>
+          </li>
+          <% }) %>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAIS DE TAREFA ================= -->
+<% if (perm.manage) { %>
+<dialog class="modal" id="modal-task-new" aria-labelledby="mt-new-h">
+  <form method="post" action="/episodios/<%= ep.id %>/tarefas" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mt-new-h">Nova tarefa</h2>
+    <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="Ex.: conteúdo extra: reação do convidado"></label>
+    <div class="row">
+      <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
+      <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></label>
+      <label>Prazo<input type="date" name="due_on"></label>
+      <label>Hora<input type="time" name="due_time"></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar tarefa</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (tickable) { %>
+<dialog class="modal" id="modal-task-edit" aria-labelledby="mt-edit-h">
+  <form method="post" action="" class="stack" data-task-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kind" data-f="kind">
+    <h2 id="mt-edit-h" data-f-text="title">Tarefa</h2>
+    <div class="row">
+      <label>Status<select name="status" data-f="status"><% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_STATUSES[k] %></option><% }) %></select></label>
+      <label>Responsável<select name="assignee_id" data-f="assignee_id" <%= perm.manage ? '' : 'disabled' %>><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></label>
+      <label>Prazo<input type="date" name="due_on" data-f="due_on" <%= perm.manage ? '' : 'disabled' %>></label>
+      <label>Hora<input type="time" name="due_time" data-f="due_time" <%= perm.manage ? '' : 'disabled' %>></label>
+    </div>
+    <label>Motivo do bloqueio <small class="muted">(se o status for Bloqueada)</small><input type="text" name="block_reason" maxlength="500" data-f="block_reason"></label>
+    <label>Observação<textarea name="notes" rows="3" maxlength="1000" data-f="notes"></textarea></label>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Fechar</button>
+      <% if (perm.manage) { %><button class="link small danger" type="submit" data-task-remove formaction="" formnovalidate>remover tarefa</button><% } %>
+    </div>
+  </form>
+</dialog>
+<% } %>
+<script src="/static/baixar.js?v=<%= assetV %>" defer></script>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<% if (perm.manage) { %>
+<dialog class="modal modal-wide" id="modal-obs" aria-labelledby="mo-h">
+  <form method="post" action="/episodios/<%= ep.id %>/observacoes" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mo-h">Observações para o editor</h2>
+    <textarea name="editor_notes" rows="7" maxlength="5000" aria-label="Observações para o editor" placeholder="O que o editor precisa saber: trechos a evitar, pedidos do convidado, ritmo, referências…"><%= ep.editor_notes || '' %></textarea>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (perm.manage) { %>
+<dialog class="modal" id="modal-patrocinio" aria-labelledby="mp-h">
+  <form method="post" action="/episodios/<%= ep.id %>/patrocinadores" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mp-h">Patrocínio do episódio</h2>
+    <p class="small muted">Escolha o papel de cada patrocinador neste episódio. "Fora" tira o vínculo.</p>
+    <ul class="plain ep-pick">
+      <% allSponsors.forEach(function (sp) { var cur = (sponsors.find(function (x) { return x.id === sp.id; }) || {}).role || ''; %>
+      <li><span><%= sp.company %></span>
+        <select name="role_<%= sp.id %>" aria-label="Papel de <%= sp.company %>"><option value="">Fora</option><option value="insercao" <%= cur === 'insercao' ? 'selected' : '' %>>Inserção</option><option value="exclusivo" <%= cur === 'exclusivo' ? 'selected' : '' %>>Exclusivo</option></select></li>
+      <% }) %>
+      <% if (!allSponsors.length) { %><li class="muted">Nenhum patrocinador cadastrado ainda.</li><% } %>
+    </ul>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (finData) { %>
+<%- include('../finance/_entry-modals', { episodes: [{ id: ep.id, number: ep.number, title: ep.title }], sponsors: allSponsors, suppliers: [], episodePre: ep.id }) %>
+<% if (perm.write) { %>
+<dialog class="modal" id="modal-duracao" aria-labelledby="md2-h">
+  <form method="post" action="/episodios/<%= ep.id %>/duracao" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="md2-h">Duração da gravação</h2>
+    <div class="grid-2 tight">
+      <label>Horas<input type="number" name="hours" min="0" max="24" value="<%= ep.recording_minutes ? Math.floor(ep.recording_minutes / 60) : 1 %>"></label>
+      <label>Minutos<input type="number" name="minutes" min="0" max="59" value="<%= ep.recording_minutes ? ep.recording_minutes % 60 : 0 %>"></label>
+    </div>
+    <p class="small muted">O saldo do estúdio é refeito: <span class="mono"><%= money(finData.settings.studio_hour_cents) %></span> por hora, menos o sinal. Se o saldo já foi pago, a diferença vira hora extra.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% } %>
+<%- include('../partials/ai-assist') %>
+<%- include('../partials/foot') %>

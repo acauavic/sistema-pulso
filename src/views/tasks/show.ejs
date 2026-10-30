@@ -1,0 +1,69 @@
+<%- include('../partials/head') %>
+<% var due = isoOf(task.due_on); var late = lateOf(task); %>
+<div class="page-head">
+  <div>
+    <span class="kicker">Tarefa · <%= C.TASK_KINDS[task.kind] %></span>
+    <h1><%= task.title %> <span class="badge tb-<%= task.status %>"><%= C.TASK_STATUSES[task.status] %></span></h1>
+    <p class="muted top-gap">Criada<%= task.creator_name ? ' por ' + task.creator_name : ' por uma rotina' %> em <%= fmt.formatDateTime(task.created_at) %><%= task.routine_id ? ' · rotina de tarefas' : '' %><%= task.completed_at ? ' · feita em ' + fmt.formatDateTime(task.completed_at) : '' %></p>
+  </div>
+  <div class="row">
+    <a class="btn ghost" href="/tarefas"><%- icon('arrow-left') %> Tarefas</a>
+    <% if (task.episode_id) { %><a class="btn" href="/episodios/<%= task.episode_id %>">Episódio</a><% } %>
+    <% if (task.guest_id && can('guests.read')) { %><a class="btn" href="/convidados/<%= task.guest_id %>">Convidado</a><% } %>
+    <% if (task.sponsor_id && can('sponsors.read')) { %><a class="btn" href="/patrocinadores/<%= task.sponsor_id %>">Patrocinador</a><% } %>
+  </div>
+</div>
+
+<div class="grid-2 align-start">
+  <section class="card">
+    <div class="row spread">
+      <h2>Detalhes</h2>
+      <%- include('../partials/dot', { type: 'task', id: task.id, user: task.assignee_id ? { id: task.assignee_id, name: task.assignee_name } : null, editable: editable, label: true }) %>
+    </div>
+    <% if (task.status === 'bloqueada') { %><p class="flash flash-error"><%- icon('lock', 14) %> Bloqueada: <%= task.block_reason %></p><% } %>
+    <% if (late) { %><p class="small err">Venceu em <%= fmt.formatDue(task.due_on, task.due_time) %>.</p><% } %>
+    <% if (editable) { %>
+    <form method="post" action="/tarefas/<%= task.id %>" class="stack" data-task-detail>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label>Título<input type="text" name="title" value="<%= task.title %>" maxlength="200" required></label>
+      <% var hasDesc = Boolean(task.description || task.description_html); %>
+      <div class="field" data-desc><span class="field-label row spread">Detalhes <% if (hasDesc) { %><button type="button" class="link small" data-desc-edit><%- icon('pencil', 12) %> Editar</button><% } %></span>
+        <% if (hasDesc) { %><div class="rich-content desc-view" data-desc-view><%- fmt.richHtml(task.description_html, task.description) %></div><% } %>
+        <div data-desc-editor <%= hasDesc ? 'hidden' : '' %>>
+          <%- include('../partials/rich-editor', { name: 'description_html', attach: 'attachment_ids', html: fmt.richHtml(task.description_html, task.description), placeholder: 'Descreva a tarefa. Cole imagens com Ctrl+V, anexe PDF, HTML ou ZIP, monte tabelas…', label: 'Detalhes da tarefa' }) %>
+        </div>
+      </div>
+      <% if (docs.length) { %><div class="field"><span class="field-label">Anexos</span>
+        <ul class="plain task-docs"><% docs.forEach(function (d) { %><li><span class="rte-ic"><%- icon('file-text', 16) %></span><a class="doc-name" href="/anexos/<%= d.id %>/baixar"><%= d.filename %></a><span class="mono small muted"><%= fmt.formatBytes(d.size_bytes) %></span><button type="button" class="icon-btn" data-attachment-delete="<%= d.id %>" aria-label="Remover <%= d.filename %>" title="Remover"><%- icon('x', 14) %></button></li><% }) %></ul>
+      </div><% } %>
+      <div class="row">
+        <label>Status<select name="status" data-block-toggle><% Object.keys(C.TASK_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= task.status === k ? 'selected' : '' %>><%= C.TASK_STATUSES[k] %></option><% }) %></select></label>
+        <label>Vence em<input type="date" name="due_on" value="<%= due || '' %>"></label>
+        <label>Hora<input type="time" name="due_time" value="<%= fmt.toInputTime(task.due_time) %>" title="Sem data, a hora vale para hoje"></label>
+        <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>" <%= task.kind === k ? 'selected' : '' %>><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
+      </div>
+      <label data-block-reason <%= task.status === 'bloqueada' ? '' : 'hidden' %>>Motivo do bloqueio<input type="text" name="block_reason" value="<%= task.block_reason || '' %>" maxlength="500" placeholder="O que está impedindo e de quem depende"></label>
+      <div class="row">
+        <label>Episódio<select name="episode_id"><option value="">—</option><% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= task.episode_id === e.id ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %><% if (task.episode_id && !episodes.some(function (e) { return e.id === task.episode_id; })) { %><option value="<%= task.episode_id %>" selected><%= task.episode_title %></option><% } %></select></label>
+        <label>Convidado<select name="guest_id"><option value="">—</option><% guests.forEach(function (g) { %><option value="<%= g.id %>" <%= task.guest_id === g.id ? 'selected' : '' %>><%= g.name %></option><% }) %><% if (task.guest_id && !guests.some(function (g) { return g.id === task.guest_id; })) { %><option value="<%= task.guest_id %>" selected><%= task.guest_name %></option><% } %></select></label>
+        <label>Patrocinador<select name="sponsor_id"><option value="">—</option><% sponsors.forEach(function (s) { %><option value="<%= s.id %>" <%= task.sponsor_id === s.id ? 'selected' : '' %>><%= s.company %></option><% }) %></select></label>
+      </div>
+      <div class="row"><button class="btn primary" type="submit">Salvar</button></div>
+    </form>
+    <% if (can('tasks.manage') || String(task.created_by) === String(currentUser.id)) { %>
+    <form method="post" action="/tarefas/<%= task.id %>/excluir" class="inline top-gap" data-confirm="Apagar esta tarefa?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger" type="submit">apagar tarefa</button></form>
+    <% } %>
+    <% } else { %>
+    <dl class="kv">
+      <dt>Detalhes</dt><dd><% if (task.description || task.description_html) { %><div class="rich-content"><%- fmt.richHtml(task.description_html, task.description) %></div><% } else { %>—<% } %>
+        <% if (docs.length) { %><ul class="plain task-docs"><% docs.forEach(function (d) { %><li><span class="rte-ic"><%- icon('file-text', 16) %></span><a class="doc-name" href="/anexos/<%= d.id %>/baixar"><%= d.filename %></a><span class="mono small muted"><%= fmt.formatBytes(d.size_bytes) %></span></li><% }) %></ul><% } %></dd>
+      <dt>Vence em</dt><dd class="handle"><%= due ? fmt.formatDue(task.due_on, task.due_time) : '—' %></dd>
+    </dl>
+    <p class="small muted">Só quem criou, o responsável ou a gestão mudam esta tarefa. Você pode comentar.</p>
+    <% } %>
+  </section>
+
+  <%- include('../partials/comments', { type: 'task', id: task.id, items: comments, back: '/tarefas/' + task.id }) %>
+</div>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

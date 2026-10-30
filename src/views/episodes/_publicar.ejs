@@ -1,0 +1,42 @@
+<%# Publicação do episódio inteiro (só YouTube). Variáveis: ep, meta, publications, social, uploadPost, uploadLive, perm, csrf, fmt, L, latestEdited, covers %>
+<% var UP2 = uploadPost.PLATFORMS; var epPubs = publications.filter(function (p) { return !p.clip_id; });
+   var ready = latestEdited && (ep.status === 'pronto_publicar' || ep.status === 'publicado');
+   var ytAcc = social && social.platforms.youtube;
+   var ytLinked = !social || (ytAcc ? !ytAcc.reauth : !social.ok);
+   var thumb = meta && meta.thumb_cover_id ? covers.find(function (c) { return c.id === meta.thumb_cover_id; }) : null;
+   var PUB2 = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-amber', 'agendado'], publicado: ['b-green', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] }; %>
+<% if (perm.review && ready) { %>
+<dialog class="modal modal-wide" id="modal-publicar" aria-labelledby="mpb-h">
+  <form method="post" action="/episodios/<%= ep.id %>/publicar" class="stack" data-busy="Enviando…">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mpb-h">Publicar no YouTube</h2>
+    <p class="muted small">O episódio inteiro vai só para o YouTube, com o título, a descrição, as tags e a thumbnail aprovada.<%= thumb ? '' : ' Nenhuma thumbnail aprovada: o YouTube vai escolher um quadro.' %></p>
+    <% if (!uploadLive) { %><p class="notice small">Modo de teste <%= locals.testAt || '' %>: o que sair por aí é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
+    <label class="check <%= ytLinked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="youtube" checked <%= ytLinked ? '' : 'disabled' %>> YouTube<% if (ytAcc && ytAcc.reauth) { %> <span class="handle bad-text">reconectar</span><% } %><% if (ytAcc) { %> <span class="handle muted"><%= ytAcc.handle %></span><% } %></label>
+    <label>Título <small class="counter" data-counter-for="ep-pt" data-max="<%= L.LIMITS.youtube.title.max %>" data-ideal="<%= L.LIMITS.youtube.title.ideal %>"></small><input type="text" id="ep-pt" name="title" data-ai="titulo_youtube" data-ai-episode="<%= ep.id %>" value="<%= (meta && meta.yt_title) || ep.title %>" maxlength="100"></label>
+    <details class="more">
+      <summary>Descrição (vem dos textos de publicação)</summary>
+      <label class="top-gap">Descrição <small class="counter" data-counter-for="ep-pd" data-max-bytes="<%= L.LIMITS.youtube.descriptionBytes %>"></small><textarea id="ep-pd" name="description" data-ai="descricao_youtube" data-ai-episode="<%= ep.id %>" rows="10"><%= (meta && meta.yt_description) || '' %></textarea></label>
+    </details>
+    <label>Agendar <small class="muted">(opcional, horário de Brasília)</small><input type="datetime-local" name="agendar"></label>
+    <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica no YouTube.</label>
+    <div class="row modal-actions"><button class="btn primary" type="submit"><%= uploadLive ? 'Publicar no YouTube' : 'Montar pedido (modo de teste)' %></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (epPubs.length) { %>
+<ul class="pubs">
+  <% epPubs.forEach(function (p) { var b = p.retry_at && PUB2[p.status] ? ['b-amber', 'nova tentativa às ' + fmt.formatSoon(p.retry_at)] : PUB2[p.status]; %>
+  <li>
+    <div class="row"><span class="badge <%= b[0] %>"><%= b[1] %></span><strong><%= p.title %></strong><span class="handle muted"><%= fmt.formatDateTime(p.scheduled_at && p.status === 'agendado' ? p.scheduled_at : p.created_at) %></span></div>
+    <% (p.results || []).forEach(function (r) { %><p class="small <%= r.ok || r.retry_at ? '' : 'err' %>"><%= UP2[r.platform] ? UP2[r.platform].label : r.platform %>: <%= r.simulated ? 'simulado, nada enviado' : (r.ok ? (r.url ? '' : (r.note || 'ok')) : (r.hint || r.error || r.status)) %><% if (r.url && /^https?:\/\//.test(r.url)) { %> <a href="<%= r.url %>" target="_blank" rel="noopener">abrir no YouTube</a><% } %></p><% }) %>
+    <% if (p.error && !(p.results || []).some(function (r) { return r.hint; })) { %><p class="small err"><%= p.error %></p><% } %>
+    <% if (perm.review) { %><p class="row small">
+      <% if (p.status === 'enviando') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
+      <% if (p.status === 'erro' || p.status === 'parcial') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/repetir" class="inline" data-busy="enviando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= p.retry_at ? 'reenviar agora' : p.status === 'parcial' ? 'reenviar as que falharam' : 'tentar de novo' %></button></form><% } %>
+      <% if (p.status === 'agendado') { %><form method="post" action="/episodios/<%= ep.id %>/publicacoes/<%= p.id %>/cancelar" class="inline" data-confirm="Cancelar este agendamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">cancelar agendamento</button></form><% } %>
+    </p><% } %>
+  </li>
+  <% }) %>
+</ul>
+<% } %>

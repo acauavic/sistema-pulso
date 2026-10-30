@@ -1,0 +1,39 @@
+<%# Painel de gestão em dois níveis: grupos (linha de cima) e abas do grupo (linha de baixo). Variável: active (chave da aba). %>
+<%
+  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage', 'trash.manage'];
+  var groups = [
+    { label: 'Visão geral', tabs: [['geral', '/gestao', 'Visão geral', ANY]] },
+    { label: 'Equipe', tabs: [
+      ['usuarios', '/usuarios', 'Usuários', ['users.read']],
+      ['logs', '/auditoria', 'Logs', ['audit.read']],
+    ] },
+    { label: 'Operação', tabs: [
+      ['cadencia', '/gestao/cadencia', 'Cadência de follow-up', ['outreach.manage']],
+      ['lembretes', '/gestao/lembretes', 'Lembretes da gravação', ['reminders.manage']],
+      ['rotinas', '/gestao/rotinas', 'Rotinas de tarefas', ['routines.manage']],
+      ['notificacoes', '/gestao/notificacoes', 'Notificações', ['notifications.manage']],
+    ] },
+    { label: 'Convites e parcerias', tabs: [
+      ['whatsapp', '/gestao/whatsapp', 'WhatsApp dos convites', ['contacts.manage']],
+      ['planos', '/gestao/patrocinios', 'Planos de patrocínio', ['plans.manage']],
+      ['galeria', '/gestao/galeria-kit', 'Galeria do media kit', ['plans.manage']],
+    ] },
+    { label: 'Sistema', tabs: [
+      ['integracoes', '/integracoes', 'Integrações', ['integrations.manage']],
+      ['busca', '/gestao/busca', 'Busca global', ['search.manage']],
+      ['sistema', '/gestao/sistema', 'Saúde do sistema', ['integrations.manage']],
+      ['lixeira', '/lixeira', 'Lixeira', ['trash.manage']],
+    ] },
+  ];
+  groups.forEach(function (g) { g.shown = g.tabs.filter(function (t) { return t[3].some(function (p) { return can(p); }); }); g.on = g.tabs.some(function (t) { return t[0] === active; }); });
+  var visible = groups.filter(function (g) { return g.shown.length; });
+  var current = visible.filter(function (g) { return g.on; })[0];
+%>
+<nav class="subnav subnav-groups" aria-label="Painel de gestão">
+  <% visible.forEach(function (g) { %><a href="<%= g.shown[0][1] %>" class="<%= g.on ? 'on' : '' %>"<%- g.on ? ' aria-current="true"' : '' %>><%= g.label %></a><% }) %>
+</nav>
+<% if (current && current.shown.length > 1) { %>
+<nav class="subnav-inner" aria-label="<%= current.label %>">
+  <% current.shown.forEach(function (t) { %><a href="<%= t[1] %>" class="<%= active === t[0] ? 'on' : '' %>"<%- active === t[0] ? ' aria-current="page"' : '' %>><%= t[2] %></a><% }) %>
+</nav>
+<% } %>

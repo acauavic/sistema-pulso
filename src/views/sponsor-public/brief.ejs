@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title><%= title %> · Pulso</title>
+<link rel="stylesheet" href="/static/patrocinador.css?v=<%= assetV %>">
+</head>
+<body>
+<%
+  var firstName = String(sponsor.contact_name || '').trim().split(/\s+/)[0];
+%>
+<div class="topbar">
+  <div class="topbar-logo">pulso<span>.</span></div>
+  <div class="topbar-tag">Cadastro do patrocinador</div>
+</div>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow"><%= sponsor.company %></div>
+    <h1><%= firstName ? firstName + ', vamos' : 'Vamos' %><br>conhecer sua marca.</h1>
+    <p class="brief-intro">Estas respostas ajudam o Pulso a apresentar a <%= sponsor.company %> do jeito certo durante as gravações. Leva poucos minutos, você pode responder por texto ou por voz e voltar depois para ajustar.</p>
+  </div>
+</div>
+
+<section>
+  <% if (sent) { %><div class="notice ok" role="status">Recebemos suas respostas. Obrigado! O que ficou em branco aparece como pendência: é só voltar a este link quando quiser responder.</div><% } %>
+  <% if (error) { %><div class="notice err" role="alert"><%= error %></div><% } %>
+<%
+  var LABEL = { respondida: 'respondida', nao_se_aplica: 'não se aplica', pendente: 'pendente', aberta: 'por responder' };
+  var total = questions.length;
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  var isDone = function (k) { return status.states[k] === 'respondida' || status.states[k] === 'nao_se_aplica'; };
+  var startAt = sent ? 'resumo' : (questions.find(function (q) { return status.states[q.key] === 'aberta'; }) || questions.find(function (q) { return status.states[q.key] === 'pendente'; }) || { key: 'resumo' }).key;
+%>
+  <form method="post" action="<%= base %>/cadastro" class="brief-form" data-brief data-base="<%= base %>" data-csrf="<%= csrf %>" data-start="<%= startAt %>" data-states="<%= JSON.stringify(status.states) %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+    <div class="progress" data-progress hidden>
+      <ol class="steps" aria-label="Perguntas do formulário">
+        <% questions.forEach(function (q, i) { %>
+        <li class="st-<%= status.states[q.key] %>" data-step="<%= q.key %>">
+          <button type="button" data-goto="<%= q.key %>" aria-label="Pergunta <%= i + 1 %>: <%= q.title %> (<%= LABEL[status.states[q.key]] %>)">
+            <span class="step-n"><%= pad(i + 1) %></span><span class="step-l"><%= q.short %></span><span class="step-s" data-step-label><%= LABEL[status.states[q.key]] %></span>
+          </button>
+        </li>
+        <% }) %>
+      </ol>
+      <p class="steps-sum" data-sum role="status"></p>
+      <p class="legend"><span class="lg lg-respondida"></span>respondida <span class="lg lg-pendente"></span>pendente (você escolheu responder depois) <span class="lg lg-aberta"></span>por responder</p>
+    </div>
+
+    <div class="q" data-q="logo">
+      <span class="q-n">01 / 08 <em class="q-state" data-q-state></em></span>
+      <h3>Logo da marca</h3>
+      <p class="hint">Em PNG, de preferência sem fundo (transparente), para aplicarmos no vídeo.</p>
+      <div class="logo-drop">
+        <% if (logo) { %><img src="<%= base %>/arquivo/<%= logo.id %>" alt="Logo atual" data-logo-img><% } else { %><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" data-logo-img hidden><% } %>
+        <div>
+          <input type="file" accept="image/png" data-logo-file <%= storageReady ? '' : 'disabled' %>>
+          <p class="logo-state" data-logo-state><%= logo ? 'Logo enviada. Envie outra para substituir.' : (storageReady ? 'Nenhuma logo enviada ainda.' : 'Envio de arquivos indisponível no momento.') %></p>
+        </div>
+      </div>
+      <%- include('_actions', { q: questions[0] }) %>
+    </div>
+
+    <div class="q" data-q="landing">
+      <span class="q-n">02 / 08 <em class="q-state" data-q-state></em></span>
+      <h3>Vocês querem disponibilizar uma página para a gente divulgar?</h3>
+      <p class="hint">Pode ser uma página com brinde ou não. Se tiver, cole o link e conte o que a pessoa ganha ao entrar. Se ainda não tiver, deixe para depois.</p>
+      <input type="url" name="landing_url" value="<%= brief.landing_url || '' %>" maxlength="500" placeholder="https://…" aria-label="Link da página de divulgação">
+      <textarea name="landing_perk" rows="2" maxlength="1000" placeholder="Brinde ou benefício dessa página (se houver)" aria-label="Brinde ou benefício"><%= brief.landing_perk || '' %></textarea>
+      <%- include('_actions', { q: questions[1] }) %>
+    </div>
+
+    <% var texts = [
+      ['offer', 2, 'Oferta ou ação especial para quem vier pelo podcast', 'Vocês querem oferecer algo como consultoria gratuita, diagnóstico, brinde, desconto, convite para evento ou alguma condição exclusiva? Ou preferem que a gente apenas apresente a empresa e direcione para o site/página?'],
+      ['presentation', 3, 'Como vocês querem que a gente apresente a empresa?', 'Se tiverem um texto institucional, apresentação ou uma mensagem que já utilizam, podem colar aqui. A gente adapta para a linguagem do podcast.'],
+      ['key_points', 4, 'Principais pontos que vocês querem destacar', 'Produto ou serviço, diferencial, público, cases, resultados…'],
+      ['restrictions', 5, 'Restrições de comunicação', 'Existe alguma informação, promessa, termo ou abordagem que vocês não querem que seja utilizada na apresentação da marca?'],
+    ]; %>
+    <% texts.forEach(function (x) { %>
+    <div class="q" data-voice data-field="<%= x[0] %>" data-q="<%= x[0] %>">
+      <span class="q-n"><%= pad(x[1] + 1) %> / 08 <em class="q-state" data-q-state></em></span>
+      <h3><%= x[2] %></h3>
+      <p class="hint"><%= x[3] %></p>
+      <textarea name="<%= x[0] %>" rows="5" maxlength="6000" aria-label="<%= x[2] %>"><%= brief[x[0]] || '' %></textarea>
+      <% if (voiceReady && storageReady) { %>
+      <div class="voice-bar">
+        <button type="button" class="btn-voice" data-voice-toggle>Responder por voz</button>
+        <span class="voice-status" data-voice-status role="status"></span>
+      </div>
+      <% } %>
+      <%- include('_actions', { q: questions[x[1]] }) %>
+    </div>
+    <% }) %>
+
+    <div class="q" data-q="slogan">
+      <span class="q-n">07 / 08 <em class="q-state" data-q-state></em></span>
+      <h3>Slogan ou frase-chave da marca</h3>
+      <p class="hint">Se existir.</p>
+      <input type="text" name="slogan" value="<%= brief.slogan || '' %>" maxlength="200" aria-label="Slogan">
+      <%- include('_actions', { q: questions[6] }) %>
+    </div>
+
+    <div class="q" data-q="goal">
+      <span class="q-n">08 / 08 <em class="q-state" data-q-state></em></span>
+      <h3>Qual é o principal objetivo do patrocínio para vocês?</h3>
+      <div class="radio-grid">
+        <% Object.keys(goals).forEach(function (k) { %>
+        <label><input type="radio" name="goal" value="<%= k %>" <%= brief.goal === k ? 'checked' : '' %>> <%= goals[k] %></label>
+        <% }) %>
+      </div>
+      <input type="text" name="goal_other" value="<%= brief.goal_other || '' %>" maxlength="500" placeholder="Se for outro resultado, qual?" aria-label="Outro objetivo">
+      <%- include('_actions', { q: questions[7] }) %>
+    </div>
+
+    <div class="q q-summary" data-q="resumo" hidden>
+      <span class="q-n">Resumo</span>
+      <h3 data-sum-title>Suas respostas</h3>
+      <p class="hint" data-sum-text></p>
+      <ul class="sum-list">
+        <% questions.forEach(function (q, i) { %>
+        <li class="st-<%= status.states[q.key] %>" data-sum-item="<%= q.key %>">
+          <span class="sum-dot"></span><span class="sum-t"><%= pad(i + 1) %> · <%= q.title %></span><span class="sum-s" data-sum-state><%= LABEL[status.states[q.key]] %></span>
+          <button type="button" class="btn-ghost" data-goto="<%= q.key %>" data-sum-btn><%= isDone(q.key) ? 'Editar' : 'Responder agora' %></button>
+        </li>
+        <% }) %>
+      </ul>
+    </div>
+
+    <button class="btn-submit" type="submit" data-nojs-submit>Enviar respostas</button>
+  </form>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">pulso<span>.</span></div>
+    <div class="footer-tag">As conversas que estão movimentando a saúde.</div>
+  </div>
+</footer>
+<script src="/static/brief.js?v=<%= assetV %>" defer></script>
+</body>
+</html>

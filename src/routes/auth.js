@@ -13,9 +13,9 @@ const { isEmail, clean } = require('../utils/format');
 
 const router = express.Router();
 
-const loginLimiterIp = createLimiter({ max: 30, windowMs: 15 * 60_000 }); // só tentativas FALHAS contam
-const loginLimiterEmail = createLimiter({ max: 8, windowMs: 15 * 60_000 });
-const forgotLimiter = createLimiter({ max: 5, windowMs: 15 * 60_000 });
+const loginLimiterIp = createLimiter({ name: 'login_ip', max: 30, windowMs: 15 * 60_000 }); // só tentativas FALHAS contam
+const loginLimiterEmail = createLimiter({ name: 'login_email', max: 8, windowMs: 15 * 60_000 });
+const forgotLimiter = createLimiter({ name: 'esqueci', max: 5, windowMs: 15 * 60_000 });
 
 const NOTICES = {
   senha: 'Senha definida! Entre com seu e-mail e a nova senha.',
@@ -32,7 +32,7 @@ router.post('/login', wrap(async (req, res) => {
   const password = typeof req.body.password === 'string' ? req.body.password : '';
   const fail = (status, error) => res.status(status).render('login', { title: 'Entrar', error, email, notice: null });
 
-  if (loginLimiterIp.blocked(req.ip) || loginLimiterEmail.blocked(email)) {
+  if (await loginLimiterIp.blocked(req.ip) || await loginLimiterEmail.blocked(email)) {
     return fail(429, 'Muitas tentativas. Aguarde alguns minutos e tente de novo.');
   }
   const { rows } = await db.query('SELECT * FROM users WHERE lower(email) = $1', [email]);
@@ -40,12 +40,12 @@ router.post('/login', wrap(async (req, res) => {
   const ok = user && user.active && user.password_hash && (await verifyPassword(password, user.password_hash));
   if (!user || !user.password_hash) await burnPasswordCheck(password);
   if (!ok) {
-    loginLimiterIp.hit(req.ip);
-    loginLimiterEmail.hit(email);
+    await loginLimiterIp.hit(req.ip);
+    await loginLimiterEmail.hit(email);
     await audit({ user: null, ip: req.ip }, 'login.falha', 'user', user?.id, { email });
     return fail(401, 'E-mail ou senha incorretos.');
   }
-  loginLimiterEmail.reset(email);
+  await loginLimiterEmail.reset(email);
   await sessions.createSession(res, user.id, req);
   await db.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
   await audit({ user, ip: req.ip }, 'login.ok', 'user', user.id);
@@ -68,7 +68,7 @@ router.get('/esqueci-senha', (req, res) => res.render('forgot', { title: 'Esquec
 router.post('/esqueci-senha', wrap(async (req, res) => {
   const email = clean(req.body.email, 254).toLowerCase();
   const render = () => res.render('forgot', { title: 'Esqueci minha senha', sent: true, email });
-  if (!isEmail(email) || !forgotLimiter.hit(req.ip) || !forgotLimiter.hit(email)) return render(); // resposta idêntica sempre
+  if (!isEmail(email) || !await forgotLimiter.hit(req.ip) || !await forgotLimiter.hit(email)) return render(); // resposta idêntica sempre
   const { rows } = await db.query('SELECT id, name, email, active FROM users WHERE lower(email) = $1', [email]);
   const user = rows[0];
   if (user && user.active) {

@@ -1,0 +1,14 @@
+<%# Abas da área Social. Variável: tab (chave da aba). %>
+<% var socialTabs = [
+  ['publicacoes', '/social/publicacoes', 'Publicações'],
+  ['novo', '/social/novo', 'Novo post'],
+  ['ideias', '/social/ideias', 'Ideias'],
+  ['insights', '/social/insights', 'Insights'],
+  ['automacoes', '/social/automacoes', 'Automações'],
+]; %>
+<div class="page-head"><div><span class="kicker">Social</span><h1><%= { publicacoes: 'Publicações', novo: 'Novo post', ideias: 'Ideias para as redes', insights: 'Insights', automacoes: 'Automações' }[tab] %></h1></div></div>
+<nav class="subnav" aria-label="Social">
+  <% socialTabs.forEach(function (t) { %><a href="<%= t[1] %>" class="<%= tab === t[0] ? 'on' : '' %>"<%- tab === t[0] ? ' aria-current="page"' : '' %>><%= t[2] %></a><% }) %>
+</nav>
+<%- include('conn-alerts') %>
+<% if (typeof live !== 'undefined' && !live) { %><p class="test-mode small"><%- icon('info', 14) %> <span>Modo de teste<%= locals.testAt ? ' ' + testAt : '' %>: posts, respostas e directs <%= locals.testAt ? 'que saírem por aí ' : '' %>são montados e conferidos, mas nada sai para as redes. A publicação de verdade é ligada pela gestão em Integrações &gt; Redes sociais.</span></p><% } %>
