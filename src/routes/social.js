@@ -91,7 +91,7 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   const okPlatforms = (pub.results || []).filter((r) => r.ok).map((r) => r.platform);
   const providers = socialApi.providersOf(pub); // um, ou vários quando as redes foram divididas entre provedores
   const viaOf = (p) => socialApi.get((pub.results || []).find((r) => r.platform === p)?.provider || pub.options?.routes?.[p] || pub.provider);
-  const canEditNet = (p) => viaOf(p).canEdit && up.EDITABLE[p];
+  const canEditNet = (p) => !(pub.results || []).some((r) => r.platform === p && r.manual) && viaOf(p).canEdit && up.EDITABLE[p];
   const canResend = can(req.user.role, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
   const resend = canResend ? await resendChoices(pub) : null;
   res.render('social/publication', {
@@ -142,6 +142,16 @@ router.post('/social/publicacoes/:id/reenviar', requirePerm('social.publish'), w
 }));
 
 // revisão da gestão
+// Uma rede foi postada por fora (pelo app da rede): registra o link e a rede passa a contar como no ar.
+router.post('/social/publicacoes/:id/por-fora', requirePerm('social.publish'), wrap(async (req, res) => {
+  const pub = await findPub(req.params.id);
+  if (!pub) return notFound(res);
+  const r = await publishing.markManual(pub.id, { platform: String(req.body.platform || ''), url: String(req.body.url || ''), user: req.user });
+  if (r.error) await req.flash('error', r.error);
+  else { await audit(req, 'publicacao.postada_por_fora', 'publication', pub.id, { rede: req.body.platform }); await req.flash('ok', `Registrado: ${up.PLATFORMS[req.body.platform].label} postado por fora.`); }
+  res.redirect(`/social/publicacoes/${pub.id}`);
+}));
+
 router.post('/social/publicacoes/:id/aprovar', requirePerm('social.publish'), wrap(async (req, res) => {
   const pub = await findPub(req.params.id);
   if (!pub) return notFound(res);

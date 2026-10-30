@@ -170,7 +170,7 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     db.query('SELECT id, kind, position, label, lint, approved, auto, updated_at FROM episode_covers WHERE clip_id = $1 ORDER BY position', [c.id]),
     db.query('SELECT * FROM episode_publications WHERE clip_id = $1 ORDER BY created_at DESC, id DESC', [c.id]),
     eligibleEpisodes(),
-    c.episode_id ? db.query('SELECT e.id, e.number, e.title, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.id = $1', [c.episode_id]) : { rows: [] },
+    c.episode_id ? db.query('SELECT e.id, e.number, e.title, g.name AS guest_name, g.instagram AS guest_instagram FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.id = $1', [c.episode_id]) : { rows: [] },
   ]);
   const provider = await socialApi.active();
   const ls = await socialApi.liveState();
@@ -210,6 +210,26 @@ router.post('/cortes/:id/atribuir', requirePerm('episodes.read'), wrap(async (re
     await req.flash('ok', `Atribuído ao ${result.episode.number ? `EP.${String(result.episode.number).padStart(3, '0')}` : 'episódio'} ${result.episode.title}.`);
   }
   res.redirect(back);
+}));
+
+// Corte postado por fora (emergência, ou sem passar pelo sistema): links do post em cada rede, collab e quando saiu.
+router.post('/cortes/:id/por-fora', requirePerm('social.publish'), wrap(async (req, res) => {
+  const c = await findClip(req); if (!c) return notFound(res);
+  const back = `/cortes/${c.id}`;
+  const parsed = publishing.parseLinks(req.body.links);
+  const igPeople = require('../services/igPeople');
+  const rawCollab = String(req.body.collab || '').split(/[\s,]+/).filter(Boolean);
+  const collab = [...new Set(rawCollab.map(igPeople.clean).filter(Boolean))];
+  let at = null;
+  if (req.body.quando) { at = fmt.parseInputDateTime(String(req.body.quando)); if (!at || at > new Date(Date.now() + 5 * 60_000)) at = 'x'; }
+  const error = parsed.error || (collab.length < rawCollab.length && 'Collab: use o @ de cada perfil do Instagram.')
+    || (collab.length > igPeople.MAX_COLLAB && `Collab no Instagram: no máximo ${igPeople.MAX_COLLAB} perfis.`) || (at === 'x' && 'Data inválida (o post já tem que ter saído).');
+  if (error) { await req.flash('error', error); return res.redirect(back); }
+  const r = await publishing.createManual({ clipId: c.id, links: parsed.links, collaborators: collab, at, user: req.user });
+  if (r.error) { await req.flash('error', r.error); return res.redirect(back); }
+  await audit(req, 'corte.postado_por_fora', 'clip', c.id, { redes: parsed.links.map((l) => l.platform) });
+  await req.flash('ok', `Registrado: postado por fora em ${parsed.links.map((l) => up.PLATFORMS[l.platform].label).join(', ')}.`);
+  res.redirect(`/social/publicacoes/${r.pub.id}`);
 }));
 
 router.post('/cortes/:id/reprocessar', requirePerm('episodes.read'), wrap(async (req, res) => {

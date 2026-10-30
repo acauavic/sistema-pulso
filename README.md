@@ -24,6 +24,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - [Portal do convidado](#portal-do-convidado)
 - [Financeiro: contas, custos automáticos e estoque](#financeiro-contas-custos-automáticos-e-estoque)
 - [Social: publicações, novo post, ideias, insights e automações](#social-publicações-novo-post-ideias-insights-e-automações)
+- [Post feito por fora do sistema](#post-feito-por-fora-do-sistema)
 - [Colaboração: tarefas, comentários, notificações e busca](#colaboração-tarefas-comentários-notificações-e-busca)
 - [Arquitetura: processos, fila, rotinas e avisos](#arquitetura-processos-fila-rotinas-e-avisos)
 - [Assistente de IA](#assistente-de-ia)
@@ -376,6 +377,15 @@ imagem para posicionar cada marcação. Vai pelos dois provedores. Código: `src
 ## Conteúdos do episódio (pedidos)
 
 Ao criar o episódio, quem cria marca o que pedir ao editor: **Cortes**, **Q&A**, **Bastidores** e **Conteúdo extra**. Vêm das rotinas "Episódio criado" de Gestão > Rotinas que estão como "pedido de conteúdo", com prazo, responsável, se vêm marcadas e se são prioridade. Cada marcado vira um pedido de conteúdo (`content_requests`), e a entrega sobe no sistema, sem Drive. O episódio criado a partir do convidado gravado usa os que vêm marcados. **Cortes** é um pedido contínuo: cada corte sobe quando fica pronto e já pode ser publicado no Social. O editor conclui a leva com "Concluir cortes", e "Retomar" reabre. Os outros pedidos seguem o fluxo de sempre: entrega, revisão, aprovado e Social.
+
+## Post feito por fora do sistema
+
+Quando um corte é postado pelo app da rede (emergência, ou o sistema falhou), registre o link para o sistema saber que ele saiu:
+
+- **Corte que não passou pelo sistema**: na página do corte, "Postado por fora? Registrar o link". Cole o link do post em cada rede (um por linha; a rede é reconhecida pelo endereço), o collab do Instagram (já vem com o @ do convidado) e quando saiu. Vira uma publicação no ar, com o texto do corte: conta no Conteúdo, no Social e no portal do convidado (inclusive como collab).
+- **Rede que falhou numa publicação**: na linha da rede, "postei por fora" abre a janela com a rede e o link. A rede passa a contar como no ar e as novas tentativas automáticas daquela rede param.
+
+Rede registrada por fora não é editada pelo provedor (edite pelo app da rede).
 
 ## Lixeira
 

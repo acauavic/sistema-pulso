@@ -6,6 +6,7 @@
   var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
   var pending = ['revisao', 'recusado'].indexOf(pub.status) >= 0;
   var notYetOut = ['agendado', 'revisao', 'recusado'].indexOf(pub.status) >= 0; // ainda não saiu: o texto muda aqui
+  var canManual = canPublish && ['erro', 'parcial', 'publicado', 'simulado'].indexOf(pub.status) >= 0;
   var canEdit = (canPublish && ['agendado', 'publicado', 'parcial', 'simulado', 'revisao', 'recusado'].indexOf(pub.status) >= 0 && (viaCanEdit || notYetOut)) || (mine && pending);
 %>
 <div class="page-head">
@@ -58,7 +59,7 @@
         <dt><%= pub.status === 'agendado' ? 'Agendado para' : 'Enviado em' %></dt><dd class="mono"><%= fmt.formatDateTime(pub.status === 'agendado' ? pub.scheduled_at : pub.created_at) %></dd>
         <% if (pub.edited_at) { %><dt>Editado em</dt><dd class="mono"><%= fmt.formatDateTime(pub.edited_at) %></dd><% } %>
         <dt>Por</dt><dd><%= pub.created_by_name || '—' %></dd>
-        <% if (pub.provider) { %><dt>Saiu <%= providers.length > 1 ? 'por' : (provider.by.split(' ')[0]) %></dt><dd><%= providerNames %></dd><% } %>
+        <% if (pub.options && pub.options.manual) { %><dt>Saiu</dt><dd>por fora, pelo app da rede (registrado aqui)</dd><% } else if (pub.provider) { %><dt>Saiu <%= providers.length > 1 ? 'por' : (provider.by.split(' ')[0]) %></dt><dd><%= providerNames %></dd><% } %>
         <% var igo = pub.options && pub.options.instagram; %>
         <% if (igo && igo.collaborators && igo.collaborators.length) { %><dt>Collab no Instagram</dt><dd class="pub-people mono"><% igo.collaborators.forEach(function (h) { %><span>@<%= h %></span><% }) %></dd><% } %>
         <% if (igo && igo.tags && igo.tags.length) { %><dt>Marcados</dt><dd class="pub-people mono"><% igo.tags.forEach(function (t) { %><span>@<%= t.username %></span><% }) %></dd><% } %>
@@ -75,6 +76,8 @@
           <% if (r.url) { %><a class="small" href="<%= r.url %>" target="_blank" rel="noopener noreferrer">abrir <%- icon('external-link', 14) %></a><% } %>
           <% if (!r.ok && r.hint) { %><span class="small <%= again ? '' : 'bad-text' %>"><%= r.hint %></span><span class="small muted">Resposta: <%= r.error %></span><% } else if (r.error) { %><span class="small bad-text"><%= r.error %></span><% } %>
           <% if (r.note) { %><span class="small muted"><%= r.note %></span><% } %>
+          <% if (r.manual) { %><span class="small muted">Postado por fora<%= r.manual_by ? ' · registrado por ' + r.manual_by : '' %><%= r.manual_at ? ' em ' + fmt.formatDateTime(r.manual_at) : '' %></span><% } %>
+          <% if (canManual && !r.ok && !r.simulated) { %><button class="link small" type="button" data-fill-modal="modal-por-fora" data-fill-action="/social/publicacoes/<%= pub.id %>/por-fora" data-fill='<%- JSON.stringify({ platform: k, url: "" }) %>'>postei por fora</button><% } %>
           <% if (pub.options && pub.options.texts && pub.options.texts[k]) { %><span class="small muted">Com texto próprio desta rede (editado no reenvio).</span><% } %>
           <% if (resend && !r.ok && r.error && !r.retry_at) { var rn = resend.list.find(function (n) { return n.key === k; }); if (rn && !rn.noAccount) { %><button class="link small" type="button" data-resend-net="<%= k %>">Corrigir e reenviar só <%= label(k) %></button><% } } %>
         </li>
@@ -176,5 +179,17 @@
   </form>
 </dialog>
 <script src="/static/reenviar.js?v=<%= assetV %>" defer></script>
+<% } %>
+<% if (canManual) { %>
+<dialog class="modal" id="modal-por-fora" aria-labelledby="mpf-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %>
+    <h2 id="mpf-h">Postado por fora</h2>
+    <p class="small muted">Quando o envio falha (ou a rede não estava na publicação) e alguém posta pelo app da rede, registre o link aqui. A rede passa a contar como no ar, sem novas tentativas.</p>
+    <label>Rede<select name="platform" required><% Object.keys(platforms).forEach(function (k) { %><option value="<%= k %>"><%= label(k) %></option><% }) %></select></label>
+    <label>Link do post<input type="url" name="url" required maxlength="500" placeholder="https://www.instagram.com/reel/…"></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Registrar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
 <% } %>
 <%- include('../partials/foot') %>

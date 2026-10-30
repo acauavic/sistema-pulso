@@ -107,6 +107,20 @@
       <% } else { %>
       <p class="small muted">Escolha as redes, o texto e o horário na janela. <%= perm.direct ? '' : 'O post vai para a revisão da gestão antes de sair.' %></p>
       <button class="btn <%= publications.length ? '' : 'primary' %>" type="button" data-modal-open="modal-publicar"><%- icon('send') %> <%= perm.direct ? 'Publicar nas redes' : 'Pedir publicação' %></button>
+      <% if (perm.direct) { %>
+      <p class="small top-gap"><button class="link small" type="button" data-modal-open="modal-por-fora">Postado por fora? Registrar o link</button></p>
+      <dialog class="modal" id="modal-por-fora" aria-labelledby="mpfc-h">
+        <form method="post" action="/cortes/<%= clip.id %>/por-fora" class="stack">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <h2 id="mpfc-h">Corte postado por fora</h2>
+          <p class="small muted">Postou pelo app da rede (emergência, ou o sistema falhou)? Cole o link do post em cada rede. O sistema reconhece a rede pelo link, e o corte passa a contar como publicado, também no portal do convidado.</p>
+          <label>Links do post <small class="muted">(um por linha)</small><textarea name="links" rows="3" required placeholder="https://www.instagram.com/reel/…&#10;https://www.tiktok.com/@…/video/…"></textarea></label>
+          <label>Collab no Instagram <small class="muted">(os @, se houve)</small><input type="text" name="collab" maxlength="120" value="<%= episode && episode.guest_instagram ? '@' + episode.guest_instagram.replace(/^@+/, '') : '' %>" placeholder="@perfil"></label>
+          <label>Quando saiu <small class="muted">(vazio = agora)</small><input type="datetime-local" name="quando"></label>
+          <div class="row modal-actions"><button class="btn primary" type="submit">Registrar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+        </form>
+      </dialog>
+      <% } %>
       <dialog class="modal modal-wide" id="modal-publicar" aria-labelledby="mpub-h">
       <h2 id="mpub-h">Publicar nas redes</h2>
       <% if (!uploadLive) { %><p class="notice small">Modo de teste <%= locals.testAt || '' %>: o que sair por aí é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>

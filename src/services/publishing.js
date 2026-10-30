@@ -630,6 +630,66 @@ async function sendAgain(cur, targets, extra, from) {
 }
 
 // Parar as novas tentativas automáticas (a equipe resolve por fora ou desiste): a publicação fica como está, com o motivo.
+// ---------------------------------------------------------------- postado por fora
+// Quando o sistema falhou (ou nem foi usado), alguém posta pelo app da rede e registra aqui o link: a rede passa a contar como
+// no ar (results com manual: true), e o resto do sistema (Conteúdo, portal do convidado, collab) enxerga como qualquer post.
+const NET_BY_HOST = [[/(^|\.)instagram\.com$/, 'instagram'], [/(^|\.)tiktok\.com$/, 'tiktok'], [/(^|\.)(youtube\.com|youtu\.be)$/, 'youtube'],
+  [/(^|\.)(facebook\.com|fb\.watch)$/, 'facebook'], [/(^|\.)linkedin\.com$/, 'linkedin'], [/(^|\.)threads\.(net|com)$/, 'threads'], [/(^|\.)(x\.com|twitter\.com)$/, 'x']];
+function networkOf(url) {
+  try {
+    const u = new URL(String(url || '').trim());
+    if (!/^https?:$/.test(u.protocol)) return null;
+    return (NET_BY_HOST.find(([re]) => re.test(u.hostname.toLowerCase())) || [])[1] || null;
+  } catch { return null; }
+}
+// Links colados (um por linha ou separados por espaço) -> { links: [{ platform, url }] } ou { error }.
+function parseLinks(raw) {
+  const parts = String(raw || '').split(/\s+/).map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return { error: 'Cole o link do post (um por rede).' };
+  const links = [];
+  for (const url of parts) {
+    const platform = networkOf(url);
+    if (!platform) return { error: `Não reconheci a rede deste link: ${url.slice(0, 80)}. Use o link do post no Instagram, TikTok, YouTube, Facebook, LinkedIn, Threads ou X.` };
+    if (links.some((l) => l.platform === platform)) return { error: `Mais de um link do ${labelOf(platform)}. Registre um post por rede.` };
+    links.push({ platform, url: url.slice(0, 500) });
+  }
+  return { links };
+}
+const manualResult = (platform, url, user, at = new Date()) => ({ platform, ok: true, url, manual: true, provider: 'manual', manual_by: user?.name || null, manual_at: at.toISOString() });
+
+// Uma rede de uma publicação que falhou (ou que não foi incluída) foi postada por fora.
+async function markManual(pubId, { platform, url, user }) {
+  const { rows: [pub] } = await db.query('SELECT * FROM episode_publications WHERE id = $1', [pubId]);
+  if (!pub) return { error: 'Publicação não encontrada.' };
+  if (!['erro', 'parcial', 'publicado', 'simulado'].includes(pub.status)) return { error: 'Espere o envio terminar (ou cancele o agendamento) antes de registrar um post feito por fora.' };
+  if (!up.PLATFORMS[platform]) return { error: 'Escolha a rede.' };
+  if (networkOf(url) !== platform) return { error: `Cole o link do post no ${labelOf(platform)}.` };
+  const results = [...(pub.results || []).filter((r) => r.platform !== platform), manualResult(platform, String(url).trim().slice(0, 500), user)];
+  const platforms = pub.platforms.includes(platform) ? pub.platforms : [...pub.platforms, platform];
+  const state = pub.status === 'simulado' ? 'simulado' : finalState(results);
+  const { rows: [saved] } = await db.query(
+    'UPDATE episode_publications SET status = $2, results = $3, platforms = $4, retry_at = $5, error = CASE WHEN $2 = \'erro\' THEN error ELSE NULL END, updated_at = now() WHERE id = $1 RETURNING *',
+    [pub.id, state, JSON.stringify(results), platforms, E.nextRetry(results)]);
+  await addEvent(pub.episode_id, user?.id, `Postado por fora no ${labelOf(platform)}: ${pub.title}`);
+  if (state === 'publicado' && pub.status !== 'publicado') await afterPublished(saved, results);
+  return { pub: saved };
+}
+
+// Corte postado por fora (sem passar pelo sistema): vira uma publicação "no ar" com os links, o texto do corte e o collab informado.
+async function createManual({ clipId, links, collaborators = [], at = null, user }) {
+  const { rows: [c] } = await db.query('SELECT * FROM episode_clips WHERE id = $1', [clipId]);
+  if (!c) return { error: 'Corte não encontrado.' };
+  const when = at || new Date();
+  const options = { manual: true, ...(collaborators.length ? { instagram: { collaborators, tags: [] } } : {}) };
+  const { rows: [pub] } = await db.query(
+    `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, status, media, results, options, created_by, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, 'publicado', 'video', $6, $7, $8, $9, $9) RETURNING *`,
+    [c.episode_id, c.id, links.map((l) => l.platform), c.post_title || c.title, c.caption || null,
+      JSON.stringify(links.map((l) => manualResult(l.platform, l.url, user, when))), JSON.stringify(options), user?.id || null, when]);
+  await addEvent(c.episode_id, user?.id, `Corte postado por fora (${names(links.map((l) => l.platform))}): ${pub.title}`);
+  return { pub };
+}
+
 async function stopRetries(pubId) {
   const { rows: [pub] } = await db.query('SELECT * FROM episode_publications WHERE id = $1 AND retry_at IS NOT NULL', [pubId]);
   if (!pub) return null;
@@ -696,4 +756,4 @@ async function resubmit(pubId, user) {
   return pub || null;
 }
 
-module.exports = { loadTarget, create, dispatch, refresh, tick, retry, resend, textOf, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };
+module.exports = { networkOf, parseLinks, markManual, createManual, loadTarget, create, dispatch, refresh, tick, retry, resend, textOf, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };

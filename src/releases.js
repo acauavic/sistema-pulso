@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.42.0', date: '2026-10-30', title: 'Post feito por fora do sistema',
+    items: [
+      { kind: 'novo', text: 'Corte postado por fora (pelo app da rede, numa emergência ou quando o sistema falhou): na página do corte, "Postado por fora? Registrar o link". Cole o link do post em cada rede (o sistema reconhece a rede pelo link), o collab do Instagram e quando saiu. O corte passa a contar como publicado, inclusive no portal do convidado.' },
+      { kind: 'novo', text: 'Na publicação, cada rede que falhou ganhou "postei por fora": registre o link e a rede passa a contar como no ar, sem novas tentativas automáticas.' },
+    ],
+  },
+  {
     version: '1.41.0', date: '2026-10-30', title: 'Portal do convidado',
     items: [
       { kind: 'novo', text: 'Cada convidado com episódio ganhou a aba "Portal": uma página só dele, que se atualiza sozinha durante a semana do episódio, com o cronograma (cortes na segunda, episódio na sexta), as duas formas de collab e o botão para falar com a produção.' },
