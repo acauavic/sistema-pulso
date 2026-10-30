@@ -126,7 +126,8 @@ describe('Portal do convidado', () => {
     assert.equal(zip.readUInt32LE(0), 0x04034b50);
     assert.equal(zip.readUInt32LE(zip.length - 22), 0x06054b50); assert.equal(zip.readUInt16LE(zip.length - 12), 2, 'duas fotos');
     assert.ok(zip.includes('a.jpg') && zip.includes('foto-bb'));
-    assert.equal(zip.readUInt32LE(14), require('zlib').crc32(Buffer.from('foto-a')) >>> 0);
+    const firstName = zip.subarray(30, 30 + zip.readUInt16LE(26)).toString(); // a ordem das duas fotos pode variar
+    assert.equal(zip.readUInt32LE(14), require('zlib').crc32(Buffer.from(firstName === 'a.jpg' ? 'foto-a' : 'foto-bb')) >>> 0);
   });
 
   it('collab no YouTube: o convidado pede, a equipe é avisada e marca como feita', async () => {
