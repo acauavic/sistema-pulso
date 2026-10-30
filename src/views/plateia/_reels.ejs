@@ -1,0 +1,16 @@
+<%# Vídeo vertical dos bastidores ("veja como foi"). Variáveis: hasWebm, hasMp4, hasReelsPoster, firstName (opcional). %>
+<section class="pl-section pl-reels-sec" id="bastidores">
+  <div class="pl-wrap pl-reels-grid">
+    <div>
+      <span class="pl-kicker">Bastidores</span>
+      <h2>Veja como é estar na plateia.</h2>
+      <p class="pl-lede pl-lede-sm">Uma gravação com plateia do Pulso, do começo ao fim: a recepção, a conversa a poucos metros, o coffee break e o encontro com quem também foi selecionado.</p>
+    </div>
+    <div class="pl-reels">
+      <video controls playsinline preload="none"<% if (hasReelsPoster) { %> poster="/plateia/imagem/bastidores"<% } %> aria-label="Vídeo dos bastidores de uma gravação com plateia">
+        <% if (hasWebm) { %><source src="/plateia/video/bastidores.webm" type="video/webm"><% } %>
+        <% if (hasMp4) { %><source src="/plateia/video/bastidores.mp4" type="video/mp4"><% } %>
+      </video>
+    </div>
+  </div>
+</section>

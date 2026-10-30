@@ -42,8 +42,9 @@
     </div>
     <div class="pl-wrap pl-hero-in">
       <span class="pl-kicker">Pulso Podcast com Plateia · vagas limitadas</span>
-      <h1>Uma plateia pequena para conversas grandes.</h1>
-      <p class="pl-lede">Cada gravação do Pulso recebe poucas pessoas, escolhidas pela produção por afinidade com o convidado e com o tema. Peça para participar, conte quem você é e, se houver encaixe, você viverá a conversa a poucos metros de quem move a saúde.</p>
+      <h1>Conheça de perto quem move a saúde.</h1>
+      <p class="pl-lede">E participe também da gravação do Pulso Podcast. Uma plateia pequena para conversas grandes: poucas pessoas, escolhidas pela produção por afinidade com o convidado e com o tema.</p>
+      <%- include('_benefits') %>
       <a class="pl-btn" href="#agenda" data-track="agenda_click">Ver as próximas gravações</a>
     </div>
     <%- include('../partials/pulse-line') %>
@@ -70,6 +71,8 @@
       <p class="pl-note">O valor é combinado com a produção apenas se o seu pedido for selecionado. Nenhuma cobrança é feita por esta página.</p>
     </div>
   </section>
+
+  <% if (hasReels) { %><%- include('_reels') %><% } %>
 
   <section class="pl-section pl-agenda" id="agenda">
     <div class="pl-wrap">

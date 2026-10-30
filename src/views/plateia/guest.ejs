@@ -35,7 +35,8 @@
     <div class="pl-wrap pl-guest-grid">
       <div class="pl-guest-text">
         <span class="pl-kicker">Pulso Podcast com Plateia · vagas limitadas</span>
-        <h1><%= g.name %></h1>
+        <h1>Conheça de perto <%= g.name %></h1>
+        <p class="pl-lede pl-lede-hero">e participe também da gravação do Pulso Podcast.</p>
         <% if (g.role) { %><p class="pl-role pl-role-lg"><%= g.role %></p><% } %>
         <% if (g.instagram) { %><a class="pl-ig" href="https://www.instagram.com/<%= encodeURIComponent(g.instagram) %>/" target="_blank" rel="noopener noreferrer"><%- icon('instagram', 16) %>@<%= g.instagram %></a><% } %>
         <% if (g.topic) { %><p class="pl-topic"><strong>Tema:</strong> <%= g.topic %></p><% } %>
@@ -44,6 +45,7 @@
           <% if (g.arrival) { %><li><%- icon('clock', 16) %><span>Chegada da plateia: <strong><%= g.arrival %></strong> · gravação às <%= g.time %></span></li><% } else { %><li><%- icon('clock', 16) %><span>Horário previsto: <%= g.time %></span></li><% } %>
           <li><%- icon('map-pin', 16) %><span><%= s.location %></span></li>
         </ul>
+        <%- include('_benefits') %>
         <% if (exempt) { %>
         <p class="pl-gift"><span class="pl-kicker">Convite de <%= partner.name %></span><strong>Participação isenta de cobrança.</strong> Se o seu pedido for selecionado, você não paga a vaga.</p>
         <% } else if (partnerFull) { %>
@@ -70,6 +72,8 @@
     </div>
   </section>
   <% } %>
+
+  <% if (hasReels) { %><%- include('_reels') %><% } %>
 
   <% if (photos.length) { %>
   <section class="pl-section pl-agenda">

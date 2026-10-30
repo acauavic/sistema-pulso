@@ -40,7 +40,7 @@ describe('Plateia: página do convidado e link de parceiro isento', () => {
   it('a página pública mostra o convidado; o que não foi preenchido não aparece; editar faz aparecer', async () => {
     let r = await anon.get('/plateia/com/mari-vabo');
     assert.equal(r.status, 200);
-    assert.match(r.text, /<h1>Mari Vabo<\/h1>/); assert.match(r.text, /Pedir para participar/); assert.match(r.text, /R\$ 197/);
+    assert.match(r.text, /<h1>Conheça de perto Mari Vabo<\/h1>/); assert.match(r.text, /participe também da gravação do Pulso Podcast/); assert.match(r.text, /Interação com o convidado/); assert.match(r.text, /Pedir para participar/); assert.match(r.text, /R\$ 197/);
     assert.doesNotMatch(r.text, /Como será/); assert.doesNotMatch(r.text, /pl-gallery/); assert.doesNotMatch(r.text, /Chegada da plateia/);
     assert.doesNotMatch(r.text, /<script>|onclick=|style=/);
     assert.match(r.headers.get('content-security-policy'), /script-src 'self'/);
@@ -118,6 +118,20 @@ describe('Plateia: página do convidado e link de parceiro isento', () => {
     r = await anon.get(`/plateia/com/mari-vabo/${partner.token}`);
     assert.match(r.text, /Participação isenta de cobrança\./);
     assert.match((await as.gestao.get(`/convidados/${g}`)).text, /1 de 2 vagas/);
+  });
+
+  it('vídeo dos bastidores: aparece nas duas páginas, com WebM e MP4, e a CSP libera só o Backblaze', async () => {
+    assert.equal((await fetch(`${app.base}/plateia/video/bastidores.webm`, { redirect: 'manual' })).status, 404);
+    await q("INSERT INTO app_settings (key, value) VALUES ('plateia_reels_webm_key', 'pulso/plateia/bastidores.webm'), ('plateia_reels_key', 'pulso/plateia/bastidores.mp4'), ('plateia_reels_poster_key', 'pulso/plateia/bastidores.jpg') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
+    for (const path of ['/plateia', '/plateia/com/mari-vabo']) {
+      const r = await anon.get(path);
+      assert.match(r.text, /id="bastidores"/, path); assert.match(r.text, /Veja como é estar na plateia/);
+      assert.match(r.text, /<source src="\/plateia\/video\/bastidores\.webm" type="video\/webm">\s*<source src="\/plateia\/video\/bastidores\.mp4" type="video\/mp4">/);
+      assert.match(r.text, /poster="\/plateia\/imagem\/bastidores"/);
+      assert.match(r.headers.get('content-security-policy'), /media-src https:\/\/s3\.acauamedia\.com https:\/\/s3\.[^ ;]+backblazeb2\.com/);
+    }
+    const v = await fetch(`${app.base}/plateia/video/bastidores.webm`, { redirect: 'manual' });
+    assert.equal(v.status, 302); assert.match(v.headers.get('location'), /bastidores\.webm\?.*X-Amz-Signature=/);
   });
 
   it('desativar o link e a página', async () => {

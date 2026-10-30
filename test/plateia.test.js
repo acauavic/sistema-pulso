@@ -45,7 +45,8 @@ describe('Pulso Podcast com Plateia', () => {
     assert.doesNotMatch(r.headers.get('x-robots-tag') || '', /noindex/);
     assert.match(r.headers.get('content-security-policy'), /script-src 'self'(;| )/);
     assert.doesNotMatch(r.headers.get('content-security-policy'), /unsafe-inline/);
-    assert.match(r.text, /Uma plateia pequena para conversas grandes\./); assert.match(r.text, /selecionada pela produção/);
+    assert.match(r.text, /<h1>Conheça de perto quem move a saúde\.<\/h1>/); assert.match(r.text, /Networking qualificado/); assert.match(r.text, /Coffee break/);
+    assert.doesNotMatch(r.text, /id="bastidores"/, 'sem vídeo dos bastidores, a seção não aparece'); assert.match(r.text, /selecionada pela produção/);
     assert.match(r.text, /Dra\. Ana Souza/); assert.match(r.text, /Dr\. Bruno Lima/);
     assert.match(r.text, /O futuro da medicina/);
     assert.doesNotMatch(r.text, /Fora da Plateia|Sem Confirmar|Já Passou/);

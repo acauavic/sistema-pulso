@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.40.0', date: '2026-10-30', title: 'Vídeo dos bastidores e novo topo da plateia',
+    items: [
+      { kind: 'novo', text: 'As páginas da plateia (a geral e a de cada convidado) ganharam a seção "Veja como é estar na plateia", com o vídeo vertical dos bastidores de uma gravação.' },
+      { kind: 'ajuste', text: 'Novo topo: "Conheça de perto [convidado] e participe também da gravação do Pulso Podcast", com o que a pessoa vive lá: networking qualificado com outros participantes selecionados, interação com o convidado, coffee break e os bastidores de uma produção profissional. Na página geral: "Conheça de perto quem move a saúde."' },
+    ],
+  },
+  {
     version: '1.39.0', date: '2026-10-30', title: 'Página da plateia de cada convidado e link de parceiro',
     items: [
       { kind: 'novo', text: 'Cada convidado aberto para plateia pode ter uma página só da gravação dele. No cadastro do convidado, a aba "Página da plateia" ativa a página e permite colocar fotos, um texto de como será, o horário de chegada da plateia e um bloco extra. O que ficar vazio não aparece. Quem pede pela página cai no mesmo painel da plateia.' },

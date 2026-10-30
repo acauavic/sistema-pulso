@@ -126,3 +126,14 @@ a { color: inherit; }
 .pl-gallery .pl-photo img { object-position: 50% 30%; }
 .pl-pre { white-space: pre-line; }
 @media (max-width: 800px) { .pl-guest-grid { grid-template-columns: 1fr; } .pl-guest-photo { order: -1; } .pl-guest-text .pl-btn { width: 100%; } }
+
+/* Topo: o que se vive na gravação; vídeo vertical dos bastidores (9:16). */
+.pl-lede-hero { margin: 4px 0 8px; }
+.pl-benefits { list-style: none; padding: 0; margin: 8px 0 24px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); max-width: 720px; }
+.pl-benefits li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: start; color: var(--text-2); font-size: 15px; }
+.pl-benefits svg { margin-top: 3px; color: var(--lime); } .pl-benefits strong { color: var(--text); font-weight: 600; }
+.pl-guest-text .pl-benefits { margin: 12px 0 4px; grid-template-columns: 1fr; }
+.pl-reels-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: clamp(32px, 6vw, 80px); align-items: center; }
+.pl-reels { position: relative; aspect-ratio: 9 / 16; width: 100%; max-width: 360px; justify-self: end; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
+.pl-reels video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--bg); }
+@media (max-width: 800px) { .pl-reels-grid { grid-template-columns: 1fr; } .pl-reels { justify-self: center; max-width: 340px; } }
