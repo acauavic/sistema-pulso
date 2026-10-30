@@ -100,8 +100,9 @@ a { color: inherit; }
 /* galeria */
 .pt-head-spread { justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .pt-gal { margin-top: 18px; }
-.pt-gal-stage { position: relative; aspect-ratio: 3 / 2; max-height: 70vh; width: 100%; border-radius: 6px; overflow: hidden; background: var(--raised); }
-.pt-gal-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pt-gal-stage { position: relative; aspect-ratio: 3 / 2; max-height: 70vh; width: 100%; border-radius: 6px; overflow: hidden; background: var(--text); }
+.pt-gal-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 240ms var(--ease); }
+.pt-gal-stage img.is-loading { opacity: .35; }
 .pt-gal-nav { position: absolute; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--surface); color: var(--text); cursor: pointer; opacity: .9; }
 .pt-gal-nav:hover { opacity: 1; } .pt-gal-nav:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .pt-gal-prev { left: 12px; } .pt-gal-next { right: 12px; }

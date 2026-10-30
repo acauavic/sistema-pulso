@@ -8,7 +8,7 @@ document.addEventListener('click', (ev) => {
 });
 
 // Galeria das fotos: passa sozinha (pausa ao passar o mouse, ao focar, com a aba escondida ou com "reduzir movimento"),
-// setas, miniaturas e teclado. "Baixar todas" dispara os downloads um depois do outro.
+// setas, miniaturas e teclado. "Baixar todas" é um ZIP montado pelo servidor.
 (() => {
   const gal = document.querySelector('[data-gal]');
   if (!gal) return;
@@ -23,16 +23,23 @@ document.addEventListener('click', (ev) => {
   let at = 0; let timer = null; let hold = false;
   let playing = total > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  const strip = gal.querySelector('.pt-gal-thumbs');
+  let want = 0;
   function show(i) {
     if (!total) return;
     at = (i + total) % total;
-    const t = thumbs[at];
-    img.src = t.dataset.big;
-    img.alt = `Foto da gravação ${at + 1} de ${total}`;
-    down.href = t.dataset.down;
+    const t = thumbs[at]; const n = at; want = n;
     pos.textContent = `${at + 1} / ${total}`;
-    thumbs.forEach((x, n) => { if (n === at) x.setAttribute('aria-current', 'true'); else x.removeAttribute('aria-current'); });
-    new Image().src = thumbs[(at + 1) % total].dataset.big; // a próxima já fica carregada
+    down.href = t.dataset.down;
+    thumbs.forEach((x, k) => { if (k === at) x.setAttribute('aria-current', 'true'); else x.removeAttribute('aria-current'); });
+    // a miniatura da foto atual fica à vista na faixa (sem rolar a página)
+    if (strip) { const li = t.parentElement; const left = li.offsetLeft - (strip.clientWidth - li.offsetWidth) / 2; strip.scrollTo({ left: Math.max(0, left), behavior: 'smooth' }); }
+    // troca só depois que a próxima carregou (sem tela vazia no meio)
+    img.classList.add('is-loading');
+    const next = new Image();
+    next.onload = next.onerror = () => { if (want !== n) return; img.src = t.dataset.big; img.alt = `Foto da gravação ${n + 1} de ${total}`; img.classList.remove('is-loading'); };
+    next.src = t.dataset.big;
+    new Image().src = thumbs[(at + 1) % total].dataset.big; // a seguinte já fica carregada
   }
   function tick() { clearTimeout(timer); if (playing && !hold && !document.hidden) timer = setTimeout(() => { show(at + 1); tick(); }, INTERVAL); }
   function setPlaying(v) { playing = v; if (play) { play.textContent = v ? 'Pausar' : 'Passar sozinha'; play.setAttribute('aria-pressed', String(v)); } tick(); }
@@ -52,18 +59,4 @@ document.addEventListener('click', (ev) => {
   document.addEventListener('visibilitychange', tick);
   setPlaying(playing);
 
-  const all = document.querySelector('[data-gal-all]');
-  all?.addEventListener('click', async () => {
-    if (all.disabled) return;
-    all.disabled = true;
-    for (let n = 0; n < total; n += 1) {
-      const a = document.createElement('a');
-      a.href = thumbs[n].dataset.down; a.download = ''; a.hidden = true;
-      document.body.appendChild(a); a.click(); a.remove();
-      if (note) { note.hidden = false; note.textContent = `Baixando ${n + 1} de ${total}. Se o navegador perguntar, permita vários downloads.`; }
-      if (n < total - 1) await new Promise((r) => setTimeout(r, 900));
-    }
-    if (note) note.textContent = `Os ${total} downloads foram iniciados. As fotos vão para a pasta de downloads.`;
-    all.disabled = false;
-  });
 })();

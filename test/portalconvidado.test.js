@@ -115,6 +115,18 @@ describe('Portal do convidado', () => {
     assert.equal((await anon.get(`${base}/fotos/${f1}/baixar`)).status, 404);
     const dl = await anon.get(`${base}/fotos/${f2}/baixar`);
     assert.equal(dl.status, 302); assert.match(dl.location, /b\.jpg/);
+    // todas num ZIP só
+    await act('gestao', `/convidados/${g}/portal/fotos`, { fotos: [String(f1), String(f2)] });
+    h.b2Store.set('pp/f/a.jpg', { body: Buffer.from('foto-a'), contentType: 'image/jpeg' });
+    h.b2Store.set('pp/f/b.jpg', { body: Buffer.from('foto-bb'), contentType: 'image/jpeg' });
+    assert.match((await anon.get(base)).text, new RegExp(`${base}/fotos\\.zip`));
+    const zr = await fetch(`${app.base}${base}/fotos.zip`);
+    assert.equal(zr.status, 200); assert.equal(zr.headers.get('content-type'), 'application/zip');
+    const zip = Buffer.from(await zr.arrayBuffer());
+    assert.equal(zip.readUInt32LE(0), 0x04034b50);
+    assert.equal(zip.readUInt32LE(zip.length - 22), 0x06054b50); assert.equal(zip.readUInt16LE(zip.length - 12), 2, 'duas fotos');
+    assert.ok(zip.includes('a.jpg') && zip.includes('foto-bb'));
+    assert.equal(zip.readUInt32LE(14), require('zlib').crc32(Buffer.from('foto-a')) >>> 0);
   });
 
   it('collab no YouTube: o convidado pede, a equipe é avisada e marca como feita', async () => {

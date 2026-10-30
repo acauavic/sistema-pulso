@@ -96,8 +96,8 @@
   <section class="pt-sec" id="episodio" aria-labelledby="ep-h">
     <h2 id="ep-h">O episódio</h2>
     <% var e = c.episode; if (e.youtube || e.spotify || e.instagram) { %>
-    <% if (ytEmbed) { %><div class="pt-player"><iframe src="<%= ytEmbed %>" title="<%= g.episode_title || 'Episódio' %> no YouTube" width="560" height="315" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><% } %>
-    <% if (spEmbed) { %><iframe class="pt-spotify" src="<%= spEmbed %>" title="<%= g.episode_title || 'Episódio' %> no Spotify" width="100%" height="152" loading="lazy" allow="encrypted-media; clipboard-write"></iframe><% } %>
+    <% if (ytEmbed) { %><div class="pt-player"><iframe src="<%= ytEmbed %>" title="<%= g.episode_title || 'Episódio' %> no YouTube" width="560" height="315" loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe></div><% } %>
+    <% if (spEmbed) { %><iframe class="pt-spotify" src="<%= spEmbed %>" title="<%= g.episode_title || 'Episódio' %> no Spotify" width="100%" height="152" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe><% } %>
     <div class="pt-links">
       <% if (e.youtube && !ytEmbed) { %><a class="pt-btn" href="<%= e.youtube %>" target="_blank" rel="noopener noreferrer"><%- icon('youtube', 16) %> Assistir no YouTube</a><% } %>
       <% if (e.spotify && !spEmbed) { %><a class="pt-btn pt-btn-sec" href="<%= e.spotify %>" target="_blank" rel="noopener noreferrer"><%- icon('headphones', 16) %> Ouvir no Spotify</a><% } %>
@@ -137,8 +137,7 @@
   <% if (c.photos.length) { %>
   <section class="pt-sec" id="fotos" aria-labelledby="fot-h">
     <div class="pt-head pt-head-spread"><h2 id="fot-h">Fotos da gravação <span class="pt-mono pt-muted"><%= c.photos.length %></span></h2>
-      <% if (c.photos.length > 1) { %><button class="pt-btn pt-btn-sec" type="button" data-gal-all><%- icon('download', 16) %> Baixar todas</button><% } %></div>
-    <p class="pt-sub pt-small" data-gal-note role="status" aria-live="polite" hidden></p>
+      <% if (c.photos.length > 1) { %><a class="pt-btn pt-btn-sec" href="<%= base %>/fotos.zip" download><%- icon('download', 16) %> Baixar todas <span class="pt-mono pt-muted">.zip · <%= fmt.formatBytes(c.photos.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0)) %></span></a><% } %></div>
     <div class="pt-gal" data-gal>
       <div class="pt-gal-stage">
         <img src="<%= base %>/fotos/<%= c.photos[0].id %>?t=p" alt="Foto da gravação 1 de <%= c.photos.length %>" width="1200" height="900" data-gal-img>

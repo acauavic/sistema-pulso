@@ -91,6 +91,27 @@ router.get(['/convidado/:token/fotos/:fid', '/convidado/:token/fotos/:fid/baixar
   res.set('Cache-Control', 'private, max-age=86400').type('image/jpeg').sendFile(disk);
 }));
 
+// Todas as fotos num ZIP só (em vez de dezenas de downloads), montado enquanto baixa.
+router.get('/convidado/:token/fotos.zip', wrap(async (req, res) => {
+  const g = await load(req, res); if (!g) return;
+  const c = await portal.content(g);
+  if (!c.photos.length) return res.status(404).end();
+  const name = `pulso-${g.episode_number ? `ep${String(g.episode_number).padStart(3, '0')}-` : ''}${fmt.slugify(g.name) || 'fotos'}-fotos.zip`;
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' });
+  const zip = require('../utils/zipStream').zipStream(res);
+  try {
+    for (const f of c.photos) {
+      const { rows: [file] } = await db.query('SELECT storage_key, filename, created_at FROM episode_files WHERE id = $1', [f.id]);
+      const obj = file && await b2.getObject(file.storage_key);
+      if (!obj) continue;
+      await zip.add(file.filename, Buffer.from(await obj.arrayBuffer()), new Date(file.created_at));
+    }
+    await zip.end();
+  } catch (err) {
+    if (err.message !== 'cancelado') { console.error(`[portal ${g.id}] zip das fotos:`, err.message); res.destroy(err); }
+  }
+}));
+
 // "Falar com a produção": WhatsApp da produção com a mensagem do portal.
 router.get('/convidado/:token/producao', wrap(async (req, res) => {
   const g = await load(req, res); if (!g) return;
