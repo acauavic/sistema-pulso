@@ -19,7 +19,7 @@ const writeLimiter = createLimiter({ name: 'portal_convidado_pedido', max: 10, w
 
 // Capas e cortes saem do sistema e são redirecionados para o Backblaze: as duas origens precisam valer. Os players do YouTube e do
 // Spotify entram por iframe. O YouTube recusa o player sem a origem de quem incorpora, por isso só a origem vai como referência.
-// O do YouTube só carrega no clique (capa do i.ytimg.com até lá): carregado junto, ele travava o play do Spotify.
+// O do YouTube só carrega no clique (capa do i.ytimg.com até lá), para a página abrir leve.
 function headers(mediaOrigin) {
   const media = ["'self'"]; if (mediaOrigin) media.push(mediaOrigin);
   const img = ["'self'", 'data:', 'https://i.ytimg.com']; if (mediaOrigin) img.push(mediaOrigin);

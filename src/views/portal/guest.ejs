@@ -97,7 +97,7 @@
     <h2 id="ep-h">O episódio</h2>
     <% var e = c.episode; if (e.youtube || e.spotify || e.instagram) { %>
     <% if (ytEmbed) { %><div class="pt-player" data-yt-src="<%= ytEmbed.src %>" data-yt-title="<%= g.episode_title || 'Episódio' %> no YouTube"><a class="pt-yt-cover" href="<%= e.youtube %>" target="_blank" rel="noopener noreferrer" data-yt-play aria-label="Assistir ao episódio aqui"><img src="<%= ytEmbed.thumb %>" alt="" width="480" height="360" loading="lazy"><span class="pt-yt-btn" aria-hidden="true"><%- icon('play', 28) %></span></a></div><% } %>
-    <% if (spEmbed) { %><iframe class="pt-spotify" src="<%= spEmbed %>" title="<%= g.episode_title || 'Episódio' %> no Spotify" width="100%" height="352" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe><% } %>
+    <% if (spEmbed) { %><iframe class="pt-spotify" src="<%= spEmbed %>" title="<%= g.episode_title || 'Episódio' %> no Spotify" width="100%" height="352" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe><% } %>
     <div class="pt-links">
       <% if (e.youtube && !ytEmbed) { %><a class="pt-btn" href="<%= e.youtube %>" target="_blank" rel="noopener noreferrer"><%- icon('youtube', 16) %> Assistir no YouTube</a><% } %>
       <% if (e.spotify && !spEmbed) { %><a class="pt-btn pt-btn-sec" href="<%= e.spotify %>" target="_blank" rel="noopener noreferrer"><%- icon('headphones', 16) %> Ouvir no Spotify</a><% } %>

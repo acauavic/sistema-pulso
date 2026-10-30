@@ -7,7 +7,7 @@ document.addEventListener('click', (ev) => {
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {});
 });
 
-// Vídeo do YouTube: a capa vira o player só no clique (carregado de cara, ele travava o play do Spotify na mesma página).
+// Vídeo do YouTube: a capa vira o player só no clique (a página abre leve).
 document.addEventListener('click', (ev) => {
   const a = ev.target.closest('[data-yt-play]');
   if (!a) return;
