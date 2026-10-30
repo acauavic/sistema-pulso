@@ -38,10 +38,11 @@
         if (!linkOpen(l)) return base;
         return base + '?text=' + encodeURIComponent('Oi, ' + l.name.split(' ')[0] + '! Seu pedido para a plateia do Pulso Podcast com ' + l.guest_name + ' foi avaliado. O pagamento da vaga (' + fmtMoney(l.link_amount) + ') é por este link: ' + l.link_url + ' . Qualquer dúvida, é só chamar por aqui.');
       };
-      var origin_ = function (l) { return l.added_by ? 'Adicionada pela equipe' : (l.utm_source ? 'Página · ' + l.utm_source + (l.utm_campaign ? ' / ' + l.utm_campaign : '') : 'Página · direto'); };
+      var origin_ = function (l) { return l.added_by ? 'Adicionada pela equipe' : l.partner_name ? 'Link de parceiro · ' + l.partner_name : (l.utm_source ? 'Página · ' + l.utm_source + (l.utm_campaign ? ' / ' + l.utm_campaign : '') : 'Página · direto'); };
       var editJson = function (l) { return fillJson({ _label: l.name, _origin: origin_(l), name: l.name, country: l.country || 'BR', phone: natPhone(l), guest_id: String(l.guest_id || ''), notes: l.notes || '', voltar: here }); };
       var payChips = function (l) { %>
-        <% if (l.status === 'confirmado' && isExempt(l)) { %><span class="badge b-gray">isento</span>
+        <% if (l.partner_name && !(l.status === 'confirmado' && isExempt(l))) { %><span class="badge b-gray" title="Pediu pelo link de <%= l.partner_name %>: participação isenta se for selecionada">parceiro · <%= l.partner_name %></span><% } %>
+        <% if (l.status === 'confirmado' && isExempt(l)) { %><span class="badge b-gray">isento<%= l.partner_name ? ' · ' + l.partner_name : '' %></span>
         <% } else if (l.status === 'confirmado' && l.amount_cents != null) { %><span class="badge <%= l.pay_status === 'pago' ? 'b-green' : 'b-amber' %>"><%= l.pay_status === 'pago' ? 'recebido ' + fmt.formatDayShort(l.pay_paid) : 'a receber até ' + fmt.formatDayShort(l.pay_due) %></span><span class="mono small"><%= fmtMoney(l.amount_cents) %></span><% } %>
         <% if (l.link_status === 'pago') { %><span class="mono small muted" title="Pago pelo link da InfinitePay"><%- icon('link', 12) %> <%= l.link_method === 'pix' ? 'Pix' : 'cartão' + (l.link_installments > 1 ? ' ' + l.link_installments + 'x' : '') %></span><% } else if (linkOpen(l)) { %><span class="mono small muted" title="Link de pagamento enviado"><%- icon('link', 12) %> <%= fmtMoney(l.link_amount) %></span><% } %>
       <% };
@@ -51,7 +52,7 @@
           <% if (linkOpen(l)) { %><button class="icon-btn" type="button" data-copy="<%= l.link_url %>" title="Copiar o link de pagamento (<%= fmtMoney(l.link_amount) %>)" aria-label="Copiar o link de pagamento de <%= l.name %>"><%- icon('copy', 16) %></button><% } %>
           <% if (l.status !== 'confirmado') { %>
             <button class="icon-btn" type="button" data-drop-open data-fill-modal="modal-confirmar" data-fill-mode="new" data-fill-action="/plateia/painel/leads/<%= l.id %>/confirmar" title="Selecionar: confirmar a participação" aria-label="Selecionar <%= l.name %>"
-              data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.amount_cents != null ? l.amount_cents : (l.price_cents || s.priceCents)), due_on: todayIso, paid: '0', paid_on: todayIso, voltar: here }) %>'><%- icon('circle-check', 16) %></button>
+              data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.amount_cents != null ? l.amount_cents : (l.price_cents || s.priceCents)), due_on: todayIso, paid: l.partner_id ? 'isento' : '0', paid_on: todayIso, voltar: here }) %>'><%- icon('circle-check', 16) %></button>
           <% } else if (!isExempt(l) && l.pay_status !== 'pago') { %>
             <form method="post" action="/plateia/painel/leads/<%= l.id %>/recebido" class="inline"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><button class="icon-btn" type="submit" title="Recebi o pagamento" aria-label="Marcar como recebido o pagamento de <%= l.name %>"><%- icon('wallet', 16) %></button></form>
           <% } else if (!isExempt(l)) { %>
@@ -145,12 +146,12 @@
                   <% Object.keys(STATUS).forEach(function (k) { if (k === l.status) return; %>
                     <% if (k === 'confirmado') { %>
                     <button class="link" type="button" data-fill-modal="modal-confirmar" data-fill-mode="new" data-fill-action="/plateia/painel/leads/<%= l.id %>/confirmar"
-                      data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.amount_cents != null ? l.amount_cents : (l.price_cents || s.priceCents)), due_on: todayIso, paid: '0', paid_on: todayIso, voltar: here }) %>'>Selecionado…</button>
+                      data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.amount_cents != null ? l.amount_cents : (l.price_cents || s.priceCents)), due_on: todayIso, paid: l.partner_id ? 'isento' : '0', paid_on: todayIso, voltar: here }) %>'>Selecionado…</button>
                     <% } else { %>
                     <form method="post" action="/plateia/painel/leads/<%= l.id %>"><%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><input type="hidden" name="status" value="<%= k %>"><button class="link" type="submit"><%= STATUS[k] %></button></form>
                     <% } %>
                   <% }) %>
-                  <% if (payLinks && ['novo', 'em_atendimento'].indexOf(l.status) >= 0) { %>
+                  <% if (payLinks && !l.partner_id && ['novo', 'em_atendimento'].indexOf(l.status) >= 0) { %>
                   <hr class="menu-sep">
                   <% if (l.link_url) { %>
                   <button class="link" type="button" data-fill-modal="modal-link" data-fill-mode="new" data-fill-action="/plateia/painel/leads/<%= l.id %>/link" data-fill='<%- fillJson({ _label: l.name + ' · ' + l.guest_name, amount: brl(l.link_amount), voltar: here }) %>'>Alterar valor do link</button>

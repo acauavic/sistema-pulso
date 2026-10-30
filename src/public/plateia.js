@@ -44,7 +44,8 @@
     window.gtag('js', new Date()); window.gtag('config', ga4);
   }
 
-  track('view');
+  const pageGuest = Number(body.dataset.guest) || null; // página de um convidado: a visita conta para ele
+  track('view', pageGuest ? { guest_id: pageGuest } : {});
 
   // ---- cliques na agenda
   document.addEventListener('click', (e) => {
@@ -106,14 +107,15 @@
     try {
       const res = await fetch('/plateia/inscricao', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guest_id: current.id, name, country: form.elements.country.value, phone: form.elements.phone.value, terms: form.elements.terms.checked, site: form.elements.site.value, visitor_id: visitor, utm, referrer, landing }),
+        body: JSON.stringify({ guest_id: current.id, partner: body.dataset.partner || undefined, name, country: form.elements.country.value, phone: form.elements.phone.value, terms: form.elements.terms.checked, site: form.elements.site.value, visitor_id: visitor, utm, referrer, landing }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) { err(json.field || 'form', json.error || 'Não foi possível enviar agora. Tente novamente.'); return; }
       ref = json.ref;
       fire('Lead', 'generate_lead', { content_name: current.name });
       const r = (k, v) => { dlg.querySelector(`[data-r="${k}"]`).textContent = v; };
-      r('guest', current.name); r('date', current.date); r('time', current.time); r('price', body.dataset.price); r('duration', body.dataset.duration);
+      r('guest', current.name); r('date', current.date); r('time', current.time); r('duration', body.dataset.duration);
+      r('price', json.exempt ? body.dataset.price : (json.price || body.dataset.price)); r('price-label', json.exempt ? 'Participação' : 'Investimento (se selecionado)');
       const wa = dlg.querySelector('[data-whatsapp]');
       if (json.url) { wa.href = json.url; wa.hidden = false; dlg.querySelector('[data-nowa]').hidden = true; } else { wa.hidden = true; dlg.querySelector('[data-nowa]').hidden = false; }
       show('review');

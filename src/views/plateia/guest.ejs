@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= title %></title>
+<meta name="description" content="<%= description %>">
+<link rel="canonical" href="<%= canonical %>">
+<% if (partner) { %><meta name="robots" content="noindex"><% } %>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pulso Podcast">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:url" content="<%= canonical %>">
+<meta property="og:title" content="<%= title %>">
+<meta property="og:description" content="<%= description %>">
+<meta property="og:image" content="<%= ogImage %>">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<%= title %>">
+<meta name="twitter:description" content="<%= description %>">
+<meta name="twitter:image" content="<%= ogImage %>">
+<link rel="icon" href="/static/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="stylesheet" href="/static/plateia.css?v=<%= assetV %>">
+</head>
+<body data-plateia data-guest="<%= g.id %>" data-partner="<%= partner && !partnerFull ? partner.token : '' %>" data-meta-pixel="<%= s.metaPixel %>" data-ga4="<%= s.ga4 %>" data-price="<%= priceLabel %>" data-price-label="<%= exempt ? 'Participação' : 'Investimento (se selecionado)' %>" data-duration="<%= s.duration %>" data-location="<%= s.location %>">
+<header class="pl-top">
+  <a class="pl-wordmark" href="/plateia" aria-label="pulso. — Pulso Podcast com Plateia">pulso<span>.</span></a>
+  <a class="pl-toplink" href="/plateia#agenda">Outras gravações</a>
+</header>
+
+<main>
+  <section class="pl-section pl-guest-hero">
+    <div class="pl-wrap pl-guest-grid">
+      <div class="pl-guest-text">
+        <span class="pl-kicker">Pulso Podcast com Plateia · vagas limitadas</span>
+        <h1><%= g.name %></h1>
+        <% if (g.role) { %><p class="pl-role pl-role-lg"><%= g.role %></p><% } %>
+        <% if (g.instagram) { %><a class="pl-ig" href="https://www.instagram.com/<%= encodeURIComponent(g.instagram) %>/" target="_blank" rel="noopener noreferrer"><%- icon('instagram', 16) %>@<%= g.instagram %></a><% } %>
+        <% if (g.topic) { %><p class="pl-topic"><strong>Tema:</strong> <%= g.topic %></p><% } %>
+        <ul class="pl-meta pl-meta-lg">
+          <li><%- icon('calendar', 16) %><span><span class="pl-cap"><%= g.weekday %></span>, <%= g.date %></span></li>
+          <% if (g.arrival) { %><li><%- icon('clock', 16) %><span>Chegada da plateia: <strong><%= g.arrival %></strong> · gravação às <%= g.time %></span></li><% } else { %><li><%- icon('clock', 16) %><span>Horário previsto: <%= g.time %></span></li><% } %>
+          <li><%- icon('map-pin', 16) %><span><%= s.location %></span></li>
+        </ul>
+        <% if (exempt) { %>
+        <p class="pl-gift"><span class="pl-kicker">Convite de <%= partner.name %></span><strong>Participação isenta de cobrança.</strong> Se o seu pedido for selecionado, você não paga a vaga.</p>
+        <% } else if (partnerFull) { %>
+        <p class="pl-note">As vagas isentas do convite de <%= partner.name %> já foram preenchidas. Você ainda pode pedir participação pelo valor normal.</p>
+        <% } %>
+        <% if (open) { %>
+        <button class="pl-btn" type="button" data-signup="<%= g.id %>" data-name="<%= g.name %>" data-date="<%= g.date %>" data-time="<%= g.arrival ? g.arrival + ' (chegada)' : g.time %>">Pedir para participar</button>
+        <% } else { %>
+        <button class="pl-btn" type="button" disabled><%= closedLabel %></button>
+        <p class="pl-note"><a href="/plateia#agenda">Veja as próximas gravações com plateia</a>.</p>
+        <% } %>
+      </div>
+      <div class="pl-photo pl-guest-photo"><% if (g.hasPhoto) { %><img src="/plateia/com/<%= g.slug %>/foto" alt="<%= g.name %>" width="1200" height="900"><% } else { %><span aria-hidden="true"><%= g.initials %></span><% } %></div>
+    </div>
+    <%- include('../partials/pulse-line') %>
+  </section>
+
+  <% if (g.intro) { %>
+  <section class="pl-section">
+    <div class="pl-wrap">
+      <span class="pl-kicker">Como será</span>
+      <h2>A gravação com <%= g.firstName %></h2>
+      <p class="pl-lede pl-lede-sm pl-pre"><%= g.intro %></p>
+    </div>
+  </section>
+  <% } %>
+
+  <% if (photos.length) { %>
+  <section class="pl-section pl-agenda">
+    <div class="pl-wrap">
+      <span class="pl-kicker">Fotos</span>
+      <ul class="pl-gallery">
+        <% photos.forEach(function (p, i) { %><li class="pl-photo"><img src="/plateia/com/<%= g.slug %>/fotos/<%= p.id %>" alt="<%= g.name %>, foto <%= i + 1 %>" loading="lazy" width="1200" height="900"></li><% }) %>
+      </ul>
+    </div>
+  </section>
+  <% } %>
+
+  <% if (g.extra) { %>
+  <section class="pl-section">
+    <div class="pl-wrap">
+      <% if (g.extraTitle) { %><h2><%= g.extraTitle %></h2><% } %>
+      <p class="pl-lede pl-lede-sm pl-pre"><%= g.extra %></p>
+    </div>
+  </section>
+  <% } %>
+
+  <section class="pl-section" id="experiencia">
+    <div class="pl-wrap">
+      <span class="pl-kicker">Como funciona</span>
+      <h2>Não é para qualquer plateia. É para quem tem a ver com a conversa.</h2>
+      <ol class="pl-steps">
+        <li><span class="pl-n">01</span><div><h3>Você pede participação</h3><p>Conte quem você é. O pedido vai para a produção, que conversa com você pelo WhatsApp.</p></div></li>
+        <li><span class="pl-n">02</span><div><h3>A produção seleciona</h3><p>A plateia é pequena e escolhida por afinidade com <%= g.firstName %> e com o tema. Pedir não garante a vaga.</p></div></li>
+        <li><span class="pl-n">03</span><div><h3>Você vive a gravação</h3><p>Recepção, a gravação a poucos metros do convidado, bastidores e coffee break.</p></div></li>
+      </ol>
+      <dl class="pl-facts">
+        <div><dt>Duração estimada</dt><dd><%= s.duration %></dd></div>
+        <% if (exempt) { %><div><dt>Participação</dt><dd>Isenta <span>convite de <%= partner.name %></span></dd></div>
+        <% } else { %><div><dt>Investimento</dt><dd><%= price %> <span>por participante selecionado</span></dd></div><% } %>
+      </dl>
+      <aside class="pl-terms" aria-labelledby="pl-terms-h"><h3 id="pl-terms-h">Condições da plateia</h3><p>O episódio com plateia está condicionado à conformidade do convidado com a presença de plateia e à disponibilidade dele. A gravação pode ser cancelada, ou a entrada de plateia externa pode ser vetada, sem aviso prévio. Nesses casos o valor será devolvido.</p></aside>
+      <p class="pl-note">O endereço completo é enviado apenas aos participantes selecionados. <%= exempt ? 'Nenhuma cobrança é feita por esta página.' : 'O valor é combinado com a produção apenas se o seu pedido for selecionado. Nenhuma cobrança é feita por esta página.' %></p>
+    </div>
+  </section>
+
+  <% if (open) { %>
+  <section class="pl-section pl-final">
+    <div class="pl-wrap">
+      <h2>Seu lugar na conversa com <%= g.firstName %> começa por um pedido.</h2>
+      <button class="pl-btn" type="button" data-signup="<%= g.id %>" data-name="<%= g.name %>" data-date="<%= g.date %>" data-time="<%= g.arrival ? g.arrival + ' (chegada)' : g.time %>">Pedir para participar</button>
+    </div>
+  </section>
+  <% } %>
+</main>
+
+<footer class="pl-foot"><span class="pl-wordmark">pulso<span>.</span></span><span>As conversas que estão movimentando a saúde.</span></footer>
+
+<%- include('_signup') %>
+<script src="/static/plateia.js?v=<%= assetV %>" defer></script>
+</body>
+</html>

@@ -320,4 +320,71 @@ router.post('/convidados/:id/foto', requirePerm('guests.write'), express.raw({ t
   res.json({ ok: true });
 }));
 
+// ---------------------------------------------------------------- página da plateia do convidado e links de parceiro
+const page = require('../services/audiencePage');
+const pageBack = (id) => `/convidados/${id}#pagina`;
+const guestOf = async (id) => (isIntId(id) ? (await db.query('SELECT id, name, audience_enabled, audience_slug FROM guests WHERE id = $1', [id])).rows[0] : null);
+
+router.post('/convidados/:id/plateia/pagina', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOf(req.params.id); if (!g) return res.redirect('/convidados');
+  const on = req.body.on === '1';
+  if (on && !g.audience_enabled) { await req.flash('error', 'Abra o convidado para plateia antes de ativar a página.'); return res.redirect(`/convidados/${g.id}#plateia`); }
+  await page.setEnabled(g.id, on);
+  await audit(req, on ? 'plateia.pagina_ativada' : 'plateia.pagina_desativada', 'guest', g.id);
+  await req.flash('ok', on ? `Página de ${g.name} ativada. Personalize e copie o link.` : `Página de ${g.name} desativada: o endereço deixa de funcionar.`);
+  res.redirect(pageBack(g.id));
+}));
+
+router.post('/convidados/:id/plateia/pagina/editar', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOf(req.params.id); if (!g) return res.redirect('/convidados');
+  const { values, error } = page.parse(req.body);
+  if (error) { await req.flash('error', error); return res.redirect(pageBack(g.id)); }
+  await page.update(g.id, values);
+  await audit(req, 'plateia.pagina_editada', 'guest', g.id);
+  await req.flash('ok', 'Página atualizada.');
+  res.redirect(pageBack(g.id));
+}));
+
+router.post('/convidados/:id/plateia/pagina/fotos', requirePerm('guests.write'), express.raw({ type: () => true, limit: MAX_IMG }), wrap(async (req, res) => {
+  const g = await guestOf(req.params.id); if (!g) return res.status(404).json({ ok: false, error: 'Convidado não encontrado.' });
+  if (!config.storageConfigured) return res.status(503).json({ ok: false, error: 'O armazenamento de arquivos não está configurado.' });
+  const key = await storeImage('convidados', g.id, req.body, 'pagina');
+  if (!key) return res.status(400).json({ ok: false, error: 'Envie uma imagem PNG, JPEG ou WebP (até 5 MB).' });
+  const out = await page.addPhoto(g.id, key);
+  if (out.error) { await b2.deleteObject(key).catch(() => {}); return res.status(400).json({ ok: false, error: out.error }); }
+  await audit(req, 'plateia.pagina_foto', 'guest', g.id);
+  res.json({ ok: true });
+}));
+
+router.post('/convidados/:id/plateia/pagina/fotos/:pid/excluir', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOf(req.params.id); if (!g || !isIntId(req.params.pid)) return res.redirect('/convidados');
+  const { rows: [p] } = await db.query('DELETE FROM guest_audience_photos WHERE id = $1 AND guest_id = $2 RETURNING storage_key', [req.params.pid, g.id]);
+  if (p) await b2.deleteObject(p.storage_key).catch(() => {});
+  await req.flash('ok', 'Foto tirada da página.');
+  res.redirect(pageBack(g.id));
+}));
+
+router.post('/convidados/:id/plateia/parceiros', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOf(req.params.id); if (!g) return res.redirect('/convidados');
+  const { values, error } = page.parsePartner(req.body);
+  if (error) { await req.flash('error', error); return res.redirect(pageBack(g.id)); }
+  if (!g.audience_slug) await page.ensureSlug(g);
+  const p = await page.createPartner(g.id, values, req.user.id);
+  await audit(req, 'plateia.parceiro_criado', 'guest', g.id, { parceiro: p.name, vagas: p.slots });
+  await req.flash('ok', `Link de ${p.name} criado. Copie e mande para o parceiro.`);
+  res.redirect(pageBack(g.id));
+}));
+
+router.post('/convidados/:id/plateia/parceiros/:pid', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOf(req.params.id); if (!g || !isIntId(req.params.pid)) return res.redirect('/convidados');
+  let changes;
+  if (req.body.active !== undefined) changes = { active: req.body.active === '1' };
+  else { const { values, error } = page.parsePartner(req.body); if (error) { await req.flash('error', error); return res.redirect(pageBack(g.id)); } changes = values; }
+  const p = await page.updatePartner(g.id, Number(req.params.pid), changes);
+  if (!p) return res.redirect(pageBack(g.id));
+  await audit(req, 'plateia.parceiro_editado', 'guest', g.id, { parceiro: p.name, ...changes });
+  await req.flash('ok', changes.active === false ? `Link de ${p.name} desativado: quem abrir vê a página normal.` : changes.active ? `Link de ${p.name} ativo de novo.` : `Link de ${p.name} atualizado.`);
+  res.redirect(pageBack(g.id));
+}));
+
 module.exports = router;

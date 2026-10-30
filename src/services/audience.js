@@ -101,43 +101,47 @@ async function recordEvent({ type, guestId = null, visitorId, utm = {}, referrer
 }
 
 // ---------------------------------------------------------------- inscrição
-function whatsappMessage({ name, guestName, date, time, priceCents, phoneDisplay }) {
+function whatsappMessage({ name, guestName, date, time, priceCents, phoneDisplay, partnerName = null }) {
   return `Olá! Meu nome é ${name} e quero pedir uma vaga na plateia do Pulso Podcast.\n` +
     `Tenho interesse na gravação do episódio com ${guestName}, no dia ${date}, às ${time}.\n` +
-    `Entendi que a plateia é selecionada pela produção e que, se eu for selecionado(a), o investimento é de ${money(priceCents)} por participante.\n` +
+    (partnerName
+      ? `Recebi o convite de ${partnerName}: entendi que a plateia é selecionada pela produção e que, se eu for selecionado(a), a participação é isenta de cobrança.\n`
+      : `Entendi que a plateia é selecionada pela produção e que, se eu for selecionado(a), o investimento é de ${money(priceCents)} por participante.\n`) +
     `Gostaria de saber como seguir. Meu WhatsApp é ${phoneDisplay}.\nObrigado(a)!`;
 }
 
 // Versão do texto das condições da plateia (page.ejs). Mudou o texto, aumente a versão.
 const TERMS_VERSION = '2026-10b';
 
-async function createLead({ guest, name, phone, utm, referrer, landingUrl, visitorId, userAgent }) {
+// partner: link de parceiro com vaga (o pedido fica isento se a pessoa for selecionada).
+async function createLead({ guest, name, phone, utm, referrer, landingUrl, visitorId, userAgent, partner = null }) {
   const s = await settings();
-  const msg = whatsappMessage({ name, guestName: guest.name, date: dateLong(guest.proposed_at), time: timeShort(guest.proposed_at), priceCents: s.priceCents, phoneDisplay: phone.display });
+  const msg = whatsappMessage({ name, guestName: guest.name, date: dateLong(guest.proposed_at), time: timeShort(guest.proposed_at), priceCents: s.priceCents, phoneDisplay: phone.display, partnerName: partner?.name });
   // mesma pessoa no mesmo episódio: atualiza em vez de duplicar
   const { rows: [dup] } = await db.query('SELECT id, ref FROM plateia_leads WHERE guest_id = $1 AND phone = $2 ORDER BY id DESC LIMIT 1', [guest.id, phone.e164]);
   let ref; let created = false; let leadId = null;
   if (dup) {
     ref = dup.ref;
-    await db.query('UPDATE plateia_leads SET name = $2, terms_accepted_at = now(), terms_version = $3, updated_at = now(), status = CASE WHEN status = \'desistiu\' THEN \'novo\' ELSE status END WHERE id = $1', [dup.id, name, TERMS_VERSION]);
+    await db.query('UPDATE plateia_leads SET name = $2, terms_accepted_at = now(), terms_version = $3, updated_at = now(), status = CASE WHEN status = \'desistiu\' THEN \'novo\' ELSE status END, partner_id = coalesce(partner_id, $4), partner_name = coalesce(partner_name, $5) WHERE id = $1',
+      [dup.id, name, TERMS_VERSION, partner?.id || null, partner?.name || null]);
   } else {
     ref = crypto.randomBytes(9).toString('base64url'); created = true;
     const { rows: [row] } = await db.query(
-      `INSERT INTO plateia_leads (ref, guest_id, guest_name, recording_at, name, phone, country, price_cents, utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid, referrer, landing_url, visitor_id, user_agent, terms_accepted_at, terms_version)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19, now(), $20) RETURNING id`,
+      `INSERT INTO plateia_leads (ref, guest_id, guest_name, recording_at, name, phone, country, price_cents, utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid, referrer, landing_url, visitor_id, user_agent, terms_accepted_at, terms_version, partner_id, partner_name)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19, now(), $20, $21, $22) RETURNING id`,
       [ref, guest.id, guest.name, guest.proposed_at, name, phone.e164, phone.country, s.priceCents, utm.utm_source, utm.utm_medium, utm.utm_campaign, utm.utm_term, utm.utm_content, utm.fbclid, utm.gclid,
-        clip(referrer, 300), clip(landingUrl, 500), cleanVisitor(visitorId), clip(userAgent, 300), TERMS_VERSION]);
+        clip(referrer, 300), clip(landingUrl, 500), cleanVisitor(visitorId), clip(userAgent, 300), TERMS_VERSION, partner?.id || null, partner?.name || null]);
     leadId = row.id;
   }
   if (created) { // a mesma pessoa pedindo de novo não conta duas vezes no funil nem avisa de novo
     await recordEvent({ type: 'lead', guestId: guest.id, visitorId, utm, referrer });
     require('./notify').notify({
-      type: 'plateia', broadcast: true, title: `Nova inscrição na plateia: ${name}`, body: `${guest.name} · ${dateLong(guest.proposed_at)}, ${timeShort(guest.proposed_at)} · ${phone.display}`,
+      type: 'plateia', broadcast: true, title: `Nova inscrição na plateia: ${name}`, body: `${guest.name} · ${dateLong(guest.proposed_at)}, ${timeShort(guest.proposed_at)} · ${phone.display}${partner ? ` · isenta, link de ${partner.name}` : ''}`,
       url: `/plateia/painel?convidado=${guest.id}`, dedupe: `plateia-lead-${leadId}`,
     }).catch((err) => console.error('aviso da plateia:', err.message));
   }
   const url = s.whatsapp ? `https://wa.me/${s.whatsapp}?text=${encodeURIComponent(msg)}` : null;
-  return { ref, url, message: msg, price: money(s.priceCents) };
+  return { ref, url, message: msg, price: partner ? 'Isento' : money(s.priceCents), exempt: Boolean(partner), partnerName: partner?.name || null };
 }
 
 // ---------------------------------------------------------------- painel
@@ -198,7 +202,8 @@ async function changeStatus(lead, status, userId) {
   const infinitePay = require('./infinitePay');
   const out = { link: null, linkError: null, released: false, kept: false };
   await db.query('UPDATE plateia_leads SET status = $2, updated_at = now() WHERE id = $1', [lead.id, status]);
-  if (status === 'em_atendimento' && config.infinitepayConfigured && !(await infinitePay.currentLink(lead.id)) && lead.status !== 'confirmado') {
+  // pedido de parceiro é isento: não nasce link de pagamento
+  if (status === 'em_atendimento' && !lead.partner_id && config.infinitepayConfigured && !(await infinitePay.currentLink(lead.id)) && lead.status !== 'confirmado') {
     try { out.link = await infinitePay.createLink({ lead, amountCents: await infinitePay.defaultAmount(lead), userId }); } catch (err) { out.linkError = err.message; }
   }
   if (lead.status === 'confirmado') { const r = await releaseLead(lead); out.released = !r.kept; out.kept = r.kept; }

@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.39.0', date: '2026-10-30', title: 'Página da plateia de cada convidado e link de parceiro',
+    items: [
+      { kind: 'novo', text: 'Cada convidado aberto para plateia pode ter uma página só da gravação dele. No cadastro do convidado, a aba "Página da plateia" ativa a página e permite colocar fotos, um texto de como será, o horário de chegada da plateia e um bloco extra. O que ficar vazio não aparece. Quem pede pela página cai no mesmo painel da plateia.' },
+      { kind: 'novo', text: 'Link de parceiro: na mesma aba, crie um link com o nome do parceiro e quantas vagas isentas ele tem. Quem entra por ele vê que a participação é isenta, cortesia do parceiro. O pedido chega marcado no painel, sem link de pagamento, e a seleção já vem como Isento. A seleção continua com vocês. Esgotadas as vagas, o link mostra o valor normal.' },
+    ],
+  },
+  {
     version: '1.38.0', date: '2026-10-28', title: 'Corrigir e reenviar uma rede',
     items: [
       { kind: 'novo', text: 'Na publicação, "Corrigir e reenviar" abre uma janela com as redes que falharam já marcadas, o motivo de cada uma, o texto e o collab do Instagram para corrigir. O texto novo vale só para as redes reenviadas; o que já está no ar não muda e não pode ser marcado de novo, para nada sair duplicado. Cada rede com erro também tem o atalho "Corrigir e reenviar só" ela.' },

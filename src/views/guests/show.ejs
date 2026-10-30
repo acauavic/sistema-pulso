@@ -150,6 +150,7 @@
   <div class="tabbar" role="tablist" aria-label="Seções do convidado">
     <button type="button" role="tab" data-tab-btn="resumo" aria-controls="pane-resumo">Resumo</button>
     <% if (showInvite) { %><button type="button" role="tab" data-tab-btn="convite" aria-controls="pane-convite">Convite</button><% } %>
+    <% if (pagePlateia) { %><button type="button" role="tab" data-tab-btn="pagina" aria-controls="pane-pagina">Página da plateia<% if (guest.audience_page_enabled) { %> <span class="count"><%= pagePlateia.partners.filter(function (p) { return p.active; }).length || '' %></span><% } %></button><% } %>
     <button type="button" role="tab" data-tab-btn="historico" aria-controls="pane-historico">Histórico <span class="count"><%= events.length %></span></button>
   </div>
 
@@ -212,6 +213,7 @@
           <% } else { %><input type="hidden" name="status" value="<%= guest.audience_status %>"><% } %>
         </form>
         <% } else { %><p class="small"><%= guest.audience_enabled ? 'Aberto para plateia' : 'Fora da plateia' %></p><% } %>
+        <% if (guest.audience_enabled) { %><p class="small"><a href="#pagina"><%= guest.audience_page_enabled ? 'Página própria da gravação e links de parceiro' : 'Criar uma página só desta gravação' %></a></p><% } %>
         <p class="small muted"><%= guest.audience_enabled ? (guest.status === 'agendado' && guest.proposed_at && new Date(guest.proposed_at) > new Date() ? 'Aparece na agenda pública da plateia.' : 'Entra na agenda pública quando a gravação estiver Agendada, com data futura.') : 'Fora da agenda pública da plateia.' %></p>
         <% if (canW) { %>
         <div data-image-scope>
@@ -288,6 +290,107 @@
         </div>
       <% } %>
     </section>
+  </div>
+  <% } %>
+
+  <% if (pagePlateia) { var P = pagePlateia; var csrfF = '<input type="hidden" name="_csrf" value="' + csrf + '">'; %>
+  <div class="pane" id="pane-pagina" data-pane-id="pagina">
+    <% if (!guest.audience_page_enabled) { %>
+    <section class="card empty page-off">
+      <%- include('../partials/pulse-line') %>
+      <h2>Página só da gravação com <%= fmt.firstName(guest.name) %></h2>
+      <p class="muted">Além da agenda geral, <%= fmt.firstName(guest.name) %> pode ter uma página própria para divulgar: fotos, como será a gravação, horário de chegada da plateia e links de parceiro com participação isenta. Os pedidos caem no mesmo painel da plateia.</p>
+      <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/plateia/pagina" class="inline"><%- csrfF %><input type="hidden" name="on" value="1"><button class="btn primary" type="submit"><%- icon('globe') %> Ativar página</button></form><% } %>
+    </section>
+    <% } else { %>
+    <div class="grid-2 align-start">
+      <div class="stack-lg">
+        <section class="card">
+          <div class="row spread"><h2>Página</h2><span class="badge <%= P.live && guest.audience_status === 'disponivel' ? 'b-green' : 'b-gray' %>"><%= !P.live ? 'fora do ar' : guest.audience_status === 'disponivel' ? 'no ar' : guest.audience_status === 'lotado' ? 'lotado' : 'encerrado' %></span></div>
+          <p class="mono small page-url"><%= P.url %></p>
+          <div class="row">
+            <button class="btn primary" type="button" data-copy="<%= P.url %>"><%- icon('copy') %> Copiar link</button>
+            <a class="btn ghost" href="<%= P.url %>" target="_blank" rel="noopener"><%- icon('external-link') %> Abrir</a>
+          </div>
+          <% if (!P.live) { %><p class="small muted top-gap">A página recebe pedidos quando a gravação estiver Agendada, com data futura. Até lá, quem abrir vê "Inscrições encerradas".</p><% } %>
+          <dl class="kv top-gap">
+            <dt>Chegada da plateia</dt><dd class="mono"><%= P.arrival || '—' %></dd>
+            <dt>Como será</dt><dd class="pre<%= guest.audience_intro ? '' : ' muted' %>"><%= guest.audience_intro || 'Sem texto: a seção não aparece.' %></dd>
+            <dt>Bloco extra</dt><dd class="pre<%= guest.audience_extra ? '' : ' muted' %>"><% if (guest.audience_extra) { %><% if (guest.audience_extra_title) { %><strong><%= guest.audience_extra_title %></strong><br><% } %><%= guest.audience_extra %><% } else { %>Vazio: não aparece.<% } %></dd>
+          </dl>
+          <% if (canW) { %>
+          <div class="row top-gap">
+            <button class="btn sm" type="button" data-modal-open="modal-pagina"><%- icon('pencil', 14) %> Editar página</button>
+            <form method="post" action="/convidados/<%= guest.id %>/plateia/pagina" class="inline push-right" data-confirm="Desativar a página? O endereço e os links de parceiro deixam de funcionar (os pedidos já feitos continuam no painel)."><%- csrfF %><input type="hidden" name="on" value="0"><button class="link small danger-link" type="submit">desativar página</button></form>
+          </div>
+          <% } %>
+        </section>
+
+        <section class="card" data-image-scope>
+          <div class="row spread"><h2>Fotos <span class="mono muted small"><%= P.photos.length %>/<%= P.max %></span></h2>
+            <% if (canW && P.photos.length < P.max) { %><button class="btn sm" type="button" data-image-pick="" <%= storageReady ? '' : 'disabled' %>><%- icon('upload', 14) %> Enviar foto</button><% } %></div>
+          <% if (!P.photos.length) { %><p class="small muted">Sem fotos: a seção não aparece. O topo da página já usa a foto principal de <%= fmt.firstName(guest.name) %>.</p><% } %>
+          <ul class="plain page-photos">
+            <% P.photos.forEach(function (ph) { %><li><img class="guest-photo" src="/plateia/com/<%= guest.audience_slug %>/fotos/<%= ph.id %>" alt="Foto da página" width="160" height="120" loading="lazy"><% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/plateia/pagina/fotos/<%= ph.id %>/excluir" class="inline" data-confirm="Tirar esta foto da página?"><%- csrfF %><button class="link small" type="submit">tirar</button></form><% } %></li><% }) %>
+          </ul>
+          <% if (canW) { %><input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-crop="<%= photoFrame.ratio %>" data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/plateia/pagina/fotos"><% } %>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="row spread"><h2>Links de parceiro</h2><% if (canW) { %><button class="btn sm" type="button" data-fill-modal="modal-parceiro" data-fill-mode="new" data-fill-action="/convidados/<%= guest.id %>/plateia/parceiros" data-fill='{"name":"","slots":""}'><%- icon('plus', 14) %> Novo link</button><% } %></div>
+        <% if (!P.partners.length) { %><p class="small muted">Um parceiro manda o link dele para os próprios clientes: quem pede por ele vê a participação isenta dos <%= plateia.price || 'valores' %> e, se for selecionado, não paga. Dá para limitar as vagas; esgotado, o link mostra o valor normal.</p><% } %>
+        <ul class="plain partner-list">
+          <% P.partners.forEach(function (p) { var link = P.url + '/' + p.token; %>
+          <li class="<%= p.active ? '' : 'is-off' %>">
+            <div class="row spread">
+              <strong class="display"><%= p.name %></strong>
+              <span class="badge <%= !p.active ? 'b-gray' : p.left === 0 ? 'b-amber' : 'b-gray' %>"><%= !p.active ? 'desativado' : p.left === 0 ? 'vagas esgotadas' : 'ativo' %></span>
+            </div>
+            <span class="mono small muted"><%= p.slots ? p.used + ' de ' + p.slots + ' vagas' : 'sem limite · ' + p.used + ' pedido' + (p.used === 1 ? '' : 's') %><%= p.total > p.used ? ' · ' + (p.total - p.used) + ' fora (não selecionado ou desistiu)' : '' %></span>
+            <span class="mono small page-url"><%= link %></span>
+            <div class="row">
+              <% if (p.active) { %><button class="btn sm" type="button" data-copy="<%= link %>"><%- icon('copy', 14) %> Copiar link</button><% } %>
+              <% if (canW) { %>
+              <button class="link small" type="button" data-fill-modal="modal-parceiro" data-fill-mode="edit" data-fill-action="/convidados/<%= guest.id %>/plateia/parceiros/<%= p.id %>" data-fill='<%- JSON.stringify({ name: p.name, slots: p.slots ? String(p.slots) : "" }).replace(/'/g, "&#39;") %>'>editar</button>
+              <form method="post" action="/convidados/<%= guest.id %>/plateia/parceiros/<%= p.id %>" class="inline"<% if (p.active) { %> data-confirm="Desativar o link de <%= p.name %>? Quem abrir passa a ver a página normal, com o valor."<% } %>><%- csrfF %><input type="hidden" name="active" value="<%= p.active ? '0' : '1' %>"><button class="link small" type="submit"><%= p.active ? 'desativar' : 'ativar de novo' %></button></form>
+              <% } %>
+            </div>
+          </li>
+          <% }) %>
+        </ul>
+        <% if (P.partners.length && plateia.canSeeLeads) { %><p class="small top-gap"><a href="/plateia/painel?convidado=<%= guest.id %>">Ver os pedidos no painel da plateia</a></p><% } %>
+      </section>
+    </div>
+    <% if (canW) { %>
+    <dialog class="modal modal-wide" id="modal-pagina" aria-labelledby="mpg-h">
+      <form method="post" action="/convidados/<%= guest.id %>/plateia/pagina/editar" class="stack">
+        <%- csrfF %>
+        <h2 id="mpg-h">Editar página</h2>
+        <p class="small muted">O que ficar vazio não aparece na página.</p>
+        <label>Como será a gravação<textarea name="intro" rows="5" maxlength="1200" placeholder="Ex.: uma conversa sobre gestão de clínicas, com abertura para perguntas da plateia no fim."><%= guest.audience_intro || '' %></textarea></label>
+        <label>Horário de chegada da plateia <small class="muted">(a gravação está marcada para <%= guest.proposed_at ? fmt.formatDateTime(guest.proposed_at) : 'data a definir' %>)</small><input type="time" name="arrival" value="<%= P.arrivalInput %>"></label>
+        <fieldset class="stack">
+          <legend class="small muted">Bloco extra (opcional)</legend>
+          <label>Título<input type="text" name="extra_title" maxlength="80" value="<%= guest.audience_extra_title || '' %>" placeholder="Ex.: O que levar"></label>
+          <label>Texto<textarea name="extra" rows="4" maxlength="1500"><%= guest.audience_extra || '' %></textarea></label>
+        </fieldset>
+        <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+      </form>
+    </dialog>
+    <dialog class="modal" id="modal-parceiro" aria-labelledby="mpa-h">
+      <form method="post" action="" class="stack" data-fill-form>
+        <%- csrfF %>
+        <h2 id="mpa-h"><span data-mode="new">Novo link de parceiro</span><span data-mode="edit">Editar link de parceiro</span></h2>
+        <p class="small muted" data-mode="new">Quem pedir pelo link vê "participação isenta, convite de [parceiro]" e, se for selecionado, entra como isento. A seleção continua com vocês.</p>
+        <label>Nome do parceiro <small class="muted">(aparece na página)</small><input type="text" name="name" maxlength="80" required placeholder="Ex.: Clínica Vida"></label>
+        <label>Vagas isentas <small class="muted">(vazio = sem limite)</small><input type="number" name="slots" min="1" max="500" inputmode="numeric" placeholder="Ex.: 5"></label>
+        <p class="small muted">Contam as vagas os pedidos em andamento e os selecionados. Quem não for selecionado ou desistir devolve a vaga.</p>
+        <div class="row modal-actions"><button class="btn primary" type="submit"><span data-mode="new">Criar link</span><span data-mode="edit">Salvar</span></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+      </form>
+    </dialog>
+    <% } %>
+    <% } %>
   </div>
   <% } %>
 

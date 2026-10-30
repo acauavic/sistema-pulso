@@ -3,6 +3,7 @@
 const express = require('express');
 const config = require('../config');
 const audience = require('../services/audience');
+const page = require('../services/audiencePage');
 const b2 = require('../services/b2');
 const db = require('../db/pool');
 const { createLimiter } = require('../auth/rateLimit');
@@ -47,6 +48,46 @@ router.get('/plateia', wrap(async (req, res) => {
     ogImage: `${config.appBaseUrl}/static/og-plateia.jpg?v=${res.locals.assetV}`, s, agenda, faq: FAQ(s), icon, countries: audience.COUNTRIES, price: audience.money(s.priceCents), videoUrl: HERO_VIDEO,
     hasHero: Boolean(s.heroKey), hasStudio: Boolean(s.studioKey), assetV: res.locals.assetV, canonical: `${config.appBaseUrl}/plateia`,
   });
+}));
+
+// Página de um convidado (/plateia/com/:slug) e o link de parceiro (/plateia/com/:slug/:token, participação isenta até o limite).
+// A página existe enquanto a gestão a deixa ativa; fora da agenda (gravação passou, lotou ou encerrou) ela mostra que encerrou.
+router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], wrap(async (req, res, next) => {
+  if (req.params.token === 'foto' || req.params.token === 'fotos') return next();
+  const g = await page.bySlug(req.params.slug);
+  if (!g) return res.status(404).set(require('../services/inviteTemplate').publicHeaders()).type('html').send(require('../services/publicPages').messageHtml('Página não encontrada', 'Esta página de plateia não existe ou foi desligada. Veja as próximas gravações em podcastpulso.com/plateia.'));
+  const s = await audience.settings();
+  const { partner, full } = req.params.token ? await page.partnerFor(g.id, req.params.token) : { partner: null, full: false };
+  if (req.params.token && !partner) return res.redirect(302, `/plateia/com/${g.audience_slug}`); // link desativado ou de outra gravação: a página normal
+  const open = s.active && g.on_agenda && g.audience_status === 'disponivel';
+  const closedLabel = !g.on_agenda ? 'Inscrições encerradas' : g.audience_status === 'lotado' ? 'Gravação lotada' : 'Inscrições encerradas';
+  const exempt = Boolean(partner && !full);
+  const price = audience.money(s.priceCents);
+  const view = {
+    id: g.id, name: g.name, slug: g.audience_slug, firstName: String(g.name).split(/\s+/)[0], role: [g.job_title, g.company].filter(Boolean).join(' · '), instagram: g.instagram, topic: g.topic,
+    hasPhoto: g.has_photo, initials: g.name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase(),
+    date: audience.dateLong(g.proposed_at), time: audience.timeShort(g.proposed_at), weekday: audience.weekday(g.proposed_at), arrival: page.timeLabel(g.audience_arrival),
+    intro: g.audience_intro, extraTitle: g.audience_extra_title, extra: g.audience_extra,
+  };
+  const canonical = `${config.appBaseUrl}/plateia/com/${g.audience_slug}`;
+  res.set(pageHeaders(s)).render('plateia/guest', {
+    title: `Plateia com ${g.name} · Pulso Podcast`,
+    description: `Assista de perto à gravação do Pulso Podcast com ${g.name}${g.topic ? ` sobre ${g.topic}` : ''}, em ${view.date}. Plateia pequena, selecionada pela produção. Peça sua participação.`,
+    ogImage: g.has_photo ? `${canonical}/foto` : `${config.appBaseUrl}/static/og-plateia.jpg?v=${res.locals.assetV}`,
+    canonical, s, g: view, photos: await page.photos(g.id), partner, partnerFull: full, exempt, open, closedLabel, price, priceLabel: exempt ? `Isenta (convite de ${partner.name})` : price,
+    countries: audience.COUNTRIES, icon, assetV: res.locals.assetV,
+  });
+}));
+router.get('/plateia/com/:slug/foto', wrap(async (req, res) => {
+  const g = await page.bySlug(req.params.slug);
+  if (!g) return res.status(404).send('Imagem não encontrada.');
+  const { rows: [r] } = await db.query('SELECT photo_key FROM guests WHERE id = $1', [g.id]);
+  return sendImage(res, r && r.photo_key);
+}));
+router.get('/plateia/com/:slug/fotos/:id', wrap(async (req, res) => {
+  const g = isIntId(req.params.id) ? await page.bySlug(req.params.slug) : null;
+  const { rows: [p] } = g ? await db.query('SELECT storage_key FROM guest_audience_photos WHERE id = $1 AND guest_id = $2', [req.params.id, g.id]) : { rows: [] };
+  return sendImage(res, p && p.storage_key);
 }));
 
 // Fotos: do convidado (só enquanto ele está na agenda pública) e as imagens do estúdio escolhidas pela gestão.
@@ -102,10 +143,13 @@ router.post('/plateia/inscricao', wrap(async (req, res) => {
   const phone = audience.validatePhone(String(b.country || ''), b.phone);
   if (phone.error) return res.status(400).json({ ok: false, field: 'phone', error: phone.error });
   if (b.terms !== true) return res.status(400).json({ ok: false, field: 'terms', error: 'Para continuar, aceite as condições da plateia.' });
+  // link de parceiro: isento enquanto houver vaga dele; esgotado, o pedido segue pelo valor normal
+  const { partner, full } = b.partner ? await page.partnerFor(guest.id, String(b.partner)) : { partner: null, full: false };
   const lead = await audience.createLead({
     guest, name, phone, utm: audience.cleanUtm(b.utm), referrer: b.referrer, landingUrl: b.landing, visitorId: b.visitor_id, userAgent: req.get('user-agent'),
+    partner: partner && !full ? partner : null,
   });
-  res.json({ ok: true, ref: lead.ref, url: lead.url });
+  res.json({ ok: true, ref: lead.ref, url: lead.url, exempt: lead.exempt, price: lead.price, partnerFull: Boolean(partner && full) });
 }));
 
 module.exports = router;

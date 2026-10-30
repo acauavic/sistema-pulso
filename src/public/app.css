@@ -1344,3 +1344,14 @@ a.icon-btn { text-decoration: none; } a.icon-btn.on { background: var(--raised);
 .resend-nets .chip-radio small { margin-left: 8px; font: 500 10px var(--f-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
 .chip-radio.off { cursor: not-allowed; } .chip-radio.off span { opacity: .55; }
 .resend-why { display: grid; gap: 4px; margin: 0; color: var(--text-2); }
+
+/* Convidado > Página da plateia: endereço em mono, fotos da página na moldura 4:3 e os links de parceiro */
+.page-url { margin: 4px 0 12px; overflow-wrap: anywhere; color: var(--text-2); }
+.page-off p { max-width: 60ch; }
+.page-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+.page-photos li { display: grid; gap: 4px; justify-items: start; } .page-photos .guest-photo { width: 100%; height: auto; }
+.partner-list { display: grid; gap: 12px; margin-top: 12px; }
+.partner-list li { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); }
+.partner-list li.is-off { opacity: .6; }
+.partner-list .display { font-family: var(--f-display); letter-spacing: -.02em; }
+.partner-list .page-url { margin: 0; }
