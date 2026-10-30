@@ -40,6 +40,7 @@ function createApp() {
   app.use(require('./routes/infinitepay')); // webhook de pagamento da plateia e a página de "pagamento recebido" (sem login)
   app.use(require('./routes/plateia')); // Pulso Podcast com Plateia: página pública de inscrição (sem login)
   app.use(require('./routes/sponsorPublic')); // media kit, formulário e portal do patrocinador (idem)
+  app.use(require('./routes/guestPortalPublic')); // portal do convidado: posts em collab, cortes exclusivos e fotos (token na URL)
 
   app.use(mw.attachSession);
   // modo de teste/publicação de verdade das redes (Integrações): relido do banco a cada 15 s, no máximo
@@ -63,6 +64,7 @@ function createApp() {
   app.use(require('./routes/plateiaAdmin')); // Plateia: inscrições, resultados e ajustes (e controles no convidado)
   app.use(require('./routes/finance')); // Financeiro: contas, estoque e custos automáticos (antes de episódios e patrocinadores)
   app.use(require('./routes/users'));
+  app.use(require('./routes/guestPortal')); // portal do convidado: aba no cadastro e corte exclusivo
   app.use(require('./routes/guestImport')); // antes de guests: /convidados/importar não pode cair em /convidados/:id
   app.use(require('./routes/guests'));
   app.use(require('./routes/sponsors'));

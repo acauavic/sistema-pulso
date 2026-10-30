@@ -25,6 +25,7 @@ function registerRoutines() {
   scheduler.every('google-agenda', 60_000, () => require('./services/googleCalendar').tick(), { delayMs: 40_000 });
   scheduler.every('convite-agenda', 60_000, () => require('./services/calendarInvites').tick(), { delayMs: 50_000 });
   scheduler.every('plateia-lembrete', 30 * 60_000, () => require('./services/audience').reminderTick(), { delayMs: 75_000 });
+  scheduler.every('portal-convidado', 10 * 60_000, () => require('./services/guestPortal').tick(), { delayMs: 80_000 }); // posts novos em collab: avisa o convidado
   scheduler.every('cadencia', 30 * 60_000, () => require('./services/outreach').dailyNotice(), { delayMs: 70_000 });
   scheduler.every('automacoes', 5 * 60_000, () => require('./services/social').runRules(), { delayMs: 60_000 });
   scheduler.every('financeiro', 3600_000, () => require('./services/finance').tick(), { delayMs: 45_000 });

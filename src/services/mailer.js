@@ -152,6 +152,23 @@ async function sendSponsorNotice({ to, title, text, url }) {
   });
 }
 
+// Portal do convidado: o link (kind 'link') ou os posts novos em collab (kind 'novos', com a lista).
+async function sendGuestPortal({ to, guestName, url, kind, posts = [] }) {
+  const first = String(guestName || '').split(/\s+/)[0] || 'tudo bem';
+  const link = (p) => (p.links.find((l) => l.platform === 'instagram') || p.links[0]).url;
+  const body = kind === 'novos'
+    ? `<p>Olá, ${esc(first)}. ${posts.length > 1 ? `Saíram ${posts.length} posts novos` : 'Saiu um post novo'} em collab com você:</p>
+<ul style="padding-left:18px;margin:0 0 16px">${posts.map((p) => `<li style="margin:0 0 6px"><a href="${esc(link(p))}" style="color:#0A0A0A">${esc(p.title)}</a></li>`).join('')}</ul>
+<p>Compartilhar nos stories e comentar ajuda o post a chegar mais longe. Está tudo no seu portal, junto com o cronograma da semana.</p>`
+    : `<p>Olá, ${esc(first)}. Obrigado por sentar à mesa.</p>
+<p>Preparamos o seu portal no ${esc(config.podcastName)}: o cronograma da semana do episódio, os posts em collab com você, cortes exclusivos para você postar e as fotos da gravação. Ele vai se atualizando durante a semana.</p>`;
+  return sendMail({
+    to, subject: kind === 'novos' ? `${posts.length > 1 ? 'Posts novos' : 'Post novo'} em collab com você` : `Seu portal no ${config.podcastName}`,
+    html: layout({ title: kind === 'novos' ? 'Mais um post em collab' : 'Seu portal está pronto', bodyHtml: body, button: { label: 'Abrir meu portal', url },
+      footer: `Você recebeu este e-mail porque participou do ${config.podcastName}.` }),
+  });
+}
+
 // Aviso de notificação do painel (quando a gestão liga o e-mail para aquele tipo).
 async function sendNotification({ to, title, text, url }) {
   return sendMail({
@@ -161,4 +178,4 @@ async function sendNotification({ to, title, text, url }) {
   });
 }
 
-module.exports = { sendCalendarInvite, sendNotification, sendSponsorNotice, outbox, sendMail, verifyMail, sendUserInvite, sendPasswordReset, sendGuestInvite, sendRsvpNotice };
+module.exports = { sendGuestPortal, sendCalendarInvite, sendNotification, sendSponsorNotice, outbox, sendMail, verifyMail, sendUserInvite, sendPasswordReset, sendGuestInvite, sendRsvpNotice };

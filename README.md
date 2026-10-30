@@ -21,6 +21,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - [Central de patrocinadores](#central-de-patrocinadores)
 - [Produção de episódios](#produção-de-episódios)
 - [Pulso Podcast com Plateia](#pulso-podcast-com-plateia)
+- [Portal do convidado](#portal-do-convidado)
 - [Financeiro: contas, custos automáticos e estoque](#financeiro-contas-custos-automáticos-e-estoque)
 - [Social: publicações, novo post, ideias, insights e automações](#social-publicações-novo-post-ideias-insights-e-automações)
 - [Colaboração: tarefas, comentários, notificações e busca](#colaboração-tarefas-comentários-notificações-e-busca)
@@ -217,6 +218,16 @@ Página **pública** `/plateia` (sem login, indexável) para o público pedir pa
 - **Medição**: UTMs, `fbclid`/`gclid` e origem ficam guardados no navegador (primeiro toque até aparecer uma campanha nova) e vão com cada evento e inscrição. Eventos: visita, clique na agenda, clique em "Quero participar" (com o episódio), formulário aberto, inscrição e abertura do WhatsApp (`plateia_events`, robôs ignorados). **Meta Pixel** e **GA4** só carregam se a gestão informar os IDs (a CSP da página libera esses domínios só nesse caso).
 - **Painel** (menu Plateia; produtora e gestão veem, só a gestão ajusta): Inscrições (WhatsApp direto, situação Novo/Em atendimento/Confirmado/Desistiu, exportação CSV), Agenda (o que está público agora), Resultados (funil, por episódio, por origem/UTM em 7/30/90 dias) e Ajustes (página no ar, preço R$ 197, duração, local, WhatsApp da produtora, IDs de rastreamento, imagens do topo e do estúdio).
 - Segurança: POSTs públicos com limite por IP, isca anti-robô, telefone e texto validados no servidor, CSP sem script inline, imagens validadas pelos primeiros bytes.
+
+## Portal do convidado
+
+Cada convidado com episódio tem a aba **Portal** no cadastro. **Ativar portal** cria uma página só dele (`/convidado/<token>`, sem login, fora dos buscadores) que se atualiza sozinha durante a semana do episódio:
+
+- **Cronograma**: os cortes em collab começam na segunda da semana em que o episódio sai, o episódio vai ao ar (data de veiculação) e os cortes exclusivos aparecem com ele. "Cronograma e aviso" ajusta as datas (vazio = automático).
+- **Posts em collab**: o sistema reconhece pelo @ do Instagram do cadastro no collab da publicação. Os demais posts do episódio aparecem em "Outros posts sobre você". O episódio no YouTube vira collab quando a equipe marca a collab do canal do convidado (que ele pode pedir pelo portal).
+- **Cortes exclusivos**: todo corte do episódio sem publicação, a não ser que a equipe tire ("tirar" na aba ou "tirar do portal" no corte). O convidado assiste, copia a legenda e baixa.
+- **Episódio e fotos**: links do YouTube, Spotify e Instagram; fotos do material que a equipe escolher.
+- **Avisos**: "Enviar link" manda por e-mail ou abre o WhatsApp com a mensagem pronta. Cada post novo em collab depois disso avisa o convidado: por e-mail sai sozinho (rotina de 10 min); no WhatsApp a equipe recebe um lembrete e usa "Avisar no WhatsApp".
 
 ## Social: publicações, novo post, ideias, insights e automações
 

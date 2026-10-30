@@ -219,6 +219,14 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
     arrivalInput: guest.audience_arrival ? String(guest.audience_arrival).slice(0, 5) : '',
     live: guest.status === 'agendado' && guest.proposed_at && new Date(guest.proposed_at) > new Date(),
   } : null;
+  // portal do convidado: nasce com o episódio
+  const portalSvc = require('../services/guestPortal');
+  const pg = episode.rows[0] ? await portalSvc.byId(guest.id) : null;
+  const portalTab = pg ? {
+    g: pg, url: pg.portal_token ? portalSvc.url(pg.portal_token) : null, c: await portalSvc.content(pg), pending: pg.portal_enabled ? await portalSvc.pending(pg) : [],
+    channel: portalSvc.channelOf(pg), NOTIFY: portalSvc.NOTIFY, dayLabel: portalSvc.dayLabel, ytUrl: portalSvc.youtubeUrl(pg.portal_yt_channel),
+    hasPhone: Boolean(require('../services/contacts').normalizeNumber(pg.phone)), hasEmail: isEmail(pg.email || ''),
+  } : null;
   const reminderList = await reminders.forGuest(guest);
   const outreach = require('../services/outreach');
   const inStage = guest.status === outreach.KINDS.guest.stage;
@@ -227,7 +235,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   res.render('guests/show', {
     outreachCtx: { kind: 'guest', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (guest.instagram ? 'instagram' : guest.phone ? 'whatsapp' : guest.email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/convidados', subjectId: guest.id },
     reminderList, photoFrame: guestPhotos.FRAME,
-    pagePlateia, plateia: { ...pl, price: guest.audience_enabled ? require('../services/audience').money((await require('../services/audience').settings()).priceCents) : null, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
+    pagePlateia, portalTab, plateia: { ...pl, price: guest.audience_enabled ? require('../services/audience').money((await require('../services/audience').settings()).priceCents) : null, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
     episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, pendingStage: isStatus(req.query.para) ? req.query.para : null, storageReady: config.storageConfigured, openModal: ['contato', 'agenda', 'email', 'perda', 'foto'].includes(req.query.abrir) ? req.query.abrir : null,
     title: guest.name, guest, events, clicks, comments: thread, linkedTasks: linkedTasks.rows, clickKinds: CLICK_KINDS, profileLabels: PROFILE_BY_KEY,
     statuses: GUEST_STATUSES, statusInfo: STATUS_BY_KEY[guest.status],

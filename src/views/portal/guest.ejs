@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= title %></title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/static/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#F4F2EC">
+<link rel="stylesheet" href="/static/portal.css?v=<%= assetV %>">
+</head>
+<body>
+<header class="pt-top">
+  <span class="pt-wordmark" aria-label="pulso.">pulso<span>.</span></span>
+  <span class="pt-mono pt-muted">Portal do convidado</span>
+</header>
+
+<main class="pt-wrap">
+  <section class="pt-hero">
+    <% if (epNo || g.episode_title) { %><span class="pt-kicker"><%= [epNo, g.episode_title].filter(Boolean).join(' · ') %></span><% } %>
+    <h1>Olá, <%= first %>.</h1>
+    <p class="pt-voice">Obrigado por sentar à mesa.</p>
+    <p class="pt-lede">Aqui ficam o cronograma da semana do episódio, os posts em collab com você, cortes exclusivos para você postar e as fotos da gravação. A página se atualiza sozinha: volte quando quiser.</p>
+  </section>
+
+  <% if (steps.length) { %>
+  <section class="pt-sec" aria-labelledby="sem-h">
+    <h2 id="sem-h">A semana do episódio</h2>
+    <ol class="pt-steps">
+      <% steps.forEach(function (s) { %>
+      <li class="is-<%= s.state %>">
+        <span class="pt-date pt-mono"><%= s.label %><% if (s.state === 'hoje') { %> <span class="pt-chip pt-chip-now">hoje</span><% } %></span>
+        <div><h3><%= s.title %></h3><p><%= s.text %></p></div>
+      </li>
+      <% }) %>
+    </ol>
+  </section>
+  <% } %>
+
+  <section class="pt-sec" id="como" aria-labelledby="como-h">
+    <h2 id="como-h">Como fazemos as collabs</h2>
+    <div class="pt-ways">
+      <div class="pt-way is-default">
+        <span class="pt-mono pt-muted">Padrão</span>
+        <h3>Nós postamos e convidamos você</h3>
+        <p>Publicamos os cortes no perfil do Pulso e enviamos o convite de collab para o seu Instagram. É só aceitar. A cada post, avisamos você.</p>
+      </div>
+      <div class="pt-way">
+        <span class="pt-mono pt-muted">Se preferir</span>
+        <h3>Você posta e convida o Pulso</h3>
+        <p>Mandamos o material, você posta no seu perfil nos dias da semana do episódio e convida o Pulso como collab.</p>
+      </div>
+    </div>
+    <p class="pt-sub">Quer combinar de outro jeito? Fale com a produção.</p>
+    <a class="pt-btn pt-btn-sec" href="<%= base %>/producao" target="_blank" rel="noopener noreferrer"><%- icon('message-circle', 16) %> Falar com a produção</a>
+  </section>
+
+  <section class="pt-sec" id="collab" aria-labelledby="col-h">
+    <div class="pt-head"><h2 id="col-h">Posts em collab com você</h2><% if (c.collab.length) { %><span class="pt-mono pt-muted"><%= c.collab.length %></span><% } %></div>
+    <% if (c.collab.length) { %>
+    <p class="pt-tip"><%- icon('sparkles', 16) %><span>Compartilhe nos stories, comente e cite a collab. Um post que circula nos dois perfis chega mais longe e mostra a sua participação no Pulso para quem já segue você.</span></p>
+    <ul class="pt-posts">
+      <% c.collab.forEach(function (p) { %><%- include('_post', { p: p }) %><% }) %>
+    </ul>
+    <% } else { %>
+    <p class="pt-empty"><%= g.cuts_from ? 'O primeiro sai em ' + dayLabel(g.cuts_from) + '.' : 'Os primeiros saem na semana do episódio.' %> Você recebe o convite de collab no Instagram: é só aceitar. A cada post novo, avisamos você.</p>
+    <% } %>
+  </section>
+
+  <section class="pt-sec" id="exclusivos" aria-labelledby="exc-h">
+    <div class="pt-head"><h2 id="exc-h">Cortes exclusivos para você</h2><% if (c.exclusiveOpen && c.exclusive.length) { %><span class="pt-mono pt-muted"><%= c.exclusive.length %></span><% } %></div>
+    <% if (c.exclusiveOpen && c.exclusive.length) { %>
+    <p class="pt-sub">Produzimos estes cortes só para você postar no seu perfil, quando quiser. Se convidar o Pulso como collab, o post aparece também para quem segue o podcast.</p>
+    <ul class="pt-clips">
+      <% c.exclusive.forEach(function (x) { var name = x.post_title || x.title; %>
+      <li class="pt-clip">
+        <video controls preload="none" playsinline <% if (x.cover_id) { %>poster="<%= base %>/capa/<%= x.cover_id %>"<% } %> aria-label="<%= name %>"><source src="<%= base %>/cortes/<%= x.id %>" type="video/mp4"></video>
+        <div class="pt-clip-body">
+          <span class="pt-mono pt-muted"><%= x.duration_ms ? fmt.formatClock(x.duration_ms) : 'corte' %><%= x.size_bytes ? ' · ' + fmt.formatBytes(x.size_bytes) : '' %></span>
+          <h3><%= name %></h3>
+          <% if (x.caption) { %>
+          <details class="pt-caption"><summary>Legenda sugerida</summary><p class="pt-pre" data-caption><%= x.caption %></p><button class="pt-link" type="button" data-copy-caption>Copiar legenda</button></details>
+          <% } %>
+          <a class="pt-btn pt-btn-sec" href="<%= base %>/cortes/<%= x.id %>/baixar"><%- icon('download', 16) %> Baixar corte</a>
+        </div>
+      </li>
+      <% }) %>
+    </ul>
+    <% } else { %>
+    <p class="pt-empty"><%= g.exclusive_from && !c.exclusiveOpen ? 'Chegam em ' + dayLabel(g.exclusive_from) + ', prontos para baixar.' : 'Ainda não há cortes exclusivos. Quando ficarem prontos, aparecem aqui para baixar.' %></p>
+    <% } %>
+  </section>
+
+  <section class="pt-sec" id="episodio" aria-labelledby="ep-h">
+    <h2 id="ep-h">O episódio</h2>
+    <% var e = c.episode; if (e.youtube || e.spotify || e.instagram) { %>
+    <div class="pt-links">
+      <% if (e.youtube) { %><a class="pt-btn" href="<%= e.youtube %>" target="_blank" rel="noopener noreferrer"><%- icon('youtube', 16) %> Assistir no YouTube</a><% } %>
+      <% if (e.spotify) { %><a class="pt-btn pt-btn-sec" href="<%= e.spotify %>" target="_blank" rel="noopener noreferrer"><%- icon('headphones', 16) %> Ouvir no Spotify</a><% } %>
+      <% if (e.instagram) { %><a class="pt-btn pt-btn-sec" href="<%= e.instagram %>" target="_blank" rel="noopener noreferrer"><%- icon('instagram', 16) %> Ver no Instagram</a><% } %>
+    </div>
+    <% } else { %>
+    <p class="pt-empty"><%= g.release_on ? 'Vai ao ar em ' + dayLabel(g.release_on) + '. Os links do YouTube e do Spotify aparecem aqui.' : 'Os links do YouTube e do Spotify aparecem aqui quando o episódio for ao ar.' %></p>
+    <% } %>
+
+    <div class="pt-yt" id="youtube">
+      <h3>O episódio também no seu canal do YouTube</h3>
+      <% if (g.portal_yt_done_at) { %>
+      <p class="pt-ok"><%- icon('check', 16) %><span>O episódio está em collab com o seu canal<% if (ytUrl) { %> (<a href="<%= ytUrl %>" target="_blank" rel="noopener noreferrer"><%= g.portal_yt_channel %></a>)<% } %>.</span></p>
+      <% } else if (g.portal_yt_requested_at) { %>
+      <p class="pt-ok"><%- icon('clock', 16) %><span>Pedido recebido para o canal <strong class="pt-mono-in"><%= g.portal_yt_channel %></strong>. A produção avisa quando a collab estiver feita.</span></p>
+      <% } else { %>
+      <p class="pt-sub">O YouTube permite que o episódio apareça também no seu canal, como collab. Diga qual é o seu canal e a produção faz o pedido, antes ou depois de o episódio sair.</p>
+      <% if (ytError) { %><p class="pt-err" role="alert">Não reconhecemos esse canal. Use o @ do canal (por exemplo, @seucanal) ou o link dele.</p><% } %>
+      <form method="post" action="<%= base %>/youtube" class="pt-form">
+        <label for="yt-canal">Seu canal no YouTube</label>
+        <div class="pt-form-row"><input id="yt-canal" type="text" name="canal" required maxlength="120" placeholder="@seucanal ou youtube.com/@seucanal" autocomplete="off"><button class="pt-btn pt-btn-sec" type="submit">Pedir a collab</button></div>
+      </form>
+      <% } %>
+    </div>
+  </section>
+
+  <% if (c.others.length) { %>
+  <section class="pt-sec" id="outros" aria-labelledby="out-h">
+    <div class="pt-head"><h2 id="out-h">Outros posts sobre você</h2><span class="pt-mono pt-muted"><%= c.others.length %></span></div>
+    <ul class="pt-posts">
+      <% c.others.forEach(function (p) { %><%- include('_post', { p: p }) %><% }) %>
+    </ul>
+  </section>
+  <% } %>
+
+  <% if (c.photos.length) { %>
+  <section class="pt-sec" id="fotos" aria-labelledby="fot-h">
+    <div class="pt-head"><h2 id="fot-h">Fotos da gravação</h2><span class="pt-mono pt-muted"><%= c.photos.length %></span></div>
+    <ul class="pt-photos">
+      <% c.photos.forEach(function (f, i) { %>
+      <li><a href="<%= base %>/fotos/<%= f.id %>?t=p" target="_blank" rel="noopener"><img src="<%= base %>/fotos/<%= f.id %>" alt="Foto da gravação <%= i + 1 %>" loading="lazy" width="400" height="300"></a>
+        <a class="pt-link" href="<%= base %>/fotos/<%= f.id %>/baixar"><%- icon('download', 14) %> Baixar</a></li>
+      <% }) %>
+    </ul>
+  </section>
+  <% } %>
+
+</main>
+
+<footer class="pt-foot"><span class="pt-wordmark">pulso<span>.</span></span><span>As conversas que estão movimentando a saúde.</span></footer>
+<script src="/static/portal.js?v=<%= assetV %>" defer></script>
+</body>
+</html>

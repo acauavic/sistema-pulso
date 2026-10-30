@@ -1,0 +1,13 @@
+<li class="pt-post">
+  <a class="pt-thumb" href="<%= p.links[0].url %>" target="_blank" rel="noopener noreferrer" aria-label="Abrir <%= p.title %>">
+    <% if (p.cover) { %><img src="<%= base %>/capa/<%= p.cover %>" alt="" loading="lazy" width="270" height="480"><% } else { %><span aria-hidden="true"><%- icon(p.kind === 'Episódio' ? 'mic' : p.kind === 'Corte' ? 'film' : 'image', 28) %></span><% } %>
+  </a>
+  <div class="pt-post-body">
+    <span class="pt-mono pt-muted"><%= p.kind %> · <%= fmt.formatDay(p.at).slice(0, 5) %></span>
+    <% if (p.collabOn.length) { %><span class="pt-chip">collab · <%= p.collabOn.join(' e ') %></span><% } %>
+    <h3><%= p.title %></h3>
+    <ul class="pt-nets">
+      <% p.links.forEach(function (l) { %><li><a href="<%= l.url %>" target="_blank" rel="noopener noreferrer"><%= l.label %> <%- icon('arrow-up-right', 14) %></a></li><% }) %>
+    </ul>
+  </div>
+</li>

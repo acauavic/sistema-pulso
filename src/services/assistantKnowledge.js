@@ -88,6 +88,18 @@ const TOPICS = [
     ],
   },
   {
+    key: 'portal_convidado', title: 'Portal do convidado', words: ['portal do convidado', 'portal', 'collab', 'cortes exclusivos', 'exclusivo', 'fotos do convidado', 'entrega ao convidado', 'youtube collab'],
+    where: '/convidados', perm: 'guests.read',
+    steps: [
+      'Cada convidado com episódio tem a aba "Portal" no cadastro. "Ativar portal" cria uma página só dele (link secreto), que se atualiza sozinha durante a semana do episódio.',
+      'O portal mostra: o cronograma (cortes começam na segunda da semana em que o episódio sai, episódio no ar, cortes exclusivos), os posts em collab com ele (o sistema reconhece pelo @ do Instagram do cadastro no collab da publicação), os outros posts do episódio, os links do YouTube, do Spotify e do Instagram, as fotos escolhidas e as duas formas de collab, com o botão "Falar com a produção".',
+      'Cortes exclusivos: todo corte do episódio que não foi publicado entra como exclusivo do convidado, para ele baixar e postar, a partir da data dos exclusivos (padrão: o dia em que o episódio sai). Para tirar um, use "tirar" na aba Portal ou "tirar do portal" na página do corte.',
+      '"Cronograma e aviso" ajusta as datas (vazio = automático) e como avisar de post novo em collab: e-mail sai sozinho; no WhatsApp a equipe recebe um lembrete e manda pelo botão "Avisar no WhatsApp" da aba.',
+      '"Enviar link" manda o portal por e-mail ou abre o WhatsApp com a mensagem pronta. O que já estava em collab quando o link foi enviado não gera aviso.',
+      'Pelo portal, o convidado pode pedir o episódio em collab com o canal dele no YouTube; a equipe recebe o aviso, faz o convite no YouTube Studio e marca como feita na aba.',
+    ],
+  },
+  {
     key: 'plateia', title: 'Pulso Podcast com Plateia', words: ['plateia', 'inscrição', 'inscrito', 'inscritos', 'pedido', 'pedidos', 'selecionado', 'selecionar', 'isento', 'link de pagamento', 'infinitepay', 'pagamento da plateia', 'vaga'],
     where: '/plateia/painel', perm: 'audience.read',
     steps: [

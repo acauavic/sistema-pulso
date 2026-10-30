@@ -1355,3 +1355,16 @@ a.icon-btn { text-decoration: none; } a.icon-btn.on { background: var(--raised);
 .partner-list li.is-off { opacity: .6; }
 .partner-list .display { font-family: var(--f-display); letter-spacing: -.02em; }
 .partner-list .page-url { margin: 0; }
+
+/* Portal do convidado (aba no cadastro) */
+.notice-card { border-left: 3px solid var(--st-edicao-fg); margin-bottom: 16px; }
+.notice-card h2 { margin-bottom: 4px; }
+.portal-clips { display: grid; gap: 6px; margin-top: 8px; }
+.portal-clips li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.portal-clips li form { margin-left: auto; }
+.portal-clips li.is-off a { color: var(--muted); }
+.portal-photo-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.portal-photo-pick label { position: relative; display: block; margin: 0; cursor: pointer; }
+.portal-photo-pick img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-card); border: 2px solid transparent; }
+.portal-photo-pick input { position: absolute; top: 8px; left: 8px; width: 18px; height: 18px; accent-color: var(--action); }
+.portal-photo-pick label:has(input:checked) img { border-color: var(--text); }

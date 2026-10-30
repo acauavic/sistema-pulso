@@ -151,6 +151,7 @@
     <button type="button" role="tab" data-tab-btn="resumo" aria-controls="pane-resumo">Resumo</button>
     <% if (showInvite) { %><button type="button" role="tab" data-tab-btn="convite" aria-controls="pane-convite">Convite</button><% } %>
     <% if (pagePlateia) { %><button type="button" role="tab" data-tab-btn="pagina" aria-controls="pane-pagina">Página da plateia<% if (guest.audience_page_enabled) { %> <span class="count"><%= pagePlateia.partners.filter(function (p) { return p.active; }).length || '' %></span><% } %></button><% } %>
+    <% if (portalTab) { %><button type="button" role="tab" data-tab-btn="portal" aria-controls="pane-portal">Portal<% if (portalTab.pending.length) { %> <span class="count"><%= portalTab.pending.length %></span><% } %></button><% } %>
     <button type="button" role="tab" data-tab-btn="historico" aria-controls="pane-historico">Histórico <span class="count"><%= events.length %></span></button>
   </div>
 
@@ -389,6 +390,148 @@
         <div class="row modal-actions"><button class="btn primary" type="submit"><span data-mode="new">Criar link</span><span data-mode="edit">Salvar</span></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
       </form>
     </dialog>
+    <% } %>
+    <% } %>
+  </div>
+  <% } %>
+
+  <% if (portalTab) { var PT = portalTab; var pg = PT.g; var pc = PT.c; var csrfP = '<input type="hidden" name="_csrf" value="' + csrf + '">'; var gFirst = fmt.firstName(guest.name); %>
+  <div class="pane" id="pane-portal" data-pane-id="portal">
+    <% if (!pg.portal_enabled) { %>
+    <section class="card empty page-off">
+      <%- include('../partials/pulse-line') %>
+      <h2>Portal de <%= gFirst %></h2>
+      <p class="muted">Uma página só de <%= gFirst %> que se atualiza sozinha durante a semana do episódio: o cronograma, os posts em collab (o sistema reconhece pelo @ no collab do Instagram), os cortes que não foram publicados como exclusivos, os links do episódio e as fotos que vocês escolherem.</p>
+      <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/portal" class="inline"><%- csrfP %><input type="hidden" name="on" value="1"><button class="btn primary" type="submit"><%- icon('globe') %> Ativar portal</button></form><% } %>
+    </section>
+    <% } else { %>
+    <% if (PT.pending.length) { %>
+    <section class="card notice-card">
+      <div class="row spread">
+        <div>
+          <h2><%= PT.pending.length === 1 ? 'Um post novo' : PT.pending.length + ' posts novos' %> em collab para avisar</h2>
+          <p class="small muted m-0"><%= PT.pending.map(function (p) { return p.title; }).join(' · ') %></p>
+        </div>
+        <form method="post" action="/convidados/<%= guest.id %>/portal/avisar" class="inline" target="_blank"><%- csrfP %><button class="btn primary" type="submit"><%- icon('message-circle') %> Avisar no WhatsApp</button></form>
+      </div>
+    </section>
+    <% } %>
+    <div class="grid-2 align-start">
+      <div class="stack-lg">
+        <section class="card">
+          <div class="row spread"><h2>Portal</h2><span class="badge <%= pg.portal_sent_at ? 'b-gray' : 'b-amber' %>"><%= pg.portal_sent_at ? 'link enviado ' + fmt.formatDay(pg.portal_sent_at).slice(0, 5) : 'link não enviado' %></span></div>
+          <p class="mono small page-url"><%= PT.url %></p>
+          <div class="row">
+            <% if (!pg.portal_sent_at) { %>
+            <button class="btn primary" type="button" data-modal-open="modal-portal-enviar"><%- icon('send') %> Enviar link</button>
+            <button class="btn ghost" type="button" data-copy="<%= PT.url %>"><%- icon('copy') %> Copiar</button>
+            <% } else { %>
+            <button class="btn <%= PT.pending.length ? '' : 'primary' %>" type="button" data-copy="<%= PT.url %>"><%- icon('copy') %> Copiar link</button>
+            <a class="btn ghost" href="<%= PT.url %>" target="_blank" rel="noopener"><%- icon('external-link') %> Abrir</a>
+            <% } %>
+          </div>
+          <% if (!pg.portal_sent_at) { %><p class="small muted top-gap">Mande quando os cortes começarem. Os posts em collab que já estiverem no ar entram no portal sem aviso; os seguintes geram aviso.</p><% } %>
+          <dl class="kv top-gap">
+            <dt>Cortes começam</dt><dd class="mono"><%= PT.dayLabel(pg.cuts_from) || '—' %><%= pg.cuts_from && !pg.cuts_from_set ? ' · automático' : '' %></dd>
+            <dt>Episódio no ar</dt><dd class="mono"><%= PT.dayLabel(pg.release_on) || 'sem data' %><%= pg.release_on && !pg.release_on_set ? ' · do episódio' : '' %></dd>
+            <dt>Exclusivos</dt><dd class="mono"><%= PT.dayLabel(pg.exclusive_from) || '—' %><%= pg.exclusive_from && !pg.exclusive_from_set ? ' · com o episódio' : '' %></dd>
+            <dt>Aviso de post novo</dt><dd><%= PT.NOTIFY[pg.portal_notify] %><%= pg.portal_notify === 'auto' ? ' (' + PT.NOTIFY[PT.channel].toLowerCase() + ')' : '' %></dd>
+          </dl>
+          <% if (!pg.release_on) { %><p class="small muted">Sem data de veiculação no episódio: o cronograma aparece quando ela for preenchida (ou ajuste aqui).</p><% } %>
+          <% if (canW) { %>
+          <div class="row top-gap">
+            <button class="btn sm" type="button" data-modal-open="modal-portal-ajustes"><%- icon('pencil', 14) %> Cronograma e aviso</button>
+            <% if (pg.portal_sent_at) { %><button class="link small" type="button" data-modal-open="modal-portal-enviar">enviar de novo</button><% } %>
+            <form method="post" action="/convidados/<%= guest.id %>/portal/novo-link" class="inline push-right" data-confirm="Gerar um link novo? O atual para de funcionar e é preciso mandar o novo para <%= gFirst %>."><%- csrfP %><button class="link small" type="submit">novo link</button></form>
+            <form method="post" action="/convidados/<%= guest.id %>/portal" class="inline" data-confirm="Desativar o portal? O link deixa de abrir (dá para ativar de novo depois)."><%- csrfP %><input type="hidden" name="on" value="0"><button class="link small danger-link" type="submit">desativar</button></form>
+          </div>
+          <% } %>
+        </section>
+
+        <section class="card">
+          <h2>Episódio em collab no YouTube</h2>
+          <% if (pg.portal_yt_done_at) { %>
+          <p><span class="badge b-gray">feita</span> <% if (PT.ytUrl) { %><a class="mono small" href="<%= PT.ytUrl %>" target="_blank" rel="noopener"><%= pg.portal_yt_channel %></a><% } %></p>
+          <p class="small muted">No portal, o episódio aparece como collab também no YouTube.</p>
+          <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/portal/youtube" class="inline"><%- csrfP %><input type="hidden" name="feito" value="0"><button class="link small" type="submit">desmarcar</button></form><% } %>
+          <% } else if (pg.portal_yt_requested_at) { %>
+          <p class="notice"><%= gFirst %> pediu em <span class="mono"><%= fmt.formatDay(pg.portal_yt_requested_at).slice(0, 5) %></span> para o episódio sair em collab com o canal <a class="mono" href="<%= PT.ytUrl %>" target="_blank" rel="noopener"><%= pg.portal_yt_channel %></a>. Faça o convite no YouTube Studio e marque aqui.</p>
+          <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/portal/youtube" class="inline"><%- csrfP %><input type="hidden" name="feito" value="1"><button class="btn sm" type="submit"><%- icon('check', 14) %> Marcar como feita</button></form><% } %>
+          <% } else { %>
+          <p class="small muted">Pelo portal, <%= gFirst %> pode pedir que o episódio apareça também no canal dele no YouTube, antes ou depois de sair. O pedido chega como aviso.</p>
+          <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/portal/youtube" class="inline"><%- csrfP %><input type="hidden" name="feito" value="1"><button class="link small" type="submit">já fizemos a collab</button></form><% } %>
+          <% } %>
+        </section>
+      </div>
+
+      <section class="card">
+        <h2>No portal agora</h2>
+        <% if (!pc.handle) { %><p class="notice small">Sem @ do Instagram no cadastro: o sistema não tem como reconhecer os posts em collab.</p><% } %>
+        <dl class="kv">
+          <dt>Em collab</dt><dd class="mono"><%= pc.collab.length %> post<%= pc.collab.length === 1 ? '' : 's' %></dd>
+          <dt>Outros posts</dt><dd class="mono"><%= pc.others.length %></dd>
+          <dt>Episódio</dt><dd class="mono"><%= ['YouTube', 'Spotify', 'Instagram'].filter(function (k) { return pc.episode[k.toLowerCase()]; }).join(' · ') || 'links ainda não saíram' %></dd>
+          <dt>Fotos</dt><dd><span class="mono"><%= pc.photos.length %> de <%= pc.photoChoices.length %></span><% if (canW && pc.photoChoices.length) { %> <button class="link small" type="button" data-modal-open="modal-portal-fotos">escolher</button><% } else if (!pc.photoChoices.length) { %> <span class="small muted">sem fotos no material do episódio</span><% } %></dd>
+        </dl>
+        <h3 class="top-gap">Cortes exclusivos <span class="mono small muted"><%= pc.exclusive.length %><%= pc.exclusiveOpen ? ' · à mostra' : (pg.exclusive_from ? ' · aparecem ' + PT.dayLabel(pg.exclusive_from) : '') %></span></h3>
+        <% if (!pc.exclusive.length && !pc.clipsOut.length) { %><p class="small muted">Todo corte do episódio que não for publicado entra aqui como exclusivo de <%= gFirst %>.</p><% } %>
+        <ul class="plain portal-clips">
+          <% pc.exclusive.forEach(function (x) { %>
+          <li><a href="/cortes/<%= x.id %>"><%= x.post_title || x.title %></a><% if (canW) { %><form method="post" action="/cortes/<%= x.id %>/convidado" class="inline"><%- csrfP %><input type="hidden" name="on" value="0"><input type="hidden" name="voltar" value="/convidados/<%= guest.id %>"><button class="link small" type="submit">tirar</button></form><% } %></li>
+          <% }) %>
+          <% pc.clipsOut.forEach(function (x) { %>
+          <li class="is-off"><a href="/cortes/<%= x.id %>"><%= x.post_title || x.title %></a> <span class="mono small muted">fora do portal</span><% if (canW) { %><form method="post" action="/cortes/<%= x.id %>/convidado" class="inline"><%- csrfP %><input type="hidden" name="on" value="1"><input type="hidden" name="voltar" value="/convidados/<%= guest.id %>"><button class="link small" type="submit">voltar</button></form><% } %></li>
+          <% }) %>
+        </ul>
+      </section>
+    </div>
+
+    <dialog class="modal" id="modal-portal-enviar" aria-labelledby="mpe-h">
+      <div class="stack">
+        <h2 id="mpe-h">Enviar o link do portal</h2>
+        <p class="small muted">A mensagem apresenta o portal e explica que ele se atualiza durante a semana.</p>
+        <% if (PT.hasEmail) { %><form method="post" action="/convidados/<%= guest.id %>/portal/enviar" data-busy="Enviando…"><%- csrfP %><input type="hidden" name="canal" value="email"><button class="btn primary" type="submit"><%- icon('mail') %> Enviar por e-mail</button> <span class="mono small muted"><%= guest.email %></span></form><% } %>
+        <% if (PT.hasPhone) { %><form method="post" action="/convidados/<%= guest.id %>/portal/enviar" target="_blank"><%- csrfP %><input type="hidden" name="canal" value="whatsapp"><button class="btn <%= PT.hasEmail ? '' : 'primary' %>" type="submit"><%- icon('message-circle') %> Abrir no WhatsApp</button> <span class="mono small muted"><%= guest.phone %></span></form><% } %>
+        <% if (!PT.hasEmail && !PT.hasPhone) { %><p class="notice small">Sem e-mail nem WhatsApp no cadastro. Copie o link e mande por onde vocês conversam.</p><% } %>
+        <div class="row modal-actions"><button class="btn ghost" type="button" data-modal-close>Fechar</button></div>
+      </div>
+    </dialog>
+    <% if (canW) { %>
+    <dialog class="modal" id="modal-portal-ajustes" aria-labelledby="mpa2-h">
+      <form method="post" action="/convidados/<%= guest.id %>/portal/datas" class="stack">
+        <%- csrfP %>
+        <h2 id="mpa2-h">Cronograma</h2>
+        <p class="small muted">Vazio = automático: o episódio sai na data de veiculação, os cortes começam na segunda daquela semana e os exclusivos aparecem com o episódio.</p>
+        <label>Cortes em collab começam<input type="date" name="cuts_from" value="<%= pg.cuts_from_set || '' %>"></label>
+        <label>Episódio vai ao ar<input type="date" name="release_on" value="<%= pg.release_on_set || '' %>"></label>
+        <label>Cortes exclusivos aparecem<input type="date" name="exclusive_from" value="<%= pg.exclusive_from_set || '' %>"></label>
+        <div class="row modal-actions"><button class="btn primary" type="submit">Salvar cronograma</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+      </form>
+      <form method="post" action="/convidados/<%= guest.id %>/portal/aviso" class="stack top-gap">
+        <%- csrfP %>
+        <h2>Aviso de post novo em collab</h2>
+        <div class="seg-radio" role="radiogroup" aria-label="Como avisar">
+          <% Object.keys(PT.NOTIFY).forEach(function (k) { %><label><input type="radio" name="canal" value="<%= k %>" <%= pg.portal_notify === k ? "checked" : "" %>><%= PT.NOTIFY[k] %></label><% }) %>
+        </div>
+        <p class="small muted">Automático usa o e-mail; sem e-mail, o WhatsApp. O e-mail sai sozinho. No WhatsApp, a equipe recebe um lembrete e manda pela aba Portal.</p>
+        <div class="row modal-actions"><button class="btn" type="submit">Salvar aviso</button></div>
+      </form>
+    </dialog>
+    <% if (pc.photoChoices.length) { %>
+    <dialog class="modal modal-wide" id="modal-portal-fotos" aria-labelledby="mpf-h">
+      <form method="post" action="/convidados/<%= guest.id %>/portal/fotos" class="stack">
+        <%- csrfP %>
+        <h2 id="mpf-h">Fotos no portal</h2>
+        <p class="small muted">Marque as que <%= gFirst %> pode ver e baixar. Fotografias e bastidores do material do episódio.</p>
+        <ul class="plain portal-photo-pick">
+          <% pc.photoChoices.forEach(function (f) { %>
+          <li><label><input type="checkbox" name="fotos" value="<%= f.id %>" <%= f.for_guest ? 'checked' : '' %>><img src="/episodios/<%= pg.episode_id %>/arquivos/<%= f.id %>/previa" alt="<%= f.filename %>" loading="lazy" width="160" height="120"></label></li>
+          <% }) %>
+        </ul>
+        <div class="row modal-actions"><button class="btn primary" type="submit">Salvar fotos</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+      </form>
+    </dialog>
+    <% } %>
     <% } %>
     <% } %>
   </div>

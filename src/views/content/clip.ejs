@@ -79,6 +79,10 @@
       <h2>Episódio</h2>
       <% if (request) { %><p class="small"><span class="muted">Entrega do pedido:</span> <a href="/conteudo/pedidos/<%= request.id %>"><strong><%= request.title %></strong></a> <span class="badge <%= request.status === 'aprovado' ? 'b-st-pronto_publicar' : 'b-st-em_revisao' %>"><%= request.status === 'aprovado' ? 'aprovado' : 'aguardando aprovação' %></span></p><% } %>
       <% if (episode) { %><p><a href="/episodios/<%= episode.id %>"><strong><%= epLabel(episode) %></strong></a><%= episode.guest_name ? ' · ' + episode.guest_name : '' %></p><% } else if (request) { %><p class="muted">Conteúdo avulso (sem episódio).</p><% } else { %><p class="muted">Este corte ainda não pertence a nenhum episódio.</p><% } %>
+      <% if (episode && episode.guest_name && clip.status === 'pronto') { %>
+      <p class="small"><span class="muted">Portal do convidado:</span> <%= publications.length ? 'aparece nos posts quando estiver no ar' : clip.for_guest ? 'exclusivo de ' + episode.guest_name.split(' ')[0] + ' enquanto não for publicado' : 'fora do portal' %>
+        <% if (perm.guest && !publications.length) { %><form method="post" action="/cortes/<%= clip.id %>/convidado" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="on" value="<%= clip.for_guest ? '0' : '1' %>"><button class="link small" type="submit"><%= clip.for_guest ? 'tirar do portal' : 'pôr no portal' %></button></form><% } %></p>
+      <% } %>
       <% if (perm.cut && clip.status !== 'enviando' && episode) { %><button class="btn sm top-gap" type="button" data-modal-open="modal-episodio">Mudar de episódio</button><% } %>
       <% if (perm.cut && clip.status !== 'enviando') { %>
       <% if (episode) { %><dialog class="modal" id="modal-episodio" aria-labelledby="mep-h"><h2 id="mep-h">Mudar de episódio</h2><% } %>

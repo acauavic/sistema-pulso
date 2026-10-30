@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.41.0', date: '2026-10-30', title: 'Portal do convidado',
+    items: [
+      { kind: 'novo', text: 'Cada convidado com episódio ganhou a aba "Portal": uma página só dele, que se atualiza sozinha durante a semana do episódio, com o cronograma (cortes na segunda, episódio na sexta), as duas formas de collab e o botão para falar com a produção.' },
+      { kind: 'novo', text: 'O portal reconhece sozinho os posts em collab com o convidado (pelo @ do Instagram no collab) e lista com a capa e o link de cada rede, junto da recomendação de compartilhar e citar a collab. Os outros posts do episódio, os links do YouTube, do Spotify e do Instagram e as fotos escolhidas pela equipe também aparecem.' },
+      { kind: 'novo', text: 'Cortes exclusivos: todo corte do episódio que não foi publicado vai para o portal, para o convidado assistir, copiar a legenda e baixar. Dá para tirar um corte pela aba Portal ou pela página do corte.' },
+      { kind: 'novo', text: 'Avisos: "Enviar link" manda o portal por e-mail ou abre o WhatsApp com a mensagem pronta. Cada post novo em collab avisa o convidado por e-mail, ou deixa um lembrete para a equipe mandar pelo WhatsApp.' },
+      { kind: 'novo', text: 'Pelo portal, o convidado pode pedir que o episódio saia em collab com o canal dele no YouTube. A equipe recebe o aviso e marca como feita.' },
+    ],
+  },
+  {
     version: '1.40.2', date: '2026-10-30', title: 'Benefícios junto do vídeo da plateia',
     items: [
       { kind: 'ajuste', text: 'Na página da plateia, a lista do que se vive na gravação (networking, interação com o convidado, coffee break, bastidores) passou para a seção do vídeo, abaixo do texto. Sem vídeo, ela continua no topo.' },
