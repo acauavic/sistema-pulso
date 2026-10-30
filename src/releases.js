@@ -9,6 +9,7 @@ module.exports = [
       { kind: 'correcao', text: 'Portal do convidado: o player do Spotify encolhia e deixava um espaço vazio ao dar play (o episódio tem vídeo e o player estava na versão compacta). Agora ele vem no tamanho de vídeo do Spotify, com a permissão de reprodução.' },
       { kind: 'correcao', text: 'Galeria de fotos: a foto aparece inteira (vertical sem cortar a cabeça), só troca depois que a próxima carregou e a miniatura da foto atual fica sempre à vista.' },
       { kind: 'ajuste', text: '"Baixar todas" agora baixa um arquivo ZIP só, com todas as fotos, em vez de dezenas de downloads.' },
+      { kind: 'correcao', text: 'Depois de cada atualização, algumas telas (o portal do convidado, a janela de reenviar e o recorte de foto) continuavam com o visual antigo por até uma hora. Agora o navegador pega a versão nova na hora.' },
     ],
   },
   {

@@ -108,8 +108,15 @@ describe('app no celular (PWA)', () => {
     assert.equal(gone.status, 302); assert.match(gone.location, /login/);
   });
 
-  it('arquivos do app versionados: pwa.js e push.js entram no hash dos arquivos', () => {
-    const src = require('fs').readFileSync(require('path').join(__dirname, '../src/middleware.js'), 'utf8');
-    for (const f of ['pwa.js', 'push.js']) assert.ok(src.includes(`'${f}'`), f);
+  it('arquivos do app versionados: todo .css, .js e .html de src/public entra no hash (nenhum arquivo novo fica de fora)', () => {
+    const fs = require('fs'); const path = require('path'); const crypto = require('crypto');
+    const dir = path.join(__dirname, '../src/public'); const h = crypto.createHash('sha1'); const seen = [];
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).sort((x, y) => x.name.localeCompare(y.name)).forEach((e) => {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p); else if (/\.(css|js|html)$/.test(e.name)) { seen.push(e.name); h.update(e.name); h.update(fs.readFileSync(p)); }
+    });
+    walk(dir);
+    for (const f of ['pwa.js', 'push.js', 'portal.css', 'portal.js', 'reenviar.js']) assert.ok(seen.includes(f), f);
+    assert.equal(ASSET_VERSION, h.digest('hex').slice(0, 10));
   });
 });

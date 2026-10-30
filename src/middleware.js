@@ -134,11 +134,15 @@ const staticDir = path.join(__dirname, 'public');
 
 // Versão dos arquivos de /static (hash do conteúdo, calculado ao subir). Vai na URL (?v=…) para que o navegador
 // não use CSS/JS antigo do cache de 1h depois de um deploy.
+// Todos os .css, .js e .html da pasta (e subpastas), para nenhum arquivo novo ficar de fora.
 const ASSET_VERSION = (() => {
   const h = crypto.createHash('sha1');
-  for (const f of ['app.css', 'app.js', 'theme.js', 'patrocinador.css', 'brief.js', 'producao.js', 'baixar.js', 'editor.js', 'design/engine.js', 'collab.js', 'uploads.js', 'tarefa-voz.js', 'richtext.js', 'social.js', 'assistant.js', 'plateia.css', 'plateia.js', 'push.js', 'pwa.js', 'offline.html', 'igpeople.js', 'aiassist.js', 'pedidos.js']) {
-    try { h.update(fs.readFileSync(path.join(staticDir, f))); } catch { /* arquivo ausente: ignora */ }
-  }
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).forEach((e) => {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walk(p);
+    else if (/\.(css|js|html)$/.test(e.name)) { h.update(e.name); h.update(fs.readFileSync(p)); }
+  });
+  try { walk(staticDir); } catch { /* pasta ausente: ignora */ }
   return h.digest('hex').slice(0, 10);
 })();
 
