@@ -35,6 +35,14 @@ router.post('/convidados/:id/portal/novo-link', requirePerm('guests.write'), wra
   res.redirect(back(g.id));
 }));
 
+router.post('/convidados/:id/portal/estender', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOr404(req, res); if (!g) return;
+  await portal.extend(g.id);
+  await audit(req, 'portal.estendido', 'guest', g.id);
+  await req.flash('ok', `Portal liberado por mais ${portal.VALID_DAYS} dias.`);
+  res.redirect(back(g.id));
+}));
+
 router.post('/convidados/:id/portal/datas', requirePerm('guests.write'), wrap(async (req, res) => {
   const g = await guestOr404(req, res); if (!g) return;
   const r = portal.parseDates(req.body);

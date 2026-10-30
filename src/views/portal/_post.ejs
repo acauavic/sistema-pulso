@@ -6,8 +6,11 @@
     <span class="pt-mono pt-muted"><%= p.kind %> · <%= fmt.formatDay(p.at).slice(0, 5) %></span>
     <% if (p.collabOn.length) { %><span class="pt-chip">collab · <%= p.collabOn.join(' e ') %></span><% } %>
     <h3><%= p.title %></h3>
-    <ul class="pt-nets">
-      <% p.links.forEach(function (l) { %><li><a href="<%= l.url %>" target="_blank" rel="noopener noreferrer"><%= l.label %> <%- icon('arrow-up-right', 14) %></a></li><% }) %>
-    </ul>
+    <div class="pt-see">
+      <span class="pt-mono pt-muted">Clique e veja:</span>
+      <ul class="pt-nets">
+        <% p.links.forEach(function (l) { %><li><a href="<%= l.url %>" target="_blank" rel="noopener noreferrer" aria-label="Ver no <%= l.label %>" title="<%= l.label %>"><%- brand(l.platform, 18) %></a></li><% }) %>
+      </ul>
+    </div>
   </div>
 </li>

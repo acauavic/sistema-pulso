@@ -225,9 +225,10 @@ Página **pública** `/plateia` (sem login, indexável) para o público pedir pa
 Cada convidado com episódio tem a aba **Portal** no cadastro. **Ativar portal** cria uma página só dele (`/convidado/<token>`, sem login, fora dos buscadores) que se atualiza sozinha durante a semana do episódio:
 
 - **Cronograma**: os cortes em collab começam na segunda da semana em que o episódio sai, o episódio vai ao ar (data de veiculação) e os cortes exclusivos aparecem com ele. "Cronograma e aviso" ajusta as datas (vazio = automático).
-- **Posts em collab**: o sistema reconhece pelo @ do Instagram do cadastro no collab da publicação. Os demais posts do episódio aparecem em "Outros posts sobre você". O episódio no YouTube vira collab quando a equipe marca a collab do canal do convidado (que ele pode pedir pelo portal).
+- **Posts em collab** (redes em ícones, abaixo de "Clique e veja:"): o sistema reconhece pelo @ do Instagram do cadastro no collab da publicação. Os demais posts do episódio aparecem em "Outros posts sobre você". O episódio no YouTube vira collab quando a equipe marca a collab do canal do convidado (que ele pode pedir pelo portal).
 - **Cortes exclusivos**: todo corte do episódio sem publicação, a não ser que a equipe tire ("tirar" na aba ou "tirar do portal" no corte). O convidado assiste, copia a legenda e baixa.
-- **Episódio e fotos**: links do YouTube, Spotify e Instagram; fotos do material que a equipe escolher.
+- **Episódio e fotos**: o vídeo do YouTube e o player do Spotify incorporados (link que não dá para incorporar vira botão) e o link do Instagram; fotos do material que a equipe escolher, em galeria que passa sozinha, com "Baixar esta foto" e "Baixar todas".
+- **Validade**: o material fica disponível por 60 dias a partir do primeiro envio do link (a data aparece no portal). Depois o link mostra que expirou; a aba Portal estende por mais 60 dias.
 - **Avisos**: "Enviar link" manda por e-mail ou abre o WhatsApp com a mensagem pronta. Cada post novo em collab depois disso avisa o convidado: por e-mail sai sozinho (rotina de 10 min); no WhatsApp a equipe recebe um lembrete e usa "Avisar no WhatsApp".
 
 ## Social: publicações, novo post, ideias, insights e automações

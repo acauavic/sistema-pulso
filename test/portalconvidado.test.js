@@ -7,6 +7,7 @@ describe('Portal do convidado', () => {
   const q = (sql, p) => h.db.query(sql, p).then((r) => r.rows);
   const one = (sql, p) => q(sql, p).then((r) => r[0]);
   const act = (who, path, form) => as[who].act(path, form, { from: `/convidados/${g}` });
+  const collabPart = (html) => html.split('id="collab"')[1].split('id="exclusivos"')[0];
   const live = (platform, url) => ({ platform, ok: true, url });
   const pub = async ({ clip = null, title, results, collab = [], media = 'video', episode = ep }) => (await one(
     `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, status, media, results, options) VALUES ($1, $2, $3, $4, 'publicado', $5, $6, $7) RETURNING id`,
@@ -47,7 +48,7 @@ describe('Portal do convidado', () => {
     await pub({ title: 'Post de frase', media: 'imagem', results: [live('linkedin', 'https://linkedin.com/p/1')] });
     await pub({ title: 'Episódio completo', results: [live('youtube', 'https://youtu.be/ep12'), live('instagram', 'https://instagram.com/reel/EP')] });
     await pub({ title: 'Rascunho', results: [{ platform: 'tiktok', ok: true, draft: true, url: null }] });
-    await q("UPDATE episodes SET youtube_url = 'https://youtu.be/ep12', spotify_url = 'https://open.spotify.com/ep12' WHERE id = $1", [ep]);
+    await q("UPDATE episodes SET youtube_url = 'https://youtu.be/ep12abcdefg', spotify_url = 'https://open.spotify.com/episode/4rOoJ6Egrf8K2IrywzwOMk?si=x' WHERE id = $1", [ep]);
     // post de outro episódio em collab com ela também entra
     const other = (await one("INSERT INTO episodes (number, title, status) VALUES (13, 'Outro', 'publicado') RETURNING id")).id;
     await pub({ episode: other, title: 'Participação especial', results: [live('instagram', 'https://instagram.com/reel/X')], collab: ['@MariVabo'] });
@@ -65,7 +66,12 @@ describe('Portal do convidado', () => {
     assert.doesNotMatch(collab, /Post de frase/);
     const others = r.text.split('id="outros"')[1];
     assert.match(others, /Post de frase/); assert.match(others, /Episódio completo/); assert.doesNotMatch(others, /Rascunho/);
-    assert.match(r.text, /Assistir no YouTube/); assert.match(r.text, /Ouvir no Spotify/); assert.match(r.text, /https:\/\/instagram\.com\/reel\/EP/);
+    assert.match(r.text, /<iframe src="https:\/\/www\.youtube-nocookie\.com\/embed\/ep12abcdefg\?rel=0"/);
+    assert.match(r.text, /src="https:\/\/open\.spotify\.com\/embed\/episode\/4rOoJ6Egrf8K2IrywzwOMk"/);
+    assert.match(r.headers.get('content-security-policy'), /frame-src https:\/\/www\.youtube-nocookie\.com https:\/\/open\.spotify\.com/);
+    assert.match(r.headers.get('content-security-policy'), /img-src 'self' data: https:\/\/s3\.test-region\.backblazeb2\.com/, 'capas redirecionadas para o Backblaze aparecem');
+    assert.match(collabPart(r.text), /Clique e veja:/); assert.match(collabPart(r.text), /aria-label="Ver no Instagram"/); assert.match(collabPart(r.text), /class="icon brand"/);
+    assert.match(r.text, /Este material fica disponível por 60 dias/); assert.match(r.text, /https:\/\/instagram\.com\/reel\/EP/);
     assert.match(r.text, /Falar com a produção/);
     const wa = await anon.get(`${base}/producao`);
     assert.equal(wa.status, 302); assert.match(wa.location, /^https:\/\/wa\.me\/\d*\?text=.*portal/);
@@ -153,6 +159,19 @@ describe('Portal do convidado', () => {
     const r = await act('gestao', `/convidados/${g}/portal/avisar`, {});
     assert.equal(r.status, 303); assert.match(r.location, /^https:\/\/wa\.me\/5511988887777\?text=.*reel%2FN2/);
     assert.doesNotMatch((await as.gestao.get(`/convidados/${g}`)).text, /para avisar/);
+  });
+
+  it('o material fica disponível por 60 dias a partir do envio; a equipe estende', async () => {
+    const { portal_expires_at: exp, portal_sent_at: sent } = await one('SELECT portal_expires_at, portal_sent_at FROM guests WHERE id = $1', [g]);
+    assert.equal(Math.round((new Date(exp) - new Date(sent)) / 86400_000), 60);
+    assert.match((await anon.get(base)).text, /Este material fica disponível até/);
+    await q("UPDATE guests SET portal_expires_at = now() - interval '1 minute' WHERE id = $1", [g]);
+    const r = await anon.get(base);
+    assert.equal(r.status, 410); assert.match(r.text, /não está mais disponível/);
+    assert.match((await as.gestao.get(`/convidados/${g}`)).text, /expirou/);
+    assert.equal(await require('../src/services/guestPortal').tick(), 0, 'expirado não avisa');
+    await act('gestao', `/convidados/${g}/portal/estender`, {});
+    assert.equal((await anon.get(base)).status, 200);
   });
 
   it('novo link derruba o antigo; desativar fecha o portal', async () => {

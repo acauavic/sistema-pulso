@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.43.0', date: '2026-10-30', title: 'Portal do convidado: players, galeria e validade',
+    items: [
+      { kind: 'novo', text: 'O episódio toca dentro do portal: o vídeo do YouTube e o player do Spotify aparecem incorporados (com o link do Instagram ao lado).' },
+      { kind: 'novo', text: 'Fotos em galeria que passa sozinha (pausa ao passar o mouse), com setas, miniaturas, "Baixar esta foto" e "Baixar todas".' },
+      { kind: 'novo', text: 'O material do portal fica disponível por 60 dias a partir do primeiro envio do link, e o portal avisa a data. Depois disso o link mostra que expirou; na aba Portal, a equipe estende por mais 60 dias.' },
+      { kind: 'ajuste', text: 'Nos posts, as redes viraram ícones, abaixo de "Clique e veja:".' },
+      { kind: 'correcao', text: 'As capas dos posts não apareciam no portal (a regra de segurança da página bloqueava as imagens do armazenamento).' },
+    ],
+  },
+  {
     version: '1.42.0', date: '2026-10-30', title: 'Post feito por fora do sistema',
     items: [
       { kind: 'novo', text: 'Corte postado por fora (pelo app da rede, numa emergência ou quando o sistema falhou): na página do corte, "Postado por fora? Registrar o link". Cole o link do post em cada rede (o sistema reconhece a rede pelo link), o collab do Instagram e quando saiu. O corte passa a contar como publicado, inclusive no portal do convidado.' },

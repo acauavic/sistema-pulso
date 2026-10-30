@@ -17,6 +17,32 @@ const NOTIFY = { auto: 'Automático', email: 'E-mail', whatsapp: 'WhatsApp', nen
 const MEDIA_LABEL = { imagem: 'Post', carrossel: 'Carrossel', story: 'Story' };
 const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
+const VALID_DAYS = 60; // o material fica disponível por 60 dias a partir do primeiro envio do link
+const expired = (g) => Boolean(g.portal_expires_at) && new Date(g.portal_expires_at) <= new Date();
+async function extend(guestId) {
+  await db.query(`UPDATE guests SET portal_expires_at = now() + interval '${VALID_DAYS} days' WHERE id = $1`, [guestId]);
+}
+
+// Players incorporados: só endereços que dá para reconhecer (senão a página mostra o botão para abrir).
+function youtubeEmbed(link) {
+  try {
+    const u = new URL(String(link || ''));
+    const host = u.hostname.replace(/^www\.|^m\./, '');
+    let id = null;
+    if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+    else if (host === 'youtube.com') id = u.searchParams.get('v') || (u.pathname.match(/^\/(?:live|shorts|embed)\/([^/?#]+)/) || [])[1];
+    return id && /^[\w-]{6,20}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}?rel=0` : null;
+  } catch { return null; }
+}
+function spotifyEmbed(link) {
+  try {
+    const u = new URL(String(link || ''));
+    if (u.hostname !== 'open.spotify.com') return null;
+    const m = u.pathname.match(/^\/(?:intl-[\w-]+\/)?(episode|show)\/([A-Za-z0-9]{10,40})/);
+    return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}` : null;
+  } catch { return null; }
+}
+
 const url = (token) => `${config.appBaseUrl}/convidado/${token}`;
 const newToken = () => crypto.randomBytes(18).toString('base64url');
 
@@ -196,7 +222,7 @@ const newsMessage = (g, posts) => `Olá, ${firstName(g.name)}! ${posts.length > 
 
 // Primeiro envio do link: o que já estava em collab não vira aviso (o convidado vê tudo ao abrir o portal).
 async function markSent(g) {
-  await db.query('UPDATE guests SET portal_sent_at = coalesce(portal_sent_at, now()) WHERE id = $1', [g.id]);
+  await db.query(`UPDATE guests SET portal_sent_at = coalesce(portal_sent_at, now()), portal_expires_at = coalesce(portal_expires_at, now() + interval '${VALID_DAYS} days') WHERE id = $1`, [g.id]);
   const { collab } = await content(g);
   for (const p of collab) {
     await db.query("INSERT INTO guest_portal_notices (guest_id, publication_id, channel, sent_at) VALUES ($1, $2, 'nenhum', now()) ON CONFLICT DO NOTHING", [g.id, p.id]);
@@ -224,7 +250,7 @@ async function markWhatsappSent(g) {
 // Rotina: posts novos em collab de quem já recebeu o link. E-mail sai na hora (um por rodada, com todos os novos); WhatsApp fica
 // pendente na aba do convidado e a equipe recebe um lembrete.
 async function tick() {
-  const { rows } = await db.query(`${DATES_SQL} WHERE portal_enabled AND portal_sent_at IS NOT NULL AND portal_notify <> 'nenhum' AND instagram IS NOT NULL`);
+  const { rows } = await db.query(`${DATES_SQL} WHERE portal_enabled AND portal_sent_at IS NOT NULL AND portal_notify <> 'nenhum' AND instagram IS NOT NULL AND (portal_expires_at IS NULL OR portal_expires_at > now())`);
   let sent = 0;
   for (const g of rows) {
     const channel = channelOf(g);
@@ -253,6 +279,6 @@ async function tick() {
 }
 
 module.exports = {
-  TOKEN_RE, NOTIFY, url, byId, byToken, content, schedule, dayLabel, today, channelOf, setEnabled, regenerate, parseDates, saveDates, setNotify,
+  TOKEN_RE, NOTIFY, VALID_DAYS, expired, extend, youtubeEmbed, spotifyEmbed, url, byId, byToken, content, schedule, dayLabel, today, channelOf, setEnabled, regenerate, parseDates, saveDates, setNotify,
   setPhotos, setYoutube, parseChannel, requestYoutube, youtubeUrl, waTo, linkMessage, newsMessage, markSent, sendLinkEmail, pending, markWhatsappSent, tick,
 };

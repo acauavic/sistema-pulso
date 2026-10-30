@@ -9,6 +9,7 @@ const tpl = require('../services/inviteTemplate');
 const pages = require('../services/publicPages');
 const { createLimiter } = require('../auth/rateLimit');
 const { icon } = require('../utils/icons');
+const { brand } = require('../utils/brandIcons');
 const fmt = require('../utils/format');
 const { wrap, isIntId } = require('../utils/wrap');
 
@@ -16,15 +17,19 @@ const router = express.Router();
 const viewLimiter = createLimiter({ name: 'portal_convidado', max: 300, windowMs: 10 * 60_000 });
 const writeLimiter = createLimiter({ name: 'portal_convidado_pedido', max: 10, windowMs: 10 * 60_000 });
 
+// Capas e cortes saem do sistema e são redirecionados para o Backblaze: as duas origens precisam valer. Os players do YouTube e do
+// Spotify entram por iframe. O YouTube recusa o player sem a origem de quem incorpora, por isso só a origem vai como referência.
 function headers(mediaOrigin) {
-  const media = ["'self'"]; if (mediaOrigin) media.push(mediaOrigin); // o <video> pede ao sistema, que redireciona para o Backblaze
+  const media = ["'self'"]; if (mediaOrigin) media.push(mediaOrigin);
   const img = ["'self'", 'data:']; if (mediaOrigin) img.push(mediaOrigin);
   return {
-    'Content-Security-Policy': `default-src 'none'; script-src 'self'; style-src 'self'; img-src ${img.join(' ')}; media-src ${media.join(' ')}; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
-    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store',
+    'Content-Security-Policy': `default-src 'none'; script-src 'self'; style-src 'self'; img-src ${img.join(' ')}; media-src ${media.join(' ')}; frame-src https://www.youtube-nocookie.com https://open.spotify.com; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
+    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   };
 }
+const expiredPage = (res) => res.status(410).set(tpl.publicHeaders()).type('html')
+  .send(pages.messageHtml('Este material não está mais disponível', 'O portal fica no ar por 60 dias. Se precisar de algum arquivo, fale com a produção do Pulso.'));
 const gone = (res) => res.status(404).set(tpl.publicHeaders()).type('html')
   .send(pages.messageHtml('Link não encontrado', 'Este link não é válido ou foi substituído por um mais recente. Fale com a produção do Pulso para receber o novo.'));
 
@@ -32,15 +37,17 @@ async function load(req, res) {
   if (!await viewLimiter.hit(req.ip)) { res.status(429).send('Muitas requisições.'); return null; }
   const g = await portal.byToken(req.params.token);
   if (!g) { gone(res); return null; }
+  if (portal.expired(g)) { expiredPage(res); return null; }
   return g;
 }
 
 router.get('/convidado/:token', wrap(async (req, res) => {
   const g = await load(req, res); if (!g) return;
   const c = await portal.content(g);
-  const origin = c.exclusiveOpen && c.exclusive.length && config.storageConfigured ? await b2.endpoint().then((e) => new URL(e).origin).catch(() => null) : null;
+  const origin = config.storageConfigured ? await b2.endpoint().then((e) => new URL(e).origin).catch(() => null) : null;
   res.set(headers(origin)).render('portal/guest', {
-    g, c, steps: portal.schedule(g), dayLabel: portal.dayLabel, base: `/convidado/${g.portal_token}`, icon, fmt,
+    g, c, steps: portal.schedule(g), dayLabel: portal.dayLabel, base: `/convidado/${g.portal_token}`, icon, fmt, brand,
+    ytEmbed: portal.youtubeEmbed(c.episode.youtube), spEmbed: portal.spotifyEmbed(c.episode.spotify), validDays: portal.VALID_DAYS,
     epNo: g.episode_number ? `EP.${String(g.episode_number).padStart(3, '0')}` : null, first: fmt.firstName(g.name),
     ytSent: req.query.youtube === 'ok', ytError: req.query.youtube === 'erro', ytUrl: portal.youtubeUrl(g.portal_yt_channel),
     assetV: res.locals.assetV, title: `Seu portal no ${config.podcastName}`,

@@ -435,6 +435,8 @@
             <dt>Cortes começam</dt><dd class="mono"><%= PT.dayLabel(pg.cuts_from) || '—' %><%= pg.cuts_from && !pg.cuts_from_set ? ' · automático' : '' %></dd>
             <dt>Episódio no ar</dt><dd class="mono"><%= PT.dayLabel(pg.release_on) || 'sem data' %><%= pg.release_on && !pg.release_on_set ? ' · do episódio' : '' %></dd>
             <dt>Exclusivos</dt><dd class="mono"><%= PT.dayLabel(pg.exclusive_from) || '—' %><%= pg.exclusive_from && !pg.exclusive_from_set ? ' · com o episódio' : '' %></dd>
+            <% var pgExpired = pg.portal_expires_at && new Date(pg.portal_expires_at) <= new Date(); %>
+            <dt>Disponível até</dt><dd><span class="mono"><%= pg.portal_expires_at ? fmt.formatDay(pg.portal_expires_at) : '60 dias depois do envio' %></span><% if (pgExpired) { %> <span class="badge b-red">expirou</span><% } %><% if (canW && pg.portal_expires_at) { %> <form method="post" action="/convidados/<%= guest.id %>/portal/estender" class="inline"><%- csrfP %><button class="link small" type="submit"><%= pgExpired ? 'liberar' : 'estender' %> por mais 60 dias</button></form><% } %></dd>
             <dt>Aviso de post novo</dt><dd><%= PT.NOTIFY[pg.portal_notify] %><%= pg.portal_notify === 'auto' ? ' (' + PT.NOTIFY[PT.channel].toLowerCase() + ')' : '' %></dd>
           </dl>
           <% if (!pg.release_on) { %><p class="small muted">Sem data de veiculação no episódio: o cronograma aparece quando ela for preenchida (ou ajuste aqui).</p><% } %>
