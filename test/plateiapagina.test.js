@@ -128,7 +128,7 @@ describe('Plateia: página do convidado e link de parceiro isento', () => {
       assert.match(r.text, /id="bastidores"/, path); assert.match(r.text, /Veja como é estar na plateia/);
       assert.match(r.text, /<source src="\/plateia\/video\/bastidores\.webm" type="video\/webm">\s*<source src="\/plateia\/video\/bastidores\.mp4" type="video\/mp4">/);
       assert.match(r.text, /poster="\/plateia\/imagem\/bastidores"/);
-      assert.match(r.headers.get('content-security-policy'), /media-src https:\/\/s3\.acauamedia\.com https:\/\/s3\.[^ ;]+backblazeb2\.com/);
+      assert.match(r.headers.get('content-security-policy'), /media-src https:\/\/s3\.acauamedia\.com 'self' https:\/\/s3\.[^ ;]+backblazeb2\.com/);
     }
     const v = await fetch(`${app.base}/plateia/video/bastidores.webm`, { redirect: 'manual' });
     assert.equal(v.status, 302); assert.match(v.headers.get('location'), /bastidores\.webm\?.*X-Amz-Signature=/);

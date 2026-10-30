@@ -23,7 +23,7 @@ const eventLimiter = createLimiter({ name: 'plateia_evento', max: 300, windowMs:
 // mediaOrigin: o Backblaze, quando há o vídeo dos bastidores (o navegador busca o vídeo direto de lá, por link assinado).
 function pageHeaders(s, mediaOrigin = null) {
   const scripts = ["'self'"]; const connect = ["'self'"]; const img = ["'self'", 'data:']; const media = ['https://s3.acauamedia.com'];
-  if (mediaOrigin) media.push(mediaOrigin);
+  if (mediaOrigin) media.push("'self'", mediaOrigin); // o <video> pede ao sistema, que redireciona para o Backblaze: os dois precisam valer
   if (s.metaPixel) { scripts.push('https://connect.facebook.net'); connect.push('https://www.facebook.com', 'https://connect.facebook.net'); img.push('https://www.facebook.com'); }
   if (s.ga4) { scripts.push('https://www.googletagmanager.com'); connect.push('https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://www.googletagmanager.com'); img.push('https://www.google-analytics.com', 'https://www.googletagmanager.com'); }
   return {

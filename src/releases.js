@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.40.1', date: '2026-10-30', title: 'Vídeo dos bastidores tocando',
+    items: [
+      { kind: 'correcao', text: 'O vídeo dos bastidores aparecia na página da plateia, mas não tocava: a regra de segurança da página bloqueava o endereço do vídeo. Agora toca.' },
+    ],
+  },
+  {
     version: '1.40.0', date: '2026-10-30', title: 'Vídeo dos bastidores e novo topo da plateia',
     items: [
       { kind: 'novo', text: 'As páginas da plateia (a geral e a de cada convidado) ganharam a seção "Veja como é estar na plateia", com o vídeo vertical dos bastidores de uma gravação.' },
