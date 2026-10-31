@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const db = require('../db/pool');
 const settingsSvc = require('./settings');
+const config = require('../config');
 
 const TZ = 'America/Sao_Paulo';
 const KEYS = ['plateia_active', 'plateia_price_cents', 'plateia_duration', 'plateia_location', 'plateia_whatsapp', 'plateia_meta_pixel', 'plateia_ga4', 'plateia_hero_key', 'plateia_studio_key', 'plateia_reels_key', 'plateia_reels_webm_key', 'plateia_reels_poster_key'];
@@ -10,7 +11,7 @@ async function settings() {
   const s = await settingsSvc.getMany(KEYS);
   return {
     active: s.plateia_active === 'true', priceCents: Number(s.plateia_price_cents) || 0, duration: s.plateia_duration, location: s.plateia_location,
-    whatsapp: s.plateia_whatsapp.replace(/\D/g, ''), metaPixel: s.plateia_meta_pixel, ga4: s.plateia_ga4, heroKey: s.plateia_hero_key, studioKey: s.plateia_studio_key, reelsKey: s.plateia_reels_key, reelsWebmKey: s.plateia_reels_webm_key, reelsPosterKey: s.plateia_reels_poster_key,
+    whatsapp: s.plateia_whatsapp.replace(/\D/g, ''), metaPixel: s.plateia_meta_pixel || config.metaPixelId, metaPixelCustom: Boolean(s.plateia_meta_pixel), ga4: s.plateia_ga4, heroKey: s.plateia_hero_key, studioKey: s.plateia_studio_key, reelsKey: s.plateia_reels_key, reelsWebmKey: s.plateia_reels_webm_key, reelsPosterKey: s.plateia_reels_poster_key,
   };
 }
 

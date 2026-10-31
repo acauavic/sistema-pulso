@@ -236,7 +236,7 @@
         <dt>Duração</dt><dd><%= s.duration %></dd>
         <dt>Local</dt><dd><%= s.location %></dd>
         <dt>WhatsApp da produtora</dt><dd><span class="mono"><%= s.whatsapp || 'não informado' %></span></dd>
-        <dt>Meta Pixel</dt><dd><span class="mono"><%= s.metaPixel || '—' %></span></dd>
+        <dt>Meta Pixel</dt><dd><span class="mono"><%= s.metaPixel || '—' %></span><% if (s.metaPixel && !s.metaPixelCustom) { %> <span class="small muted">padrão do sistema, o mesmo das páginas de patrocinador e convidado</span><% } %></dd>
         <dt>Google Analytics 4</dt><dd><span class="mono"><%= s.ga4 || '—' %></span></dd>
       </dl>
     </section>
@@ -368,7 +368,7 @@
     <details class="more">
       <summary>Rastreamento de campanhas</summary>
       <div class="stack top-gap">
-        <label>ID do Meta Pixel<input type="text" name="meta_pixel" inputmode="numeric" value="<%= s.metaPixel %>" placeholder="1234567890123456"></label>
+        <label>ID do Meta Pixel<input type="text" name="meta_pixel" inputmode="numeric" value="<%= s.metaPixelCustom ? s.metaPixel : '' %>" placeholder="<%= s.metaPixel ? s.metaPixel + ' (padrão)' : '1234567890123456' %>"></label>
         <label>ID do Google Analytics 4<input type="text" name="ga4" value="<%= s.ga4 %>" placeholder="G-XXXXXXXXXX"></label>
         <p class="small muted">Só esta página carrega essas ferramentas. Sem os IDs, nada de terceiros é carregado.</p>
       </div>

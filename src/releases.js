@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.44.0', date: '2026-10-31', title: 'Meta Pixel nas páginas públicas',
+    items: [
+      { kind: 'novo', text: 'O Meta Pixel do Pulso mede as visitas das páginas da plateia, do patrocinador (media kit, cadastro e portal) e do convidado (convite e portal), com o nome de cada página.' },
+      { kind: 'novo', text: 'Na plateia, enviar o formulário de interesse conta como conversão (Lead) no Pixel; abrir o formulário conta como início.' },
+      { kind: 'ajuste', text: 'O convite e o portal do convidado, abertos pelo navegador, passam para um endereço limpo: o código secreto do link não vai para a Meta. O link enviado continua o mesmo.' },
+    ],
+  },
+  {
     version: '1.43.2', date: '2026-10-30', title: 'Spotify tocando no portal',
     items: [
       { kind: 'correcao', text: 'Portal do convidado: o primeiro clique no play do Spotify não fazia nada. A galeria de fotos continuava trocando de foto fora da tela e atrapalhava; agora ela só passa sozinha quando está à vista, e o Spotify carrega junto com a página.' },

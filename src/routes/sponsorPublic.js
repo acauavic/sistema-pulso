@@ -12,6 +12,7 @@ const groq = require('../services/groq');
 const mailer = require('../services/mailer');
 const tpl = require('../services/inviteTemplate');
 const pages = require('../services/publicPages');
+const pixel = require('../services/pixel');
 const { createLimiter } = require('../auth/rateLimit');
 const { wrap } = require('../utils/wrap');
 const fmt = require('../utils/format');
@@ -34,10 +35,12 @@ const FORM_STAGES = ['ganho', 'ativo', 'inativo'];
 const PORTAL_STAGES = ['ativo', 'inativo'];
 
 // Cabeçalhos das páginas com script próprio nosso (formulário e portal): sem sandbox, mas só 'self' e microfone liberado.
-const appHeaders = ({ scripts = true } = {}) => ({
+// O Meta Pixel (quando ligado) carrega da Meta e envia para ela: entra no script, connect e img.
+const px = () => (pixel.on() ? pixel.csp : { script: [], connect: [], img: [] });
+const appHeaders = () => ({
   'Content-Security-Policy':
-    `default-src 'none'; ${scripts ? "script-src 'self'; " : ''}style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; ` +
-    "font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    `default-src 'none'; script-src 'self' ${px().script.join(' ')}; style-src 'self'; img-src 'self' data: blob: ${px().img.join(' ')}; media-src 'self' blob:; ` +
+    `font-src 'self'; connect-src 'self' ${px().connect.join(' ')}; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
   'Permissions-Policy': 'microphone=(self), camera=(), geolocation=()',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
@@ -108,7 +111,7 @@ router.get('/patrocinador/kit', withSession(), wrap(async (req, res) => {
     if (rowCount) await sponsorsSvc.addEvent(sponsor.id, null, 'kit_visto', 'Abriu o media kit');
   }
   const html = tpl.render(tpl.mediaKitHtml(), { link_quero: '/patrocinador/quero', link_equipe: '/patrocinador/equipe', agenda_html: await sponsorsSvc.kitAgendaHtml(), guests_json: tpl.safeJson(await require('../services/kitGallery').items()), ...(await require('../services/plans').kitHtml()) });
-  res.set(tpl.publicHeaders()).type('html').send(html);
+  res.set(tpl.publicHeaders("'none'", { pixel: true })).type('html').send(pixel.inject(html, { content: 'Media kit', category: 'patrocinador', v: res.locals.assetV, absolute: true }));
 }));
 
 // "Quero ser patrocinador": conta o clique, leva a Prospecção para Em negociação e abre o WhatsApp comercial.
@@ -146,6 +149,7 @@ async function renderBrief(res, sp, extra = {}) {
   const logo = files.rows.find((f) => f.kind === 'logo') || null;
   const status = sponsorsSvc.briefState(brief, { hasLogo: Boolean(logo) });
   res.set(appHeaders()).render('sponsor-public/brief', {
+    pixelTag: pixel.tag({ content: 'Cadastro do patrocinador', category: 'patrocinador', v: res.locals.assetV }),
     title: `Cadastro — ${sponsor.company}`, sponsor, csrf: sp.csrf, brief: { ...brief, ...(extra.values || {}) }, logo, goals: C.SPONSOR_GOALS,
     questions: sponsorsSvc.BRIEF_QUESTIONS, status,
     base: '/patrocinador', voiceReady: config.groqConfigured, storageReady: config.storageConfigured,
@@ -276,7 +280,8 @@ router.get('/patrocinador/portal', withSession(), wrap(async (req, res) => {
   const sponsor = req.sp.sponsor;
   if (!PORTAL_STAGES.includes(sponsor.stage)) return notYet(res, 'Portal ainda não disponível', 'O portal do patrocinador abre assim que a parceria estiver ativa. Fale com a equipe do Pulso se tiver dúvidas.');
   const data = await sponsorsSvc.portalData(sponsor);
-  res.set(appHeaders({ scripts: false })).render('sponsor-public/portal', {
+  res.set(appHeaders()).render('sponsor-public/portal', {
+    pixelTag: pixel.tag({ content: 'Portal do patrocinador', category: 'patrocinador', v: res.locals.assetV }),
     title: `Portal ${sponsor.company}`, sponsor, ...data, C, base: '/patrocinador', photoUrl: guestPhotos.signedUrl,
   });
 }));

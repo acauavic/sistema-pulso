@@ -46,6 +46,7 @@
 
   const pageGuest = Number(body.dataset.guest) || null; // página de um convidado: a visita conta para ele
   track('view', pageGuest ? { guest_id: pageGuest } : {});
+  fire('ViewContent', 'view_item', { content_name: document.title, content_category: pageGuest ? 'plateia_convidado' : 'plateia' });
 
   // ---- cliques na agenda
   document.addEventListener('click', (e) => {

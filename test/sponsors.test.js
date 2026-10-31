@@ -861,12 +861,12 @@ describe('central de patrocinadores', () => {
       assert.match(t, /moldura · bloco lateral fixo/);
       assert.match(t, /inserção · card com QR Code/);
       assert.match(t, /O QR Code leva direto para o link de destino/);
-      assert.doesNotMatch(t, /<script/, 'portal sem JavaScript');
+      assert.equal((t.match(/<script/g) || []).length, 1, 'só o script do Meta Pixel'); assert.match(t, /<script src="\/static\/pixel\.js/);
       assert.doesNotMatch(t, /fonts\.googleapis|gstatic/, 'fontes locais');
       assert.doesNotMatch(t, /[\u{1F300}-\u{1FAFF}]/u, 'sem emoji');
       const csp = r.headers.get('content-security-policy');
       assert.match(csp, /default-src 'none'/);
-      assert.doesNotMatch(csp, /script-src/);
+      assert.match(csp, /script-src 'self' https:\/\/connect\.facebook\.net;/, 'scripts: só o nosso (Pixel) e o da Meta');
       assert.match(r.headers.get('x-robots-tag'), /noindex/);
       const imgs = [...t.matchAll(/src="(\/patrocinador\/arquivo\/\d+)"/g)].map((m) => m[1]);
       assert.equal(imgs.length, 2, 'moldura e QR Code');

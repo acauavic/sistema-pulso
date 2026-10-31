@@ -54,6 +54,9 @@ const config = {
   gemini: { key: env.GEMINI_KEY || env.GEMINI_API_KEY, model: env.GEMINI_MODEL || 'gemini-3.8-flash' },
   // Groq: transcrição de voz (Whisper large-v3).
   groq: { key: env.GROQ_APIKEY, model: env.GROQ_WHISPER_MODEL || 'whisper-large-v3' },
+  // Meta Pixel das páginas públicas (plateia, patrocinador, convidado). O ID é público (vai no HTML); "off" desliga.
+  // A plateia pode usar outro em Plateia > Ajustes.
+  metaPixelId: env.META_PIXEL_ID === 'off' ? '' : (/^\d{5,20}$/.test(env.META_PIXEL_ID || '') ? env.META_PIXEL_ID : '1442878457199798'),
 
   // Confere se o vídeo editado do episódio é horizontal (ffprobe). Desligar só em teste.
   checkVideoFormat: String(env.VIDEO_FORMAT_CHECK ?? 'true').toLowerCase() !== 'false',

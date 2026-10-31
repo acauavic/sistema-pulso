@@ -6,6 +6,7 @@ const portal = require('../services/guestPortal');
 const b2 = require('../services/b2');
 const db = require('../db/pool');
 const tpl = require('../services/inviteTemplate');
+const pixel = require('../services/pixel');
 const pages = require('../services/publicPages');
 const { createLimiter } = require('../auth/rateLimit');
 const { icon } = require('../utils/icons');
@@ -23,8 +24,10 @@ const writeLimiter = createLimiter({ name: 'portal_convidado_pedido', max: 10, w
 function headers(mediaOrigin) {
   const media = ["'self'"]; if (mediaOrigin) media.push(mediaOrigin);
   const img = ["'self'", 'data:', 'https://i.ytimg.com']; if (mediaOrigin) img.push(mediaOrigin);
+  const script = ["'self'"]; const connect = ["'self'"];
+  if (pixel.on()) { script.push(...pixel.csp.script); connect.push(...pixel.csp.connect); img.push(...pixel.csp.img); }
   return {
-    'Content-Security-Policy': `default-src 'none'; script-src 'self'; style-src 'self'; img-src ${img.join(' ')}; media-src ${media.join(' ')}; frame-src https://www.youtube-nocookie.com https://open.spotify.com; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
+    'Content-Security-Policy': `default-src 'none'; script-src ${script.join(' ')}; style-src 'self'; img-src ${img.join(' ')}; media-src ${media.join(' ')}; frame-src https://www.youtube-nocookie.com https://open.spotify.com; font-src 'self'; connect-src ${connect.join(' ')}; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
     'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   };
@@ -34,16 +37,31 @@ const expiredPage = (res) => res.status(410).set(tpl.publicHeaders()).type('html
 const gone = (res) => res.status(404).set(tpl.publicHeaders()).type('html')
   .send(pages.messageHtml('Link não encontrado', 'Este link não é válido ou foi substituído por um mais recente. Fale com a produção do Pulso para receber o novo.'));
 
-async function load(req, res) {
+async function load(req, res, token = req.params.token) {
   if (!await viewLimiter.hit(req.ip)) { res.status(429).send('Muitas requisições.'); return null; }
-  const g = await portal.byToken(req.params.token);
+  const g = await portal.byToken(token);
   if (!g) { gone(res); return null; }
   if (portal.expired(g)) { expiredPage(res); return null; }
   return g;
 }
 
+// Pelo navegador, o link com o código vira /convidado/meu-portal (o código fica num cookie), para o Meta Pixel não levar o código
+// junto com o endereço da página. As fotos, capas e cortes continuam pelo endereço com o código (isso não vai para a Meta).
+const PORTAL_COOKIE = 'pulso_portal';
+router.get('/convidado/meu-portal', wrap(async (req, res) => {
+  const token = pixel.tokenFrom(req, PORTAL_COOKIE);
+  if (!token) return res.status(401).set(tpl.publicHeaders()).type('html').send(pages.messageHtml('Abra pelo seu link', 'Para ver o seu portal, use o link que a produção do Pulso enviou para você.'));
+  return showPortal(req, res, token);
+}));
+
 router.get('/convidado/:token', wrap(async (req, res) => {
-  const g = await load(req, res); if (!g) return;
+  if (portal.TOKEN_RE.test(req.params.token) && pixel.on()
+    && pixel.cleanUrl(req, res, { cookie: PORTAL_COOKIE, path: '/convidado', to: '/convidado/meu-portal', token: req.params.token })) return;
+  return showPortal(req, res, req.params.token);
+}));
+
+async function showPortal(req, res, token) {
+  const g = await load(req, res, token); if (!g) return;
   const c = await portal.content(g);
   const origin = config.storageConfigured ? await b2.endpoint().then((e) => new URL(e).origin).catch(() => null) : null;
   res.set(headers(origin)).render('portal/guest', {
@@ -52,8 +70,9 @@ router.get('/convidado/:token', wrap(async (req, res) => {
     epNo: g.episode_number ? `EP.${String(g.episode_number).padStart(3, '0')}` : null, first: fmt.firstName(g.name),
     ytSent: req.query.youtube === 'ok', ytError: req.query.youtube === 'erro', ytUrl: portal.youtubeUrl(g.portal_yt_channel),
     assetV: res.locals.assetV, title: `Seu portal no ${config.podcastName}`,
+    pixelTag: pixel.tag({ content: 'Portal do convidado', category: 'convidado', v: res.locals.assetV }),
   });
-}));
+}
 
 // Capa de um post ou de um corte que está no portal (nada além disso).
 router.get('/convidado/:token/capa/:cid', wrap(async (req, res) => {

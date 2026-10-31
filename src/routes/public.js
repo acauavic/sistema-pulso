@@ -6,6 +6,7 @@ const guestsSvc = require('../services/guests');
 const mailer = require('../services/mailer');
 const tpl = require('../services/inviteTemplate');
 const pages = require('../services/publicPages');
+const pixel = require('../services/pixel');
 const { createLimiter } = require('../auth/rateLimit');
 const { RSVP_OPEN, ACCEPT_FROM, STATUS_BY_KEY } = require('../constants');
 const { firstName } = require('../utils/format');
@@ -36,9 +37,24 @@ const rsvpStateOf = (guest) => {
   return null;
 };
 
+// Pelo navegador, o link com o código vira /convite/abrir (o código fica num cookie), para o Meta Pixel não levar o código junto
+// com o endereço da página. Robôs de pré-visualização e chamadas diretas recebem a página no próprio link.
+const INVITE_COOKIE = 'pulso_convite';
+router.get('/convite/abrir', wrap(async (req, res) => {
+  const token = pixel.tokenFrom(req, INVITE_COOKIE);
+  if (!token) return res.status(401).set(tpl.publicHeaders()).type('html').send(pages.messageHtml('Abra pelo seu link', 'Para ver o convite, use o link que a equipe do Pulso enviou para você.'));
+  return showInvite(req, res, token);
+}));
+
 router.get('/convite/:token', wrap(async (req, res) => {
   if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
-  const guest = await guestByToken(req.params.token);
+  if (TOKEN_RE.test(req.params.token) && !isBot(req) && pixel.on()
+    && pixel.cleanUrl(req, res, { cookie: INVITE_COOKIE, path: '/convite', to: '/convite/abrir', token: req.params.token })) return;
+  return showInvite(req, res, req.params.token);
+}));
+
+async function showInvite(req, res, token) {
+  const guest = await guestByToken(token);
   if (!guest) return gone(res);
 
   if (!guest.invite_viewed_at && !isBot(req)) {
@@ -49,8 +65,9 @@ router.get('/convite/:token', wrap(async (req, res) => {
     rsvpState: rsvpStateOf(guest), closed: !RSVP_OPEN.includes(guest.status),
   });
   if (!rendered) return gone(res);
-  return res.set(tpl.publicHeaders()).type('html').send(rendered.html);
-}));
+  return res.set(tpl.publicHeaders("'none'", { pixel: true })).type('html')
+    .send(pixel.inject(rendered.html, { content: 'Convite', category: 'convidado', v: res.locals.assetV, absolute: true }));
+}
 
 // Avisa o responsável (melhor esforço: falha de e-mail não atrapalha o convidado).
 async function notifyOwner(guest, accepted, message) {

@@ -199,7 +199,8 @@ describe('Pulso Podcast com Plateia', () => {
       assert.equal((await h.db.query("SELECT value FROM app_settings WHERE key='plateia_price_cents'")).rows[0].value, before);
     }
     let r = await anon.get('/plateia');
-    assert.doesNotMatch(r.headers.get('content-security-policy'), /facebook|googletagmanager/);
+    assert.doesNotMatch(r.headers.get('content-security-policy'), /googletagmanager/, 'GA4 só quando informado');
+    assert.match(r.text, /data-meta-pixel="1442878457199798"/, 'sem ID próprio, vale o Pixel do sistema');
     await send({ price: '250,00', meta_pixel: '1234567890123', ga4: 'g-abc123xyz9' });
     r = await anon.get('/plateia');
     assert.match(r.text, /R\$ 250/); assert.match(r.text, /data-meta-pixel="1234567890123"/); assert.match(r.text, /data-ga4="G-ABC123XYZ9"/);

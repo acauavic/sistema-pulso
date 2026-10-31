@@ -332,7 +332,7 @@ describe('fluxos ponta a ponta', () => {
       assert.match(csp, /default-src 'none'/);
       assert.match(csp, /sandbox allow-scripts allow-forms/);
       assert.doesNotMatch(csp, /allow-same-origin/, 'scripts do modelo ficam isolados do painel');
-      assert.doesNotMatch(csp, /connect-src/);
+      assert.match(csp, /connect-src https:\/\/www\.facebook\.com https:\/\/connect\.facebook\.net;/, 'só o Meta Pixel envia dados para fora');
       assert.match(csp, /script-src 'unsafe-inline'/);
       assert.match(r.headers.get('x-robots-tag'), /noindex/);
     });
@@ -1067,7 +1067,8 @@ describe('fluxos ponta a ponta', () => {
       assert.ok(m, 'bloco G presente');
       assert.doesNotMatch(m[1], /<|>/, 'sem < ou > crus dentro do script');
       assert.equal(JSON.parse(m[1]).nome, evil, 'o valor original é preservado ao interpretar o JSON');
-      assert.equal((f.page.text.match(/<\/script>/g) || []).length, templateHtml.match(/<\/script>/g).length, 'mesmo número de </script> do modelo');
+      const noPixel = f.page.text.replace(/<script src="[^"]*\/static\/pixel\.js[^"]*"[^>]*><\/script>/, '');
+      assert.equal((noPixel.match(/<\/script>/g) || []).length, templateHtml.match(/<\/script>/g).length, 'mesmo número de </script> do modelo (fora o do Pixel)');
     });
 
     it('formulário de recusa vem de origem null (sandbox): é aceito; outros POSTs com origin null não', async () => {

@@ -74,11 +74,14 @@ function render(template, vars, { escape = true } = {}) {
 // Cabeçalhos da página pública. O modelo pode ter <script> (o convite do Pulso tem intro animada),
 // então ele roda em SANDBOX sem allow-same-origin: origem opaca, sem acesso a cookies, sem fetch
 // (connect-src bloqueado) e sem tocar no painel — mesmo que alguém coloque script malicioso num modelo.
-function publicHeaders(frameAncestors = "'none'") {
+// pixel: libera o Meta Pixel (o script vem do endereço do sistema, porque em sandbox 'self' não vale).
+function publicHeaders(frameAncestors = "'none'", { pixel = false } = {}) {
+  const px = pixel && require('./pixel').on() ? require('./pixel') : null;
   return {
     'Content-Security-Policy':
       'sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox; ' +
-      "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https:; " +
+      `default-src 'none'; script-src 'unsafe-inline'${px ? ` ${px.appOrigin()} ${px.csp.script.join(' ')}` : ''}; style-src 'unsafe-inline' https:; ` +
+      `${px ? `connect-src ${px.csp.connect.join(' ')}; ` : ''}` +
       "img-src 'self' https: data:; font-src https: data:; media-src https:; " +
       `form-action 'self'; base-uri 'none'; frame-ancestors ${frameAncestors}`,
     'X-Content-Type-Options': 'nosniff',
