@@ -68,6 +68,7 @@ function createApp() {
   app.use(require('./routes/guestImport')); // antes de guests: /convidados/importar não pode cair em /convidados/:id
   app.use(require('./routes/guests'));
   app.use(require('./routes/sponsors'));
+  app.use(require('./routes/bulkDownload')); // /baixar.zip: vários arquivos (episódio, cortes, posts) num ZIP só
   app.use(require('./routes/covers')); // /episodios/:id/capas/*: antes das rotas genéricas do episódio
   app.use(require('./routes/contentBulk')); // Conteúdo: atribuir, aprovar, mudar responsável e excluir vários de uma vez
   app.use(require('./routes/requests')); // Conteúdo > pedidos para o editor (trailer, vídeo avulso, post, story…)

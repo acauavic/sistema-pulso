@@ -151,7 +151,7 @@
         <% var canRaw = perm.upload && storageReady;
            var where = epNo + ' · ' + ep.title;
            var fileRow = function (f) { %>
-            <li<% if (f.status === 'pronto') { %> data-dl-item data-href="<%= fileBase + f.id %>/baixar" data-name="<%= f.filename %>" data-bytes="<%= Number(f.size_bytes || 0) %>"<% } %>>
+            <li<% if (f.status === 'pronto') { %> data-dl-item data-zip="f<%= f.id %>" data-href="<%= fileBase + f.id %>/baixar" data-name="<%= f.filename %>" data-bytes="<%= Number(f.size_bytes || 0) %>"<% } %>>
               <% if (f.status === 'pronto') { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= f.filename %>"><% } %>
               <span>
                 <%= f.label ? f.label + ' · ' : '' %><span class="mono small"><%= f.filename %></span>
@@ -223,7 +223,7 @@
           </div>
           <% folders.forEach(function (g) { %>
           <% var readyList = g.list.filter(function (f) { return f.status === 'pronto'; }); %>
-          <div class="folder-panel" data-folder-panel="<%= g.kind %>" data-dl hidden>
+          <div class="folder-panel" data-folder-panel="<%= g.kind %>" data-dl data-dl-zip="<%= (ep.number ? 'ep' + String(ep.number).padStart(3, '0') : 'episodio') + '-' + g.title %>" hidden>
             <div class="folder-crumb">
               <button class="icon-btn" type="button" data-folder-back aria-label="Voltar às pastas" title="Voltar às pastas"><%- icon('arrow-left', 16) %></button>
               <span class="muted small">Material bruto /</span>
@@ -231,7 +231,7 @@
               <% if (readyList.length > 1) { %>
               <span class="row dl-actions">
                 <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
-                <button class="btn sm" type="button" data-dl-everything title="Baixa todos os <%= readyList.length %> arquivos desta pasta, um depois do outro"><%- icon('download', 14) %> Baixar tudo</button>
+                <button class="btn sm" type="button" data-dl-everything title="Baixa os <%= readyList.length %> arquivos desta pasta num ZIP só"><%- icon('download', 14) %> Baixar tudo</button>
               </span>
               <% } %>
             </div>
@@ -257,12 +257,12 @@
         <% } %>
       </section>
       <% if (gallery.length) { %>
-      <dialog class="modal gallery" id="modal-galeria" aria-labelledby="gal-h" data-gallery>
+      <dialog class="modal gallery" id="modal-galeria" aria-labelledby="gal-h" data-gallery data-g-zip="<%= ep.number ? 'ep' + String(ep.number).padStart(3, '0') : 'episodio' %>">
         <div class="gal-head">
           <div><span class="kicker"><%= epNo %> · <%= ep.title %></span><h2 id="gal-h">Galeria</h2></div>
           <span class="gal-tools">
             <button class="btn sm ghost" type="button" data-g-select><%- icon('check-square', 14) %> Selecionar</button>
-            <button class="btn sm" type="button" data-g-everything title="Baixa todos os arquivos desta pasta, um depois do outro"><%- icon('download', 14) %> Baixar pasta</button>
+            <button class="btn sm" type="button" data-g-everything title="Baixa os arquivos desta pasta num ZIP só"><%- icon('download', 14) %> Baixar pasta</button>
           </span>
           <button class="icon-btn" type="button" data-modal-close aria-label="Fechar a galeria" title="Fechar"><%- icon('x', 18) %></button>
         </div>

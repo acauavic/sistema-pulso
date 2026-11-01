@@ -1,8 +1,10 @@
-// Baixar vários arquivos de uma vez (material do episódio e galeria). Cada arquivo continua sendo o mesmo link de sempre
-// (/baixar, que o servidor troca por um link assinado e curto do Backblaze): aqui só se dispara um depois do outro, cada um num
-// quadro escondido (por isso o frame-src da CSP aceita o Backblaze), e o próprio navegador faz os downloads em paralelo, direto do armazenamento (nada passa pelo servidor, nada é compactado).
-// Marcação de uma lista: um contêiner [data-dl] com itens [data-dl-item data-href data-name data-bytes] (cada um com um
-// [data-dl-check]), os botões [data-dl-select] e [data-dl-everything] e a barra [data-dl-bar].
+// Baixar vários arquivos de uma vez (material e galeria do episódio, posts e cortes do Conteúdo). Dois ou mais arquivos saem num
+// ZIP só (/baixar.zip, montado pelo servidor enquanto baixa, direto do Backblaze); um arquivo sozinho continua sendo o link de
+// sempre (/baixar, que o servidor troca por um link assinado e curto do Backblaze), aberto num quadro escondido (por isso o
+// frame-src da CSP aceita o Backblaze; é também o caminho de reserva se algum item vier sem data-zip).
+// Marcação de uma lista: um contêiner [data-dl data-dl-zip="nome-do-zip"] com itens [data-dl-item data-href data-name data-bytes
+// data-zip="f12"] (f = arquivo do episódio, c = corte, k = capa/post; cada um com um [data-dl-check]), os botões [data-dl-select] e
+// [data-dl-everything] e a barra [data-dl-bar].
 // Ações em massa na mesma seleção (Conteúdo: atribuir, aprovar, excluir…): cada item leva data-id; na barra,
 // [data-dl-do="acao"] envia o formulário [data-dl-form] do contêiner (com data-confirm, pergunta antes; {n} vira a contagem) e
 // [data-dl-open="id-da-janela"] abre uma janela cujo formulário recebe os ids marcados em [data-dl-ids] ({n} em [data-dl-n]).
@@ -22,29 +24,41 @@
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   const sum = (list) => list.reduce((t, it) => t + (Number(it.bytes) || 0), 0);
 
-  // Dispara os downloads em sequência. onStep(feito, total) a cada arquivo. Devolve quantos foram iniciados (0 se já havia uma rodada).
-  async function start(list, onStep) {
-    if (busy || !list.length) return 0;
-    if (list.length > 1 && sum(list) > CONFIRM_BYTES && !window.confirm(`Baixar ${plural(list.length, 'arquivo', 'arquivos')} (${bytesText(sum(list))})? Eles vão para a pasta de downloads do seu computador.`)) return 0;
+  // Um quadro escondido por download: com link clicado na própria página, o download que ainda esperava resposta era cancelado
+  // pelo seguinte (navegação da aba).
+  const viaFrame = (href) => {
+    const f = document.createElement('iframe');
+    f.hidden = true; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.src = href;
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), FRAME_MS);
+  };
+  const zipHref = (list, name) => `/baixar.zip?itens=${list.map((it) => it.zip).join(',')}${name ? `&nome=${encodeURIComponent(name)}` : ''}`;
+
+  // Baixa a lista: 2+ arquivos num ZIP só (opts.zipName dá o nome); 1 arquivo, direto. Devolve { n, zip } (n = 0 se já havia uma
+  // rodada ou a pessoa desistiu). Item sem data-zip (não deveria acontecer) faz cair no jeito antigo: um download por arquivo.
+  async function start(list, opts = {}) {
+    if (busy || !list.length) return { n: 0 };
+    if (list.length > 1 && sum(list) > CONFIRM_BYTES && !window.confirm(`Baixar ${plural(list.length, 'arquivo', 'arquivos')} (${bytesText(sum(list))})${list.every((it) => it.zip) ? ' num ZIP só' : ''}? Vai para a pasta de downloads do seu computador.`)) return { n: 0 };
+    if (list.length > 1 && list.every((it) => it.zip)) { // mesmo domínio: o link com download baixa sem sair da página
+      const a = document.createElement('a'); a.href = zipHref(list, opts.zipName); a.download = ''; a.hidden = true;
+      document.body.appendChild(a); a.click(); a.remove();
+      return { n: list.length, zip: true };
+    }
     busy = true;
     try {
       for (let i = 0; i < list.length; i += 1) {
-        // Cada arquivo num quadro escondido próprio. Com link clicado na página, cada download era uma navegação da aba
-        // (/baixar redireciona para o Backblaze) e a seguinte cancelava a anterior que ainda não tinha resposta: de 20, chegavam 4 ou 5.
-        const f = document.createElement('iframe');
-        f.hidden = true; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.src = list[i].href;
-        document.body.appendChild(f);
-        setTimeout(() => f.remove(), FRAME_MS);
-        if (onStep) onStep(i + 1, list.length);
+        viaFrame(list[i].href);
         if (i < list.length - 1) await new Promise((r) => setTimeout(r, GAP_MS));
       }
-      return list.length;
+      return { n: list.length };
     } finally { busy = false; }
   }
-  window.PulsoBaixar = { start, bytesText, plural, isBusy: () => busy };
+  const doneNote = (r) => (r.zip
+    ? `ZIP com ${plural(r.n, 'arquivo', 'arquivos')} a caminho. Ele é montado enquanto baixa: acompanhe na barra de downloads do navegador.`
+    : `${plural(r.n, 'download iniciado', 'downloads iniciados')}. Acompanhe na barra de downloads do navegador.`);
+  window.PulsoBaixar = { start, doneNote, bytesText, plural, isBusy: () => busy };
 
-  const itemOf = (el) => ({ href: el.dataset.href, name: el.dataset.name, bytes: Number(el.dataset.bytes) || 0 });
-  const doneNote = (n) => `${plural(n, 'download iniciado', 'downloads iniciados')}. Acompanhe na barra de downloads do navegador; se ele perguntar, permita baixar vários arquivos.`;
+  const itemOf = (el) => ({ href: el.dataset.href, name: el.dataset.name, bytes: Number(el.dataset.bytes) || 0, zip: el.dataset.zip });
 
   document.querySelectorAll('[data-dl]').forEach((box) => {
     const rows = () => [...box.querySelectorAll('[data-dl-item]')];
@@ -75,8 +89,9 @@
       if (on) go?.focus({ preventScroll: true }); else box.querySelector('[data-dl-select]')?.focus({ preventScroll: true });
     };
     const run = async (list) => {
-      const started = await start(list, (n, total) => say(`Iniciando ${n} de ${total}…`));
-      if (started) say(doneNote(started));
+      if (list.length > 1) say(`Preparando ${plural(list.length, 'arquivo', 'arquivos')}…`);
+      const r = await start(list, { zipName: box.dataset.dlZip });
+      say(r.n ? doneNote(r) : '');
     };
 
     // ids marcados viram campos "ids" do formulário que vai para o servidor

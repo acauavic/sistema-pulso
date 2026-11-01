@@ -626,7 +626,7 @@
     const goBtn = gal.querySelector('[data-g-go]'); const allBtn = gal.querySelector('[data-g-all]'); const selBtn = gal.querySelector('[data-g-select]'); const everyBtn = gal.querySelector('[data-g-everything]');
     const dl = window.PulsoBaixar;
     let selecting = false; const sel = new Set();
-    const asDownload = (it) => ({ href: it.down, name: it.name, bytes: it.bytes });
+    const asDownload = (it) => ({ href: it.down, name: it.name, bytes: it.bytes, zip: `f${it.id}` });
     const say = (t) => { noteEl.textContent = t; noteEl.hidden = !t; };
     function syncBar() {
       const list = items(); const chosen = list.filter((it) => sel.has(it.id));
@@ -639,8 +639,9 @@
       selBtn.lastChild.textContent = on ? ' Cancelar seleção' : ' Selecionar'; syncBar();
     }
     async function runDownload(list) {
-      const started = await dl.start(list.map(asDownload), (n, total) => say(`Iniciando ${n} de ${total}…`));
-      if (started) say(`${dl.plural(started, 'download iniciado', 'downloads iniciados')}. Acompanhe na barra de downloads do navegador; se ele perguntar, permita baixar vários arquivos.`);
+      const folderName = (data.find((f) => f.key === folder) || {}).title || folder;
+      const r = await dl.start(list.map(asDownload), { zipName: `${gal.dataset.gZip || 'episodio'}-${folderName}` });
+      say(r.n ? dl.doneNote(r) : '');
     }
     selBtn.addEventListener('click', () => setSelecting(!selecting));
     gal.querySelector('[data-g-cancel]').addEventListener('click', () => setSelecting(false));

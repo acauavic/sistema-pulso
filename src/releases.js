@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.48.0', date: '2026-11-01', title: 'Baixar vários em ZIP',
+    items: [
+      { kind: 'novo', text: 'Com dois ou mais arquivos, "Baixar tudo", "Baixar pasta" e "Baixar selecionados" baixam um ZIP só (material do episódio, bastidores, galeria, posts e cortes). O ZIP é montado enquanto baixa, e a barra de downloads do navegador mostra o andamento e o tempo que falta. Um arquivo sozinho continua baixando direto.' },
+    ],
+  },
+  {
     version: '1.47.2', date: '2026-11-01', title: 'Baixar tudo baixa todos os arquivos',
     items: [
       { kind: 'correcao', text: '"Baixar tudo", "Baixar pasta" e "Baixar selecionados" (material do episódio, galeria, bastidores, posts e cortes) baixavam só 4 ou 5 arquivos: cada download cancelava o anterior que ainda não tinha começado. Agora cada arquivo sai por conta própria e todos chegam. Se o navegador perguntar, permita baixar vários arquivos.' },

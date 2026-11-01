@@ -71,7 +71,7 @@ function b2Error(message, status, body = '') {
   return err;
 }
 
-async function request(method, key, { body, contentType, query = {}, timeout = 60_000, bucketLevel = false, headers = {} } = {}) {
+async function request(method, key, { body, contentType, query = {}, timeout = 60_000, signal = null, bucketLevel = false, headers = {} } = {}) {
   if (!config.storageConfigured) throw new Error('Armazenamento não configurado (BB_KEY_ID, BB_APPLICATION_KEY, BUCKET_NAME).');
   const base = new URL(await endpoint());
   const region = base.hostname.match(/^s3\.([a-z0-9-]+)\./)?.[1] || 'us-east-005';
@@ -87,7 +87,7 @@ async function request(method, key, { body, contentType, query = {}, timeout = 6
     method,
     headers: { ...extra, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate, Authorization: authorization },
     body,
-    signal: AbortSignal.timeout(timeout),
+    signal: signal || AbortSignal.timeout(timeout), // quem passa signal (ZIP de vídeos de GBs) controla o tempo e o cancelamento
   });
 }
 
@@ -97,8 +97,8 @@ async function putObject(key, body, contentType) {
 }
 
 // Devolve a Response do fetch (o chamador faz o stream); 404 vira null.
-async function getObject(key) {
-  const res = await request('GET', key);
+async function getObject(key, { signal = null } = {}) {
+  const res = await request('GET', key, { signal });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Backblaze recusou a leitura (${res.status}).`);
   return res;

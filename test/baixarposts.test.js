@@ -20,11 +20,11 @@ describe('Conteúdo > Posts: selecionar e baixar vários posts gerados', () => {
   it('com 2+ imagens: Selecionar e Baixar tudo; cada cartão leva o link de baixar e o nome do arquivo; a imagem marca no modo seleção', async () => {
     const a = await cover(epMany, 'post_quote', 0); await cover(epMany, 'post_quote', 1); const c3 = await cover(epMany, 'carousel', 2, { group: 'car', label: 'Slide 3', size: 123456 });
     const page = (await gestao.get(`/conteudo?vista=posts&episodio=${epMany}`)).text;
-    const sec = page.match(/<section class="card top-gap" data-dl>[\s\S]*?<\/section>/)[0];
+    const sec = page.match(/<section class="card top-gap" data-dl data-dl-zip="ep014-posts">[\s\S]*?<\/section>/)[0];
     assert.match(sec, /data-dl-select/); assert.match(sec, /data-dl-everything/); assert.match(sec, /Baixa as 3 imagens/);
     assert.match(sec, /data-dl-bar[^>]*hidden/, 'a barra só aparece depois de Selecionar');
     assert.equal((sec.match(/data-dl-item/g) || []).length, 3);
-    assert.match(sec, new RegExp(`data-dl-item data-id="${a}" data-href="/capas/${a}/imagem\\?baixar=1" data-name="ep014-post-quote-1\\.jpg" data-bytes="400000"`));
+    assert.match(sec, new RegExp(`data-dl-item data-id="${a}" data-zip="k${a}" data-href="/capas/${a}/imagem\\?baixar=1" data-name="ep014-post-quote-1\\.jpg" data-bytes="400000"`));
     assert.match(sec, new RegExp(`data-href="/capas/${c3}/imagem\\?baixar=1" data-name="ep014-carousel-3\\.jpg" data-bytes="123456"`));
     assert.match(sec, /<a href="\/capas\/\d+\/imagem" target="_blank" rel="noopener" data-dl-pick>/, 'a imagem abre em outra aba, mas no modo seleção marca o cartão');
     assert.match(sec, /Baixar<\/a>/, 'o Baixar de cada cartão continua');

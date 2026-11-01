@@ -53,7 +53,7 @@ describe('episódio: material bruto e vídeo editado em pastas', () => {
     const bast = panel('bastidor');
     assert.match(bast, /data-dl\b/); assert.match(bast, /data-dl-select/); assert.match(bast, /data-dl-everything/);
     assert.match(bast, /data-dl-bar[^>]*hidden/, 'a barra de seleção só aparece depois de "Selecionar"');
-    assert.match(bast, new RegExp(`data-dl-item data-href="/episodios/${ep}/arquivos/${a}/baixar" data-name="bast-1.jpg" data-bytes="1048576"`));
+    assert.match(bast, new RegExp(`data-dl-item data-zip="f${a}" data-href="/episodios/${ep}/arquivos/${a}/baixar" data-name="bast-1.jpg" data-bytes="1048576"`));
     assert.match(bast, /data-name="a &#34;b&#34; &amp; &lt;c&gt;\.jpg"/, 'o nome do arquivo vai escapado');
     assert.doesNotMatch(bast, /<c>/);
     assert.equal((bast.match(/data-dl-item/g) || []).length, 2, 'o arquivo que ainda está enviando não entra na seleção');

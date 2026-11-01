@@ -79,7 +79,7 @@
     <% } %>
 
     <% var clipPick = perm.cut && clips.length > 1; %>
-    <div<%- clipPick ? ' data-dl' : '' %>>
+    <div<%- clipPick ? ' data-dl data-dl-zip="cortes"' : '' %>>
     <% if (clipPick) { %>
     <div class="row dl-toolbar">
       <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
@@ -120,7 +120,7 @@
     <% } %>
     <% postGroups.forEach(function (g) { %>
     <% var postCount = g.covers.length; var epTag = g.episode.number ? 'ep' + String(g.episode.number).padStart(3, '0') : 'episodio'; %>
-    <section class="card top-gap"<%- postCount > 1 ? ' data-dl' : '' %>>
+    <section class="card top-gap"<%- postCount > 1 ? ' data-dl data-dl-zip="' + epTag + '-posts"' : '' %>>
       <div class="row spread">
         <div><span class="kicker"><%= g.episode.number ? 'EP.' + String(g.episode.number).padStart(3, '0') : 'Episódio' %></span><h2><a href="/episodios/<%= g.episode.id %>"><%= g.episode.title %></a></h2><% if (g.episode.guest_name) { %><p class="small muted"><%= g.episode.guest_name %></p><% } %></div>
         <% if (perm.cut && g.canGenerate && aiReady) { %>
@@ -135,7 +135,7 @@
       <% if (postCount > 1) { %>
       <div class="row dl-toolbar">
         <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
-        <button class="btn sm" type="button" data-dl-everything title="Baixa as <%= postCount %> imagens deste episódio, uma depois da outra"><%- icon('download', 14) %> Baixar tudo</button>
+        <button class="btn sm" type="button" data-dl-everything title="Baixa as <%= postCount %> imagens deste episódio num ZIP só"><%- icon('download', 14) %> Baixar tudo</button>
       </div>
       <div class="dl-bar" data-dl-bar role="group" aria-label="Ações nos posts marcados" hidden>
         <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
@@ -154,7 +154,7 @@
       <h3 class="capas-kind"><%= KINDS[kind] %></h3>
       <div class="cover-grid">
         <% list.forEach(function (c) { var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
-        <figure class="cover-card <%= c.approved ? 'approved' : '' %>"<% if (postCount > 1) { %> data-dl-item data-id="<%= c.id %>" data-href="/capas/<%= c.id %>/imagem?baixar=1" data-name="<%= epTag + '-' + c.kind.replace(/_/g, '-') + '-' + (c.position + 1) + '.jpg' %>" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %>>
+        <figure class="cover-card <%= c.approved ? 'approved' : '' %>"<% if (postCount > 1) { %> data-dl-item data-id="<%= c.id %>" data-zip="k<%= c.id %>" data-href="/capas/<%= c.id %>/imagem?baixar=1" data-name="<%= epTag + '-' + c.kind.replace(/_/g, '-') + '-' + (c.position + 1) + '.jpg' %>" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %>>
           <% if (postCount > 1) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.label || KINDS[kind] %>"><% } %>
           <a href="/capas/<%= c.id %>/imagem" target="_blank" rel="noopener" data-dl-pick><img src="/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
           <figcaption>
