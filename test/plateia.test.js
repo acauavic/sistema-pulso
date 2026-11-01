@@ -169,6 +169,14 @@ describe('Pulso Podcast com Plateia', () => {
     assert.ok(r.perGuest.find((x) => x.id === g1).clicks === 1);
   });
 
+  it('botão flutuante de WhatsApp: leva à produtora com mensagem pronta e o clique conta', async () => {
+    const page = (await anon.get('/plateia')).text;
+    assert.match(page, /class="pl-wa" href="https:\/\/wa\.me\/5511988887777\?text=Ol%C3%A1%2C%20vim%20pela%20p%C3%A1gina%20da%20plateia[^"]*"[^>]*data-wa-float/);
+    assert.equal((await json('/plateia/evento', { type: 'contact', visitor_id: 'visitante-123456' })).status, 204);
+    assert.equal((await audience.results(30)).contacts, 1);
+    assert.match((await as.gestao.get('/plateia/painel')).text, /Botão "Fale com a produção"/);
+  });
+
   it('painel: produtora atende, gestão ajusta, editor não entra; inscrições e CSV', async () => {
     assert.equal((await as.editor.get('/plateia/painel')).status, 403);
     assert.equal((await as.prod.get('/plateia/painel')).status, 200);

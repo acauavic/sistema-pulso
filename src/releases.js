@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.47.0', date: '2026-11-01', title: 'WhatsApp da produção na página da plateia',
+    items: [
+      { kind: 'novo', text: 'As páginas da plateia (a agenda geral e a de cada convidado) têm um botão flutuante "Dúvidas? Fale com a produção", que abre o WhatsApp da produtora com uma mensagem pronta. No celular ele vira um ícone redondo no canto. Só aparece com o WhatsApp informado em Plateia > Ajustes.' },
+      { kind: 'ajuste', text: 'Os cliques no botão aparecem em Plateia > Resultados e chegam ao Pixel da Meta como "Contact".' },
+    ],
+  },
+  {
     version: '1.46.0', date: '2026-10-31', title: 'Transcrição logo depois do envio',
     items: [
       { kind: 'novo', text: 'A transcrição do episódio começa sozinha, em segundo plano, assim que o vídeo editado termina de subir. O FFmpeg lê o vídeo direto do armazenamento e guarda só o áudio, sem ocupar o disco do servidor com o vídeo. O card "Vídeo editado" mostra se ela está pronta.' },

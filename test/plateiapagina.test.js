@@ -57,6 +57,10 @@ describe('Plateia: página do convidado e link de parceiro isento', () => {
     assert.match(r.text, /<h2>O que levar<\/h2>/); assert.match(r.text, /Documento com foto\./);
     assert.match(r.text, new RegExp(`/plateia/com/mari-vabo/fotos/${ph.id}`));
     assert.equal((await fetch(`${app.base}/plateia/com/mari-vabo/fotos/${ph.id}`)).status, 200);
+    assert.doesNotMatch(r.text, /class="pl-wa"/, 'sem WhatsApp da produtora, sem botão');
+    await q("INSERT INTO app_settings (key, value) VALUES ('plateia_whatsapp', '5511988887777') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
+    assert.match((await anon.get('/plateia/com/mari-vabo')).text, /wa\.me\/5511988887777\?text=[^"]*plateia%20com%20Mari%20Vabo/);
+    await q("DELETE FROM app_settings WHERE key = 'plateia_whatsapp'");
     assert.equal((await anon.get('/plateia/com/nao-existe')).status, 404);
   });
 

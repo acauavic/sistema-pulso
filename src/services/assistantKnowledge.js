@@ -106,6 +106,7 @@ const TOPICS = [
     where: '/plateia/painel', perm: 'audience.read',
     steps: [
       'A página pública lista as gravações dos convidados Agendados (com data futura e "Aberto para plateia"). A pessoa pede a vaga e é levada ao WhatsApp da produtora.',
+      'As páginas da plateia têm um botão flutuante "Dúvidas? Fale com a produção" que abre o WhatsApp da produtora (o número de Plateia > Ajustes); os cliques aparecem nos Resultados.',
       'Em Plateia > Pedidos há a Lista e o Quadro (colunas: Novo pedido, Em avaliação, Selecionado, Não selecionado e Desistiu; arrastar muda a situação), com busca e filtros por episódio e origem.',
       'Selecionar pede o valor combinado (conta a receber no Financeiro), "já recebi" ou isento. Em avaliação gera o link de pagamento da InfinitePay (quando configurada). Sair de Selecionado cancela a conta ainda não paga.',
       '"Adicionar pessoa" inclui quem foi combinado por fora. Cada pedido pode ser editado ou excluído (pedido já pago não é excluído).',

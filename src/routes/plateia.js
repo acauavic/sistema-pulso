@@ -146,7 +146,7 @@ router.post('/plateia/evento', wrap(async (req, res) => {
     if (b.type === 'whatsapp' && typeof b.ref === 'string') {
       const { rows: [lead] } = await db.query('UPDATE plateia_leads SET whatsapp_opened_at = coalesce(whatsapp_opened_at, now()) WHERE ref = $1 RETURNING guest_id', [b.ref.slice(0, 40)]);
       if (lead) await audience.recordEvent({ type: 'whatsapp', guestId: lead.guest_id, visitorId: b.visitor_id, utm, referrer: b.referrer });
-    } else if (['view', 'agenda_click', 'signup_click', 'form_open'].includes(b.type)) {
+    } else if (['view', 'agenda_click', 'signup_click', 'form_open', 'contact'].includes(b.type)) {
       await audience.recordEvent({ type: b.type, guestId, visitorId: b.visitor_id, utm, referrer: b.referrer });
     }
   } catch (err) {

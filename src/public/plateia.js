@@ -52,6 +52,7 @@
   document.addEventListener('click', (e) => {
     const a = e.target.closest('[data-track="agenda_click"]');
     if (a) track('agenda_click', {}, true);
+    if (e.target.closest('[data-wa-float]')) { track('contact', pageGuest ? { guest_id: pageGuest } : {}, true); fire('Contact', 'contact', { content_category: pageGuest ? 'plateia_convidado' : 'plateia' }); }
   });
 
   // ---- inscrição

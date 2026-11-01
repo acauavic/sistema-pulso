@@ -96,7 +96,7 @@ function cleanUtm(input = {}) {
   return o;
 }
 const cleanVisitor = (v) => (/^[A-Za-z0-9_-]{8,64}$/.test(String(v || '')) ? String(v) : null);
-const EVENT_TYPES = ['view', 'agenda_click', 'signup_click', 'form_open', 'lead', 'whatsapp'];
+const EVENT_TYPES = ['view', 'agenda_click', 'signup_click', 'form_open', 'lead', 'whatsapp', 'contact'];
 
 async function recordEvent({ type, guestId = null, visitorId, utm = {}, referrer = null }) {
   if (!EVENT_TYPES.includes(type)) return false;
@@ -168,7 +168,7 @@ async function results(days = 30) {
   const t = Object.fromEntries(totals.map((r) => [r.type, r]));
   const get = (k) => (t[k] ? t[k].n : 0);
   return {
-    days, visitors: t.view ? t.view.visitors : 0, views: get('view'), agendaClicks: get('agenda_click'), signupClicks: get('signup_click'), formOpens: get('form_open'), leads: get('lead'), whatsapp: get('whatsapp'),
+    days, visitors: t.view ? t.view.visitors : 0, views: get('view'), agendaClicks: get('agenda_click'), signupClicks: get('signup_click'), formOpens: get('form_open'), leads: get('lead'), whatsapp: get('whatsapp'), contacts: get('contact'),
     perGuest, perUtm,
   };
 }
