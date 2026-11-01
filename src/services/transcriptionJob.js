@@ -1,5 +1,5 @@
-// Trabalho "transcricao": assim que o editor termina de subir o vídeo editado, o FFmpeg tira só o áudio direto do link do
-// Backblaze (sem baixar o vídeo inteiro) e a Groq transcreve, em segundo plano. A transcrição fica guardada com o arquivo de
+// Trabalho "transcricao": assim que o editor termina de subir o vídeo editado, o FFmpeg lê o vídeo pelo link do Backblaze e
+// grava só o áudio (o vídeo passa pela rede, mas não ocupa o disco do servidor) e a Groq transcreve, em segundo plano. A transcrição fica guardada com o arquivo de
 // origem; quando o episódio vai para a finalização, a análise por IA reaproveita esse texto em vez de transcrever de novo.
 const db = require('../db/pool');
 const config = require('../config');
@@ -40,7 +40,7 @@ async function run(job, { update }) {
   const t0 = Date.now();
   try {
     await update('Tirando o áudio do vídeo…', 10);
-    // o FFmpeg lê o link assinado e só puxa a faixa de áudio: o vídeo não precisa vir inteiro para o servidor
+    // o FFmpeg lê o link assinado e grava só o áudio: o vídeo não é salvo no disco do servidor
     const url = await b2.presignGet(latest.storage_key, { expires: 6 * 3600 });
     const transcript = await fin.transcribeVideo(url, dir, { onProgress: (m) => update(m, 50) });
     // o arquivo pode ter sido trocado enquanto transcrevia: só guarda se ainda é o mais novo

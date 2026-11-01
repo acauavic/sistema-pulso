@@ -6,7 +6,7 @@ module.exports = [
   {
     version: '1.46.0', date: '2026-10-31', title: 'Transcrição logo depois do envio',
     items: [
-      { kind: 'novo', text: 'A transcrição do episódio começa sozinha, em segundo plano, assim que o vídeo editado termina de subir. O FFmpeg tira só o áudio direto do armazenamento, sem baixar o vídeo inteiro. O card "Vídeo editado" mostra se ela está pronta.' },
+      { kind: 'novo', text: 'A transcrição do episódio começa sozinha, em segundo plano, assim que o vídeo editado termina de subir. O FFmpeg lê o vídeo direto do armazenamento e guarda só o áudio, sem ocupar o disco do servidor com o vídeo. O card "Vídeo editado" mostra se ela está pronta.' },
       { kind: 'ajuste', text: 'A análise por IA da finalização reaproveita a transcrição já pronta e termina mais rápido. Versão nova do vídeo gera transcrição nova.' },
     ],
   },

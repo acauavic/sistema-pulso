@@ -368,7 +368,7 @@ describe('trabalho de finalização (FFmpeg real, IA simulada)', { skip: hasFfmp
     void finJob;
   });
 
-  it('vídeo editado novo é transcrito logo depois do envio (FFmpeg pelo link, sem baixar o vídeo); a análise reaproveita e roda mesmo com a transcrição pronta', async () => {
+  it('vídeo editado novo é transcrito logo depois do envio (FFmpeg pelo link, sem salvar o vídeo no disco); a análise reaproveita e roda mesmo com a transcrição pronta', async () => {
     const trJob = require('../src/services/transcriptionJob');
     const b2 = require('../src/services/b2');
     const key = 'pp/episodios/1/editado-v2.mp4';
