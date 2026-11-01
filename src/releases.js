@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.46.0', date: '2026-10-31', title: 'Transcrição logo depois do envio',
+    items: [
+      { kind: 'novo', text: 'A transcrição do episódio começa sozinha, em segundo plano, assim que o vídeo editado termina de subir. O FFmpeg tira só o áudio direto do armazenamento, sem baixar o vídeo inteiro. O card "Vídeo editado" mostra se ela está pronta.' },
+      { kind: 'ajuste', text: 'A análise por IA da finalização reaproveita a transcrição já pronta e termina mais rápido. Versão nova do vídeo gera transcrição nova.' },
+    ],
+  },
+  {
     version: '1.45.0', date: '2026-10-31', title: 'Valor da plateia por gravação',
     items: [
       { kind: 'novo', text: 'Cada gravação pode ter o próprio valor da vaga: no cadastro do convidado, em "Podcast com plateia", "editar" ao lado do valor. Vazio usa o valor geral de Plateia > Ajustes. A página da gravação, a agenda, a mensagem de WhatsApp, o pedido e a conta a receber usam esse valor; pedidos já feitos guardam o valor da época.' },

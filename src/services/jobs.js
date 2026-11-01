@@ -11,7 +11,7 @@ const errorHooks = new Map();
 const WORKER_ID = `${os.hostname()}:${process.pid}`;
 const CHANNEL = 'pulso_jobs';
 // Duas pistas por processo: a pesada (FFmpeg + IA, minutos) não segura a leve (e-mails, ideias), que roda em paralelo.
-const HEAVY = ['corte', 'finalizacao'];
+const HEAVY = ['corte', 'finalizacao', 'transcricao'];
 // onError(job, err): avisar alguém quando o trabalho falha de vez (ex.: notificação de rotina do sistema).
 const register = (kind, fn, { onError } = {}) => { handlers.set(kind, fn); if (onError) errorHooks.set(kind, onError); };
 

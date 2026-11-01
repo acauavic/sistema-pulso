@@ -368,6 +368,52 @@ describe('trabalho de finalização (FFmpeg real, IA simulada)', { skip: hasFfmp
     void finJob;
   });
 
+  it('vídeo editado novo é transcrito logo depois do envio (FFmpeg pelo link, sem baixar o vídeo); a análise reaproveita e roda mesmo com a transcrição pronta', async () => {
+    const trJob = require('../src/services/transcriptionJob');
+    const b2 = require('../src/services/b2');
+    const key = 'pp/episodios/1/editado-v2.mp4';
+    h.b2Store.set(key, { body: videoBuf, contentType: 'video/mp4' });
+    const { rows: [v2] } = await h.db.query("INSERT INTO episode_files (episode_id, kind, filename, content_type, size_bytes, storage_key, status, version) VALUES ($1,'editado','v2.mp4','video/mp4',$2,$3,'pronto',2) RETURNING *", [ep.id, videoBuf.length, key]);
+    // o FFmpeg de verdade não alcança o Backblaze simulado: o "link" vira o arquivo local (a chamada é a mesma)
+    const realPresign = b2.presignGet; const local = path.join(tmp, 'v2.mp4'); fs.writeFileSync(local, videoBuf);
+    let asked = null; b2.presignGet = async (k) => { asked = k; return local; };
+    try {
+      const queued = await trJob.enqueueFor(v2);
+      assert.equal(queued.kind, 'transcricao'); assert.equal(queued.ref_id, v2.id);
+      const before = h.groqCalls.length;
+      const done = await jobs.runNext();
+      assert.equal(done.id, queued.id); assert.equal(done.status, 'done', done.error);
+      assert.equal(asked, key, 'lê o vídeo pelo link do bucket');
+      assert.ok(h.groqCalls.length > before);
+      const tr = await trJob.readyFor(ep.id, v2.id);
+      assert.ok(tr, 'transcrição guardada com o arquivo de origem'); assert.match(tr.text, /Sem ego/);
+      assert.match((await as.gestao.get(`/episodios/${ep.id}`)).text, /Transcrição da versão 2:<\/span> <span class="mono">pronta/);
+      const { rows: [ev] } = await h.db.query("SELECT message FROM episode_events WHERE episode_id = $1 AND message LIKE 'Transcrição do vídeo editado%' ORDER BY id DESC LIMIT 1", [ep.id]);
+      assert.match(ev.message, /versão 2/);
+      // mesma versão de novo: não transcreve outra vez
+      const again = await jobs.enqueue('transcricao', { episodeId: ep.id, refId: v2.id });
+      assert.equal((await jobs.runNext()).id, again.id);
+      assert.equal((await h.db.query('SELECT result FROM jobs WHERE id = $1', [again.id])).rows[0].result.skipped, 'já transcrito');
+
+      // ir para a finalização ainda enfileira a análise (a transcrição pronta não conta como "já analisado")
+      await h.db.query("UPDATE episodes SET status = 'em_revisao' WHERE id = $1", [ep.id]);
+      const csrf = await as.gestao.csrf('/episodios');
+      assert.equal((await as.gestao.post(`/episodios/${ep.id}/etapa`, { to: 'em_finalizacao' }, { headers: { accept: 'application/json', 'x-csrf-token': csrf } })).status, 200);
+      const fin = await jobs.latest(ep.id, 'finalizacao');
+      assert.equal(fin.status, 'queued');
+      b2.presignGet = realPresign; // a análise baixa o vídeo pelo Backblaze simulado
+      const groqBefore = h.groqCalls.length;
+      const ran = await jobs.runNext();
+      assert.equal(ran.id, fin.id); assert.equal(ran.status, 'done', ran.error);
+      assert.equal(h.groqCalls.length, groqBefore, 'reaproveitou a transcrição: nada foi para a Groq de novo');
+      assert.equal((await h.db.query('SELECT ai_file_id FROM episode_metadata WHERE episode_id = $1', [ep.id])).rows[0].ai_file_id, v2.id);
+      // voltar da revisão sem vídeo novo: não analisa de novo
+      await h.db.query("UPDATE episodes SET status = 'em_revisao' WHERE id = $1", [ep.id]);
+      await as.gestao.post(`/episodios/${ep.id}/etapa`, { to: 'em_finalizacao' }, { headers: { accept: 'application/json', 'x-csrf-token': await as.gestao.csrf('/episodios') } });
+      assert.equal((await jobs.latest(ep.id, 'finalizacao')).id, fin.id, 'a mesma versão já analisada não entra na fila de novo');
+    } finally { b2.presignGet = realPresign; }
+  });
+
   it('excluir o episódio apaga também os quadros do bucket', async () => {
     const { rows: frames } = await h.db.query('SELECT storage_key FROM episode_frames WHERE episode_id=$1', [ep.id]);
     assert.ok(frames.length && frames.every((f) => h.b2Store.has(f.storage_key)));

@@ -53,13 +53,19 @@ async function run(job, { update }) {
     const video = await media.download(await b2.presignGet(file.storage_key, { expires: 3600 }), path.join(dir, 'video.mp4'));
     const probe = await media.probe(video);
 
-    await update('Transcrevendo o áudio…', 15);
-    const transcript = await fin.transcribeVideo(video, dir, { onProgress: (m) => update(m, 25) });
+    // a transcrição deste vídeo normalmente já foi feita logo depois do envio (trabalho "transcricao"): reaproveita
+    const tr = require('./transcriptionJob');
+    const saved = await tr.readyFor(episode.id, file.id);
+    let transcript;
+    if (saved) {
+      await update('Usando a transcrição feita depois do envio…', 25);
+      transcript = { text: saved.text, segments: saved.segments, duration_ms: saved.duration_ms };
+    } else {
+      await update('Transcrevendo o áudio…', 15);
+      transcript = await fin.transcribeVideo(video, dir, { onProgress: (m) => update(m, 25) });
+    }
     const durationMs = transcript.duration_ms || probe.duration_ms;
-    await db.query(
-      `INSERT INTO episode_transcripts (episode_id, text, segments, language, duration_ms, source_file_id) VALUES ($1,$2,$3,'pt',$4,$5)
-       ON CONFLICT (episode_id) DO UPDATE SET text = EXCLUDED.text, segments = EXCLUDED.segments, duration_ms = EXCLUDED.duration_ms, source_file_id = EXCLUDED.source_file_id, created_at = now()`,
-      [episode.id, transcript.text, JSON.stringify(transcript.segments), durationMs, file.id]);
+    if (!saved) await tr.save(episode.id, file.id, transcript, durationMs);
 
     await update('Escolhendo quadros do vídeo…', 40);
     const frames = await fin.pickFrames(video, durationMs, dir);
@@ -75,9 +81,9 @@ async function run(job, { update }) {
 
     // Só preenche o que está vazio: o que a equipe já escreveu à mão não é sobrescrito.
     await db.query(
-      `INSERT INTO episode_metadata (episode_id, suggestions, yt_title, yt_description, yt_tags, sp_title, sp_description, thumb_text, thumb_frame_id, chapters, ai_model, ai_generated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now())
-       ON CONFLICT (episode_id) DO UPDATE SET suggestions = EXCLUDED.suggestions, ai_model = EXCLUDED.ai_model, ai_generated_at = now(), updated_at = now(),
+      `INSERT INTO episode_metadata (episode_id, suggestions, yt_title, yt_description, yt_tags, sp_title, sp_description, thumb_text, thumb_frame_id, chapters, ai_model, ai_generated_at, ai_file_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12)
+       ON CONFLICT (episode_id) DO UPDATE SET suggestions = EXCLUDED.suggestions, ai_model = EXCLUDED.ai_model, ai_generated_at = now(), ai_file_id = EXCLUDED.ai_file_id, updated_at = now(),
          yt_title = coalesce(nullif(episode_metadata.yt_title, ''), EXCLUDED.yt_title),
          yt_description = coalesce(nullif(episode_metadata.yt_description, ''), EXCLUDED.yt_description),
          yt_tags = coalesce(nullif(episode_metadata.yt_tags, ''), EXCLUDED.yt_tags),
@@ -87,7 +93,7 @@ async function run(job, { update }) {
          thumb_frame_id = coalesce(episode_metadata.thumb_frame_id, EXCLUDED.thumb_frame_id),
          chapters = coalesce(nullif(episode_metadata.chapters, ''), EXCLUDED.chapters)`,
       [episode.id, JSON.stringify({ ...s, issues: result.issues }), s.youtube_titles[0]?.texto || null, s.youtube_description, s.tags.join(', '), s.spotify_title,
-        s.spotify_description, s.thumbnail_texts[0]?.texto || null, best?.id || null, L.formatChapters(s.chapters), result.model]);
+        s.spotify_description, s.thumbnail_texts[0]?.texto || null, best?.id || null, L.formatChapters(s.chapters), result.model, file.id]);
     await update('Montando thumbnails, posts e carrossel…', 93);
     let coversMade = 0;
     try {

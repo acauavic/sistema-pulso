@@ -50,6 +50,7 @@ async function main() {
 
   // executores da fila (registrar em todo processo: o web também enfileira, e no "all" ele mesmo roda)
   require('./services/finalizationJob');
+  require('./services/transcriptionJob'); // transcrição do vídeo editado, logo depois do envio
   require('./services/clips');
   require('./services/social');
   require('./services/notify');

@@ -308,6 +308,10 @@
           <div class="row spread"><h2>Vídeo editado</h2><span class="row"><% if (editedDone.length) { %><button class="icon-btn" type="button" data-gallery-open data-folder="editado" aria-label="Ver as versões na galeria" title="Ver na galeria"><%- icon('image', 16) %></button><span class="badge b-st-em_edicao">v<%= editedDone[0].version %></span><% } %></span></div>
           <% if (!inProduction) { %><p class="muted">A edição começa quando o material for liberado para o editor.</p><% } else { %>
           <p class="small muted">O vídeo do episódio é <strong>horizontal</strong> (16:9). Vídeos verticais são cortes e vão em <a href="/conteudo">Conteúdo</a>.</p>
+          <% var lastEdited = editedDone.slice().sort(function (a, b) { return b.version - a.version; })[0]; %>
+          <% if (lastEdited) { var trOk = transcript && transcript.source_file_id === lastEdited.id; var trRun = !trOk && trJob && trJob.ref_id === lastEdited.id && ['queued', 'running'].indexOf(trJob.status) >= 0; var trErr = !trOk && !trRun && trJob && trJob.ref_id === lastEdited.id && trJob.status === 'error'; %>
+          <p class="small"><span class="muted">Transcrição da versão <%= lastEdited.version %>:</span> <span class="mono"><%= trOk ? 'pronta' + (transcript.duration_ms ? ' · ' + fmt.formatClock(transcript.duration_ms) : '') : trRun ? 'em andamento' : trErr ? 'falhou' : 'sai na finalização' %></span><% if (trRun) { %> <span class="small muted">em segundo plano; pode seguir trabalhando.</span><% } else if (trErr) { %> <span class="small muted">a análise por IA transcreve de novo na finalização.</span><% } %></p>
+          <% } %>
           <% var editedUploader = function (label) { %>
           <div class="uploader" data-uploader data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-edited="1" data-where="<%= epNo + ' · ' + ep.title %>" data-hash="edicao">
             <input type="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>

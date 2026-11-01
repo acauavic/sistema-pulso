@@ -35,9 +35,11 @@ async function probe(file) {
 }
 
 // Áudio mono 16 kHz em Opus 24 kbps, em pedaços de `chunkSeconds` (cabe folgado no limite de envio da Groq). Devolve [{ file, offset_ms }].
+// `video` pode ser um arquivo ou um link (assinado): pelo link, o FFmpeg só puxa o que precisa e retoma se a conexão cair.
 async function extractAudioChunks(video, dir, chunkSeconds = 1200) {
   const pattern = path.join(dir, 'audio_%03d.ogg');
-  await run('ffmpeg', ['-v', 'error', '-y', '-i', video, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'libopus', '-b:a', '24k', '-f', 'segment', '-segment_time', String(chunkSeconds), '-reset_timestamps', '1', pattern]);
+  const net = /^https?:\/\//.test(String(video)) ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '30'] : [];
+  await run('ffmpeg', ['-v', 'error', '-y', ...net, '-i', video, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'libopus', '-b:a', '24k', '-f', 'segment', '-segment_time', String(chunkSeconds), '-reset_timestamps', '1', pattern]);
   return fs.readdirSync(dir).filter((f) => /^audio_\d+\.ogg$/.test(f)).sort().map((f, i) => ({ file: path.join(dir, f), offset_ms: i * chunkSeconds * 1000 }));
 }
 

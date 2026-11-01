@@ -256,7 +256,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     db.query('SELECT * FROM episode_metadata WHERE episode_id = $1', [ep.id]),
     db.query("SELECT id, at_ms, width, height, analysis, score FROM episode_frames WHERE episode_id = $1 AND clip_id IS NULL AND NOT (coalesce(analysis, '{}'::jsonb) ? 'custom') ORDER BY score DESC NULLS LAST, at_ms", [ep.id]),
     jobs.latest(ep.id, 'finalizacao'),
-    db.query('SELECT duration_ms, length(text) AS chars, jsonb_array_length(segments) AS segments FROM episode_transcripts WHERE episode_id = $1', [ep.id]),
+    db.query('SELECT duration_ms, length(text) AS chars, jsonb_array_length(segments) AS segments, source_file_id FROM episode_transcripts WHERE episode_id = $1', [ep.id]),
     db.query('SELECT id, kind, group_key, position, label, lint, width, height, size_bytes, approved, auto, updated_at FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL ORDER BY kind, group_key, position, id', [ep.id]),
     db.query(`SELECT (SELECT count(*)::int FROM episode_clips WHERE episode_id = $1) AS clips,
                      (SELECT count(*)::int FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND kind IN ('post_quote','post_split','carousel')) AS posts,
@@ -292,7 +292,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
     epComments: await commentsSvc.list('episode', ep.id),
     content: { ...contentRows.rows[0], total: contentRows.rows[0].clips + contentRows.rows[0].posts }, tabs, defaultTab, publications: pubRows.rows, social, uploadPost, uploadLive: ls.live, testAt: ls.testAt, provider,
-    covers: coverRows.rows, meta: meta.rows[0] || null, frames: frames.rows, job, transcript: transcript.rows[0] || null,
+    covers: coverRows.rows, meta: meta.rows[0] || null, frames: frames.rows, job, transcript: transcript.rows[0] || null, trJob: await jobs.latest(ep.id, 'transcricao'),
     aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,
     finData, fin: finSvc, money: fmt.formatBRL, today: finSvc.todayISO(), here: req.originalUrl,
     stageIndex, allSponsors: (await db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY lower(company)")).rows,
@@ -568,6 +568,8 @@ router.post('/episodios/:id/arquivos/:fid/concluir', uploadAccess, wrap(async (r
   }
   await prod.addFileEvent(f, req.user.id);
   await db.query('UPDATE episodes SET updated_at = now() WHERE id = $1', [f.episode_id]);
+  // vídeo editado: a transcrição começa já, em segundo plano (a análise por IA da finalização reaproveita o texto)
+  if (f.kind === 'editado') await require('../services/transcriptionJob').enqueueFor(f, req.user.id).catch((err) => console.error('Fila da transcrição:', err.message));
   res.json({ ok: true, id: f.id });
 }));
 

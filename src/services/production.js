@@ -149,9 +149,9 @@ const EFFECTS = {
   async em_finalizacao(ep, user) {
     if (config.groqConfigured && config.geminiConfigured && config.storageConfigured) {
       const { rows: [done] } = await db.query(
-        `SELECT 1 FROM episode_transcripts t WHERE t.episode_id = $1
-            AND t.source_file_id = (SELECT id FROM episode_files WHERE episode_id = $1 AND kind = 'editado' AND status = 'pronto' ORDER BY version DESC LIMIT 1)`, [ep.id]);
-      if (done) return; // a versão aprovada já foi analisada (ex.: voltou da revisão sem mudar o vídeo)
+        `SELECT 1 FROM episode_metadata m WHERE m.episode_id = $1
+            AND m.ai_file_id = (SELECT id FROM episode_files WHERE episode_id = $1 AND kind = 'editado' AND status = 'pronto' ORDER BY version DESC LIMIT 1)`, [ep.id]);
+      if (done) return; // a versão aprovada já foi analisada (ex.: voltou da revisão sem mudar o vídeo); a transcrição feita no envio não conta
       await require('./jobs').enqueue('finalizacao', { episodeId: ep.id });
       await addEvent(ep.id, user.id, 'ia', 'Análise por IA na fila: transcrição, quadros, títulos e descrições');
     }
