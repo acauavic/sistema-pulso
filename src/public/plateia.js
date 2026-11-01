@@ -79,7 +79,7 @@
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-signup]');
     if (!b) return;
-    current = { id: Number(b.dataset.signup), name: b.dataset.name, date: b.dataset.date, time: b.dataset.time };
+    current = { id: Number(b.dataset.signup), name: b.dataset.name, date: b.dataset.date, time: b.dataset.time, price: b.dataset.price };
     ref = null;
     track('signup_click', { guest_id: current.id });
     track('form_open', { guest_id: current.id });
@@ -116,7 +116,7 @@
       fire('Lead', 'generate_lead', { content_name: current.name });
       const r = (k, v) => { dlg.querySelector(`[data-r="${k}"]`).textContent = v; };
       r('guest', current.name); r('date', current.date); r('time', current.time); r('duration', body.dataset.duration);
-      r('price', json.exempt ? body.dataset.price : (json.price || body.dataset.price)); r('price-label', json.exempt ? 'Participação' : 'Investimento (se selecionado)');
+      r('price', json.exempt ? body.dataset.price : (json.price || (current && current.price) || body.dataset.price)); r('price-label', json.exempt ? 'Participação' : 'Investimento (se selecionado)');
       const wa = dlg.querySelector('[data-whatsapp]');
       if (json.url) { wa.href = json.url; wa.hidden = false; dlg.querySelector('[data-nowa]').hidden = true; } else { wa.hidden = true; dlg.querySelector('[data-nowa]').hidden = false; }
       show('review');

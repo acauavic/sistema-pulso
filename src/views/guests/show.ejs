@@ -214,6 +214,20 @@
           <% } else { %><input type="hidden" name="status" value="<%= guest.audience_status %>"><% } %>
         </form>
         <% } else { %><p class="small"><%= guest.audience_enabled ? 'Aberto para plateia' : 'Fora da plateia' %></p><% } %>
+        <% if (guest.audience_enabled) { %>
+        <p class="small"><span class="muted">Valor da vaga:</span> <span class="mono"><%= plateia.price %></span> <span class="small muted"><%= guest.audience_price_cents ? 'só desta gravação' : 'valor geral' %></span><% if (canW) { %> <button class="link small" type="button" data-modal-open="modal-preco-plateia">editar</button><% } %></p>
+        <% if (canW) { %>
+        <dialog class="modal" id="modal-preco-plateia" aria-labelledby="mpp-h">
+          <form method="post" action="/convidados/<%= guest.id %>/plateia/preco" class="stack">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <h2 id="mpp-h">Valor da vaga nesta gravação</h2>
+            <p class="small muted">Vazio = o valor geral (<span class="mono"><%= plateia.generalPrice %></span>, em Plateia &gt; Ajustes). Vale para os pedidos novos; os já feitos guardam o valor da época.</p>
+            <label>Valor por participante (R$)<input type="text" name="price" inputmode="decimal" value="<%= guest.audience_price_cents ? fmt.formatBRL(guest.audience_price_cents).replace(/^R\$\s?/, '') : '' %>" placeholder="<%= (plateia.generalPrice || '').replace(/^R\$\s?/, '') %>"></label>
+            <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+          </form>
+        </dialog>
+        <% } %>
+        <% } %>
         <% if (guest.audience_enabled) { %><p class="small"><a href="#pagina"><%= guest.audience_page_enabled ? 'Página própria da gravação e links de parceiro' : 'Criar uma página só desta gravação' %></a></p><% } %>
         <p class="small muted"><%= guest.audience_enabled ? (guest.status === 'agendado' && guest.proposed_at && new Date(guest.proposed_at) > new Date() ? 'Aparece na agenda pública da plateia.' : 'Entra na agenda pública quando a gravação estiver Agendada, com data futura.') : 'Fora da agenda pública da plateia.' %></p>
         <% if (canW) { %>

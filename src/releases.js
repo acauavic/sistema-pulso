@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.45.0', date: '2026-10-31', title: 'Valor da plateia por gravação',
+    items: [
+      { kind: 'novo', text: 'Cada gravação pode ter o próprio valor da vaga: no cadastro do convidado, em "Podcast com plateia", "editar" ao lado do valor. Vazio usa o valor geral de Plateia > Ajustes. A página da gravação, a agenda, a mensagem de WhatsApp, o pedido e a conta a receber usam esse valor; pedidos já feitos guardam o valor da época.' },
+      { kind: 'ajuste', text: 'Com gravações de valores diferentes, a agenda pública mostra o valor em cada cartão e o resumo da página diz "a partir de".' },
+      { kind: 'correcao', text: 'Valores com centavos na plateia apareciam arredondados (R$ 197,50 virava R$ 198).' },
+    ],
+  },
+  {
     version: '1.44.0', date: '2026-10-31', title: 'Meta Pixel nas páginas públicas',
     items: [
       { kind: 'novo', text: 'O Meta Pixel do Pulso mede as visitas das páginas da plateia, do patrocinador (media kit, cadastro e portal) e do convidado (convite e portal), com o nome de cada página.' },

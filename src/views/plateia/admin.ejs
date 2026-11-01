@@ -360,7 +360,7 @@
     <h2 id="mpa-h">Ajustes da página</h2>
     <label class="check"><input type="checkbox" name="active" value="1" <%= s.active ? 'checked' : '' %>> Página no ar (desmarque para pausar as inscrições)</label>
     <div class="grid-2 tight">
-      <label>Investimento por participante (R$)<input type="text" name="price" inputmode="decimal" value="<%= brl(s.priceCents) %>" required></label>
+      <label>Investimento por participante (R$) <small class="muted">(valor geral; cada gravação pode ter o seu, no cadastro do convidado, em "Podcast com plateia")</small><input type="text" name="price" inputmode="decimal" value="<%= brl(s.priceCents) %>" required></label>
       <label>Duração estimada<input type="text" name="duration" maxlength="40" value="<%= s.duration %>" required></label>
     </div>
     <label>Local<input type="text" name="location" maxlength="160" value="<%= s.location %>" required></label>

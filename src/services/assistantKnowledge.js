@@ -110,6 +110,7 @@ const TOPICS = [
       '"Adicionar pessoa" inclui quem foi combinado por fora. Cada pedido pode ser editado ou excluído (pedido já pago não é excluído).',
       'No dia da gravação, se há selecionados, o sistema cria uma tarefa para a produtora lembrar todo mundo, com a lista e uma mensagem sugerida.',
       'Meta Pixel: as páginas da plateia, do patrocinador (media kit, cadastro, portal) e do convidado (convite, portal) medem as visitas; na plateia, enviar o formulário de interesse conta como conversão (Lead). O ID do Pixel da plateia pode ser trocado em Plateia > Ajustes.',
+      'Valor da vaga: o geral fica em Plateia > Ajustes; cada gravação pode ter o seu no cadastro do convidado, em "Podcast com plateia" (editar; vazio = o geral). Pedidos já feitos guardam o valor da época.',
       'Preço, local, WhatsApp e imagens da página: Plateia > Ajustes (gestão).',
       'As duas páginas da plateia mostram o vídeo dos bastidores ("Veja como é estar na plateia") e, no topo, os benefícios: networking com outros participantes selecionados, interação com o convidado, coffee break e bastidores. Trocar o vídeo hoje é pelo suporte técnico (não há botão no painel).',
       'Página de um convidado: no cadastro do convidado aberto para plateia, a aba "Página da plateia" ativa uma página só daquela gravação (Copiar link). "Editar página" põe o texto de como será, o horário de chegada da plateia e um bloco extra; até 6 fotos. O que ficar vazio não aparece. Os pedidos caem no mesmo painel.',

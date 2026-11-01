@@ -9,7 +9,7 @@ const { slugify } = require('../utils/format');
 const MAX_PHOTOS = 6;
 // Pedido que ainda ocupa uma vaga do parceiro (quem não foi selecionado ou desistiu devolve a vaga).
 const HOLDING = "status NOT IN ('nao_selecionado', 'desistiu')";
-const PAGE_FIELDS = 'audience_page_enabled, audience_slug, audience_intro, audience_arrival, audience_extra_title, audience_extra';
+const PAGE_FIELDS = 'audience_price_cents, audience_page_enabled, audience_slug, audience_intro, audience_arrival, audience_extra_title, audience_extra';
 
 // Endereço da página: nome do convidado, sem repetir o de outro.
 async function ensureSlug(guest) {

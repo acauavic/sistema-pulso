@@ -194,7 +194,7 @@ function parseConfirm(body) {
 router.post('/plateia/painel/leads', requirePerm('audience.read'), wrap(async (req, res) => {
   const back = (guestId) => res.redirect(guestId ? `/plateia/painel?convidado=${guestId}` : '/plateia/painel');
   const guestId = isIntId(String(req.body.guest_id || '')) ? Number(req.body.guest_id) : null;
-  const { rows: [guest] } = guestId ? await db.query("SELECT id, name, proposed_at FROM guests WHERE id = $1 AND status = 'agendado' AND proposed_at IS NOT NULL", [guestId]) : { rows: [] };
+  const { rows: [guest] } = guestId ? await db.query("SELECT id, name, proposed_at, audience_price_cents FROM guests WHERE id = $1 AND status = 'agendado' AND proposed_at IS NOT NULL", [guestId]) : { rows: [] };
   const name = clean(req.body.name, 120);
   const phone = audience.validatePhone(req.body.country || 'BR', req.body.phone);
   const confirmed = req.body.status === 'confirmado';
@@ -296,6 +296,19 @@ router.post('/convidados/:id/plateia', requirePerm('guests.write'), wrap(async (
   if (!g) return res.redirect('/convidados');
   await audit(req, 'convidado.plateia', 'guest', g.id, { enabled, status });
   await req.flash('ok', enabled ? `${g.name} aparece na agenda da plateia (${GUEST_STATUS[status].toLowerCase()}).` : `${g.name} saiu da agenda da plateia.`);
+  res.redirect(`/convidados/${g.id}#plateia`);
+}));
+
+// Valor da vaga desta gravação (vazio = o valor geral de Plateia > Ajustes). Pedidos já feitos guardam o valor da época.
+router.post('/convidados/:id/plateia/preco', requirePerm('guests.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return res.redirect('/convidados');
+  const raw = String(req.body.price || '').trim();
+  const price = raw ? parseBRL(raw) : null;
+  if (raw && (price == null || Number.isNaN(price) || price <= 0)) { await req.flash('error', 'Valor inválido. Use algo como 197,00, ou deixe vazio para usar o valor geral.'); return res.redirect(`/convidados/${req.params.id}#plateia`); }
+  const { rows: [g] } = await db.query('UPDATE guests SET audience_price_cents = $2 WHERE id = $1 RETURNING id, name', [req.params.id, price]);
+  if (!g) return res.redirect('/convidados');
+  await audit(req, 'convidado.plateia_valor', 'guest', g.id, { valor: price });
+  await req.flash('ok', price ? `Valor da vaga na gravação com ${g.name}: ${formatBRL(price)}.` : `A gravação com ${g.name} volta a usar o valor geral.`);
   res.redirect(`/convidados/${g.id}#plateia`);
 }));
 

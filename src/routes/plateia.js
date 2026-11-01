@@ -42,10 +42,11 @@ const BENEFITS = [
 // Vídeo vertical dos bastidores (Plateia > Ajustes): o endereço do Backblaze entra na CSP só quando há vídeo.
 const reelsOrigin = async (s) => (s.reelsKey || s.reelsWebmKey ? new URL(await b2.endpoint()).origin : null);
 
-const FAQ = (s) => [
+// varies: alguma gravação da agenda tem valor próprio; min: o menor valor da agenda.
+const FAQ = (s, { varies = false, min = s.priceCents } = {}) => [
   ['Pedir participação garante a minha vaga?', 'Não. A plateia de cada gravação é selecionada pela produção. Ao pedir participação, você fala com a nossa produtora pelo WhatsApp, que avalia o seu pedido e responde com os próximos passos.'],
   ['Como a plateia é escolhida?', 'Pensamos em cada episódio a partir do convidado: quem tem afinidade com o tema, pode contribuir com a conversa e aproveitar aquele encontro. Por isso as vagas são poucas e cada pedido é avaliado.'],
-  ['Quanto custa participar?', `O investimento é de ${audience.money(s.priceCents)} por participante selecionado. O valor é combinado com a produção; esta página não faz nenhuma cobrança.`],
+  ['Quanto custa participar?', varies ? `O valor depende da gravação e aparece em cada uma na agenda (a partir de ${audience.money(min)}), por participante selecionado. O valor é combinado com a produção; esta página não faz nenhuma cobrança.` : `O investimento é de ${audience.money(s.priceCents)} por participante selecionado. O valor é combinado com a produção; esta página não faz nenhuma cobrança.`],
   ['Quanto tempo dura a experiência?', `A duração estimada é de ${s.duration}, incluindo a recepção e a experiência de gravação.`],
   ['Onde acontece a gravação?', 'No estúdio do Pulso Podcast, em Alphaville, São Paulo. O endereço completo é enviado apenas aos participantes selecionados.'],
   ['Posso escolher o episódio?', 'Sim. Você escolhe a gravação que quer pedir; a produção decide o encaixe conforme o convidado e as vagas de cada episódio.'],
@@ -54,11 +55,14 @@ const FAQ = (s) => [
 router.get('/plateia', wrap(async (req, res) => {
   const s = await audience.settings();
   const agenda = s.active ? await audience.agenda() : [];
+  const varies = agenda.some((g) => g.priceCents !== s.priceCents);
+  const min = Math.min(s.priceCents, ...agenda.map((g) => g.priceCents));
   res.set(pageHeaders(s, await reelsOrigin(s))).render('plateia/page', {
+    varies, money: audience.money,
     benefits: BENEFITS, hasReels: Boolean(s.reelsKey || s.reelsWebmKey), hasWebm: Boolean(s.reelsWebmKey), hasMp4: Boolean(s.reelsKey), hasReelsPoster: Boolean(s.reelsPosterKey),
     title: 'Pulso Podcast com Plateia: assista às gravações em São Paulo',
     description: 'Assista de perto às gravações do Pulso Podcast em São Paulo. Uma plateia pequena, escolhida pela produção por afinidade com o convidado. Peça sua participação.',
-    ogImage: `${config.appBaseUrl}/static/og-plateia.jpg?v=${res.locals.assetV}`, s, agenda, faq: FAQ(s), icon, countries: audience.COUNTRIES, price: audience.money(s.priceCents), videoUrl: HERO_VIDEO,
+    ogImage: `${config.appBaseUrl}/static/og-plateia.jpg?v=${res.locals.assetV}`, s, agenda, faq: FAQ(s, { varies, min }), icon, countries: audience.COUNTRIES, price: varies ? `a partir de ${audience.money(min)}` : audience.money(s.priceCents), videoUrl: HERO_VIDEO,
     hasHero: Boolean(s.heroKey), hasStudio: Boolean(s.studioKey), assetV: res.locals.assetV, canonical: `${config.appBaseUrl}/plateia`,
   });
 }));
@@ -75,7 +79,7 @@ router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], wrap(async (req,
   const open = s.active && g.on_agenda && g.audience_status === 'disponivel';
   const closedLabel = !g.on_agenda ? 'Inscrições encerradas' : g.audience_status === 'lotado' ? 'Gravação lotada' : 'Inscrições encerradas';
   const exempt = Boolean(partner && !full);
-  const price = audience.money(s.priceCents);
+  const price = audience.money(audience.priceOf(g, s));
   const view = {
     id: g.id, name: g.name, slug: g.audience_slug, firstName: String(g.name).split(/\s+/)[0], role: [g.job_title, g.company].filter(Boolean).join(' · '), instagram: g.instagram, topic: g.topic,
     hasPhoto: g.has_photo, initials: g.name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase(),

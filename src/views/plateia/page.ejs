@@ -96,9 +96,10 @@
               <li><%- icon('calendar', 16) %><span><span class="pl-cap"><%= g.weekday %></span>, <%= g.date %></span></li>
               <li><%- icon('clock', 16) %><span>Horário previsto: <%= g.time %></span></li>
               <li><%- icon('map-pin', 16) %><span><%= s.location %></span></li>
+              <% if (varies) { %><li><%- icon('wallet', 16) %><span><%= money(g.priceCents) %> por participante selecionado</span></li><% } %>
             </ul>
             <% if (g.status === 'disponivel') { %>
-            <button class="pl-btn" type="button" data-signup="<%= g.id %>" data-name="<%= g.name %>" data-date="<%= g.date %>" data-time="<%= g.time %>">Pedir para participar</button>
+            <button class="pl-btn" type="button" data-signup="<%= g.id %>" data-name="<%= g.name %>" data-date="<%= g.date %>" data-time="<%= g.time %>" data-price="<%= money(g.priceCents) %>">Pedir para participar</button>
             <% } else { %>
             <button class="pl-btn" type="button" disabled><%= g.status === 'lotado' ? 'Gravação lotada' : 'Inscrições encerradas' %></button>
             <% } %>

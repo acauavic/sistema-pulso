@@ -63,16 +63,21 @@ function parts(d) {
 const dateLong = (d) => { const p = parts(d); return `${p.day} de ${MONTHS[p.month - 1]} de ${p.year}`; };
 const timeShort = (d) => { const p = parts(d); return p.minute ? `${p.hour}h${String(p.minute).padStart(2, '0')}` : `${p.hour}h`; };
 const weekday = (d) => WEEK[new Date(new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(d)) + 'T12:00:00Z').getUTCDay()];
-const money = (cents) => `R$ ${Math.round(cents / 100).toLocaleString('pt-BR')}`;
+// "R$ 197" quando é inteiro; "R$ 197,50" quando tem centavos (antes arredondava para R$ 198).
+const money = (cents) => { const n = Number(cents) || 0; return `R$ ${(n / 100).toLocaleString('pt-BR', { minimumFractionDigits: n % 100 ? 2 : 0, maximumFractionDigits: 2 })}`; };
 
 // ---------------------------------------------------------------- agenda
 // Sai sozinha dos convidados: confirmados (Agendado), com data futura e não desmarcados da plateia.
-const AGENDA_SQL = `SELECT id, name, instagram, job_title, company, topic, proposed_at, audience_status, (photo_key IS NOT NULL) AS has_photo
+// Valor da vaga de uma gravação: o próprio (no convidado) ou o geral de Plateia > Ajustes.
+const priceOf = (guest, s) => (Number(guest?.audience_price_cents) > 0 ? Number(guest.audience_price_cents) : s.priceCents);
+
+const AGENDA_SQL = `SELECT id, name, instagram, job_title, company, topic, proposed_at, audience_status, audience_price_cents, (photo_key IS NOT NULL) AS has_photo
                       FROM guests WHERE status = 'agendado' AND audience_enabled AND proposed_at > now() ORDER BY proposed_at, id`;
 
 async function agenda() {
-  const { rows } = await db.query(AGENDA_SQL);
+  const [{ rows }, s] = await Promise.all([db.query(AGENDA_SQL), settings()]);
   return rows.map((g) => ({
+    priceCents: priceOf(g, s), customPrice: Number(g.audience_price_cents) > 0,
     id: g.id, name: g.name, role: [g.job_title, g.company].filter(Boolean).join(' · '), topic: g.topic, instagram: g.instagram, status: g.audience_status, hasPhoto: g.has_photo,
     at: g.proposed_at, date: dateLong(g.proposed_at), time: timeShort(g.proposed_at), weekday: weekday(g.proposed_at),
   }));
@@ -117,7 +122,7 @@ const TERMS_VERSION = '2026-10b';
 // partner: link de parceiro com vaga (o pedido fica isento se a pessoa for selecionada).
 async function createLead({ guest, name, phone, utm, referrer, landingUrl, visitorId, userAgent, partner = null }) {
   const s = await settings();
-  const msg = whatsappMessage({ name, guestName: guest.name, date: dateLong(guest.proposed_at), time: timeShort(guest.proposed_at), priceCents: s.priceCents, phoneDisplay: phone.display, partnerName: partner?.name });
+  const msg = whatsappMessage({ name, guestName: guest.name, date: dateLong(guest.proposed_at), time: timeShort(guest.proposed_at), priceCents: priceOf(guest, s), phoneDisplay: phone.display, partnerName: partner?.name });
   // mesma pessoa no mesmo episódio: atualiza em vez de duplicar
   const { rows: [dup] } = await db.query('SELECT id, ref FROM plateia_leads WHERE guest_id = $1 AND phone = $2 ORDER BY id DESC LIMIT 1', [guest.id, phone.e164]);
   let ref; let created = false; let leadId = null;
@@ -130,7 +135,7 @@ async function createLead({ guest, name, phone, utm, referrer, landingUrl, visit
     const { rows: [row] } = await db.query(
       `INSERT INTO plateia_leads (ref, guest_id, guest_name, recording_at, name, phone, country, price_cents, utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, gclid, referrer, landing_url, visitor_id, user_agent, terms_accepted_at, terms_version, partner_id, partner_name)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19, now(), $20, $21, $22) RETURNING id`,
-      [ref, guest.id, guest.name, guest.proposed_at, name, phone.e164, phone.country, s.priceCents, utm.utm_source, utm.utm_medium, utm.utm_campaign, utm.utm_term, utm.utm_content, utm.fbclid, utm.gclid,
+      [ref, guest.id, guest.name, guest.proposed_at, name, phone.e164, phone.country, priceOf(guest, s), utm.utm_source, utm.utm_medium, utm.utm_campaign, utm.utm_term, utm.utm_content, utm.fbclid, utm.gclid,
         clip(referrer, 300), clip(landingUrl, 500), cleanVisitor(visitorId), clip(userAgent, 300), TERMS_VERSION, partner?.id || null, partner?.name || null]);
     leadId = row.id;
   }
@@ -142,7 +147,7 @@ async function createLead({ guest, name, phone, utm, referrer, landingUrl, visit
     }).catch((err) => console.error('aviso da plateia:', err.message));
   }
   const url = s.whatsapp ? `https://wa.me/${s.whatsapp}?text=${encodeURIComponent(msg)}` : null;
-  return { ref, url, message: msg, price: partner ? 'Isento' : money(s.priceCents), exempt: Boolean(partner), partnerName: partner?.name || null };
+  return { ref, url, message: msg, price: partner ? 'Isento' : money(priceOf(guest, s)), exempt: Boolean(partner), partnerName: partner?.name || null };
 }
 
 // ---------------------------------------------------------------- painel
@@ -236,7 +241,7 @@ async function addLead({ guest, name, phone, userId }) {
   const { rows: [row] } = await db.query(
     `INSERT INTO plateia_leads (ref, guest_id, guest_name, recording_at, name, phone, country, price_cents, added_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [crypto.randomBytes(9).toString('base64url'), guest.id, guest.name, guest.proposed_at, name, phone.e164, phone.country, s.priceCents, userId]);
+    [crypto.randomBytes(9).toString('base64url'), guest.id, guest.name, guest.proposed_at, name, phone.e164, phone.country, priceOf(guest, s), userId]);
   return { lead: row };
 }
 
@@ -290,7 +295,7 @@ async function reminderTick(now = new Date()) {
   return made;
 }
 
-module.exports = {
+module.exports = { priceOf,
   changeStatus, addLead, reminderTick, producerFor,
   todayISO: () => require('./finance').todayISO(), confirmLead, releaseLead, setReceived,
   settings, COUNTRIES, COUNTRY_BY_CODE, validatePhone, dateLong, timeShort, weekday, money, agenda, agendaGuest, cleanUtm, cleanVisitor, recordEvent, whatsappMessage, createLead, TERMS_VERSION, results, EVENT_TYPES, clip,
