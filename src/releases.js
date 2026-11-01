@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.47.1', date: '2026-11-01', title: 'Página da plateia no celular',
+    items: [
+      { kind: 'ajuste', text: 'Na página de cada convidado, no celular, o título vem antes da foto e o botão "Pedir para participar" fica logo abaixo dela, sem precisar rolar. Os dados da gravação vêm depois do botão.' },
+      { kind: 'ajuste', text: 'O vídeo dos bastidores virou a segunda seção das duas páginas da plateia, logo depois do topo, com o título "Veja como é participar do Pulso Podcast."' },
+    ],
+  },
+  {
     version: '1.47.0', date: '2026-11-01', title: 'WhatsApp da produção na página da plateia',
     items: [
       { kind: 'novo', text: 'As páginas da plateia (a agenda geral e a de cada convidado) têm um botão flutuante "Dúvidas? Fale com a produção", que abre o WhatsApp da produtora com uma mensagem pronta. No celular ele vira um ícone redondo no canto. Só aparece com o WhatsApp informado em Plateia > Ajustes.' },

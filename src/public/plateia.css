@@ -111,21 +111,30 @@ a { color: inherit; }
 
 /* Página de um convidado (/plateia/com/:slug): foto e dados lado a lado; o convite do parceiro em plum (é o externo quem vê). */
 .pl-guest-hero { border-top: 0; padding-top: clamp(48px, 7vw, 88px); padding-bottom: 0; }
-.pl-guest-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(32px, 5vw, 64px); align-items: center; }
+/* Computador: título e dados à esquerda, foto à direita. Celular: título, foto e o botão logo abaixo (cabe na primeira tela); os dados vêm depois. */
+.pl-guest-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); grid-template-areas: "head photo" "text photo"; column-gap: clamp(32px, 5vw, 64px); align-items: center; }
+.pl-guest-head { grid-area: head; align-self: end; } .pl-guest-photo { grid-area: photo; } .pl-guest-text { grid-area: text; align-self: start; }
 .pl-guest-text { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.pl-guest-text h1 { max-width: 16ch; margin-bottom: 4px; }
+.pl-guest-head h1 { max-width: 16ch; margin-bottom: 4px; }
+.pl-guest-cta { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 12px; }
 .pl-role-lg { font-size: 17px; }
 .pl-meta-lg { margin: 16px 0 8px; } .pl-meta-lg li { font-size: 16px; } .pl-meta-lg strong { font-weight: 600; }
 .pl-guest-photo { width: 100%; border-radius: 6px; border: 1px solid var(--line); }
 .pl-guest-hero .pulse-line { display: block; width: 100%; height: 56px; margin-top: clamp(48px, 7vw, 80px); }
-.pl-guest-text .pl-btn { margin-top: 12px; }
 .pl-gift { margin: 12px 0 0; padding: 18px 20px; max-width: 46ch; background: var(--plum); border-radius: 6px; color: var(--text-2); }
 .pl-gift .pl-kicker { margin-bottom: 6px; color: var(--text-2); } .pl-gift strong { color: var(--text); }
 .pl-gallery { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
 .pl-gallery .pl-photo { border-radius: 6px; border: 1px solid var(--line); }
 .pl-gallery .pl-photo img { object-position: 50% 30%; }
 .pl-pre { white-space: pre-line; }
-@media (max-width: 800px) { .pl-guest-grid { grid-template-columns: 1fr; } .pl-guest-photo { order: -1; } .pl-guest-text .pl-btn { width: 100%; } }
+@media (max-width: 800px) {
+  .pl-guest-hero { padding-top: 24px; }
+  .pl-guest-grid { grid-template-columns: 1fr; grid-template-areas: "head" "photo" "text"; row-gap: 20px; }
+  .pl-guest-head .pl-kicker { margin-bottom: 10px; } .pl-guest-head h1 { font-size: clamp(32px, 9vw, 48px); } .pl-guest-head .pl-lede-hero { margin: 8px 0 0; font-size: 17px; }
+  .pl-guest-photo { width: min(100%, calc((100svh - 400px) * 4 / 3)); min-width: 180px; }
+  .pl-guest-cta { order: -2; align-self: stretch; margin-top: 0; } .pl-guest-cta .pl-btn { width: 100%; }
+  .pl-guest-text > .pl-gift, .pl-guest-text > .pl-note { order: -1; }
+}
 
 /* Topo: o que se vive na gravação; vídeo vertical dos bastidores (9:16). */
 .pl-lede-hero { margin: 4px 0 8px; }

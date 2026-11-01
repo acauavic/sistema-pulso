@@ -33,10 +33,13 @@
 <main>
   <section class="pl-section pl-guest-hero">
     <div class="pl-wrap pl-guest-grid">
-      <div class="pl-guest-text">
+      <div class="pl-guest-head">
         <span class="pl-kicker">Pulso Podcast com Plateia · vagas limitadas</span>
         <h1>Conheça de perto <%= g.name %></h1>
         <p class="pl-lede pl-lede-hero">e participe também da gravação do Pulso Podcast.</p>
+      </div>
+      <div class="pl-photo pl-guest-photo"><% if (g.hasPhoto) { %><img src="/plateia/com/<%= g.slug %>/foto" alt="<%= g.name %>" width="1200" height="900"><% } else { %><span aria-hidden="true"><%= g.initials %></span><% } %></div>
+      <div class="pl-guest-text">
         <% if (g.role) { %><p class="pl-role pl-role-lg"><%= g.role %></p><% } %>
         <% if (g.instagram) { %><a class="pl-ig" href="https://www.instagram.com/<%= encodeURIComponent(g.instagram) %>/" target="_blank" rel="noopener noreferrer"><%- icon('instagram', 16) %>@<%= g.instagram %></a><% } %>
         <% if (g.topic) { %><p class="pl-topic"><strong>Tema:</strong> <%= g.topic %></p><% } %>
@@ -51,17 +54,20 @@
         <% } else if (partnerFull) { %>
         <p class="pl-note">As vagas isentas do convite de <%= partner.name %> já foram preenchidas. Você ainda pode pedir participação pelo valor normal.</p>
         <% } %>
+        <div class="pl-guest-cta">
         <% if (open) { %>
-        <button class="pl-btn" type="button" data-signup="<%= g.id %>" data-name="<%= g.name %>" data-date="<%= g.date %>" data-time="<%= g.arrival ? g.arrival + ' (chegada)' : g.time %>">Pedir para participar</button>
+          <button class="pl-btn" type="button" data-signup="<%= g.id %>" data-name="<%= g.name %>" data-date="<%= g.date %>" data-time="<%= g.arrival ? g.arrival + ' (chegada)' : g.time %>">Pedir para participar</button>
         <% } else { %>
-        <button class="pl-btn" type="button" disabled><%= closedLabel %></button>
-        <p class="pl-note"><a href="/plateia#agenda">Veja as próximas gravações com plateia</a>.</p>
+          <button class="pl-btn" type="button" disabled><%= closedLabel %></button>
+          <p class="pl-note"><a href="/plateia#agenda">Veja as próximas gravações com plateia</a>.</p>
         <% } %>
+        </div>
       </div>
-      <div class="pl-photo pl-guest-photo"><% if (g.hasPhoto) { %><img src="/plateia/com/<%= g.slug %>/foto" alt="<%= g.name %>" width="1200" height="900"><% } else { %><span aria-hidden="true"><%= g.initials %></span><% } %></div>
     </div>
     <%- include('../partials/pulse-line') %>
   </section>
+
+  <% if (hasReels) { %><%- include('_reels') %><% } %>
 
   <% if (g.intro) { %>
   <section class="pl-section">
@@ -72,8 +78,6 @@
     </div>
   </section>
   <% } %>
-
-  <% if (hasReels) { %><%- include('_reels') %><% } %>
 
   <% if (photos.length) { %>
   <section class="pl-section pl-agenda">

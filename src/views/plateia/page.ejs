@@ -50,6 +50,8 @@
     <%- include('../partials/pulse-line') %>
   </section>
 
+  <% if (hasReels) { %><%- include('_reels') %><% } %>
+
   <section class="pl-section" id="experiencia">
     <div class="pl-wrap">
       <span class="pl-kicker">Como funciona</span>
@@ -72,7 +74,6 @@
     </div>
   </section>
 
-  <% if (hasReels) { %><%- include('_reels') %><% } %>
 
   <section class="pl-section pl-agenda" id="agenda">
     <div class="pl-wrap">

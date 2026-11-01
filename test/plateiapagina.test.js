@@ -40,7 +40,7 @@ describe('Plateia: página do convidado e link de parceiro isento', () => {
   it('a página pública mostra o convidado; o que não foi preenchido não aparece; editar faz aparecer', async () => {
     let r = await anon.get('/plateia/com/mari-vabo');
     assert.equal(r.status, 200);
-    assert.match(r.text, /<h1>Conheça de perto Mari Vabo<\/h1>/); assert.match(r.text, /participe também da gravação do Pulso Podcast/); assert.match(r.text, /Interação com o convidado/); assert.match(r.text, /Pedir para participar/); assert.match(r.text, /R\$ 197/);
+    assert.match(r.text, /<h1>Conheça de perto Mari Vabo<\/h1>/); assert.match(r.text, /<h1>Conheça de perto Mari Vabo[\s\S]*?pl-guest-photo[\s\S]*?pl-guest-cta[\s\S]*?Pedir para participar/, 'título, foto e o botão nessa ordem (no celular o botão cabe na primeira tela)'); assert.match(r.text, /participe também da gravação do Pulso Podcast/); assert.match(r.text, /Interação com o convidado/); assert.match(r.text, /Pedir para participar/); assert.match(r.text, /R\$ 197/);
     assert.doesNotMatch(r.text, /Como será/); assert.doesNotMatch(r.text, /pl-gallery/); assert.doesNotMatch(r.text, /Chegada da plateia/);
     assert.doesNotMatch(r.text, /<script>|onclick=|style=/);
     assert.match(r.headers.get('content-security-policy'), /script-src 'self'/);
@@ -129,8 +129,10 @@ describe('Plateia: página do convidado e link de parceiro isento', () => {
     await q("INSERT INTO app_settings (key, value) VALUES ('plateia_reels_webm_key', 'pulso/plateia/bastidores.webm'), ('plateia_reels_key', 'pulso/plateia/bastidores.mp4'), ('plateia_reels_poster_key', 'pulso/plateia/bastidores.jpg') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
     for (const path of ['/plateia', '/plateia/com/mari-vabo']) {
       const r = await anon.get(path);
-      assert.match(r.text, /id="bastidores"/, path); assert.match(r.text, /Veja como é estar na plateia/);
-      assert.match(r.text, /Veja como é estar na plateia[\s\S]*?pl-benefits[\s\S]*?<video/, 'com vídeo, os benefícios vão para a seção do vídeo, abaixo do texto');
+      assert.match(r.text, /id="bastidores"/, path); assert.match(r.text, /Veja como é participar do Pulso Podcast\./);
+      assert.match(r.text, /<\/section>\s*<section class="pl-section pl-reels-sec" id="bastidores"/, 'o vídeo é a seção logo depois do topo');
+      assert.match(r.text, /id="bastidores"[\s\S]*id="experiencia"/);
+      assert.match(r.text, /Veja como é participar do Pulso Podcast[\s\S]*?pl-benefits[\s\S]*?<video/, 'com vídeo, os benefícios vão para a seção do vídeo, abaixo do texto');
       assert.equal((r.text.match(/class="pl-benefits"/g) || []).length, 1, 'uma lista só');
       assert.match(r.text, /<source src="\/plateia\/video\/bastidores\.webm" type="video\/webm">\s*<source src="\/plateia\/video\/bastidores\.mp4" type="video\/mp4">/);
       assert.match(r.text, /poster="\/plateia\/imagem\/bastidores"/);
