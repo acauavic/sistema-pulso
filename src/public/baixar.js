@@ -1,6 +1,6 @@
 // Baixar vários arquivos de uma vez (material do episódio e galeria). Cada arquivo continua sendo o mesmo link de sempre
-// (/baixar, que o servidor troca por um link assinado e curto do Backblaze): aqui só se dispara um depois do outro, e o próprio
-// navegador faz os downloads em paralelo, direto do armazenamento (nada passa pelo servidor, nada é compactado).
+// (/baixar, que o servidor troca por um link assinado e curto do Backblaze): aqui só se dispara um depois do outro, cada um num
+// quadro escondido (por isso o frame-src da CSP aceita o Backblaze), e o próprio navegador faz os downloads em paralelo, direto do armazenamento (nada passa pelo servidor, nada é compactado).
 // Marcação de uma lista: um contêiner [data-dl] com itens [data-dl-item data-href data-name data-bytes] (cada um com um
 // [data-dl-check]), os botões [data-dl-select] e [data-dl-everything] e a barra [data-dl-bar].
 // Ações em massa na mesma seleção (Conteúdo: atribuir, aprovar, excluir…): cada item leva data-id; na barra,
@@ -8,6 +8,7 @@
 // [data-dl-open="id-da-janela"] abre uma janela cujo formulário recebe os ids marcados em [data-dl-ids] ({n} em [data-dl-n]).
 (function () {
   const GAP_MS = 900; // intervalo entre um download e o seguinte: o navegador aceita melhor e o Backblaze não recebe tudo de uma vez
+  const FRAME_MS = 5 * 60 * 1000; // o quadro fica um tempo: o download já passou para o navegador, mas sem pressa para tirar
   const CONFIRM_BYTES = 2 * 1024 ** 3; // acima disso, pergunta antes (evita baixar 100 GB por engano)
   let busy = false;
 
@@ -28,9 +29,12 @@
     busy = true;
     try {
       for (let i = 0; i < list.length; i += 1) {
-        const a = document.createElement('a');
-        a.href = list[i].href; a.download = list[i].name || ''; a.hidden = true;
-        document.body.appendChild(a); a.click(); a.remove();
+        // Cada arquivo num quadro escondido próprio. Com link clicado na página, cada download era uma navegação da aba
+        // (/baixar redireciona para o Backblaze) e a seguinte cancelava a anterior que ainda não tinha resposta: de 20, chegavam 4 ou 5.
+        const f = document.createElement('iframe');
+        f.hidden = true; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.src = list[i].href;
+        document.body.appendChild(f);
+        setTimeout(() => f.remove(), FRAME_MS);
         if (onStep) onStep(i + 1, list.length);
         if (i < list.length - 1) await new Promise((r) => setTimeout(r, GAP_MS));
       }

@@ -19,7 +19,7 @@ function securityHeaders(req, res, next) {
     'Cache-Control': 'no-store',
     'Content-Security-Policy':
       "default-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: https://*.backblazeb2.com; style-src 'self'; script-src 'self'; connect-src 'self' https://*.backblazeb2.com; " +
-      "frame-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'",
+      "frame-src 'self' https://*.backblazeb2.com; form-action 'self'; base-uri 'none'; frame-ancestors 'self'",
   });
   next();
 }

@@ -99,6 +99,7 @@ describe('envio direto do navegador ao Backblaze: link assinado por parte e regi
     // a Política de segurança deixa o navegador falar com o bucket
     const home = await fetch(`${app.base}/login`);
     assert.match(home.headers.get('content-security-policy'), /connect-src 'self' https:\/\/\*\.backblazeb2\.com;/);
+    assert.match(home.headers.get('content-security-policy'), /frame-src 'self' https:\/\/\*\.backblazeb2\.com;/, 'baixar vários: cada arquivo num quadro escondido que vai ao Backblaze');
   });
 
   it('Integrações: mostra se o bucket aceita envio direto e liga/desliga o CORS com um clique (só a regra do painel), com auditoria', async () => {

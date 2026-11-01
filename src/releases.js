@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.47.2', date: '2026-11-01', title: 'Baixar tudo baixa todos os arquivos',
+    items: [
+      { kind: 'correcao', text: '"Baixar tudo", "Baixar pasta" e "Baixar selecionados" (material do episódio, galeria, bastidores, posts e cortes) baixavam só 4 ou 5 arquivos: cada download cancelava o anterior que ainda não tinha começado. Agora cada arquivo sai por conta própria e todos chegam. Se o navegador perguntar, permita baixar vários arquivos.' },
+    ],
+  },
+  {
     version: '1.47.1', date: '2026-11-01', title: 'Página da plateia no celular',
     items: [
       { kind: 'ajuste', text: 'Na página de cada convidado, no celular, o título vem antes da foto e o botão "Pedir para participar" fica logo abaixo dela, sem precisar rolar. Os dados da gravação vêm depois do botão.' },
