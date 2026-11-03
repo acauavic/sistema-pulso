@@ -108,6 +108,16 @@
     <p class="pt-empty"><%= g.release_on ? 'Vai ao ar em ' + dayLabel(g.release_on) + '. O vídeo do YouTube e o player do Spotify aparecem aqui.' : 'O vídeo do YouTube e o player do Spotify aparecem aqui quando o episódio for ao ar.' %></p>
     <% } %>
 
+    <% if (c.videoOn) { %>
+    <div class="pt-yt pt-file" id="baixar-episodio">
+      <div>
+        <h3>O vídeo do episódio para você</h3>
+        <p class="pt-mono pt-muted"><%= fmt.formatBytes(c.video.size_bytes) %></p>
+      </div>
+      <a class="pt-btn pt-btn-sec" href="<%= base %>/episodio/baixar"><%- icon('download', 16) %> Baixar episódio</a>
+    </div>
+    <% } %>
+
     <div class="pt-yt" id="youtube">
       <h3>O episódio também no seu canal do YouTube</h3>
       <% if (g.portal_yt_done_at) { %>

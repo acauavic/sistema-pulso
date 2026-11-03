@@ -96,6 +96,12 @@ router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], wrap(async (req,
     countries: audience.COUNTRIES, icon, assetV: res.locals.assetV,
   });
 }));
+// Logo do parceiro: só pelo link dele, enquanto o link estiver ativo.
+router.get('/plateia/com/:slug/:token/logo', wrap(async (req, res) => {
+  const g = await page.bySlug(req.params.slug);
+  const { partner } = g ? await page.partnerFor(g.id, req.params.token) : { partner: null };
+  return sendImage(res, partner && partner.logo_key);
+}));
 router.get('/plateia/com/:slug/foto', wrap(async (req, res) => {
   const g = await page.bySlug(req.params.slug);
   if (!g) return res.status(404).send('Imagem não encontrada.');

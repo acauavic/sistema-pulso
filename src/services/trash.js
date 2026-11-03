@@ -14,7 +14,7 @@ const SKIP = new Set(['jobs', 'sponsor_sessions', 'sessions', 'trash_items']);
 const COMMENT_TYPE = { guests: 'guest', sponsors: 'sponsor', episodes: 'episode', tasks: 'task', episode_clips: 'clip', content_requests: 'content_request' };
 const ATTACH_TYPE = { tasks: 'task', content_requests: 'content_request', comments: 'comment', episode_comments: 'review' };
 // Colunas que guardam o caminho de um arquivo no Backblaze.
-const FILE_COLUMNS = { episode_files: 'storage_key', episode_clips: 'storage_key', episode_covers: 'storage_key', episode_frames: 'storage_key', sponsor_files: 'storage_key', attachments: 'storage_key', guests: 'photo_key' };
+const FILE_COLUMNS = { episode_files: 'storage_key', episode_clips: 'storage_key', episode_covers: 'storage_key', episode_frames: 'storage_key', sponsor_files: 'storage_key', attachments: 'storage_key', guests: 'photo_key', plateia_partners: 'logo_key' };
 
 const epTag = (n) => (n ? `EP.${String(n).padStart(3, '0')}` : '');
 const COVER_KINDS = { youtube_thumb: 'Thumbnail do YouTube', reel_cover: 'Capa de Reels/TikTok', post_quote: 'Post de frase', post_split: 'Tela dividida', carousel: 'Carrossel', entrega: 'Imagem entregue' };

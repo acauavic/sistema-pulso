@@ -66,6 +66,17 @@ router.post('/convidados/:id/portal/fotos', requirePerm('guests.write'), wrap(as
   res.redirect(back(g.id));
 }));
 
+// Vídeo do episódio para baixar no portal: só com a equipe liberando.
+router.post('/convidados/:id/portal/video', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOr404(req, res); if (!g) return;
+  const on = req.body.on === '1';
+  if (on && !await portal.latestVideo(g.episode_id)) { await req.flash('error', 'O episódio ainda não tem vídeo editado para liberar.'); return res.redirect(back(g.id)); }
+  await portal.setVideo(g.id, on);
+  await audit(req, on ? 'portal.video_liberado' : 'portal.video_retirado', 'guest', g.id);
+  await req.flash('ok', on ? 'Vídeo do episódio liberado para baixar no portal.' : 'O vídeo do episódio saiu do portal.');
+  res.redirect(back(g.id));
+}));
+
 router.post('/convidados/:id/portal/youtube', requirePerm('guests.write'), wrap(async (req, res) => {
   const g = await guestOr404(req, res); if (!g) return;
   const done = req.body.feito === '1';

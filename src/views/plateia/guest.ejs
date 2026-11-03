@@ -50,7 +50,10 @@
         </ul>
         <% if (!hasReels) { %><%- include('_benefits') %><% } %>
         <% if (exempt) { %>
-        <p class="pl-gift"><span class="pl-kicker">Convite de <%= partner.name %></span><strong>Participação isenta de cobrança.</strong> Se o seu pedido for selecionado, você não paga a vaga.</p>
+        <div class="pl-gift">
+          <% if (partner.logo_key) { %><span class="pl-gift-logo"><img src="/plateia/com/<%= g.slug %>/<%= partner.token %>/logo?v=<%= encodeURIComponent(partner.logo_key.slice(-12)) %>" alt="<%= partner.name %>"></span><% } %>
+          <p><span class="pl-kicker">Convite de <%= partner.name %></span><strong>Participação isenta de cobrança.</strong> Se o seu pedido for selecionado, você não paga a vaga.</p>
+        </div>
         <% } else if (partnerFull) { %>
         <p class="pl-note">As vagas isentas do convite de <%= partner.name %> já foram preenchidas. Você ainda pode pedir participação pelo valor normal.</p>
         <% } %>

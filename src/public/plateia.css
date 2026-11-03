@@ -122,7 +122,9 @@ a { color: inherit; }
 .pl-guest-photo { width: 100%; border-radius: 6px; border: 1px solid var(--line); }
 .pl-guest-hero .pulse-line { display: block; width: 100%; height: 56px; margin-top: clamp(48px, 7vw, 80px); }
 .pl-gift { margin: 12px 0 0; padding: 18px 20px; max-width: 46ch; background: var(--plum); border-radius: 6px; color: var(--text-2); }
-.pl-gift .pl-kicker { margin-bottom: 6px; color: var(--text-2); } .pl-gift strong { color: var(--text); }
+.pl-gift .pl-kicker { margin-bottom: 6px; color: var(--text-2); } .pl-gift strong { color: var(--text); } .pl-gift p { margin: 0; }
+.pl-gift-logo { display: inline-flex; margin-bottom: 12px; padding: 8px 12px; border-radius: 6px; background: var(--text); } /* fundo claro: a logo do parceiro aparece em qualquer cor */
+.pl-gift-logo img { display: block; max-width: 180px; max-height: 44px; object-fit: contain; }
 .pl-gallery { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
 .pl-gallery .pl-photo { border-radius: 6px; border: 1px solid var(--line); }
 .pl-gallery .pl-photo img { object-position: 50% 30%; }
@@ -132,6 +134,7 @@ a { color: inherit; }
   .pl-guest-grid { grid-template-columns: 1fr; grid-template-areas: "head" "photo" "text"; row-gap: 20px; }
   .pl-guest-head .pl-kicker { margin-bottom: 10px; } .pl-guest-head h1 { font-size: clamp(32px, 9vw, 48px); } .pl-guest-head .pl-lede-hero { margin: 8px 0 0; font-size: 17px; }
   .pl-guest-photo { width: min(100%, calc((100svh - 400px) * 4 / 3)); min-width: 180px; }
+  .pl-guest-grid:has(.pl-gift-logo) .pl-guest-photo { width: min(100%, calc((100svh - 490px) * 4 / 3)); } /* foto menor: a logo do parceiro também cabe na primeira tela */
   .pl-guest-cta { order: -2; align-self: stretch; margin-top: 0; } .pl-guest-cta .pl-btn { width: 100%; }
   .pl-guest-text > .pl-gift, .pl-guest-text > .pl-note { order: -1; }
 }

@@ -357,13 +357,23 @@
         <% if (!P.partners.length) { %><p class="small muted">Um parceiro manda o link dele para os próprios clientes: quem pede por ele vê a participação isenta dos <%= plateia.price || 'valores' %> e, se for selecionado, não paga. Dá para limitar as vagas; esgotado, o link mostra o valor normal.</p><% } %>
         <ul class="plain partner-list">
           <% P.partners.forEach(function (p) { var link = P.url + '/' + p.token; %>
-          <li class="<%= p.active ? '' : 'is-off' %>">
+          <li class="<%= p.active ? '' : 'is-off' %>" data-image-scope>
             <div class="row spread">
               <strong class="display"><%= p.name %></strong>
               <span class="badge <%= !p.active ? 'b-gray' : p.left === 0 ? 'b-amber' : 'b-gray' %>"><%= !p.active ? 'desativado' : p.left === 0 ? 'vagas esgotadas' : 'ativo' %></span>
             </div>
             <span class="mono small muted"><%= p.slots ? p.used + ' de ' + p.slots + ' vagas' : 'sem limite · ' + p.used + ' pedido' + (p.used === 1 ? '' : 's') %><%= p.total > p.used ? ' · ' + (p.total - p.used) + ' fora (não selecionado ou desistiu)' : '' %></span>
             <span class="mono small page-url"><%= link %></span>
+            <% if (p.logo_key || canW) { %>
+            <div class="row partner-logo">
+              <% if (p.logo_key) { %><span class="partner-logo-plate"><img src="/convidados/<%= guest.id %>/plateia/parceiros/<%= p.id %>/logo?v=<%= encodeURIComponent(p.logo_key.slice(-12)) %>" alt="Logo de <%= p.name %>"></span><% } %>
+              <% if (canW) { %>
+              <button class="link small" type="button" data-image-pick="" <%= storageReady ? '' : 'disabled' %>><%= p.logo_key ? 'trocar logo' : 'enviar logo' %></button>
+              <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-image-input data-csrf="<%= csrf %>" data-base="/convidados/<%= guest.id %>/plateia/parceiros/<%= p.id %>/logo">
+              <% if (p.logo_key) { %><form method="post" action="/convidados/<%= guest.id %>/plateia/parceiros/<%= p.id %>/logo/excluir" class="inline"><%- csrfF %><button class="link small" type="submit">tirar</button></form><% } else { %><span class="small muted">PNG, JPEG ou WebP. Aparece sobre fundo claro no convite.</span><% } %>
+              <% } %>
+            </div>
+            <% } %>
             <div class="row">
               <% if (p.active) { %><button class="btn sm" type="button" data-copy="<%= link %>"><%- icon('copy', 14) %> Copiar link</button><% } %>
               <% if (canW) { %>
@@ -488,6 +498,18 @@
           <dt>Outros posts</dt><dd class="mono"><%= pc.others.length %></dd>
           <dt>Episódio</dt><dd class="mono"><%= ['YouTube', 'Spotify', 'Instagram'].filter(function (k) { return pc.episode[k.toLowerCase()]; }).join(' · ') || 'links ainda não saíram' %></dd>
           <dt>Fotos</dt><dd><span class="mono"><%= pc.photos.length %> de <%= pc.photoChoices.length %></span><% if (canW && pc.photoChoices.length) { %> <button class="link small" type="button" data-modal-open="modal-portal-fotos">escolher</button><% } else if (!pc.photoChoices.length) { %> <span class="small muted">sem fotos no material do episódio</span><% } %></dd>
+          <dt>Vídeo do episódio</dt><dd>
+            <% if (pg.portal_video) { %>
+            <span class="mono"><%= pc.video ? 'Versão ' + pc.video.version + ' · ' + fmt.formatBytes(pc.video.size_bytes) : 'Liberado' %></span> <% if (!pc.video) { %><span class="small muted">aparece quando o vídeo editado subir</span><% } %>
+            <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/portal/video" class="inline"><%- csrfP %><input type="hidden" name="on" value="0"><button class="link small" type="submit">tirar</button></form><% } %>
+            <br><span class="small muted"><%= gFirst %> pode baixar. A cada versão nova do editor, o portal entrega a mais nova.</span>
+            <% } else if (pc.video) { %>
+            <span class="small muted">Fora do portal</span>
+            <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/portal/video" class="inline" data-confirm="Liberar para <%= gFirst %> baixar o vídeo editado (versão <%= pc.video.version %>)? A cada versão nova do editor, o portal entrega a mais nova."><%- csrfP %><input type="hidden" name="on" value="1"><button class="link small" type="submit">liberar para baixar</button></form><% } %>
+            <% } else { %>
+            <span class="small muted">sem vídeo editado no episódio</span>
+            <% } %>
+          </dd>
         </dl>
         <h3 class="top-gap">Cortes exclusivos <span class="mono small muted"><%= pc.exclusive.length %><%= pc.exclusiveOpen ? ' · à mostra' : (pg.exclusive_from ? ' · aparecem ' + PT.dayLabel(pg.exclusive_from) : '') %></span></h3>
         <% if (!pc.exclusive.length && !pc.clipsOut.length) { %><p class="small muted">Todo corte do episódio que não for publicado entra aqui como exclusivo de <%= gFirst %>.</p><% } %>

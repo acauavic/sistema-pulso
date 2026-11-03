@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.49.0', date: '2026-11-02', title: 'Vídeo do episódio no portal e logo do parceiro',
+    items: [
+      { kind: 'novo', text: 'O portal do convidado pode oferecer o vídeo do episódio para baixar: na aba Portal do convidado, em "No portal agora", "liberar para baixar". Vem desligado, e entrega sempre a versão mais nova que o editor enviou.' },
+      { kind: 'novo', text: 'Cada link de parceiro da plateia pode ter a logomarca dele: em "Links de parceiro", "enviar logo". Ela aparece no convite, na página de inscrição de quem chega por aquele link.' },
+    ],
+  },
+  {
     version: '1.48.0', date: '2026-11-01', title: 'Baixar vários em ZIP',
     items: [
       { kind: 'novo', text: 'Com dois ou mais arquivos, "Baixar tudo", "Baixar pasta" e "Baixar selecionados" baixam um ZIP só (material do episódio, bastidores, galeria, posts e cortes). O ZIP é montado enquanto baixa, e a barra de downloads do navegador mostra o andamento e o tempo que falta. Um arquivo sozinho continua baixando direto.' },

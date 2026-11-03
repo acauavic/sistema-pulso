@@ -1355,6 +1355,9 @@ a.icon-btn { text-decoration: none; } a.icon-btn.on { background: var(--raised);
 .partner-list li.is-off { opacity: .6; }
 .partner-list .display { font-family: var(--f-display); letter-spacing: -.02em; }
 .partner-list .page-url { margin: 0; }
+.partner-logo { align-items: center; }
+.partner-logo-plate { display: inline-flex; padding: 6px 10px; border-radius: var(--r-card); background: var(--white); } /* sempre claro, como no convite */
+.partner-logo-plate img { display: block; max-width: 120px; max-height: 36px; object-fit: contain; }
 
 /* Portal do convidado (aba no cadastro) */
 .notice-card { border-left: 3px solid var(--st-edicao-fg); margin-bottom: 16px; }

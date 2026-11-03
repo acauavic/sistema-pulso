@@ -94,6 +94,7 @@ const TOPICS = [
     steps: [
       'Cada convidado com episódio tem a aba "Portal" no cadastro. "Ativar portal" cria uma página só dele (link secreto), que se atualiza sozinha durante a semana do episódio.',
       'O portal mostra: o cronograma (cortes começam na segunda da semana em que o episódio sai, episódio no ar, cortes exclusivos), os posts em collab com ele (o sistema reconhece pelo @ do Instagram do cadastro no collab da publicação), os outros posts do episódio, o vídeo do YouTube e o player do Spotify incorporados, o link do Instagram, as fotos escolhidas (em galeria) e as duas formas de collab, com o botão "Falar com a produção".',
+      'Vídeo do episódio para baixar: não vem ligado. Na aba Portal, em "No portal agora", "liberar para baixar" deixa o convidado baixar a versão mais nova do vídeo editado (ela acompanha cada versão nova do editor); "tirar" fecha.',
       'Cortes exclusivos: todo corte do episódio que não foi publicado entra como exclusivo do convidado, para ele baixar e postar, a partir da data dos exclusivos (padrão: o dia em que o episódio sai). Para tirar um, use "tirar" na aba Portal ou "tirar do portal" na página do corte.',
       '"Cronograma e aviso" ajusta as datas (vazio = automático) e como avisar de post novo em collab: e-mail sai sozinho; no WhatsApp a equipe recebe um lembrete e manda pelo botão "Avisar no WhatsApp" da aba.',
       '"Enviar link" manda o portal por e-mail ou abre o WhatsApp com a mensagem pronta. O que já estava em collab quando o link foi enviado não gera aviso.',
@@ -116,6 +117,7 @@ const TOPICS = [
       'Preço, local, WhatsApp e imagens da página: Plateia > Ajustes (gestão).',
       'As duas páginas da plateia mostram o vídeo dos bastidores ("Veja como é participar do Pulso Podcast", logo depois do topo) e, no topo, os benefícios: networking com outros participantes selecionados, interação com o convidado, coffee break e bastidores. Trocar o vídeo hoje é pelo suporte técnico (não há botão no painel).',
       'Página de um convidado: no cadastro do convidado aberto para plateia, a aba "Página da plateia" ativa uma página só daquela gravação (Copiar link). "Editar página" põe o texto de como será, o horário de chegada da plateia e um bloco extra; até 6 fotos. O que ficar vazio não aparece. Os pedidos caem no mesmo painel.',
+      'Logo do parceiro: no cartão do link, "enviar logo" (PNG, JPEG ou WebP, até 5 MB). Ela aparece no convite, na página de inscrição de quem chega por aquele link, sobre um fundo claro.',
       'Link de parceiro (isento): na mesma aba, "Novo link" com o nome do parceiro e as vagas isentas (vazio = sem limite). Quem pede pelo link vê a participação isenta; o pedido chega marcado "parceiro · Nome", sem link de pagamento, e a seleção já vem como Isento. A seleção continua com a equipe. Vaga de quem não foi selecionado ou desistiu volta para o parceiro; esgotado, o link mostra o valor normal.',
       'Pelo assistente: "plateia" lista pedidos e quem está selecionado; "plateia_adicionar", "plateia_situacao" e "plateia_selecionar" agem sobre os pedidos.',
     ],

@@ -89,6 +89,14 @@ function channelOf(g) {
 const liveOf = (p) => (p.results || []).filter((r) => r.ok && !r.simulated && !r.draft && /^https?:\/\//.test(r.url || ''))
   .map((r) => ({ platform: r.platform, label: up.PLATFORMS[r.platform]?.label || r.platform, url: r.url }));
 
+// O vídeo do episódio que o convidado pode baixar, se a equipe liberar: a versão mais nova que o editor enviou.
+async function latestVideo(episodeId) {
+  if (!episodeId) return null;
+  const { rows: [f] } = await db.query(
+    "SELECT id, filename, size_bytes, version, storage_key FROM episode_files WHERE episode_id = $1 AND kind = 'editado' AND status = 'pronto' ORDER BY version DESC, id DESC LIMIT 1", [episodeId]);
+  return f || null;
+}
+
 async function content(g) {
   const handle = igPeople.clean(g.instagram);
   const { rows: pubs } = await db.query(
@@ -120,6 +128,7 @@ async function content(g) {
     `SELECT id, kind, filename, size_bytes, for_guest FROM episode_files
       WHERE episode_id = $1 AND kind IN ('foto', 'bastidor') AND status = 'pronto' ORDER BY kind DESC, created_at, id`, [g.episode_id]);
   const photos = files.filter((f) => PHOTO_EXT.test(f.filename));
+  const video = await latestVideo(g.episode_id);
   const exclusiveOpen = Boolean(g.exclusive_from) && g.exclusive_from <= today();
   const episodeIg = posts.find((p) => p.episodeVideo && p.links.some((l) => l.platform === 'instagram'));
   return {
@@ -128,6 +137,7 @@ async function content(g) {
     others: posts.filter((p) => !p.collab),
     exclusive: clips.filter((c) => c.for_guest), clipsOut: clips.filter((c) => !c.for_guest), exclusiveOpen,
     photos: photos.filter((f) => f.for_guest), photoChoices: photos,
+    video, videoOn: Boolean(g.portal_video && video),
     episode: {
       youtube: g.ep_youtube || null, spotify: g.ep_spotify || null,
       instagram: episodeIg ? episodeIg.links.find((l) => l.platform === 'instagram').url : null,
@@ -183,6 +193,10 @@ async function setPhotos(g, ids) {
   if (!g.episode_id) return;
   const list = [].concat(ids || []).map(Number).filter(Number.isInteger);
   await db.query("UPDATE episode_files SET for_guest = (id = ANY($2::int[])) WHERE episode_id = $1 AND kind IN ('foto', 'bastidor')", [g.episode_id, list]);
+}
+
+async function setVideo(guestId, on) {
+  await db.query('UPDATE guests SET portal_video = $2 WHERE id = $1', [guestId, on]);
 }
 
 async function setYoutube(guestId, done) {
@@ -280,5 +294,5 @@ async function tick() {
 
 module.exports = {
   TOKEN_RE, NOTIFY, VALID_DAYS, expired, extend, youtubeEmbed, spotifyEmbed, url, byId, byToken, content, schedule, dayLabel, today, channelOf, setEnabled, regenerate, parseDates, saveDates, setNotify,
-  setPhotos, setYoutube, parseChannel, requestYoutube, youtubeUrl, waTo, linkMessage, newsMessage, markSent, sendLinkEmail, pending, markWhatsappSent, tick,
+  latestVideo, setPhotos, setVideo, setYoutube, parseChannel, requestYoutube, youtubeUrl, waTo, linkMessage, newsMessage, markSent, sendLinkEmail, pending, markWhatsappSent, tick,
 };

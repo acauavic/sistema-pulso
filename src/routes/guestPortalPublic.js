@@ -98,6 +98,16 @@ router.get(['/convidado/:token/cortes/:id', '/convidado/:token/cortes/:id/baixar
   res.set('Cache-Control', 'private, max-age=60').redirect(302, await b2.presignGet(row.storage_key, { expires: 6 * 3600, download }));
 }));
 
+// Vídeo do episódio: só se a equipe liberou no cadastro do convidado.
+router.get('/convidado/:token/episodio/baixar', wrap(async (req, res) => {
+  const g = await load(req, res); if (!g) return;
+  const video = g.portal_video ? await portal.latestVideo(g.episode_id) : null;
+  if (!video) return res.status(404).end();
+  const ext = (video.filename.match(/\.[A-Za-z0-9]{2,5}$/) || ['.mp4'])[0].toLowerCase();
+  const name = `pulso-${g.episode_number ? `ep${String(g.episode_number).padStart(3, '0')}-` : ''}${fmt.slugify(g.name) || 'episodio'}${ext}`;
+  res.set('Cache-Control', 'no-store').redirect(302, await b2.presignGet(video.storage_key, { expires: 6 * 3600, download: name }));
+}));
+
 // Fotos escolhidas: prévia (t = miniatura, p = grande) do disco do servidor, ou o arquivo original para baixar.
 router.get(['/convidado/:token/fotos/:fid', '/convidado/:token/fotos/:fid/baixar'], wrap(async (req, res) => {
   const g = await load(req, res); if (!g) return;

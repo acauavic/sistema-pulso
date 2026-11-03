@@ -384,7 +384,39 @@ router.post('/convidados/:id/plateia/parceiros', requirePerm('guests.write'), wr
   if (!g.audience_slug) await page.ensureSlug(g);
   const p = await page.createPartner(g.id, values, req.user.id);
   await audit(req, 'plateia.parceiro_criado', 'guest', g.id, { parceiro: p.name, vagas: p.slots });
-  await req.flash('ok', `Link de ${p.name} criado. Copie e mande para o parceiro.`);
+  await req.flash('ok', `Link de ${p.name} criado. Copie e mande para o parceiro. Se quiser, envie a logo dele no cartão do link.`);
+  res.redirect(pageBack(g.id));
+}));
+
+// Logo do parceiro: original, sem recorte (logomarca não tem proporção padrão e pode ter fundo transparente).
+const partnerOf = async (guestId, pid) => (isIntId(pid) ? (await db.query('SELECT * FROM plateia_partners WHERE id = $1 AND guest_id = $2', [pid, guestId])).rows[0] : null);
+
+router.get('/convidados/:id/plateia/parceiros/:pid/logo', requirePerm('guests.read'), wrap(async (req, res) => {
+  const p = isIntId(req.params.id) ? await partnerOf(req.params.id, req.params.pid) : null;
+  if (!p?.logo_key) return res.status(404).end();
+  res.set('Cache-Control', 'private, max-age=600').redirect(302, await b2.presignGet(p.logo_key, { expires: 3600 }));
+}));
+
+router.post('/convidados/:id/plateia/parceiros/:pid/logo', requirePerm('guests.write'), express.raw({ type: () => true, limit: MAX_IMG }), wrap(async (req, res) => {
+  const g = await guestOf(req.params.id); const p = g ? await partnerOf(g.id, req.params.pid) : null;
+  if (!p) return res.status(404).json({ ok: false, error: 'Parceiro não encontrado.' });
+  if (!config.storageConfigured) return res.status(503).json({ ok: false, error: 'O armazenamento de arquivos não está configurado.' });
+  const key = await storeImage('parceiros', p.id, req.body, 'logo');
+  if (!key) return res.status(400).json({ ok: false, error: 'Envie a logo em PNG, JPEG ou WebP (até 5 MB).' });
+  await db.query('UPDATE plateia_partners SET logo_key = $2 WHERE id = $1', [p.id, key]);
+  if (p.logo_key) await b2.deleteObject(p.logo_key).catch(() => {});
+  await audit(req, 'plateia.parceiro_logo', 'guest', g.id, { parceiro: p.name });
+  res.json({ ok: true });
+}));
+
+router.post('/convidados/:id/plateia/parceiros/:pid/logo/excluir', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOf(req.params.id); const p = g ? await partnerOf(g.id, req.params.pid) : null;
+  if (!p) return res.redirect('/convidados');
+  if (p.logo_key) {
+    await db.query('UPDATE plateia_partners SET logo_key = NULL WHERE id = $1', [p.id]);
+    await b2.deleteObject(p.logo_key).catch(() => {});
+  }
+  await req.flash('ok', `Logo de ${p.name} tirada do convite.`);
   res.redirect(pageBack(g.id));
 }));
 
