@@ -66,6 +66,24 @@ router.post('/convidados/:id/portal/fotos', requirePerm('guests.write'), wrap(as
   res.redirect(back(g.id));
 }));
 
+// Calendário de posts previstos: salvar coloca no portal; "on" tira ou devolve sem perder as linhas.
+router.post('/convidados/:id/portal/calendario', requirePerm('guests.write'), wrap(async (req, res) => {
+  const g = await guestOr404(req, res); if (!g) return;
+  if (req.body.on !== undefined) {
+    const on = req.body.on === '1';
+    await portal.setPostPlanVisible(g.id, on);
+    await audit(req, on ? 'portal.calendario_mostrado' : 'portal.calendario_retirado', 'guest', g.id);
+    await req.flash('ok', on ? 'Calendário de posts de volta ao portal.' : 'O calendário de posts saiu do portal. As datas continuam guardadas.');
+    return res.redirect(back(g.id));
+  }
+  const r = portal.parsePostPlan(req.body);
+  if (r.error) { await req.flash('error', r.error); return res.redirect(back(g.id)); }
+  await portal.savePostPlan(g.id, r.items);
+  await audit(req, 'portal.calendario_salvo', 'guest', g.id, { posts: r.items.length });
+  await req.flash('ok', r.items.length ? `Calendário salvo: ${r.items.length} post${r.items.length === 1 ? '' : 's'} previsto${r.items.length === 1 ? '' : 's'} no portal.` : 'Calendário vazio: ele saiu do portal.');
+  res.redirect(back(g.id));
+}));
+
 // Vídeo do episódio para baixar no portal: só com a equipe liberando.
 router.post('/convidados/:id/portal/video', requirePerm('guests.write'), wrap(async (req, res) => {
   const g = await guestOr404(req, res); if (!g) return;

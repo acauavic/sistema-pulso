@@ -1371,6 +1371,10 @@ a.icon-btn { text-decoration: none; } a.icon-btn.on { background: var(--raised);
 /* Portal do convidado (aba no cadastro) */
 .notice-card { border-left: 3px solid var(--st-edicao-fg); margin-bottom: 16px; }
 .notice-card h2 { margin-bottom: 4px; }
+.plan-list { display: grid; gap: 6px; } .plan-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; } .plan-list li.is-off { color: var(--muted); }
+.plan-rows { display: grid; gap: 12px; }
+.plan-row { display: grid; grid-template-columns: 150px 120px minmax(0, 1fr) auto; align-items: end; gap: 8px; } .plan-row label { min-width: 0; } .plan-row input { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; } .plan-row .icon-btn { margin-bottom: 6px; }
+@media (max-width: 600px) { .plan-row { grid-template-columns: minmax(0, 1fr) 112px auto; padding-bottom: 12px; border-bottom: 1px solid var(--line); } .plan-row label:nth-child(3) { grid-column: 1 / -1; grid-row: 2; } .plan-row .icon-btn { grid-column: 3; grid-row: 1; } }
 .portal-clips { display: grid; gap: 6px; margin-top: 8px; }
 .portal-clips li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .portal-clips li form { margin-left: auto; }

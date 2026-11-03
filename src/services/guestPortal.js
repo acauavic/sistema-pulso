@@ -129,6 +129,7 @@ async function content(g) {
       WHERE episode_id = $1 AND kind IN ('foto', 'bastidor') AND status = 'pronto' ORDER BY kind DESC, created_at, id`, [g.episode_id]);
   const photos = files.filter((f) => PHOTO_EXT.test(f.filename));
   const video = await latestVideo(g.episode_id);
+  const plan = await postPlan(g.id);
   const exclusiveOpen = Boolean(g.exclusive_from) && g.exclusive_from <= today();
   const episodeIg = posts.find((p) => p.episodeVideo && p.links.some((l) => l.platform === 'instagram'));
   return {
@@ -138,6 +139,7 @@ async function content(g) {
     exclusive: clips.filter((c) => c.for_guest), clipsOut: clips.filter((c) => !c.for_guest), exclusiveOpen,
     photos: photos.filter((f) => f.for_guest), photoChoices: photos,
     video, videoOn: Boolean(g.portal_video && video),
+    plan, planOn: Boolean(g.portal_post_plan && plan.length),
     episode: {
       youtube: g.ep_youtube || null, spotify: g.ep_spotify || null,
       instagram: episodeIg ? episodeIg.links.find((l) => l.platform === 'instagram').url : null,
@@ -193,6 +195,52 @@ async function setPhotos(g, ids) {
   if (!g.episode_id) return;
   const list = [].concat(ids || []).map(Number).filter(Number.isInteger);
   await db.query("UPDATE episode_files SET for_guest = (id = ANY($2::int[])) WHERE episode_id = $1 AND kind IN ('foto', 'bastidor')", [g.episode_id, list]);
+}
+
+// Calendário de posts: previsão que a equipe monta para o convidado, sem ligação com os posts de verdade.
+const MAX_PLAN = 40;
+const planTime = (t) => { if (!t) return null; const [h, m] = String(t).split(':').map(Number); return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`; };
+async function postPlan(guestId) {
+  const { rows } = await db.query(
+    `SELECT id, to_char(on_date, 'YYYY-MM-DD') AS on_date, to_char(at_time, 'HH24:MI') AS at_time, label FROM guest_post_plan
+      WHERE guest_id = $1 ORDER BY on_date, at_time NULLS LAST, id`, [guestId]);
+  const now = today();
+  return rows.map((r) => ({ ...r, day: dayLabel(r.on_date), time: planTime(r.at_time), state: r.on_date < now ? 'feito' : r.on_date === now ? 'hoje' : 'vem' }));
+}
+// Linhas da janela. Linha toda vazia é ignorada; horário e descrição são opcionais, a data não.
+function parsePostPlan(body) {
+  const list = (v) => [].concat(v ?? []).map((x) => String(x).trim());
+  const dates = list(body.plano_data); const times = list(body.plano_hora); const labels = list(body.plano_texto);
+  const items = [];
+  for (let i = 0; i < Math.max(dates.length, times.length, labels.length); i += 1) {
+    const [date, time, label] = [dates[i] || '', times[i] || '', labels[i] || ''];
+    if (!date && !time && !label) continue;
+    if (!date) return { error: 'Falta a data em uma das linhas do calendário.' };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00Z`))) return { error: 'Data inválida. Use o seletor de data.' };
+    if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return { error: 'Horário inválido. Use, por exemplo, 18:00.' };
+    items.push({ date, time: time || null, label: label.slice(0, 80) || null });
+  }
+  if (items.length > MAX_PLAN) return { error: `O calendário aceita até ${MAX_PLAN} posts.` };
+  return { items };
+}
+// Salvar é o que coloca o calendário no portal; sem nenhuma linha, ele sai.
+async function savePostPlan(guestId, items) {
+  const client = await db.getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM guest_post_plan WHERE guest_id = $1', [guestId]);
+    for (const it of items) await client.query('INSERT INTO guest_post_plan (guest_id, on_date, at_time, label) VALUES ($1, $2, $3, $4)', [guestId, it.date, it.time, it.label]);
+    await client.query('UPDATE guests SET portal_post_plan = $2 WHERE id = $1', [guestId, items.length > 0]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+async function setPostPlanVisible(guestId, on) {
+  await db.query('UPDATE guests SET portal_post_plan = $2 WHERE id = $1', [guestId, on]);
 }
 
 async function setVideo(guestId, on) {
@@ -294,5 +342,5 @@ async function tick() {
 
 module.exports = {
   TOKEN_RE, NOTIFY, VALID_DAYS, expired, extend, youtubeEmbed, spotifyEmbed, url, byId, byToken, content, schedule, dayLabel, today, channelOf, setEnabled, regenerate, parseDates, saveDates, setNotify,
-  latestVideo, setPhotos, setVideo, setYoutube, parseChannel, requestYoutube, youtubeUrl, waTo, linkMessage, newsMessage, markSent, sendLinkEmail, pending, markWhatsappSent, tick,
+  postPlan, parsePostPlan, savePostPlan, setPostPlanVisible, latestVideo, setPhotos, setVideo, setYoutube, parseChannel, requestYoutube, youtubeUrl, waTo, linkMessage, newsMessage, markSent, sendLinkEmail, pending, markWhatsappSent, tick,
 };

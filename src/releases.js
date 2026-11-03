@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.51.0', date: '2026-11-03', title: 'Calendário de posts no portal do convidado',
+    items: [
+      { kind: 'novo', text: 'A aba Portal do convidado ganhou o "Calendário de posts": monte quantos posts vão sair, a data, o horário provável e, se quiser, o que sai em cada um. Salvo, ele aparece na seção de posts em collab do portal, como previsão. Não precisa ter o post pronto, e "tirar do portal" esconde sem apagar as datas.' },
+    ],
+  },
+  {
     version: '1.50.0', date: '2026-11-02', title: 'Reações nos comentários',
     items: [
       { kind: 'novo', text: 'Todo comentário, inclusive os da revisão do vídeo, aceita reações com emoji: 👍 ❤️ 😂 🎉 😮 🙏. Clique no rostinho para reagir; clique de novo no emoji para tirar. Parar o mouse sobre a reação mostra quem reagiu.' },

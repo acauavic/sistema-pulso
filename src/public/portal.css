@@ -11,10 +11,10 @@
 :root { --bg: #F4F2EC; --surface: #FFFFFF; --raised: #E9E5DA; --line: #E2DED3; --line-strong: #D6D1C4; --text: #0A0A0A; --text-2: #4A4A4A; --muted: #6B6B6B; --lime: #C8FF42; --plum: #2D1B4E; --plum-soft: #E9E3F5; --bad: #9E2A1E; --bad-soft: #FBE3E0; --ease: cubic-bezier(.2, .8, .2, 1); }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.6 "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-h1, h2, h3 { font-family: "Space Grotesk", system-ui, sans-serif; letter-spacing: -.04em; line-height: 1.1; margin: 0; }
+h1, h2, h3, h4 { font-family: "Space Grotesk", system-ui, sans-serif; letter-spacing: -.04em; line-height: 1.1; margin: 0; }
 h1 { font-size: clamp(36px, 7vw, 56px); font-weight: 700; }
 h2 { font-size: 24px; font-weight: 700; }
-h3 { font-size: 17px; font-weight: 500; letter-spacing: -.02em; }
+h3, h4 { font-size: 17px; font-weight: 500; letter-spacing: -.02em; }
 p { margin: 0 0 12px; }
 a { color: inherit; }
 .icon { flex: none; vertical-align: -3px; }
@@ -50,12 +50,13 @@ a { color: inherit; }
 .pt-chip-now { background: var(--lime); color: var(--text); }
 
 /* cronograma */
+.pt-plan { margin-top: 18px; } .pt-plan .pt-steps { margin-top: 12px; }
 .pt-steps { list-style: none; margin: 18px 0 0; padding: 0; border-top: 1px solid var(--line); }
 .pt-steps li { display: grid; grid-template-columns: 150px 1fr; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .pt-steps p { color: var(--text-2); margin: 4px 0 0; }
 .pt-date { font-size: 12px; color: var(--text); padding-top: 2px; }
-.pt-steps .is-feito h3, .pt-steps .is-feito .pt-date { color: var(--muted); }
-.pt-steps .is-hoje h3 { font-weight: 700; }
+.pt-steps .is-feito h3, .pt-steps .is-feito h4, .pt-steps .is-feito .pt-date { color: var(--muted); }
+.pt-steps .is-hoje h3, .pt-steps .is-hoje h4 { font-weight: 700; }
 
 /* posts */
 .pt-posts { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }

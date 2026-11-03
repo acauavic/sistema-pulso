@@ -475,6 +475,27 @@
         </section>
 
         <section class="card">
+          <div class="row spread"><h2>Calendário de posts</h2><% if (pc.plan.length) { %><span class="badge b-gray"><%= pc.planOn ? 'no portal' : 'fora do portal' %></span><% } %></div>
+          <% if (!pc.plan.length) { %>
+          <p class="small muted">Avise <%= gFirst %> antes de os posts ficarem prontos: quantos vão sair, em que data e o horário provável. Só aparece no portal depois de salvar.</p>
+          <% if (canW) { %><p><button class="btn sm" type="button" data-modal-open="modal-portal-calendario"><%- icon('calendar', 14) %> Montar calendário</button></p><% } %>
+          <% } else { %>
+          <p class="mono small muted"><%= pc.plan.length %> previsto<%= pc.plan.length === 1 ? '' : 's' %></p>
+          <ul class="plain plan-list">
+            <% pc.plan.forEach(function (it) { %>
+            <li class="<%= it.state === 'feito' ? 'is-off' : '' %>"><span class="mono small"><%= it.day %><%= it.time ? ' · ' + it.time : '' %></span> <span><%= it.label || 'Post em collab' %></span></li>
+            <% }) %>
+          </ul>
+          <% if (canW) { %>
+          <div class="row top-gap">
+            <button class="btn sm" type="button" data-modal-open="modal-portal-calendario"><%- icon('pencil', 14) %> Editar calendário</button>
+            <form method="post" action="/convidados/<%= guest.id %>/portal/calendario" class="inline"><%- csrfP %><input type="hidden" name="on" value="<%= pg.portal_post_plan ? '0' : '1' %>"><button class="link small" type="submit"><%= pg.portal_post_plan ? 'tirar do portal' : 'mostrar no portal' %></button></form>
+          </div>
+          <% } %>
+          <% } %>
+        </section>
+
+        <section class="card">
           <h2>Episódio em collab no YouTube</h2>
           <% if (pg.portal_yt_done_at) { %>
           <p><span class="badge b-gray">feita</span> <% if (PT.ytUrl) { %><a class="mono small" href="<%= PT.ytUrl %>" target="_blank" rel="noopener"><%= pg.portal_yt_channel %></a><% } %></p>
@@ -523,6 +544,37 @@
         </ul>
       </section>
     </div>
+
+    <% if (canW) { %>
+    <dialog class="modal modal-wide" id="modal-portal-calendario" aria-labelledby="mpc-h">
+      <form method="post" action="/convidados/<%= guest.id %>/portal/calendario" class="stack">
+        <%- csrfP %>
+        <h2 id="mpc-h">Calendário de posts</h2>
+        <p class="small muted">Um post por linha. Só a data é obrigatória; a descrição vazia aparece como "Post em collab".</p>
+        <div class="plan-rows" data-plan-rows>
+          <% (pc.plan.length ? pc.plan : [{}]).forEach(function (it) { %>
+          <div class="plan-row" data-plan-line>
+            <label>Data<input type="date" name="plano_data" value="<%= it.on_date || '' %>"></label>
+            <label>Horário provável<input type="time" name="plano_hora" value="<%= it.at_time || '' %>"></label>
+            <label>O que sai<input type="text" name="plano_texto" maxlength="80" value="<%= it.label || '' %>" placeholder="Ex.: Corte sobre gestão"></label>
+            <button class="icon-btn" type="button" data-plan-remove aria-label="Tirar esta linha" title="Tirar esta linha"><%- icon('x', 16) %></button>
+          </div>
+          <% }) %>
+        </div>
+        <template data-plan-row>
+          <div class="plan-row" data-plan-line>
+            <label>Data<input type="date" name="plano_data"></label>
+            <label>Horário provável<input type="time" name="plano_hora"></label>
+            <label>O que sai<input type="text" name="plano_texto" maxlength="80" placeholder="Ex.: Corte sobre gestão"></label>
+            <button class="icon-btn" type="button" data-plan-remove aria-label="Tirar esta linha" title="Tirar esta linha"><%- icon('x', 16) %></button>
+          </div>
+        </template>
+        <p><button class="btn sm ghost" type="button" data-plan-add><%- icon('plus', 14) %> Adicionar post</button></p>
+        <div class="row modal-actions"><button class="btn primary" type="submit">Salvar e mostrar no portal</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+      </form>
+    </dialog>
+    <script src="/static/postplan.js?v=<%= assetV %>" defer></script>
+    <% } %>
 
     <dialog class="modal" id="modal-portal-enviar" aria-labelledby="mpe-h">
       <div class="stack">

@@ -59,13 +59,27 @@
 
   <section class="pt-sec" id="collab" aria-labelledby="col-h">
     <div class="pt-head"><h2 id="col-h">Posts em collab com você</h2><% if (c.collab.length) { %><span class="pt-mono pt-muted"><%= c.collab.length %></span><% } %></div>
+    <% if (c.planOn) { %>
+    <div class="pt-plan" id="calendario">
+      <div class="pt-head"><h3>Calendário de posts</h3><span class="pt-mono pt-muted"><%= c.plan.length %> previsto<%= c.plan.length === 1 ? '' : 's' %></span></div>
+      <ol class="pt-steps">
+        <% c.plan.forEach(function (it) { %>
+        <li class="is-<%= it.state %>">
+          <span class="pt-date pt-mono"><%= it.day %><% if (it.state === 'hoje') { %> <span class="pt-chip pt-chip-now">hoje</span><% } %></span>
+          <div><h4><%= it.label || 'Post em collab' %></h4><% if (it.time) { %><p>Por volta de <span class="pt-mono-in"><%= it.time %></span></p><% } %></div>
+        </li>
+        <% }) %>
+      </ol>
+      <p class="pt-empty">Datas e horários são uma previsão e podem mudar.</p>
+    </div>
+    <% } %>
     <% if (c.collab.length) { %>
     <p class="pt-tip"><%- icon('sparkles', 16) %><span>Compartilhe nos stories, comente e cite a collab. Um post que circula nos dois perfis chega mais longe e mostra a sua participação no Pulso para quem já segue você.</span></p>
     <ul class="pt-posts">
       <% c.collab.forEach(function (p) { %><%- include('_post', { p: p }) %><% }) %>
     </ul>
     <% } else { %>
-    <p class="pt-empty"><%= g.cuts_from ? 'O primeiro sai em ' + dayLabel(g.cuts_from) + '.' : 'Os primeiros saem na semana do episódio.' %> Você recebe o convite de collab no Instagram: é só aceitar. A cada post novo, avisamos você.</p>
+    <p class="pt-empty"><%= c.planOn ? '' : g.cuts_from ? 'O primeiro sai em ' + dayLabel(g.cuts_from) + '.' : 'Os primeiros saem na semana do episódio.' %> Você recebe o convite de collab no Instagram: é só aceitar. A cada post novo, avisamos você.</p>
     <% } %>
   </section>
 
