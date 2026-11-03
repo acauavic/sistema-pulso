@@ -15,6 +15,8 @@
           <% c.attachments.filter(function (a) { return a.kind === 'audio'; }).forEach(function (a) { %><div class="cmt-audio"><audio controls preload="none" src="/anexos/<%= a.id %>"></audio><% if (a.transcript) { %><details open><summary class="small muted">Transcrição</summary><p class="rte-transcript small"><%= a.transcript %></p></details><% } %></div><% }) %>
           <div class="cmt-docs"><% c.attachments.filter(function (a) { return a.kind === 'file'; }).forEach(function (a) { %><a class="btn sm" href="/anexos/<%= a.id %>/baixar"><%- icon('file-text', 14) %> <%= a.filename %> <span class="mono small muted"><%= fmt.formatBytes(a.size_bytes) %></span></a><% }) %></div>
         </div><% } %>
+        <div class="cmt-foot">
+        <%- include('reactions', { kind: 'comment', id: c.id, items: c.reactions }) %>
         <% var mine = currentUser && String(c.author_id) === String(currentUser.id); %>
         <% if (currentUser && (mine || can('tasks.manage'))) { %>
         <div class="cmt-actions">
@@ -22,6 +24,7 @@
           <form method="post" action="/comentarios/<%= c.id %>/excluir" class="inline" data-confirm="Apagar este comentário?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= back %>#comentarios"><button class="icon-btn danger-ic" type="submit" aria-label="Apagar o comentário" title="Apagar"><%- icon('trash-2', 14) %></button></form>
         </div>
         <% } %>
+        </div>
       </div>
     </li>
     <% }) %>

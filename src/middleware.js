@@ -81,6 +81,7 @@ async function attachSession(req, res, next) {
     res.locals.ROLES = ROLES;
     res.locals.fmt = fmt;
     res.locals.icon = icon;
+    res.locals.reactionEmojis = require('./services/reactions').EMOJIS;
     res.locals.podcastName = config.podcastName;
     res.locals.currentPath = req.path;
     res.locals.currentUrl = req.originalUrl; // com a busca (?vista=…): o Desfazer volta para a mesma aba

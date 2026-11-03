@@ -27,6 +27,7 @@ const TOPICS = [
     key: 'comentarios', title: 'Comentários, anexos e áudio', words: ['comentário', 'comentarios', 'comentar', 'menção', 'mencionar', 'arroba', 'áudio', 'audio', 'transcrição', 'anexo', 'anexar', 'imagem', 'print', 'pdf', 'zip', 'tabela', 'link miniatura', 'miniatura'],
     where: 'Cada convidado, patrocinador, episódio, corte e tarefa tem a caixa de comentários; a revisão do vídeo tem a dela', perm: 'comments.write',
     steps: [
+      'Reações: todo comentário aceita reação com emoji (👍 ❤️ 😂 🎉 😮 🙏) pelo ícone de rostinho; clicar de novo tira. Quem escreveu recebe um aviso; para não receber, marque "Silenciar reações" em Notificações. A gestão também pode desligar esse aviso para todos.',
       'Todas as caixas de comentário têm o mesmo editor: formatação, tabelas, imagens coladas ou arrastadas, anexos (imagem até 10 MB; PDF, HTML e ZIP até 25 MB), links com miniatura e @menções (a pessoa mencionada recebe notificação).',
       'O microfone grava um áudio (até ~2 minutos) e transcreve sozinho; o comentário mostra o player e o texto falado, e a transcrição vai no aviso da equipe. É possível inserir a transcrição no texto.',
       'Ctrl+Enter envia. Na revisão do vídeo, o comentário vale para o ponto do vídeo (ou geral) e pode ser marcado como resolvido.',

@@ -2,6 +2,7 @@
 const express = require('express');
 const db = require('../db/pool');
 const comments = require('../services/comments');
+const reactions = require('../services/reactions');
 const responsible = require('../services/responsible');
 const push = require('../services/push');
 const reminders = require('../services/reminders');
@@ -18,6 +19,18 @@ const wantsJson = (req) => /json/.test(req.get('accept') || '');
 const backTo = (req, fallback) => { const v = String(req.body.voltar || ''); return /^\/(?!\/)[\w\-/?=&#.%]*$/.test(v) ? v : fallback; };
 
 // ---------------------------------------------------------------- comentários
+// Reação com emoji: clicar de novo tira. Devolve a barra pronta para trocar na página.
+router.post('/reacoes', requirePerm('comments.write'), wrap(async (req, res) => {
+  const { tipo, id, emoji } = req.body;
+  if (!isIntId(String(id || ''))) return res.status(400).json({ ok: false, error: 'Comentário inválido.' });
+  const result = await reactions.toggle({ kind: String(tipo), id: Number(id), emoji: String(emoji), user: req.user });
+  if (result.error) return res.status(result.status || 400).json({ ok: false, error: result.error });
+  res.render('partials/reactions', { kind: tipo, id, items: result.reactions }, (err, html) => {
+    if (err) { console.error('[reações]', err.message); return res.status(500).json({ ok: false, error: 'Não foi possível mostrar as reações.' }); }
+    res.json({ ok: true, html });
+  });
+}));
+
 router.post('/comentarios', requirePerm('comments.write'), wrap(async (req, res) => {
   const type = String(req.body.tipo || ''); const id = req.body.id;
   if (!comments.isEntity(type) || !isIntId(id)) return wantsJson(req) ? res.status(400).json({ ok: false, error: 'Item inválido.' }) : res.status(400).send('Item inválido.');

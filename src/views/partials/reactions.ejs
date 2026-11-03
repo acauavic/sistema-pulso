@@ -1,0 +1,15 @@
+<%# Reações de um comentário. Variáveis: kind ('comment' | 'review'), id, items ([{ emoji, count, users }]). Comportamento em reactions.js. %>
+<% var canReact = can('comments.write'); var me = currentUser ? String(currentUser.id) : ''; var rx = items || []; %>
+<% if (canReact || rx.length) { %>
+<div class="reacts" data-reacts data-kind="<%= kind %>" data-id="<%= id %>">
+  <% rx.forEach(function (r) { var mine = r.users.some(function (u) { return String(u.id) === me; }); var who = r.users.map(function (u) { return u.name; }).join(', '); %>
+  <button type="button" class="react-chip<%= mine ? ' mine' : '' %>" data-react="<%= r.emoji %>" aria-pressed="<%= mine %>" title="<%= who %>" aria-label="<%= r.emoji %> <%= r.count %>: <%= who %>"<%= canReact ? '' : ' disabled' %>><span class="react-emoji"><%= r.emoji %></span><span class="mono"><%= r.count %></span></button>
+  <% }) %>
+  <% if (canReact) { %>
+  <button type="button" class="icon-btn react-add" data-react-open aria-expanded="false" aria-label="Reagir" title="Reagir"><%- icon('smile-plus', 16) %></button>
+  <span class="react-pop" data-react-pop role="group" aria-label="Escolha uma reação" hidden>
+    <% reactionEmojis.forEach(function (e) { %><button type="button" class="react-pick" data-react="<%= e %>" aria-label="Reagir com <%= e %>"><%= e %></button><% }) %>
+  </span>
+  <% } %>
+</div>
+<% } %>

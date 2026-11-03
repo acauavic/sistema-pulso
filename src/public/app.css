@@ -1109,6 +1109,15 @@ dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z
 .cmt-actions { display: flex; align-items: center; gap: 2px; margin: 4px 0 0 -6px; }
 .cmt-actions .icon-btn { padding: 6px; color: var(--muted); } .cmt-actions .icon-btn:hover { color: var(--text); }
 .cmt-actions .icon-btn.danger-ic:hover { color: var(--bad); }
+.cmt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 6px 0 0 -2px; } .cmt-foot .cmt-actions { margin: 0; }
+.reacts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.react-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: var(--r-full); background: transparent; color: var(--text-2); font-size: 12px; cursor: pointer; transition: border-color 160ms cubic-bezier(.2,.8,.2,1); }
+.react-chip:hover:not(:disabled) { border-color: var(--text-2); } .react-chip:disabled { cursor: default; }
+.react-chip.mine { border-color: var(--text); color: var(--text); } /* a sua reação: anel na cor do texto; o lime fica para a ação */
+.react-emoji, .react-pick { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+.react-add { padding: 6px; color: var(--muted); } .react-add:hover { color: var(--text); }
+.react-pop { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line-strong); border-radius: var(--r-full); background: var(--surface); } .react-pop[hidden] { display: none; }
+.react-pick { width: 32px; height: 28px; border: 0; border-radius: var(--r-full); background: transparent; font-size: 16px; line-height: 1; cursor: pointer; } .react-pick:hover, .react-pick:focus-visible { background: var(--raised); }
 .cmt-edited { display: inline-flex; color: var(--muted); }
 [data-resolve="1"] .ic-undo, [data-resolve="0"] .ic-do { display: none; }
 .ce-files { display: grid; gap: 4px; margin: 8px 0 0; } .ce-files:empty { display: none; }

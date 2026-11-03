@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.50.0', date: '2026-11-02', title: 'Reações nos comentários',
+    items: [
+      { kind: 'novo', text: 'Todo comentário, inclusive os da revisão do vídeo, aceita reações com emoji: 👍 ❤️ 😂 🎉 😮 🙏. Clique no rostinho para reagir; clique de novo no emoji para tirar. Parar o mouse sobre a reação mostra quem reagiu.' },
+      { kind: 'novo', text: 'Quem escreveu o comentário recebe um aviso a cada reação. Para não receber, marque "Silenciar reações" em Notificações.' },
+    ],
+  },
+  {
     version: '1.49.0', date: '2026-11-02', title: 'Vídeo do episódio no portal e logo do parceiro',
     items: [
       { kind: 'novo', text: 'O portal do convidado pode oferecer o vídeo do episódio para baixar: na aba Portal do convidado, em "No portal agora", "liberar para baixar". Vem desligado, e entrega sempre a versão mais nova que o editor enviou.' },

@@ -705,7 +705,11 @@ router.get(['/episodios/:id/quadros/:fid', '/quadros/:fid'], requirePerm('episod
 
 // ---- checklists do episódio ----
 // Quantos comentários há na revisão e quantos seguem abertos (a tela atualiza o contador da aba sem recarregar).
-const withReviewFiles = async (rows) => { const f = await attachmentsSvc.forReviews(rows.map((c) => c.id)); return rows.map((c) => ({ ...c, attachments: f[c.id] || [] })); };
+const withReviewFiles = async (rows) => {
+  const ids = rows.map((c) => c.id);
+  const [f, rx] = await Promise.all([attachmentsSvc.forReviews(ids), require('../services/reactions').forComments('review', ids)]);
+  return rows.map((c) => ({ ...c, attachments: f[c.id] || [], reactions: rx[c.id] || [] }));
+};
 const commentCounts = async (epId) => (await db.query('SELECT count(*)::int AS total, count(*) FILTER (WHERE NOT resolved)::int AS open FROM episode_comments WHERE episode_id = $1', [epId])).rows[0];
 const canTick = (role) => can(role, 'production.edit') || can(role, 'production.review') || can(role, 'production.manage');
 

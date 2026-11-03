@@ -37,8 +37,10 @@ async function list(type, id) {
   const { rows } = await db.query(
     `SELECT c.*, u.name AS author_name FROM comments c LEFT JOIN users u ON u.id = c.author_id
       WHERE c.entity_type = $1 AND c.entity_id = $2 ORDER BY c.created_at, c.id`, [type, id]);
-  const files = await require('./attachments').forComments(rows.map((c) => c.id));
-  return rows.map((c) => ({ ...c, attachments: files[c.id] || [] }));
+  const ids = rows.map((c) => c.id);
+  const files = await require('./attachments').forComments(ids);
+  const reactions = await require('./reactions').forComments('comment', ids);
+  return rows.map((c) => ({ ...c, attachments: files[c.id] || [], reactions: reactions[c.id] || [] }));
 }
 
 // html: comentário do editor rico (limpo aqui); attachmentIds: áudios e documentos enviados antes (imagens do texto entram sozinhas).
