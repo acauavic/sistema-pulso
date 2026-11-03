@@ -1,0 +1,20 @@
+<%# Análise por IA, numa linha. Variáveis: ep, meta, job, transcript, aiReady, perm, csrf, fmt %>
+<% var canWriteMeta = perm.review || perm.manage; var running = job && (job.status === 'queued' || job.status === 'running'); %>
+<div class="ia-status" data-ia data-url="/episodios/<%= ep.id %>/ia/status" data-running="<%= running ? '1' : '0' %>">
+  <div class="row spread">
+    <div class="row">
+      <strong>Análise por IA</strong>
+      <% if (!aiReady) { %><span class="badge b-gray">não configurada</span>
+      <% } else if (running) { %><span class="badge b-amber" data-ia-badge><%= job.status === 'queued' ? 'na fila' : 'rodando' %></span>
+      <% } else if (job && job.status === 'error') { %><span class="badge b-red">falhou</span>
+      <% } else if (meta && meta.ai_generated_at) { %><span class="badge b-green">pronta</span>
+      <% } else { %><span class="badge b-gray">ainda não rodou</span><% } %>
+      <span class="small muted" data-ia-msg><%= running ? (job.message || '') : (job && job.status === 'error' ? job.error : (meta && meta.ai_generated_at ? 'Gerada em ' + fmt.formatDateTime(meta.ai_generated_at) : '')) %></span>
+    </div>
+    <% if (canWriteMeta && aiReady && !running) { %>
+    <form method="post" action="/episodios/<%= ep.id %>/ia/gerar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm <%= meta && meta.ai_generated_at ? 'ghost' : '' %>" type="submit"><%= meta && meta.ai_generated_at ? 'Analisar de novo' : 'Gerar sugestões' %></button></form>
+    <% } %>
+  </div>
+  <% if (transcript) { %><p class="handle muted">Transcrição: <%= transcript.segments %> trechos · <%= Math.round(transcript.chars / 100) / 10 %> mil caracteres · <%= fmt.formatClock(transcript.duration_ms) %></p><% } %>
+  <% if (running) { %><div class="bar"><i data-ia-bar data-w="<%= job.progress %>"></i></div><% } %>
+</div>

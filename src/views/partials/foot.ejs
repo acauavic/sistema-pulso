@@ -1,4 +1,55 @@
-<% if (currentUser) { %></div></main></div><% } else { %></div></div><% } %>
-<script src="/static/app.js" defer></script>
+<% if (currentUser) { %></div></main></div>
+<dialog class="palette" data-palette aria-label="Busca global">
+  <div class="palette-box">
+    <div class="palette-input"><%- icon('search') %><input type="search" placeholder="Buscar convidado, episódio, tarefa… ou digite uma ação" autocomplete="off" spellcheck="false" data-palette-input aria-label="Buscar"><kbd>Esc</kbd></div>
+    <div class="palette-results" data-palette-results role="listbox"></div>
+    <div class="palette-foot small muted"><span>↑ ↓ para navegar · Enter abre</span><a href="/gestao/busca" data-palette-tips hidden></a></div>
+  </div>
+</dialog>
+<div class="toasts" data-toasts aria-live="polite"></div>
+<% if (navCounts && navCounts.release_seen !== appVersion && currentPath !== '/novidades') { %>
+<aside class="release-toast" role="status" aria-label="Sistema atualizado">
+  <a class="release-toast-main" href="/novidades"><span class="kicker">Sistema atualizado · v<%= appVersion %></span><strong><%= releaseInfo.title %></strong><span class="small">Ver o que mudou</span></a>
+  <form method="post" action="/novidades/visto"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentPath %>"><button class="icon-btn" type="submit" aria-label="Dispensar o aviso" title="Dispensar"><%- icon('x') %></button></form>
+</aside>
+<% } %>
+<button class="assist-fab" type="button" data-assist-open aria-label="Abrir o assistente" aria-expanded="false"><%- icon('sparkles', 20) %><span class="assist-dot" aria-hidden="true"></span></button>
+<section class="assist" data-assist hidden aria-label="Assistente" data-user="<%= fmt.firstName(currentUser.name) %>">
+  <header class="assist-head">
+    <div class="assist-titles"><strong>Assistente</strong><span class="kicker" data-assist-title>Nova conversa</span></div>
+    <div class="assist-tools">
+      <button class="icon-btn" type="button" data-assist-history aria-label="Conversas anteriores" title="Conversas anteriores"><%- icon('clock') %></button>
+      <button class="icon-btn" type="button" data-assist-new aria-label="Nova conversa" title="Nova conversa"><%- icon('plus') %></button>
+      <button class="icon-btn" type="button" data-assist-close aria-label="Fechar" title="Fechar"><%- icon('x') %></button>
+    </div>
+  </header>
+  <div class="assist-list" data-assist-list hidden></div>
+  <div class="assist-msgs" data-assist-msgs aria-live="polite"></div>
+  <form class="assist-form" data-assist-form>
+    <label class="sr-only" for="assist-input">Pergunta</label>
+    <textarea id="assist-input" rows="1" maxlength="4000" placeholder="Pergunte ou grave um áudio" data-assist-input></textarea>
+    <button class="icon-btn assist-mic" type="button" data-assist-mic aria-label="Gravar pergunta por voz" title="Gravar por voz"><%- icon('mic') %></button>
+    <button class="btn primary sm" type="submit" data-assist-send aria-label="Enviar"><%- icon('send') %></button>
+  </form>
+</section>
+<dialog class="modal" id="modal-pwa-ios" aria-labelledby="pwa-ios-h">
+  <h2 id="pwa-ios-h">Instalar o Pulso no iPhone</h2>
+  <p class="small muted">O Safari instala pelo menu de compartilhar. Com o app na tela, os alertas chegam como os de qualquer aplicativo.</p>
+  <ol class="pwa-steps">
+    <li><span class="pwa-step-ico"><%- icon('share', 20) %></span><span>Toque em <strong>Compartilhar</strong>, na barra do Safari.</span></li>
+    <li><span class="pwa-step-ico"><%- icon('square-plus', 20) %></span><span>Escolha <strong>Adicionar à Tela de Início</strong> e toque em Adicionar.</span></li>
+    <li><span class="pwa-step-ico"><%- icon('bell', 20) %></span><span>Abra o Pulso pelo ícone e toque em <strong>Ativar alertas</strong> no Início.</span></li>
+  </ol>
+  <div class="row modal-actions"><button class="btn" type="button" data-modal-close>Entendi</button></div>
+</dialog>
+<script type="application/json" id="team-users"><%- JSON.stringify((teamUsers || []).map(function (u) { return { id: u.id, name: u.name, ini: fmt.initials(u.name) }; })).replace(/</g, '\\u003c') %></script>
+<template data-upl-icons><span data-i="x"><%- icon('x', 14) %></span><span data-i="rotate-cw"><%- icon('rotate-cw', 14) %></span><span data-i="chevron-up"><%- icon('chevron-up', 16) %></span></template>
+<script src="/static/uploads.js?v=<%= assetV %>" defer></script>
+<script src="/static/collab.js?v=<%= assetV %>" defer></script>
+<script src="/static/assistant.js?v=<%= assetV %>" defer></script>
+<script src="/static/push.js?v=<%= assetV %>" defer></script>
+<script src="/static/pwa.js?v=<%= assetV %>" defer></script>
+<% } else { %></div></div><% } %>
+<script src="/static/app.js?v=<%= assetV %>" defer></script>
 </body>
 </html>

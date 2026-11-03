@@ -46,38 +46,43 @@ async function generateInvite(guest, userId, { regenerate = false } = {}) {
   return { token, longUrl, shortUrl, warning };
 }
 
-async function loadTemplate(templateId) {
-  if (templateId) {
-    const { rows } = await db.query('SELECT * FROM invite_templates WHERE id = $1', [templateId]);
-    if (rows[0]) return rows[0];
-  }
-  const { rows } = await db.query('SELECT * FROM invite_templates ORDER BY is_default DESC, id LIMIT 1');
-  return rows[0] || null;
-}
-
-// Monta HTML + assunto do convite deste convidado.
+// Monta HTML + assunto do convite deste convidado (modelo fixo do Pulso).
 async function renderInvite(guest, { rsvpState = null, closed = false, preview = false } = {}) {
-  const template = await loadTemplate(guest.template_id);
-  if (!template) return null;
   let ownerName = null;
   if (guest.owner_id) {
     const { rows } = await db.query('SELECT name FROM users WHERE id = $1', [guest.owner_id]);
     ownerName = rows[0]?.name || null;
   }
   const token = guest.invite_token || 'previa';
+  const base = `/convite/${token}`;
   const vars = tpl.buildVariables(guest, {
     owner: ownerName,
-    shortUrl: guest.short_url,
-    publicUrl: longInviteUrl(token),
-    rsvpAction: preview ? '#' : `/convite/${token}/responder`,
+    links: preview ? {} : { aceitar: `${base}/aceitar`, producao: `${base}/producao` },
   });
-  vars.bloco_resposta = tpl.responseBlock(preview ? '#' : `/convite/${token}/responder`, { state: rsvpState, closed });
+  vars.bloco_resposta = tpl.responseBlock(preview ? '#' : `${base}/responder`, { state: rsvpState, closed });
   return {
-    template,
-    html: tpl.render(template.html_body, vars),
-    subject: tpl.render(template.subject, vars, { escape: false }),
+    html: tpl.render(tpl.inviteHtml(), vars),
+    subject: `Convite para o ${config.podcastName}`,
     vars,
   };
 }
 
-module.exports = { addEvent, generateInvite, renderInvite, loadTemplate, longInviteUrl };
+// Link do WhatsApp da produção com mensagem pronta (número e texto em Gestão > WhatsApp dos convites). kind: 'aceitar' | 'producao'.
+async function whatsappUrl(kind, guest) {
+  return require('./contacts').waUrl('producao', kind, guest.name || 'convidado');
+}
+
+const recordClick = (guestId, kind) =>
+  db.query('INSERT INTO invite_clicks (guest_id, kind) VALUES ($1, $2)', [guestId, kind]);
+
+// Resumo dos cliques: { aceitar: {total, first, last}, producao: {...} }
+async function clickStats(guestId) {
+  const { rows } = await db.query(
+    `SELECT kind, count(*)::int AS total, min(created_at) AS first, max(created_at) AS last
+       FROM invite_clicks WHERE guest_id = $1 GROUP BY kind`, [guestId]);
+  const stats = { aceitar: { total: 0 }, producao: { total: 0 } };
+  for (const r of rows) stats[r.kind] = { total: r.total, first: r.first, last: r.last };
+  return stats;
+}
+
+module.exports = { addEvent, generateInvite, renderInvite, longInviteUrl, whatsappUrl, recordClick, clickStats };

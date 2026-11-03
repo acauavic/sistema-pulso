@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0A0A">
+  <title>Sem conexão · Pulso</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<!-- Guardada pelo service worker (sw.js) e mostrada quando a navegação falha sem internet. -->
+<div class="auth"><div class="auth-box">
+  <div class="wordmark" role="img" aria-label="pulso.">pulso<span class="dot">.</span></div>
+  <div class="card auth-card offline-card">
+    <svg class="pulse-line" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M0 40 H1200" fill="none" stroke="#333333" stroke-width="3" vector-effect="non-scaling-stroke"/></svg>
+    <span class="kicker">Sem conexão</span>
+    <h1>O Pulso está esperando a internet.</h1>
+    <p class="muted">Assim que o aparelho voltar a se conectar, a página abre sozinha. O que já estava salvo continua no servidor.</p>
+    <a class="btn primary" href="" data-retry>Tentar de novo</a>
+  </div>
+</div></div>
+<script src="/static/offline.js"></script>
+</body>
+</html>

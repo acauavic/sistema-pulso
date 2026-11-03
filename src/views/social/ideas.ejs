@@ -1,0 +1,72 @@
+<%- include('../partials/head') %>
+<%- include('../partials/social-nav') %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var epNo = function (n) { return n ? 'EP.' + String(n).padStart(3, '0') : 'EP.—'; };
+  var kindTag = { corte: 'CORTE', story: 'STORY', carrossel: 'CARROSSEL' };
+  var statusLabel = { sugerida: 'Sugeridas', aprovada: 'Aprovadas', feita: 'Feitas', descartada: 'Descartadas' };
+  var groups = []; ideas.forEach(function (i) { var g = groups[groups.length - 1]; if (!g || g.id !== i.episode_id) groups.push(g = { id: i.episode_id, label: epNo(i.episode_number) + ' · ' + i.episode_title, items: [] }); g.items.push(i); });
+  var act = function (i, acao, label, tone, confirm) { return '<form method="post" action="/social/ideias/' + i.id + '/' + acao + '" class="inline"' + (confirm ? ' data-confirm="' + confirm + '"' : '') + '>' + csrfField + '<button class="btn sm ' + (tone || '') + '" type="submit">' + label + '</button></form>'; };
+%>
+<div class="grid-2 align-start ideas-layout">
+  <section class="card stack">
+    <h2>Pedir ideias</h2>
+    <p class="small muted">A IA lê a conversa do episódio e sugere cortes, stories e carrosséis. Ela recebe a lista do que já foi feito ou sugerido e não repete.</p>
+    <% if (!aiReady) { %><p class="flash flash-error">IA (Gemini) não configurada neste servidor.</p><% } %>
+    <% if (running) { %><p class="small warn"><%- icon('clock', 14) %> Um pedido está na fila. Você recebe uma notificação quando terminar.</p><% } %>
+    <% if (canIdeas) { %>
+    <form method="post" action="/social/ideias/gerar" class="stack" data-check-all-scope>
+      <%- csrfField %>
+      <fieldset class="row wrap">
+        <legend>O que sugerir</legend>
+        <% Object.keys(kinds).forEach(function (k) { %><label class="check"><input type="checkbox" name="kinds" value="<%= k %>" checked> <%= kinds[k] %></label><% }) %>
+      </fieldset>
+      <fieldset>
+        <legend>Episódios</legend>
+        <label class="check"><input type="checkbox" data-check-all> Todos os que têm transcrição</label>
+        <div class="check-list">
+          <% episodes.forEach(function (e) { %>
+          <label class="check"><input type="checkbox" name="episodes" value="<%= e.id %>" <%= e.has_text ? 'data-check-item' : 'disabled' %>> <span class="mono"><%= epNo(e.number) %></span> <%= e.guest_name || e.title %><% if (!e.has_text) { %> <span class="small muted">· sem transcrição ainda</span><% } else if (e.ideas) { %> <span class="small muted">· <%= e.ideas %> ideia(s) já</span><% } %></label>
+          <% }) %>
+          <% if (!episodes.length) { %><p class="muted small">Nenhum episódio gravado ainda.</p><% } %>
+        </div>
+      </fieldset>
+      <div><button class="btn primary" type="submit" <%= aiReady ? '' : 'disabled' %>><%- icon('sparkles') %> Sugerir ideias</button></div>
+    </form>
+    <% } %>
+  </section>
+
+  <section>
+    <div class="seg" role="group" aria-label="Status das ideias">
+      <% Object.keys(statusLabel).forEach(function (s) { %><a href="/social/ideias?status=<%= s %>" class="<%= status === s ? 'on' : '' %>"><%= statusLabel[s] %> <span class="mono"><%= counts[s] || 0 %></span></a><% }) %>
+    </div>
+    <% if (!ideas.length) { %>
+      <div class="empty card top-gap"><%- include('../partials/pulse-line') %><p><strong><%= status === 'sugerida' ? 'Nenhuma ideia esperando.' : 'Nada aqui.' %></strong></p><p class="muted small"><%= status === 'sugerida' ? 'Escolha episódios ao lado e peça ideias.' : 'As ideias mudam de lista quando alguém aprova, marca como feita ou descarta.' %></p></div>
+    <% } %>
+    <% groups.forEach(function (g) { %>
+      <h3 class="idea-ep kicker"><a href="/episodios/<%= g.id %>"><%= g.label %></a></h3>
+      <div class="idea-list">
+        <% g.items.forEach(function (i) { var b = i.body || {}; %>
+        <article class="card idea">
+          <span class="tag-mono">[ <%= kindTag[i.kind] %> ]</span>
+          <h3><%= i.title %></h3>
+          <% if (i.hook) { %><p class="small"><span class="muted">Gancho:</span> <%= i.hook %></p><% } %>
+          <% if (b.frase) { %><p class="voz">&ldquo;<%= b.frase %>&rdquo;</p><% } %>
+          <% if (b.inicio_seg != null) { %><p class="mono small">TRECHO <%= fmt.formatClock(b.inicio_seg * 1000) %> – <%= b.fim_seg != null ? fmt.formatClock(b.fim_seg * 1000) : '?' %></p><% } %>
+          <% if ((b.slides || []).length) { %><ol class="small"><% b.slides.forEach(function (s) { %><li><%= s %></li><% }) %></ol><% } %>
+          <% if (b.legenda) { %><p class="small muted pre"><%= b.legenda %></p><% } %>
+          <% if (canIdeas) { %>
+          <div class="row">
+            <% if (i.status === 'sugerida') { %><%- act(i, 'aprovar', 'Aprovar e virar tarefa', '') %><%- act(i, 'feita', 'Já fizemos', 'ghost') %><%- act(i, 'descartar', 'Descartar', 'ghost') %>
+            <% } else if (i.status === 'aprovada') { %><% if (i.task_id) { %><a class="btn sm" href="/tarefas/<%= i.task_id %>">Ver tarefa</a><% } %><%- act(i, 'feita', 'Marcar como feita', '') %>
+            <% } else { %><%- act(i, 'reabrir', 'Reabrir', 'ghost') %><% } %>
+          </div>
+          <% } %>
+        </article>
+        <% }) %>
+      </div>
+    <% }) %>
+  </section>
+</div>
+<script src="/static/social.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

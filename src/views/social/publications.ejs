@@ -1,0 +1,43 @@
+<%- include('../partials/head') %>
+<%- include('../partials/social-nav') %>
+<%
+  var badge = { revisao: 'b-amber', recusado: 'b-red', publicado: 'b-green', parcial: 'b-amber', agendado: 'b-st-agendado', erro: 'b-red', simulado: 'b-gray', enviando: 'b-amber' };
+  var link = function (s, m) { var q = []; if (s) q.push('status=' + s); if (m) q.push('tipo=' + m); return '/social/publicacoes' + (q.length ? '?' + q.join('&') : ''); };
+  var total = Object.keys(counts).reduce(function (n, k) { return n + counts[k]; }, 0);
+%>
+<div class="toolbar">
+  <div class="seg" role="group" aria-label="Status">
+    <a href="<%= link('', media) %>" class="<%= !status ? 'on' : '' %>">Todas <span class="mono"><%= total %></span></a>
+    <% ['revisao', 'recusado', 'agendado', 'publicado', 'erro', 'simulado'].forEach(function (s) { if (!counts[s] && status !== s) return; %>
+    <a href="<%= link(s, media) %>" class="<%= status === s ? 'on' : '' %>"><%= statusLabel[s] %> <span class="mono"><%= counts[s] || 0 %></span></a>
+    <% }) %>
+  </div>
+  <div class="seg" role="group" aria-label="Tipo">
+    <a href="<%= link(status, '') %>" class="<%= !media ? 'on' : '' %>">Tudo</a>
+    <% Object.keys(MEDIA).forEach(function (m) { %><a href="<%= link(status, m) %>" class="<%= media === m ? 'on' : '' %>"><%= MEDIA[m] %></a><% }) %>
+  </div>
+  <% if (can('social.request')) { %><a class="btn primary" href="/social/novo"><%- icon('plus') %> Novo post</a><% } %>
+</div>
+<% if (counts.revisao && can('social.publish') && status !== 'revisao') { %><p class="flash flash-ok"><a href="/social/publicacoes?status=revisao"><strong class="mono"><%= counts.revisao %></strong> post<%= counts.revisao > 1 ? 's esperam' : ' espera' %> a sua aprovação.</a></p><% } %>
+
+<% if (!pubs.length) { %>
+<div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nada por aqui ainda.</strong></p><p class="muted small">Os cortes, posts, carrosséis e stories publicados ou agendados aparecem nesta lista.</p></div>
+<% } else { %>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Quando</th><th>Tipo</th><th>Publicação</th><th>Redes</th><th>Status</th></tr></thead>
+    <tbody>
+      <% pubs.forEach(function (p) { %>
+      <tr>
+        <td class="mono nowrap"><%= p.scheduled_at && p.status === 'agendado' ? fmt.formatDateTime(p.scheduled_at) : fmt.formatDateTime(p.created_at) %></td>
+        <td><span class="tag-mono">[ <%= MEDIA[p.media].toUpperCase() %> ]</span></td>
+        <td><a href="/social/publicacoes/<%= p.id %>"><strong><%= p.title %></strong></a><div class="small muted"><%= p.episode_id ? (p.episode_number ? 'EP.' + String(p.episode_number).padStart(3, '0') + ' · ' : '') + p.episode_title : 'Conteúdo avulso' %></div></td>
+        <td class="small"><%= p.platforms.map(function (k) { return platforms[k] ? platforms[k].label : k; }).join(', ') %></td>
+        <td><% if (p.retry_at) { %><span class="badge b-amber">Nova tentativa</span> <span class="mono small muted"><%= fmt.formatSoon(p.retry_at) %></span><% } else { %><span class="badge <%= badge[p.status] %>"><%= statusLabel[p.status] %></span><% } %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+<%- include('../partials/foot') %>

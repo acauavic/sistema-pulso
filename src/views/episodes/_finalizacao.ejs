@@ -1,0 +1,109 @@
+<%# Finalização em quatro passos. Variáveis do show.ejs: ep, meta, covers, frames, checklist, itemsFor, tickable, perm, publications, latestEdited, ... %>
+<%
+  var m = meta || {};
+  var canWriteMeta = perm.review || perm.manage;
+  var epPubs2 = publications.filter(function (p) { return !p.clip_id; });
+  var lacks = [];
+  if (!m.yt_title) lacks.push('título do YouTube');
+  if (!m.yt_description) lacks.push('descrição do YouTube');
+  if (!m.sp_title || !m.sp_description) lacks.push('textos do Spotify');
+  if (!m.chapters) lacks.push('capítulos');
+  var thumbs = covers.filter(function (c) { return c.kind === 'youtube_thumb'; });
+  var approved = thumbs.find(function (c) { return c.approved; });
+  var listItems = itemsFor('finalizado').concat(itemsFor('livre'));
+  var done = listItems.filter(function (i) { return i.done; }).length;
+  var reqOpen = listItems.filter(function (i) { return i.required && !i.done; }).length;
+  var readyToPublish = latestEdited && (ep.status === 'pronto_publicar' || ep.status === 'publicado');
+  var isPublished = ep.status === 'publicado' || epPubs2.some(function (p) { return p.status === 'publicado'; });
+  // o passo que a pessoa deve fazer agora leva o botão principal
+  var next = lacks.length ? 1 : (!approved ? 2 : (reqOpen ? 3 : 4));
+  var step = function (n) { return String(n).padStart(2, '0'); };
+%>
+<section class="card" id="finalizacao">
+  <div class="row spread">
+    <div><h2>Finalização</h2><p class="small muted"><%= isPublished ? 'Episódio publicado.' : 'Quatro passos até publicar. Abra só o que precisa.' %></p></div>
+  </div>
+  <%- include('_ia_status') %>
+
+  <ol class="final-steps top-gap">
+    <li class="final-step <%= lacks.length ? '' : 'is-done' %>">
+      <span class="step-n mono"><%= step(1) %></span>
+      <div class="final-body">
+        <div class="row"><h3>Textos de publicação</h3><% if (lacks.length) { %><span class="badge b-amber">faltam <%= lacks.length %></span><% } else { %><span class="badge b-green">prontos</span><% } %></div>
+        <% if (m.yt_title) { %>
+          <p class="final-sum"><strong><%= m.yt_title %></strong></p>
+          <p class="small muted">Spotify: <%= m.sp_title || '—' %> · <span class="mono"><%= m.chapters ? m.chapters.split('\n').filter(Boolean).length : 0 %></span> capítulos<%= m.thumb_text ? ' · thumbnail: "' + m.thumb_text + '"' : '' %></p>
+        <% } else { %>
+          <p class="small muted"><%= aiReady ? 'Gere as sugestões pela análise por IA acima, ou escreva os textos à mão.' : 'Escreva os textos de título, descrição e capítulos.' %></p>
+        <% } %>
+        <% if (lacks.length && m.yt_title) { %><p class="small muted">Falta: <%= lacks.join(', ') %>.</p><% } %>
+      </div>
+      <div class="final-actions"><button class="btn sm <%= next === 1 && canWriteMeta ? 'primary' : '' %>" type="button" data-modal-open="modal-textos"><%- icon(canWriteMeta ? 'pencil' : 'eye', 14) %> <%= canWriteMeta ? (m.yt_title ? 'Revisar textos' : 'Escrever textos') : 'Ver textos' %></button></div>
+    </li>
+
+    <li class="final-step <%= approved ? 'is-done' : '' %>">
+      <span class="step-n mono"><%= step(2) %></span>
+      <div class="final-body">
+        <div class="row"><h3>Thumbnail do YouTube</h3><% if (approved) { %><span class="badge b-green">aprovada</span><% } else if (thumbs.length) { %><span class="badge b-amber">escolha uma</span><% } else { %><span class="badge b-gray">sem opções</span><% } %></div>
+        <p class="small muted"><%= approved ? (approved.label || 'Thumbnail aprovada') : (thumbs.length ? thumbs.length + ' opção' + (thumbs.length === 1 ? '' : 'ões') + ' prontas. Aprove uma (obrigatório para finalizar).' : 'Depois da análise por IA o sistema monta 3 opções.') %></p>
+      </div>
+      <div class="final-actions"><% if (canWriteMeta) { %><button class="btn sm" type="button" data-modal-open="modal-textos" data-tab="th">Texto e quadro</button><% } %></div>
+      <details class="final-more" <%= next === 2 && thumbs.length ? 'open' : '' %>>
+        <summary><%= approved ? 'Ver as opções' : 'Ver as opções e aprovar' %> <span class="count"><%= thumbs.length %></span></summary>
+        <%- include('_capas') %>
+      </details>
+    </li>
+
+    <li class="final-step <%= listItems.length && done === listItems.length ? 'is-done' : '' %>">
+      <span class="step-n mono"><%= step(3) %></span>
+      <div class="final-body">
+        <div class="row"><h3>Checklist</h3>
+          <% if (!listItems.length) { %><span class="badge b-gray">sem itens</span><% } else if (reqOpen) { %><span class="badge b-amber"><%= reqOpen %> obrigatório<%= reqOpen === 1 ? '' : 's' %> em aberto</span><% } else { %><span class="badge <%= done === listItems.length ? 'b-green' : 'b-gray' %>"><span class="mono"><%= done %>/<%= listItems.length %></span></span><% } %>
+        </div>
+      </div>
+      <div class="final-actions"></div>
+      <details class="final-more" <%= next === 3 ? 'open' : '' %>>
+        <summary>Abrir o checklist <span class="count"><%= done %>/<%= listItems.length %></span></summary>
+        <%- include('_checklist', { items: itemsFor('finalizado'), gate: 'finalizado', tickable: tickable }) %>
+        <% if (itemsFor('livre').length) { %><h4 class="capas-kind">Itens livres</h4><%- include('_checklist', { items: itemsFor('livre'), gate: 'livre', tickable: tickable }) %><% } %>
+      </details>
+    </li>
+
+    <li class="final-step <%= isPublished ? 'is-done' : '' %>">
+      <span class="step-n mono"><%= step(4) %></span>
+      <div class="final-body">
+        <div class="row"><h3>Publicação</h3><% if (isPublished) { %><span class="badge b-green">publicado</span><% } else if (readyToPublish) { %><span class="badge b-amber">pronto</span><% } else { %><span class="badge b-gray">ainda não</span><% } %></div>
+        <% if (ep.youtube_url || ep.spotify_url) { %>
+        <p class="small"><% if (ep.youtube_url) { %><a href="<%= ep.youtube_url %>" target="_blank" rel="noopener noreferrer">YouTube</a><% } %><%= ep.youtube_url && ep.spotify_url ? ' · ' : '' %><% if (ep.spotify_url) { %><a href="<%= ep.spotify_url %>" target="_blank" rel="noopener noreferrer">Spotify</a><% } %></p>
+        <% } else { %><p class="small muted"><%= readyToPublish ? 'Tudo certo? Publique no YouTube e salve os links.' : 'Disponível quando o episódio estiver em "Pronto para publicar".' %></p><% } %>
+      </div>
+      <div class="final-actions">
+        <% if (perm.review && readyToPublish) { %><button class="btn sm <%= next === 4 ? 'primary' : '' %>" type="button" data-modal-open="modal-publicar"><%- icon('send', 14) %> Publicar no YouTube</button><% } %>
+        <% if (perm.review) { %><button class="btn sm ghost" type="button" data-modal-open="modal-links">Links</button><% } %>
+      </div>
+      <%- include('_publicar') %>
+    </li>
+  </ol>
+</section>
+
+<%- include('_ideias') %>
+
+<section class="card top-gap" id="conteudo-resumo">
+  <div class="row spread">
+    <div><h2>Cortes e posts deste episódio</h2><p class="small muted"><%= content.clips %> corte<%= content.clips === 1 ? '' : 's' %> · <%= content.posts %> post<%= content.posts === 1 ? '' : 's' %> e carrossel<%= content.posts === 1 ? '' : 's' %></p></div>
+    <a class="btn" href="/conteudo?episodio=<%= ep.id %>"><%- icon('layers') %> Abrir em Conteúdo</a>
+  </div>
+</section>
+
+<%- include('_textos') %>
+<% if (perm.review) { %>
+<dialog class="modal" id="modal-links" aria-labelledby="mlk-h">
+  <form method="post" action="/episodios/<%= ep.id %>/links" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mlk-h">Links de publicação</h2>
+    <label>Vídeo no YouTube<input type="url" name="youtube_url" value="<%= ep.youtube_url || '' %>" maxlength="500" placeholder="https://youtu.be/…"></label>
+    <label>Episódio no Spotify<input type="url" name="spotify_url" value="<%= ep.spotify_url || '' %>" maxlength="500" placeholder="https://open.spotify.com/…"></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar links</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>

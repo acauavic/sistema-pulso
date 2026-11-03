@@ -1,0 +1,165 @@
+<%- include('../partials/head') %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var json = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
+  var brl = function (c) { return (Number(c) / 100).toFixed(2).replace('.', ','); };
+  var canWrite = can('finance.write');
+  var hourMin = settings.studio_minutes;
+  var total = Math.round(hourMin / 60 * settings.studio_hour_cents);
+  var balance = Math.max(0, total - settings.studio_deposit_cents);
+  var dur = function (m) { return (m >= 60 ? Math.floor(m / 60) + ' h' : '') + (m % 60 ? ' ' + (m % 60) + ' min' : ''); };
+  var tabs = [{ key: 'estudio', label: 'Estúdio e caixa' }, { key: 'episodio', label: 'Por episódio', n: rules.length }, { key: 'mensais', label: 'Mensais', n: recurring.length }];
+  var anchorTxt = function (r) { var d = Number(r.offset_days); var when = r.anchor === 'gatilho' ? 'no dia' : r.anchor === 'gravacao' ? 'da gravação' : 'da veiculação'; return d === 0 ? (r.anchor === 'gatilho' ? 'vence no dia' : 'vence no dia da ' + when.replace('da ', '')) : 'vence ' + Math.abs(d) + (Math.abs(d) === 1 ? ' dia ' : ' dias ') + (d > 0 ? 'depois ' : 'antes ') + (r.anchor === 'gatilho' ? 'do gatilho' : when); };
+%>
+<div class="page-head"><div><span class="kicker">Financeiro</span><h1>Custos automáticos</h1></div></div>
+<%- include('_nav', { active: 'regras', counts: counts }) %>
+<p class="lead">Aqui você diz o que custa e quando. O sistema lança sozinho cada conta no momento certo, sem ninguém lembrar.</p>
+
+<div class="tabs-wrap" data-tabs data-default="estudio">
+  <div class="tabbar" role="tablist" aria-label="Custos automáticos">
+    <% tabs.forEach(function (t) { %><button type="button" role="tab" data-tab-btn="<%= t.key %>" aria-controls="pane-<%= t.key %>"><%= t.label %><% if (t.n) { %> <span class="count"><%= t.n %></span><% } %></button><% }) %>
+  </div>
+
+  <div class="pane" id="pane-estudio" data-pane-id="estudio">
+    <section class="card">
+      <div class="row spread">
+        <div><h2>Estúdio</h2><p class="small muted">Cada gravação gera duas contas sozinhas: o sinal para reservar a data e o saldo no dia.</p></div>
+        <% if (canWrite) { %><button class="btn" type="button" data-modal-open="modal-ajustes"><%- icon('pencil') %> Editar</button><% } %>
+      </div>
+      <dl class="kv">
+        <dt>Hora de estúdio</dt><dd><span class="mono"><%= money(settings.studio_hour_cents) %></span></dd>
+        <dt>Sinal da reserva</dt><dd><span class="mono"><%= money(settings.studio_deposit_cents) %></span> <span class="muted">· vence quando a gravação é agendada</span></dd>
+        <dt>Duração esperada</dt><dd><span class="mono"><%= dur(hourMin) %></span> <span class="muted">· vale até alguém registrar a duração real</span></dd>
+        <dt>Na prática</dt><dd>Gravação de <%= dur(hourMin) %>: <span class="mono"><%= money(total) %></span> no total, sendo <span class="mono"><%= money(settings.studio_deposit_cents) %></span> de sinal e <span class="mono"><%= money(balance) %></span> no dia. Passou do combinado? Registre a duração no episódio e o saldo é refeito (hora extra incluída).</dd>
+      </dl>
+    </section>
+    <section class="card top-gap">
+      <div class="row spread"><h2>Caixa e previsão</h2><% if (canWrite) { %><button class="btn" type="button" data-modal-open="modal-ajustes"><%- icon('pencil') %> Editar</button><% } %></div>
+      <dl class="kv">
+        <dt>Caixa inicial</dt><dd><span class="mono"><%= money(settings.opening_balance_cents) %><%= settings.opening_on ? ' em ' + fmt.formatDay(settings.opening_on) : '' %></span></dd>
+        <dt>Episódios por mês</dt><dd><span class="mono"><%= String(settings.episodes_per_month).replace('.', ',') %></span> <span class="muted">· base da previsão de estoque</span></dd>
+      </dl>
+    </section>
+  </div>
+
+  <div class="pane" id="pane-episodio" data-pane-id="episodio" hidden>
+    <section class="card">
+      <div class="row spread">
+        <div><h2>Custos que nascem com o episódio</h2><p class="small muted">Edição, Uber dos hosts, produtora por episódio… cada um vira uma conta no momento escolhido.</p></div>
+        <% if (canWrite) { %><button class="btn" type="button" data-fill-modal="modal-regra" data-fill-mode="new" data-fill-action="/financeiro/regras" data-fill='<%- json({ name: '', category: 'edicao', trigger: 'episodio_gravado', amount: '', anchor: 'gatilho', offset_days: '0', supplier: '', active: '1' }) %>'><%- icon('plus') %> Novo custo</button><% } %>
+      </div>
+      <% if (!rules.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum custo por episódio</strong><span>O estúdio já é automático. Adicione o que mais custa a cada episódio (ex.: edição, transporte dos hosts).</span></div><% } %>
+      <ul class="plain plan-list">
+        <% rules.forEach(function (r) { %>
+        <li class="<%= r.active ? '' : 'is-off' %>">
+          <div class="plan-list-main"><strong><%= r.name %><% if (!r.active) { %> <span class="badge b-gray">Pausado</span><% } %></strong><span class="small muted"><%= C.FIN_TRIGGERS[r.trigger] %> · <%= anchorTxt(r) %> · <%= C.FIN_OUT[r.category] %><%= r.supplier ? ' · ' + r.supplier : '' %></span></div>
+          <span class="mono"><%= money(r.amount_cents) %></span>
+          <span class="plan-list-tools"><% if (canWrite) { %><button class="btn sm ghost" type="button" data-fill-modal="modal-regra" data-fill-mode="edit" data-fill-action="/financeiro/regras/<%= r.id %>" data-fill-remove="/financeiro/regras/<%= r.id %>/excluir" data-fill-remove-label="Excluir custo" data-fill-confirm="Excluir este custo automático? O que ainda não foi pago some junto." data-fill='<%- json({ name: r.name, category: r.category, trigger: r.trigger, amount: brl(r.amount_cents), anchor: r.anchor, offset_days: String(r.offset_days), supplier: r.supplier || '', active: r.active ? '1' : '0' }) %>'>Editar</button><% } %></span>
+        </li>
+        <% }) %>
+      </ul>
+    </section>
+  </div>
+
+  <div class="pane" id="pane-mensais" data-pane-id="mensais" hidden>
+    <section class="card">
+      <div class="row spread">
+        <div><h2>Custos mensais</h2><p class="small muted">Salário da produtora, assinaturas, hospedagem… lançados todo mês, com três meses de antecedência.</p></div>
+        <% if (canWrite) { %><button class="btn" type="button" data-fill-modal="modal-mensal" data-fill-mode="new" data-fill-action="/financeiro/mensais" data-fill='<%- json({ name: '', category: 'equipe', amount: '', day_of_month: '5', starts_on: fin.todayISO(), ends_on: '', supplier: '', active: '1' }) %>'><%- icon('plus') %> Novo custo mensal</button><% } %>
+      </div>
+      <% if (!recurring.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum custo mensal</strong><span>Cadastre o salário da produtora e as assinaturas para o caixa prever o mês.</span></div><% } %>
+      <ul class="plain plan-list">
+        <% recurring.forEach(function (r) { %>
+        <li class="<%= r.active ? '' : 'is-off' %>">
+          <div class="plan-list-main"><strong><%= r.name %><% if (!r.active) { %> <span class="badge b-gray">Pausado</span><% } %></strong><span class="small muted">Todo dia <span class="mono"><%= r.day_of_month %></span> · <%= C.FIN_OUT[r.category] %><%= r.supplier ? ' · ' + r.supplier : '' %><%= r.ends_on ? ' · até ' + fmt.formatDay(r.ends_on) : '' %></span></div>
+          <span class="mono"><%= money(r.amount_cents) %></span>
+          <span class="plan-list-tools"><% if (canWrite) { %><button class="btn sm ghost" type="button" data-fill-modal="modal-mensal" data-fill-mode="edit" data-fill-action="/financeiro/mensais/<%= r.id %>" data-fill-remove="/financeiro/mensais/<%= r.id %>/excluir" data-fill-remove-label="Excluir custo mensal" data-fill-confirm="Excluir este custo mensal? As contas em aberto somem; o que já foi pago fica." data-fill='<%- json({ name: r.name, category: r.category, amount: brl(r.amount_cents), day_of_month: String(r.day_of_month), starts_on: r.starts_on, ends_on: r.ends_on || '', supplier: r.supplier || '', active: r.active ? '1' : '0' }) %>'>Editar</button><% } %></span>
+        </li>
+        <% }) %>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<% if (canWrite) { %>
+<dialog class="modal modal-wide" id="modal-ajustes" aria-labelledby="mj-h">
+  <form method="post" action="/financeiro/regras/ajustes" class="stack">
+    <%- csrfField %>
+    <h2 id="mj-h">Estúdio e caixa</h2>
+    <div class="grid-2 tight">
+      <label>Hora de estúdio (R$)<input type="text" name="studio_hour" inputmode="decimal" value="<%= brl(settings.studio_hour_cents) %>" required></label>
+      <label>Sinal da reserva (R$)<input type="text" name="studio_deposit" inputmode="decimal" value="<%= brl(settings.studio_deposit_cents) %>" required></label>
+    </div>
+    <label>Duração esperada da gravação (minutos)<input type="number" name="studio_minutes" min="15" max="1440" value="<%= settings.studio_minutes %>" required></label>
+    <details class="more">
+      <summary>Caixa e previsão</summary>
+      <div class="stack top-gap">
+        <div class="grid-2 tight">
+          <label>Caixa inicial (R$)<input type="text" name="opening_balance" inputmode="decimal" value="<%= brl(settings.opening_balance_cents) %>"></label>
+          <label>Na data<input type="date" name="opening_on" value="<%= settings.opening_on || '' %>"></label>
+        </div>
+        <label>Episódios por mês<input type="text" name="episodes_per_month" inputmode="decimal" value="<%= String(settings.episodes_per_month).replace('.', ',') %>" required></label>
+      </div>
+    </details>
+    <p class="small muted">Vale para as próximas gravações. As contas já lançadas não mudam.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal modal-wide" id="modal-regra" aria-labelledby="mr-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %>
+    <h2 id="mr-h"><span data-mode="edit">Editar custo</span><span data-mode="new" hidden>Novo custo por episódio</span></h2>
+    <label>Nome<input type="text" name="name" maxlength="120" required placeholder="Ex.: Edição do episódio"></label>
+    <div class="grid-2 tight">
+      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="400,00"></label>
+      <label>Categoria<select name="category"><% Object.keys(C.FIN_OUT).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_OUT[k] %></option><% }) %></select></label>
+    </div>
+    <label>Quando nasce<select name="trigger"><% Object.keys(C.FIN_TRIGGERS).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_TRIGGERS[k] %></option><% }) %></select></label>
+    <details class="more">
+      <summary>Vencimento e fornecedor</summary>
+      <div class="stack top-gap">
+        <div class="grid-2 tight">
+          <label>Vence<select name="anchor"><% Object.keys(C.FIN_ANCHORS).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_ANCHORS[k] %></option><% }) %></select></label>
+          <label>Dias de diferença <small class="muted">(negativo = antes)</small><input type="number" name="offset_days" min="-365" max="365"></label>
+        </div>
+        <label>Fornecedor<input type="text" name="supplier" maxlength="120"></label>
+        <label>Situação<select name="active"><option value="1">Ativo</option><option value="0">Pausado</option></select></label>
+      </div>
+    </details>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+      <button class="link small danger-link push-right" type="submit" data-fill-remove-btn formnovalidate>Excluir custo</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal modal-wide" id="modal-mensal" aria-labelledby="mm-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %>
+    <h2 id="mm-h"><span data-mode="edit">Editar custo mensal</span><span data-mode="new" hidden>Novo custo mensal</span></h2>
+    <label>Nome<input type="text" name="name" maxlength="120" required placeholder="Ex.: Salário da produtora"></label>
+    <div class="grid-2 tight">
+      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="3.500,00"></label>
+      <label>Todo dia<input type="number" name="day_of_month" min="1" max="28" required></label>
+    </div>
+    <details class="more">
+      <summary>Categoria, período e fornecedor</summary>
+      <div class="stack top-gap">
+        <label>Categoria<select name="category"><% Object.keys(C.FIN_OUT).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_OUT[k] %></option><% }) %></select></label>
+        <div class="grid-2 tight">
+          <label>Começa em<input type="date" name="starts_on"></label>
+          <label>Termina em <small class="muted">(opcional)</small><input type="date" name="ends_on"></label>
+        </div>
+        <label>Fornecedor ou pessoa<input type="text" name="supplier" maxlength="120"></label>
+        <label>Situação<select name="active"><option value="1">Ativo</option><option value="0">Pausado</option></select></label>
+      </div>
+    </details>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+      <button class="link small danger-link push-right" type="submit" data-fill-remove-btn formnovalidate>Excluir custo mensal</button>
+    </div>
+  </form>
+</dialog>
+<% } %>
+<%- include('../partials/foot') %>

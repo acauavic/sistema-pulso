@@ -1,0 +1,143 @@
+<%- include('../partials/head') %>
+<%
+  var maxSent = Math.max.apply(null, r.channels.map(function (c) { return c.sent; }).concat([1]));
+  var pct = function (a, b) { return b ? Math.round(a / b * 100) : 0; };
+  var STATE = { atrasado: ['b-red', 'atrasado'], possivel_perdido: ['b-red', 'possível perdido'] };
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+%>
+<div class="page-head">
+  <div><span class="kicker">Gestão · Abordagens</span><h1>Cadência</h1></div>
+  <div class="row">
+    <div class="seg" aria-label="Período">
+      <% [7, 30, 90].forEach(function (d) { %><a class="<%= days === d ? 'on' : '' %>" href="/gestao/cadencia?dias=<%= d %>"><%= d %> dias</a><% }) %>
+    </div>
+    <button class="btn" type="button" data-modal-open="modal-cadencia"><%- icon('sliders-horizontal') %> Configurar cadência e metas</button>
+  </div>
+</div>
+<%- include('../partials/gestao-nav', { active: 'cadencia' }) %>
+<p class="lead">Cada contato com convidados e patrocinadores, por canal e por pessoa, e se os follow-ups estão em dia. De <span class="mono"><%= shortDay(r.from) %></span> a <span class="mono"><%= shortDay(r.to) %></span>.</p>
+
+<section class="stat-grid" aria-label="Resumo">
+  <div class="stat"><span class="stat-label">Abordagens</span><span class="stat-n"><%= r.sent %></span></div>
+  <div class="stat"><span class="stat-label">Respostas</span><span class="stat-n"><%= r.replies %></span><span class="small muted"><%= r.replyRate === null ? 'sem abordagens' : r.replyRate + '% das abordagens' %></span></div>
+  <div class="stat"><span class="stat-label">Follow-ups hoje</span><span class="stat-n"><%= r.states.hoje %></span></div>
+  <div class="stat"><span class="stat-label">Atrasados</span><span class="stat-n <%= r.states.atrasado ? 'hl-bad' : '' %>"><%= r.states.atrasado %></span></div>
+  <div class="stat"><span class="stat-label">Possíveis perdidos</span><span class="stat-n <%= r.states.possivel_perdido ? 'hl-bad' : '' %>"><%= r.states.possivel_perdido %></span></div>
+  <div class="stat"><span class="stat-label">Meta cumprida</span><span class="stat-n"><%= r.goalRate === null ? '—' : r.goalRate + '%' %></span><span class="small muted">dias úteis, patrocinadores</span></div>
+</section>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="canais">
+  <div class="tabbar" role="tablist" aria-label="Seções do painel">
+    <button type="button" role="tab" data-tab-btn="canais" aria-controls="pane-canais">Por canal</button>
+    <button type="button" role="tab" data-tab-btn="pessoas" aria-controls="pane-pessoas">Por pessoa e meta</button>
+    <button type="button" role="tab" data-tab-btn="fila" aria-controls="pane-fila">Precisam de ação <span class="count"><%= r.queue.length %></span></button>
+    <button type="button" role="tab" data-tab-btn="dados" aria-controls="pane-dados">Preenchimento</button>
+  </div>
+
+  <div class="pane" id="pane-canais" data-pane-id="canais">
+    <section class="card">
+      <h2>Abordagens por canal</h2>
+      <% if (!r.sent && !r.replies) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhuma abordagem no período</strong><span>Quando a equipe registrar contatos na página do convidado ou do patrocinador, eles aparecem aqui.</span></div><% } else { %>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Canal</th><th class="num">Convidados</th><th class="num">Patrocinadores</th><th class="num">Total</th><th class="num">Respostas</th><th class="bar-col" aria-label="Participação"></th></tr></thead>
+        <tbody>
+          <% r.channels.forEach(function (c) { %>
+          <tr>
+            <td><strong><%= c.label %></strong></td>
+            <td class="num mono"><%= c.guest.sent %></td><td class="num mono"><%= c.sponsor.sent %></td><td class="num mono"><%= c.sent %></td>
+            <td class="num mono"><%= c.replies %><% if (c.sent) { %> <span class="muted">· <%= pct(c.replies, c.sent) %>%</span><% } %></td>
+            <td class="bar-col"><svg class="hbar" viewBox="0 0 100 6" preserveAspectRatio="none" role="img" aria-label="<%= c.label %>: <%= c.sent %> abordagens"><rect class="bg" width="100" height="6" rx="3"/><rect class="fg" width="<%= pct(c.sent, maxSent) %>" height="6" rx="3"/></svg></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+      <% } %>
+    </section>
+  </div>
+
+  <div class="pane" id="pane-pessoas" data-pane-id="pessoas">
+    <section class="card">
+      <h2>Por pessoa</h2>
+      <p class="small muted">A meta é de abordagens de patrocinadores por dia útil. Ajuste em "Configurar cadência e metas".</p>
+      <% if (!r.people.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Ninguém registrou abordagens ainda</strong><span>Defina a meta diária das produtoras em "Configurar" e peça para registrarem cada contato.</span></div><% } else { %>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Pessoa</th><th class="num">Convidados</th><th class="num">Patrocinadores</th><th class="num">Respostas</th><th class="num">Meta/dia</th><th class="num">Média/dia</th><th class="num">Dias com meta</th><th class="num">Atrasados</th></tr></thead>
+        <tbody>
+          <% r.people.forEach(function (p) { %>
+          <tr>
+            <td><strong><%= p.name %></strong><br><span class="small muted"><%= ROLES[p.role].label %></span></td>
+            <td class="num mono"><%= p.guest.sent %></td><td class="num mono"><%= p.sponsor.sent %></td><td class="num mono"><%= p.guest.replies + p.sponsor.replies %></td>
+            <td class="num mono"><%= p.target || '—' %></td><td class="num mono"><%= p.target ? p.avgPerDay : '—' %></td>
+            <td class="num mono"><%= p.target ? p.hitDays + ' / ' + p.goalDays : '—' %></td>
+            <td class="num mono <%= p.overdue ? 'err' : '' %>"><%= p.overdue %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+      <% } %>
+    </section>
+  </div>
+
+  <div class="pane" id="pane-fila" data-pane-id="fila">
+    <section class="card">
+      <h2>Quem precisa de ação</h2>
+      <% if (!r.queue.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Nada atrasado</strong><span>Todos os follow-ups estão em dia.</span></div><% } else { %>
+      <ul class="plain today-list">
+        <% r.queue.forEach(function (x) { %>
+        <li>
+          <a href="<%= base(x.kind) %>/<%= x.id %>#abordagens"><strong><%= x.name %></strong></a>
+          <span class="mono small muted"><%= x.kind === 'guest' ? 'CONVIDADO' : 'PATROCINADOR' %> · <%= x.owner_name ? x.owner_name.toUpperCase() : 'SEM RESPONSÁVEL' %></span>
+          <span class="badge <%= STATE[x.state][0] %>"><%= x.state === 'atrasado' ? 'atrasado ' + (-x.daysTo) + 'd' : STATE[x.state][1] %></span>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+    </section>
+  </div>
+
+  <div class="pane" id="pane-dados" data-pane-id="dados">
+    <section class="card">
+      <h2>Os dados estão sendo preenchidos?</h2>
+      <ul class="plain checks">
+        <li><span class="badge <%= r.fill.noAttempt ? 'b-amber' : 'b-green' %>"><%= r.fill.noAttempt ? 'atenção' : 'ok' %></span>
+          <span><strong><%= r.fill.noAttempt %></strong> de <%= r.fill.guestsInStage %> convidados em Convite enviado ainda sem nenhuma abordagem registrada.</span></li>
+        <li><span class="badge <%= r.fill.noAddress ? 'b-amber' : 'b-green' %>"><%= r.fill.noAddress ? 'atenção' : 'ok' %></span>
+          <span><strong><%= r.fill.noAddress %></strong> de <%= r.fill.sentTotal %> abordagens do período sem o endereço usado (qual @, e-mail ou número).</span></li>
+        <li><span class="badge <%= r.fill.unowned ? 'b-amber' : 'b-green' %>"><%= r.fill.unowned ? 'atenção' : 'ok' %></span>
+          <span><strong><%= r.fill.unowned %></strong> convidados ou patrocinadores em abordagem sem responsável (ninguém é avisado dos follow-ups deles).</span></li>
+        <li><span class="badge <%= r.states.a_abordar ? 'b-amber' : 'b-green' %>"><%= r.states.a_abordar ? 'atenção' : 'ok' %></span>
+          <span><strong><%= r.states.a_abordar %></strong> patrocinadores em Prospecção ainda sem a primeira abordagem.</span></li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<dialog class="modal" id="modal-cadencia" aria-labelledby="mcd-h">
+  <form method="post" action="/gestao/cadencia/config" class="stack">
+    <%- csrfField %>
+    <h2 id="mcd-h">Cadência e metas</h2>
+    <label>Convidados: dias de espera entre as abordagens
+      <input type="text" name="guest" value="<%= r.cfg.guest.join(', ') %>" inputmode="numeric" placeholder="3, 4, 7, 7">
+    </label>
+    <label>Patrocinadores: dias de espera entre as abordagens
+      <input type="text" name="sponsor" value="<%= r.cfg.sponsor.join(', ') %>" inputmode="numeric" placeholder="3, 5, 7, 14">
+    </label>
+    <p class="small muted">Cada número é a espera depois de uma abordagem, até o próximo follow-up. O último vale também como espera final: se ninguém responder depois dele, o card é indicado como possível perdido (a pessoa decide). Hoje: convidados <strong><%= r.cfg.guest.length %></strong> follow-ups, patrocinadores <strong><%= r.cfg.sponsor.length %></strong>.</p>
+    <label>Meta diária de abordagens de patrocinadores (produtoras)
+      <input type="number" name="goal_default" min="0" max="200" value="<%= r.cfg.sponsorGoal %>">
+    </label>
+    <details class="more">
+      <summary>Meta de cada pessoa</summary>
+      <div class="stack top-gap">
+        <% r.users.forEach(function (u) { %>
+        <label><%= u.name %> <small class="muted">(<%= ROLES[u.role].label %>)</small>
+          <input type="number" name="goal_<%= u.id %>" min="0" max="200" value="<%= ownGoal.has(u.id) ? ownGoal.get(u.id) : '' %>" placeholder="<%= u.role === 'produtora' ? 'padrão: ' + r.cfg.sponsorGoal : 'sem meta' %>">
+        </label>
+        <% }) %>
+        <p class="small muted">Em branco = padrão da produtora (ou sem meta, para os outros perfis). 0 = sem meta.</p>
+      </div>
+    </details>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<%- include('../partials/foot') %>

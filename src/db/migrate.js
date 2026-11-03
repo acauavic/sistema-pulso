@@ -12,7 +12,7 @@ async function migrate() {
     await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
     const done = new Set((await client.query('SELECT name FROM schema_migrations')).rows.map((r) => r.name));
-    const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql') && !f.startsWith('.')).sort();
     const applied = [];
     for (const file of files) {
       if (done.has(file)) continue;

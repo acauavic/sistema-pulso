@@ -1,0 +1,244 @@
+// Painel de gestão: usuários, logs (auditoria), notificações, rotinas de tarefas, busca global e integrações num lugar só.
+const express = require('express');
+const db = require('../db/pool');
+const C = require('../constants');
+const search = require('../services/search');
+const { ROLES, PERMISSIONS, can } = require('../permissions');
+const { requirePerm } = require('../middleware');
+const { audit } = require('../services/audit');
+const { clean } = require('../utils/format');
+const { wrap, isIntId, isUuid } = require('../utils/wrap');
+
+const router = express.Router();
+const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage'].some((p) => can(req.user.role, p))
+  ? next() : res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não acessa o painel de gestão.' }));
+
+router.get('/gestao', anyGestao, wrap(async (req, res) => {
+  const [users, audit24, routines, shortcuts, tips] = await Promise.all([
+    db.query('SELECT count(*) FILTER (WHERE active)::int AS active, count(*) FILTER (WHERE active AND password_hash IS NULL)::int AS pending FROM users'),
+    db.query("SELECT count(*)::int AS n FROM audit_log WHERE created_at > now() - interval '24 hours'"),
+    db.query('SELECT count(*) FILTER (WHERE active)::int AS n FROM task_routines'),
+    db.query('SELECT count(*)::int AS n FROM search_shortcuts'),
+    can(req.user.role, 'search.manage') ? search.suggestions(req.app) : [],
+  ]);
+  res.render('gestao/index', { title: 'Gestão', stats: { users: users.rows[0], audit: audit24.rows[0].n, routines: routines.rows[0].n, shortcuts: shortcuts.rows[0].n, tips: tips.length } });
+}));
+
+// ---------------------------------------------------------------- notificações (configuração geral)
+router.get('/gestao/notificacoes', requirePerm('notifications.manage'), wrap(async (req, res) => {
+  const { rows } = await db.query('SELECT * FROM notification_settings');
+  const { rows: last } = await db.query('SELECT type, count(*)::int AS n FROM notifications WHERE created_at > now() - interval \'7 days\' GROUP BY type');
+  res.render('gestao/notifications', { title: 'Notificações', settings: Object.fromEntries(rows.map((r) => [r.type, r])), types: C.NOTIFICATION_TYPES, roles: ROLES, week: Object.fromEntries(last.map((r) => [r.type, r.n])) });
+}));
+
+router.post('/gestao/notificacoes', requirePerm('notifications.manage'), wrap(async (req, res) => {
+  for (const type of Object.keys(C.NOTIFICATION_TYPES)) {
+    const inApp = req.body[`${type}_in_app`] === '1'; const email = req.body[`${type}_email`] === '1';
+    const roles = [].concat(req.body[`${type}_roles`] || []).filter((r) => ROLES[r]);
+    await db.query('UPDATE notification_settings SET in_app = $2, email = $3, roles = $4, updated_at = now(), updated_by = $5 WHERE type = $1', [type, inApp, email, roles, req.user.id]);
+  }
+  await audit(req, 'notificacoes.configuradas', 'settings', null, {});
+  await req.flash('ok', 'Configuração das notificações salva.');
+  res.redirect('/gestao/notificacoes');
+}));
+
+// ---------------------------------------------------------------- lembretes da gravação
+const reminders = require('../services/reminders');
+const settingsSvc = require('../services/settings');
+const REMINDER_FIELDS = { endereco: 'lembrete_endereco', hora: 'lembrete_hora', d3: 'lembrete_msg_d3', d1: 'lembrete_msg_d1', dia: 'lembrete_msg_dia', h3: 'lembrete_msg_h3' };
+
+router.get('/gestao/lembretes', requirePerm('reminders.manage'), wrap(async (req, res) => {
+  const s = await reminders.settings();
+  // exemplo com a próxima gravação agendada (ou uma de mentira), para a gestão ver como a mensagem fica
+  const { rows: [next] } = await db.query("SELECT id, name, phone, proposed_at FROM guests WHERE status = 'agendado' AND proposed_at > now() ORDER BY proposed_at LIMIT 1");
+  const sample = next || { name: 'Dra. Maria Souza', proposed_at: new Date(Date.now() + 5 * 86400_000) };
+  const examples = Object.fromEntries(reminders.ORDER.map((k) => [k, reminders.message(k, sample, s)]));
+  res.render('gestao/reminders', { title: 'Lembretes da gravação', s, kinds: reminders.KINDS, order: reminders.ORDER, examples, sampleName: sample.name, openField: REMINDER_FIELDS[req.query.editar] ? req.query.editar : null });
+}));
+
+router.post('/gestao/lembretes', requirePerm('reminders.manage'), wrap(async (req, res) => {
+  const field = REMINDER_FIELDS[req.body.campo] ? req.body.campo : null;
+  if (!field) return res.redirect('/gestao/lembretes');
+  let value = String(req.body.valor || '').replace(/\r\n/g, '\n').trim();
+  if (field === 'hora' && !/^(0[6-9]|1[0-2]):[0-5]\d$/.test(value)) {
+    await req.flash('error', 'Horário dos lembretes: entre 06:00 e 12:59 (ex.: 09:00).');
+    return res.redirect('/gestao/lembretes?editar=hora');
+  }
+  if (['d3', 'd1', 'dia', 'h3'].includes(field) && !value) {
+    await req.flash('error', 'A mensagem não pode ficar vazia.');
+    return res.redirect(`/gestao/lembretes?editar=${field}`);
+  }
+  value = value.slice(0, field === 'endereco' ? 300 : 1500);
+  await settingsSvc.set(REMINDER_FIELDS[field], value);
+  if (field === 'hora') await reminders.resyncAll(); // novo horário: refaz a agenda de quem está agendado
+  await audit(req, 'lembretes.configurados', 'settings', null, { campo: field });
+  await req.flash('ok', 'Salvo.');
+  res.redirect('/gestao/lembretes');
+}));
+
+// ---------------------------------------------------------------- WhatsApp dos convites
+router.get('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req, res) => {
+  const contacts = require('../services/contacts');
+  res.render('gestao/whatsapp', { title: 'WhatsApp dos convites', contacts, cur: await contacts.current(), sample: { producao: 'Dra. Maria Souza', patrocinio: 'Clínica Exemplo' }, openGroup: contacts.GROUPS[req.query.editar] ? req.query.editar : null, plateiaWa: await require('../services/settings').get('plateia_whatsapp') });
+}));
+
+router.post('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req, res) => {
+  const contacts = require('../services/contacts');
+  const group = contacts.GROUPS[req.body.grupo] ? req.body.grupo : null;
+  if (!group) return res.redirect('/gestao/whatsapp');
+  const r = await contacts.save(group, req.body);
+  if (r.error) { await req.flash('error', r.error); return res.redirect(`/gestao/whatsapp?editar=${group}`); }
+  await audit(req, 'whatsapp.configurado', 'settings', null, { grupo: group });
+  await req.flash('ok', 'Salvo. Os botões dos convites já usam o novo WhatsApp.');
+  res.redirect('/gestao/whatsapp');
+}));
+
+// ---------------------------------------------------------------- galeria do media kit
+router.get('/gestao/galeria-kit', requirePerm('plans.manage'), wrap(async (req, res) => {
+  const kit = require('../services/kitGallery');
+  const rows = await kit.candidates();
+  res.render('gestao/galeria-kit', { title: 'Galeria do media kit', rows, kit, photoUrl: require('../services/guestPhotos').signedUrl, openId: Number(req.query.editar) || null });
+}));
+
+router.post('/gestao/galeria-kit/:id/mostrar', requirePerm('plans.manage'), wrap(async (req, res) => {
+  const on = req.body.mostrar === '1';
+  if (!await require('../services/kitGallery').setFeatured(Number(req.params.id), on)) await req.flash('error', 'Só episódios publicados entram na galeria.');
+  else await audit(req, on ? 'kit.galeria_inclui' : 'kit.galeria_tira', 'episode', req.params.id);
+  res.redirect('/gestao/galeria-kit');
+}));
+
+router.post('/gestao/galeria-kit/:id', requirePerm('plans.manage'), wrap(async (req, res) => {
+  if (!await require('../services/kitGallery').save(Number(req.params.id), req.body)) await req.flash('error', 'Episódio não encontrado ou ainda não publicado.');
+  else { await audit(req, 'kit.galeria_edita', 'episode', req.params.id); await req.flash('ok', 'Salvo. O media kit já mostra o novo texto.'); }
+  res.redirect('/gestao/galeria-kit');
+}));
+
+// ---------------------------------------------------------------- rotinas de tarefas
+function parseRoutine(body) {
+  const v = {
+    trigger: C.ROUTINE_TRIGGERS[body.trigger] ? body.trigger : null,
+    kind: C.TASK_KINDS[body.kind] ? body.kind : 'geral',
+    title: clean(body.title, 200),
+    description: String(body.description || '').trim().slice(0, 2000) || null,
+    anchor: C.ROUTINE_ANCHORS[body.anchor] ? body.anchor : 'gatilho',
+    offset_days: Math.max(-365, Math.min(365, Number.parseInt(body.offset_days, 10) || 0)),
+    assignee_mode: C.ROUTINE_ASSIGNEES[body.assignee_mode] ? body.assignee_mode : 'ninguem',
+    assignee_id: isUuid(body.assignee_id) ? body.assignee_id : null,
+    active: body.active === '1',
+    // só no "episódio criado": vira pedido de conteúdo (entrega no sistema) em vez de tarefa, vem marcado no formulário, prioridade
+    target: body.trigger === 'episodio_criado' && body.target === 'pedido' ? 'pedido' : 'tarefa',
+    default_on: body.default_on === '1',
+    priority: body.priority === '1',
+  };
+  if (!v.trigger) return { error: 'Escolha quando a tarefa é criada.' };
+  if (!v.title) return { error: 'Dê um título para a tarefa.' };
+  if (v.assignee_mode === 'usuario' && !v.assignee_id) return { error: 'Escolha a pessoa fixa.' };
+  if (v.assignee_mode !== 'usuario') v.assignee_id = null;
+  return { values: v };
+}
+
+router.get('/gestao/rotinas', requirePerm('routines.manage'), wrap(async (req, res) => {
+  const [routines, users] = await Promise.all([
+    db.query(`SELECT r.*, u.name AS assignee_name, (SELECT count(*)::int FROM tasks t WHERE t.routine_id = r.id) + (SELECT count(*)::int FROM content_requests q WHERE q.routine_id = r.id) AS created FROM task_routines r
+               LEFT JOIN users u ON u.id = r.assignee_id ORDER BY r.trigger, r.position, r.id`),
+    db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+  ]);
+  res.render('gestao/routines', { title: 'Rotinas de tarefas', routines: routines.rows, users: users.rows, C, editing: isIntId(req.query.editar) ? Number(req.query.editar) : null });
+}));
+
+router.post('/gestao/rotinas', requirePerm('routines.manage'), wrap(async (req, res) => {
+  const { values: v, error } = parseRoutine({ active: '1', ...req.body });
+  if (error) { await req.flash('error', error); return res.redirect('/gestao/rotinas'); }
+  const { rows: [r] } = await db.query(
+    `INSERT INTO task_routines (trigger, kind, title, description, anchor, offset_days, assignee_mode, assignee_id, active, target, default_on, priority, position)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, (SELECT coalesce(max(position),0)+1 FROM task_routines)) RETURNING id`,
+    [v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active, v.target, v.default_on, v.priority]);
+  await audit(req, 'rotina.criada', 'routine', r.id, { titulo: v.title });
+  await req.flash('ok', 'Rotina criada. Vale para os próximos episódios que passarem por esse momento.');
+  res.redirect('/gestao/rotinas');
+}));
+
+router.post('/gestao/rotinas/:id', requirePerm('routines.manage'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return res.redirect('/gestao/rotinas');
+  const { values: v, error } = parseRoutine(req.body);
+  if (error) { await req.flash('error', error); return res.redirect(`/gestao/rotinas?editar=${req.params.id}`); }
+  await db.query(`UPDATE task_routines SET trigger=$2, kind=$3, title=$4, description=$5, anchor=$6, offset_days=$7, assignee_mode=$8, assignee_id=$9, active=$10, target=$11, default_on=$12, priority=$13, updated_at=now() WHERE id=$1`,
+    [req.params.id, v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active, v.target, v.default_on, v.priority]);
+  await audit(req, 'rotina.editada', 'routine', req.params.id, { titulo: v.title });
+  await req.flash('ok', 'Rotina salva. Tarefas já criadas não mudam (o vencimento delas é editado na própria tarefa).');
+  res.redirect('/gestao/rotinas');
+}));
+
+router.post('/gestao/rotinas/:id/excluir', requirePerm('routines.manage'), wrap(async (req, res) => {
+  if (isIntId(req.params.id)) { await db.query('DELETE FROM task_routines WHERE id = $1', [req.params.id]); await audit(req, 'rotina.excluida', 'routine', req.params.id, {}); }
+  res.redirect('/gestao/rotinas');
+}));
+
+// ---------------------------------------------------------------- busca global: atalhos e sugestões
+router.get('/gestao/busca', requirePerm('search.manage'), wrap(async (req, res) => {
+  const [tips, shortcuts, top, misses] = await Promise.all([
+    search.suggestions(req.app),
+    db.query('SELECT s.*, u.name AS author FROM search_shortcuts s LEFT JOIN users u ON u.id = s.created_by ORDER BY s.label'),
+    db.query("SELECT lower(q) AS q, count(*)::int AS n FROM search_log WHERE created_at > now() - interval '30 days' GROUP BY lower(q) ORDER BY count(*) DESC LIMIT 12"),
+    db.query("SELECT count(*)::int AS n FROM search_log WHERE results = 0 AND created_at > now() - interval '30 days'"),
+  ]);
+  res.render('gestao/search', {
+    title: 'Busca global', tips, shortcuts: shortcuts.rows, top: top.rows, misses: misses.rows[0].n,
+    actions: search.ACTIONS, providers: search.PROVIDERS.map((p) => ({ label: p.label, tables: p.tables })), perms: Object.keys(PERMISSIONS),
+    prefill: { label: String(req.query.label || ''), url: String(req.query.url || ''), keywords: String(req.query.keywords || ''), sugestao: String(req.query.sugestao || '') },
+  });
+}));
+
+router.post('/gestao/busca/atalhos', requirePerm('search.manage'), wrap(async (req, res) => {
+  const label = clean(req.body.label, 80); const url = String(req.body.url || '').trim().slice(0, 300);
+  const keywords = clean(req.body.keywords, 300) || null; const perm = PERMISSIONS[req.body.perm] ? req.body.perm : null;
+  if (!label || !/^\/(?!\/)/.test(url)) { await req.flash('error', 'Dê um nome e um endereço do próprio painel (começando com /).'); return res.redirect('/gestao/busca'); }
+  const { rows: [s] } = await db.query('INSERT INTO search_shortcuts (label, url, keywords, perm, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id', [label, url, keywords, perm, req.user.id]);
+  if (req.body.sugestao) await db.query('INSERT INTO search_dismissed (key) VALUES ($1) ON CONFLICT DO NOTHING', [String(req.body.sugestao).slice(0, 300)]);
+  await audit(req, 'busca.atalho_criado', 'shortcut', s.id, { label, url });
+  await req.flash('ok', `Atalho “${label}” criado: já aparece no Ctrl+K.`);
+  res.redirect('/gestao/busca');
+}));
+
+router.post('/gestao/busca/atalhos/:id/excluir', requirePerm('search.manage'), wrap(async (req, res) => {
+  if (isIntId(req.params.id)) await db.query('DELETE FROM search_shortcuts WHERE id = $1', [req.params.id]);
+  res.redirect('/gestao/busca');
+}));
+
+router.post('/gestao/busca/dispensar', requirePerm('search.manage'), wrap(async (req, res) => {
+  const key = String(req.body.key || '').slice(0, 300);
+  if (key) await db.query('INSERT INTO search_dismissed (key) VALUES ($1) ON CONFLICT DO NOTHING', [key]);
+  res.redirect('/gestao/busca');
+}));
+
+// ---- Sistema: fila de trabalhos, processos (workers) e rotinas ----
+const JOB_LABEL = { corte: 'Ler corte', finalizacao: 'Análise por IA do episódio', social_ideias: 'Ideias para as redes', email_notificacao: 'E-mail de notificação' };
+router.get('/gestao/sistema', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const [counts, failed, running, workers, runs, pubSending, pubWaiting, pubAction] = await Promise.all([
+    db.query("SELECT status, count(*)::int AS n FROM jobs WHERE status <> 'done' OR finished_at > now() - interval '24 hours' GROUP BY status"),
+    db.query("SELECT * FROM jobs WHERE status = 'error' ORDER BY finished_at DESC NULLS LAST LIMIT 30"),
+    db.query("SELECT * FROM jobs WHERE status IN ('running','queued') ORDER BY status DESC, run_after LIMIT 30"),
+    db.query("SELECT *, seen_at > now() - interval '90 seconds' AS alive FROM worker_heartbeats WHERE seen_at > now() - interval '1 hour' ORDER BY seen_at DESC LIMIT 10"),
+    db.query('SELECT * FROM scheduler_runs ORDER BY name'),
+    // publicações: no provedor agora, com nova tentativa marcada e as que pararam pedindo ação (últimos 14 dias)
+    db.query("SELECT p.id, p.title, p.platforms, (SELECT max(started_at) FROM publication_attempts a WHERE a.publication_id = p.id) AS since FROM episode_publications p WHERE p.status = 'enviando' ORDER BY p.id DESC LIMIT 10"),
+    db.query('SELECT id, title, retry_at, attempts, results FROM episode_publications WHERE retry_at IS NOT NULL ORDER BY retry_at LIMIT 10'),
+    db.query(`SELECT id, title, updated_at, results FROM episode_publications WHERE status IN ('erro','parcial') AND retry_at IS NULL AND updated_at > now() - interval '14 days'
+                AND results @> '[{"action": true}]' ORDER BY updated_at DESC LIMIT 10`),
+  ]);
+  res.render('gestao/system', {
+    title: 'Sistema', counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])), failed: failed.rows, running: running.rows,
+    workers: workers.rows, runs: runs.rows, jobLabel: JOB_LABEL, sse: require('../services/realtime').connectedCount(),
+    pubSending: pubSending.rows, pubWaiting: pubWaiting.rows, pubAction: pubAction.rows, netLabel: (p) => require('../services/uploadPost').PLATFORMS[p]?.label || p,
+  });
+}));
+
+router.post('/gestao/sistema/trabalhos/:id/repetir', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return res.redirect('/gestao/sistema');
+  const job = await require('../services/jobs').retryJob(Number(req.params.id));
+  await audit(req, 'trabalho.repetido', 'job', req.params.id);
+  await req.flash(job ? 'ok' : 'error', job ? 'Trabalho de volta na fila.' : 'Esse trabalho não está com erro.');
+  res.redirect('/gestao/sistema');
+}));
+
+module.exports = router;

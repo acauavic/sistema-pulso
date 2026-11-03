@@ -1,0 +1,127 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker">Gestão</span><h1>Planos de patrocínio</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'planos' }) %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var moneyVal = function (c) { return (Number(c) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var json = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
+%>
+<p class="lead">O que está aqui vale no <strong>media kit</strong>, no <strong>portal do patrocinador</strong> e nos entregáveis de cada patrocinador da cota. Para mudar só um patrocinador, use a aba Entregas dele.</p>
+
+<section class="card rule-card">
+  <form method="post" action="/gestao/patrocinios/regras" class="row spread" data-autosubmit-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div><strong>Episódio exclusivo não recebe inserção</strong><p class="small muted">Quando o episódio é entrega de um patrocinador (exclusivo), a equipe não consegue incluir inserção de outro patrocinador nele. Hoje: <strong><%= blockInsertion ? 'ligado' : 'desligado' %></strong>.</p></div>
+    <button class="btn" type="submit" name="block_insertion" value="<%= blockInsertion ? '0' : '1' %>"><%= blockInsertion ? 'Desligar' : 'Ligar' %></button>
+  </form>
+</section>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="<%= plans[0].key %>">
+  <div class="tabbar" role="tablist" aria-label="Planos">
+    <% plans.forEach(function (p) { %><button type="button" role="tab" data-tab-btn="<%= p.key %>" aria-controls="pane-<%= p.key %>"><%= p.name %> <span class="count"><%= p.items.length + (p.includes ? plans.find(function (x) { return x.key === p.includes; }).items.length : 0) %></span></button><% }) %>
+  </div>
+
+  <% plans.forEach(function (p) { var inc = p.includes ? plans.find(function (x) { return x.key === p.includes; }) : null; %>
+  <div class="pane" id="pane-<%= p.key %>" data-pane-id="<%= p.key %>">
+    <section class="card plan-card">
+      <div class="row spread">
+        <div>
+          <h2><%= p.name %> <span class="mono muted"><%= money(p.price_cents) %></span></h2>
+          <p class="small muted"><span class="mono"><%= usage[p.key] || 0 %></span> patrocinador<%= (usage[p.key] || 0) === 1 ? '' : 'es' %> nesta cota<%= inc ? ' · inclui tudo do ' + inc.name : '' %></p>
+        </div>
+        <button class="btn" type="button" data-modal-open="modal-plan-<%= p.key %>"><%- icon('pencil') %> Editar plano</button>
+      </div>
+      <dl class="kv">
+        <dt>Slide</dt><dd><strong><%= p.headline || '—' %></strong><% if (p.lede) { %><br><span class="muted"><%= p.lede %></span><% } %></dd>
+        <dt>Chip</dt><dd><%= p.tag || '—' %></dd>
+        <dt>Episódios</dt><dd><%= p.episodes_label || '—' %></dd>
+        <% if (p.note) { %><dt>Aviso</dt><dd class="muted"><%= p.note %></dd><% } %>
+      </dl>
+    </section>
+
+    <section class="card top-gap">
+      <div class="row spread">
+        <h3>Entregáveis <span class="mono muted"><%= p.items.length %></span></h3>
+        <button class="btn sm" type="button" data-fill-modal="modal-item" data-fill-mode="new" data-fill='<%- json({ section: 'entrega' }) %>' data-fill-action="/gestao/patrocinios/<%= p.key %>/itens"><%- icon('plus') %> Adicionar</button>
+      </div>
+      <% if (inc) { %><p class="small muted">Além de tudo do <%= inc.name %> (<%= inc.items.length %> entregáveis, editados na aba <%= inc.name %>).</p><% } %>
+      <% if (!p.items.length) { %><p class="muted small">Nenhum entregável próprio neste plano.</p><% } %>
+      <ul class="plain plan-list">
+        <% p.items.forEach(function (i, n) { %>
+        <li>
+          <div class="plan-list-main"><strong><%= i.title %></strong><% if (i.description) { %><span class="small muted"><%= i.description %></span><% } %></div>
+          <span class="mono small muted"><%= i.kind ? kinds[i.kind] : '' %><%= i.quantity ? ' · ' + i.quantity : '' %></span>
+          <span class="plan-list-tools">
+            <% if (n > 0) { %><form method="post" action="/gestao/patrocinios/itens/<%= i.id %>/mover" class="inline"><%- csrfField %><input type="hidden" name="dir" value="up"><button class="icon-btn" type="submit" aria-label="Subir <%= i.title %>" title="Subir"><%- icon('chevron-up', 14) %></button></form><% } %>
+            <button class="btn sm ghost" type="button" data-fill-modal="modal-item" data-fill-mode="edit" data-fill-action="/gestao/patrocinios/itens/<%= i.id %>" data-fill-remove="/gestao/patrocinios/itens/<%= i.id %>/excluir" data-fill='<%- json({ title: i.title, description: i.description || '', kind: i.kind || '', quantity: i.quantity || '', section: 'entrega' }) %>'>Editar</button>
+          </span>
+        </li>
+        <% }) %>
+      </ul>
+    </section>
+
+    <% if (p.key === 'diamond' || p.choices.length) { %>
+    <section class="card top-gap">
+      <div class="row spread">
+        <h3>Opções "escolha 1 de <%= p.choices.length %>" <span class="small muted"><%= p.choice_label ? '· ' + p.choice_label : '' %></span></h3>
+        <button class="btn sm" type="button" data-fill-modal="modal-item" data-fill-mode="new" data-fill='<%- json({ section: 'escolha' }) %>' data-fill-action="/gestao/patrocinios/<%= p.key %>/itens"><%- icon('plus') %> Adicionar</button>
+      </div>
+      <ul class="plain plan-list">
+        <% p.choices.forEach(function (i) { %>
+        <li>
+          <div class="plan-list-main"><strong><%= i.title %></strong><% if (i.description) { %><span class="small muted"><%= i.description %></span><% } %></div>
+          <span></span>
+          <span class="plan-list-tools"><button class="btn sm ghost" type="button" data-fill-modal="modal-item" data-fill-mode="edit" data-fill-action="/gestao/patrocinios/itens/<%= i.id %>" data-fill-remove="/gestao/patrocinios/itens/<%= i.id %>/excluir" data-fill='<%- json({ title: i.title, description: i.description || '', section: 'escolha' }) %>'>Editar</button></span>
+        </li>
+        <% }) %>
+      </ul>
+    </section>
+    <% } %>
+  </div>
+
+  <dialog class="modal modal-wide" id="modal-plan-<%= p.key %>" aria-labelledby="mp-<%= p.key %>-h">
+    <form method="post" action="/gestao/patrocinios/<%= p.key %>" class="stack">
+      <%- csrfField %>
+      <h2 id="mp-<%= p.key %>-h">Editar plano <%= p.name %></h2>
+      <div class="grid-2 tight">
+        <label>Nome do plano<input type="text" name="name" value="<%= p.name %>" maxlength="40" required></label>
+        <label>Investimento (R$)<input type="text" name="price" value="<%= moneyVal(p.price_cents) %>" inputmode="decimal" required></label>
+      </div>
+      <label>Título do slide<input type="text" name="headline" value="<%= p.headline || '' %>" maxlength="160"></label>
+      <label>Frase de apoio<textarea name="lede" rows="2" maxlength="400"><%= p.lede || '' %></textarea></label>
+      <div class="grid-2 tight">
+        <label>Chip do slide<input type="text" name="tag" value="<%= p.tag || '' %>" maxlength="120"></label>
+        <label>Episódios patrocinados <small class="muted">(comparativo)</small><input type="text" name="episodes_label" value="<%= p.episodes_label || '' %>" maxlength="80"></label>
+      </div>
+      <% if (p.key === 'diamond') { %>
+      <label class="check"><input type="checkbox" name="includes" value="1" <%= p.includes ? 'checked' : '' %>> Inclui tudo do plano <%= plans[0].name %></label>
+      <label>Título das opções "escolha 1"<input type="text" name="choice_label" value="<%= p.choice_label || '' %>" maxlength="160"></label>
+      <label>Aviso no fim do slide<textarea name="note" rows="2" maxlength="400"><%= p.note || '' %></textarea></label>
+      <% } %>
+      <p class="small muted">Os patrocinadores desta cota acompanham a mudança.</p>
+      <div class="row modal-actions"><button class="btn primary" type="submit">Salvar plano</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </form>
+  </dialog>
+  <% }) %>
+</div>
+
+<dialog class="modal modal-wide" id="modal-item" aria-labelledby="mi-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %><input type="hidden" name="section" value="entrega">
+    <h2 id="mi-h"><span data-mode="edit">Editar</span><span data-mode="new" hidden>Novo</span> <span data-hide-section="escolha">entregável</span><span data-hide-section="entrega" hidden>opção</span></h2>
+    <label>Nome<input type="text" name="title" maxlength="120" required></label>
+    <label>Descrição <small class="muted">(aparece no media kit e no portal)</small><textarea name="description" rows="2" maxlength="500"></textarea></label>
+    <div class="grid-2 tight" data-hide-section="escolha">
+      <label>Tipo <small class="muted">(liga a moldura, QR Code…)</small>
+        <select name="kind"><option value="">Sem tipo</option><% Object.keys(kinds).forEach(function (k) { %><option value="<%= k %>"><%= kinds[k] %></option><% }) %></select>
+      </label>
+      <label>Quantidade<input type="number" name="quantity" min="1" max="999"></label>
+    </div>
+    <p class="small muted" data-mode="new" hidden>Os patrocinadores da cota recebem na hora.</p>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+      <button class="link small danger-link push-right" type="submit" data-fill-remove-btn data-mode="edit" formnovalidate>Retirar do plano</button>
+    </div>
+  </form>
+</dialog>
+<%- include('../partials/foot') %>

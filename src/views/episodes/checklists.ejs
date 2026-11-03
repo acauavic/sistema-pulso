@@ -1,0 +1,46 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Produção · Padrões</span><h1>Checklists padrão</h1></div>
+  <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
+</div>
+<p class="lead">Modelos que o editor e a gestão mantêm juntos. Cada episódio recebe uma cópia quando chega em <strong>Disponível para edição</strong>. Os marcados como <strong>obrigatórios</strong> travam a passagem: <em>antes da revisão</em> impede enviar para revisão; <em>antes de finalizar</em> impede marcar como pronto para publicar.</p>
+
+<div class="stack-lg">
+  <% templates.forEach(function (t) { %>
+  <form method="post" action="/episodios/checklists/<%= t.id %>" class="card stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2 tight">
+      <label>Nome<input type="text" name="name" value="<%= t.name %>" maxlength="120" required></label>
+      <label>Porta
+        <select name="gate"><% Object.keys(gates).forEach(function (g) { %><option value="<%= g %>" <%= t.gate === g ? 'selected' : '' %>><%= gates[g] %></option><% }) %></select>
+      </label>
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" name="required" value="1" <%= t.required ? 'checked' : '' %>> Obrigatório (trava a passagem)</label>
+      <label class="check"><input type="checkbox" name="active" value="1" <%= t.active ? 'checked' : '' %>> Ativo (vale para os próximos episódios)</label>
+    </div>
+    <label>Itens <small class="muted">(um por linha)</small>
+      <textarea name="items" rows="<%= Math.min(14, t.items.length + 2) %>"><%= t.items.join('\n') %></textarea>
+    </label>
+    <div class="row">
+      <button class="btn primary" type="submit">Salvar</button>
+      <button class="btn danger" type="submit" formaction="/episodios/checklists/<%= t.id %>/excluir" data-confirm-click="Excluir este checklist?">Excluir</button>
+    </div>
+  </form>
+  <% }) %>
+
+  <form method="post" action="/episodios/checklists" class="card stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2>Novo checklist</h2>
+    <div class="grid-2 tight">
+      <label>Nome<input type="text" name="name" maxlength="120" required placeholder="Ex.: Cortes — antes de liberar"></label>
+      <label>Porta
+        <select name="gate"><% Object.keys(gates).forEach(function (g) { %><option value="<%= g %>"><%= gates[g] %></option><% }) %></select>
+      </label>
+    </div>
+    <label class="check"><input type="checkbox" name="required" value="1" checked> Obrigatório (trava a passagem)</label>
+    <label>Itens <small class="muted">(um por linha)</small><textarea name="items" rows="5" required></textarea></label>
+    <div><button class="btn primary" type="submit"><%- icon('plus') %> Criar checklist</button></div>
+  </form>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,10 @@
+# HTTPS automático (Let's Encrypt) para o domínio do painel. O DNS do domínio precisa apontar para este servidor.
+{$DOMINIO} {
+	encode zstd gzip
+	reverse_proxy web:3100 {
+		flush_interval -1   # tempo real (SSE) sem buffer
+	}
+	request_body {
+		max_size 300MB
+	}
+}

@@ -1,0 +1,49 @@
+<%# Janela do pedido de participação (página geral e página do convidado) e os dados do formulário. Variáveis: countries, icon. %>
+<dialog class="pl-modal" id="pl-modal" aria-labelledby="pl-modal-h">
+  <button class="pl-close" type="button" data-close aria-label="Fechar">&times;</button>
+  <div data-step="form">
+    <span class="pl-kicker" id="pl-modal-kicker">Pedido de participação</span>
+    <h2 id="pl-modal-h">Quem é você?</h2>
+    <p class="pl-sub" data-episode></p>
+    <form id="pl-form" novalidate>
+      <label class="pl-field">Nome completo
+        <input type="text" name="name" autocomplete="name" maxlength="120" required>
+        <small class="pl-err" data-err="name"></small>
+      </label>
+      <div class="pl-field">
+        <label for="pl-phone">WhatsApp</label>
+        <div class="pl-phone">
+          <select name="country" aria-label="País" autocomplete="country">
+            <% countries.forEach(function (c) { %><option value="<%= c.code %>" <%= c.code === 'BR' ? 'selected' : '' %>><%= c.name %> (+<%= c.dial %>)</option><% }) %>
+          </select>
+          <input type="tel" id="pl-phone" name="phone" inputmode="tel" autocomplete="tel-national" required placeholder="(11) 91234-5678">
+        </div>
+        <small class="pl-err" data-err="phone"></small>
+      </div>
+      <div class="pl-field pl-accept">
+        <p class="pl-terms-short">O episódio com plateia está condicionado à conformidade do convidado com a presença de plateia e à disponibilidade dele. A gravação pode ser cancelada, ou a entrada de plateia externa pode ser vetada, sem aviso prévio. Nesses casos o valor será devolvido.</p>
+        <label class="pl-check"><input type="checkbox" name="terms" value="1"> <span>Li e aceito as condições da plateia.</span></label>
+        <small class="pl-err" data-err="terms"></small>
+      </div>
+      <input type="text" name="site" class="pl-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <p class="pl-err pl-err-main" data-err="form" role="alert"></p>
+      <button class="pl-btn" type="submit">Revisar pedido</button>
+    </form>
+  </div>
+  <div data-step="review" hidden>
+    <span class="pl-kicker">Revisão</span>
+    <h2>Você está pedindo uma vaga na plateia de:</h2>
+    <dl class="pl-review">
+      <div><dt>Convidado</dt><dd data-r="guest"></dd></div>
+      <div><dt>Data</dt><dd data-r="date"></dd></div>
+      <div><dt>Horário</dt><dd data-r="time"></dd></div>
+      <div><dt data-r="price-label">Investimento (se selecionado)</dt><dd data-r="price"></dd></div>
+      <div><dt>Duração estimada</dt><dd data-r="duration"></dd></div>
+    </dl>
+    <p class="pl-warn">Pedir participação não confirma a sua vaga. A plateia é selecionada pela produção, por afinidade com o convidado e o tema. Ao continuar, você fala com a nossa produtora pelo WhatsApp, que avalia o seu pedido e responde com os próximos passos.</p>
+    <a class="pl-btn" data-whatsapp href="#" rel="noopener"><%- icon('whatsapp', 18) %> Continuar pelo WhatsApp</a>
+    <p class="pl-sub" data-nowa hidden>Recebemos o seu pedido. A produção avalia o encaixe e responde pelo WhatsApp informado.</p>
+  </div>
+</dialog>
+
+<script type="application/json" id="pl-data"><%- JSON.stringify({ countries: countries.map(function (c) { return { code: c.code, dial: c.dial, min: c.min, max: c.max }; }) }).replace(/</g, '\\u003c') %></script>

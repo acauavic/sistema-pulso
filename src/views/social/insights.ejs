@@ -1,0 +1,57 @@
+<%- include('../partials/head') %>
+<%- include('../partials/social-nav') %>
+<%
+  var num = function (v) { return v == null ? '—' : Number(v).toLocaleString('pt-BR'); };
+  var names = Object.keys(data.platforms);
+%>
+<div class="toolbar">
+  <span class="small muted"><%= data.updatedAt ? 'Atualizado ' + fmt.formatDateTime(data.updatedAt) + ' (os números são lidos no máximo uma vez por hora)' : 'Números das contas conectadas no Upload-Post' %></span>
+  <% if (data.ok) { %><a class="btn sm" href="/social/insights?atualizar=1"><%- icon('refresh-cw') %> Atualizar agora</a><% } %>
+</div>
+<% if (data.error) { %><p class="flash flash-error"><%= data.error %></p><% } %>
+
+<% if (!names.length && !data.error) { %>
+<div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma rede conectada.</strong></p><p class="muted small">Conecte as contas no Upload-Post para ver seguidores, visualizações e alcance aqui.</p></div>
+<% } %>
+
+<div class="stack-lg">
+  <% names.forEach(function (p) { var d = data.platforms[p]; %>
+  <section class="card platform-card">
+    <div class="row spread"><h2><%= platforms[p] ? platforms[p].label : p %></h2><span class="handle muted"><%= d.handle ? '@' + String(d.handle).replace(/^@/, '') : '' %></span></div>
+    <% if (!d.current) { %><p class="muted small">Sem números desta rede agora.</p><% } else { %>
+    <div class="stat-grid">
+      <% d.metrics.forEach(function (m) { if (m.value == null) return; %>
+      <div class="stat">
+        <span class="stat-label"><%= m.label %></span>
+        <span class="stat-n"><%= num(m.value) %></span>
+        <span class="delta <%= m.delta > 0 ? 'up' : (m.delta < 0 ? 'down' : '') %>"><%= m.delta == null ? 'sem comparação ainda' : (m.delta > 0 ? '▲ ' : m.delta < 0 ? '▼ ' : '') + num(Math.abs(m.delta)) + ' em 7 dias' %></span>
+      </div>
+      <% }) %>
+    </div>
+    <% } %>
+  </section>
+  <% }) %>
+
+  <section class="card">
+    <h2>O que a equipe publicou</h2>
+    <p class="small muted">Últimos 30 dias, pelos registros do painel.</p>
+    <div class="stat-grid">
+      <a class="stat" href="/social/publicacoes?status=publicado"><span class="stat-label">Publicadas</span><span class="stat-n"><%= ours.published %></span></a>
+      <a class="stat" href="/social/publicacoes?status=agendado"><span class="stat-label">Agendadas</span><span class="stat-n"><%= ours.scheduled %></span></a>
+      <a class="stat" href="/social/publicacoes?status=erro"><span class="stat-label">Com erro</span><span class="stat-n"><%= ours.failed %></span></a>
+      <a class="stat" href="/social/publicacoes?status=simulado"><span class="stat-label">Testes</span><span class="stat-n"><%= ours.tested %></span></a>
+    </div>
+    <div class="grid-2 tight">
+      <div>
+        <h3>Por tipo</h3>
+        <dl class="kv"><% ours.byMedia.forEach(function (m) { %><dt><%= MEDIA[m.media] %></dt><dd class="mono"><%= m.n %></dd><% }) %></dl>
+      </div>
+      <div>
+        <h3>Por rede</h3>
+        <% if (!ours.byPlatform.length) { %><p class="muted small">Nada publicado nos últimos 30 dias.</p><% } %>
+        <dl class="kv"><% ours.byPlatform.forEach(function (r) { %><dt><%= platforms[r.platform] ? platforms[r.platform].label : r.platform %></dt><dd class="mono"><%= r.n %></dd><% }) %></dl>
+      </div>
+    </div>
+  </section>
+</div>
+<%- include('../partials/foot') %>

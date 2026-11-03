@@ -1,0 +1,23 @@
+<%# Janela de recorte da foto do convidado. Moldura única 4:3 (1200×900): plateia, media kit, portal do patrocinador e painel. Script: /static/cropper.js %>
+<dialog class="modal" id="modal-recorte" aria-labelledby="m-recorte-h" data-out-w="<%= photoFrame.width %>" data-out-h="<%= photoFrame.height %>">
+  <div class="stack">
+    <h2 id="m-recorte-h">Enquadrar a foto</h2>
+    <p class="small muted">Arraste a foto para enquadrar o rosto. A mesma moldura (<span class="mono"><%= photoFrame.ratio %></span>) aparece na página da plateia, no media kit, no portal do patrocinador e aqui no painel.</p>
+    <div class="crop-stage" data-crop-stage tabindex="0" role="img" aria-label="Área de recorte. Arraste a foto, ou use as setas para mover e + e − para aproximar.">
+      <canvas width="640" height="480" data-crop-canvas></canvas>
+      <span class="crop-grid" aria-hidden="true"></span>
+    </div>
+    <label class="crop-zoom"><span>Zoom</span><input type="range" min="1" max="4" step="0.01" value="1" data-crop-zoom></label>
+    <p class="small warn" data-crop-warn hidden>A foto é pequena para essa moldura e pode ficar borrada. Prefira uma com pelo menos 1200 px de largura.</p>
+    <div class="crop-previews" aria-label="Como a foto aparece">
+      <figure><canvas width="160" height="120" data-crop-preview></canvas><figcaption>Plateia</figcaption></figure>
+      <figure><canvas width="112" height="84" data-crop-preview></canvas><figcaption>Media kit e portal</figcaption></figure>
+      <figure><canvas width="72" height="54" data-crop-preview></canvas><figcaption>Painel</figcaption></figure>
+    </div>
+    <div class="row modal-actions">
+      <button class="btn primary" type="button" data-crop-ok>Usar esta foto</button>
+      <button class="btn ghost" type="button" data-crop-cancel>Cancelar</button>
+      <button class="link small" type="button" data-crop-other>Escolher outra foto</button>
+    </div>
+  </div>
+</dialog>

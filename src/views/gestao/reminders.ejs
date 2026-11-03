@@ -1,0 +1,42 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker">Gestão</span><h1>Lembretes da gravação</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'lembretes' }) %>
+<p class="lead">Com o convidado em Agendado, o sistema avisa a produtora na hora de cada lembrete e deixa a mensagem pronta na página do convidado, com o botão do WhatsApp.
+  Gravação antes das <span class="mono"><%= (Number(s.morning.slice(0, 2)) + 3) + 'h' %></span>: sem lembretes no dia (o de 1 dia antes leva o endereço). Lembrete do dia e o de 3 horas a menos de 1h30 um do outro: fica só o de 3 horas, com o endereço.</p>
+<% var openOnLoad = function (k) { return openField === k ? 'data-open-on-load' : ''; }; %>
+<div class="stack">
+  <section class="card">
+    <div class="row spread"><h2>Endereço do estúdio</h2><button class="btn sm" type="button" data-modal-open="m-endereco"><%- icon('pencil', 14) %> Editar</button></div>
+    <p><%= s.address %></p>
+    <% if (!s.addressSet) { %><p class="small warn">Usando o local da página da plateia. Coloque o endereço completo (rua, número, referência) para o lembrete do dia.</p><% } %>
+  </section>
+  <section class="card">
+    <div class="row spread"><h2>Horário dos lembretes</h2><button class="btn sm" type="button" data-modal-open="m-hora"><%- icon('pencil', 14) %> Editar</button></div>
+    <p class="mono"><%= s.morning %></p>
+    <p class="small muted">Hora dos lembretes de 3 dias, 1 dia e do dia (o de 3 horas segue o horário da gravação).</p>
+  </section>
+  <% order.forEach(function (k) { %>
+  <section class="card">
+    <div class="row spread"><h2><%= kinds[k].label %> <span class="small muted">· <%= kinds[k].hint %></span></h2><button class="btn sm" type="button" data-modal-open="m-<%= k %>"><%- icon('pencil', 14) %> Editar</button></div>
+    <p class="pre small"><%= examples[k] %></p>
+    <p class="handle muted">Exemplo com <%= sampleName %></p>
+  </section>
+  <% }) %>
+</div>
+
+<% [['endereco', 'Endereço do estúdio', s.address, 'Rua, número, bairro, cidade e uma referência para chegar.'], ['hora', 'Horário dos lembretes', s.morning, 'Entre 06:00 e 12:59. Muda a hora dos lembretes já agendados.']]
+     .concat(order.map(function (k) { return [k, 'Mensagem: ' + kinds[k].label, s.messages[k], 'Use {primeiro_nome}, {nome}, {dia}, {data}, {hora} e {endereco}.']; }))
+     .forEach(function (f) { %>
+<dialog class="modal" id="m-<%= f[0] %>" aria-labelledby="m-<%= f[0] %>-h" <%= openOnLoad(f[0]) %>>
+  <form method="post" action="/gestao/lembretes" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="campo" value="<%= f[0] %>">
+    <h2 id="m-<%= f[0] %>-h"><%= f[1] %></h2>
+    <% if (f[0] === 'hora') { %><label>Horário<input type="time" name="valor" value="<%= f[2] %>" min="06:00" max="12:59" required></label>
+    <% } else if (f[0] === 'endereco') { %><label>Endereço<input type="text" name="valor" value="<%= f[2] %>" maxlength="300"></label>
+    <% } else { %><label>Mensagem<textarea name="valor" rows="7" maxlength="1500" required><%= f[2] %></textarea></label><% } %>
+    <p class="small muted"><%= f[3] %></p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% }) %>
+<%- include('../partials/foot') %>

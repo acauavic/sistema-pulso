@@ -1,0 +1,66 @@
+<%- include('../partials/head') %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var chosen = rows.filter(function (r) { return r.kit_featured && r.guest_id; }).length;
+%>
+<div class="page-head"><div><span class="kicker">Gestão · Convites e parcerias</span><h1>Galeria do media kit</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'galeria' }) %>
+<p class="lead">Escolha quais episódios publicados aparecem no slide "Quem já sentou à mesa" do media kit. A galeria mostra 8 convidados por vez (4 colunas, 2 linhas) e passa para o lado quando há mais.</p>
+
+<% if (!rows.length) { %>
+<div class="empty">
+  <%- include('../partials/pulse-line') %>
+  <h2>Nenhum episódio publicado ainda</h2>
+  <p>Quando um episódio for marcado como publicado, ele aparece aqui para você escolher. Até lá, o media kit mostra a galeria padrão de lançamento.</p>
+</div>
+<% } else { %>
+<p class="small muted"><span class="mono"><%= chosen %></span> de <span class="mono"><%= rows.length %></span> no media kit.<% if (!chosen) { %> Enquanto você não escolher nenhum, o kit mostra a galeria padrão de lançamento.<% } %></p>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Convidado</th><th>Episódio</th><th class="num">Alcance</th><th>No kit</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (r) { var cred = kit.credentialOf(r); var usable = Boolean(r.guest_id); %>
+      <tr>
+        <td>
+          <div class="row">
+            <% if (r.has_photo) { %><img class="guest-photo" src="<%= photoUrl(r.guest_id) %>" alt="" width="64" height="48" loading="lazy"><% } %>
+            <div><strong><%= r.guest_name || 'Sem convidado ligado' %></strong><% if (r.instagram) { %><br><span class="small muted mono">@<%= String(r.instagram).replace(/^@/, '') %></span><% } %></div>
+          </div>
+        </td>
+        <td><span class="mono small muted"><%= r.number ? 'EP.' + String(r.number).padStart(3, '0') : 'EP' %></span><br><%= r.title %></td>
+        <td class="num mono"><%= r.kit_audience || '—' %></td>
+        <td>
+          <% if (!usable) { %><span class="small muted">precisa de convidado</span>
+          <% } else { %>
+          <form method="post" action="/gestao/galeria-kit/<%= r.id %>/mostrar" class="inline"><%- csrfField %>
+            <input type="hidden" name="mostrar" value="<%= r.kit_featured ? '0' : '1' %>">
+            <% if (r.kit_featured) { %><button class="btn sm" type="submit" title="Tirar do media kit"><span class="badge b-green">no kit</span> Tirar</button>
+            <% } else { %><button class="btn sm" type="submit">Mostrar no kit</button><% } %>
+          </form>
+          <% } %>
+        </td>
+        <td><% if (usable) { %><button class="icon-btn" type="button" data-modal-open="m-ep-<%= r.id %>" aria-label="Editar texto de <%= r.guest_name %>" title="Editar texto"><%- icon('pencil', 14) %></button><% } %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<% rows.forEach(function (r) { if (!r.guest_id) return; %>
+<dialog class="modal" id="m-ep-<%= r.id %>" aria-labelledby="m-ep-<%= r.id %>-h" <%= openId === r.id ? 'data-open-on-load' : '' %>>
+  <form method="post" action="/gestao/galeria-kit/<%= r.id %>" class="stack"><%- csrfField %>
+    <h2 id="m-ep-<%= r.id %>-h"><%= r.guest_name %></h2>
+    <label>Alcance
+      <input type="text" name="audience" maxlength="20" value="<%= r.kit_audience || '' %>" placeholder="+3,6M">
+    </label>
+    <p class="small muted">Seguidores somados, como quer que apareça. Em branco, o kit mostra um traço.</p>
+    <label>Frase de apresentação
+      <textarea name="credential" rows="3" maxlength="200" placeholder="<%= kit.credentialOf(Object.assign({}, r, { kit_credential: null })) %>"><%= r.kit_credential || '' %></textarea>
+    </label>
+    <p class="small muted">Duas linhas no máximo. Em branco, usa o cargo e a empresa do cadastro do convidado.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% }) %>
+<% } %>
+<%- include('../partials/foot') %>

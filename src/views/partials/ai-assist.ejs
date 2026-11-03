@@ -1,0 +1,5 @@
+<%# Liga o botão "Sugerir com IA" nos campos marcados com data-ai (só quando a IA está configurada). Pode ser incluído mais de uma vez. %>
+<% if (locals.aiOn) { %>
+<template data-ai-icons><span data-i="sparkles"><%- icon('sparkles', 14) %></span><span data-i="send"><%- icon('send', 14) %></span></template>
+<script src="/static/aiassist.js?v=<%= assetV %>" defer></script>
+<% } %>
