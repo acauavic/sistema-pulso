@@ -302,6 +302,10 @@ input[type="file"] { padding: 8px 12px; }
 .review-timeline::before { content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: var(--line-strong); }
 .review-timeline .marker { position: absolute; top: 3px; width: 10px; height: 12px; margin-left: -5px; padding: 0; border: 0; border-radius: 2px; background: var(--lime); cursor: pointer; }
 .review-timeline .marker.resolved { background: var(--muted); }
+.review-timeline .marker.range { margin-left: 0; min-width: 10px; opacity: .75; } .review-timeline .marker.range:hover { opacity: 1; }
+.review-timeline { cursor: pointer; touch-action: none; user-select: none; }
+.review-timeline .range-sel { position: absolute; top: 0; bottom: 0; border: 1px solid var(--text); border-radius: 2px; background: color-mix(in srgb, var(--text) 16%, transparent); pointer-events: none; }
+.review-timeline .range-sel.open { width: 2px; padding: 0; border-width: 0; background: var(--text); }
 .comment-list { display: grid; gap: 12px; } .comment { padding: 10px 12px; background: var(--raised); border-radius: var(--r-card); border-left: 3px solid var(--lime); }
 .comment.resolved { opacity: .6; border-left-color: var(--muted); }
 .comment p { margin: 6px 0; } .seek { background: none; border: 1px solid var(--line-strong); border-radius: var(--r-tag); color: var(--text); padding: 2px 8px; cursor: pointer; }

@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.52.0', date: '2026-11-03', title: 'Trecho na revisão e troca do vídeo do corte',
+    items: [
+      { kind: 'novo', text: 'Na revisão do vídeo, o comentário pode marcar um trecho: arraste na linha do tempo, ou use "Marcar início do trecho" e "Marcar fim do trecho" (atalhos I e O). Clicar no tempo do comentário toca aquele trecho e para no fim dele.' },
+      { kind: 'novo', text: 'O vídeo de um corte ainda não publicado pode ser trocado: "Trocar vídeo" na página do corte. Título, legenda, capa escolhida e comentários continuam, a versão anterior fica guardada para baixar, e quem revisa recebe um aviso quando a nova versão fica pronta.' },
+    ],
+  },
+  {
     version: '1.51.0', date: '2026-11-03', title: 'Calendário de posts no portal do convidado',
     items: [
       { kind: 'novo', text: 'A aba Portal do convidado ganhou o "Calendário de posts": monte quantos posts vão sair, a data, o horário provável e, se quiser, o que sai em cada um. Salvo, ele aparece na seção de posts em collab do portal, como previsão. Não precisa ter o post pronto, e "tirar do portal" esconde sem apagar as datas.' },

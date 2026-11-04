@@ -796,20 +796,22 @@ router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(asy
   if (!body && !ids.length && !(rich && rich.html)) return res.status(400).json({ ok: false, error: 'Escreva o comentário.' });
   const at = req.body.at_ms === '' || req.body.at_ms == null ? null : Number.parseInt(req.body.at_ms, 10);
   if (at != null && (!Number.isInteger(at) || at < 0 || at > 24 * 3600 * 1000)) return res.status(400).json({ ok: false, error: 'Minutagem inválida.' });
+  const end = req.body.end_ms === '' || req.body.end_ms == null ? null : Number.parseInt(req.body.end_ms, 10);
+  if (end != null && (at == null || !Number.isInteger(end) || end <= at || end > 24 * 3600 * 1000)) return res.status(400).json({ ok: false, error: 'Trecho inválido: o fim precisa vir depois do início.' });
   let fileId = null;
   if (isIntId(String(req.body.file_id || ''))) {
     const { rowCount } = await db.query("SELECT 1 FROM episode_files WHERE id = $1 AND episode_id = $2 AND kind = 'editado'", [req.body.file_id, ep.id]);
     if (rowCount) fileId = Number(req.body.file_id);
   }
-  const { rows: [c] } = await db.query('INSERT INTO episode_comments (episode_id, file_id, at_ms, body, body_html, author_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-    [ep.id, fileId, at, body, rich ? rich.html || null : null, req.user.id]);
+  const { rows: [c] } = await db.query('INSERT INTO episode_comments (episode_id, file_id, at_ms, end_ms, body, body_html, author_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+    [ep.id, fileId, at, end, body, rich ? rich.html || null : null, req.user.id]);
   const linked = ids.length ? await attachmentsSvc.link(ids, 'review', c.id, req.user) : 0;
   const files = linked ? (await attachmentsSvc.forReviews([c.id]))[c.id] || [] : [];
   const said = body || (files.find((f) => f.kind === 'audio')?.transcript ? `Áudio: ${files.find((f) => f.kind === 'audio').transcript}` : 'Anexo enviado.');
-  await prod.addEvent(ep.id, req.user.id, 'comentario', `Comentário${at != null ? ` em ${require('../utils/format').formatClock(at)}` : ''}: ${said.slice(0, 140)}`);
+  await prod.addEvent(ep.id, req.user.id, 'comentario', `Comentário${at != null ? ` em ${fmt.formatRange(at, end)}` : ''}: ${said.slice(0, 140)}`);
   if (wantsJson(req)) {
     const html = await renderPartial(res, 'episodes/_review_comment', { c: { ...c, author_name: req.user.name, attachments: files }, ep, tickable: true });
-    return res.json({ ok: true, id: c.id, html, comment: { id: c.id, at_ms: at, clock: at != null ? fmt.formatClock(at) : null, body, author: req.user.name, when: fmt.formatDateTime(new Date()), resolved: false }, counts: await commentCounts(ep.id) });
+    return res.json({ ok: true, id: c.id, html, comment: { id: c.id, at_ms: at, end_ms: end, clock: at != null ? fmt.formatRange(at, end) : null, body, author: req.user.name, when: fmt.formatDateTime(new Date()), resolved: false }, counts: await commentCounts(ep.id) });
   }
   res.redirect(back(ep.id, '#revisao'));
 }));

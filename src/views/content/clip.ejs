@@ -30,16 +30,19 @@
 <% if (clip.status === 'enviando' || clip.status === 'processando') { %>
 <section class="card"><div class="bar"><i data-clip-bar data-w="0"></i></div><p class="small muted" data-clip-msg><%= clip.status === 'enviando' ? 'Enviando…' : 'Lendo o vídeo, a fala e os quadros. Leva alguns minutos.' %></p></section>
 <% } %>
-<% if (clip.status === 'erro') { %><section class="card"><p class="err"><%= clip.error %></p></section><% } %>
+<% if (clip.status === 'erro') { %><section class="card"><p class="err"><%= clip.error %></p><% if (perm.cut && replace.allowed) { %><p><button class="btn sm" type="button" data-modal-open="modal-trocar"><%- icon('upload', 14) %> Enviar outro vídeo</button></p><% } %></section><% } %>
 <% if (clip.note) { %><p class="notice small"><%= clip.note %></p><% } %>
 
 <div class="grid-2 align-start top-gap" data-clip="<%= clip.id %>">
   <div class="stack-lg">
     <% if (ready) { %>
     <section class="card">
-      <h2>Vídeo e capa</h2>
+      <div class="row spread">
+        <h2>Vídeo e capa<% if (clip.version > 1) { %> <span class="mono small muted">v<%= clip.version %></span><% } %></h2>
+        <% if (perm.cut && replace.allowed) { %><button class="btn sm" type="button" data-modal-open="modal-trocar"><%- icon('upload', 14) %> Trocar vídeo</button><% } %>
+      </div>
       <div class="clip-media">
-        <video controls preload="metadata" playsinline src="/cortes/<%= clip.id %>/video#t=0.1"></video>
+        <video controls preload="metadata" playsinline src="/cortes/<%= clip.id %>/video<%= clip.version > 1 ? '?v=' + clip.version : '' %>#t=0.1"></video>
         <div>
           <p class="kicker">Capa<%= covers.length ? '' : ' (ainda sem sugestões)' %></p>
           <div class="clip-covers">
@@ -56,6 +59,19 @@
           <% if (chosen && perm.cut) { %><p class="row small"><a class="btn sm" href="/capas/<%= chosen.id %>/editar">Editar capa</a><span class="muted">Troque o quadro ou envie uma imagem sua.</span></p><% } %>
         </div>
       </div>
+      <% if (versions.length) { %>
+      <details class="top-gap">
+        <summary>Versões anteriores <span class="mono small muted"><%= versions.length %></span></summary>
+        <ul class="plain file-list file-compact">
+          <% versions.forEach(function (v) { %>
+          <li>
+            <span><span class="mono small">v<%= v.version %></span> <span class="mono small"><%= v.filename || '' %></span> <span class="handle muted">· <%= fmt.formatBytes(v.size_bytes) %><%= v.duration_ms ? ' · ' + fmt.formatClock(v.duration_ms) : '' %> · trocada em <%= fmt.formatDay(v.replaced_at) %><%= v.uploader ? ' · ' + v.uploader : '' %></span></span>
+            <a class="btn sm" href="/cortes/<%= clip.id %>/versoes/<%= v.id %>/baixar"><%- icon('download', 14) %> Baixar</a>
+          </li>
+          <% }) %>
+        </ul>
+      </details>
+      <% } %>
     </section>
     <% } %>
 
@@ -193,6 +209,22 @@
 </dialog>
 <% } %>
 <div class="top-gap"><%- include('../partials/comments', { type: 'clip', id: clip.id, items: comments, back: '/cortes/' + clip.id }) %></div>
+<% if (perm.cut && replace.allowed) { %>
+<dialog class="modal" id="modal-trocar" aria-labelledby="mtr-h">
+  <div class="stack">
+    <h2 id="mtr-h">Trocar o vídeo do corte</h2>
+    <p class="small muted">O novo vídeo vira a versão <span class="mono"><%= clip.version + 1 %></span>. Título, legenda, capa escolhida e comentários continuam, e a versão atual fica guardada para baixar. O sistema lê o vídeo de novo e sugere capas novas.</p>
+    <% if (replace.waiting) { %><p class="notice small">Este corte tem publicação agendada ou em revisão: ela vai sair com o vídeo novo. Confira a capa.</p><% } %>
+    <div class="uploader" data-uploader data-close-on-start="1" data-base="/cortes/<%= clip.id %>/trocar/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="<%= clip.title %>" data-hash="">
+      <input type="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files aria-label="Novo vídeo do corte">
+      <button class="btn primary" type="button" data-start><%- icon('upload') %> Enviar nova versão</button>
+      <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
+      <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
+    </div>
+    <div class="row modal-actions"><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </div>
+</dialog>
+<% } %>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>

@@ -390,6 +390,8 @@ Ao criar o episódio, quem cria marca o que pedir ao editor: **Cortes**, **Q&A**
 
 Quando um corte é postado pelo app da rede (emergência, ou o sistema falhou), registre o link para o sistema saber que ele saiu:
 
+- **Trocar o vídeo do corte**: enquanto não foi publicado, "Trocar vídeo" na página do corte sobe uma nova versão (`clip_versions` guarda as anteriores). Título, legenda, capa escolhida e comentários continuam; publicação agendada ou em revisão sai com o vídeo novo.
+- **Trecho na revisão**: o comentário da revisão do vídeo pode ter início e fim (`episode_comments.end_ms`), marcados por arraste na linha do tempo, pelo botão ou pelas teclas I e O.
 - **Corte que não passou pelo sistema**: na página do corte, "Postado por fora? Registrar o link". Cole o link do post em cada rede (um por linha; a rede é reconhecida pelo endereço), o collab do Instagram (já vem com o @ do convidado) e quando saiu. Vira uma publicação no ar, com o texto do corte: conta no Conteúdo, no Social e no portal do convidado (inclusive como collab).
 - **Rede que falhou numa publicação**: na linha da rede, "postei por fora" abre a janela com a rede e o link. A rede passa a contar como no ar e as novas tentativas automáticas daquela rede param.
 

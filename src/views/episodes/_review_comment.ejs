@@ -1,7 +1,7 @@
 <%# Um comentário da revisão do vídeo (na minutagem). Variáveis: c, ep, tickable %>
-<li class="comment <%= c.resolved ? 'resolved' : '' %>" data-at="<%= c.at_ms == null ? '' : c.at_ms %>" data-id="<%= c.id %>">
+<li class="comment <%= c.resolved ? 'resolved' : '' %>" data-at="<%= c.at_ms == null ? '' : c.at_ms %>" data-end="<%= c.end_ms == null ? '' : c.end_ms %>" data-id="<%= c.id %>">
   <div class="row">
-    <% if (c.at_ms != null) { %><button type="button" class="seek handle" data-seek="<%= c.at_ms %>"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></button><% } else { %><span class="badge b-gray">geral</span><% } %>
+    <% if (c.at_ms != null) { %><button type="button" class="seek handle" data-seek="<%= c.at_ms %>"<% if (c.end_ms != null) { %> data-seek-end="<%= c.end_ms %>" title="Tocar este trecho"<% } %>><%- icon('clock', 12) %> <%= fmt.formatRange(c.at_ms, c.end_ms) %></button><% } else { %><span class="badge b-gray">geral</span><% } %>
     <span class="small muted"><%= c.author_name || '—' %> · <%= fmt.formatDateTime(c.created_at) %></span><% if (c.edited_at) { %><span class="cmt-edited" title="Editado em <%= fmt.formatDateTime(c.edited_at) %>" aria-label="Editado em <%= fmt.formatDateTime(c.edited_at) %>"><%- icon('pencil', 12) %></span><% } %>
   </div>
   <% if (c.body_html) { %><div class="rich-content comment-body"><%- c.body_html %></div><% } else if (c.body) { %><p class="pre"><%= c.body %></p><% } %>

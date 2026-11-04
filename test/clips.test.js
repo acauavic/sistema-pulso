@@ -54,6 +54,19 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
     if (stop) return { init: init.json, id };
     return { init: init.json, id, done: await call(c, 'POST', `/cortes/${id}/concluir`) };
   };
+  // troca de vídeo: mesmo caminho, com a base /cortes/:id/trocar/
+  const replaceClip = async (c, clipId, name, data, { stop = false } = {}) => {
+    const init = await call(c, 'POST', `/cortes/${clipId}/trocar/iniciar`, { json: { nome: name, tamanho: data.length, tipo: 'video/mp4' } });
+    if (init.status !== 200) return { init };
+    const { id, partSize, totalParts } = init.json;
+    for (let n = 1; n <= totalParts; n += 1) {
+      const slice = data.subarray((n - 1) * partSize, Math.min(data.length, n * partSize));
+      const part = await call(c, 'PUT', `/cortes/${clipId}/trocar/${id}/parte/${n}`, { raw: slice });
+      assert.equal(part.status, 200, part.text);
+    }
+    if (stop) return { init: init.json, id };
+    return { init: init.json, id, done: await call(c, 'POST', `/cortes/${clipId}/trocar/${id}/concluir`) };
+  };
   const clipRow = (id) => h.db.query('SELECT * FROM episode_clips WHERE id=$1', [id]).then((r) => r.rows[0]);
   const runAll = async () => { for (let i = 0; i < 8; i += 1) { if (!(await jobs.runNext())) break; } };
   const lastCall = (pred) => [...h.uploadPostCalls].reverse().find(pred);
@@ -369,6 +382,92 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
       assert.equal((await h.db.query('SELECT count(*)::int n FROM episode_covers WHERE clip_id=$1', [clip.id])).rows[0].n, 0);
     });
   });
+
+  // ---- trocar o vídeo de um corte ainda não publicado
+  let id;
+  it('troca: prepara um corte já revisado', async () => {
+      ({ id } = await uploadClip(as.editor, 'troca.mp4', vertical));
+      await runAll();
+      await h.db.query("UPDATE episode_clips SET title = 'Corte revisado', post_title = 'Título aprovado', caption = 'Legenda aprovada', episode_id = $2 WHERE id = $1", [id, ep.id]);
+      await h.db.query("INSERT INTO comments (entity_type, entity_id, author_id, body) SELECT 'clip', $1, id, 'Ajustar o começo' FROM users WHERE email LIKE 'prod%' LIMIT 1", [id]);
+  });
+
+    it('a página oferece a troca a quem corta, e quem não corta não troca', async () => {
+      const page = (await as.editor.get(`/cortes/${id}`)).text;
+      assert.match(page, /data-modal-open="modal-trocar"/); assert.match(page, new RegExp(`data-base="/cortes/${id}/trocar/"`));
+      assert.doesNotMatch((await as.prod.get(`/cortes/${id}`)).text, /modal-trocar/);
+      assert.equal((await call(as.prod, 'POST', `/cortes/${id}/trocar/iniciar`, { json: { nome: 'x.mp4', tamanho: 100 } })).status, 403);
+      assert.equal((await call(as.editor, 'POST', `/cortes/${id}/trocar/iniciar`, { json: { nome: 'x.txt', tamanho: 100 } })).status, 400);
+    });
+
+    it('enquanto o arquivo sobe, o vídeo atual continua valendo; cancelar não muda nada', async () => {
+      const before = await clipRow(id);
+      const r = await replaceClip(as.editor, id, 'novo.mp4', horizontal, { stop: true });
+      const during = await clipRow(id);
+      assert.equal(during.storage_key, before.storage_key); assert.equal(during.status, 'pronto');
+      assert.equal((await call(as.editor, 'POST', `/cortes/${id}/trocar/${r.id}/cancelar`)).status, 200);
+      assert.equal((await h.db.query('SELECT 1 FROM clip_replacements WHERE clip_id = $1', [id])).rows.length, 0);
+      assert.equal((await clipRow(id)).version, 1);
+    });
+
+    it('envio direto ao armazenamento (o caminho de produção) tem as mesmas rotas', async () => {
+      const r = await replaceClip(as.editor, id, 'direto.mp4', horizontal, { stop: true });
+      await h.db.query('DELETE FROM clip_upload_parts WHERE clip_id = $1', [id]);
+      const urls = await call(as.editor, 'GET', `/cortes/${id}/trocar/${r.id}/urls?partes=1`);
+      assert.equal(urls.status, 200);
+      const ok = await call(as.editor, 'POST', `/cortes/${id}/trocar/${r.id}/parte/1/ok`, { json: { etag: '"abc"', size: Math.min(horizontal.length, r.init.partSize) } });
+      assert.equal(ok.status, 200, ok.text);
+      assert.equal((await h.db.query('SELECT etag FROM clip_upload_parts WHERE clip_id = $1', [id])).rows.length, 1);
+      assert.equal((await call(as.editor, 'GET', `/cortes/${id}/trocar/999999/urls?partes=1`)).status, 404, 'outro envio não vale');
+      await call(as.editor, 'POST', `/cortes/${id}/trocar/${r.id}/cancelar`);
+    });
+
+    it('concluir vira a versão 2: textos, episódio e comentários ficam; a versão 1 fica guardada para baixar; quem revisa é avisado', async () => {
+      const before = await clipRow(id);
+      const r = await replaceClip(as.editor, id, 'novo.mp4', horizontal);
+      assert.equal(r.done.status, 200, r.done.text);
+      assert.equal((await clipRow(id)).status, 'processando');
+      await runAll();
+      const now = await clipRow(id);
+      assert.equal(now.status, 'pronto'); assert.equal(now.version, 2); assert.equal(now.filename, 'novo.mp4');
+      assert.notEqual(now.storage_key, before.storage_key); assert.ok(h.b2Store.has(now.storage_key));
+      assert.equal(now.width, 640, 'as medidas são as do vídeo novo');
+      assert.equal(now.post_title, 'Título aprovado'); assert.equal(now.caption, 'Legenda aprovada'); assert.equal(now.episode_id, ep.id);
+      const { rows: [v] } = await h.db.query('SELECT * FROM clip_versions WHERE clip_id = $1', [id]);
+      assert.equal(v.version, 1); assert.equal(v.storage_key, before.storage_key); assert.ok(h.b2Store.has(v.storage_key), 'a versão antiga continua no armazenamento');
+      const page = (await as.editor.get(`/cortes/${id}`)).text;
+      assert.match(page, /Versões anteriores/); assert.match(page, new RegExp(`/cortes/${id}/versoes/${v.id}/baixar`));
+      assert.match(page, new RegExp(`/cortes/${id}/video\\?v=2#t=0\\.1`), 'o navegador não reaproveita o vídeo antigo');
+      assert.equal((await as.editor.get(`/cortes/${id}/versoes/${v.id}/baixar`)).status, 302);
+      const { rows: notes } = await h.db.query("SELECT n.title, n.user_id FROM notifications n WHERE n.dedupe_key = $1", [`corte-versao-${id}-2`]);
+      assert.ok(notes.length >= 1); assert.match(notes[0].title, /Nova versão do corte: Corte revisado/);
+    });
+
+    it('publicação agendada não trava a troca e avisa na janela; publicado trava, inclusive no fim de um envio em andamento', async () => {
+      const [pub] = (await h.db.query("INSERT INTO episode_publications (episode_id, clip_id, platforms, title, status, media, scheduled_at) VALUES ($1,$2,'{instagram}','T','agendado','video', now() + interval '1 day') RETURNING id", [ep.id, id])).rows;
+      assert.match((await as.editor.get(`/cortes/${id}`)).text, /publicação agendada ou em revisão/);
+      const r = await replaceClip(as.editor, id, 'outro.mp4', horizontal, { stop: true });
+      await h.db.query("UPDATE episode_publications SET status = 'publicado' WHERE id = $1", [pub.id]);
+      const done = await call(as.editor, 'POST', `/cortes/${id}/trocar/${r.id}/concluir`);
+      assert.equal(done.status, 409); assert.match(done.json.error, /já foi publicado/);
+      assert.equal((await clipRow(id)).version, 2);
+      assert.equal((await h.db.query('SELECT 1 FROM clip_replacements WHERE clip_id = $1', [id])).rows.length, 0);
+      assert.equal((await call(as.editor, 'POST', `/cortes/${id}/trocar/iniciar`, { json: { nome: 'x.mp4', tamanho: 100 } })).status, 409);
+      assert.doesNotMatch((await as.editor.get(`/cortes/${id}`)).text, /modal-trocar/);
+    });
+
+    it('a lixeira leva e devolve as versões; apagar de vez limpa o armazenamento', async () => {
+      await h.db.query('DELETE FROM episode_publications WHERE clip_id = $1', [id]);
+      const trash = require('../src/services/trash');
+      const { rows: [v] } = await h.db.query('SELECT storage_key FROM clip_versions WHERE clip_id = $1', [id]);
+      const t = await trash.remove('clip', id, { user: { id: null, role: 'gestao' } });
+      assert.ok(t);
+      assert.equal((await h.db.query('SELECT 1 FROM clip_versions WHERE clip_id = $1', [id])).rows.length, 0);
+      const { rows: [item] } = await h.db.query('SELECT id, storage_keys FROM trash_items ORDER BY id DESC LIMIT 1');
+      assert.ok(item.storage_keys.includes(v.storage_key));
+      await trash.restore(item.id);
+      assert.equal((await h.db.query('SELECT 1 FROM clip_versions WHERE clip_id = $1', [id])).rows.length, 1);
+    });
 });
 
 describe('regras dos cortes', () => {

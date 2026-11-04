@@ -365,7 +365,7 @@
           <h2>Ajustes pedidos na revisão (<%= openComments.length %>)</h2>
           <ul class="plain comment-list">
             <% openComments.forEach(function (c) { %>
-            <li class="comment"><div class="row"><% if (c.at_ms != null) { %><span class="handle"><%- icon('clock', 12) %> <%= fmt.formatClock(c.at_ms) %></span><% } else { %><span class="badge b-gray">geral</span><% } %><span class="small muted"><%= c.author_name || '—' %></span></div><p class="pre"><%= c.body %></p></li>
+            <li class="comment"><div class="row"><% if (c.at_ms != null) { %><span class="handle"><%- icon('clock', 12) %> <%= fmt.formatRange(c.at_ms, c.end_ms) %></span><% } else { %><span class="badge b-gray">geral</span><% } %><span class="small muted"><%= c.author_name || '—' %></span></div><p class="pre"><%= c.body %></p></li>
             <% }) %>
           </ul>
         </section>
@@ -403,12 +403,14 @@
           </label>
           <span class="pc-time mono"><span data-cur>0:00</span> / <span data-dur>0:00</span></span>
         </div>
-        <p class="small muted pc-hint">Atalhos: espaço pausa · ← → 5 s · J L 10 s · , . um quadro · C comenta neste ponto</p>
+        <p class="small muted pc-hint">Atalhos: espaço pausa · ← → 5 s · J L 10 s · , . um quadro · C comenta<%= tickable ? ' · I O marcam início e fim do trecho (ou arraste na linha do tempo)' : '' %></p>
         <% if (tickable) { %>
         <form class="stack top-gap" data-comment-form>
           <%- include('../partials/rich-editor', { name: 'body_html', attach: 'anexos', placeholder: 'Comente neste ponto do vídeo… cole imagens, anexe arquivos ou grave um áudio', label: 'Comentário', size: 'sm', audio: true, ctrlEnter: true }) %>
           <div class="row">
-            <span class="handle muted">no ponto <strong data-now>0:00</strong></span>
+            <span class="handle muted" aria-live="polite"><span data-where-label>no ponto</span> <strong data-now>0:00</strong></span>
+            <button class="btn sm ghost" type="button" data-range-mark><%- icon('flag', 14) %> <span data-range-mark-label>Marcar início do trecho</span></button>
+            <button class="icon-btn" type="button" data-range-clear aria-label="Tirar o trecho marcado" title="Tirar o trecho marcado" hidden><%- icon('x', 14) %></button>
             <button class="btn primary icon-only" type="submit" aria-label="Comentar neste ponto" title="Comentar neste ponto"><%- icon('send', 16) %></button>
             <button class="btn icon-only" type="button" data-general aria-label="Comentário geral (sem minutagem)" title="Comentário geral (sem minutagem)"><%- icon('message-square', 16) %></button>
           </div>

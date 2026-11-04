@@ -72,6 +72,91 @@ async function cancelUpload(clip) {
   await db.query('DELETE FROM episode_clips WHERE id = $1', [clip.id]);
 }
 
+// ---------------------------------------------------------------- trocar o vídeo de um corte que ainda não foi publicado
+// O novo arquivo sobe à parte: o vídeo atual continua valendo até o envio terminar. No fim, o atual vira uma versão guardada
+// (clip_versions) e o corte passa a apontar para o novo, com os mesmos título, legenda, comentários e episódio.
+const LOCKED_PUBLICATIONS = ['publicado', 'parcial', 'enviando'];
+async function replaceState(clip) {
+  const { rows } = await db.query('SELECT status FROM episode_publications WHERE clip_id = $1', [clip.id]);
+  const locked = rows.some((p) => LOCKED_PUBLICATIONS.includes(p.status));
+  const waiting = rows.filter((p) => ['agendado', 'revisao'].includes(p.status)).length; // saem com o vídeo novo
+  let error = null;
+  if (locked) error = 'Este corte já foi publicado (ou está sendo enviado às redes): o vídeo não pode mais ser trocado.';
+  else if (!['pronto', 'erro'].includes(clip.status) || !clip.storage_key) error = 'Espere o corte terminar de ser lido para trocar o vídeo.';
+  return { allowed: !error, error, waiting };
+}
+const pendingReplacement = (clipId) => db.query('SELECT * FROM clip_replacements WHERE clip_id = $1', [clipId]).then((r) => r.rows[0] || null);
+async function cancelReplacement(clipId) {
+  const rep = await pendingReplacement(clipId);
+  if (!rep) return;
+  await b2.abortMultipart(rep.storage_key, rep.upload_id).catch((err) => console.error('Falha ao cancelar a troca do corte:', err.message));
+  await db.query('DELETE FROM clip_upload_parts WHERE clip_id = $1', [clipId]);
+  await db.query('DELETE FROM clip_replacements WHERE id = $1', [rep.id]);
+}
+async function startReplacement(clip, { filename, size, contentType, userId }) {
+  await cancelReplacement(clip.id); // envio anterior que ficou pela metade
+  const type = String(contentType || 'video/mp4').split(';')[0].trim().toLowerCase().slice(0, 100) || 'video/mp4';
+  const name = prod.safeName(filename);
+  const ext = (name.match(/\.([A-Za-z0-9]{1,6})$/)?.[1] || 'mp4').toLowerCase();
+  const partSize = prod.partSizeFor(size);
+  const key = await b2.keyFor('cortes', clip.id, `video-${crypto.randomBytes(6).toString('hex')}.${ext}`);
+  const uploadId = await b2.createMultipart(key, type);
+  const { rows: [rep] } = await db.query(
+    'INSERT INTO clip_replacements (clip_id, storage_key, upload_id, filename, content_type, part_size, size_bytes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+    [clip.id, key, uploadId, name, type, partSize, size, userId]);
+  return { rep, partSize, totalParts: Math.max(1, Math.ceil(size / partSize)) };
+}
+async function finishReplacement(clip, rep) {
+  const { rows: parts } = await db.query('SELECT part_number, etag, size_bytes FROM clip_upload_parts WHERE clip_id = $1 ORDER BY part_number', [clip.id]);
+  const total = Math.max(1, Math.ceil(Number(rep.size_bytes) / rep.part_size));
+  if (parts.length !== total) return { error: `Faltam partes: recebi ${parts.length} de ${total}.` };
+  for (let i = 0; i < parts.length; i += 1) if (parts[i].part_number !== i + 1) return { error: `A parte ${i + 1} não chegou.` };
+  if (parts.reduce((n, p) => n + p.size_bytes, 0) !== Number(rep.size_bytes)) return { error: 'O tamanho recebido não bate com o do arquivo.' };
+  await b2.completeMultipart(rep.storage_key, rep.upload_id, parts.map((p) => ({ number: p.part_number, etag: p.etag })));
+  const client = await db.getPool().connect();
+  let done;
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO clip_versions (clip_id, version, storage_key, filename, content_type, size_bytes, duration_ms, width, height, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [clip.id, clip.version, clip.storage_key, clip.filename, clip.content_type, clip.size_bytes, clip.duration_ms, clip.width, clip.height, clip.video_by || clip.created_by]);
+    ({ rows: [done] } = await client.query(
+      `UPDATE episode_clips SET storage_key = $2, filename = $3, content_type = $4, size_bytes = $5, part_size = $6, version = version + 1, video_by = $7,
+         status = 'processando', error = NULL, note = NULL, updated_at = now() WHERE id = $1 RETURNING *`,
+      [clip.id, rep.storage_key, rep.filename, rep.content_type, rep.size_bytes, rep.part_size, rep.created_by]));
+    await client.query('DELETE FROM clip_upload_parts WHERE clip_id = $1', [clip.id]);
+    await client.query('DELETE FROM clip_replacements WHERE id = $1', [rep.id]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+  await jobs.enqueue('corte', { refId: clip.id, payload: { replaced: true } });
+  return { clip: done };
+}
+const versionsOf = (clipId) => db.query(
+  'SELECT v.*, u.name AS uploader FROM clip_versions v LEFT JOIN users u ON u.id = v.uploaded_by WHERE v.clip_id = $1 ORDER BY v.version DESC', [clipId]).then((r) => r.rows);
+
+// Nova versão pronta: avisa quem revisa e quem comentou neste corte.
+async function announceNewVersion(clip) {
+  const { can, ROLES } = require('../permissions');
+  const roles = Object.keys(ROLES).filter((r) => can(r, 'production.review'));
+  const { rows: users } = await db.query(
+    `SELECT id FROM users WHERE active AND role = ANY($1)
+     UNION SELECT author_id FROM comments WHERE entity_type = 'clip' AND entity_id = $2 AND author_id IS NOT NULL`, [roles, clip.id]);
+  const { rows: [info] } = await db.query('SELECT name FROM users WHERE id = $1', [clip.video_by]);
+  const { waiting } = await replaceState({ ...clip, status: 'pronto' });
+  await require('./notify').notify({
+    type: 'episodio', users: users.map((u) => u.id), actorId: clip.video_by,
+    title: `Nova versão do corte: ${clip.title}`,
+    body: `${info?.name ? `${info.name} subiu` : 'Subiu'} a versão ${clip.version}.${waiting ? ' A publicação já marcada sai com este vídeo.' : ' Confira antes de publicar.'}`,
+    url: `/cortes/${clip.id}`, entity: { type: 'clip', id: clip.id }, dedupe: `corte-versao-${clip.id}-${clip.version}`,
+  });
+}
+
 // ---------------------------------------------------------------- textos (IA)
 const TEXTS_SCHEMA = {
   type: 'OBJECT',
@@ -137,7 +222,8 @@ async function buildCovers(clipId, userId = null) {
     const res = await store.render(built.spec, { [picks[i].ref]: buffers[picks[i].ref] }, built.ctxData);
     made.push({ built, res, text, i });
   }
-  const { rows: old } = await db.query('DELETE FROM episode_covers WHERE clip_id = $1 AND auto AND NOT approved RETURNING storage_key', [clipId]);
+  // capa que uma publicação já usa fica: apagar deixaria o post agendado sem capa
+  const { rows: old } = await db.query('DELETE FROM episode_covers WHERE clip_id = $1 AND auto AND NOT approved AND id NOT IN (SELECT cover_id FROM episode_publications WHERE clip_id = $1 AND cover_id IS NOT NULL) RETURNING storage_key', [clipId]);
   for (const o of old) await b2.deleteObject(o.storage_key).catch(() => {});
   const rows = [];
   for (const m of made) {
@@ -221,14 +307,20 @@ async function runProcess(job, { update }) {
       notes.push(`As capas ainda não foram geradas: ${why}. Use "Ler de novo" mais tarde.`);
     }
 
-    await update('Escrevendo título e legenda…', 70);
-    const { episode, guest } = await episodeContext(clip.episode_id);
-    const { rows: [meta] } = clip.episode_id ? await db.query('SELECT suggestions FROM episode_metadata WHERE episode_id = $1', [clip.episode_id]) : { rows: [] };
-    const texts = await writeTexts({ episode, guest, transcript, hashtags: meta?.suggestions?.hashtags || [] });
-    await db.query(
-      `UPDATE episode_clips SET transcript = $2, post_title = coalesce($3, post_title), caption = coalesce(nullif(caption, ''), $4),
-         cover_texts = CASE WHEN $5::jsonb = '[]'::jsonb THEN cover_texts ELSE $5::jsonb END, updated_at = now() WHERE id = $1`,
-      [clip.id, transcript, texts.post_title, texts.caption, JSON.stringify(texts.cover_texts)]);
+    // Troca de vídeo: título e legenda já passaram pela revisão, então ficam como estão; só a transcrição acompanha o vídeo novo.
+    const replaced = Boolean(job.payload?.replaced);
+    if (replaced) {
+      await db.query('UPDATE episode_clips SET transcript = $2, updated_at = now() WHERE id = $1', [clip.id, transcript]);
+    } else {
+      await update('Escrevendo título e legenda…', 70);
+      const { episode, guest } = await episodeContext(clip.episode_id);
+      const { rows: [meta] } = clip.episode_id ? await db.query('SELECT suggestions FROM episode_metadata WHERE episode_id = $1', [clip.episode_id]) : { rows: [] };
+      const texts = await writeTexts({ episode, guest, transcript, hashtags: meta?.suggestions?.hashtags || [] });
+      await db.query(
+        `UPDATE episode_clips SET transcript = $2, post_title = coalesce($3, post_title), caption = coalesce(nullif(caption, ''), $4),
+           cover_texts = CASE WHEN $5::jsonb = '[]'::jsonb THEN cover_texts ELSE $5::jsonb END, updated_at = now() WHERE id = $1`,
+        [clip.id, transcript, texts.post_title, texts.caption, JSON.stringify(texts.cover_texts)]);
+    }
 
     let covers = 0;
     if (analyzed) {
@@ -236,12 +328,16 @@ async function runProcess(job, { update }) {
       try { covers = (await buildCovers(clip.id, clip.created_by)).length; } catch (err) { notes.push(`Capas não montadas: ${String(err.message).slice(0, 120)}.`); }
     }
     await db.query("UPDATE episode_clips SET status = 'pronto', note = $2, error = NULL, updated_at = now() WHERE id = $1", [clip.id, notes.join(' ') || null]);
+    if (replaced) {
+      await announceNewVersion(clip).catch((err) => console.error('[corte] aviso de nova versão:', err.message));
+      return { clip_id: clip.id, version: clip.version, duration_ms: info.duration_ms, covers };
+    }
     await require('./notify').notify({ type: 'rotina', users: [clip.created_by], title: `${clip.title} está pronto`, body: notes.length ? notes.join(' ') : `${covers} capas sugeridas. Falta atribuir ao episódio e publicar.`, url: `/cortes/${clip.id}`, entity: { type: 'clip', id: clip.id } }).catch(() => {});
     await announceToReview(clip, covers).catch((err) => console.error('[corte] aviso à gestão:', err.message));
     return { clip_id: clip.id, duration_ms: info.duration_ms, width: info.width, height: info.height, covers, transcript: Boolean(transcript) };
   } catch (err) {
     await db.query("UPDATE episode_clips SET status = 'erro', error = $2, updated_at = now() WHERE id = $1", [clip.id, String(err.message).slice(0, 500)]);
-    await require('./notify').notify({ type: 'rotina', users: [clip.created_by], title: `Não foi possível ler ${clip.title}`, body: String(err.message).slice(0, 300), url: `/cortes/${clip.id}`, entity: { type: 'clip', id: clip.id } }).catch(() => {});
+    await require('./notify').notify({ type: 'rotina', users: [clip.video_by || clip.created_by], title: `Não foi possível ler ${clip.title}`, body: String(err.message).slice(0, 300), url: `/cortes/${clip.id}`, entity: { type: 'clip', id: clip.id } }).catch(() => {});
     throw err;
   } finally {
     await media.rmDir(dir);
@@ -254,7 +350,8 @@ async function removeClip(clipId) {
   if (!clip) return false;
   if (clip.upload_id) await b2.abortMultipart(clip.storage_key, clip.upload_id).catch(() => {});
   const keys = [clip.storage_key];
-  for (const t of ['episode_covers', 'episode_frames']) keys.push(...(await db.query(`SELECT storage_key FROM ${t} WHERE clip_id = $1`, [clipId])).rows.map((r) => r.storage_key));
+  await cancelReplacement(clipId);
+  for (const t of ['episode_covers', 'episode_frames', 'clip_versions']) keys.push(...(await db.query(`SELECT storage_key FROM ${t} WHERE clip_id = $1`, [clipId])).rows.map((r) => r.storage_key));
   await db.query('DELETE FROM episode_clips WHERE id = $1', [clipId]);
   for (const k of keys.filter(Boolean)) await b2.deleteObject(k).catch((err) => console.error('Falha ao apagar do bucket:', err.message));
   return true;
@@ -286,4 +383,4 @@ async function announceToReview(clip, covers) {
 }
 
 jobs.register('corte', runProcess);
-module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, writeTexts, buildCovers, assign, runProcess, removeClip, momentsFor, cleanCoverText };
+module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, replaceState, pendingReplacement, cancelReplacement, startReplacement, finishReplacement, versionsOf, writeTexts, buildCovers, assign, runProcess, removeClip, momentsFor, cleanCoverText };

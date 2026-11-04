@@ -139,6 +139,8 @@ function formatClock(ms) {
   const h = Math.floor(t / 3600); const m = Math.floor((t % 3600) / 60); const s = t % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
+// Ponto ou trecho do vídeo: "1:32" ou "1:32 – 1:40".
+const formatRange = (at, end = null) => (end == null ? formatClock(at) : `${formatClock(at)} – ${formatClock(end)}`);
 const formatDayShort = (v) => formatDay(v).slice(0, 5);
 // Hora do prazo das tarefas: 'HH:MM' ou 'HH:MM:SS' (coluna TIME) -> "14h" / "14h30".
 const timeParts = (v) => { const m = String(v || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/); return m ? { h: m[1], m: m[2] } : null; };
@@ -171,7 +173,7 @@ function relativeDays(v, now = new Date()) {
 }
 const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
-module.exports = { escHtml, richHtml, commentHtml, initials, relativeDays,
+module.exports = { formatRange, escHtml, richHtml, commentHtml, initials, relativeDays,
   formatBRL, parseBRL, parseInputDate, toInputDate, formatDay, formatDayShort, formatDayLong, timeParts, formatTime, toInputTime, formatDue, formatDueShort, formatBytes, formatClock,
   TZ, formatDateTime, formatDate, formatSoon, formatLong, toInputValue, parseInputDateTime,
   shortDate, monthShort, dayNum, todayLabel, greeting,

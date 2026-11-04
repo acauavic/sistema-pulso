@@ -72,7 +72,10 @@
         try { if (edited) await requireHorizontal(f); ok.push({ file: f, kind: edited ? 'editado' : 'corte', label: '' }); } catch (err) { say(`${f.name}: ${err.message}`); }
       }
       input.value = '';
-      if (ok.length) uploads().add(ok, { base: box.dataset.base, csrf: box.dataset.csrf, where: box.dataset.where || '', hash: box.dataset.hash });
+      if (ok.length) {
+        uploads().add(ok, { base: box.dataset.base, csrf: box.dataset.csrf, where: box.dataset.where || '', hash: box.dataset.hash });
+        if (box.dataset.closeOnStart) box.closest('dialog')?.close(); // a bandeja mostra o andamento; a página se atualiza no fim
+      }
     });
   });
 
@@ -423,16 +426,75 @@
     document.querySelectorAll('[data-comment-list] .comment[data-at]').forEach((c) => {
       if (c.dataset.at === '') return;
       const ms = Number(c.dataset.at);
+      const end = c.dataset.end ? Number(c.dataset.end) : null;
       const dot = document.createElement('button');
       dot.type = 'button';
-      dot.className = `marker${c.classList.contains('resolved') ? ' resolved' : ''}`;
+      dot.className = `marker${end != null ? ' range' : ''}${c.classList.contains('resolved') ? ' resolved' : ''}`;
       dot.style.left = `${Math.min(100, (ms / 1000 / video.duration) * 100)}%`;
-      dot.title = clock(ms);
-      dot.setAttribute('aria-label', `Comentário em ${clock(ms)}`);
-      dot.addEventListener('click', (e) => { e.stopPropagation(); video.currentTime = ms / 1000; c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
+      if (end != null) dot.style.width = `${Math.min(100, ((end - ms) / 1000 / video.duration) * 100)}%`;
+      dot.title = end != null ? `${clock(ms)} – ${clock(end)}` : clock(ms);
+      dot.setAttribute('aria-label', end != null ? `Comentário de ${clock(ms)} a ${clock(end)}` : `Comentário em ${clock(ms)}`);
+      dot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (dragged) return;
+        seekTo(ms, end); c.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
       timeline.appendChild(dot);
     });
+    drawSelection();
   }
+
+  // ---- ir até um ponto, ou tocar um trecho e parar no fim dele
+  let stopAt = null; let startedAt = 0;
+  function seekTo(ms, end = null) {
+    if (!video) return;
+    video.currentTime = ms / 1000;
+    stopAt = end; startedAt = ms;
+    if (end != null) video.play().catch(() => {});
+  }
+  function watchStop() {
+    if (stopAt == null) return;
+    const now = video.currentTime * 1000;
+    if (now >= stopAt) { video.pause(); stopAt = null; } else if (now < startedAt - 1000) stopAt = null; // a pessoa saiu do trecho
+  }
+
+  // ---- trecho que está sendo marcado para o próximo comentário: início e fim em ms (fim vazio = só o início marcado)
+  const sel = { start: null, end: null };
+  let dragged = false;
+  let selBand = null;
+  function drawSelection() {
+    if (!timeline || !video || !Number.isFinite(video.duration) || !video.duration) return;
+    if (!selBand) { selBand = document.createElement('span'); selBand.className = 'range-sel'; }
+    if (selBand.parentNode !== timeline) timeline.appendChild(selBand);
+    selBand.hidden = sel.start == null;
+    if (sel.start == null) return;
+    selBand.style.left = `${Math.min(100, (sel.start / 1000 / video.duration) * 100)}%`;
+    selBand.style.width = sel.end != null ? `${Math.min(100, ((sel.end - sel.start) / 1000 / video.duration) * 100)}%` : '';
+    selBand.classList.toggle('open', sel.end == null);
+  }
+  function syncSelection() {
+    if (!form) return;
+    const label = form.querySelector('[data-where-label]'); const markLabel = form.querySelector('[data-range-mark-label]');
+    const mark = form.querySelector('[data-range-mark]'); const clear = form.querySelector('[data-range-clear]');
+    const submit = form.querySelector('button[type=submit]');
+    const has = sel.start != null;
+    label.textContent = sel.end != null ? 'no trecho' : has ? 'trecho a partir de' : 'no ponto';
+    if (has) nowEl.textContent = sel.end != null ? `${clock(sel.start)} – ${clock(sel.end)}` : clock(sel.start);
+    else nowEl.textContent = clock(video.currentTime * 1000);
+    markLabel.textContent = has ? 'Marcar fim do trecho' : 'Marcar início do trecho';
+    mark.hidden = sel.end != null; clear.hidden = !has;
+    const what = sel.end != null ? 'Comentar neste trecho' : 'Comentar neste ponto';
+    submit.setAttribute('aria-label', what); submit.title = what;
+    drawSelection();
+  }
+  function markStart(ms) { sel.start = ms; if (sel.end != null && sel.end <= ms) sel.end = null; syncSelection(); }
+  function markEnd(ms) {
+    if (sel.start == null) { markStart(ms); return; }
+    if (ms === sel.start) return;
+    if (ms < sel.start) { sel.end = sel.start; sel.start = ms; } else sel.end = ms;
+    syncSelection();
+  }
+  function clearSelection() { sel.start = null; sel.end = null; syncSelection(); }
 
   // contador da aba "Revisão" (comentários em aberto)
   function setBadge(counts) {
@@ -449,7 +511,7 @@
   if (video) {
     const cur = review.querySelector('[data-cur]'); const dur = review.querySelector('[data-dur]');
     const playBtn = review.querySelector('[data-playpause]');
-    const syncTime = () => { const t = clock(video.currentTime * 1000); if (cur) cur.textContent = t; if (nowEl) nowEl.textContent = t; };
+    const syncTime = () => { const t = clock(video.currentTime * 1000); if (cur) cur.textContent = t; if (nowEl && sel.start == null) nowEl.textContent = t; };
     const syncPlay = () => {
       const playing = !video.paused && !video.ended;
       review.querySelector('[data-pp-play]').hidden = playing; review.querySelector('[data-pp-pause]').hidden = !playing;
@@ -466,7 +528,7 @@
 
     video.addEventListener('loadedmetadata', () => { drawMarkers(); if (dur) dur.textContent = clock(video.duration * 1000); });
     video.addEventListener('durationchange', () => { if (dur && Number.isFinite(video.duration)) dur.textContent = clock(video.duration * 1000); });
-    video.addEventListener('timeupdate', syncTime);
+    video.addEventListener('timeupdate', () => { syncTime(); watchStop(); });
     video.addEventListener('seeked', syncTime);
     video.addEventListener('play', syncPlay); video.addEventListener('pause', syncPlay); video.addEventListener('ended', syncPlay);
     if (video.readyState >= 1) { drawMarkers(); if (dur) dur.textContent = clock(video.duration * 1000); }
@@ -475,11 +537,48 @@
     form?.querySelector('.rte-area')?.addEventListener('focus', () => video.pause());
 
     // clicar na linha dos marcadores leva o vídeo até aquele ponto
+    const msAt = (x) => { const r = timeline.getBoundingClientRect(); return Math.round(Math.min(1, Math.max(0, (x - r.left) / r.width)) * video.duration * 1000); };
     timeline?.addEventListener('click', (e) => {
+      if (dragged) { dragged = false; return; } // foi o fim de um arraste, não um clique
       if (e.target !== timeline || !Number.isFinite(video.duration)) return;
-      const r = timeline.getBoundingClientRect();
-      video.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * video.duration; syncTime();
+      video.currentTime = msAt(e.clientX) / 1000; stopAt = null; syncTime();
     });
+
+    // arrastar na linha marca o trecho do comentário (o vídeo acompanha, para a pessoa ver onde está)
+    if (timeline && tickable) {
+      let from = null; let id = null;
+      timeline.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || !Number.isFinite(video.duration)) return;
+        from = e.clientX; id = e.pointerId; dragged = false;
+      });
+      timeline.addEventListener('pointermove', (e) => {
+        if (from == null || e.pointerId !== id) return;
+        if (!dragged) {
+          if (Math.abs(e.clientX - from) < 5) return;
+          dragged = true; timeline.setPointerCapture(id); video.pause(); stopAt = null;
+        }
+        const [a, b] = [msAt(from), msAt(e.clientX)];
+        sel.start = Math.min(a, b); sel.end = Math.max(a, b);
+        video.currentTime = msAt(e.clientX) / 1000;
+        syncSelection();
+      });
+      const drop = (e) => {
+        if (from == null || e.pointerId !== id) return;
+        from = null;
+        if (!dragged) return;
+        if (sel.end - sel.start < 500) clearSelection(); // meio segundo: foi um toque, não um trecho
+        else video.currentTime = sel.start / 1000;
+        setTimeout(() => { dragged = false; }, 0); // o clique que vem junto com o fim do arraste já passou
+      };
+      timeline.addEventListener('pointerup', drop);
+      timeline.addEventListener('pointercancel', drop);
+    }
+
+    form?.querySelector('[data-range-mark]')?.addEventListener('click', () => {
+      const ms = Math.round(video.currentTime * 1000);
+      if (sel.start == null) markStart(ms); else markEnd(ms);
+    });
+    form?.querySelector('[data-range-clear]')?.addEventListener('click', clearSelection);
 
     // atalhos (fora de campos de texto, e só com a aba Revisão à vista)
     window.addEventListener('keydown', (e) => {
@@ -492,23 +591,22 @@
       else if (k === 'j') skip(-10); else if (k === 'l') skip(10);
       else if (k === ',' || k === '.') { video.pause(); skip(k === ',' ? -1 / 30 : 1 / 30); }
       else if (k === 'c' && form) { form.querySelector('.rte-area').focus(); }
+      else if (k === 'i' && form) markStart(Math.round(video.currentTime * 1000));
+      else if (k === 'o' && form) markEnd(Math.round(video.currentTime * 1000));
       else used = false;
       if (used) e.preventDefault();
     });
   }
 
-  document.querySelectorAll('[data-seek]').forEach((b) => b.addEventListener('click', () => {
-    if (!video) return;
-    video.currentTime = Number(b.dataset.seek) / 1000;
-    video.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }));
+  const seekFrom = (b) => { if (!video) return; seekTo(Number(b.dataset.seek), b.dataset.seekEnd ? Number(b.dataset.seekEnd) : null); video.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+  document.querySelectorAll('[data-seek]:not(.comment [data-seek])').forEach((b) => b.addEventListener('click', () => seekFrom(b)));
 
   // ---- comentar, resolver e apagar sem recarregar
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
 
   // O servidor devolve o comentário pronto (texto rico, anexos, áudio): aqui só se insere e se ligam os botões.
   function bindComment(li) {
-    li.querySelectorAll('[data-seek]').forEach((b) => b.addEventListener('click', () => { if (!video) return; video.currentTime = Number(b.dataset.seek) / 1000; video.scrollIntoView({ block: 'center', behavior: 'smooth' }); }));
+    li.querySelectorAll('[data-seek]').forEach((b) => b.addEventListener('click', () => seekFrom(b)));
     li.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () => resolveComment(b)));
     li.querySelectorAll('[data-comment-delete]').forEach(bindDelete);
     window.PulsoRich?.hydrate(li);
@@ -525,14 +623,15 @@
     if (rte.rte.pending()) { window.alert('Espere o envio do anexo terminar.'); return; }
     const buttons = form.querySelectorAll('button'); buttons.forEach((b) => { b.disabled = true; });
     try {
-      const data = new URLSearchParams({ body_html: html, at_ms: general ? '' : String(Math.round(video.currentTime * 1000)), file_id: review.dataset.file });
+      // só o início marcado, sem o fim: vale como comentário naquele ponto
+      const data = new URLSearchParams({ body_html: html, at_ms: general ? '' : String(sel.start ?? Math.round(video.currentTime * 1000)), end_ms: general || sel.end == null ? '' : String(sel.end), file_id: review.dataset.file });
       ids.forEach((id) => data.append('anexos', id));
       const res = await post(review.dataset.url, data);
       const out = await res.json().catch(() => ({}));
       if (!res.ok || !out.ok) { window.alert(out.error || 'Não foi possível salvar o comentário.'); return; }
       const li = document.createElement('template'); li.innerHTML = out.html.trim(); const node = li.content.firstElementChild;
       bindComment(node); insertSorted(node); refreshEmpty(); setBadge(out.counts); drawMarkers();
-      rte.rte.reset(); node.classList.add('just-added'); node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      clearSelection(); rte.rte.reset(); node.classList.add('just-added'); node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       setTimeout(() => node.classList.remove('just-added'), 2400);
       rte.rte.focus();
     } catch { window.alert('Sem conexão. Tente de novo.'); } finally { buttons.forEach((b) => { b.disabled = false; }); }

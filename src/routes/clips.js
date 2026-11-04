@@ -152,6 +152,78 @@ router.post(['/cortes/:id/cancelar', '/conteudo/pedidos/:pid/cortes/:id/cancelar
   res.json({ ok: true });
 }));
 
+// ---------------------------------------------------------------- trocar o vídeo (corte ainda não publicado)
+// Mesmo caminho do envio de um corte novo (iniciar, partes, concluir), para a fila de envios do navegador funcionar igual.
+async function replacingClip(req, res) {
+  if (!canCut(req.user.role)) { uploadError(res, 403, 'Só o editor e a gestão trocam o vídeo do corte.'); return null; }
+  const clip = await findClip(req);
+  if (!clip) { uploadError(res, 404, 'Corte não encontrado.'); return null; }
+  return clip;
+}
+async function pendingOf(req, res) {
+  const clip = await replacingClip(req, res); if (!clip) return null;
+  const rep = await clips.pendingReplacement(clip.id);
+  if (!rep || !isIntId(req.params.rid) || String(rep.id) !== req.params.rid) { uploadError(res, 404, 'Envio não encontrado ou já concluído.'); return null; }
+  return { clip, rep, upload: { id: clip.id, storage_key: rep.storage_key, upload_id: rep.upload_id } };
+}
+router.post('/cortes/:id/trocar/iniciar', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const clip = await replacingClip(req, res); if (!clip) return;
+  if (!config.storageConfigured) return uploadError(res, 503, 'Armazenamento (Backblaze) não configurado.');
+  const state = await clips.replaceState(clip);
+  if (!state.allowed) return uploadError(res, 409, state.error);
+  const filename = String(req.body.nome || '');
+  const size = Number(req.body.tamanho);
+  if (!Number.isSafeInteger(size) || size <= 0) return uploadError(res, 400, 'Arquivo vazio.');
+  if (size > clips.MAX_BYTES) return uploadError(res, 400, 'Arquivo grande demais para um corte.');
+  if (!clips.VIDEO_EXT.includes(extOf(filename))) return uploadError(res, 400, `Envie vídeo (${clips.VIDEO_EXT.join(', ')}).`);
+  const { rep, partSize, totalParts } = await clips.startReplacement(clip, { filename, size, contentType: req.body.tipo, userId: req.user.id });
+  res.json({ ok: true, id: rep.id, partSize, totalParts });
+}));
+router.put('/cortes/:id/trocar/:rid/parte/:n', requirePerm('episodes.read'), express.raw({ type: () => true, limit: MAX_PART }), wrap(async (req, res) => {
+  const p = await pendingOf(req, res); if (!p) return;
+  const n = Number.parseInt(req.params.n, 10);
+  const total = Math.max(1, Math.ceil(Number(p.rep.size_bytes) / p.rep.part_size));
+  if (!Number.isInteger(n) || n < 1 || n > total) return uploadError(res, 400, 'Parte inválida.');
+  const expected = n < total ? p.rep.part_size : Number(p.rep.size_bytes) - p.rep.part_size * (total - 1);
+  if (!Buffer.isBuffer(req.body) || req.body.length !== expected) return uploadError(res, 400, `A parte ${n} deveria ter ${expected} bytes e chegou com ${Buffer.isBuffer(req.body) ? req.body.length : 0}.`);
+  await clips.receivePart(p.upload, n, req.body);
+  res.json({ ok: true });
+}));
+router.get('/cortes/:id/trocar/:rid/urls', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const p = await pendingOf(req, res); if (!p) return;
+  res.set('Cache-Control', 'no-store').json(await require('../services/directUpload').urls({ key: p.rep.storage_key, uploadId: p.rep.upload_id, size: p.rep.size_bytes, partSize: p.rep.part_size, query: req.query.partes }));
+}));
+router.post('/cortes/:id/trocar/:rid/parte/:n/ok', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const p = await pendingOf(req, res); if (!p) return;
+  const c = require('../services/directUpload').confirm({ size: p.rep.size_bytes, partSize: p.rep.part_size, number: req.params.n, body: req.body });
+  if (c.error) return uploadError(res, c.status, c.error);
+  await clips.registerPart(p.upload, Number(req.params.n), c.etag, c.size);
+  res.json({ ok: true });
+}));
+router.post('/cortes/:id/trocar/:rid/concluir', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const p = await pendingOf(req, res); if (!p) return;
+  const state = await clips.replaceState(p.clip); // pode ter sido publicado enquanto o arquivo subia
+  if (!state.allowed) { await clips.cancelReplacement(p.clip.id); return uploadError(res, 409, state.error); }
+  const result = await clips.finishReplacement(p.clip, p.rep);
+  if (result.error) return uploadError(res, 409, result.error);
+  await audit(req, 'corte.video_trocado', 'clip', p.clip.id, { arquivo: p.rep.filename, versao: result.clip.version });
+  res.json({ ok: true, id: p.clip.id });
+}));
+router.post('/cortes/:id/trocar/:rid/cancelar', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const p = await pendingOf(req, res); if (!p) return;
+  await clips.cancelReplacement(p.clip.id);
+  res.json({ ok: true });
+}));
+// Versão anterior: só para baixar.
+router.get('/cortes/:id/versoes/:vid/baixar', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const c = await findClip(req);
+  if (!c || !isIntId(req.params.vid)) return notFound(res);
+  const { rows: [v] } = await db.query('SELECT * FROM clip_versions WHERE id = $1 AND clip_id = $2', [req.params.vid, c.id]);
+  if (!v) return notFound(res);
+  const ext = (String(v.filename || '').match(/\.[A-Za-z0-9]{1,6}$/) || ['.mp4'])[0].toLowerCase();
+  res.set('Cache-Control', 'no-store').redirect(302, await b2.presignGet(v.storage_key, { expires: 3600, download: `${fmt.slugify(c.title) || `corte-${c.id}`}-v${v.version}${ext}` }));
+}));
+
 // andamento (a tela consulta enquanto algum corte está enviando/processando)
 router.get('/cortes/status', requirePerm('episodes.read'), wrap(async (req, res) => {
   const { rows } = await db.query(
@@ -178,7 +250,7 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
   const thread = await require('../services/comments').list('clip', c.id);
   const request = c.request_id ? await require('../services/contentRequests').get(c.request_id) : null;
   res.render('content/clip', {
-    comments: thread, request,
+    comments: thread, request, versions: await clips.versionsOf(c.id), replace: await clips.replaceState(c),
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C,
     running: ['enviando', 'processando'].includes(c.status) || pubs.rows.some((p) => p.status === 'enviando'),
@@ -247,6 +319,7 @@ router.post('/cortes/:id/excluir', requirePerm('episodes.read'), wrap(async (req
   const c = await findClip(req); if (!c) return notFound(res);
   const gone = await recordChanges.snapshot('clip', c.id);
   let t = null;
+  await clips.cancelReplacement(c.id);
   if (c.status === 'enviando') await clips.removeClip(c.id); // envio pela metade: cancela de vez
   else t = await require('../services/trash').remove('clip', c.id, { user: req.user });
   await recordChanges.deleted({ type: 'clip', row: gone, actor: req.user });
