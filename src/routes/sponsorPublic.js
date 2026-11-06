@@ -110,7 +110,7 @@ router.get('/patrocinador/kit', withSession(), wrap(async (req, res) => {
     const { rowCount } = await db.query('UPDATE sponsors SET kit_viewed_at = now() WHERE id = $1 AND kit_viewed_at IS NULL', [sponsor.id]);
     if (rowCount) await sponsorsSvc.addEvent(sponsor.id, null, 'kit_visto', 'Abriu o media kit');
   }
-  const html = tpl.render(tpl.mediaKitHtml(), { link_quero: '/patrocinador/quero', link_equipe: '/patrocinador/equipe', agenda_html: await sponsorsSvc.kitAgendaHtml(), guests_json: tpl.safeJson(await require('../services/kitGallery').items()), ...(await require('../services/plans').kitHtml()) });
+  const html = tpl.render(tpl.mediaKitHtml(), { link_quero: '/patrocinador/quero', link_equipe: '/patrocinador/equipe', agenda_html: await sponsorsSvc.kitAgendaHtml(), guests_json: tpl.safeJson(await require('../services/kitGallery').items()), kit_rodape: await require('../services/kitGallery').footText(), ...(await require('../services/plans').kitHtml()) });
   res.set(tpl.publicHeaders("'none'", { pixel: true })).type('html').send(pixel.inject(html, { content: 'Media kit', category: 'patrocinador', v: res.locals.assetV, absolute: true }));
 }));
 

@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.54.0', date: '2026-11-05', title: 'Media kit: quem já sentou à mesa, todos de uma vez',
+    items: [
+      { kind: 'ajuste', text: 'No media kit, o slide "Quem já sentou à mesa" não passa mais de página: um convidado aparece em destaque, com foto quadrada, alcance e apresentação, e troca sozinho; todos os outros ficam à vista numa grade de fotos quadradas. Passar o mouse ou clicar numa foto mostra aquele convidado. No celular, cada um é um cartão com a foto e a apresentação embaixo.' },
+      { kind: 'ajuste', text: 'O rodapé do slide conta os episódios no ar e os gravados a caminho direto do sistema, em vez de um texto fixo.' },
+    ],
+  },
+  {
     version: '1.53.0', date: '2026-11-05', title: 'Galeria do media kit com episódios gravados',
     items: [
       { kind: 'ajuste', text: 'Gestão > Galeria do media kit: além dos publicados, os episódios já gravados (em edição, revisão, finalização ou prontos para publicar) também podem entrar no slide "Quem já sentou à mesa". A lista mostra a etapa de cada episódio.' },

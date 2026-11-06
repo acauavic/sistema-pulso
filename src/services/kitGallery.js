@@ -49,4 +49,14 @@ async function items() {
   }));
 }
 
-module.exports = { candidates, credentialOf, save, setFeatured, items, clean };
+// Rodapé do slide: quantos episódios já estão no ar e quantos já foram gravados e vêm a seguir (vem do sistema, não fica velho).
+async function footText() {
+  const { rows: [r] } = await db.query("SELECT count(*) FILTER (WHERE status = 'publicado')::int AS no_ar, count(*) FILTER (WHERE status <> 'publicado')::int AS a_caminho FROM episodes");
+  const parts = [];
+  if (r.no_ar) parts.push(`${r.no_ar} ${r.no_ar === 1 ? 'episódio' : 'episódios'} no ar`);
+  if (r.a_caminho) parts.push(`${r.a_caminho} ${r.a_caminho === 1 ? 'gravado' : 'gravados'} a caminho`);
+  parts.push('1 novo por semana');
+  return parts.join(' · ');
+}
+
+module.exports = { candidates, credentialOf, save, setFeatured, items, footText, clean };

@@ -28,7 +28,8 @@ describe('Galeria do media kit: a equipe escolhe quais episódios gravados apare
     assert.deepEqual(await chosen(), []);
     const html = await kitPage();
     assert.match(html, /var GUESTS_DEFAULT = \[/);
-    assert.match(html, /id="galleryTrack"/);
+    assert.match(html, /id="mesaGrid"/);
+    assert.match(html, /3 episódios no ar · 1 gravado a caminho · 1 novo por semana/, 'rodapé conta os episódios do sistema');
   });
 
   it('a tela lista os episódios gravados, publicados ou não, com a etapa, e a gestão escolhe', async () => {
