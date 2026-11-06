@@ -67,7 +67,7 @@ const TOPICS = [
       'Etapas: Prospecção, Em negociação, Ganho (formulário de cadastro), Ativo (portal e entregas), mais Inativo e Perdido. A página do patrocinador guia o próximo passo.',
       'Cada patrocinador recebe um link reutilizável (sem criar conta) para o media kit, o formulário de cadastro e o portal. "Quero ser patrocinador" no media kit leva à negociação e abre o WhatsApp comercial.',
       'Planos (Ouro e Diamond), com preço e entregáveis, ficam em Gestão > Planos de patrocínio e alimentam o media kit, a cota e as entregas do portal.',
-      'O slide "Quem já sentou à mesa" do media kit mostra os episódios publicados que a gestão escolher em Gestão > Galeria do media kit (alcance e frase editáveis).',
+      'O slide "Quem já sentou à mesa" do media kit mostra os episódios gravados (publicados ou ainda em produção) que a gestão escolher em Gestão > Galeria do media kit (alcance e frase editáveis).',
       'O WhatsApp comercial e as mensagens prontas se configuram em Gestão > WhatsApp dos convites.',
       'Pelo assistente: "patrocinador" mostra etapa, cota, formulário, entregas e gravações reservadas.',
     ],

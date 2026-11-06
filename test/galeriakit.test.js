@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const kitGallery = require('../src/services/kitGallery');
 
-describe('Galeria do media kit: a equipe escolhe quais episódios publicados aparecem', () => {
+describe('Galeria do media kit: a equipe escolhe quais episódios gravados aparecem', () => {
   const as = {}; let app; let token; const ep = {};
   const kitPage = async () => { const c = h.client(app.base); await c.get(`/patrocinador/${token}`); return (await c.get('/patrocinador/kit')).text; };
   const chosen = async () => JSON.parse((await kitPage()).match(/var GUESTS_CHOSEN = (\[.*?\]);\n/s)[1]);
@@ -31,11 +31,13 @@ describe('Galeria do media kit: a equipe escolhe quais episódios publicados apa
     assert.match(html, /id="galleryTrack"/);
   });
 
-  it('a tela lista só episódios publicados e a gestão escolhe', async () => {
+  it('a tela lista os episódios gravados, publicados ou não, com a etapa, e a gestão escolhe', async () => {
     const page = await as.gestao.get('/gestao/galeria-kit');
     assert.equal(page.status, 200);
     assert.match(page.text, /Dra\. Ana Lima/); assert.match(page.text, /Dr\. Beto/);
-    assert.doesNotMatch(page.text, /Ainda Não/, 'episódio em edição não aparece');
+    assert.match(page.text, /Ainda Não/, 'episódio ainda em edição também aparece');
+    assert.match(page.text, /badge b-st-em_edicao">Em edição/);
+    assert.match(page.text, /badge b-st-publicado">Publicado/);
     assert.match(page.text, /precisa de convidado/, 'episódio sem convidado não pode ir ao kit');
 
     const r = await as.gestao.act(`/gestao/galeria-kit/${ep.a}/mostrar`, { mostrar: '1' }, { from: '/gestao/galeria-kit' });
@@ -57,13 +59,14 @@ describe('Galeria do media kit: a equipe escolhe quais episódios publicados apa
     assert.equal(list[1].audience, '+1,2M'); assert.equal(list[1].credential, 'Médico e empresário'); assert.equal(list[1].handle, 'dr.beto');
   });
 
-  it('tirar do kit e regras: episódio não publicado e sem convidado não entram; quem não é da gestão não acessa', async () => {
+  it('tirar do kit e regras: gravado ainda não publicado entra; sem convidado não; quem não é da gestão não acessa', async () => {
     await as.gestao.act(`/gestao/galeria-kit/${ep.a}/mostrar`, { mostrar: '0' }, { from: '/gestao/galeria-kit' });
     assert.deepEqual((await chosen()).map((x) => x.name), ['Dr. Beto']);
     await as.gestao.act(`/gestao/galeria-kit/${ep.c}/mostrar`, { mostrar: '1' }, { from: '/gestao/galeria-kit' });
-    assert.equal((await h.db.query('SELECT kit_featured FROM episodes WHERE id=$1', [ep.c])).rows[0].kit_featured, false);
+    await as.gestao.act(`/gestao/galeria-kit/${ep.c}`, { audience: '+80K', credential: '' }, { from: '/gestao/galeria-kit' });
+    assert.deepEqual((await chosen()).map((x) => [x.name, x.audience]), [['Dr. Beto', '+1,2M'], ['Ainda Não', '+80K']], 'em edição entra no kit, na ordem dos episódios');
     await as.gestao.act(`/gestao/galeria-kit/${ep.d}/mostrar`, { mostrar: '1' }, { from: '/gestao/galeria-kit' });
-    assert.equal((await kitGallery.items()).length, 1, 'sem convidado ligado não vira cartão');
+    assert.equal((await kitGallery.items()).length, 2, 'sem convidado ligado não vira cartão');
     for (const k of ['prod', 'editor']) assert.equal((await as[k].get('/gestao/galeria-kit')).status, 403);
   });
 });

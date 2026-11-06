@@ -5,13 +5,13 @@
 %>
 <div class="page-head"><div><span class="kicker">Gestão · Convites e parcerias</span><h1>Galeria do media kit</h1></div></div>
 <%- include('../partials/gestao-nav', { active: 'galeria' }) %>
-<p class="lead">Escolha quais episódios publicados aparecem no slide "Quem já sentou à mesa" do media kit. A galeria mostra 8 convidados por vez (4 colunas, 2 linhas) e passa para o lado quando há mais.</p>
+<p class="lead">Escolha quais episódios gravados, publicados ou ainda em produção, aparecem no slide "Quem já sentou à mesa" do media kit. A galeria mostra 8 convidados por vez (4 colunas, 2 linhas) e passa para o lado quando há mais.</p>
 
 <% if (!rows.length) { %>
 <div class="empty">
   <%- include('../partials/pulse-line') %>
-  <h2>Nenhum episódio publicado ainda</h2>
-  <p>Quando um episódio for marcado como publicado, ele aparece aqui para você escolher. Até lá, o media kit mostra a galeria padrão de lançamento.</p>
+  <h2>Nenhum episódio gravado ainda</h2>
+  <p>Assim que a primeira gravação virar episódio, ela aparece aqui para você escolher. Até lá, o media kit mostra a galeria padrão de lançamento.</p>
 </div>
 <% } else { %>
 <p class="small muted"><span class="mono"><%= chosen %></span> de <span class="mono"><%= rows.length %></span> no media kit.<% if (!chosen) { %> Enquanto você não escolher nenhum, o kit mostra a galeria padrão de lançamento.<% } %></p>
@@ -27,7 +27,7 @@
             <div><strong><%= r.guest_name || 'Sem convidado ligado' %></strong><% if (r.instagram) { %><br><span class="small muted mono">@<%= String(r.instagram).replace(/^@/, '') %></span><% } %></div>
           </div>
         </td>
-        <td><span class="mono small muted"><%= r.number ? 'EP.' + String(r.number).padStart(3, '0') : 'EP' %></span><br><%= r.title %></td>
+        <td><span class="mono small muted"><%= r.number ? 'EP.' + String(r.number).padStart(3, '0') : 'EP' %></span> <span class="badge b-st-<%= r.status %>"><%= statuses[r.status] %></span><br><%= r.title %></td>
         <td class="num mono"><%= r.kit_audience || '—' %></td>
         <td>
           <% if (!usable) { %><span class="small muted">precisa de convidado</span>

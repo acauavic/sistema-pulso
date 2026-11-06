@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.53.0', date: '2026-11-05', title: 'Galeria do media kit com episódios gravados',
+    items: [
+      { kind: 'ajuste', text: 'Gestão > Galeria do media kit: além dos publicados, os episódios já gravados (em edição, revisão, finalização ou prontos para publicar) também podem entrar no slide "Quem já sentou à mesa". A lista mostra a etapa de cada episódio.' },
+    ],
+  },
+  {
     version: '1.52.0', date: '2026-11-03', title: 'Trecho na revisão e troca do vídeo do corte',
     items: [
       { kind: 'novo', text: 'Na revisão do vídeo, o comentário pode marcar um trecho: arraste na linha do tempo, ou use "Marcar início do trecho" e "Marcar fim do trecho" (atalhos I e O). Clicar no tempo do comentário toca aquele trecho e para no fim dele.' },
