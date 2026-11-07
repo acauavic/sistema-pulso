@@ -71,13 +71,16 @@ router.post('/responsavel', wrap(async (req, res) => {
 router.get('/notificacoes', wrap(async (req, res) => {
   const type = notifySvc.TYPES.includes(req.query.tipo) ? req.query.tipo : null;
   const unread = req.query.filtro === 'nao-lidas';
-  const [items, counts, mutes] = await Promise.all([
-    notifySvc.list(req.user.id, { type, unread, limit: 100 }),
+  const { pageOf, paginate } = require('../utils/pager');
+  const pg = pageOf(req, 100);
+  const [raw, counts, mutes] = await Promise.all([
+    notifySvc.list(req.user.id, { type, unread, limit: pg.limit, offset: pg.offset }),
     db.query('SELECT type, count(*) FILTER (WHERE read_at IS NULL)::int AS unread FROM notifications WHERE user_id = $1 GROUP BY type', [req.user.id]),
     db.query('SELECT type FROM notification_mutes WHERE user_id = $1', [req.user.id]),
   ]);
+  const { rows: items, pager } = paginate(req, raw, pg);
   res.render('notifications/index', {
-    title: 'Notificações', items, type, unread, types: C.NOTIFICATION_TYPES,
+    title: 'Notificações', items, pager, type, unread, types: C.NOTIFICATION_TYPES,
     unreadBy: Object.fromEntries(counts.rows.map((r) => [r.type, r.unread])), muted: mutes.rows.map((r) => r.type),
     pushKey: push.publicKey(), tab: 'avisos', dueNow: (await reminders.queue()).now.length,
   });
@@ -144,11 +147,19 @@ router.post('/notificacoes/preferencias', wrap(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------- busca global
+// Quantas sugestões de melhoria a busca tem (aparece ao abrir a busca vazia): percorre as rotas e o banco, então guarda 10 min.
+let tipsCache = { at: 0, n: 0 };
+async function tipsCount(app) {
+  if (Date.now() - tipsCache.at < 10 * 60_000) return tipsCache.n;
+  tipsCache = { at: Date.now(), n: (await search.suggestions(app)).length };
+  return tipsCache.n;
+}
+
 router.get('/busca', wrap(async (req, res) => {
   const result = await search.search(req.query.q, req.user);
   if (result.q.length >= 2 && req.query.registrar !== '0') await search.log(req.user, result.q, result.total);
   let tips = 0;
-  if (!result.q && require('../permissions').can(req.user.role, 'search.manage')) tips = (await search.suggestions(req.app)).length;
+  if (!result.q && require('../permissions').can(req.user.role, 'search.manage')) tips = await tipsCount(req.app);
   res.set('Cache-Control', 'no-store').json({ ok: true, ...result, tips });
 }));
 

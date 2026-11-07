@@ -264,9 +264,18 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
                      (SELECT count(*)::int FROM content_requests WHERE episode_id = $1 AND status IN ('pedido','producao','revisao')) AS requests`, [ep.id]),
     db.query('SELECT * FROM episode_publications WHERE episode_id = $1 AND clip_id IS NULL ORDER BY created_at DESC, id DESC LIMIT 30', [ep.id]),
   ]);
-  const provider = await socialApi.active();
-  const ls = await socialApi.liveState();
-  const social = can(req.user.role, 'production.review') && ['pronto_publicar', 'publicado'].includes(ep.status) ? await socialApi.connectedAll() : null;
+  const finSvc = require('../services/finance');
+  // o resto da página, também em paralelo (antes: uma consulta depois da outra)
+  const [provider, ls, social, finRaw, finSettings, epComments, trJob, allSponsors, reviewComments] = await Promise.all([
+    socialApi.active(), socialApi.liveState(),
+    can(req.user.role, 'production.review') && ['pronto_publicar', 'publicado'].includes(ep.status) ? socialApi.connectedAll() : null,
+    can(req.user.role, 'finance.read') ? finSvc.episodeFinance(ep.id) : null,
+    can(req.user.role, 'finance.read') ? finSvc.settings() : null,
+    commentsSvc.list('episode', ep.id),
+    jobs.latest(ep.id, 'transcricao'),
+    db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY lower(company)"),
+    withReviewFiles(comments.rows),
+  ]);
   const stageIndex = C.EPISODE_STAGES.findIndex((s) => s.key === ep.status);
   const openComments = comments.rows.filter((c) => !c.resolved).length;
   // Abas por etapa: a revisão só aparece enquanto o episódio está em revisão; a finalização, de "em finalização" em diante.
@@ -276,9 +285,8 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   if (ep.status === 'em_revisao') tabs.push({ key: 'revisao', label: 'Revisão', badge: openComments || null });
   if (stageIndex >= finIdx) tabs.push({ key: 'finalizacao', label: 'Finalização' });
   let finData = null;
-  const finSvc = require('../services/finance');
-  if (can(req.user.role, 'finance.read')) {
-    finData = { ...(await finSvc.episodeFinance(ep.id)), settings: await finSvc.settings() };
+  if (finRaw) {
+    finData = { ...finRaw, settings: finSettings };
     tabs.push({ key: 'financeiro', label: 'Financeiro' });
   }
   tabs.push({ key: 'historico', label: 'Histórico' });
@@ -288,14 +296,14 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   const latestEdited = edited[0] || null; // a mais nova primeiro
   res.render('episodes/show', {
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
-    title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: await withReviewFiles(comments.rows),
+    title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: reviewComments,
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
-    epComments: await commentsSvc.list('episode', ep.id),
+    epComments,
     content: { ...contentRows.rows[0], total: contentRows.rows[0].clips + contentRows.rows[0].posts }, tabs, defaultTab, publications: pubRows.rows, social, uploadPost, uploadLive: ls.live, testAt: ls.testAt, provider,
-    covers: coverRows.rows, meta: meta.rows[0] || null, frames: frames.rows, job, transcript: transcript.rows[0] || null, trJob: await jobs.latest(ep.id, 'transcricao'),
+    covers: coverRows.rows, meta: meta.rows[0] || null, frames: frames.rows, job, transcript: transcript.rows[0] || null, trJob,
     aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,
     finData, fin: finSvc, money: fmt.formatBRL, today: finSvc.todayISO(), here: req.originalUrl,
-    stageIndex, allSponsors: (await db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY lower(company)")).rows,
+    stageIndex, allSponsors: allSponsors.rows,
     partSizeMb: Math.round(prod.partSizeFor(0) / prod.MB), storageReady: config.storageConfigured,
     perm: {
       manage: can(req.user.role, 'production.manage'), upload: can(req.user.role, 'production.upload'),
@@ -586,6 +594,10 @@ const redirectToFile = (inline) => wrap(async (req, res) => {
   const file = await loadFile(req);
   if (!file || file.status !== 'pronto') return notFound(res);
   const isVideo = ['editado', 'bruto_video'].includes(file.kind);
+  if (inline && !isVideo && require('../services/previews').mediaType(file) === 'image') { // ver a foto: WebP; "Baixar" continua o original
+    const sent = await require('../services/webImage').send(req, res, { key: file.storage_key, mime: file.content_type, maxSide: 2400, headers: { 'Cache-Control': 'private, max-age=86400' }, fallback: () => false });
+    if (sent !== false) return sent;
+  }
   const url = await b2.presignGet(file.storage_key, {
     expires: inline ? 6 * 3600 : 900,
     download: inline ? null : file.filename,
@@ -602,7 +614,7 @@ router.get('/episodios/:id/arquivos/:fid/previa', requirePerm('episodes.read'), 
   const size = req.query.t === 'p' ? 'p' : 't';
   const disk = await require('../services/previews').get(file, size);
   if (!disk) return res.status(404).end();
-  res.set('Cache-Control', 'private, max-age=31536000, immutable').type('image/jpeg').sendFile(disk);
+  res.set('Cache-Control', 'private, max-age=31536000, immutable').type(require('path').extname(disk)).sendFile(disk); // WebP (miniaturas antigas: JPG)
 }));
 
 // Miniatura feita pelo navegador logo depois do envio (sai do arquivo que a pessoa já tem: nada é baixado do Backblaze).
@@ -700,7 +712,10 @@ router.get(['/episodios/:id/quadros/:fid', '/quadros/:fid'], requirePerm('episod
     ? await db.query('SELECT storage_key FROM episode_frames WHERE id = $1', [req.params.fid])
     : await db.query('SELECT storage_key FROM episode_frames WHERE id = $1 AND episode_id = $2', [req.params.fid, req.params.id]);
   if (!f) return notFound(res);
-  res.set('Cache-Control', 'private, max-age=300').redirect(302, await b2.presignGet(f.storage_key, { expires: 3600 }));
+  return require('../services/webImage').send(req, res, { // quadro do vídeo: WebP para ver (nunca muda)
+    key: f.storage_key, maxSide: 1600, headers: { 'Cache-Control': 'private, max-age=86400' },
+    fallback: async () => res.set('Cache-Control', 'private, max-age=300').redirect(302, await b2.presignGet(f.storage_key, { expires: 3600 })),
+  });
 }));
 
 // ---- checklists do episódio ----

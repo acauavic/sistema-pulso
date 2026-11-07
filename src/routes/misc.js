@@ -32,6 +32,12 @@ async function editorHome(req, res) {
 
 router.get('/', wrap(async (req, res) => {
   if (can(req.user.role, 'production.edit') && !can(req.user.role, 'production.manage')) return editorHome(req, res);
+  // painel: os três blocos (convidados, financeiro, cadência) começam juntos
+  const fin = require('../services/finance');
+  const outreach = require('../services/outreach');
+  const pMoney = can(req.user.role, 'finance.read') ? Promise.all([fin.counts(), fin.stockItems(), db.query(
+    "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on <= CURRENT_DATE + 7), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'")]) : null;
+  const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user) : null;
   const [counts, upcoming, recent, mine] = await Promise.all([
     db.query('SELECT status, count(*)::int AS n FROM guests GROUP BY status'),
     db.query(`SELECT id, name, topic, proposed_at FROM guests
@@ -43,14 +49,11 @@ router.get('/', wrap(async (req, res) => {
   ]);
   const byStatus = Object.fromEntries(counts.rows.map((r) => [r.status, r.n]));
   let money = null;
-  if (can(req.user.role, 'finance.read')) {
-    const fin = require('../services/finance');
-    const [c, stock, { rows: [week] }] = await Promise.all([fin.counts(), fin.stockItems(), db.query(
-      "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on <= CURRENT_DATE + 7), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'")]);
+  if (pMoney) {
+    const [c, stock, { rows: [week] }] = await pMoney;
     money = { late: c.atrasados, out7: Number(week.out7), toBuy: stock.filter((i) => i.active && ['comprar', 'acabou'].includes(i.state)).length };
   }
-  const outreach = require('../services/outreach');
-  const outToday = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? await outreach.todayFor(req.user) : null;
+  const outToday = pOut ? await pOut : null;
   if (outToday) outToday.items = outToday.items.map((x) => ({ ...x, d: outreach.describe(x) }));
   res.render('dashboard', {
     money, outToday, CHANNELS: outreach.CHANNELS, outBase: (k) => outreach.KINDS[k].base,
@@ -60,8 +63,11 @@ router.get('/', wrap(async (req, res) => {
 }));
 
 router.get('/auditoria', requirePerm('audit.read'), wrap(async (req, res) => {
-  const { rows } = await db.query('SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT 300');
-  res.render('audit', { title: 'Auditoria', rows });
+  const { pageOf, paginate } = require('../utils/pager');
+  const pg = pageOf(req, 100); // 100 por página (antes: só os 300 mais recentes, o resto não aparecia)
+  const { rows: raw } = await db.query('SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2', [pg.limit, pg.offset]);
+  const { rows, pager } = paginate(req, raw, pg);
+  res.render('audit', { title: 'Auditoria', rows, pager });
 }));
 
 // ---- integrações: status + testes seguros (sem expor segredos) ----
@@ -237,6 +243,12 @@ router.post('/integracoes/email', requirePerm('integrations.manage'), wrap(async
     await req.flash('error', `Falha no envio: ${err.message}`);
   }
   res.redirect('/integracoes');
+}));
+
+// Velocidade real: o navegador manda (sendBeacon) as medições da página ao sair dela. Sem resposta útil: 204.
+router.post('/metricas/vitals', wrap(async (req, res) => {
+  await require('../services/perf').saveVitals(req.user, req.body || {});
+  res.status(204).end();
 }));
 
 module.exports = router;

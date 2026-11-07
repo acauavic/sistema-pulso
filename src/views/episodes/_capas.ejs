@@ -6,7 +6,7 @@
   <div class="row spread">
     <span class="small muted"><%= covers.length ? 'Aprove uma opção para usar na publicação.' : '' %></span>
     <% if (designers && aiReady && frames.length) { %>
-    <form method="post" action="/episodios/<%= ep.id %>/capas/gerar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kinds" value="youtube_thumb"><button class="btn sm" type="submit"><%= covers.length ? 'Gerar de novo' : 'Gerar thumbnails' %></button></form>
+    <form method="post" action="/episodios/<%= ep.id %>/capas/gerar" class="inline" data-busy="Gerando as capas…"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kinds" value="youtube_thumb"><button class="btn sm" type="submit"><%= covers.length ? 'Gerar de novo' : 'Gerar thumbnails' %></button></form>
     <% } %>
   </div>
   <% if (!covers.length) { %>

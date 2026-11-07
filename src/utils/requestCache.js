@@ -5,7 +5,10 @@ const { AsyncLocalStorage } = require('async_hooks');
 const als = new AsyncLocalStorage();
 
 // Fica depois dos leitores do corpo (express.json/urlencoded): eles chamam o próximo passo de dentro de eventos do socket.
-const middleware = (req, res, next) => als.run(new Map(), next);
+const PERF = Symbol('perf');
+const middleware = (req, res, next) => als.run(new Map(req.perf ? [[PERF, req.perf]] : []), next);
+// Medição da requisição atual (services/perf.js), para o pool somar o tempo de banco. null fora de requisição.
+const perf = () => als.getStore()?.get(PERF) || null;
 
 function memo(key, fn) {
   const store = als.getStore();
@@ -18,7 +21,7 @@ function memo(key, fn) {
 function forget(prefix) {
   const store = als.getStore();
   if (!store) return;
-  for (const k of [...store.keys()]) if (k.startsWith(prefix)) store.delete(k);
+  for (const k of [...store.keys()]) if (typeof k === 'string' && k.startsWith(prefix)) store.delete(k);
 }
 
-module.exports = { middleware, memo, forget };
+module.exports = { middleware, memo, forget, perf };

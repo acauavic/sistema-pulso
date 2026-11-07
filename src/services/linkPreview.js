@@ -102,14 +102,21 @@ function parse(html, pageUrl) {
 const cleanUrl = (raw) => { try { const u = new URL(String(raw || '').trim()); return ['http:', 'https:'].includes(u.protocol) && u.href.length <= 1500 ? u.href : null; } catch { return null; } };
 
 // Devolve { ok, url, title, description, image, site } (ok:false = não deu para ler a página: a tela fica só com o link).
-async function preview(rawUrl) {
+const inflight = new Map(); // o mesmo link pedido junto (várias abas, vários comentários) busca a página uma vez
+function preview(rawUrl) {
+  const key = String(rawUrl || '');
+  if (!inflight.has(key)) inflight.set(key, previewNow(rawUrl).finally(() => inflight.delete(key)));
+  return inflight.get(key);
+}
+async function previewNow(rawUrl) {
   const url = cleanUrl(rawUrl);
   if (!url) return { ok: false, url: String(rawUrl || ''), error: 'Link inválido.' };
   const { rows: [cached] } = await db.query('SELECT * FROM link_previews WHERE url = $1', [url]);
   if (cached && (Date.now() - new Date(cached.fetched_at).getTime()) / 1000 < (cached.ok ? TTL_OK : TTL_FAIL)) return { ok: cached.ok, url, title: cached.title, description: cached.description, image: cached.image, site: cached.site };
   let result = { ok: false, title: null, description: null, image: null, site: null };
   try {
-    const res = await fetcher(url);
+    // limite total (DNS, redirecionamentos e página que manda os bytes aos poucos): 8 s; o limite de cada conexão é só de silêncio
+    let t; const res = await Promise.race([fetcher(url), new Promise((_, reject) => { t = setTimeout(() => reject(Object.assign(new Error('A página demorou demais.'), { code: 'ETIMEDOUT' })), 8000); })]).finally(() => clearTimeout(t));
     const type = String(res.headers['content-type'] || '');
     if (res.status >= 200 && res.status < 300 && /html/i.test(type)) {
       const p = parse(res.body.toString('utf8'), res.url || url);

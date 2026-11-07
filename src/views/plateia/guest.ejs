@@ -38,7 +38,7 @@
         <h1>Conheça de perto <%= g.name %></h1>
         <p class="pl-lede pl-lede-hero">e participe também da gravação do Pulso Podcast.</p>
       </div>
-      <div class="pl-photo pl-guest-photo"><% if (g.hasPhoto) { %><img src="/plateia/com/<%= g.slug %>/foto" alt="<%= g.name %>" width="1200" height="900"><% } else { %><span aria-hidden="true"><%= g.initials %></span><% } %></div>
+      <div class="pl-photo pl-guest-photo"><% if (g.hasPhoto) { %><img fetchpriority="high" src="/plateia/com/<%= g.slug %>/foto" alt="<%= g.name %>" width="1200" height="900"><% } else { %><span aria-hidden="true"><%= g.initials %></span><% } %></div>
       <div class="pl-guest-text">
         <% if (g.role) { %><p class="pl-role pl-role-lg"><%= g.role %></p><% } %>
         <% if (g.instagram) { %><a class="pl-ig" href="https://www.instagram.com/<%= encodeURIComponent(g.instagram) %>/" target="_blank" rel="noopener noreferrer"><%- icon('instagram', 16) %>@<%= g.instagram %></a><% } %>
@@ -51,7 +51,7 @@
         <% if (!hasReels) { %><%- include('_benefits') %><% } %>
         <% if (exempt) { %>
         <div class="pl-gift">
-          <% if (partner.logo_key) { %><span class="pl-gift-logo"><img src="/plateia/com/<%= g.slug %>/<%= partner.token %>/logo?v=<%= encodeURIComponent(partner.logo_key.slice(-12)) %>" alt="<%= partner.name %>"></span><% } %>
+          <% if (partner.logo_key) { %><span class="pl-gift-logo"><img loading="lazy" decoding="async" src="/plateia/com/<%= g.slug %>/<%= partner.token %>/logo?v=<%= encodeURIComponent(partner.logo_key.slice(-12)) %>" alt="<%= partner.name %>"></span><% } %>
           <p><span class="pl-kicker">Convite de <%= partner.name %></span><strong>Participação isenta de cobrança.</strong> Se o seu pedido for selecionado, você não paga a vaga.</p>
         </div>
         <% } else if (partnerFull) { %>

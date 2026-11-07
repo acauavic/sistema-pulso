@@ -329,7 +329,9 @@ async function getConversation(userId, id) {
 const removeConversation = (userId, id) => db.query('DELETE FROM assistant_conversations WHERE id = $1 AND user_id = $2', [id, userId]).then((r) => r.rowCount > 0);
 
 // Uma pergunta. Devolve { conversation, reply, tools } ou lança erro com mensagem amigável.
-async function ask({ user, conversationId = null, text, page = null, audio = false }) {
+// onEvent(tipo, dado): resposta em tempo real (tela escrevendo enquanto a IA gera). Tipos: 'delta' (pedaço de texto),
+// 'reset' (o texto daquela volta era só preâmbulo de uma consulta: apaga), 'tool' (nome da consulta em andamento).
+async function ask({ user, conversationId = null, text, page = null, audio = false, onEvent = null }) {
   const question = String(text || '').trim().slice(0, 4000);
   if (!question) throw Object.assign(new Error('Escreva ou grave a pergunta.'), { status: 400 });
   let conv = conversationId ? (await db.query('SELECT * FROM assistant_conversations WHERE id = $1 AND user_id = $2', [conversationId, user.id])).rows[0] : null;
@@ -344,8 +346,10 @@ async function ask({ user, conversationId = null, text, page = null, audio = fal
   let reply = '';
   try {
     for (let round = 0; round < MAX_ROUNDS; round += 1) {
-      const r = await gemini.chat({ system: systemPrompt(user, page), contents, tools: tools.map((t) => t.decl) });
+      const req = { system: systemPrompt(user, page), contents, tools: tools.map((t) => t.decl) };
+      const r = onEvent ? await gemini.chatStream({ ...req, onText: (t) => onEvent('delta', t) }) : await gemini.chat(req);
       if (!r.calls.length) { reply = r.text; break; }
+      if (onEvent) { if (r.text) onEvent('reset'); for (const c of r.calls) onEvent('tool', c.name); }
       contents.push({ role: 'model', parts: r.parts });
       const responses = [];
       for (const call of r.calls) {

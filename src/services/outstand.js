@@ -70,9 +70,17 @@ async function call(method, path, { body = null, idempotency = null, timeout = 3
 let cache = { at: 0, value: null };
 // Contas conectadas (só leitura), no formato do painel: { youtube: { handle, name, reauth, accountId } }. Guarda 60 s.
 // force (botão "Testar"): confere também o token de cada conta (GET /v1/social-accounts/:id/health) e marca "reconectar".
-async function connected({ force = false } = {}) {
+let refreshing = null; // consulta em andamento: quem chega junto espera a mesma (sem pedidos repetidos ao provedor)
+// Depois de 60 s a tela não espera o provedor: mostra o último estado (até 10 min) e atualiza por trás.
+async function connected({ force = false, fresh = false } = {}) {
   if (!config.outstandConfigured) return { ok: false, platforms: {}, error: 'OUTSTAND_API_KEY não configurada.' };
-  if (!force && cache.value && Date.now() - cache.at < 60_000) return cache.value;
+  if (!force && !fresh) {
+    const age = Date.now() - cache.at;
+    if (cache.value && age < 60_000) return cache.value;
+    if (!refreshing) refreshing = connected({ fresh: true }).finally(() => { refreshing = null; });
+    if (cache.value && age < 10 * 60_000) return cache.value;
+    return refreshing;
+  }
   let value;
   try {
     const rows = [];
@@ -100,7 +108,7 @@ async function connected({ force = false } = {}) {
   cache = { at: Date.now(), value };
   return value;
 }
-const resetCache = () => { cache = { at: 0, value: null }; };
+const resetCache = () => { cache = { at: 0, value: null }; refreshing = null; };
 
 // Como o TikTok sai: 'direto' (publica) ou 'rascunho' (vai para a caixa do TikTok e a pessoa termina no app). Padrão: direto.
 const tiktokMode = async () => ((await settings.get('outstand_tiktok_mode')) === 'rascunho' ? 'rascunho' : 'direto');

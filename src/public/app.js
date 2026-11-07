@@ -15,6 +15,15 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sidebar?.classList.contains('open')) setMenu(false); });
   window.addEventListener('pageshow', () => setMenu(false)); // voltar pelo histórico não reabre a página com o menu aberto
 
+  // Assistente: o script só baixa quando a pessoa abre (ou se ele ficou aberto da última vez). Até lá, só o botão.
+  const assistFab = document.querySelector('[data-assist-open][data-assist-src]');
+  if (assistFab) {
+    const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* sem storage */ } } };
+    const loadAssist = () => { if (document.querySelector('script[data-assist-loaded]')) return; const s = document.createElement('script'); s.src = assistFab.dataset.assistSrc; s.dataset.assistLoaded = '1'; document.body.appendChild(s); };
+    if (store.get('pulso-assist-open') === '1') loadAssist();
+    else assistFab.addEventListener('click', () => { store.set('pulso-assist-open', '1'); loadAssist(); }, { once: true }); // o script abre sozinho ao carregar
+  }
+
   // tema: escuro (padrão) ou claro; a escolha fica só neste navegador
   document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
     const root = document.documentElement;

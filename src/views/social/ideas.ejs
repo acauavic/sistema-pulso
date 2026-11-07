@@ -15,7 +15,7 @@
     <% if (!aiReady) { %><p class="flash flash-error">IA (Gemini) não configurada neste servidor.</p><% } %>
     <% if (running) { %><p class="small warn"><%- icon('clock', 14) %> Um pedido está na fila. Você recebe uma notificação quando terminar.</p><% } %>
     <% if (canIdeas) { %>
-    <form method="post" action="/social/ideias/gerar" class="stack" data-check-all-scope>
+    <form method="post" action="/social/ideias/gerar" class="stack" data-check-all-scope data-busy="Gerando ideias…">
       <%- csrfField %>
       <fieldset class="row wrap">
         <legend>O que sugerir</legend>

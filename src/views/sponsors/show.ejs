@@ -200,7 +200,7 @@
         <p class="muted"><%= formState.pending ? 'Respondeu parte do formulário e deixou o resto como pendência.' : (sponsor.brief_completed_at ? 'Respondeu sem preencher os campos.' : 'Ainda não respondeu o formulário.') %></p>
       <% } %>
       <dl class="kv">
-        <% if (logo) { %><dt>Logo</dt><dd><img class="logo-preview" src="<%= fileBase + logo.id %>" alt="Logo de <%= sponsor.company %>"> <a class="small" href="<%= fileBase + logo.id %>?baixar=1">baixar</a></dd><% } %>
+        <% if (logo) { %><dt>Logo</dt><dd><img loading="lazy" decoding="async" class="logo-preview" src="<%= fileBase + logo.id %>" alt="Logo de <%= sponsor.company %>"> <a class="small" href="<%= fileBase + logo.id %>?baixar=1">baixar</a></dd><% } %>
         <% if (brief.landing_url) { %><dt>Página</dt><dd><a href="<%= brief.landing_url %>" target="_blank" rel="noopener noreferrer"><%= brief.landing_url %></a></dd><% } %>
         <% if (brief.landing_perk) { %><dt>Brinde da página</dt><dd class="pre"><%= brief.landing_perk %></dd><% } %>
         <% questions.forEach(function (q) { if (brief[q[0]]) { %><dt><%= q[1] %></dt><dd class="pre"><%= brief[q[0]] %></dd><% } }) %>

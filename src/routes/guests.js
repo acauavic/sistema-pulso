@@ -196,31 +196,42 @@ router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) =>
 router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) => {
   const guest = await findGuest(req.params.id);
   if (!guest) return notFound(res);
-  const { rows: events } = await db.query(
-    `SELECT e.*, u.name AS user_name FROM guest_events e LEFT JOIN users u ON u.id = e.user_id
-      WHERE e.guest_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT 200`, [guest.id]);
   const defaultMessage =
     `Olá, ${firstName(guest.name)}! Tudo bem?\n\nÉ um prazer convidar você para participar do ${config.podcastName}.` +
     `${guest.topic ? ` Gostaríamos de conversar sobre: ${guest.topic}.` : ''}\n\nPreparamos um convite com todos os detalhes. É só clicar no botão abaixo e responder.`;
-  const clicks = await guestsSvc.clickStats(guest.id);
-  const [thread, linkedTasks, episode] = await Promise.all([
+  const audiencePage = require('../services/audiencePage');
+  const portalSvc = require('../services/guestPortal');
+  const outreach = require('../services/outreach');
+  const audience = require('../services/audience');
+  const inStage = guest.status === outreach.KINDS.guest.stage;
+  // Tudo o que a página lê e não depende de outra leitura sai junto (antes: ~12 consultas em fila). Só o portal espera o episódio.
+  const [{ rows: events }, clicks, thread, linkedTasks, episode, { rows: bookings }, { rows: [linkedSponsor] }, { rows: [pl] },
+    audPhotos, audPartners, reminderList, outHist, outKnown, outEval, audSettings] = await Promise.all([
+    db.query(
+      `SELECT e.*, u.name AS user_name FROM guest_events e LEFT JOIN users u ON u.id = e.user_id
+        WHERE e.guest_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT 200`, [guest.id]),
+    guestsSvc.clickStats(guest.id),
     require('../services/comments').list('guest', guest.id),
     db.query("SELECT t.id, t.title, t.status, t.due_on, t.due_time, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.guest_id = $1 ORDER BY (t.status = 'feito'), t.due_on NULLS LAST", [guest.id]),
     db.query('SELECT id, number, status, youtube_url, spotify_url FROM episodes WHERE guest_id = $1', [guest.id]),
+    db.query('SELECT b.role, s.id, s.company FROM sponsor_bookings b JOIN sponsors s ON s.id = b.sponsor_id WHERE b.guest_id = $1 ORDER BY s.company', [guest.id]),
+    guest.sponsor_id ? db.query('SELECT id, company FROM sponsors WHERE id = $1', [guest.sponsor_id]) : { rows: [] },
+    db.query("SELECT count(*)::int AS leads, count(*) FILTER (WHERE status = 'confirmado')::int AS confirmed FROM plateia_leads WHERE guest_id = $1", [guest.id]),
+    guest.audience_enabled ? audiencePage.photos(guest.id) : null,
+    guest.audience_enabled ? audiencePage.partners(guest.id) : null,
+    reminders.forGuest(guest),
+    outreach.history('guest', guest.id), outreach.knownAddresses('guest', guest.id, guest),
+    inStage ? outreach.evaluateAll('guest', { ids: [guest.id] }) : new Map(),
+    guest.audience_enabled ? audience.settings() : null,
   ]);
-  const { rows: bookings } = await db.query('SELECT b.role, s.id, s.company FROM sponsor_bookings b JOIN sponsors s ON s.id = b.sponsor_id WHERE b.guest_id = $1 ORDER BY s.company', [guest.id]);
-  const { rows: [linkedSponsor] } = guest.sponsor_id ? await db.query('SELECT id, company FROM sponsors WHERE id = $1', [guest.sponsor_id]) : { rows: [] };
-  const { rows: [pl] } = await db.query("SELECT count(*)::int AS leads, count(*) FILTER (WHERE status = 'confirmado')::int AS confirmed FROM plateia_leads WHERE guest_id = $1", [guest.id]);
   // página da plateia do convidado: só faz sentido com ele aberto para plateia
-  const audiencePage = require('../services/audiencePage');
   const pagePlateia = guest.audience_enabled ? {
-    photos: await audiencePage.photos(guest.id), partners: await audiencePage.partners(guest.id), max: audiencePage.MAX_PHOTOS,
+    photos: audPhotos, partners: audPartners, max: audiencePage.MAX_PHOTOS,
     url: guest.audience_slug ? `${config.appBaseUrl}/plateia/com/${guest.audience_slug}` : null, arrival: audiencePage.timeLabel(guest.audience_arrival),
     arrivalInput: guest.audience_arrival ? String(guest.audience_arrival).slice(0, 5) : '',
     live: guest.status === 'agendado' && guest.proposed_at && new Date(guest.proposed_at) > new Date(),
   } : null;
   // portal do convidado: nasce com o episódio
-  const portalSvc = require('../services/guestPortal');
   const pg = episode.rows[0] ? await portalSvc.byId(guest.id) : null;
   const pgContent = pg ? await portalSvc.content(pg) : null;
   const portalTab = pg ? {
@@ -228,15 +239,11 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
     channel: portalSvc.channelOf(pg), NOTIFY: portalSvc.NOTIFY, dayLabel: portalSvc.dayLabel, ytUrl: portalSvc.youtubeUrl(pg.portal_yt_channel),
     hasPhone: Boolean(require('../services/contacts').normalizeNumber(pg.phone)), hasEmail: isEmail(pg.email || ''),
   } : null;
-  const reminderList = await reminders.forGuest(guest);
-  const outreach = require('../services/outreach');
-  const inStage = guest.status === outreach.KINDS.guest.stage;
-  const [outHist, outKnown, outEval] = await Promise.all([outreach.history('guest', guest.id), outreach.knownAddresses('guest', guest.id, guest), inStage ? outreach.evaluateAll('guest', { ids: [guest.id] }) : new Map()]);
   const outSm = outEval.get(guest.id) || null;
   res.render('guests/show', {
     outreachCtx: { kind: 'guest', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (guest.instagram ? 'instagram' : guest.phone ? 'whatsapp' : guest.email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/convidados', subjectId: guest.id },
     reminderList, photoFrame: guestPhotos.FRAME,
-    pagePlateia, portalTab, plateia: { ...pl, price: guest.audience_enabled ? require('../services/audience').money(require('../services/audience').priceOf(guest, await require('../services/audience').settings())) : null, generalPrice: guest.audience_enabled ? require('../services/audience').money((await require('../services/audience').settings()).priceCents) : null, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
+    pagePlateia, portalTab, plateia: { ...pl, price: guest.audience_enabled ? audience.money(audience.priceOf(guest, audSettings)) : null, generalPrice: guest.audience_enabled ? audience.money(audSettings.priceCents) : null, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
     episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, pendingStage: isStatus(req.query.para) ? req.query.para : null, storageReady: config.storageConfigured, openModal: ['contato', 'agenda', 'email', 'perda', 'foto'].includes(req.query.abrir) ? req.query.abrir : null,
     title: guest.name, guest, events, clicks, comments: thread, linkedTasks: linkedTasks.rows, clickKinds: CLICK_KINDS, profileLabels: PROFILE_BY_KEY,
     statuses: GUEST_STATUSES, statusInfo: STATUS_BY_KEY[guest.status],

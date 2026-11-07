@@ -218,11 +218,20 @@ router.post('/gestao/busca/dispensar', requirePerm('search.manage'), wrap(async 
 
 // ---- Sistema: fila de trabalhos, processos (workers) e rotinas ----
 const JOB_LABEL = { corte: 'Ler corte', finalizacao: 'Análise por IA do episódio', social_ideias: 'Ideias para as redes', email_notificacao: 'E-mail de notificação' };
+const JOB_COLS = 'id, kind, status, episode_id, ref_id, attempts, max_attempts, message, error, run_after, finished_at';
+
+// Desempenho: velocidade real (navegador de quem usa), requisições lentas do servidor e consultas mais lentas do banco.
+router.get('/gestao/desempenho', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const days = [7, 30].includes(Number(req.query.dias)) ? Number(req.query.dias) : 7;
+  const perf = require('../services/perf');
+  res.render('gestao/desempenho', { title: 'Desempenho', r: await perf.report(days), LIMITS: perf.LIMITS });
+}));
+
 router.get('/gestao/sistema', requirePerm('integrations.manage'), wrap(async (req, res) => {
   const [counts, failed, running, workers, runs, pubSending, pubWaiting, pubAction] = await Promise.all([
     db.query("SELECT status, count(*)::int AS n FROM jobs WHERE status <> 'done' OR finished_at > now() - interval '24 hours' GROUP BY status"),
-    db.query("SELECT * FROM jobs WHERE status = 'error' ORDER BY finished_at DESC NULLS LAST LIMIT 30"),
-    db.query("SELECT * FROM jobs WHERE status IN ('running','queued') ORDER BY status DESC, run_after LIMIT 30"),
+    db.query(`SELECT ${JOB_COLS} FROM jobs WHERE status = 'error' ORDER BY finished_at DESC NULLS LAST LIMIT 30`), // sem payload/result: a tela não usa
+    db.query(`SELECT ${JOB_COLS} FROM jobs WHERE status IN ('running','queued') ORDER BY status DESC, run_after LIMIT 30`),
     db.query("SELECT *, seen_at > now() - interval '90 seconds' AS alive FROM worker_heartbeats WHERE seen_at > now() - interval '1 hour' ORDER BY seen_at DESC LIMIT 10"),
     db.query('SELECT * FROM scheduler_runs ORDER BY name'),
     // publicações: no provedor agora, com nova tentativa marcada e as que pararam pedindo ação (últimos 14 dias)

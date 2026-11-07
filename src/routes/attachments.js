@@ -29,7 +29,9 @@ const open = (forceDownload) => wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return res.status(404).send('Não encontrado.');
   const { rows: [att] } = await require('../db/pool').query('SELECT * FROM attachments WHERE id = $1', [req.params.id]);
   if (!att || !await attachments.canView(req.user, att)) return res.status(404).send('Não encontrado.');
-  res.set('Cache-Control', 'private, max-age=300').redirect(302, await attachments.presign(att, { download: forceDownload }));
+  const toBucket = async () => res.set('Cache-Control', 'private, max-age=300').redirect(302, await attachments.presign(att, { download: forceDownload }));
+  if (forceDownload || !/^image\//.test(att.content_type || '')) return toBucket();
+  return require('../services/webImage').send(req, res, { key: att.storage_key, mime: att.content_type, maxSide: 2000, headers: { 'Cache-Control': 'private, max-age=86400' }, fallback: toBucket }); // imagem no texto: WebP
 });
 router.get('/anexos/:id', open(false));
 router.get('/anexos/:id/baixar', open(true));

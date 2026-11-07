@@ -100,38 +100,46 @@ router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], wrap(async (req,
 router.get('/plateia/com/:slug/:token/logo', wrap(async (req, res) => {
   const g = await page.bySlug(req.params.slug);
   const { partner } = g ? await page.partnerFor(g.id, req.params.token) : { partner: null };
-  return sendImage(res, partner && partner.logo_key);
+  return sendImage(req, res, partner && partner.logo_key);
 }));
 router.get('/plateia/com/:slug/foto', wrap(async (req, res) => {
   const g = await page.bySlug(req.params.slug);
   if (!g) return res.status(404).send('Imagem não encontrada.');
   const { rows: [r] } = await db.query('SELECT photo_key FROM guests WHERE id = $1', [g.id]);
-  return sendImage(res, r && r.photo_key);
+  return sendImage(req, res, r && r.photo_key);
 }));
 router.get('/plateia/com/:slug/fotos/:id', wrap(async (req, res) => {
   const g = isIntId(req.params.id) ? await page.bySlug(req.params.slug) : null;
   const { rows: [p] } = g ? await db.query('SELECT storage_key FROM guest_audience_photos WHERE id = $1 AND guest_id = $2', [req.params.id, g.id]) : { rows: [] };
-  return sendImage(res, p && p.storage_key);
+  return sendImage(req, res, p && p.storage_key);
 }));
 
 // Fotos: do convidado (só enquanto ele está na agenda pública) e as imagens do estúdio escolhidas pela gestão.
-async function sendImage(res, key) {
-  const obj = key ? await b2.getObject(key).catch(() => null) : null;
-  if (!obj) return res.status(404).send('Imagem não encontrada.');
-  res.set({ 'Content-Type': obj.headers.get('content-type') || 'image/jpeg', 'Cache-Control': 'public, max-age=600', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" });
-  return res.send(Buffer.from(await obj.arrayBuffer()));
+// Para ver: WebP guardado no servidor (não baixa do bucket a cada visita). Robô do og:image e navegador sem WebP: o original.
+async function sendImage(req, res, key) {
+  if (!key) return res.status(404).send('Imagem não encontrada.');
+  const headers = { 'Cache-Control': 'public, max-age=600', 'Content-Security-Policy': "default-src 'none'; sandbox" };
+  return require('../services/webImage').send(req, res, {
+    key, maxSide: 2000, headers,
+    fallback: async () => {
+      const obj = await b2.getObject(key).catch(() => null);
+      if (!obj) return res.status(404).send('Imagem não encontrada.');
+      res.set({ ...headers, 'Content-Type': obj.headers.get('content-type') || 'image/jpeg', 'X-Content-Type-Options': 'nosniff' });
+      return res.send(Buffer.from(await obj.arrayBuffer()));
+    },
+  });
 }
 
 router.get('/plateia/foto/:id', wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return res.status(404).send('Imagem não encontrada.');
   const { rows: [g] } = await db.query("SELECT photo_key FROM guests WHERE id = $1 AND status = 'agendado' AND audience_enabled AND proposed_at > now()", [req.params.id]);
-  return sendImage(res, g && g.photo_key);
+  return sendImage(req, res, g && g.photo_key);
 }));
 
 router.get('/plateia/imagem/:slot', wrap(async (req, res) => {
   const s = await audience.settings();
   const key = { hero: s.heroKey, estudio: s.studioKey, bastidores: s.reelsPosterKey }[req.params.slot];
-  return sendImage(res, key);
+  return sendImage(req, res, key);
 }));
 
 // Vídeo dos bastidores: link assinado do Backblaze (6 h), sem passar o arquivo pelo servidor. WebM primeiro; MP4 para quem não toca WebM.

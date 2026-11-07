@@ -146,23 +146,26 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
     db.query('SELECT e.id, e.number, e.title, e.aired_on, e.recorded_on, e.status, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id ORDER BY e.number DESC NULLS LAST, e.id DESC LIMIT 200'),
     sponsorsSvc.clickStats(sponsor.id),
   ]);
-  const [agenda, guestLinks] = await Promise.all([ // gravações marcadas (ainda sem episódio) que dá para reservar
+  // os blocos abaixo não dependem um do outro: começam juntos e a página espera todos de uma vez (antes, um bloco por vez)
+  const pAgenda = Promise.all([ // gravações marcadas (ainda sem episódio) que dá para reservar
     db.query(`SELECT g.id, g.name, g.status, g.proposed_at, g.sponsor_id, b.role FROM guests g
                 LEFT JOIN sponsor_bookings b ON b.guest_id = g.id AND b.sponsor_id = $1
                WHERE g.status IN ('em_agendamento', 'agendado') AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.guest_id = g.id)
                ORDER BY g.proposed_at NULLS LAST, lower(g.name)`, [sponsor.id]),
     db.query('SELECT id, name, status, sponsor_relation FROM guests WHERE sponsor_id = $1 ORDER BY lower(name)', [sponsor.id]),
   ]);
-  const [thread, linkedTasks] = await Promise.all([
+  const pThread = Promise.all([
     require('../services/comments').list('sponsor', sponsor.id),
     db.query("SELECT t.id, t.title, t.status, t.due_on, t.due_time, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.sponsor_id = $1 ORDER BY (t.status = 'feito'), t.due_on NULLS LAST", [sponsor.id]),
   ]);
   const outreach = require('../services/outreach');
-  const [outHist, outKnown, outEval] = await Promise.all([outreach.history('sponsor', sponsor.id), outreach.knownAddresses('sponsor', sponsor.id, sponsor), sponsor.stage === outreach.KINDS.sponsor.stage ? outreach.evaluateAll('sponsor', { ids: [sponsor.id] }) : new Map()]);
-  const outSm = outEval.get(sponsor.id) || null;
+  const pOut = Promise.all([outreach.history('sponsor', sponsor.id), outreach.knownAddresses('sponsor', sponsor.id, sponsor), sponsor.stage === outreach.KINDS.sponsor.stage ? outreach.evaluateAll('sponsor', { ids: [sponsor.id] }) : new Map()]);
   const finSvc = require('../services/finance');
+  const [[agenda, guestLinks], [thread, linkedTasks], [outHist, outKnown, outEval], finSummary] = await Promise.all([
+    pAgenda, pThread, pOut, can(req.user.role, 'finance.read') ? finSvc.sponsorSummary(sponsor.id) : null]);
+  const outSm = outEval.get(sponsor.id) || null;
   const finView = can(req.user.role, 'finance.read')
-    ? { finSummary: await finSvc.sponsorSummary(sponsor.id), fin: finSvc, money: fmtMoney, today: finSvc.todayISO(), here: req.originalUrl } : { finSummary: null };
+    ? { finSummary, fin: finSvc, money: fmtMoney, today: finSvc.todayISO(), here: req.originalUrl } : { finSummary: null };
   res.render('sponsors/show', {
     outreachCtx: { kind: 'sponsor', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (sponsor.contact_phone ? 'whatsapp' : sponsor.contact_email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/patrocinadores', subjectId: sponsor.id },
     ...finView, openModal: ['ganho', 'ativo'].includes(req.query.abrir) ? req.query.abrir : null, agenda: agenda.rows, guestLinks: guestLinks.rows, guestStatuses: C.STATUS_BY_KEY,
@@ -489,7 +492,7 @@ router.get('/patrocinadores/:id/arquivos/:fid', requirePerm('sponsors.read'), wr
   if (!isIntId(req.params.id) || !isIntId(req.params.fid)) return notFound(res);
   const { rows: [file] } = await db.query('SELECT * FROM sponsor_files WHERE id = $1 AND sponsor_id = $2', [req.params.fid, req.params.id]);
   if (!file) return notFound(res);
-  return sponsorsSvc.sendFile(res, file, { inline: req.query.baixar !== '1' });
+  return sponsorsSvc.sendFile(res, file, { inline: req.query.baixar !== '1', req });
 }));
 
 router.post('/patrocinadores/:id/arquivos/:fid/excluir', requirePerm('sponsors.write'), wrap(async (req, res) => {

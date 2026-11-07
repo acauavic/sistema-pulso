@@ -5,9 +5,18 @@
   const me = document.currentScript;
   const id = me && me.dataset.pixel;
   if (!/^\d{5,20}$/.test(id || '')) return;
-  /* eslint-disable */
-  !function (f, b, e, v, n, t, s) { if (f.fbq) return; n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); }; if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = []; t = b.createElement(e); t.async = !0; t.src = v; s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s); }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
-  /* eslint-enable */
+  // Scripts de terceiros (Meta, Google) só baixam depois que a página terminou de carregar e o navegador ficou livre:
+  // não disputam a rede com a foto e o texto do topo. Até lá, os eventos ficam numa fila (fbq/dataLayer) e saem depois.
+  const later = (fn) => { const go = () => (window.requestIdleCallback || ((f) => setTimeout(f, 1)))(fn, { timeout: 3000 }); if (document.readyState === 'complete') go(); else window.addEventListener('load', go, { once: true }); };
+  const addScript = (src) => later(() => { const s = document.createElement('script'); s.async = true; s.src = src; document.head.appendChild(s); });
+  const fbStub = () => {
+    if (window.fbq) return;
+    const n = function () { if (n.callMethod) n.callMethod.apply(n, arguments); else n.queue.push(arguments); };
+    window.fbq = n; if (!window._fbq) window._fbq = n;
+    n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
+    addScript('https://connect.facebook.net/en_US/fbevents.js');
+  };
+  fbStub();
   window.fbq('init', id);
   window.fbq('track', 'PageView');
   const params = {};

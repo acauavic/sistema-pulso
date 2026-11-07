@@ -10,7 +10,7 @@ function createApp() {
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'views'));
 
-  app.use('/static', express.static(mw.staticDir, { maxAge: '1h' }));
+  app.use('/static', require('./utils/staticFiles').staticFiles(mw.staticDir)); // Brotli/gzip prontos em memória + cache longo com ?v=
   // Ícones na raiz: o navegador e o iOS pedem esses caminhos sozinhos (convite e media kit não têm <link rel="icon">).
   app.get('/favicon.ico', (req, res) => res.sendFile(path.join(mw.staticDir, 'favicon.ico'), { maxAge: '7d' }));
   // Service worker na raiz (escopo = painel inteiro) e manifesto do app (iPhone: alertas só com o painel na Tela de Início).
@@ -20,6 +20,7 @@ function createApp() {
   app.get('/manifest.webmanifest', (req, res) => res.type('application/manifest+json').sendFile(path.join(mw.staticDir, 'manifest.webmanifest'), { maxAge: '1d' }));
   app.get('/apple-touch-icon.png', (req, res) => res.sendFile(path.join(mw.staticDir, 'apple-touch-icon.png'), { maxAge: '7d' }));
   app.use(mw.securityHeaders);
+  app.use(require('./services/perf').middleware); // tempo de cada resposta (e do banco): Server-Timing e requisições lentas
 
   app.get('/healthz', async (req, res) => {
     try {

@@ -314,10 +314,17 @@ router.post('/convidados/:id/plateia/preco', requirePerm('guests.write'), wrap(a
 
 router.get('/convidados/:id/foto', requirePerm('guests.read'), wrap(async (req, res) => {
   const { rows: [g] } = isIntId(req.params.id) ? await db.query('SELECT photo_key FROM guests WHERE id = $1', [req.params.id]) : { rows: [] };
-  const obj = g && g.photo_key ? await b2.getObject(g.photo_key).catch(() => null) : null;
-  if (!obj) return res.status(404).send('Sem foto.');
-  res.set({ 'Content-Type': obj.headers.get('content-type') || 'image/jpeg', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" });
-  return res.send(Buffer.from(await obj.arrayBuffer()));
+  if (!g || !g.photo_key) return res.status(404).send('Sem foto.');
+  const headers = { 'Cache-Control': 'private, max-age=300', 'Content-Security-Policy': "default-src 'none'; sandbox" };
+  return require('../services/webImage').send(req, res, { // para ver: WebP (a chave muda a cada foto nova)
+    key: g.photo_key, maxSide: 1200, headers,
+    fallback: async () => {
+      const obj = await b2.getObject(g.photo_key).catch(() => null);
+      if (!obj) return res.status(404).send('Sem foto.');
+      res.set({ ...headers, 'Content-Type': obj.headers.get('content-type') || 'image/jpeg', 'X-Content-Type-Options': 'nosniff' });
+      return res.send(Buffer.from(await obj.arrayBuffer()));
+    },
+  });
 }));
 
 router.post('/convidados/:id/foto', requirePerm('guests.write'), express.raw({ type: () => true, limit: MAX_IMG }), wrap(async (req, res) => {
@@ -394,7 +401,10 @@ const partnerOf = async (guestId, pid) => (isIntId(pid) ? (await db.query('SELEC
 router.get('/convidados/:id/plateia/parceiros/:pid/logo', requirePerm('guests.read'), wrap(async (req, res) => {
   const p = isIntId(req.params.id) ? await partnerOf(req.params.id, req.params.pid) : null;
   if (!p?.logo_key) return res.status(404).end();
-  res.set('Cache-Control', 'private, max-age=600').redirect(302, await b2.presignGet(p.logo_key, { expires: 3600 }));
+  return require('../services/webImage').send(req, res, { // logo em PNG continua com fundo transparente no WebP
+    key: p.logo_key, maxSide: 800, headers: { 'Cache-Control': 'private, max-age=600' },
+    fallback: async () => res.set('Cache-Control', 'private, max-age=600').redirect(302, await b2.presignGet(p.logo_key, { expires: 3600 })),
+  });
 }));
 
 router.post('/convidados/:id/plateia/parceiros/:pid/logo', requirePerm('guests.write'), express.raw({ type: () => true, limit: MAX_IMG }), wrap(async (req, res) => {

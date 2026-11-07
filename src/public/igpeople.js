@@ -93,14 +93,17 @@
         const open = shown.length > 0 && document.activeElement === input;
         list.hidden = !open; input.setAttribute('aria-expanded', String(open));
       }
+      let ctrl = null;
       async function load() {
         const my = (seq += 1);
+        if (ctrl) ctrl.abort(); // a busca anterior ainda em andamento não interessa mais
+        ctrl = new AbortController();
         try {
-          const res = await fetch(`/social/instagram/sugestoes?q=${encodeURIComponent(input.value)}&episodio=${encodeURIComponent(episode)}`, { headers: { Accept: 'application/json' } });
+          const res = await fetch(`/social/instagram/sugestoes?q=${encodeURIComponent(input.value)}&episodio=${encodeURIComponent(episode)}`, { headers: { Accept: 'application/json' }, signal: ctrl.signal });
           const body = await res.json();
           if (my !== seq) return; // resposta velha: outra busca já saiu
           options = body.ok ? body.items : []; cursor = -1; render();
-        } catch { options = []; render(); }
+        } catch (err) { if (err.name !== 'AbortError' && my === seq) { options = []; render(); } }
       }
       function pick(h) {
         if (!add(h)) return;
@@ -108,7 +111,7 @@
         if (kind === 'tag' && photo) input.blur(); // libera a imagem para posicionar a marcação
         else load(); // continua aberto para escolher mais
       }
-      input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 180); render(); });
+      input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 250); render(); }); // espera parar de digitar
       input.addEventListener('focus', () => load());
       input.addEventListener('blur', () => setTimeout(close, 120));
       input.addEventListener('keydown', (e) => {

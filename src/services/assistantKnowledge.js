@@ -189,7 +189,7 @@ const TOPICS = [
     key: 'gestao', title: 'Painel de gestão', words: ['gestão', 'gestao', 'configurar', 'configuração', 'ajustes', 'usuários', 'usuarios', 'logs', 'auditoria', 'integrações', 'integracoes', 'rotinas', 'busca global', 'saúde do sistema', 'whatsapp dos convites'],
     where: '/gestao', perm: 'users.read',
     steps: [
-      'O menu de Gestão tem grupos com abas: Visão geral; Equipe (Usuários, Logs); Operação (Cadência de follow-up, Lembretes da gravação, Rotinas de tarefas, Notificações); Convites e parcerias (WhatsApp dos convites, Planos de patrocínio, Galeria do media kit); Sistema (Integrações, Busca global, Saúde do sistema, Lixeira).',
+      'O menu de Gestão tem grupos com abas: Visão geral; Equipe (Usuários, Logs); Operação (Cadência de follow-up, Lembretes da gravação, Rotinas de tarefas, Notificações); Convites e parcerias (WhatsApp dos convites, Planos de patrocínio, Galeria do media kit); Sistema (Integrações, Busca global, Saúde do sistema, Desempenho, Lixeira).',
       'Cada aba aparece só para quem tem a permissão dela.',
     ],
   },

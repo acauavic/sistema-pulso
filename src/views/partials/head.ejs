@@ -17,6 +17,9 @@
   <meta name="apple-mobile-web-app-title" content="Pulso">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <script src="/static/theme.js?v=<%= assetV %>"></script>
+  <%# fontes do texto e dos títulos começam a baixar junto com o CSS (sem esperar o navegador descobrir que precisa delas) %>
+  <link rel="preload" href="/static/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/space-grotesk-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/app.css?v=<%= assetV %>">
 </head>
 <body>

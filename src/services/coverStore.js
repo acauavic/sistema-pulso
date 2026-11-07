@@ -28,13 +28,15 @@ async function loadFrames(episodeId, { clipId, custom = false } = {}) {
   });
 }
 
+// Baixa os quadros pedidos, 4 de cada vez (antes: um depois do outro).
 async function imageBuffers(frames, refs) {
   const out = {};
-  for (const ref of refs) {
-    const f = frames.find((x) => x.ref === ref);
-    if (!f) continue;
-    const obj = await b2.getObject(f.storage_key);
-    if (obj) out[ref] = Buffer.from(await obj.arrayBuffer());
+  const todo = [...new Set(refs)].map((ref) => frames.find((x) => x.ref === ref)).filter(Boolean);
+  for (let i = 0; i < todo.length; i += 4) {
+    await Promise.all(todo.slice(i, i + 4).map(async (f) => {
+      const obj = await b2.getObject(f.storage_key);
+      if (obj) out[f.ref] = Buffer.from(await obj.arrayBuffer());
+    }));
   }
   return out;
 }
@@ -119,7 +121,7 @@ async function addCustomImage(episodeId, { buffer, clipId = null, fromFile = nul
   try { img = await loadImage(raw); } catch { return { error: 'Não consegui abrir esta imagem. Use JPG, PNG ou WebP (HEIC e RAW não abrem aqui).' }; }
   if (img.width < 400 || img.height < 400) return { error: 'A imagem é muito pequena (mínimo 400 px de cada lado).' };
   const orientation = previews.jpegOrientation(raw); // foto de câmera/celular: já entra em pé
-  const jpeg = await previews.shrink(raw, 2400, orientation, 92);
+  const jpeg = await previews.shrink(raw, 2400, orientation, 92, 'jpeg');
   const dims = await loadImage(jpeg);
   const big = { width: dims.width, height: dims.height };
   let analysis = { rostos: [], caixas_de_texto: [], custom: true, unchecked: true, ...(fromFile ? { from_file: Number(fromFile) } : {}) };
@@ -127,7 +129,7 @@ async function addCustomImage(episodeId, { buffer, clipId = null, fromFile = nul
     const dir = await media.tempDir('pulso-img-');
     try {
       const small = path.join(dir, 'small.jpg');
-      fs.writeFileSync(small, await previews.shrink(raw, 768, orientation, 80));
+      fs.writeFileSync(small, await previews.shrink(raw, 768, orientation, 80, 'jpeg'));
       const [a] = await require('./finalization').analyzeFrames([{ small, at_ms: 0, width: big.width, height: big.height }], { attempts: 2, timeoutMs: 25_000 }); // resposta rápida: se a IA estiver ocupada, segue sem conferir
       if (a) analysis = { ...a, custom: true, ...(fromFile ? { from_file: Number(fromFile) } : {}) };
     } catch (err) {
@@ -176,7 +178,7 @@ async function generateForEpisode(episodeId, { kinds = ['youtube_thumb', 'post_q
   const epLabel = episode.number ? `EP.${String(episode.number).padStart(3, '0')}` : '';
   const who = episode.guest_name || '';
   const role = shortRole(episode);
-  const buffers = await imageBuffers(frames, frames.map((f) => f.ref));
+  const buffers = {}; // só os quadros que cada capa usa, baixados na hora (antes: todos os quadros, um por um, mesmo os que não entravam)
   const created = [];
   const group = `g${Date.now().toString(36)}`;
 
@@ -186,6 +188,8 @@ async function generateForEpisode(episodeId, { kinds = ['youtube_thumb', 'post_q
 
   const save = async (kind, built, extra = {}) => {
     const used = refsOf(built.spec);
+    const missing = used.filter((r) => !(r in buffers));
+    if (missing.length) Object.assign(buffers, Object.fromEntries(missing.map((r) => [r, undefined])), await imageBuffers(frames, missing));
     const res = await render(built.spec, Object.fromEntries(used.map((r) => [r, buffers[r]])), built.ctxData, { thumb: kind === 'youtube_thumb' });
     created.push(await insertCover(episodeId, { kind, spec: built.spec, ctx: built.ctxData, lint: res.lint, ...extra }, res, userId));
   };

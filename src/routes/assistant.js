@@ -29,9 +29,24 @@ router.post('/assistente/conversas/:id/excluir', wrap(async (req, res) => {
 async function answer(req, res, text, extra = {}) {
   if (!await limiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitas perguntas seguidas. Espere alguns minutos.' });
   if (!config.geminiConfigured) return res.status(503).json({ ok: false, error: 'A IA não está configurada neste servidor.' });
+  const conversationId = isIntId(String(req.body?.conversation_id ?? req.query.conversa ?? '')) ? Number(req.body?.conversation_id ?? req.query.conversa) : null;
+  const args = { user: req.user, conversationId, text, page: page(req.body?.page ?? req.query.pagina), audio: Boolean(extra.transcript) };
+  // A tela pede em tempo real (Accept: text/event-stream): a resposta vai saindo pedaço por pedaço, como a IA escreve.
+  if (/text\/event-stream/.test(req.get('accept') || '')) {
+    res.set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
+    res.flushHeaders();
+    const emit = (type, data) => { if (!res.writableEnded) res.write(`event: ${type}\ndata: ${JSON.stringify(data ?? {})}\n\n`); };
+    if (extra.transcript) emit('transcript', { text: extra.transcript });
+    try {
+      const r = await assistant.ask({ ...args, onEvent: (type, data) => emit(type, type === 'delta' ? { t: data } : type === 'tool' ? { name: data } : {}) });
+      emit('done', { ok: true, ...r, ...extra });
+    } catch (err) {
+      emit('done', { ok: false, error: err.status ? err.message : 'Não consegui responder agora.' });
+    }
+    return res.end();
+  }
   try {
-    const conversationId = isIntId(String(req.body?.conversation_id ?? req.query.conversa ?? '')) ? Number(req.body?.conversation_id ?? req.query.conversa) : null;
-    const r = await assistant.ask({ user: req.user, conversationId, text, page: page(req.body?.page ?? req.query.pagina), audio: Boolean(extra.transcript) });
+    const r = await assistant.ask(args);
     return res.json({ ok: true, ...r, ...extra });
   } catch (err) {
     return res.status(err.status || 500).json({ ok: false, error: err.status ? err.message : 'Não consegui responder agora.' });

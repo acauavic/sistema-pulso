@@ -70,7 +70,7 @@ const unusedClips = () => availableClips();
 const unusedImages = () => availableImages();
 
 const STATUS_LABEL = { revisao: 'Em revisão', recusado: 'Devolvido', simulado: 'Simulado', enviando: 'Enviando', agendado: 'Agendado', publicado: 'Publicado', parcial: 'Parcial', erro: 'Erro' };
-async function listPublications({ status = '', media = '', limit = 200 } = {}) {
+async function listPublications({ status = '', media = '', limit = 200, offset = 0 } = {}) {
   const where = []; const params = [];
   if (STATUS_LABEL[status]) { params.push(status); where.push(`p.status = $${params.length}`); }
   if (['video', 'imagem', 'carrossel', 'story'].includes(media)) { params.push(media); where.push(`p.media = $${params.length}`); }
@@ -79,7 +79,7 @@ async function listPublications({ status = '', media = '', limit = 200 } = {}) {
     `SELECT p.*, e.number AS episode_number, e.title AS episode_title, c.title AS clip_title, u.name AS created_by_name
        FROM episode_publications p LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN users u ON u.id = p.created_by
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY coalesce(p.scheduled_at, p.created_at) DESC LIMIT $${params.length}`, params);
+      ORDER BY coalesce(p.scheduled_at, p.created_at) DESC, p.id DESC LIMIT $${params.length} OFFSET ${Math.max(0, Number(offset) || 0)}`, params);
   return rows;
 }
 

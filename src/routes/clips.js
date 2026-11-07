@@ -244,13 +244,16 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     eligibleEpisodes(),
     c.episode_id ? db.query('SELECT e.id, e.number, e.title, g.name AS guest_name, g.instagram AS guest_instagram FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.id = $1', [c.episode_id]) : { rows: [] },
   ]);
-  const provider = await socialApi.active();
-  const ls = await socialApi.liveState();
-  const social = canPublish(req.user.role) ? await socialApi.connectedAll() : null; // cada rede com a conta do provedor dela
-  const thread = await require('../services/comments').list('clip', c.id);
-  const request = c.request_id ? await require('../services/contentRequests').get(c.request_id) : null;
+  // independentes entre si: saem juntas (antes, uma depois da outra)
+  const [provider, ls, social, thread, request, versions, replace] = await Promise.all([
+    socialApi.active(), socialApi.liveState(),
+    canPublish(req.user.role) ? socialApi.connectedAll() : null, // cada rede com a conta do provedor dela
+    require('../services/comments').list('clip', c.id),
+    c.request_id ? require('../services/contentRequests').get(c.request_id) : null,
+    clips.versionsOf(c.id), clips.replaceState(c),
+  ]);
   res.render('content/clip', {
-    comments: thread, request, versions: await clips.versionsOf(c.id), replace: await clips.replaceState(c),
+    comments: thread, request, versions, replace,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C,
     running: ['enviando', 'processando'].includes(c.status) || pubs.rows.some((p) => p.status === 'enviando'),

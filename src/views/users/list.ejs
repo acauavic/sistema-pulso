@@ -45,7 +45,7 @@
             <summary class="btn sm ghost" aria-label="Mais ações para <%= u.name %>">Mais</summary>
             <div class="row-menu-list">
           <% if (u.active) { %>
-            <form method="post" action="/usuarios/<%= u.id %>/reenviar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= u.has_password ? 'Enviar nova senha' : 'Reenviar acesso' %></button></form>
+            <form method="post" action="/usuarios/<%= u.id %>/reenviar" class="inline" data-busy="Enviando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit"><%= u.has_password ? 'Enviar nova senha' : 'Reenviar acesso' %></button></form>
           <% } %>
           <% if (!isSelf) { %>
             <form method="post" action="/usuarios/<%= u.id %>/status" class="inline" <% if (u.active) { %>data-confirm="Desativar <%= u.name %>? A pessoa será desconectada."<% } %>>

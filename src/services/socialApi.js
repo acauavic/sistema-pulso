@@ -154,6 +154,7 @@ function sentMessage(pub, { trail = '' } = {}) {
   if (pub.status === 'revisao') return 'Enviado para a revisão da gestão. Você recebe um aviso quando for aprovado ou devolvido.';
   if (pub.status === 'simulado') return `Modo de teste: o pedido foi montado e conferido, mas NADA foi enviado ${joinNames(ps.map((x) => x.by))}. A publicação de verdade é ligada em Integrações > Redes sociais.`;
   if (pub.status === 'agendado') return 'Publicação agendada.';
+  if (pub.background && pub.status === 'enviando') return `Enviando ${joinNames(ps.map((x) => x.to))}: o arquivo ainda está subindo. Pode seguir; esta página mostra o resultado e você recebe um aviso se algo falhar.`;
   if (pub.status === 'erro' && pub.retry_at) return `Ainda não saiu. ${pub.error}`;
   if (pub.status === 'erro') return `Não foi possível enviar: ${pub.error}`;
   return `Enviado ${joinNames(ps.map((x) => x.to))}.${trail}`;

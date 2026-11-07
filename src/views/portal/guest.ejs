@@ -164,7 +164,7 @@
       <% if (c.photos.length > 1) { %><a class="pt-btn pt-btn-sec" href="<%= base %>/fotos.zip" download><%- icon('download', 16) %> Baixar todas <span class="pt-mono pt-muted">.zip · <%= fmt.formatBytes(c.photos.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0)) %></span></a><% } %></div>
     <div class="pt-gal" data-gal>
       <div class="pt-gal-stage">
-        <img src="<%= base %>/fotos/<%= c.photos[0].id %>?t=p" alt="Foto da gravação 1 de <%= c.photos.length %>" width="1200" height="900" data-gal-img>
+        <img loading="lazy" decoding="async" src="<%= base %>/fotos/<%= c.photos[0].id %>?t=p" alt="Foto da gravação 1 de <%= c.photos.length %>" width="1200" height="900" data-gal-img>
         <% if (c.photos.length > 1) { %>
         <button class="pt-gal-nav pt-gal-prev" type="button" data-gal-prev aria-label="Foto anterior"><%- icon('chevron-left', 22) %></button>
         <button class="pt-gal-nav pt-gal-next" type="button" data-gal-next aria-label="Próxima foto"><%- icon('chevron-right', 22) %></button>

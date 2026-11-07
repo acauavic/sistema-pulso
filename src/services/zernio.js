@@ -47,9 +47,17 @@ async function call(method, path, { body = null, idempotency = null, timeout = 3
 
 let cache = { at: 0, value: null };
 // Contas conectadas (só leitura), no formato do painel: { youtube: { handle, name, reauth, accountId } }. Guarda 60 s.
-async function connected({ force = false } = {}) {
+let refreshing = null; // consulta em andamento: quem chega junto espera a mesma (sem pedidos repetidos ao provedor)
+// Depois de 60 s a tela não espera o provedor: mostra o último estado (até 10 min) e atualiza por trás.
+async function connected({ force = false, fresh = false } = {}) {
   if (!config.zernioConfigured) return { ok: false, platforms: {}, error: 'ZERNIO_API_KEY não configurada.' };
-  if (!force && cache.value && Date.now() - cache.at < 60_000) return cache.value;
+  if (!force && !fresh) {
+    const age = Date.now() - cache.at;
+    if (cache.value && age < 60_000) return cache.value;
+    if (!refreshing) refreshing = connected({ fresh: true }).finally(() => { refreshing = null; });
+    if (cache.value && age < 10 * 60_000) return cache.value;
+    return refreshing;
+  }
   let value;
   try {
     const qs = new URLSearchParams({ limit: '100', ...(config.zernio.profileId ? { profileId: config.zernio.profileId } : {}) });
@@ -67,7 +75,7 @@ async function connected({ force = false } = {}) {
   cache = { at: Date.now(), value };
   return value;
 }
-const resetCache = () => { cache = { at: 0, value: null }; };
+const resetCache = () => { cache = { at: 0, value: null }; refreshing = null; };
 
 // Opções de cada rede (platformSpecificData) e o texto de cada uma.
 function platformEntry(p, { kind, media, title, description, coverUrl, accounts, instagram = null }) {

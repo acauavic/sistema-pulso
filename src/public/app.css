@@ -1445,3 +1445,10 @@ a.icon-btn { text-decoration: none; } a.icon-btn.on { background: var(--raised);
   .skel-cal .skel-day:nth-child(n+8) { display: none; } /* no celular o calendário vira lista de dias */
   .skel-btn { width: 44px; }
 }
+/* Gestão > Desempenho: texto da consulta do banco quebra na largura da coluna */
+code.query-text { display: block; white-space: normal; word-break: break-word; font-size: 11px; line-height: 1.5; background: none; border: 0; padding: 0; color: var(--text-2); }
+/* Paginação das listas longas (partials/pager.ejs) */
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; }
+/* Listas longas (quadros com dezenas de cartões, listas de pedidos e da lixeira): o navegador só desenha o que está à vista,
+   o resto entra quando a rolagem chega (virtualização nativa). A altura reservada evita a barra de rolagem pular. */
+.kcard, .req-row { content-visibility: auto; contain-intrinsic-size: auto 88px; }

@@ -28,16 +28,25 @@ function verify(id, exp, sig, now = Date.now()) {
 }
 
 // Responde com a foto (o bucket é privado: tudo passa por aqui). Devolve false se não houver foto.
-async function send(res, guestId) {
+// req: para ver em WebP (guardado no servidor) quando o navegador aceita; senão vai o original.
+async function send(res, guestId, req = null) {
   const { rows: [g] } = await db.query('SELECT photo_key FROM guests WHERE id = $1 AND photo_key IS NOT NULL', [guestId]);
-  const obj = g ? await b2.getObject(g.photo_key).catch(() => null) : null;
-  if (!obj) return false;
-  res.set({
-    'Content-Type': obj.headers.get('content-type') || 'image/jpeg', 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff',
+  if (!g) return false;
+  const headers = {
+    'Cache-Control': 'private, max-age=3600',
     'Content-Security-Policy': "default-src 'none'; sandbox", 'Cross-Origin-Resource-Policy': 'cross-origin', // o media kit roda em sandbox (origem opaca): same-origin bloquearia a foto. Quem controla o acesso é a assinatura do endereço
-  });
-  res.send(Buffer.from(await obj.arrayBuffer()));
-  return true;
+  };
+  const original = async () => {
+    const obj = await b2.getObject(g.photo_key).catch(() => null);
+    if (!obj) return false;
+    res.set({ ...headers, 'Content-Type': obj.headers.get('content-type') || 'image/jpeg', 'X-Content-Type-Options': 'nosniff' });
+    res.send(Buffer.from(await obj.arrayBuffer()));
+    return true;
+  };
+  if (!req) return original();
+  let sent = true;
+  await require('./webImage').send(req, res, { key: g.photo_key, maxSide: 1200, headers, fallback: async () => { sent = await original(); } });
+  return sent;
 }
 
 module.exports = { FRAME, signedUrl, verify, send };

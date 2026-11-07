@@ -324,6 +324,12 @@
   });
 
   // ---------------------------------------------------------------- IA de finalização: andamento, contadores e sugestões
+  // Consulta periódica só com a aba à vista: aba em segundo plano espera voltar (sem pedidos ao servidor que ninguém vê).
+  const whenVisible = (fn, ms) => setTimeout(() => {
+    if (!document.hidden) return fn();
+    const back = () => { if (document.hidden) return; document.removeEventListener('visibilitychange', back); fn(); };
+    document.addEventListener('visibilitychange', back);
+  }, ms);
   const ia = document.querySelector('[data-ia]');
   if (ia && ia.dataset.running === '1') {
     const poll = async () => {
@@ -338,9 +344,9 @@
           if (job.status === 'done' || job.status === 'error') { window.location.hash = 'finalizacao'; window.location.reload(); return; }
         }
       } catch { /* tenta de novo */ }
-      setTimeout(poll, 3000);
+      whenVisible(poll, 3000);
     };
-    setTimeout(poll, 2000);
+    whenVisible(poll, 2000);
   }
   // larguras de barra vêm em data-w (a CSP não aceita style= inline)
   document.querySelectorAll('[data-w]').forEach((el) => { el.style.width = `${el.dataset.w}%`; });
@@ -364,7 +370,7 @@
         if (last && sig !== last) { window.location.reload(); return; }
         last = sig;
       } catch { /* tenta de novo */ }
-      setTimeout(poll, 4000);
+      whenVisible(poll, 4000);
     };
     poll();
   }

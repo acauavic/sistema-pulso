@@ -27,12 +27,15 @@ router.get('/social', requirePerm('social.read'), (req, res) => res.redirect('/s
 router.get('/social/publicacoes', requirePerm('social.read'), wrap(async (req, res) => {
   const status = social.STATUS_LABEL[req.query.status] ? req.query.status : '';
   const media = MEDIA[req.query.tipo] ? req.query.tipo : '';
-  const [pubs, counts] = await Promise.all([
-    social.listPublications({ status, media }),
+  const { pageOf, paginate } = require('../utils/pager');
+  const pg = pageOf(req, 50);
+  const [rawPubs, counts] = await Promise.all([
+    social.listPublications({ status, media, limit: pg.limit, offset: pg.offset }),
     db.query('SELECT status, count(*)::int AS n FROM episode_publications GROUP BY status'),
   ]);
+  const { rows: pubs, pager } = paginate(req, rawPubs, pg);
   res.render('social/publications', {
-    title: 'Social', tab: 'publicacoes', pubs, status, media, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, ...(await pubLive()),
+    title: 'Social', tab: 'publicacoes', pubs, pager, status, media, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, ...(await pubLive()),
     counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])),
   });
 }));

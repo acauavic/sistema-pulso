@@ -155,8 +155,8 @@
   <div class="section-title">Como sua marca aparece</div>
   <% if (moldura || qrcode) { %>
   <div class="brand-showcase">
-    <% if (moldura) { %><div class="mock-card"><img src="<%= base %>/arquivo/<%= moldura.id %>" alt="Moldura — <%= sponsor.company %>"><div class="mock-caption">moldura · bloco lateral fixo</div></div><% } %>
-    <% if (qrcode) { %><div class="mock-card"><img src="<%= base %>/arquivo/<%= qrcode.id %>" alt="QR Code — <%= sponsor.company %>"><div class="mock-caption">inserção · card com QR Code</div></div><% } %>
+    <% if (moldura) { %><div class="mock-card"><img loading="lazy" decoding="async" src="<%= base %>/arquivo/<%= moldura.id %>" alt="Moldura — <%= sponsor.company %>"><div class="mock-caption">moldura · bloco lateral fixo</div></div><% } %>
+    <% if (qrcode) { %><div class="mock-card"><img loading="lazy" decoding="async" src="<%= base %>/arquivo/<%= qrcode.id %>" alt="QR Code — <%= sponsor.company %>"><div class="mock-caption">inserção · card com QR Code</div></div><% } %>
   </div>
   <% } else { %>
   <div class="brand-empty">Estamos preparando a moldura e o QR Code da sua marca. Eles aparecem aqui assim que ficarem prontos.</div>

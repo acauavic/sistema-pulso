@@ -84,7 +84,7 @@ describe('Vídeo do episódio no portal do convidado e logo do parceiro', () => 
     assert.ok(k1 && h.b2Store.has(k1));
 
     const pub = (await anon.get(`/plateia/com/${slug}/${p.token}`)).text;
-    assert.match(pub, new RegExp(`class="pl-gift-logo"><img src="/plateia/com/${slug}/${p.token}/logo\\?v=[^"]+" alt="Clínica Vida"`));
+    assert.match(pub, new RegExp(`class="pl-gift-logo"><img loading="lazy" decoding="async" src="/plateia/com/${slug}/${p.token}/logo\\?v=[^"]+" alt="Clínica Vida"`));
     assert.doesNotMatch((await anon.get(`/plateia/com/${slug}`)).text, /pl-gift-logo/, 'a página normal não mostra');
     assert.doesNotMatch((await anon.get(`/plateia/com/${slug}/${sem.token}`)).text, /pl-gift-logo/, 'outro parceiro não mostra');
     const img = await fetch(`${app.base}/plateia/com/${slug}/${p.token}/logo`);

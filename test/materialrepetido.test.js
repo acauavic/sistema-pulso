@@ -134,7 +134,7 @@ describe('material: repetidos, envios parados, armazenamento cheio e galeria', (
     const gets = () => h.b2Calls.filter((c) => c.method === 'GET' && c.key === ph.storage_key).length;
     const before = gets(); const putsBefore = h.b2Calls.filter((c) => c.method === 'PUT').length;
     const first = await fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa`, { headers: { cookie: as.gestao.cookie() } });
-    assert.equal(first.status, 200); assert.equal(first.headers.get('content-type'), 'image/jpeg');
+    assert.equal(first.status, 200); assert.equal(first.headers.get('content-type'), 'image/webp', 'miniatura para ver: WebP');
     assert.match(first.headers.get('cache-control'), /immutable/, 'o navegador guarda para sempre');
     assert.equal((await fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa?t=p`, { headers: { cookie: as.gestao.cookie() } })).status, 200);
     for (let i = 0; i < 3; i += 1) await fetch(`${app.base}/episodios/${epId}/arquivos/${photoId}/previa`, { headers: { cookie: as.gestao.cookie() } });

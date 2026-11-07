@@ -124,7 +124,7 @@
       <div class="row spread">
         <div><span class="kicker"><%= g.episode.number ? 'EP.' + String(g.episode.number).padStart(3, '0') : 'Episódio' %></span><h2><a href="/episodios/<%= g.episode.id %>"><%= g.episode.title %></a></h2><% if (g.episode.guest_name) { %><p class="small muted"><%= g.episode.guest_name %></p><% } %></div>
         <% if (perm.cut && g.canGenerate && aiReady) { %>
-        <form method="post" action="/episodios/<%= g.episode.id %>/capas/gerar" class="inline">
+        <form method="post" action="/episodios/<%= g.episode.id %>/capas/gerar" class="inline" data-busy="Gerando as capas…">
           <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="conteudo">
           <% ['post_quote', 'post_split', 'carousel'].forEach(function (k) { %><input type="hidden" name="kinds" value="<%= k %>"><% }) %>
           <button class="btn sm" type="submit"><%= g.covers.length ? 'Gerar de novo' : 'Gerar posts' %></button>

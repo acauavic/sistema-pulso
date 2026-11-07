@@ -4,6 +4,19 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.56.0', date: '2026-11-07', title: 'Imagens em WebP, assistente em tempo real e painel de desempenho',
+    items: [
+      { kind: 'novo', text: 'O assistente responde em tempo real: o texto vai aparecendo enquanto a IA escreve, e "Consultando o sistema" aparece quando ele busca dados antes de responder.' },
+      { kind: 'novo', text: 'Gestão > Sistema > Desempenho: quanto cada página demora no navegador de quem usa (aparecer, responder ao clique, pular na tela), as respostas lentas do servidor e as consultas que mais pesam no banco.' },
+      { kind: 'ajuste', text: 'As imagens para ver no sistema (fotos dos convidados, capas, quadros, logos, fotos da galeria) chegam em WebP, mais leves, e ficam guardadas no servidor depois da primeira visita. "Baixar" continua entregando o arquivo original, em JPG ou PNG como foi enviado.' },
+      { kind: 'ajuste', text: 'Publicar agora, aprovar e reenviar não seguram mais a tela enquanto o vídeo sobe: se passar de alguns segundos, a página volta com "Enviando" e o resultado aparece sozinho (com aviso se algo falhar).' },
+      { kind: 'ajuste', text: 'Gerar capas baixa só os quadros usados, vários de uma vez; o estado das contas das redes não faz mais a página esperar o provedor.' },
+      { kind: 'ajuste', text: 'Auditoria, notificações e publicações ganharam páginas (Mais recentes / Mais antigos): o histórico antigo voltou a aparecer.' },
+      { kind: 'ajuste', text: 'Busca global e sugestões do Instagram esperam você parar de digitar e cancelam a busca anterior; botões que demoram (gerar ideias, gerar capas, testes de integração, enviar convite) não disparam duas vezes; reagir a um comentário aparece na hora.' },
+      { kind: 'ajuste', text: 'Painel mais rápido: duas cópias do servidor dividindo o acesso, arquivos do sistema comprimidos em Brotli e guardados no navegador, imagens abaixo da dobra carregando sob demanda e páginas de convidado, patrocinador, episódio e corte buscando os dados em paralelo.' },
+    ],
+  },
+  {
     version: '1.55.0', date: '2026-11-07', title: 'Páginas mais rápidas e carregamento com esqueleto',
     items: [
       { kind: 'novo', text: 'Ao abrir outra página do painel, se ela demorar um pouco, a área de conteúdo mostra o contorno da tela que vem (lista, cadastro, painel, quadro ou calendário) em vez de ficar parada na página anterior. A busca global também mostra o contorno dos resultados enquanto procura.' },

@@ -35,6 +35,8 @@ function registerRoutines() {
     await require('./auth/rateLimit').purge();
     await require('./services/attachments').purge();
     await require('./services/linkPreview').purge();
+    await require('./services/webImage').purge();
+    await require('./services/perf').purge(); // requisições lentas (30 dias) e velocidade real (60 dias) // WebP de visualização sem uso há 90 dias (refeito se alguém pedir)
     await require('./services/trash').purge(); // lixeira: o que passou de 15 dias sai de vez (com os arquivos)
     await db.query("DELETE FROM jobs WHERE status = 'done' AND finished_at < now() - interval '30 days'");
     await db.query("DELETE FROM worker_heartbeats WHERE seen_at < now() - interval '1 day'");

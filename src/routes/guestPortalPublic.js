@@ -83,7 +83,10 @@ router.get('/convidado/:token/capa/:cid', wrap(async (req, res) => {
   if (!allowed.has(Number(req.params.cid))) return res.status(404).end();
   const { rows: [cv] } = await db.query('SELECT storage_key FROM episode_covers WHERE id = $1', [req.params.cid]);
   if (!cv?.storage_key) return res.status(404).end();
-  res.set('Cache-Control', 'private, max-age=600').redirect(302, await b2.presignGet(cv.storage_key, { expires: 3600 }));
+  return require('../services/webImage').send(req, res, { // capa para ver: WebP (o convidado baixa o corte e a legenda, não a capa)
+    key: cv.storage_key, maxSide: 1600, headers: { 'Cache-Control': 'private, max-age=600' },
+    fallback: async () => res.set('Cache-Control', 'private, max-age=600').redirect(302, await b2.presignGet(cv.storage_key, { expires: 3600 })),
+  });
 }));
 
 // Corte exclusivo: assistir (inline) ou baixar.
@@ -118,7 +121,7 @@ router.get(['/convidado/:token/fotos/:fid', '/convidado/:token/fotos/:fid/baixar
   if (req.path.endsWith('/baixar')) return res.set('Cache-Control', 'no-store').redirect(302, await b2.presignGet(file.storage_key, { expires: 3600, download: file.filename }));
   const disk = await require('../services/previews').get(file, req.query.t === 'p' ? 'p' : 't');
   if (!disk) return res.status(404).end();
-  res.set('Cache-Control', 'private, max-age=86400').type('image/jpeg').sendFile(disk);
+  res.set('Cache-Control', 'private, max-age=86400').type(require('path').extname(disk)).sendFile(disk); // WebP (miniaturas antigas: JPG)
 }));
 
 // Todas as fotos num ZIP só (em vez de dezenas de downloads), montado enquanto baixa.

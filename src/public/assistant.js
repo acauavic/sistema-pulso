@@ -55,6 +55,35 @@
     return data;
   };
 
+  // Pergunta com resposta em tempo real (SSE pelo fetch). Erros antes de começar (limite, IA desligada) vêm em JSON.
+  async function stream([url, opts], onEvent) {
+    const res = await fetch(url, { ...opts, headers: { Accept: 'text/event-stream', 'x-csrf-token': csrf, ...(opts.headers || {}) } });
+    if (!/event-stream/.test(res.headers.get('content-type') || '')) {
+      const data = await res.json().catch(() => ({ ok: false, error: `Erro ${res.status}.` }));
+      if (!res.ok || data.ok === false) throw new Error(data.error || `Erro ${res.status}.`);
+      return data;
+    }
+    const reader = res.body.getReader(); const decoder = new TextDecoder();
+    let buf = ''; let done = null;
+    const handle = (block) => {
+      const type = /^event: (.+)$/m.exec(block)?.[1]; const line = /^data: (.*)$/m.exec(block)?.[1];
+      if (!type || line == null) return;
+      let data; try { data = JSON.parse(line); } catch { return; }
+      if (type === 'done') done = data; else onEvent(type, data);
+    };
+    for (;;) {
+      const { value, done: end } = await reader.read();
+      if (end) break;
+      buf += decoder.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0) { handle(buf.slice(0, i)); buf = buf.slice(i + 2); }
+    }
+    if (buf.trim()) handle(buf);
+    if (!done) throw new Error('A conexão caiu no meio da resposta. Tente de novo.');
+    if (done.ok === false) throw new Error(done.error || 'Não consegui responder agora.');
+    return done;
+  }
+
   async function load(id) {
     list.hidden = true; msgs.hidden = false;
     try {
@@ -75,17 +104,31 @@
     const mine = q ? bubble('user', q) : bubble('user', 'Transcrevendo o áudio…', { audio: true });
     input.value = ''; autosize();
     const wait = typing();
+    let live = null; let raw = ''; let frame = 0; // balão que vai sendo escrito enquanto a resposta chega
+    const paint = () => { frame = 0; if (live) { live.innerHTML = format(raw); msgs.scrollTop = msgs.scrollHeight; } };
+    const onEvent = (type, data) => {
+      if (type === 'transcript' && audioBlob) { mine.textContent = data.text; const t = document.createElement('span'); t.className = 'assist-tag'; t.textContent = 'por voz'; mine.appendChild(t); }
+      if (type === 'tool') wait.setAttribute('aria-label', 'Consultando o sistema');
+      if (type === 'reset') { raw = ''; if (live) { live.remove(); live = null; } msgs.appendChild(wait); }
+      if (type === 'delta') {
+        if (!live) { wait.remove(); live = bubble('assistant', ''); }
+        raw += data.t;
+        if (!frame) frame = requestAnimationFrame(paint); // um desenho por quadro, não um por pedaço
+      }
+    };
     try {
       const page = location.pathname;
-      const data = audioBlob
-        ? await api(`/assistente/audio?pagina=${encodeURIComponent(page)}${convId ? `&conversa=${convId}` : ''}`, { method: 'POST', headers: { 'Content-Type': audioBlob.type || 'audio/webm' }, body: audioBlob })
-        : await api('/assistente/mensagem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: q, conversation_id: convId, page }) });
-      if (audioBlob) { mine.textContent = data.transcript; const t = document.createElement('span'); t.className = 'assist-tag'; t.textContent = 'por voz'; mine.appendChild(t); }
+      const data = await stream(audioBlob
+        ? [`/assistente/audio?pagina=${encodeURIComponent(page)}${convId ? `&conversa=${convId}` : ''}`, { method: 'POST', headers: { 'Content-Type': audioBlob.type || 'audio/webm' }, body: audioBlob }]
+        : ['/assistente/mensagem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: q, conversation_id: convId, page }) }], onEvent);
+      if (audioBlob && data.transcript) onEvent('transcript', { text: data.transcript });
       setConv(data.conversation.id, data.conversation.title);
       wait.remove();
-      bubble('assistant', data.reply, { error: data.error });
+      if (frame) cancelAnimationFrame(frame);
+      if (live) { live.innerHTML = format(data.reply); live.classList.toggle('err', Boolean(data.error)); msgs.scrollTop = msgs.scrollHeight; } else bubble('assistant', data.reply, { error: data.error });
     } catch (err) {
       wait.remove();
+      if (live) live.remove();
       if (audioBlob) mine.remove();
       bubble('assistant', err.message || 'Não consegui responder agora.', { error: true });
     } finally { busy = false; send.disabled = false; mic.disabled = false; input.focus(); }

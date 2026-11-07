@@ -52,8 +52,8 @@ function jpegOrientation(buf) {
   return 1;
 }
 
-// Reduz para caber em `side` (sem aumentar), aplica a rotação e devolve JPEG.
-async function shrink(buf, side, orientation = 1, quality = 82) {
+// Reduz para caber em `side` (sem aumentar), aplica a rotação e devolve WebP (padrão: para ver no sistema) ou JPEG.
+async function shrink(buf, side, orientation = 1, quality = 82, format = 'webp') {
   const { createCanvas, loadImage } = require('@napi-rs/canvas');
   const img = await loadImage(buf);
   const turned = orientation >= 5;
@@ -65,7 +65,7 @@ async function shrink(buf, side, orientation = 1, quality = 82) {
   const T = { 2: [-1, 0, 0, 1, w, 0], 3: [-1, 0, 0, -1, w, h], 4: [1, 0, 0, -1, 0, h], 5: [0, 1, 1, 0, 0, 0], 6: [0, 1, -1, 0, h, 0], 7: [0, -1, -1, 0, h, w], 8: [0, -1, 1, 0, 0, w] }[orientation];
   if (T) ctx.transform(...T);
   ctx.drawImage(img, 0, 0, w, h);
-  return canvas.encode('jpeg', quality);
+  return canvas.encode(format === 'jpeg' ? 'jpeg' : 'webp', quality);
 }
 
 async function imageBytes(file) {
@@ -88,8 +88,9 @@ async function videoPreview(file, side) {
   } finally { await media.rmDir(dir); }
 }
 
-// Arquivo no disco: <previewDir>/<episódio>/<arquivo>-<t|p>.jpg (o id do arquivo nunca se repete; substituir gera outro id).
-const fileFor = (file, size) => path.join(config.previewDir, String(Number(file.episode_id)), `${Number(file.id)}-${size}.jpg`);
+// Arquivo no disco: <previewDir>/<episódio>/<arquivo>-<t|p>.webp (o id do arquivo nunca se repete; substituir gera outro id).
+// Até a 1.55 eram .jpg: o que já existe vira WebP na primeira visita, a partir do JPG do disco (sem baixar o original de novo).
+const fileFor = (file, size, ext = 'webp') => path.join(config.previewDir, String(Number(file.episode_id)), `${Number(file.id)}-${size}.${ext}`);
 const stored = (file, size) => { const f = fileFor(file, size); try { return fs.statSync(f).size > 0 ? f : null; } catch { return null; } };
 async function save(file, size, buf) {
   const f = fileFor(file, size);
@@ -100,7 +101,7 @@ async function save(file, size, buf) {
   return f;
 }
 // Apaga as miniaturas de um arquivo (removido ou substituído) ou de um episódio inteiro.
-const removeFor = (file) => Promise.all(Object.keys(SIZES).map((k) => fs.promises.rm(fileFor(file, k), { force: true })));
+const removeFor = (file) => Promise.all(Object.keys(SIZES).flatMap((k) => ['webp', 'jpg'].map((ext) => fs.promises.rm(fileFor(file, k, ext), { force: true }))));
 const removeEpisode = (episodeId) => fs.promises.rm(path.join(config.previewDir, String(Number(episodeId))), { recursive: true, force: true });
 
 // Fila curta: no máximo 2 gerações ao mesmo tempo (foto grande decodificada ocupa memória; ffmpeg ocupa CPU).
@@ -117,6 +118,10 @@ async function get(file, size) {
   const have = stored(file, size);
   if (have) return have;
   if (size === 'p' && mediaType(file) === 'video') return get(file, 't'); // vídeo: o grande é o próprio player; a capa é a miniatura
+  const legacy = fileFor(file, size, 'jpg');
+  if (fs.existsSync(legacy)) { // miniatura antiga em JPG: converte a partir dela e apaga o JPG
+    try { const f = await save(file, size, await shrink(fs.readFileSync(legacy), side, 1)); await fs.promises.rm(legacy, { force: true }); return f; } catch { return legacy; }
+  }
   const id = `${file.id}:${size}`;
   if ((failed.get(id) || 0) > Date.now()) return null;
   if (inflight.has(id)) return inflight.get(id);
@@ -142,7 +147,7 @@ async function get(file, size) {
   return job;
 }
 
-// Miniatura feita pelo navegador no envio. Não confia no que chega: decodifica, limita o tamanho e regrava como JPEG limpo.
+// Miniatura feita pelo navegador no envio. Não confia no que chega: decodifica, limita o tamanho e regrava como WebP limpo.
 const MAX_INCOMING = 3 * 1024 * 1024;
 async function receive(file, size, buf) {
   const side = SIZES[size];

@@ -12,7 +12,7 @@
       <span class="small muted" data-ia-msg><%= running ? (job.message || '') : (job && job.status === 'error' ? job.error : (meta && meta.ai_generated_at ? 'Gerada em ' + fmt.formatDateTime(meta.ai_generated_at) : '')) %></span>
     </div>
     <% if (canWriteMeta && aiReady && !running) { %>
-    <form method="post" action="/episodios/<%= ep.id %>/ia/gerar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm <%= meta && meta.ai_generated_at ? 'ghost' : '' %>" type="submit"><%= meta && meta.ai_generated_at ? 'Analisar de novo' : 'Gerar sugestões' %></button></form>
+    <form method="post" action="/episodios/<%= ep.id %>/ia/gerar" class="inline" data-busy="Colocando na fila…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm <%= meta && meta.ai_generated_at ? 'ghost' : '' %>" type="submit"><%= meta && meta.ai_generated_at ? 'Analisar de novo' : 'Gerar sugestões' %></button></form>
     <% } %>
   </div>
   <% if (transcript) { %><p class="handle muted">Transcrição: <%= transcript.segments %> trechos · <%= Math.round(transcript.chars / 100) / 10 %> mil caracteres · <%= fmt.formatClock(transcript.duration_ms) %></p><% } %>

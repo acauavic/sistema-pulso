@@ -47,7 +47,7 @@ async function sendToUser(userId, payload) {
   let sent = 0;
   for (const s of rows) {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 12 * 3600, urgency: 'normal' });
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 12 * 3600, urgency: 'normal', timeout: 10_000 }); // serviço de push lento não segura a fila
       await db.query('UPDATE push_subscriptions SET last_ok_at = now(), failures = 0 WHERE id = $1', [s.id]);
       sent += 1;
     } catch (err) {

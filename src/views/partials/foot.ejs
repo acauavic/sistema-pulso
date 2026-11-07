@@ -13,7 +13,7 @@
   <form method="post" action="/novidades/visto"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentPath %>"><button class="icon-btn" type="submit" aria-label="Dispensar o aviso" title="Dispensar"><%- icon('x') %></button></form>
 </aside>
 <% } %>
-<button class="assist-fab" type="button" data-assist-open aria-label="Abrir o assistente" aria-expanded="false"><%- icon('sparkles', 20) %><span class="assist-dot" aria-hidden="true"></span></button>
+<button class="assist-fab" type="button" data-assist-open data-assist-src="/static/assistant.js?v=<%= assetV %>" aria-label="Abrir o assistente" aria-expanded="false"><%- icon('sparkles', 20) %><span class="assist-dot" aria-hidden="true"></span></button>
 <section class="assist" data-assist hidden aria-label="Assistente" data-user="<%= fmt.firstName(currentUser.name) %>">
   <header class="assist-head">
     <div class="assist-titles"><strong>Assistente</strong><span class="kicker" data-assist-title>Nova conversa</span></div>
@@ -48,9 +48,9 @@
 <script src="/static/skeleton.js?v=<%= assetV %>" defer></script>
 <script src="/static/collab.js?v=<%= assetV %>" defer></script>
 <script src="/static/reactions.js?v=<%= assetV %>" defer></script>
-<script src="/static/assistant.js?v=<%= assetV %>" defer></script>
 <script src="/static/push.js?v=<%= assetV %>" defer></script>
 <script src="/static/pwa.js?v=<%= assetV %>" defer></script>
+<script src="/static/vitals.js?v=<%= assetV %>" defer></script>
 <% } else { %></div></div><% } %>
 <script src="/static/app.js?v=<%= assetV %>" defer></script>
 </body>

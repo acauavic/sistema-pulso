@@ -65,15 +65,15 @@ jobs.register('email_notificacao', async (job) => {
 
 const unreadCount = (userId) => db.query('SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [userId]).then((r) => r.rows[0].n);
 
-async function list(userId, { type = null, unread = false, limit = 50, before = null } = {}) {
+async function list(userId, { type = null, unread = false, limit = 50, before = null, offset = 0 } = {}) {
   const params = [userId]; const where = ['n.user_id = $1'];
   if (type && TYPES.includes(type)) { params.push(type); where.push(`n.type = $${params.length}`); }
   if (unread) where.push('n.read_at IS NULL');
   if (before) { params.push(before); where.push(`n.id < $${params.length}`); }
-  params.push(Math.min(200, limit));
+  params.push(Math.min(201, limit));
   const { rows } = await db.query(
     `SELECT n.*, a.name AS actor_name FROM notifications n LEFT JOIN users a ON a.id = n.actor_id
-      WHERE ${where.join(' AND ')} ORDER BY n.created_at DESC, n.id DESC LIMIT $${params.length}`, params);
+      WHERE ${where.join(' AND ')} ORDER BY n.created_at DESC, n.id DESC LIMIT $${params.length} OFFSET ${Math.max(0, Number(offset) || 0)}`, params);
   return rows;
 }
 

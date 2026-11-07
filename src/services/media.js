@@ -51,11 +51,20 @@ async function extractFrame(video, atMs, outFile, { maxSide = 1920, quality = 3 
 }
 
 // Baixa uma URL (link assinado) direto para o disco.
-async function download(url, dest) {
-  const res = await fetch(url);
-  if (!res.ok || !res.body) throw new Error(`Não foi possível baixar o arquivo (${res.status}).`);
-  await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(dest));
-  return dest;
+// Limite de tempo: até 2 h para o arquivo todo e 2 min sem receber nada (conexão parada não segura a fila para sempre).
+async function download(url, dest, { timeoutMs = 2 * 3600_000, idleMs = 120_000 } = {}) {
+  const ctrl = new AbortController();
+  const total = setTimeout(() => ctrl.abort(new Error('Download demorou demais.')), timeoutMs);
+  let idle = setTimeout(() => ctrl.abort(new Error('Download parou de receber dados.')), idleMs);
+  const alive = () => { clearTimeout(idle); idle = setTimeout(() => ctrl.abort(new Error('Download parou de receber dados.')), idleMs); };
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok || !res.body) throw new Error(`Não foi possível baixar o arquivo (${res.status}).`);
+    const src = Readable.fromWeb(res.body);
+    src.on('data', alive);
+    await pipeline(src, fs.createWriteStream(dest), { signal: ctrl.signal });
+    return dest;
+  } finally { clearTimeout(total); clearTimeout(idle); }
 }
 
 async function tempDir(prefix = 'pulso-') {

@@ -27,6 +27,11 @@ describe('assistente de IA', () => {
         const next = script.shift() || { text: 'Pronto.' };
         if (next.status) return Response.json({ error: { message: next.message } }, { status: next.status });
         const parts = next.call ? [{ functionCall: { name: next.call, args: next.args || {} } }] : [{ text: next.text }];
+        if (String(url).includes(':streamGenerateContent')) { // em tempo real: o texto chega em pedaços (SSE)
+          const pieces = next.call ? [parts] : next.text.match(/.{1,6}/gs).map((t) => [{ text: t }]);
+          const sse = pieces.map((p) => `data: ${JSON.stringify({ candidates: [{ content: { role: 'model', parts: p } }] })}\r\n\r\n`).join('');
+          return new Response(sse, { headers: { 'content-type': 'text/event-stream' } });
+        }
         return Response.json({ candidates: [{ content: { role: 'model', parts } }] });
       }
       return realFetch(url, opts);
@@ -46,6 +51,27 @@ describe('assistente de IA', () => {
     assert.match(t, /data-assist-open/);
     assert.match(t, /\/static\/assistant\.js/);
     assert.match(t, /data-assist-mic/);
+  });
+
+  it('em tempo real: a resposta sai em pedaços (SSE), avisa a consulta e termina com a conversa salva', async () => {
+    script = [{ call: 'tarefas', args: { escopo: 'hoje' } }, { text: 'Hoje você tem 1 tarefa: Revisar o EP.012.' }];
+    const token = await as.gestao.csrf('/');
+    const res = await fetch(`${app.base}/assistente/mensagem`, {
+      method: 'POST', headers: { cookie: as.gestao.cookie(), accept: 'text/event-stream', 'x-csrf-token': token, 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'O que tenho para hoje?', page: '/' }),
+    });
+    assert.match(res.headers.get('content-type'), /text\/event-stream/);
+    const raw = await res.text();
+    const events = raw.split('\n\n').filter(Boolean).map((b) => ({ type: /^event: (.+)$/m.exec(b)[1], data: JSON.parse(/^data: (.*)$/m.exec(b)[1]) }));
+    assert.ok(events.some((e) => e.type === 'tool' && e.data.name === 'tarefas'), 'avisa que está consultando');
+    const deltas = events.filter((e) => e.type === 'delta');
+    assert.ok(deltas.length > 3, 'vários pedaços, não um bloco só');
+    assert.equal(deltas.map((e) => e.data.t).join(''), 'Hoje você tem 1 tarefa: Revisar o EP.012.');
+    const done = events.at(-1);
+    assert.equal(done.type, 'done'); assert.equal(done.data.ok, true); assert.deepEqual(done.data.tools, ['tarefas']);
+    const { rows: [last] } = await h.db.query("SELECT content FROM assistant_messages WHERE role = 'assistant' ORDER BY id DESC LIMIT 1");
+    assert.equal(last.content, 'Hoje você tem 1 tarefa: Revisar o EP.012.');
+    await h.db.query('DELETE FROM assistant_conversations'); // os próximos testes contam as conversas do zero
   });
 
   it('usa ferramenta do sistema, guarda a conversa e responde com link', async () => {

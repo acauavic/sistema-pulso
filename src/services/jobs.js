@@ -16,15 +16,23 @@ const HEAVY = ['corte', 'finalizacao', 'transcricao'];
 const register = (kind, fn, { onError } = {}) => { handlers.set(kind, fn); if (onError) errorHooks.set(kind, onError); };
 
 // Enfileira. Se já existe um igual esperando ou rodando para o mesmo episódio/ref, devolve esse (não duplica).
+// Conferir e inserir acontecem sob uma trava curta (por tipo + episódio + ref): dois cliques juntos não enfileiram duas vezes.
 async function enqueue(kind, { episodeId = null, refId = null, payload = {}, maxAttempts = 3, delayMs = 0, createdBy = null } = {}) {
-  const { rows: [existing] } = await db.query(
-    `SELECT * FROM jobs WHERE kind = $1 AND episode_id IS NOT DISTINCT FROM $2 AND ref_id IS NOT DISTINCT FROM $3 AND status IN ('queued','running') ORDER BY id LIMIT 1`,
-    [kind, episodeId, refId]);
-  if (existing) return existing;
-  const { rows: [job] } = await db.query(
-    `INSERT INTO jobs (kind, episode_id, ref_id, payload, max_attempts, run_after, created_by)
-     VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' milliseconds')::interval, $7) RETURNING *`,
-    [kind, episodeId, refId, JSON.stringify(payload), maxAttempts, String(Math.max(0, delayMs)), createdBy]);
+  const client = await db.getPool().connect();
+  let job;
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`fila:${kind}:${episodeId ?? ''}:${refId ?? ''}`]);
+    const { rows: [existing] } = await client.query(
+      `SELECT * FROM jobs WHERE kind = $1 AND episode_id IS NOT DISTINCT FROM $2 AND ref_id IS NOT DISTINCT FROM $3 AND status IN ('queued','running') ORDER BY id LIMIT 1`,
+      [kind, episodeId, refId]);
+    if (existing) { await client.query('COMMIT'); return existing; }
+    ({ rows: [job] } = await client.query(
+      `INSERT INTO jobs (kind, episode_id, ref_id, payload, max_attempts, run_after, created_by)
+       VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' milliseconds')::interval, $7) RETURNING *`,
+      [kind, episodeId, refId, JSON.stringify(payload), maxAttempts, String(Math.max(0, delayMs)), createdBy]));
+    await client.query('COMMIT');
+  } catch (err) { await client.query('ROLLBACK').catch(() => {}); throw err; } finally { client.release(); }
   await db.query('SELECT pg_notify($1, $2)', [CHANNEL, String(job.id)]).catch(() => {});
   return job;
 }

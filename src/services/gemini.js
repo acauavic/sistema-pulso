@@ -65,6 +65,62 @@ async function chat({ system, contents, tools = [], temperature = 0.5, model = c
   throw lastErr;
 }
 
+// Igual ao chat, mas a resposta chega aos pedaços (streamGenerateContent em SSE): onText(pedaço) é chamado a cada trecho de
+// texto, para a tela ir escrevendo enquanto o modelo gera. Devolve { text, calls, parts } como o chat.
+// Sem novas tentativas no meio do texto (já foi mostrado): só tenta de novo se falhar antes do primeiro pedaço.
+async function chatStream({ system, contents, tools = [], temperature = 0.5, model = config.gemini.model, timeoutMs = 60_000, attempts = 2, onText = () => {} }) {
+  if (!config.geminiConfigured) throw new Error('IA não configurada (GEMINI_KEY).');
+  const body = {
+    ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+    contents,
+    ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
+    generationConfig: { temperature },
+  };
+  let lastErr;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    let started = false;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': config.gemini.key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        lastErr = new Error(`Gemini recusou (${res.status}): ${json.error?.message || 'erro desconhecido'}`);
+        if (res.status !== 429 && res.status < 500) throw lastErr;
+      } else {
+        let text = ''; const calls = []; const callParts = []; let finish = null; let buf = '';
+        const decoder = new TextDecoder();
+        const handle = (line) => {
+          if (!line.startsWith('data:')) return;
+          let json; try { json = JSON.parse(line.slice(5).trim()); } catch { return; }
+          const cand = json.candidates?.[0];
+          if (cand?.finishReason) finish = cand.finishReason;
+          for (const part of cand?.content?.parts || []) {
+            if (part.functionCall) { calls.push({ name: part.functionCall.name, args: part.functionCall.args || {} }); callParts.push(part); } else if (part.text && !part.thought) { text += part.text; started = true; onText(part.text); }
+          }
+        };
+        for await (const chunk of res.body) {
+          buf += decoder.decode(chunk, { stream: true });
+          let i;
+          while ((i = buf.indexOf('\n')) >= 0) { handle(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
+        }
+        handle(buf.trim());
+        text = text.trim();
+        // o turno do modelo volta no histórico como veio: texto (se houve) + as chamadas de ferramenta (com a assinatura delas)
+        const parts = [...(text ? [{ text }] : []), ...callParts];
+        if (text || calls.length) return { text, calls, parts };
+        lastErr = new Error(`Gemini não respondeu (${finish || 'sem motivo'}).`);
+      }
+    } catch (err) {
+      if (started) throw err; // já mostrou parte do texto: não repete
+      lastErr = err;
+      if (/recusou \((4\d\d)\)/.test(err.message) && !/\(429\)/.test(err.message)) throw err;
+    }
+    if (attempt < attempts) await new Promise((r) => setTimeout(r, 2000 * attempt));
+  }
+  throw lastErr;
+}
+
 // Mensagem para a equipe quando a IA falha (sem jargão).
 function friendlyError(err) {
   const m = String(err?.message || err);
@@ -74,4 +130,4 @@ function friendlyError(err) {
   return 'A IA não conseguiu responder agora. Tente de novo em instantes.';
 }
 
-module.exports = { generateJson, chat, friendlyError, imagePart };
+module.exports = { chatStream, generateJson, chat, friendlyError, imagePart };

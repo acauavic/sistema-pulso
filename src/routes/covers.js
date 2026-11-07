@@ -53,12 +53,19 @@ const homeOf = (c) => (c.clip_id ? `/cortes/${c.clip_id}` : (c.kind === 'youtube
 router.get(both('/imagem'), requirePerm('episodes.read'), wrap(async (req, res) => {
   const c = await findCover(req);
   if (!c) return notFound(res);
+  const current = String(req.query.v || '') === String(new Date(c.updated_at).getTime()) && req.query.baixar !== '1';
+  if (req.query.baixar !== '1') { // para ver: WebP guardado no servidor (a versão entra na chave: capa refeita = WebP novo)
+    const sent = await require('../services/webImage').send(req, res, {
+      key: c.storage_key, version: String(new Date(c.updated_at).getTime()), maxSide: 2400,
+      headers: { 'Cache-Control': current ? 'private, max-age=86400' : 'no-cache' }, fallback: () => false,
+    });
+    if (sent !== false) return sent;
+  }
   const { rows: [ep] } = c.episode_id ? await db.query('SELECT number FROM episodes WHERE id = $1', [c.episode_id]) : { rows: [] };
   const url = await b2.presignGet(c.storage_key, { expires: 3600, download: req.query.baixar === '1' ? fileName(ep, c) : null });
   // A capa muda de arquivo quando é editada (o antigo é apagado do bucket). Só dá para guardar o redirecionamento no navegador
   // quando o endereço traz a versão atual (?v=updated_at); "Baixar" e links sem versão perguntam sempre, para nunca cair no
   // arquivo antigo ("NoSuchKey").
-  const current = String(req.query.v || '') === String(new Date(c.updated_at).getTime()) && req.query.baixar !== '1';
   res.set('Cache-Control', current ? 'private, max-age=600' : 'no-store').redirect(302, url);
 }));
 

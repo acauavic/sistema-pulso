@@ -126,7 +126,7 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
     return pub;
   }
   await addEvent(target.episode?.id, userId, scheduledAt ? `Publicação agendada (${names(list)}): ${pub.title}` : `Publicação enviada (${names(list)}): ${pub.title}`);
-  return scheduledAt ? pub : dispatch(pub.id, { trigger: 'agora' });
+  return scheduledAt ? pub : dispatchSoon(pub.id, { trigger: 'agora' });
 }
 
 // ---------------------------------------------------------------- tentativas (observabilidade)
@@ -172,6 +172,21 @@ function byText(pub, groups) {
     [...buckets.values()].forEach((b, i) => out.push({ provider: g.provider, platforms: b.platforms, title: b.title, description: b.description, keyName: i ? `${g.provider.id}:${b.platforms.slice().sort().join('+')}` : g.provider.id }));
   }
   return out;
+}
+
+// Envio pedido por uma pessoa (Publicar agora, aprovar, reenviar): espera até WAIT_MS pelo resultado; se o vídeo ainda estiver
+// subindo para o provedor, a página volta na hora com "enviando" e o envio continua em segundo plano (a tela acompanha sozinha,
+// e um aviso chega se falhar). Se o processo cair no meio, a rotina de 30 s retoma ("interrompido" → nova tentativa).
+const WAIT_MS = Number(process.env.PUBLISH_WAIT_MS || 8000);
+async function dispatchSoon(pubId, opts) {
+  const run = dispatch(pubId, opts).catch((err) => { console.error(`[publicação ${pubId}] envio em segundo plano:`, err.message); return null; });
+  let timer;
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve('demorou'), WAIT_MS); });
+  const first = await Promise.race([run, late]);
+  clearTimeout(timer);
+  if (first !== 'demorou') return first;
+  const { rows: [pub] } = await db.query('SELECT * FROM episode_publications WHERE id = $1', [pubId]);
+  return pub ? { ...pub, background: true } : null;
 }
 
 async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {}) {
@@ -626,7 +641,7 @@ async function sendAgain(cur, targets, extra, from) {
     [cur.id, JSON.stringify({ tries, ...extra }), from, platforms]);
   if (!claimed) return null;
   const keep = (cur.results || []).filter((r) => !targets.includes(r.platform));
-  return dispatch(claimed.id, { only: keep.length ? targets : null, keep, trigger: 'manual' });
+  return dispatchSoon(claimed.id, { only: keep.length ? targets : null, keep, trigger: 'manual' });
 }
 
 // Parar as novas tentativas automáticas (a equipe resolve por fora ou desiste): a publicação fica como está, com o motivo.
@@ -727,7 +742,7 @@ async function approve(pubId, reviewer) {
       WHERE id = $1 AND status = 'revisao' RETURNING *`, [pubId, reviewer.id]);
   if (!pub) return null;
   await addEvent(pub.episode_id, reviewer.id, `Publicação aprovada por ${reviewer.name}: ${pub.title}`);
-  const final = pub.status === 'enviando' ? await dispatch(pub.id, { trigger: 'aprovado' }) : pub;
+  const final = pub.status === 'enviando' ? await dispatchSoon(pub.id, { trigger: 'aprovado' }) : pub;
   await notify({
     type: 'tarefa', users: [pub.created_by], actorId: reviewer.id, title: `Post aprovado: ${pub.title}`,
     body: final.status === 'agendado' ? 'Aprovado e agendado.' : final.status === 'simulado' ? 'Aprovado (modo de teste: nada foi enviado às redes).' : final.status === 'erro' ? `Aprovado, mas ainda não saiu: ${final.error}` : 'Aprovado e enviado às redes.',

@@ -233,7 +233,14 @@ async function deleteFile(file) {
 }
 
 // Envia um arquivo do bucket como resposta HTTP (o bucket é privado: tudo passa por aqui).
-async function sendFile(res, file, { inline = true } = {}) {
+// req + inline: imagem (logo, moldura, QR) vai em WebP para ver; "Baixar" (inline = false) manda o original.
+async function sendFile(res, file, { inline = true, req = null } = {}) {
+  if (inline && req) {
+    return require('./webImage').send(req, res, {
+      key: file.storage_key, mime: file.content_type, maxSide: 2000, headers: { 'Cache-Control': 'private, max-age=300' },
+      fallback: () => sendFile(res, file, { inline }),
+    });
+  }
   const obj = await b2.getObject(file.storage_key);
   if (!obj) return res.status(404).send('Arquivo não encontrado.');
   const safeName = encodeURIComponent(file.filename || `arquivo-${file.id}`);

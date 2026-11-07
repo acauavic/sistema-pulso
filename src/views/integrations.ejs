@@ -40,7 +40,7 @@
     <% if (otherRows.length) { %><details class="provider-live"><summary class="small">Contas em provedores que não publicam essas redes <span class="mono muted"><%= otherRows.length %></span></summary>
       <ul class="plain acct-list top-gap"><% otherRows.forEach(function (a) { %><li class="acct-row"><span><strong><%= a.networkLabel %></strong><% if (a.handle) { %> <span class="mono small">@<%= String(a.handle).replace(/^@/, '') %></span><% } %><br><span class="mono small muted"><%= a.providerLabel.toUpperCase() %></span></span><span class="badge <%= chip[a.status] %>"><%= a.statusLabel %></span></li><% }) %></ul>
     </details><% } %>
-    <form method="post" action="/integracoes/redes/verificar" class="top-gap"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('refresh-cw', 14) %> Verificar agora</button> <span class="small muted">O painel também confere sozinho a cada 15 minutos e avisa a gestão quando uma conta cai.</span></form>
+    <form method="post" action="/integracoes/redes/verificar" class="top-gap" data-busy="Conferindo…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('refresh-cw', 14) %> Verificar agora</button> <span class="small muted">O painel também confere sozinho a cada 15 minutos e avisa a gestão quando uma conta cai.</span></form>
 
     <span class="kicker top-gap">Cada rede por um provedor</span>
     <p class="small m-0"><%= Object.keys(social.overrides).length ? Object.keys(social.overrides).map(function (n) { return social.networks[n] + ' sai ' + social.providers.filter(function (p) { return p.id === social.overrides[n]; }).map(function (p) { return p.by; })[0]; }).join('; ') + '. As demais saem pelo provedor em uso.' : 'Todas as redes saem pelo provedor em uso.' %></p>
@@ -108,7 +108,7 @@
 
     <div class="row top-gap">
       <% social.providers.filter(function (p) { return p.configured; }).forEach(function (p) { %>
-      <form method="post" action="/integracoes/redes/testar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><button class="btn sm ghost" type="submit">Testar <%= p.label %> (só leitura)</button></form>
+      <form method="post" action="/integracoes/redes/testar" class="inline" data-busy="Testando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="provedor" value="<%= p.id %>"><button class="btn sm ghost" type="submit">Testar <%= p.label %> (só leitura)</button></form>
       <% }) %>
     </div>
   </section>
@@ -140,7 +140,7 @@
       <li>Servidor: <code><%= smtp.host %>:<%= smtp.port %></code></li>
       <li>Remetente: <code><%= smtp.from || '—' %></code></li>
     </ul>
-    <form method="post" action="/integracoes/email">
+    <form method="post" action="/integracoes/email" data-busy="Enviando…">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <button class="btn" type="submit">Enviar e-mail de teste para mim</button>
     </form>
@@ -166,7 +166,7 @@
       <li>O link nasce quando a produtora coloca o pedido em <strong>Em avaliação</strong>, com o valor da página (dá para alterar). Quando a InfinitePay avisa o pagamento, o pedido vira Selecionado e entra como recebido no Financeiro.</li>
     </ul>
     <% if (infinitepay.ok) { %>
-    <form method="post" action="/integracoes/infinitepay"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" type="submit">Gerar link de teste (R$ 1,00)</button></form>
+    <form method="post" action="/integracoes/infinitepay" data-busy="Gerando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" type="submit">Gerar link de teste (R$ 1,00)</button></form>
     <% } else { %><p class="small muted">Defina INFINITEPAY_HANDLE no servidor e ative o "checkout externo" no app da InfinitePay.</p><% } %>
   </section>
   <section class="card">
@@ -179,7 +179,7 @@
       <li>Enviando: <strong><%= calTypes.filter(function (t) { return google.types[t.key].enabled; }).map(function (t) { return t.label; }).join(', ') || 'nada (tudo desligado)' %></strong>. A rotina confere a cada minuto e o painel atualiza o Google logo depois de qualquer alteração.</li>
     </ul>
     <% if (google.configured) { %>
-    <form method="post" action="/integracoes/google" class="row">
+    <form method="post" action="/integracoes/google" class="row" data-busy="Conectando…">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <button class="btn" type="submit" name="acao" value="testar">Testar conexão (somente leitura)</button>
       <button class="btn" type="submit" name="acao" value="sincronizar">Sincronizar agora</button>

@@ -264,7 +264,7 @@ router.post('/patrocinador/audio', express.raw({ type: () => true, limit: MAX_AU
 // ---- foto do convidado no media kit e no portal: endereço assinado e com validade (o kit roda isolado, sem cookie) ----
 router.get('/agenda/foto/:id', wrap(async (req, res) => {
   if (!guestPhotos.verify(req.params.id, req.query.e, req.query.s)) return res.status(404).type('text').send('Foto não encontrada.');
-  if (!await guestPhotos.send(res, Number(req.params.id))) return res.status(404).type('text').send('Foto não encontrada.');
+  if (!await guestPhotos.send(res, Number(req.params.id), req)) return res.status(404).type('text').send('Foto não encontrada.');
 }));
 
 // ---- arquivos que o próprio patrocinador pode ver (logo, moldura, QR Code) ----
@@ -272,7 +272,7 @@ router.get('/patrocinador/arquivo/:fid', withSession(), wrap(async (req, res) =>
   if (!/^\d{1,9}$/.test(req.params.fid)) return gone(res);
   const { rows: [file] } = await db.query("SELECT * FROM sponsor_files WHERE id = $1 AND sponsor_id = $2 AND kind IN ('logo','moldura','qrcode')", [req.params.fid, req.sp.sponsor.id]);
   if (!file) return gone(res);
-  return sponsorsSvc.sendFile(res, file);
+  return sponsorsSvc.sendFile(res, file, { req });
 }));
 
 // ---- portal do patrocinador ativo ----
