@@ -1388,3 +1388,60 @@ a.icon-btn { text-decoration: none; } a.icon-btn.on { background: var(--raised);
 .portal-photo-pick img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-card); border: 2px solid transparent; }
 .portal-photo-pick input { position: absolute; top: 8px; left: 8px; width: 18px; height: 18px; accent-color: var(--action); }
 .portal-photo-pick label:has(input:checked) img { border-color: var(--text); }
+
+/* ---------------------------------------------------------------- esqueleto de carregamento (skeleton.js)
+   Ao trocar de página, o conteúdo dá lugar ao contorno da tela que vem. Blocos em `raised` sobre o fundo, com um brilho
+   discreto que passa (sem brilho com movimento reduzido). Nada de lime: carregar não é ação. */
+.main.is-loading > .container { display: none; }
+.skel-page { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+.skel { display: block; position: relative; overflow: hidden; background: var(--raised); border-radius: var(--r-tag); }
+.skel::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 6%, transparent), transparent); animation: skel-shine 1.4s var(--ease) infinite; }
+@keyframes skel-shine { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skel::after { animation: none; display: none; } }
+.skel-stack { display: grid; gap: 10px; min-width: 0; }
+.skel-grow { flex: 1; }
+.skel-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 8px; }
+.skel-kicker { width: 120px; height: 10px; }
+.skel-title { width: min(340px, 70vw); height: 28px; border-radius: var(--r-card); }
+.skel-btn { width: 140px; height: 40px; border-radius: var(--r-full); }
+.skel-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.skel-pill { width: 88px; height: 32px; border-radius: var(--r-full); }
+.skel-pill.w-pill2 { width: 160px; }
+.skel-tab { width: 96px; height: 32px; border-radius: var(--r-full); }
+.skel-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 20px; display: grid; gap: 12px; }
+.skel-rows { padding: 4px 20px; gap: 0; }
+.skel-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.skel-row:last-child { border-bottom: 0; }
+.skel-avatar { width: 32px; height: 32px; border-radius: 50%; flex: none; }
+.skel-line { height: 12px; }
+.skel-line.skel-sm { height: 9px; }
+.skel-line.skel-h { height: 16px; margin-bottom: 4px; }
+.skel-chip { width: 72px; height: 20px; flex: none; }
+.skel-num { width: 64px; height: 36px; border-radius: var(--r-card); }
+.skel .w-25, .skel.w-25 { width: 25%; } .skel.w-35 { width: 35%; } .skel.w-40 { width: 40%; } .skel.w-45 { width: 45%; } .skel.w-50 { width: 50%; }
+.skel.w-55 { width: 55%; } .skel.w-60 { width: 60%; } .skel.w-65 { width: 65%; } .skel.w-70 { width: 70%; } .skel.w-75 { width: 75%; }
+.skel.w-85 { width: 85%; } .skel.w-90 { width: 90%; }
+.skel-split { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.skel-col { display: grid; gap: 16px; }
+.skel-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.skel-stat { padding: 16px 18px; gap: 14px; }
+.skel-board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; overflow: hidden; }
+.skel-colbox { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px; display: grid; gap: 10px; align-content: start; }
+.skel-tile { background: var(--raised); border-radius: var(--r-card); padding: 14px 12px; display: grid; gap: 10px; }
+.skel-card .skel, .skel-colbox > .skel { background: var(--line); } /* dentro do cartão, um tom acima para aparecer */
+.skel-tile .skel { background: var(--line-strong); }
+.skel-cal { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; padding: 0; background: var(--line); overflow: hidden; }
+.skel-day { background: var(--surface); min-height: 84px; padding: 10px; }
+.skel-day .skel { width: 28%; }
+.palette-skel { display: grid; gap: 6px; padding: 6px; }
+.palette-skel .skel { height: 38px; border-radius: var(--r-field); }
+@media (max-width: 860px) {
+  .skel-split { grid-template-columns: 1fr; }
+  .skel-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .skel-board { grid-template-columns: minmax(0, 1fr); }
+  .skel-board .skel-colbox:nth-child(n+2) { display: none; } /* no celular o quadro abre numa coluna */
+  .skel-cal { grid-template-columns: 1fr; }
+  .skel-cal .skel-day { min-height: 0; }
+  .skel-cal .skel-day:nth-child(n+8) { display: none; } /* no celular o calendário vira lista de dias */
+  .skel-btn { width: 44px; }
+}

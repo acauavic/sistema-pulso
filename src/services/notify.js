@@ -6,15 +6,17 @@ const mailer = require('./mailer');
 const { NOTIFICATION_TYPES } = require('../constants');
 const jobs = require('./jobs');
 const realtime = require('./realtime');
+const { memo } = require('../utils/requestCache');
 
 const TYPES = Object.keys(NOTIFICATION_TYPES);
 
-async function settings() {
+// Lida uma vez por requisição (uma ação em massa chamava notify várias vezes e relia a tabela a cada aviso).
+const settings = () => memo('notificacoes:config', async () => {
   const { rows } = await db.query('SELECT * FROM notification_settings');
   const out = Object.fromEntries(TYPES.map((t) => [t, { type: t, in_app: true, email: false, roles: [] }]));
   for (const r of rows) out[r.type] = r;
   return out;
-}
+});
 
 // Pessoas ativas com estes papéis (para os avisos gerais: agendamento, rotinas).
 async function usersWithRoles(roles) {
@@ -36,18 +38,17 @@ async function notify({ type, users = [], broadcast = false, title, body = null,
   const { rows: active } = await db.query(
     `SELECT u.id, u.email, u.name FROM users u WHERE u.active AND u.id = ANY($1::uuid[])
        AND NOT EXISTS (SELECT 1 FROM notification_mutes m WHERE m.user_id = u.id AND m.type = $2)`, [ids, type]);
-  const created = [];
-  for (const u of active) {
-    const { rows: [n] } = await db.query(
-      `INSERT INTO notifications (user_id, type, title, body, url, actor_id, entity_type, entity_id, dedupe_key, read_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, CASE WHEN $10 THEN NULL ELSE now() END)
-       ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING *`,
-      [u.id, type, String(title).slice(0, 300), body ? String(body).slice(0, 1000) : null, url, actorId, entity?.type || null, entity?.id || null, dedupe, cfg.in_app]);
-    if (!n) continue;
-    created.push(n);
-    // e-mail vai pela fila (com novas tentativas), fora da requisição
-    if (cfg.email && u.email) await jobs.enqueue('email_notificacao', { refId: n.id, maxAttempts: 5 });
-  }
+  if (!active.length) return [];
+  // uma gravação para todas as pessoas (antes: um INSERT por pessoa)
+  const { rows: inserted } = await db.query(
+    `INSERT INTO notifications (user_id, type, title, body, url, actor_id, entity_type, entity_id, dedupe_key, read_at)
+     SELECT u, $2::text, $3::text, $4::text, $5::text, $6::uuid, $7::text, $8::int, $9::text, CASE WHEN $10::boolean THEN NULL ELSE now() END FROM unnest($1::uuid[]) AS u
+     ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING *`,
+    [active.map((u) => u.id), type, String(title).slice(0, 300), body ? String(body).slice(0, 1000) : null, url, actorId, entity?.type || null, entity?.id || null, dedupe, cfg.in_app]);
+  const byUser = new Map(inserted.map((n) => [String(n.user_id), n]));
+  const created = active.map((u) => byUser.get(String(u.id))).filter(Boolean); // mesma ordem de antes
+  // e-mail vai pela fila (com novas tentativas), fora da requisição
+  if (cfg.email) for (const u of active) { const n = byUser.get(String(u.id)); if (n && u.email) await jobs.enqueue('email_notificacao', { refId: n.id, maxAttempts: 5 }); }
   // aviso na hora para quem está com o painel aberto (badge + aviso flutuante)
   for (const n of created.filter((x) => !x.read_at)) await require('./push').queue(n); // aparelhos com o painel fechado
   for (const n of created.filter((x) => !x.read_at)) await realtime.publish([n.user_id], { type: 'notification', id: n.id, kind: n.type, title: n.title, body: n.body, url: n.url ? `/notificacoes/${n.id}/abrir` : null });

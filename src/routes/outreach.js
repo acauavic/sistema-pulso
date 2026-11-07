@@ -52,7 +52,7 @@ router.post('/abordagens/:id/excluir', wrap(async (req, res) => {
 router.get('/gestao/cadencia', requirePerm('outreach.manage'), wrap(async (req, res) => {
   const days = [7, 30, 90].includes(Number(req.query.dias)) ? Number(req.query.dias) : 30;
   const r = await outreach.report(days);
-  const goalOf = await outreach.goals(r.users);
+  const goalOf = r.goalOf; // o relatório já leu as metas: não relê
   const { rows: own } = await db.query('SELECT user_id, daily_target FROM outreach_goals');
   res.render('gestao/cadencia', { title: 'Cadência', r, days, CHANNELS: outreach.CHANNELS, goalOf, ownGoal: new Map(own.map((o) => [o.user_id, o.daily_target])), shortDay, base: (k) => outreach.KINDS[k].base });
 }));

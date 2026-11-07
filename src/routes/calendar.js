@@ -28,7 +28,7 @@ router.get('/calendario', requirePerm('calendar.read'), wrap(async (req, res) =>
   const win = cal.range(cfg.visao, cfg.data);
   const [list, { rows: people }] = await Promise.all([
     cal.events({ user, from: win.from, to: win.to, types: cfg.tipos, owner: cfg.owner, hideDone: cfg.ocultar }),
-    db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+    require('../services/team').activeUsers(),
   ]);
   const byDay = {};
   for (const e of list) (byDay[e.day] = byDay[e.day] || []).push(e);

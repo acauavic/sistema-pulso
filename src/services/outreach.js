@@ -208,7 +208,7 @@ async function report(days) {
     days, from, to, cfg, channels, people, queue, sent, replies, replyRate: sent ? Math.round((replies / sent) * 100) : null,
     states: { atrasado: all.filter((x) => x.state === 'atrasado').length, hoje: all.filter((x) => x.state === 'hoje').length, possivel_perdido: all.filter((x) => x.state === 'possivel_perdido').length, a_abordar: [...s.values()].filter((x) => x.state === 'a_abordar').length },
     fill: { guestsInStage: guestsIn.length, noAttempt, noAddress: fill.no_address, sentTotal: fill.total, unowned: all.filter((x) => !x.owner_id).length },
-    goalRate, users,
+    goalRate, users, goalOf,
   };
 }
 

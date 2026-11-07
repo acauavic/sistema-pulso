@@ -178,7 +178,8 @@ router.get('/financeiro/exportar.csv', requirePerm('finance.read'), wrap(async (
 // ---------------------------------------------------------------- estoque
 router.get('/financeiro/estoque', requirePerm('stock.read'), wrap(async (req, res) => {
   const items = await fin.stockItems();
-  for (const i of items) i.moves = await fin.stockMoves(i.id, 6);
+  const moves = await fin.stockMovesFor(items.map((i) => i.id), 6);
+  for (const i of items) i.moves = moves[i.id] || [];
   const showItems = req.query.arquivados === '1' ? items : items.filter((i) => i.active);
   res.render('finance/stock', { title: 'Estoque', items: showItems, archived: items.filter((i) => !i.active).length, showArchived: req.query.arquivados === '1', settings: await fin.settings(), fin, C, money, counts: can(req.user.role, 'finance.read') ? await fin.counts() : null });
 }));

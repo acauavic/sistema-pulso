@@ -130,8 +130,9 @@ let syncedAt = 0;
 async function syncLive({ force = false } = {}) {
   if (!force && Date.now() - syncedAt < 15_000) return;
   syncedAt = Date.now();
+  const vals = await settings.getMany(ORDER.map(liveKey)); // uma consulta para os três provedores
   for (const id of ORDER) {
-    const v = await settings.get(liveKey(id));
+    const v = vals[liveKey(id)];
     if (v === 'true' || v === 'false') LIVE_TARGET[id].live = v === 'true'; // sem escolha no painel: fica o da variável de ambiente
   }
 }

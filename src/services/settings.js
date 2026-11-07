@@ -1,5 +1,6 @@
 // Ajustes gerais do sistema (Gestão): chave/valor em `app_settings`.
 const db = require('../db/pool');
+const { memo, forget } = require('../utils/requestCache');
 
 const DEFAULTS = {
   block_insertion_in_exclusive: 'true',
@@ -12,12 +13,18 @@ const DEFAULTS = {
   plateia_whatsapp: '', plateia_meta_pixel: '', plateia_ga4: '', plateia_hero_key: '', plateia_studio_key: '',
 };
 
-async function get(key) {
+// Na mesma requisição, a mesma chave vai ao banco uma vez (uma página chegava a ler 18 ajustes um por um).
+const get = (key) => memo(`ajuste:${key}`, async () => {
   const { rows: [r] } = await db.query('SELECT value FROM app_settings WHERE key = $1', [key]);
   return r ? r.value : DEFAULTS[key];
+});
+async function set(key, value) {
+  forget('ajuste:');
+  const out = await db.query(
+    'INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()', [key, String(value)]);
+  forget('ajuste:');
+  return out;
 }
-const set = (key, value) => db.query(
-  'INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()', [key, String(value)]);
 
 // Episódio que é entrega de um patrocinador (exclusivo) não recebe inserção de outro — se a gestão deixar ligado.
 const blockInsertion = async () => (await get('block_insertion_in_exclusive')) === 'true';

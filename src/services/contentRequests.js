@@ -45,6 +45,8 @@ const SELECT = `SELECT r.*, a.name AS assignee_name, cb.name AS creator_name, e.
   FROM content_requests r LEFT JOIN users a ON a.id = r.assignee_id LEFT JOIN users cb ON cb.id = r.created_by LEFT JOIN episodes e ON e.id = r.episode_id`;
 
 const get = (id) => db.query(`${SELECT} WHERE r.id = $1`, [id]).then((x) => x.rows[0] || null);
+// Vários de uma vez (ações em massa), na ordem pedida: uma consulta em vez de uma por pedido.
+const getMany = (ids) => (ids.length ? db.query(`${SELECT} WHERE r.id = ANY($1)`, [ids]).then((x) => { const by = new Map(x.rows.map((r) => [String(r.id), r])); return ids.map((id) => by.get(String(id))).filter(Boolean); }) : Promise.resolve([]));
 const list = ({ open = false, assigneeId = null, episodeId = null } = {}) => {
   const where = []; const p = [];
   where.push(open ? `r.status = ANY('{${OPEN.join(',')}}')` : 'true');
@@ -199,4 +201,4 @@ async function removeImage(r, coverId, user = null) { // vai para a lixeira (dá
 
 const isLate = (r, today) => Boolean(r.due_on) && OPEN.includes(r.status) && String(r.due_on instanceof Date ? r.due_on.toISOString() : r.due_on).slice(0, 10) < today;
 
-module.exports = { KINDS, FROM_ROUTINE, finishCortes, resumeCortes, STATUSES, FORMATS, OPEN, MAX_IMAGE, canRequest, canReview, canWork, isMine, get, list, parse, create, update, start, deliveries, deliver, approve, askChanges, cancel, reopen, clipEpisode, addImage, removeImage, isLate, url };
+module.exports = { getMany, KINDS, FROM_ROUTINE, finishCortes, resumeCortes, STATUSES, FORMATS, OPEN, MAX_IMAGE, canRequest, canReview, canWork, isMine, get, list, parse, create, update, start, deliveries, deliver, approve, askChanges, cancel, reopen, clipEpisode, addImage, removeImage, isLate, url };

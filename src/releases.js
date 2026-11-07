@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.55.0', date: '2026-11-07', title: 'Páginas mais rápidas e carregamento com esqueleto',
+    items: [
+      { kind: 'novo', text: 'Ao abrir outra página do painel, se ela demorar um pouco, a área de conteúdo mostra o contorno da tela que vem (lista, cadastro, painel, quadro ou calendário) em vez de ficar parada na página anterior. A busca global também mostra o contorno dos resultados enquanto procura.' },
+      { kind: 'ajuste', text: 'Menos idas ao banco por página: ajustes do sistema, lista da equipe e configuração dos avisos são lidos uma vez por página; o estoque, o portal do convidado, os avisos e as ações em massa de pedidos deixaram de consultar item por item.' },
+      { kind: 'ajuste', text: 'Novos índices nas consultas que mais rodam (publicações, fila de trabalhos, tarefas do convidado e do patrocinador, gravações no calendário, resultados da plateia), para o sistema continuar rápido conforme os dados crescem.' },
+    ],
+  },
+  {
     version: '1.54.0', date: '2026-11-05', title: 'Media kit: quem já sentou à mesa, todos de uma vez',
     items: [
       { kind: 'ajuste', text: 'No media kit, o slide "Quem já sentou à mesa" não passa mais de página: um convidado aparece em destaque, com foto quadrada, alcance e apresentação, e troca sozinho; todos os outros ficam à vista numa grade de fotos quadradas. Passar o mouse ou clicar numa foto mostra aquele convidado. No celular, cada um é um cartão com a foto e a apresentação embaixo.' },

@@ -278,6 +278,21 @@ function forecast(item, s, today = todayISO()) {
 }
 const STOCK_STATE = { ok: 'Em dia', atencao: 'Comprar em breve', comprar: 'Comprar agora', acabou: 'Acabou' };
 
+// As últimas movimentações de vários itens numa consulta só: { itemId: [movs] } (a tela de estoque fazia uma por item).
+async function stockMovesFor(itemIds, limit = 8) {
+  const out = Object.fromEntries(itemIds.map((id) => [id, []]));
+  if (!itemIds.length) return out;
+  const { rows } = await db.query(
+    `SELECT * FROM (
+       SELECT m.*, e.number AS ep_number, e.title AS ep_title, u.name AS user_name,
+              row_number() OVER (PARTITION BY m.item_id ORDER BY m.created_at DESC, m.id DESC) AS rn
+         FROM fin_stock_moves m LEFT JOIN episodes e ON e.id = m.episode_id LEFT JOIN users u ON u.id = m.user_id
+        WHERE m.item_id = ANY($1)) x
+      WHERE rn <= $2 ORDER BY item_id, created_at DESC, id DESC`, [itemIds, limit]);
+  for (const { rn, ...m } of rows) (out[m.item_id] ||= []).push({ ...m, qty: Number(m.qty) });
+  return out;
+}
+
 async function stockMoves(itemId, limit = 8) {
   const { rows } = await db.query(
     `SELECT m.*, e.number AS ep_number, e.title AS ep_title, u.name AS user_name FROM fin_stock_moves m LEFT JOIN episodes e ON e.id = m.episode_id LEFT JOIN users u ON u.id = m.user_id
@@ -433,6 +448,6 @@ module.exports = {
   todayISO, addDays, addMonths, monthOf, monthLabel, monthShortLabel, shiftMonth, iso, settings,
   syncGuest, onGuestDeleted, onEpisodeDeleted, onSponsorDeleted, onEpisodeCreated, onEpisodeStage, onEpisodeDates, recomputeStudio, setDuration, consumeStock,
   ensureRecurring, planSponsorPayment, sponsorSummary, afterPaid,
-  stockItems, stockMoves, buyStock, forecast, STOCK_STATE,
+  stockItems, stockMoves, stockMovesFor, buyStock, forecast, STOCK_STATE,
   entries, counts, overview, cashNow, costPerEpisode, episodeFinance, tick, toEntry,
 };

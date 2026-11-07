@@ -27,7 +27,7 @@ async function findSponsor(id) {
 }
 
 async function formOptions() {
-  const users = await db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)');
+  const users = await require('../services/team').activeUsers();
   return {
     owners: users.rows, stages: C.SPONSOR_STAGES, kinds: C.SPONSOR_KINDS, tiers: C.SPONSOR_TIERS, stageHints: sponsorsSvc.STAGE_HINTS,
   };
@@ -102,7 +102,7 @@ router.get('/patrocinadores', requirePerm('sponsors.read'), wrap(async (req, res
          FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id LEFT JOIN sponsor_briefs b ON b.sponsor_id = s.id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY s.updated_at DESC LIMIT 500`, params),
-    db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+    require('../services/team').activeUsers(),
     db.query("SELECT stage, count(*)::int AS n, coalesce(sum(value_cents),0)::bigint AS total FROM sponsors GROUP BY stage"),
   ]);
   for (const s of sponsors) { // andamento do formulário (só depois de Ganho)

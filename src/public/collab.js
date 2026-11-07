@@ -40,8 +40,11 @@
       box.querySelectorAll('.palette-item').forEach((el) => el.classList.toggle('on', Number(el.dataset.i) === active));
       box.querySelector('.palette-item.on')?.scrollIntoView({ block: 'nearest' });
     }
+    // enquanto a busca responde: linhas-esqueleto (só se ainda não há resultado na janela)
+    const skeletonRows = () => { if (!box.querySelector('.palette-item')) box.innerHTML = `<div class="palette-skel" aria-hidden="true">${'<span class="skel"></span>'.repeat(5)}</div>`; };
     async function load(q) {
       const my = ++seq;
+      const wait = setTimeout(skeletonRows, 120);
       try {
         const res = await fetch(`/busca?q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } });
         const data = await res.json();
@@ -50,7 +53,7 @@
         if (!q) { const rec = recents(); if (rec.length) groups = [{ label: 'Abertos recentemente', items: rec }, ...groups]; }
         render(groups);
         if (tips) { tips.hidden = !data.tips; tips.textContent = data.tips ? `${data.tips} sugest${data.tips > 1 ? 'ões' : 'ão'} para melhorar a busca →` : ''; }
-      } catch { box.innerHTML = '<p class="palette-empty">Não foi possível buscar agora.</p>'; }
+      } catch { box.innerHTML = '<p class="palette-empty">Não foi possível buscar agora.</p>'; } finally { clearTimeout(wait); }
     }
     function choose(i, newTab) {
       const it = items[i]; if (!it) return;
@@ -59,7 +62,7 @@
       if (!it.url) return;
       if (lastQ && lastQ.length >= 2) navigator.sendBeacon?.('/busca/escolha', new Blob([JSON.stringify({ q: lastQ, url: it.url, _csrf: csrf })], { type: 'application/json' }));
       if (it.kind !== 'acao') remember({ title: it.title, sub: it.sub, url: it.url, kind: it.kind });
-      if (newTab) window.open(it.url, '_blank'); else window.location.href = it.url;
+      if (newTab) window.open(it.url, '_blank'); else { palette.close(); window.PulsoSkeleton?.show(it.url); window.location.href = it.url; }
     }
     const open = () => { if (palette.open) return; palette.showModal(); input.value = ''; lastQ = ''; load(''); setTimeout(() => input.focus(), 10); };
     document.querySelectorAll('[data-palette-open]').forEach((b) => b.addEventListener('click', open));

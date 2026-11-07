@@ -88,6 +88,13 @@
 - **Formulário do patrocinador em etapas (2026-10-08)**: `sponsors.js` tem `BRIEF_QUESTIONS` (8 perguntas; `skippable` e `na`), `briefState` (respondida | nao_se_aplica | pendente | aberta, derivado do conteúdo + colunas `skipped`/`na` de `sponsor_briefs`, migration 012), `applyAnswer`, `reconcileBrief` (tira pendência/NA do que passou a ter resposta e marca `brief_completed_at` só quando as 8 estão respondidas). Rotas públicas `POST /patrocinador/resposta` e `/concluir` (JSON, CSRF no cabeçalho, limite próprio de 150/10 min); o `POST /cadastro` antigo segue para quem está sem JS (vazios puláveis viram pendência). `closeBrief` registra evento e avisa o responsável uma vez por situação. Visual: `.steps` (patrocinador.css) e `.fp-steps` (painel).
 - **Fora do escopo/pendente**: publicar de verdade (precisa o dono conectar TikTok e ligar `UPLOAD_POST_LIVE`), Spotify (sem API de upload), carrossel/foto no Instagram via API, aprovação de moldura/QR pelo patrocinador, WhatsApp.
 
+## Desempenho (1.55.0)
+
+- **Memória por requisição** (`utils/requestCache.js`, `memo(chave, fn)` / `forget(prefixo)`, AsyncLocalStorage ligado em `app.js` logo depois dos leitores de corpo): `settings.get` (`ajuste:*`; `set` esquece), `notify` (config dos avisos) e `services/team.activeUsers()` (lista da equipe do menu e das telas). Fora de requisição (rotinas, fila) não guarda nada.
+- **Sem N+1**: estoque usa `fin.stockMovesFor(ids)` (janela `row_number`); portal do convidado grava os avisos com `unnest` (`tick` e `markSent`) e `pending(g, c)` aceita o conteúdo já montado; ZIP das fotos busca os arquivos de uma vez; `notify` insere para todos num INSERT só; ações em massa de pedidos usam `contentRequests.getMany`; config das notificações salva com `jsonb_to_recordset`; `socialApi.syncLive` usa `getMany`.
+- **Índices** (migração 061): publicações por status, `updated_at`, `scheduled_at` e `clip_id`; `jobs (kind, ref_id, id DESC)`; quadros por corte; tarefas por convidado/patrocinador; `sponsor_episodes (episode_id)`; `guests (proposed_at)`; `plateia_events (guest_id, type, created_at)`. O filtro de dia do calendário (`inRange`) virou faixa da própria coluna para o índice servir.
+- **Esqueleto** (`public/skeleton.js`, `window.PulsoSkeleton`): clique em link interno ou formulário GET → depois de 160 ms troca `.container` por `.skel-page` no formato da tela (lista, cadastro, painel, quadro, calendário, cartões). Ignora download/mídia, `target`, `download`, `data-no-skeleton`, clique já tratado (fica depois do `uploads.js`); some no `pageshow`, se a página perguntar antes de sair e após 12 s.
+
 ## Colaboração (2026-10-08)
 
 - **Tarefas**: tabela `episode_tasks` virou **`tasks`** (migration 013): `episode_id` nulável + `guest_id`/`sponsor_id`, status **a_fazer | fazendo | feito | bloqueada** (bloqueada exige `block_reason`, CHECK no banco), `created_by`, `completed_at`, `routine_id`. Serviço `services/tasks.js` (parse/create/update com avisos, `applyRoutines(trigger, episodeId)`, `dueTick()` diário com dedupe). Rotas `/tarefas` (escopo minhas|hoje|todas; visão lista|quadro|calendario) e as do episódio delegam ao serviço. "Hoje" = minhas não feitas com vencimento ≤ hoje (Brasília).
@@ -100,6 +107,8 @@
 - **Pegadinha**: rotas públicas do patrocinador com fetch precisam estar na lista de `Origin: null` em `originCheck` (já incluí `resposta|concluir`).
 
 ## Últimas Decisões
+
+- **Varredura de desempenho (1.55.0)**: N+1 achado de dois jeitos: a suíte rodou com um contador de consultas por requisição (mesmo SQL repetido) e um leitor de laços com `await`. O que ficou de fora de propósito: escritas item a item com regra própria (edição em massa de convidados, lixeira, importação) e rotinas que chamam API externa por item. Índices escolhidos pelas estatísticas do banco do ar (`pg_stat_user_tables`: leituras completas) e pelas consultas que rodam em toda página ou a cada poucos segundos; as tabelas ainda são pequenas, então o ganho maior agora é no N+1 e na leitura repetida. Sem `pg_stat_statements` no ar (precisaria reiniciar o Postgres).
 
 - **Galeria do kit sem páginas e fotos dos convidados (1.54.0)**: o carrossel 4×2 saiu; destaque que troca a cada 5 s (para no mouse, não troca com `prefers-reduced-motion`) + grade que se ajusta. Fotos dos convidados antigos sem foto (Tamiris, Rachel, Márcio, Ben Zruel, Rafael Pelosi e o cadastro conjunto Guto + Filippe, com os dois lado a lado) foram recortadas das fotos padrão do kit (`public/kit/img-0*.jpg`, 16:9) para 1200×900 e gravadas direto no cadastro em produção. Matheus (Illumi.ai) não tem cadastro.
 - **Galeria do media kit com gravados (1.53.0)**: `kitGallery.candidates/save/setFeatured` não filtram mais `status = 'publicado'`; todo episódio existe só depois de gravado (nasce em `gravado`), então qualquer etapa entra. A tela mostra o chip da etapa (`b-st-*`); o cartão do kit não muda (não mostra número nem etapa).
@@ -301,9 +310,6 @@
   Mapeamento etapa→status: prospect=PAUTA, convite_enviado=AGENDADO (plum), confirmado=GRAVADO, gravado=EM EDIÇÃO, publicado=PUBLICADO (único lime), recusou/cancelado=CANCELADO.
   O convite público do convidado (`convite-pulso.html`) **não foi alterado** (tem identidade própria, sandbox). Módulos do DS ainda não construídos:
   Episódios, Gravações, Cortes, Métricas, Patrocinadores, Financeiro; portais do patrocinador e do convidado.
-- **Projeto movido para `sistema-pulso` (2026-10-08)**. Nasceu por engano em `podcast/` dentro de
-  `acauavic/agente_bruno` (repo do agente da clínica); o usuário pediu pra mover. Histórico git não foi
-  preservado (repo novo começa do zero, 1 commit).
 - **Criação do sistema (2026-10-08)**: (1) permissões em arquivo único e provisórias; (2) o convite do Pulso usa JS
   (a intro animada trava o scroll sem JS) → página pública em **CSP `sandbox allow-scripts allow-forms` sem
   `allow-same-origin`**, o que obriga aceitar `Origin: null` só em `POST /convite/:token/responder`;

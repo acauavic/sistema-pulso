@@ -28,7 +28,7 @@ const SCHEMA = {
 // Quem e o quê o modelo pode citar (só nomes que existem no sistema).
 async function context() {
   const [users, episodes, guests, sponsors] = await Promise.all([
-    db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+    require('./team').activeUsers(),
     db.query('SELECT id, number, title FROM episodes ORDER BY coalesce(number, 0) DESC, id DESC LIMIT 40'),
     db.query("SELECT id, name FROM guests WHERE status NOT IN ('perdido', 'cancelado') ORDER BY updated_at DESC LIMIT 200"),
     db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY updated_at DESC LIMIT 100"),

@@ -35,7 +35,7 @@ async function findGuest(id) {
 }
 
 async function formOptions() {
-  const users = await db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)');
+  const users = await require('../services/team').activeUsers();
   const sponsors = await db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)");
   return { owners: users.rows, sponsors: sponsors.rows, statuses: GUEST_STATUSES, profiles: PROFILES, stageHints: rules.STAGE_HINTS, lossReasons: LOSS_REASONS };
 }
@@ -131,7 +131,7 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
          FROM guests g LEFT JOIN users u ON u.id = g.owner_id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY g.updated_at DESC LIMIT 500`, params),
-    db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+    require('../services/team').activeUsers(),
     can(req.user.role, 'guests.write') && view === 'lista' ? db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)") : { rows: [] },
   ]);
   const outreach = require('../services/outreach');
@@ -222,8 +222,9 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   // portal do convidado: nasce com o episódio
   const portalSvc = require('../services/guestPortal');
   const pg = episode.rows[0] ? await portalSvc.byId(guest.id) : null;
+  const pgContent = pg ? await portalSvc.content(pg) : null;
   const portalTab = pg ? {
-    g: pg, url: pg.portal_token ? portalSvc.url(pg.portal_token) : null, c: await portalSvc.content(pg), pending: pg.portal_enabled ? await portalSvc.pending(pg) : [],
+    g: pg, url: pg.portal_token ? portalSvc.url(pg.portal_token) : null, c: pgContent, pending: pg.portal_enabled ? await portalSvc.pending(pg, pgContent) : [],
     channel: portalSvc.channelOf(pg), NOTIFY: portalSvc.NOTIFY, dayLabel: portalSvc.dayLabel, ytUrl: portalSvc.youtubeUrl(pg.portal_yt_channel),
     hasPhone: Boolean(require('../services/contacts').normalizeNumber(pg.phone)), hasEmail: isEmail(pg.email || ''),
   } : null;

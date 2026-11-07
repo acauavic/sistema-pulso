@@ -32,11 +32,16 @@ router.get('/gestao/notificacoes', requirePerm('notifications.manage'), wrap(asy
 }));
 
 router.post('/gestao/notificacoes', requirePerm('notifications.manage'), wrap(async (req, res) => {
-  for (const type of Object.keys(C.NOTIFICATION_TYPES)) {
-    const inApp = req.body[`${type}_in_app`] === '1'; const email = req.body[`${type}_email`] === '1';
-    const roles = [].concat(req.body[`${type}_roles`] || []).filter((r) => ROLES[r]);
-    await db.query('UPDATE notification_settings SET in_app = $2, email = $3, roles = $4, updated_at = now(), updated_by = $5 WHERE type = $1', [type, inApp, email, roles, req.user.id]);
-  }
+  // todos os tipos numa gravação só (antes: um UPDATE por tipo)
+  const types = Object.keys(C.NOTIFICATION_TYPES);
+  const rows = types.map((type) => ({
+    type, in_app: req.body[`${type}_in_app`] === '1', email: req.body[`${type}_email`] === '1',
+    roles: [].concat(req.body[`${type}_roles`] || []).filter((r) => ROLES[r]),
+  }));
+  await db.query(
+    `UPDATE notification_settings s SET in_app = v.in_app, email = v.email, roles = v.roles, updated_at = now(), updated_by = $2
+       FROM jsonb_to_recordset($1::jsonb) AS v(type text, in_app boolean, email boolean, roles text[]) WHERE s.type = v.type`,
+    [JSON.stringify(rows), req.user.id]);
   await audit(req, 'notificacoes.configuradas', 'settings', null, {});
   await req.flash('ok', 'Configuração das notificações salva.');
   res.redirect('/gestao/notificacoes');
@@ -141,7 +146,7 @@ router.get('/gestao/rotinas', requirePerm('routines.manage'), wrap(async (req, r
   const [routines, users] = await Promise.all([
     db.query(`SELECT r.*, u.name AS assignee_name, (SELECT count(*)::int FROM tasks t WHERE t.routine_id = r.id) + (SELECT count(*)::int FROM content_requests q WHERE q.routine_id = r.id) AS created FROM task_routines r
                LEFT JOIN users u ON u.id = r.assignee_id ORDER BY r.trigger, r.position, r.id`),
-    db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+    require('../services/team').activeUsers(),
   ]);
   res.render('gestao/routines', { title: 'Rotinas de tarefas', routines: routines.rows, users: users.rows, C, editing: isIntId(req.query.editar) ? Number(req.query.editar) : null });
 }));

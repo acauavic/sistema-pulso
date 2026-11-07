@@ -53,7 +53,7 @@ async function navData(req, res, next) {
                        (SELECT count(*)::int FROM tasks WHERE assignee_id = $1 AND status <> 'feito') AS tasks,
                        (SELECT release_seen FROM users WHERE id = $1) AS release_seen,
                        CASE WHEN $2 THEN (SELECT count(*)::int FROM episode_publications WHERE status = 'revisao') ELSE 0 END AS reviews`, [req.user.id, can(req.user.role, 'social.publish')]),
-      db.query('SELECT id, name FROM users WHERE active ORDER BY lower(name)'),
+      require('./services/team').activeUsers(),
     ]);
     res.locals.navCounts = counts.rows[0];
     res.locals.teamUsers = users.rows;

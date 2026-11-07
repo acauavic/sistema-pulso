@@ -130,8 +130,10 @@ router.get('/convidado/:token/fotos.zip', wrap(async (req, res) => {
   res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' });
   const zip = require('../utils/zipStream').zipStream(res);
   try {
+    const { rows: files } = await db.query('SELECT id, storage_key, filename, created_at FROM episode_files WHERE id = ANY($1)', [c.photos.map((f) => f.id)]);
+    const byId = new Map(files.map((x) => [x.id, x]));
     for (const f of c.photos) {
-      const { rows: [file] } = await db.query('SELECT storage_key, filename, created_at FROM episode_files WHERE id = $1', [f.id]);
+      const file = byId.get(f.id);
       const obj = file && await b2.getObject(file.storage_key);
       if (!obj) continue;
       await zip.add(file.filename, Buffer.from(await obj.arrayBuffer()), new Date(file.created_at));

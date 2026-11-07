@@ -76,7 +76,9 @@ function range(mode, anchor, listDays = 30) {
 // ---------------------------------------------------------------- eventos
 const dayOf = (col) => `to_char((${col} AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD')`;
 const timeOf = (col) => `to_char(${col} AT TIME ZONE '${TZ}', 'HH24:MI')`;
-const inRange = (col) => `(${col} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date`;
+// Dia de Brasília entre $1 e $2 (inclusive), escrito como faixa da própria coluna para o índice dela servir
+// (antes: (col AT TIME ZONE …)::date BETWEEN …, que obrigava a ler a tabela inteira).
+const inRange = (col) => `(${col} >= ($1::date::timestamp AT TIME ZONE '${TZ}') AND ${col} < (($2::date + 1)::timestamp AT TIME ZONE '${TZ}'))`;
 const epNo = (n) => (n ? `EP.${String(n).padStart(3, '0')}` : 'Episódio');
 const POST_STATUS = { revisao: 'em revisão', recusado: 'devolvido', simulado: 'simulado', enviando: 'enviando', agendado: 'agendado', publicado: 'publicado', parcial: 'parcial', erro: 'com erro' };
 

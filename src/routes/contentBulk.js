@@ -101,7 +101,7 @@ router.post('/conteudo/em-massa/posts', requirePerm('episodes.read'), wrap(async
 router.post('/conteudo/em-massa/pedidos', requirePerm('episodes.read'), wrap(async (req, res) => {
   const ids = idsOf(req.body); const to = back(req, 'pedidos');
   if (!ids.length) { await req.flash('error', 'Marque pelo menos um pedido.'); return res.redirect(to); }
-  const all = (await Promise.all(ids.map((id) => R.get(id)))).filter(Boolean);
+  const all = await R.getMany(ids);
   const mine = all.filter((r) => canEditRequest(req.user, r));
   const left = all.length - mine.length;
   const outside = left ? ` ${plural(left, 'pedido ficou', 'pedidos ficaram')} de fora: só quem pediu e a gestão mudam o pedido.` : '';

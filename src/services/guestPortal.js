@@ -286,8 +286,9 @@ const newsMessage = (g, posts) => `Olá, ${firstName(g.name)}! ${posts.length > 
 async function markSent(g) {
   await db.query(`UPDATE guests SET portal_sent_at = coalesce(portal_sent_at, now()), portal_expires_at = coalesce(portal_expires_at, now() + interval '${VALID_DAYS} days') WHERE id = $1`, [g.id]);
   const { collab } = await content(g);
-  for (const p of collab) {
-    await db.query("INSERT INTO guest_portal_notices (guest_id, publication_id, channel, sent_at) VALUES ($1, $2, 'nenhum', now()) ON CONFLICT DO NOTHING", [g.id, p.id]);
+  if (collab.length) {
+    await db.query(`INSERT INTO guest_portal_notices (guest_id, publication_id, channel, sent_at)
+                    SELECT $1, unnest($2::int[]), 'nenhum', now() ON CONFLICT DO NOTHING`, [g.id, collab.map((p) => p.id)]);
   }
 }
 
@@ -298,10 +299,11 @@ async function sendLinkEmail(g) {
   return { ok: true };
 }
 
-async function pending(g) {
+// c: o conteúdo já carregado pela página (evita montar tudo de novo).
+async function pending(g, c = null) {
   const { rows } = await db.query('SELECT publication_id FROM guest_portal_notices WHERE guest_id = $1 AND sent_at IS NULL ORDER BY id', [g.id]);
   if (!rows.length) return [];
-  const { collab } = await content(g);
+  const { collab } = c || await content(g);
   const ids = new Set(rows.map((r) => r.publication_id));
   return collab.filter((p) => ids.has(p.id));
 }
@@ -317,13 +319,13 @@ async function tick() {
   for (const g of rows) {
     const channel = channelOf(g);
     const { collab } = await content(g);
-    const fresh = [];
-    for (const p of collab) {
-      const { rowCount } = await db.query(
-        'INSERT INTO guest_portal_notices (guest_id, publication_id, channel, sent_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
-        [g.id, p.id, channel, channel === 'whatsapp' ? null : new Date()]);
-      if (rowCount) fresh.push(p);
-    }
+    // todos os posts numa gravação só; voltam só os que ainda não tinham aviso (antes: um INSERT por post a cada 10 min)
+    const { rows: added } = collab.length ? await db.query(
+      `INSERT INTO guest_portal_notices (guest_id, publication_id, channel, sent_at)
+       SELECT $1, unnest($2::int[]), $3, $4 ON CONFLICT DO NOTHING RETURNING publication_id`,
+      [g.id, collab.map((p) => p.id), channel, channel === 'whatsapp' ? null : new Date()]) : { rows: [] };
+    const addedIds = new Set(added.map((r) => r.publication_id));
+    const fresh = collab.filter((p) => addedIds.has(p.id));
     if (!fresh.length) continue;
     if (channel === 'email') {
       await require('./mailer').sendGuestPortal({ to: g.email, guestName: g.name, url: url(g.portal_token), kind: 'novos', posts: fresh })
