@@ -574,7 +574,7 @@ router.post('/episodios/:id/arquivos/:fid/concluir', uploadAccess, wrap(async (r
   if (f.kind === 'editado') { // o vídeo pilar do episódio só pode ser horizontal
     const check = await prod.checkEditedVideo(f);
     if (check.error) { await prod.deleteFile(f); return uploadError(res, 422, check.error); }
-    if (check.fps) await db.query('UPDATE episode_files SET fps = $2 WHERE id = $1', [f.id, check.fps]); // marcadores no quadro certo
+    if (check.fps || check.width) await db.query('UPDATE episode_files SET fps = coalesce($2, fps), width = coalesce($3, width), height = coalesce($4, height) WHERE id = $1', [f.id, check.fps || null, check.width || null, check.height || null]); // marcadores no quadro certo e sequência do Premiere no tamanho do vídeo
     const fixed = await reviewSvc.versionUploaded(f); // o que o editor marcou como feito entra nesta versão
     await reviewSvc.newVersionNotice(f, fixed, req.user).catch((err) => console.error('Aviso de versão nova:', err.message));
   }
@@ -842,14 +842,15 @@ router.post('/episodios/:id/comentarios/:cid/ainda-nao', requirePerm('episodes.r
   res.json({ ok: true, html: await commentHtml(res, ep.id, c.id, ep), summary: await reviewSvc.summary(ep.id), counts: await commentCounts(ep.id) });
 }));
 
-// Marcadores para o programa de edição (DaVinci: EDL de marcadores) ou lista em texto. Minutagens são orientação, e o arquivo diz isso.
+// Marcadores para o programa de edição (Premiere: XML com uma sequência; DaVinci: EDL de marcadores) ou lista em texto. Minutagens são orientação, e o arquivo diz isso.
 router.get('/episodios/:id/marcadores', requirePerm('episodes.read'), wrap(async (req, res) => {
   const ep = await findEpisode(req.params.id);
   if (!ep) return notFound(res);
   const { rows: comments } = await db.query('SELECT c.*, u.name AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.episode_id = $1', [ep.id]);
   const latest = await reviewSvc.latestEdited(ep.id);
   const out = reviewSvc.markers({
-    ep, comments, format: req.query.formato === 'texto' ? 'texto' : 'davinci', which: req.query.quais === 'todos' ? 'todos' : 'abertos',
+    ep, comments, format: ['texto', 'premiere'].includes(req.query.formato) ? req.query.formato : 'davinci', which: req.query.quais === 'todos' ? 'todos' : 'abertos',
+    width: latest?.width, height: latest?.height,
     fps: reviewSvc.pickFps(req.query.fps, reviewSvc.pickFps(latest?.fps)), startHour: req.query.inicio === '00' ? 0 : 1, latestVersion: latest?.version ?? null,
   });
   res.set({ 'Content-Type': out.contentType, 'Content-Disposition': `attachment; filename="${out.filename}"`, 'Cache-Control': 'no-store' }).send(out.body);

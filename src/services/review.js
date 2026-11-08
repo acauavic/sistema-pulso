@@ -16,7 +16,7 @@ const NOTE = 'As minutagens são aproximadas: mostram onde está o ajuste, não 
 const stateOf = (c) => (c.resolved ? 'resolvido' : c.fixed_at ? 'conferir' : 'aberto');
 
 const latestEdited = (episodeId) => db.query(
-  "SELECT id, version, fps FROM episode_files WHERE episode_id = $1 AND kind = 'editado' AND status = 'pronto' ORDER BY version DESC, id DESC LIMIT 1",
+  "SELECT id, version, fps, width, height FROM episode_files WHERE episode_id = $1 AND kind = 'editado' AND status = 'pronto' ORDER BY version DESC, id DESC LIMIT 1",
   [episodeId]).then((r) => r.rows[0] || null);
 
 // O editor marca (ou desmarca) "feito". A correção entra na versão mais nova que já está no ar se ela for posterior à comentada;
@@ -101,9 +101,17 @@ const oneLine = (s, max) => String(s || '').replace(/\s+/g, ' ').replace(/\|/g, 
 const COLOR = { aberto: 'ResolveColorRed', conferir: 'ResolveColorYellow', resolvido: 'ResolveColorGreen' };
 const STATE_LABEL = { aberto: 'em aberto', conferir: 'feito, falta conferir', resolvido: 'conferido' };
 
+// Premiere: cor do marcador em <pproColor> (inteiro com os bytes A,B,G,R). Vermelho é o valor que o próprio Premiere exporta;
+// sem <pproColor> o marcador fica verde (o padrão do Premiere), então "conferido" não leva cor.
+const PPRO_COLOR = { aberto: 4281740498, conferir: 0xFF2BA1D0 };
+const xml = (s) => String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const NTSC = [23.976, 29.97, 59.94];
+
 // comments: os da revisão (com author_name). which: 'abertos' (não conferidos) | 'todos'.
-// format: 'davinci' (EDL de marcadores: Linha do tempo > Importar > Marcadores da linha do tempo a partir de EDL) | 'texto'.
-function markers({ ep, comments, format = 'davinci', fps = 30, startHour = 1, which = 'abertos', latestVersion = null }) {
+// format: 'premiere' (XML do Final Cut 7, que o Premiere importa como uma sequência com os marcadores)
+//       | 'davinci' (EDL de marcadores: Linha do tempo > Importar > Marcadores da linha do tempo a partir de EDL) | 'texto'.
+function markers({ ep, comments, format = 'davinci', fps = 30, startHour = 1, which = 'abertos', latestVersion = null, width = null, height = null }) {
   const list = comments.filter((c) => which === 'todos' || !c.resolved)
     .sort((a, b) => (a.at_ms ?? -1) - (b.at_ms ?? -1) || a.id - b.id);
   const timed = list.filter((c) => c.at_ms != null);
@@ -133,6 +141,45 @@ function markers({ ep, comments, format = 'davinci', fps = 30, startHour = 1, wh
     }
     if (!list.length) out.push('Nenhum ajuste nesta lista.');
     return { filename: `${slug}.txt`, contentType: 'text/plain; charset=utf-8', body: `﻿${out.join('\r\n')}` };
+  }
+
+  if (format === 'premiere') {
+    // XML do Final Cut 7 (xmeml), que o Premiere importa (Arquivo > Importar) como uma sequência nova com os marcadores.
+    // A sequência começa em 00:00:00:00, como no Premiere; <in>/<out> são quadros desde o início (out -1 = marcador de ponto).
+    const frame = (ms) => Math.round((ms / 1000) * fps);
+    const rate = `<rate><timebase>${Math.round(fps)}</timebase><ntsc>${NTSC.includes(fps) ? 'TRUE' : 'FALSE'}</ntsc></rate>`;
+    const w = width > 0 ? width : 1920; const h = height > 0 ? height : 1080;
+    const seqName = `${epNo} · ajustes da revisão`;
+    const last = timed.reduce((m, c) => Math.max(m, frame(c.end_ms ?? c.at_ms)), 0);
+    const marks = timed.map((c) => {
+      const st = stateOf(c);
+      const tag = vTag(c) && vTag(c).startsWith('minutagem') ? `[${vTag(c)}] ` : '';
+      const inF = frame(c.at_ms);
+      const outF = c.end_ms != null ? Math.max(inF + 1, frame(c.end_ms)) : -1;
+      const comment = `${tag}${oneLine(c.body || 'ajuste', 2000)} (${c.author_name || 'revisão'} · ${STATE_LABEL[st]}). Minutagem aproximada: confira um pouco antes e depois.`;
+      return ['    <marker>',
+        `      <comment>${xml(comment)}</comment>`,
+        `      <name>${xml(`~ ${oneLine(c.body || 'ajuste', 80)}`)}</name>`,
+        `      <in>${inF}</in>`, `      <out>${outF}</out>`,
+        ...(PPRO_COLOR[st] ? [`      <pproColor>${PPRO_COLOR[st]}</pproColor>`] : []),
+        '    </marker>'].join('\n');
+    });
+    const tracks = (n) => Array.from({ length: n }, () => '<track></track>').join('');
+    const body = ['<?xml version="1.0" encoding="UTF-8"?>', '<!DOCTYPE xmeml>',
+      `<!-- ${xml(`${epNo} · ${ep.title}. ${NOTE}`).replace(/-{2,}/g, '-')} -->`, // comentário de XML não aceita "--"
+      '<xmeml version="4">',
+      '  <sequence id="sequence-1">',
+      `    <name>${xml(seqName)}</name>`,
+      `    <duration>${last + Math.round(fps * 10)}</duration>`,
+      `    ${rate}`,
+      `    <timecode>${rate}<string>00:00:00:00</string><frame>0</frame><displayformat>NDF</displayformat></timecode>`,
+      '    <media>',
+      `      <video><format><samplecharacteristics>${rate}<width>${w}</width><height>${h}</height><anamorphic>FALSE</anamorphic><pixelaspectratio>square</pixelaspectratio><fielddominance>none</fielddominance></samplecharacteristics></format>${tracks(3)}</video>`,
+      `      <audio><numOutputChannels>2</numOutputChannels><format><samplecharacteristics><depth>16</depth><samplerate>48000</samplerate></samplecharacteristics></format>${tracks(4)}</audio>`,
+      '    </media>',
+      ...marks,
+      '  </sequence>', '</xmeml>', ''].join('\n');
+    return { filename: `${slug}.xml`, contentType: 'application/xml; charset=utf-8', body };
   }
 
   // EDL de marcadores no formato que o próprio DaVinci Resolve exporta (e importa de volta).

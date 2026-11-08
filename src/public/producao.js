@@ -885,3 +885,15 @@
   const first = [...board.querySelectorAll('.column')].find((c) => c.querySelector('.kcard'));
   if (first) board.scrollLeft = first.offsetLeft - board.offsetLeft;
 }());
+
+// Baixar marcadores: cada programa mostra só o que vale para ele (o início da linha do tempo é coisa do DaVinci; a lista em texto não tem quadros).
+(function () {
+  const form = document.querySelector('form[data-markers]');
+  if (!form) return;
+  const sync = () => {
+    const f = (form.querySelector('input[name="formato"]:checked') || {}).value || 'premiere';
+    form.querySelectorAll('[data-mk-only]').forEach((el) => { el.hidden = !el.dataset.mkOnly.split(' ').includes(f); });
+  };
+  form.addEventListener('change', (e) => { if (e.target.name === 'formato') sync(); });
+  sync();
+}());

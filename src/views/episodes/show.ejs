@@ -523,21 +523,27 @@
 
 <% if (comments.length) { var fpsNow = latestEdited && latestEdited.fps ? Number(latestEdited.fps) : null; %>
 <dialog class="modal" id="modal-marcadores" aria-labelledby="mk-h">
-  <form method="get" action="/episodios/<%= ep.id %>/marcadores" class="stack" data-no-skeleton>
+  <form method="get" action="/episodios/<%= ep.id %>/marcadores" class="stack" data-no-skeleton data-markers>
     <h2 id="mk-h">Baixar marcadores</h2>
-    <p class="small muted">Os ajustes da revisão num arquivo para o programa de edição: cada comentário vira um marcador na linha do tempo, com o texto. No DaVinci Resolve: <span class="mono">Timeline &gt; Import &gt; Timeline Markers from EDL</span> (em português: Linha do tempo &gt; Importar &gt; Marcadores da linha do tempo a partir de EDL).</p>
     <p class="notice small"><%- icon('info', 14) %> <%= reviewNote %></p>
     <fieldset><legend>Arquivo</legend><div class="chips-radio">
-      <label class="chip-radio"><input type="radio" name="formato" value="davinci" checked><span>DaVinci Resolve (.edl)</span></label>
+      <label class="chip-radio"><input type="radio" name="formato" value="premiere" checked><span>Premiere Pro (.xml)</span></label>
+      <label class="chip-radio"><input type="radio" name="formato" value="davinci"><span>DaVinci Resolve (.edl)</span></label>
       <label class="chip-radio"><input type="radio" name="formato" value="texto"><span>Lista em texto (.txt)</span></label></div>
     </fieldset>
+    <div class="small muted" data-mk-only="premiere">
+      <p>No Premiere, <span class="mono">Arquivo &gt; Importar</span> e escolha o arquivo: ele cria a sequência "<%= ep.number ? 'EP.' + String(ep.number).padStart(3, '0') : 'Episódio' %> · ajustes da revisão" com um marcador por comentário (passe o mouse para ler; a lista inteira fica no painel Marcadores).</p>
+      <p>Para trabalhar com eles na sua edição: na sua sequência, selecione tudo e copie (<span class="mono">Cmd+A</span>, <span class="mono">Cmd+C</span>); na sequência dos ajustes, com a agulha no início, cole (<span class="mono">Cmd+V</span>). Ou deixe a sequência dos ajustes aberta ao lado, como guia.</p>
+    </div>
+    <p class="small muted" data-mk-only="davinci" hidden>No DaVinci Resolve: <span class="mono">Timeline &gt; Import &gt; Timeline Markers from EDL</span> (em português: Linha do tempo &gt; Importar &gt; Marcadores da linha do tempo a partir de EDL). Cada comentário vira um marcador na linha do tempo aberta.</p>
+    <p class="small muted" data-mk-only="texto" hidden>Uma lista para ler ou imprimir, com a minutagem, o texto e o estado de cada ajuste.</p>
     <fieldset><legend>Quais ajustes</legend><div class="chips-radio">
       <label class="chip-radio"><input type="radio" name="quais" value="abertos" checked><span>Os que faltam conferir</span></label>
       <label class="chip-radio"><input type="radio" name="quais" value="todos"><span>Todos</span></label></div>
     </fieldset>
-    <div class="row">
+    <div class="row" data-mk-only="premiere davinci">
       <label>Quadros por segundo<select name="fps"><% reviewFps.forEach(function (f) { %><option value="<%= f %>" <%= (fpsNow ? Math.abs(fpsNow - f) < 0.02 : f === 30) ? 'selected' : '' %>><%= String(f).replace('.', ',') %><%= fpsNow && Math.abs(fpsNow - f) < 0.02 ? ' (o do vídeo)' : '' %></option><% }) %></select></label>
-      <label>A linha do tempo começa em<select name="inicio"><option value="01" selected>01:00:00:00 (padrão do DaVinci)</option><option value="00">00:00:00:00</option></select></label>
+      <label data-mk-only="davinci" hidden>A linha do tempo começa em<select name="inicio"><option value="01" selected>01:00:00:00 (padrão do DaVinci)</option><option value="00">00:00:00:00</option></select></label>
     </div>
     <div class="row modal-actions"><button class="btn primary" type="submit"><%- icon('download', 14) %> Baixar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>

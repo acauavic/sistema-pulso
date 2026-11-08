@@ -113,6 +113,30 @@ describe('Revisão que não se perde: comentários seguem as versões, "feito" d
     assert.match(open, /00:00:00:00|01:02:03:00/);
   });
 
+  it('marcadores do Premiere: XML com uma sequência, marcadores em quadros desde o início, cor por estado e o aviso', async () => {
+    await q('UPDATE episode_files SET width = 3840, height = 2160 WHERE episode_id = $1', [ep]);
+    const r = await editor.get(`/episodios/${ep}/marcadores?formato=premiere&quais=todos&fps=29.97`);
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('content-disposition'), /ep019-ajustes-da-revisao\.xml/);
+    const x = r.text;
+    assert.match(x, /^<\?xml version="1.0" encoding="UTF-8"\?>\n<!DOCTYPE xmeml>/);
+    assert.match(x, /<!-- EP\.019 · Conversa com Mari\. As minutagens são aproximadas/);
+    assert.match(x, /<name>EP\.019 · ajustes da revisão<\/name>/);
+    assert.match(x, /<rate><timebase>30<\/timebase><ntsc>TRUE<\/ntsc><\/rate>/, '29,97 = base 30 com NTSC');
+    assert.match(x, /<width>3840<\/width><height>2160<\/height>/, 'sequência no tamanho do vídeo');
+    // 92 s a 29,97 = quadro 2757; trecho até 100,5 s = quadro 3012
+    assert.match(x, /<comment>\[minutagem da v1\] Pode cortar daqui até a pergunta do Acauã \(Gil Gestão · conferido\)\. Minutagem aproximada[^<]*<\/comment>\s*<name>~ Pode cortar daqui[^<]*<\/name>\s*<in>2757<\/in>\s*<out>3012<\/out>\s*<\/marker>/, 'conferido fica com a cor padrão (verde)');
+    assert.match(x, /<name>~ Mostrar o Acauã \/ fazendo a pergunta<\/name>\s*<in>111578<\/in>\s*<out>-1<\/out>\s*<pproColor>4281740498<\/pproColor>/, 'ponto = out -1; em aberto = vermelho');
+  });
+
+  it('a janela dos marcadores abre no Premiere e explica como importar', async () => {
+    const page = (await editor.get(`/episodios/${ep}`)).text;
+    const modal = page.split('id="modal-marcadores"')[1].split('</dialog>')[0];
+    assert.match(modal, /value="premiere" checked/);
+    assert.match(modal, /Arquivo &gt; Importar/);
+    assert.match(modal, /data-mk-only="davinci" hidden>A linha do tempo começa em/);
+  });
+
   it('lista em texto: diz que a minutagem é orientação e traz cada ajuste', async () => {
     const r = await editor.get(`/episodios/${ep}/marcadores?formato=texto&quais=todos`);
     assert.equal(r.status, 200);

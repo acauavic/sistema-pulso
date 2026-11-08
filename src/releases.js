@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.58.0', date: '2026-11-08', title: 'Marcadores da revisão no Premiere',
+    items: [
+      { kind: 'novo', text: '"Baixar marcadores" agora gera o arquivo do Premiere Pro (.xml), que já vem marcado: no Premiere, Arquivo > Importar cria a sequência "EP.0XX · ajustes da revisão" com um marcador por comentário (vermelho em aberto, amarelo feito, verde conferido; trecho vira marcador com duração). A janela explica como levar os marcadores para a sua edição.' },
+      { kind: 'ajuste', text: 'A janela dos marcadores mostra só o que vale para o programa escolhido, e cada marcador continua avisando que a minutagem é aproximada.' },
+    ],
+  },
+  {
     version: '1.57.0', date: '2026-11-07', title: 'Revisão que não se perde e marcadores para o editor',
     items: [
       { kind: 'novo', text: 'O editor marca cada ajuste pedido na revisão como feito, na aba Material. Ao subir a nova versão, o ajuste vira "feito na v2", e quem revisa confere um por um: "Conferido" ou "Ainda não" (volta para o editor). A revisão ganhou o filtro Todos | Para conferir | Em aberto | Conferidos.' },
