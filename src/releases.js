@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.57.0', date: '2026-11-07', title: 'Revisão que não se perde e marcadores para o editor',
+    items: [
+      { kind: 'novo', text: 'O editor marca cada ajuste pedido na revisão como feito, na aba Material. Ao subir a nova versão, o ajuste vira "feito na v2", e quem revisa confere um por um: "Conferido" ou "Ainda não" (volta para o editor). A revisão ganhou o filtro Todos | Para conferir | Em aberto | Conferidos.' },
+      { kind: 'novo', text: '"Baixar marcadores": os ajustes da revisão num arquivo para o DaVinci Resolve (cada comentário vira um marcador na linha do tempo, com o texto) ou numa lista em texto. As minutagens são uma orientação: o arquivo e a tela lembram de conferir o ponto certo antes de cortar.' },
+      { kind: 'correcao', text: 'Os comentários da revisão não somem mais junto com o vídeo: a versão que tem comentários não pode ser removida (a correção sobe como versão nova), e cada comentário guarda a versão em que foi feito ("minutagem da v1" quando o player já mostra outra).' },
+      { kind: 'ajuste', text: 'Quem revisa recebe aviso quando chega uma versão nova durante a revisão, com quantos ajustes o editor marcou como feitos.' },
+    ],
+  },
+  {
     version: '1.56.0', date: '2026-11-07', title: 'Imagens em WebP, assistente em tempo real e painel de desempenho',
     items: [
       { kind: 'novo', text: 'O assistente responde em tempo real: o texto vai aparecendo enquanto a IA escreve, e "Consultando o sistema" aparece quando ele busca dados antes de responder.' },

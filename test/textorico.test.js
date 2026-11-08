@@ -167,7 +167,7 @@ describe('texto rico nas tarefas e comentários: anexos, imagens, links e áudio
     };
     const r = await post(as.gestao, { body_html: `<p>Cortar <strong>aqui</strong></p><img src="${img.url}"><script>x</script>`, at_ms: '83000', file_id: String(vid), anexos: [String(pdf.id), String(au.id)] });
     assert.equal(r.status, 200); assert.equal(r.json.ok, true); assert.equal(r.json.comment.clock, '1:23');
-    assert.match(r.json.html, /<li class="comment\s*"[^>]*data-at="83000"/); assert.match(r.json.html, /<strong>aqui<\/strong>/); assert.match(r.json.html, /<audio controls[^>]*src="\/anexos\/\d+"/); assert.match(r.json.html, /lista\.pdf/); assert.match(r.json.html, /texto transcrito de teste/); assert.doesNotMatch(r.json.html, /<script/);
+    assert.match(r.json.html, /<li class="comment[^"]*"[^>]*data-at="83000"/); assert.match(r.json.html, /<strong>aqui<\/strong>/); assert.match(r.json.html, /<audio controls[^>]*src="\/anexos\/\d+"/); assert.match(r.json.html, /lista\.pdf/); assert.match(r.json.html, /texto transcrito de teste/); assert.doesNotMatch(r.json.html, /<script/);
     const [c] = await q('SELECT * FROM episode_comments WHERE episode_id = $1', [ep]);
     assert.equal(c.body, 'Cortar aqui'); assert.match(c.body_html, /<img src="\/anexos\/\d+"/);
     assert.equal((await q("SELECT count(*)::int AS n FROM attachments WHERE entity_type = 'review' AND entity_id = $1", [c.id]))[0].n, 3, 'imagem do texto, PDF e áudio ligados ao comentário');

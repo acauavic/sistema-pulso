@@ -694,7 +694,7 @@ describe('produção de episódios', () => {
         assert.match(html, /Comentários da revisão \(1\)[\s\S]*Cortar o silêncio aqui/, `${status}: comentário arquivado no histórico`);
       }
       await h.db.query("UPDATE episodes SET status='em_edicao' WHERE id=$1", [id]);
-      assert.match(await page(as.editor, id), /Ajustes pedidos na revisão \(1\)/, 'o editor vê o que precisa ajustar');
+      assert.match(await page(as.editor, id), /Ajustes pedidos na revisão[\s\S]*0 de 1 feitos/, 'o editor vê o que precisa ajustar');
     });
 
     it('material bruto enviado vira lista agrupada com "Baixar"; o botão "Enviar material" é só de quem sobe bruto', async () => {

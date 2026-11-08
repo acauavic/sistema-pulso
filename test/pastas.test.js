@@ -80,7 +80,7 @@ describe('episódio: material bruto e vídeo editado em pastas', () => {
     assert.match(ed, /2 comentários de revisão nesta versão · 1 em aberto/);
     assert.match(ed, /<a href="#revisao">Abrir a revisão<\/a>/, 'só a versão atual leva à aba de revisão');
     assert.equal((ed.match(/Abrir a revisão/g) || []).length, 1);
-    assert.match(ed, /aria-label="Remover a versão"/);
+    assert.match(ed, /Versão com comentários da revisão: não pode ser removida/, 'versão com comentários: cadeado no lugar da lixeira');
   });
 
   it('as pastas funcionam sem JS inline: o script e o estilo estão nos arquivos do painel', async () => {

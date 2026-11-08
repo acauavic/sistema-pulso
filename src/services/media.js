@@ -31,6 +31,7 @@ async function probe(file) {
   return {
     duration_ms: Math.round(Number(j.format?.duration || 0) * 1000),
     width: v?.width || null, height: v?.height || null, hasAudio: (j.streams || []).some((s) => s.codec_type === 'audio'),
+    fps: (() => { const [a, b] = String(v?.r_frame_rate || '').split('/').map(Number); return a && b ? Math.round((a / b) * 1000) / 1000 : null; })(),
   };
 }
 

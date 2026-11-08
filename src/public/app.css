@@ -1452,3 +1452,27 @@ code.query-text { display: block; white-space: normal; word-break: break-word; f
 /* Listas longas (quadros com dezenas de cartões, listas de pedidos e da lixeira): o navegador só desenha o que está à vista,
    o resto entra quando a rolagem chega (virtualização nativa). A altura reservada evita a barra de rolagem pular. */
 .kcard, .req-row { content-visibility: auto; contain-intrinsic-size: auto 88px; }
+
+/* ---------------------------------------------------------------- revisão: ajustes que acompanham as versões
+   Editor: caixa "feito" por ajuste (aba Material). Quem revisa: "Conferido" / "Ainda não" no comentário (aba Revisão).
+   Estados sem lime: feito e falta conferir = âmbar; conferido = neutro e apagado. */
+.fix-list { display: grid; gap: 0; margin-top: 8px; }
+.fix-item { border-bottom: 1px solid var(--line); }
+.fix-item:last-child { border-bottom: 0; }
+.fix-check { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px 0; margin: 0; cursor: pointer; }
+.fix-check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--action); }
+.fix-main { display: grid; gap: 6px; min-width: 0; }
+.fix-body { color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.fix-item.done .fix-body { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+.review-bar { gap: 12px; flex-wrap: wrap; }
+.review-bar .seg .mono { margin-left: 6px; color: var(--muted); }
+.cmt-check { gap: 12px; margin-top: 8px; align-items: center; }
+.comment.st-conferir { border-left: 3px solid var(--st-edicao-fg); padding-left: 12px; }
+.icon-btn.is-locked { color: var(--muted); cursor: help; }
+.mono.warn, .small.warn { color: var(--st-edicao-fg); }
+#ajustes .row.spread .btn { white-space: nowrap; flex: none; }
+/* controle segmentado com botões (filtros que não trocam de página) */
+.seg button { display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; height: 32px; border: 0; border-radius: var(--r-full); background: none; color: var(--text-2); font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; }
+.seg button.on { background: var(--raised); color: var(--text); } .seg button:hover { color: var(--text); }
+.seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+@media (max-width: 860px) { .review-bar .seg { max-width: 100%; overflow-x: auto; } }

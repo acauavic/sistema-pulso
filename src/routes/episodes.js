@@ -298,6 +298,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: reviewComments,
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
+    reviewNote: reviewSvc.NOTE, reviewFps: reviewSvc.FPS, // revisão: minutagem é orientação; marcadores para o programa de edição
     epComments,
     content: { ...contentRows.rows[0], total: contentRows.rows[0].clips + contentRows.rows[0].posts }, tabs, defaultTab, publications: pubRows.rows, social, uploadPost, uploadLive: ls.live, testAt: ls.testAt, provider,
     covers: coverRows.rows, meta: meta.rows[0] || null, frames: frames.rows, job, transcript: transcript.rows[0] || null, trJob,
@@ -573,6 +574,9 @@ router.post('/episodios/:id/arquivos/:fid/concluir', uploadAccess, wrap(async (r
   if (f.kind === 'editado') { // o vídeo pilar do episódio só pode ser horizontal
     const check = await prod.checkEditedVideo(f);
     if (check.error) { await prod.deleteFile(f); return uploadError(res, 422, check.error); }
+    if (check.fps) await db.query('UPDATE episode_files SET fps = $2 WHERE id = $1', [f.id, check.fps]); // marcadores no quadro certo
+    const fixed = await reviewSvc.versionUploaded(f); // o que o editor marcou como feito entra nesta versão
+    await reviewSvc.newVersionNotice(f, fixed, req.user).catch((err) => console.error('Aviso de versão nova:', err.message));
   }
   await prod.addFileEvent(f, req.user.id);
   await db.query('UPDATE episodes SET updated_at = now() WHERE id = $1', [f.episode_id]);
@@ -631,6 +635,13 @@ router.post('/episodios/:id/arquivos/:fid/excluir', uploadAccess, wrap(async (re
   const file = await loadFile(req);
   if (!file) return notFound(res);
   if (!fileAccess(req.user, file.kind)) return res.status(403).render('error', { title: 'Sem permissão', message: file.kind === 'editado' ? 'Só quem edita remove o vídeo editado.' : 'O material bruto é removido pela produção.' });
+  if (file.kind === 'editado' && file.status !== 'enviando') {
+    const n = await require('../services/review').commentsOnFile(file.id);
+    if (n) { // os comentários da revisão moram nesta versão: a correção sobe como versão nova
+      await req.flash('error', `A versão ${file.version} tem ${n} comentário${n > 1 ? 's' : ''} da revisão e não pode ser removida. Envie a correção como nova versão: os ajustes seguem com ela, e você marca cada um como feito.`);
+      return res.redirect(back(file.episode_id, '#material'));
+    }
+  }
   if (file.status === 'enviando') await prod.deleteFile(file); // envio pela metade: cancela de vez (não há o que restaurar)
   else {
     const t = await trash.remove('episode_file', file.id, { user: req.user });
@@ -799,6 +810,50 @@ router.post('/episodios/:id/tarefas/:tid/excluir', requirePerm('production.manag
 }));
 
 // ---- revisão: comentários na minutagem ----
+const reviewSvc = require('../services/review');
+// Um comentário já renderizado (para a tela trocar o item sem recarregar).
+async function commentHtml(res, epId, id, ep) {
+  const { rows: [c] } = await db.query('SELECT c.*, u.name AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.id = $1', [id]);
+  const latest = await reviewSvc.latestEdited(epId);
+  const [full] = await withReviewFiles([c]);
+  return renderPartial(res, 'episodes/_review_comment', { c: full, ep, tickable: true, latestVersion: latest?.version ?? null, perm: permsOf(res.locals.currentUser) });
+}
+const permsOf = (user) => ({ edit: can(user.role, 'production.edit'), review: can(user.role, 'production.review') });
+
+// O editor marca "feito" (ou desfaz). Só quem edita.
+router.post('/episodios/:id/comentarios/:cid/feito', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!can(req.user.role, 'production.edit')) return res.status(403).json({ ok: false, error: 'Só quem edita marca o ajuste como feito.' });
+  if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return res.status(404).json({ ok: false });
+  const done = req.body.feito === '1' || req.body.feito === true || req.body.feito === 'true';
+  const c = await reviewSvc.markFixed(Number(req.params.id), Number(req.params.cid), done, req.user);
+  if (!c) return res.status(404).json({ ok: false, error: 'Comentário não encontrado.' });
+  const ep = await findEpisode(req.params.id);
+  if (wantsJson(req)) return res.json({ ok: true, fixed: Boolean(c.fixed_at), fixedVersion: c.fixed_version, html: await commentHtml(res, ep.id, c.id, ep), summary: await reviewSvc.summary(ep.id), counts: await commentCounts(ep.id) });
+  res.redirect(back(req.params.id, '#ajustes'));
+}));
+
+// Quem revisa devolve um ajuste marcado como feito: volta para o editor como "em aberto".
+router.post('/episodios/:id/comentarios/:cid/ainda-nao', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!can(req.user.role, 'production.review')) return res.status(403).json({ ok: false, error: 'Só quem revisa devolve o ajuste.' });
+  if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return res.status(404).json({ ok: false });
+  const c = await reviewSvc.reopenFix(Number(req.params.id), Number(req.params.cid));
+  if (!c) return res.status(404).json({ ok: false, error: 'Comentário não encontrado.' });
+  const ep = await findEpisode(req.params.id);
+  res.json({ ok: true, html: await commentHtml(res, ep.id, c.id, ep), summary: await reviewSvc.summary(ep.id), counts: await commentCounts(ep.id) });
+}));
+
+// Marcadores para o programa de edição (DaVinci: EDL de marcadores) ou lista em texto. Minutagens são orientação, e o arquivo diz isso.
+router.get('/episodios/:id/marcadores', requirePerm('episodes.read'), wrap(async (req, res) => {
+  const ep = await findEpisode(req.params.id);
+  if (!ep) return notFound(res);
+  const { rows: comments } = await db.query('SELECT c.*, u.name AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.episode_id = $1', [ep.id]);
+  const latest = await reviewSvc.latestEdited(ep.id);
+  const out = reviewSvc.markers({
+    ep, comments, format: req.query.formato === 'texto' ? 'texto' : 'davinci', which: req.query.quais === 'todos' ? 'todos' : 'abertos',
+    fps: reviewSvc.pickFps(req.query.fps, reviewSvc.pickFps(latest?.fps)), startHour: req.query.inicio === '00' ? 0 : 1, latestVersion: latest?.version ?? null,
+  });
+  res.set({ 'Content-Type': out.contentType, 'Content-Disposition': `attachment; filename="${out.filename}"`, 'Cache-Control': 'no-store' }).send(out.body);
+}));
 // Renderiza um pedaço de página (o comentário recém-criado) com as variáveis do layout, para o navegador só inserir.
 const renderPartial = (res, view, data) => new Promise((resolve, reject) => res.render(view, data, (err, html) => (err ? reject(err) : resolve(html))));
 router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(async (req, res) => {
@@ -813,19 +868,19 @@ router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(asy
   if (at != null && (!Number.isInteger(at) || at < 0 || at > 24 * 3600 * 1000)) return res.status(400).json({ ok: false, error: 'Minutagem inválida.' });
   const end = req.body.end_ms === '' || req.body.end_ms == null ? null : Number.parseInt(req.body.end_ms, 10);
   if (end != null && (at == null || !Number.isInteger(end) || end <= at || end > 24 * 3600 * 1000)) return res.status(400).json({ ok: false, error: 'Trecho inválido: o fim precisa vir depois do início.' });
-  let fileId = null;
+  let fileId = null; let version = null;
   if (isIntId(String(req.body.file_id || ''))) {
-    const { rowCount } = await db.query("SELECT 1 FROM episode_files WHERE id = $1 AND episode_id = $2 AND kind = 'editado'", [req.body.file_id, ep.id]);
-    if (rowCount) fileId = Number(req.body.file_id);
+    const { rows: [vf] } = await db.query("SELECT id, version FROM episode_files WHERE id = $1 AND episode_id = $2 AND kind = 'editado'", [req.body.file_id, ep.id]);
+    if (vf) { fileId = vf.id; version = vf.version; }
   }
-  const { rows: [c] } = await db.query('INSERT INTO episode_comments (episode_id, file_id, at_ms, end_ms, body, body_html, author_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-    [ep.id, fileId, at, end, body, rich ? rich.html || null : null, req.user.id]);
+  const { rows: [c] } = await db.query('INSERT INTO episode_comments (episode_id, file_id, version, at_ms, end_ms, body, body_html, author_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+    [ep.id, fileId, version, at, end, body, rich ? rich.html || null : null, req.user.id]);
   const linked = ids.length ? await attachmentsSvc.link(ids, 'review', c.id, req.user) : 0;
   const files = linked ? (await attachmentsSvc.forReviews([c.id]))[c.id] || [] : [];
   const said = body || (files.find((f) => f.kind === 'audio')?.transcript ? `Áudio: ${files.find((f) => f.kind === 'audio').transcript}` : 'Anexo enviado.');
   await prod.addEvent(ep.id, req.user.id, 'comentario', `Comentário${at != null ? ` em ${fmt.formatRange(at, end)}` : ''}: ${said.slice(0, 140)}`);
   if (wantsJson(req)) {
-    const html = await renderPartial(res, 'episodes/_review_comment', { c: { ...c, author_name: req.user.name, attachments: files }, ep, tickable: true });
+    const html = await renderPartial(res, 'episodes/_review_comment', { c: { ...c, author_name: req.user.name, attachments: files }, ep, tickable: true, latestVersion: version, perm: permsOf(req.user) });
     return res.json({ ok: true, id: c.id, html, comment: { id: c.id, at_ms: at, end_ms: end, clock: at != null ? fmt.formatRange(at, end) : null, body, author: req.user.name, when: fmt.formatDateTime(new Date()), resolved: false }, counts: await commentCounts(ep.id) });
   }
   res.redirect(back(ep.id, '#revisao'));
@@ -842,7 +897,7 @@ router.post('/episodios/:id/comentarios/:cid/editar', requirePerm('episodes.read
   if (edit.error) return res.status(422).json({ ok: false, error: edit.error });
   const { rows: [saved] } = await db.query('UPDATE episode_comments SET body = $2, body_html = $3, edited_at = now() WHERE id = $1 RETURNING *', [c.id, edit.text, edit.html]);
   const files = (await attachmentsSvc.forReviews([c.id]))[c.id] || [];
-  const html = await renderPartial(res, 'episodes/_review_comment', { c: { ...saved, author_name: req.user.name, attachments: files }, ep, tickable: true });
+  const html = await renderPartial(res, 'episodes/_review_comment', { c: { ...saved, author_name: req.user.name, attachments: files }, ep, tickable: true, latestVersion: (await reviewSvc.latestEdited(ep.id))?.version ?? null, perm: permsOf(req.user) });
   res.json({ ok: true, id: c.id, html, counts: await commentCounts(ep.id) });
 }));
 
@@ -854,7 +909,10 @@ router.post('/episodios/:id/comentarios/:cid/resolver', requirePerm('episodes.re
     'UPDATE episode_comments SET resolved = $3, resolved_by = $4, resolved_at = CASE WHEN $3 THEN now() ELSE NULL END WHERE id = $1 AND episode_id = $2',
     [req.params.cid, req.params.id, resolved, resolved ? req.user.id : null]);
   if (!rowCount) return res.status(404).json({ ok: false });
-  if (wantsJson(req)) return res.json({ ok: true, resolved, counts: await commentCounts(req.params.id) });
+  if (wantsJson(req)) {
+    const ep = await findEpisode(req.params.id);
+    return res.json({ ok: true, resolved, html: await commentHtml(res, ep.id, Number(req.params.cid), ep), summary: await reviewSvc.summary(ep.id), counts: await commentCounts(req.params.id) });
+  }
   res.redirect(back(req.params.id, '#revisao'));
 }));
 

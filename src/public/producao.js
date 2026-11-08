@@ -614,6 +614,8 @@
   function bindComment(li) {
     li.querySelectorAll('[data-seek]').forEach((b) => b.addEventListener('click', () => seekFrom(b)));
     li.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () => resolveComment(b)));
+    li.querySelectorAll('button[data-fix]').forEach((b) => b.addEventListener('click', () => commentAction(b, `/episodios/${epId}/comentarios/${b.dataset.fix}/feito`, { feito: b.dataset.fixTo })));
+    li.querySelectorAll('[data-not-yet]').forEach((b) => b.addEventListener('click', () => commentAction(b, `/episodios/${epId}/comentarios/${b.dataset.notYet}/ainda-nao`, {})));
     li.querySelectorAll('[data-comment-delete]').forEach(bindDelete);
     window.PulsoRich?.hydrate(li);
   }
@@ -645,17 +647,60 @@
   form?.addEventListener('submit', (e) => { e.preventDefault(); submitComment(false); });
   review?.querySelector('[data-general]')?.addEventListener('click', () => submitComment(true));
 
-  async function resolveComment(b) {
+  // Troca o comentário pelo que o servidor devolveu (estado novo: feito, conferido, devolvido) e atualiza contadores e filtro.
+  function swapComment(li, out) {
+    if (out.html) {
+      const tpl = document.createElement('template'); tpl.innerHTML = out.html.trim(); const node = tpl.content.firstElementChild;
+      bindComment(node); li.replaceWith(node);
+    }
+    setBadge(out.counts); setSummary(out.summary); applyFilter(); drawMarkers();
+  }
+  async function commentAction(b, url, data) {
     const li = b.closest('.comment'); b.disabled = true;
     try {
-      const res = await post(`/episodios/${epId}/comentarios/${b.dataset.comment}/resolver`, { resolved: b.dataset.resolve });
+      const res = await post(url, data);
       const out = await res.json().catch(() => ({}));
-      if (!res.ok || !out.ok) { window.alert('Não foi possível atualizar o comentário.'); return; }
-      li.classList.toggle('resolved', out.resolved); b.dataset.resolve = out.resolved ? '0' : '1';
-      b.title = out.resolved ? 'Reabrir' : 'Marcar como resolvido'; b.setAttribute('aria-label', out.resolved ? 'Reabrir o comentário' : 'Marcar como resolvido');
-      setBadge(out.counts); drawMarkers();
-    } finally { b.disabled = false; }
+      if (!res.ok || !out.ok) { window.alert(out.error || 'Não foi possível atualizar o comentário.'); return; }
+      swapComment(li, out);
+    } catch { window.alert('Sem conexão. Tente de novo.'); } finally { b.disabled = false; }
   }
+  const resolveComment = (b) => commentAction(b, `/episodios/${epId}/comentarios/${b.dataset.comment}/resolver`, { resolved: b.dataset.resolve });
+
+  // Filtro da revisão: Todos | Para conferir | Em aberto | Conferidos (só esconde na tela).
+  const filterBox = document.querySelector('[data-comment-filter]');
+  let filterOn = '';
+  function applyFilter() {
+    list?.querySelectorAll('.comment').forEach((c) => { c.hidden = Boolean(filterOn) && c.dataset.state !== filterOn; });
+  }
+  function setSummary(s) {
+    if (!s || !filterBox) return;
+    const set = (k, v) => { const n = filterBox.querySelector(`[data-n="${k}"]`); if (n) n.textContent = v; };
+    set('todos', s.total); set('conferir', s.conferir); set('aberto', s.aberto); set('resolvido', s.resolvido);
+  }
+  filterBox?.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => {
+    filterOn = b.dataset.filter;
+    filterBox.querySelectorAll('[data-filter]').forEach((x) => x.classList.toggle('on', x === b));
+    applyFilter();
+  }));
+
+  // Cartão do editor (aba Material): cada ajuste com a caixa "feito"; o contador acompanha.
+  const fixes = document.querySelector('[data-fixes]');
+  fixes?.querySelectorAll('input[data-fix]').forEach((box) => box.addEventListener('change', async () => {
+    const item = box.closest('.fix-item'); const done = box.checked;
+    item.classList.toggle('done', done); // na hora; volta se der erro
+    try {
+      const res = await post(`/episodios/${epId}/comentarios/${box.dataset.fix}/feito`, { feito: done ? '1' : '0' });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.ok) throw new Error(out.error || 'erro');
+      const state = item.querySelector('[data-fix-state]');
+      if (state) state.textContent = out.fixed ? (out.fixedVersion ? `feito na v${out.fixedVersion}` : 'feito · entra na próxima versão') : '';
+      const all = fixes.querySelectorAll('input[data-fix]').length; const n = fixes.querySelectorAll('input[data-fix]:checked').length;
+      const count = fixes.querySelector('[data-fix-count]'); if (count) count.textContent = `${n} de ${all} feitos`;
+    } catch (err) {
+      box.checked = !done; item.classList.toggle('done', !done);
+      window.alert(err.message && err.message !== 'erro' ? err.message : 'Não foi possível salvar. Tente de novo.');
+    }
+  }));
 
   function bindDelete(f) {
     f.addEventListener('submit', async (e) => {

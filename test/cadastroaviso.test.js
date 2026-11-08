@@ -185,7 +185,7 @@ describe('avisos de alteração e exclusão de cadastro; edição de comentário
     it('a aba de revisão usa ícones: enviar, comentário geral, resolver, editar e apagar', async () => {
       const page = (await as.gestao.get(`/episodios/${ep.id}`)).text;
       assert.match(page, /id="modal-review-edit"/); assert.match(page, /data-dialog="modal-review-edit"/);
-      assert.match(page, /aria-label="Marcar como resolvido"/); assert.doesNotMatch(page, />Comentário geral<|>Comentar neste ponto<|>apagar</);
+      assert.match(page, /aria-label="Marcar como conferido"/); assert.doesNotMatch(page, />Comentário geral<|>Comentar neste ponto<|>apagar</);
       const res = await json('gestao', `/episodios/${ep.id}/comentarios/${c.id}/resolver`, { resolved: '1' });
       assert.equal(res.body.resolved, true);
       assert.match((await as.gestao.get(`/episodios/${ep.id}`)).text, /aria-label="Reabrir o comentário"/);

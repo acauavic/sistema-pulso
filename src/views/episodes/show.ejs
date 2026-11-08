@@ -347,7 +347,7 @@
                   <span><span class="mono small"><%= f.filename %></span> <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDateTime(f.created_at) %><%= f.uploader ? ' · ' + f.uploader : '' %></span><% if (f.status === 'enviando') { %> <span class="badge b-amber">enviando</span><% } %></span>
                   <span class="row">
                     <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
-                    <% if (perm.edit) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover esta versão?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover a versão" title="Remover"><%- icon('trash-2', 14) %></button></form><% } %>
+                    <% if (perm.edit && !cm.length) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover esta versão?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover a versão" title="Remover"><%- icon('trash-2', 14) %></button></form><% } else if (perm.edit) { %><span class="icon-btn is-locked" title="Tem comentários da revisão: envie a correção como nova versão" aria-label="Versão com comentários da revisão: não pode ser removida"><%- icon('lock', 14) %></span><% } %>
                   </span>
                 </li>
               </ul>
@@ -360,12 +360,31 @@
           <% } %>
         </section>
 
-        <% if (openComments.length && ['em_edicao', 'disponivel_edicao'].indexOf(ep.status) >= 0) { %>
-        <section class="card" id="ajustes">
-          <h2>Ajustes pedidos na revisão (<%= openComments.length %>)</h2>
-          <ul class="plain comment-list">
-            <% openComments.forEach(function (c) { %>
-            <li class="comment"><div class="row"><% if (c.at_ms != null) { %><span class="handle"><%- icon('clock', 12) %> <%= fmt.formatRange(c.at_ms, c.end_ms) %></span><% } else { %><span class="badge b-gray">geral</span><% } %><span class="small muted"><%= c.author_name || '—' %></span></div><p class="pre"><%= c.body %></p></li>
+        <% if (openComments.length && ['em_edicao', 'disponivel_edicao'].indexOf(ep.status) >= 0) {
+             var fixedN = openComments.filter(function (c) { return c.fixed_at; }).length; %>
+        <section class="card" id="ajustes" data-fixes>
+          <div class="row spread">
+            <h2 class="m-0">Ajustes pedidos na revisão</h2>
+            <button class="btn sm" type="button" data-modal-open="modal-marcadores"><%- icon('download', 14) %> Baixar marcadores</button>
+          </div>
+          <p class="mono small muted top-gap" data-fix-count><%= fixedN %> de <%= openComments.length %> feitos</p>
+          <p class="notice small"><%- icon('info', 14) %> <%= reviewNote %> Marque cada ajuste como feito ao corrigir; ao subir a nova versão, quem revisa confere um por um.</p>
+          <ul class="plain fix-list">
+            <% openComments.forEach(function (c) { var other = c.at_ms != null && c.version != null && latestEdited && c.version !== latestEdited.version; %>
+            <li class="fix-item<%= c.fixed_at ? ' done' : '' %>">
+              <label class="fix-check">
+                <input type="checkbox" data-fix="<%= c.id %>" <%= c.fixed_at ? 'checked' : '' %> <%= perm.edit ? '' : 'disabled' %> aria-label="Ajuste feito">
+                <span class="fix-main">
+                  <span class="row">
+                    <% if (c.at_ms != null) { %><span class="handle"><%- icon('clock', 12) %> ≈ <%= fmt.formatRange(c.at_ms, c.end_ms) %></span><% } else { %><span class="badge b-gray">geral</span><% } %>
+                    <% if (c.version != null) { %><span class="mono small muted"><%= other ? 'minutagem da v' + c.version : 'v' + c.version %></span><% } %>
+                    <span class="small muted"><%= c.author_name || '—' %></span>
+                    <span class="mono small muted" data-fix-state><%= c.fixed_at ? (c.fixed_version ? 'feito na v' + c.fixed_version : 'feito · entra na próxima versão') : '' %></span>
+                  </span>
+                  <span class="pre fix-body"><%= c.body %></span>
+                </span>
+              </label>
+            </li>
             <% }) %>
           </ul>
         </section>
@@ -419,8 +438,20 @@
         <% } %>
       </div>
       <% } %>
+      <% var rs = { aberto: 0, conferir: 0, resolvido: 0 }; comments.forEach(function (c) { rs[c.resolved ? 'resolvido' : c.fixed_at ? 'conferir' : 'aberto'] += 1; }); %>
+      <% if (comments.length) { %>
+      <div class="row spread top-gap review-bar">
+        <div class="seg" role="group" aria-label="Filtrar os comentários" data-comment-filter>
+          <button type="button" class="on" data-filter="">Todos <span class="mono" data-n="todos"><%= comments.length %></span></button>
+          <button type="button" data-filter="conferir">Para conferir <span class="mono" data-n="conferir"><%= rs.conferir %></span></button>
+          <button type="button" data-filter="aberto">Em aberto <span class="mono" data-n="aberto"><%= rs.aberto %></span></button>
+          <button type="button" data-filter="resolvido">Conferidos <span class="mono" data-n="resolvido"><%= rs.resolvido %></span></button>
+        </div>
+        <button class="btn sm ghost" type="button" data-modal-open="modal-marcadores"><%- icon('download', 14) %> Baixar marcadores</button>
+      </div>
+      <% } %>
       <ul class="plain comment-list top-gap" data-comment-list>
-        <% comments.forEach(function (c) { %><%- include('_review_comment', { c: c, ep: ep, tickable: tickable }) %><% }) %>
+        <% comments.forEach(function (c) { %><%- include('_review_comment', { c: c, ep: ep, tickable: tickable, latestVersion: latestEdited ? latestEdited.version : null }) %><% }) %>
         <li class="muted" data-no-comments <%= comments.length ? 'hidden' : '' %>>Sem comentários.</li>
       </ul>
     </section>
@@ -490,6 +521,28 @@
   </div>
 </div>
 
+<% if (comments.length) { var fpsNow = latestEdited && latestEdited.fps ? Number(latestEdited.fps) : null; %>
+<dialog class="modal" id="modal-marcadores" aria-labelledby="mk-h">
+  <form method="get" action="/episodios/<%= ep.id %>/marcadores" class="stack" data-no-skeleton>
+    <h2 id="mk-h">Baixar marcadores</h2>
+    <p class="small muted">Os ajustes da revisão num arquivo para o programa de edição: cada comentário vira um marcador na linha do tempo, com o texto. No DaVinci Resolve: <span class="mono">Timeline &gt; Import &gt; Timeline Markers from EDL</span> (em português: Linha do tempo &gt; Importar &gt; Marcadores da linha do tempo a partir de EDL).</p>
+    <p class="notice small"><%- icon('info', 14) %> <%= reviewNote %></p>
+    <fieldset><legend>Arquivo</legend><div class="chips-radio">
+      <label class="chip-radio"><input type="radio" name="formato" value="davinci" checked><span>DaVinci Resolve (.edl)</span></label>
+      <label class="chip-radio"><input type="radio" name="formato" value="texto"><span>Lista em texto (.txt)</span></label></div>
+    </fieldset>
+    <fieldset><legend>Quais ajustes</legend><div class="chips-radio">
+      <label class="chip-radio"><input type="radio" name="quais" value="abertos" checked><span>Os que faltam conferir</span></label>
+      <label class="chip-radio"><input type="radio" name="quais" value="todos"><span>Todos</span></label></div>
+    </fieldset>
+    <div class="row">
+      <label>Quadros por segundo<select name="fps"><% reviewFps.forEach(function (f) { %><option value="<%= f %>" <%= (fpsNow ? Math.abs(fpsNow - f) < 0.02 : f === 30) ? 'selected' : '' %>><%= String(f).replace('.', ',') %><%= fpsNow && Math.abs(fpsNow - f) < 0.02 ? ' (o do vídeo)' : '' %></option><% }) %></select></label>
+      <label>A linha do tempo começa em<select name="inicio"><option value="01" selected>01:00:00:00 (padrão do DaVinci)</option><option value="00">00:00:00:00</option></select></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit"><%- icon('download', 14) %> Baixar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <!-- ================= MODAIS DE TAREFA ================= -->
 <% if (perm.manage) { %>
 <dialog class="modal" id="modal-task-new" aria-labelledby="mt-new-h">

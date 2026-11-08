@@ -178,7 +178,7 @@ async function notifyStage(ep, to, user) {
   } else if (to === 'disponivel_edicao') { users = await usersWithPerm('production.manage'); title = `Devolvido à fila: ${label}`; body = `${name} devolveu o episódio à fila de edição.`; }
   else if (to === 'em_edicao' && from === 'disponivel_edicao') { users = await usersWithPerm('production.manage'); title = `${name} assumiu a edição: ${label}`; }
   else if (to === 'em_edicao' && from === 'em_revisao') { users = [ep.editor_id]; title = `Ajustes pedidos: ${label}`; body = 'Veja os comentários abertos e envie de novo para revisão.'; hash = '#revisao'; }
-  else if (to === 'em_revisao' && from === 'em_edicao') { users = await usersWithPerm('production.review'); title = `Vídeo para revisar: ${label}`; body = `${name} enviou o vídeo editado para revisão.`; hash = '#revisao'; }
+  else if (to === 'em_revisao' && from === 'em_edicao') { users = await usersWithPerm('production.review'); title = `Vídeo para revisar: ${label}`; body = `${name} enviou o vídeo editado para revisão.${(await require('./review').progressLine(ep.id).then((l) => (l ? ` ${l}` : '')).catch(() => ''))}`; hash = '#revisao'; }
   else if (to === 'em_finalizacao' && from === 'em_revisao') { users = [ep.editor_id, ...await usersWithPerm('production.manage')]; title = `Vídeo aprovado: ${label}`; body = 'Segue para a finalização (títulos, descrições e thumbnail).'; }
   else if (to === 'pronto_publicar') { users = [ep.editor_id, ...await usersWithPerm('production.manage')]; title = `Pronto para publicar: ${label}`; }
   else if (to === 'publicado') { users = [ep.editor_id, ...await usersWithPerm('production.manage')]; title = `Publicado: ${label}`; }
@@ -355,7 +355,7 @@ async function checkEditedVideo(file) {
   if (info.width <= info.height) {
     return { error: `O vídeo do episódio precisa ser horizontal (16:9). Este é ${info.height > info.width ? 'vertical' : 'quadrado'} (${info.width}×${info.height}). Cortes verticais são enviados em Conteúdo.`, width: info.width, height: info.height };
   }
-  return { ok: true, width: info.width, height: info.height };
+  return { ok: true, width: info.width, height: info.height, fps: info.fps || null };
 }
 
 async function cancelUpload(file) {
