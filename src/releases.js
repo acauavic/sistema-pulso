@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.59.0', date: '2026-11-08', title: 'Mensagens da equipe',
+    items: [
+      { kind: 'novo', text: 'Mensagens: conversas individuais e grupos dentro do sistema. Dá para editar e apagar o que você enviou, reagir com emoji, responder em thread, anexar arquivos e mandar áudio com transcrição.' },
+      { kind: 'novo', text: 'Grupos: quem administra renomeia, adiciona e remove pessoas e escolhe outros administradores. Qualquer pessoa pode sair.' },
+      { kind: 'novo', text: '"Resumir" com IA: as não lidas, as últimas 24 horas, os últimos 7 dias ou uma thread, com o que foi falado, as decisões e as pendências.' },
+      { kind: 'novo', text: 'Entrega garantida: sem conexão, a mensagem fica guardada e sai sozinha quando a conexão voltar, sem duplicar. Quem esteve fora recebe tudo ao reconectar. Quem não leu em 20 segundos recebe um aviso.' },
+    ],
+  },
+  {
     version: '1.58.0', date: '2026-11-08', title: 'Marcadores da revisão no Premiere',
     items: [
       { kind: 'novo', text: '"Baixar marcadores" agora gera o arquivo do Premiere Pro (.xml), que já vem marcado: no Premiere, Arquivo > Importar cria a sequência "EP.0XX · ajustes da revisão" com um marcador por comentário (vermelho em aberto, amarelo feito, verde conferido; trecho vira marcador com duração). A janela explica como levar os marcadores para a sua edição.' },

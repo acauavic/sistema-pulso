@@ -40,6 +40,7 @@ function registerRoutines() {
     await require('./services/trash').purge(); // lixeira: o que passou de 15 dias sai de vez (com os arquivos)
     await db.query("DELETE FROM jobs WHERE status = 'done' AND finished_at < now() - interval '30 days'");
     await db.query("DELETE FROM worker_heartbeats WHERE seen_at < now() - interval '1 day'");
+    await db.query("DELETE FROM chat_outbox WHERE published_at < now() - interval '7 days'");
   }, { delayMs: 120_000 });
   return scheduler;
 }
@@ -57,6 +58,7 @@ async function main() {
   require('./services/social');
   require('./services/notify');
   require('./services/push'); // registra o trabalho 'push_notificacao'
+  const chat = require('./services/chat'); // registra 'chat_tarefa'
 
   let server = null;
   let scheduler = null;
@@ -81,6 +83,8 @@ async function main() {
     }).listen(config.port, () => console.log(`Pulso Gestão (worker) rodando a fila e as rotinas; saúde em :${config.port}/healthz`));
   }
 
+  await chat.start({ web: runsWeb, worker: runsWorker }); // mensagens: RabbitMQ (ou Postgres, se ele faltar) e o publicador da chat_outbox
+
   // Vigia: o painel avisa a gestão se o worker parar ou um agendado atrasar; o worker se reinicia se o banco parar de responder.
   require('./services/watchdog').start({ web: runsWeb, worker: runsWorker });
 
@@ -90,6 +94,7 @@ async function main() {
     setTimeout(() => process.exit(1), 15_000).unref();
     if (scheduler) await scheduler.stop();
     if (runsWorker) await require('./services/jobs').stopWorker();
+    await chat.stop();
     if (runsWeb) require('./services/realtime').stop();
     server.close(() => db.close().finally(() => process.exit(0)));
   };

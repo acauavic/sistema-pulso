@@ -198,6 +198,14 @@
   };
   if (window.EventSource) {
     const es = new EventSource('/eventos');
+    window.pulsoEvents = es; // a tela de mensagens escuta a mesma conexão
+    // contador de Mensagens no menu, em qualquer tela
+    const chatBadges = document.querySelectorAll('[data-chat-unread]');
+    let chatTimer = null;
+    const refreshChatBadge = () => { clearTimeout(chatTimer); chatTimer = setTimeout(async () => {
+      try { const r = await (await fetch('/mensagens/nao-lidas', { headers: { Accept: 'application/json' } })).json(); chatBadges.forEach((b) => { b.textContent = String(r.n); b.hidden = !r.n; }); } catch { /* na próxima */ }
+    }, 400); };
+    if (chatBadges.length) { es.addEventListener('chat', refreshChatBadge); es.addEventListener('open', refreshChatBadge); }
     es.addEventListener('notification', (e) => {
       let n; try { n = JSON.parse(e.data); } catch { return; }
       if (badge) setUnread(Number(badge.textContent || 0) + 1);

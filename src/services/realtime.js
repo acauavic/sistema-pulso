@@ -15,13 +15,28 @@ async function publish(userIds, event) {
   await db.query('SELECT pg_notify($1, $2)', [CHANNEL, payload]).catch((err) => console.error('tempo real:', err.message));
 }
 
+function deliverLocal(users, event) {
+  for (const u of users || []) {
+    for (const res of clients.get(String(u)) || []) res.write(`event: ${event.type || 'message'}\ndata: ${JSON.stringify(event)}\n\n`);
+  }
+}
+
+// Recados entre as cópias do painel (ex.: mensagens do chat quando o RabbitMQ não está disponível).
+const topics = new Map();
+const on = (topic, fn) => topics.set(topic, fn);
+async function broadcast(topic, data) {
+  const payload = JSON.stringify({ topic, data });
+  if (Buffer.byteLength(payload) > 7500) throw new Error('recado grande demais para o NOTIFY');
+  await db.query('SELECT pg_notify($1, $2)', [CHANNEL, payload]);
+}
+
 function deliver(raw) {
   let msg;
   try { msg = JSON.parse(raw); } catch { return; }
-  for (const u of msg.users || []) {
-    for (const res of clients.get(u) || []) res.write(`event: ${msg.event.type || 'message'}\ndata: ${JSON.stringify(msg.event)}\n\n`);
-  }
+  if (msg.topic) { Promise.resolve(topics.get(msg.topic)?.(msg.data)).catch((err) => console.error('tempo real:', err.message)); return; }
+  deliverLocal(msg.users, msg.event);
 }
+const isConnected = (userId) => clients.has(String(userId));
 
 async function listen() {
   if (listener) return;
@@ -51,4 +66,4 @@ function handler(req, res) {
 
 const connectedCount = () => [...clients.values()].reduce((n, s) => n + s.size, 0);
 
-module.exports = { CHANNEL, publish, listen, stop, handler, connectedCount };
+module.exports = { CHANNEL, publish, listen, stop, handler, connectedCount, deliverLocal, on, broadcast, isConnected };

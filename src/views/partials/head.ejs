@@ -40,6 +40,7 @@
   <nav class="nav" aria-label="Principal">
     <%- navItem('/', 'layout-dashboard', 'Painel', currentPath === '/') %>
     <a href="/notificacoes" class="<%= currentPath.startsWith('/notificacoes') ? 'active' : '' %>" data-nav-notifications><%- icon('bell') %><span>Notificações</span><span class="nav-count" data-unread <%= navCounts && navCounts.unread ? '' : 'hidden' %>><%= navCounts ? navCounts.unread : 0 %></span></a>
+    <% if (can('chat.use')) { %><a href="/mensagens" class="<%= currentPath.startsWith('/mensagens') ? 'active' : '' %>"><%- icon('message-circle') %><span>Mensagens</span><span class="nav-count" data-chat-unread <%= navCounts && navCounts.chat_unread ? '' : 'hidden' %>><%= navCounts ? navCounts.chat_unread : 0 %></span></a><% } %>
     <% if (can('tasks.read')) { %><a href="/tarefas" class="<%= currentPath.startsWith('/tarefas') ? 'active' : '' %>"><%- icon('check-square') %><span>Tarefas</span><% if (navCounts && navCounts.tasks) { %><span class="nav-count muted-count"><%= navCounts.tasks %></span><% } %></a><% } %>
     <% if (can('calendar.read')) { %><%- navItem('/calendario', 'calendar-days', 'Calendário', currentPath.startsWith('/calendario')) %><% } %>
     <span class="kicker nav-group">Operação</span>
@@ -70,13 +71,14 @@
 <%# Celular: barra inferior de app (3 atalhos conforme o perfil + Notificações + Menu, que abre o menu completo). %>
 <% const tabItems = [
      { href: '/', icon: 'layout-dashboard', label: 'Painel', on: currentPath === '/', show: true },
+     { href: '/mensagens', icon: 'message-circle', label: 'Chat', on: currentPath.startsWith('/mensagens'), show: can('chat.use'), count: navCounts ? navCounts.chat_unread : 0 },
      { href: '/tarefas', icon: 'check-square', label: 'Tarefas', on: currentPath.startsWith('/tarefas'), show: can('tasks.read') },
      { href: '/calendario', icon: 'calendar-days', label: 'Agenda', on: currentPath.startsWith('/calendario'), show: can('calendar.read') },
      { href: '/convidados', icon: 'mic', label: 'Convidados', on: currentPath.startsWith('/convidados'), show: can('guests.read') },
      { href: '/episodios', icon: 'calendar', label: 'Episódios', on: currentPath.startsWith('/episodios'), show: can('episodes.read') },
    ].filter(function (t) { return t.show; }).slice(0, 3); %>
 <nav class="tabnav" aria-label="Atalhos">
-  <% tabItems.forEach(function (t) { %><a href="<%= t.href %>" class="<%= t.on ? 'on' : '' %>"<%- t.on ? ' aria-current="page"' : '' %>><%- icon(t.icon, 20) %><span><%= t.label %></span></a><% }) %>
+  <% tabItems.forEach(function (t) { %><a href="<%= t.href %>" class="<%= t.on ? 'on' : '' %>"<%- t.on ? ' aria-current="page"' : '' %>><% if (t.href === '/mensagens') { %><span class="tabnav-ico"><%- icon(t.icon, 20) %><span class="tabnav-count" data-chat-unread <%= t.count ? '' : 'hidden' %>><%= t.count %></span></span><% } else { %><%- icon(t.icon, 20) %><% } %><span><%= t.label %></span></a><% }) %>
   <a href="/notificacoes" class="<%= currentPath.startsWith('/notificacoes') ? 'on' : '' %>"><span class="tabnav-ico"><%- icon('bell', 20) %><span class="tabnav-count" data-unread <%= navCounts && navCounts.unread ? '' : 'hidden' %>><%= navCounts ? navCounts.unread : 0 %></span></span><span>Avisos</span></a>
   <button type="button" data-nav-toggle aria-expanded="false"><%- icon('menu', 20) %><span>Menu</span></button>
 </nav>

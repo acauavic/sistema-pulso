@@ -53,6 +53,7 @@ const PERMISSIONS = {
   'tasks.write': ALL,                                   // criar e mexer nas tarefas que criou ou que são suas
   'tasks.manage': ['superadmin', 'gestao', 'produtora'], // mexer em qualquer tarefa e reatribuir
   'comments.write': ALL,
+  'chat.use': ALL, // mensagens da equipe: conversas individuais e grupos
   // painel de gestão
   'notifications.manage': ['superadmin', 'gestao'],     // configuração geral das notificações
   'routines.manage': ['superadmin', 'gestao'],          // rotinas de tarefas (vencimento padrão)

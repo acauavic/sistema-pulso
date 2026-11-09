@@ -97,6 +97,7 @@ async function forComments(commentIds) {
 async function canView(user, att) {
   if (!att.entity_id) return String(att.uploaded_by) === String(user.id);
   if (att.entity_type === 'task') return can(user.role, 'tasks.read');
+  if (att.entity_type === 'chat') return require('./chat').canSeeMessage(user.id, att.entity_id);
   if (att.entity_type === 'review' || att.entity_type === 'content_request') return can(user.role, 'episodes.read');
   const { rows: [c] } = await db.query('SELECT entity_type FROM comments WHERE id = $1', [att.entity_id]);
   return Boolean(c) && require('./comments').canSee(user.role, c.entity_type);
@@ -115,7 +116,8 @@ async function purge() {
     `SELECT * FROM attachments WHERE (entity_id IS NULL AND created_at < now() - interval '2 days')
         OR (entity_type = 'task' AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.id = entity_id))
         OR (entity_type = 'comment' AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.id = entity_id))
-        OR (entity_type = 'review' AND NOT EXISTS (SELECT 1 FROM episode_comments c WHERE c.id = entity_id)) LIMIT 200`);
+        OR (entity_type = 'review' AND NOT EXISTS (SELECT 1 FROM episode_comments c WHERE c.id = entity_id))
+        OR (entity_type = 'chat' AND NOT EXISTS (SELECT 1 FROM chat_messages m WHERE m.id = entity_id)) LIMIT 200`);
   for (const a of rows) await remove(a);
   return rows.length;
 }

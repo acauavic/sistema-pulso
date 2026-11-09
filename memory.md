@@ -88,6 +88,15 @@
 - **Formulário do patrocinador em etapas (2026-10-08)**: `sponsors.js` tem `BRIEF_QUESTIONS` (8 perguntas; `skippable` e `na`), `briefState` (respondida | nao_se_aplica | pendente | aberta, derivado do conteúdo + colunas `skipped`/`na` de `sponsor_briefs`, migration 012), `applyAnswer`, `reconcileBrief` (tira pendência/NA do que passou a ter resposta e marca `brief_completed_at` só quando as 8 estão respondidas). Rotas públicas `POST /patrocinador/resposta` e `/concluir` (JSON, CSRF no cabeçalho, limite próprio de 150/10 min); o `POST /cadastro` antigo segue para quem está sem JS (vazios puláveis viram pendência). `closeBrief` registra evento e avisa o responsável uma vez por situação. Visual: `.steps` (patrocinador.css) e `.fp-steps` (painel).
 - **Fora do escopo/pendente**: publicar de verdade (precisa o dono conectar TikTok e ligar `UPLOAD_POST_LIVE`), Spotify (sem API de upload), carrossel/foto no Instagram via API, aprovação de moldura/QR pelo patrocinador, WhatsApp.
 
+## Mensagens (1.59.0)
+
+- **Dados** (migração 065): `chat_conversations` (`direct_key` única, `rev`), `chat_members` (`role`, `left_at`, `last_read_id`, `notified_upto`), `chat_messages` (`client_id` único por autor, `parent_id` = thread de um nível, `rev`, `deleted_at`), `chat_reactions`, `chat_outbox`, `chat_summaries`. Anexo com `entity_type = 'chat'`.
+- **Entrega** (`services/chat.js`): toda escrita faz `bump` (UPDATE na conversa, trava até o COMMIT): rev e id crescem na ordem em que valem, e `/novidades?desde=rev` não perde nada. Mensagem e outbox na mesma transação. `chatRelay` publica (SKIP LOCKED, roda em todo processo; `kick` depois do COMMIT e volta de 3 s): RabbitMQ com confirmação; sem ele, `realtime.broadcast` (eventos) e `jobs` `chat_tarefa` (tarefas). Publicar duas vezes não faz mal: tela junta por id+rev; aviso usa `dedupe`; resumo trava com `status = gerando`.
+- **RabbitMQ** (`chatBus.js`, `RABBITMQ_URL`, opcional): só códigos, nunca texto. Topic `pulso.chat`; `evento.#` em fila exclusiva por réplica web; `tarefa.#` em quorum `pulso.chat.tarefas` (limite 5, depois `pulso.chat.mortas`); `espera.#` com TTL 20 s que cai em `tarefa.aviso`. Status em Integrações.
+- **Tela** (`public/chat.js`): renderiza por JSON. `pulso.chat.pendentes.<id>` no localStorage guarda o que falta enviar (mesmo `client_id` nas novas tentativas). `window.pulsoEvents` (collab.js) é a conexão SSE; evento `chat`. Conferência ao reconectar, ao voltar para a aba e a cada 30 s.
+- **Fora do escopo por enquanto**: excluir grupo, recibo de leitura ("visto"), busca nas mensagens.
+- **Dev**: arquivos de `src/public` entram na versão e na memória ao subir: reiniciar o servidor depois de mexer em JS/CSS.
+
 ## Revisão que não se perde (1.57.0)
 
 - **Dados** (migração 063): `episode_comments.file_id` agora `ON DELETE SET NULL` (antes CASCADE: apagar a versão apagava os comentários, aconteceu no EP.019 em 30/10, 27 comentários na lixeira); colunas `version` (versão comentada), `fixed_at/fixed_by/fixed_version` (o "feito" do editor). `episode_files.fps` lido no envio do editado (`media.probe` devolve `fps`, `checkEditedVideo` repassa).
@@ -127,6 +136,8 @@
 - **Pegadinha**: rotas públicas do patrocinador com fetch precisam estar na lista de `Origin: null` em `originCheck` (já incluí `resposta|concluir`).
 
 ## Últimas Decisões
+
+- **Mensagens com RabbitMQ (1.59.0)**: o dono pediu o Rabbit dele, em outra máquina. O Postgres continua sendo a fonte da verdade; o Rabbit é transporte, e o chat cai para o Postgres se ele sair do ar. Rabbit não carrega conteúdo porque fica fora do servidor.
 
 - **Marcadores no Premiere (1.58.0)**: o editor usa Premiere; XML do Final Cut 7 (o caminho que o Premiere importa sem extensão) em vez de CSV ou painel. Padrão da janela passou a ser Premiere.
 

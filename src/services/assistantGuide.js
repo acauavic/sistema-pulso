@@ -39,6 +39,7 @@ const ACTIONS = {
   'tasks.read': { text: 'ver tarefas', where: 'Tarefas' },
   'tasks.write': { text: 'criar tarefas (com prazo e hora, por voz ou digitando, com anexos) e mexer nas que criou ou que são dela', where: 'Tarefas' },
   'tasks.manage': { text: 'mexer em qualquer tarefa e reatribuir', where: 'Tarefas' },
+  'chat.use': { text: 'trocar mensagens com a equipe em Mensagens: conversas individuais e grupos, threads, reações, áudio e resumo com IA' },
   'comments.write': { text: 'comentar em convidados, patrocinadores, episódios, cortes e tarefas, e na revisão do vídeo (texto formatado, imagens, anexos e áudio com transcrição; @ chama alguém)', where: 'Comentários de cada item' },
   'notifications.manage': { text: 'configurar quais avisos vão para o painel, o e-mail e quem os recebe', where: 'Gestão > Notificações' },
   'routines.manage': { text: 'configurar as rotinas de tarefas que nascem sozinhas', where: 'Gestão > Rotinas de tarefas' },

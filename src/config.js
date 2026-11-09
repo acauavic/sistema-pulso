@@ -96,6 +96,7 @@ config.mailConfigured = config.mailDryRun || Boolean(config.brevo.user && config
 config.storageConfigured = Boolean(config.b2.keyId && config.b2.appKey && config.b2.bucket);
 config.geminiConfigured = Boolean(config.gemini.key);
 config.groqConfigured = Boolean(config.groq.key);
+config.rabbit = { url: env.RABBITMQ_URL || '' }; // mensagens do chat; sem ele, tudo segue pelo Postgres
 config.uploadPostConfigured = Boolean(config.uploadPost.key);
 config.zernioConfigured = Boolean(config.zernio.key);
 // Envio direto do navegador ao Backblaze (mais rápido: não passa pelo servidor). UPLOAD_DIRECT=false desliga e tudo volta a passar pelo servidor.

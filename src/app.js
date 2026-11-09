@@ -55,6 +55,7 @@ function createApp() {
   app.use(require('./routes/misc'));
   app.use(require('./routes/collab')); // comentários, responsável, notificações e busca global
   app.use(require('./routes/assistant')); // assistente de IA flutuante (texto e áudio, com histórico)
+  app.use(require('./routes/chat')); // mensagens da equipe: conversas, grupos, threads, reações, áudio e resumo com IA
   app.use(require('./routes/attachments')); // anexos (imagem, PDF, HTML, ZIP, áudio) e miniatura de links
   app.use(require('./routes/tasks'));
   app.use(require('./routes/outreach')); // Cadência de abordagem: registro por canal, follow-ups e painel da gestão

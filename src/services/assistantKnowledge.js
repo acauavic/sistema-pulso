@@ -24,6 +24,18 @@ const TOPICS = [
     ],
   },
   {
+    key: 'mensagens', title: 'Mensagens (chat da equipe)', words: ['mensagem', 'mensagens', 'chat', 'conversa', 'grupo', 'thread', 'direct'],
+    where: '/mensagens', perm: 'chat.use',
+    steps: [
+      'Em Mensagens, "Nova conversa" abre com uma pessoa ou cria um grupo. Enter envia e Shift+Enter quebra a linha (no celular, o botão envia).',
+      'Passe o mouse na mensagem (no celular, toque nela) para reagir, responder em thread e, nas suas, editar ou apagar.',
+      'O microfone grava áudio com transcrição; o clipe anexa arquivo.',
+      'Toque no nome da conversa para ver os participantes. Quem administra o grupo renomeia, adiciona, remove e escolhe outros administradores; qualquer pessoa pode sair.',
+      '"Resumir" usa a IA para resumir as não lidas, as últimas 24 horas, os últimos 7 dias ou uma thread, com decisões e pendências.',
+      'Sem conexão, a mensagem fica guardada e sai sozinha quando a conexão voltar. Quem não leu em 20 segundos recebe um aviso no sino e no celular (cada pessoa pode silenciar em Notificações).',
+    ],
+  },
+  {
     key: 'comentarios', title: 'Comentários, anexos e áudio', words: ['comentário', 'comentarios', 'comentar', 'menção', 'mencionar', 'arroba', 'áudio', 'audio', 'transcrição', 'anexo', 'anexar', 'imagem', 'print', 'pdf', 'zip', 'tabela', 'link miniatura', 'miniatura'],
     where: 'Cada convidado, patrocinador, episódio, corte e tarefa tem a caixa de comentários; a revisão do vídeo tem a dela', perm: 'comments.write',
     steps: [

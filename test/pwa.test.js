@@ -42,14 +42,14 @@ describe('app no celular (PWA)', () => {
     assert.match(t, /<meta name="push-key" content="">/);
     const nav = t.match(/<nav class="tabnav"[\s\S]*?<\/nav>/)[0];
     assert.match(nav, /href="\/tarefas" class="on" aria-current="page"/, 'a aba da página atual fica ativa');
-    for (const label of ['Painel', 'Tarefas', 'Agenda', 'Avisos', 'Menu']) assert.match(nav, new RegExp(`<span>${label}</span>`));
+    for (const label of ['Painel', 'Chat', 'Tarefas', 'Avisos', 'Menu']) assert.match(nav, new RegExp(`<span>${label}</span>`));
     assert.match(nav, /data-nav-toggle aria-expanded="false"/);
     assert.equal((t.match(/data-unread/g) || []).length, 2, 'contador no menu e na barra de baixo');
     assert.match(t, /data-pwa-install hidden/); assert.match(t, /id="modal-pwa-ios"/); assert.match(t, /\/static\/pwa\.js\?v=/);
     // a barra de baixo respeita as permissões do perfil
     const navEd = (await as.editor.get('/')).text.match(/<nav class="tabnav"[\s\S]*?<\/nav>/)[0];
-    const expected = [['Tarefas', 'tasks.read'], ['Agenda', 'calendar.read'], ['Convidados', 'guests.read'], ['Episódios', 'episodes.read']].filter(([, p]) => can('editor_video', p)).slice(0, 2).map(([l]) => l);
-    for (const label of ['Painel', ...expected, 'Avisos', 'Menu']) assert.match(navEd, new RegExp(`<span>${label}</span>`), `editor vê ${label}`);
+    const expected = [['Tarefas', 'tasks.read'], ['Agenda', 'calendar.read'], ['Convidados', 'guests.read'], ['Episódios', 'episodes.read']].filter(([, p]) => can('editor_video', p)).slice(0, 1).map(([l]) => l);
+    for (const label of ['Painel', 'Chat', ...expected, 'Avisos', 'Menu']) assert.match(navEd, new RegExp(`<span>${label}</span>`), `editor vê ${label}`);
     // o cartão de instalar/ligar alertas só existe no Início
     assert.match((await as.gestao.get('/')).text, /data-app-card hidden/);
     assert.match((await as.editor.get('/')).text, /data-app-card hidden/, 'o Início do editor também tem o cartão');

@@ -52,6 +52,7 @@ async function navData(req, res, next) {
       db.query(`SELECT (SELECT count(*)::int FROM notifications WHERE user_id = $1 AND read_at IS NULL) AS unread,
                        (SELECT count(*)::int FROM tasks WHERE assignee_id = $1 AND status <> 'feito') AS tasks,
                        (SELECT release_seen FROM users WHERE id = $1) AS release_seen,
+                       (SELECT count(*)::int FROM chat_members cm JOIN chat_messages cx ON cx.conversation_id = cm.conversation_id AND cx.id > cm.last_read_id AND cx.deleted_at IS NULL AND cx.author_id IS DISTINCT FROM cm.user_id WHERE cm.user_id = $1 AND cm.left_at IS NULL) AS chat_unread,
                        CASE WHEN $2 THEN (SELECT count(*)::int FROM episode_publications WHERE status = 'revisao') ELSE 0 END AS reviews`, [req.user.id, can(req.user.role, 'social.publish')]),
       require('./services/team').activeUsers(),
     ]);
