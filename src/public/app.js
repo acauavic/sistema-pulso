@@ -455,3 +455,18 @@
     });
   });
 })();
+
+// Vídeo: o player toca a versão leve (720p). "Ver no original" troca para o arquivo enviado sem perder o ponto em que estava.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-video-swap]'); if (!btn) return;
+  const video = document.getElementById(btn.dataset.videoSwap); if (!video) return;
+  const original = btn.dataset.on !== '1';
+  const at = video.currentTime; const playing = !video.paused;
+  const url = new URL(video.currentSrc || video.src, location.href); url.hash = '';
+  if (original) url.searchParams.set('original', '1'); else url.searchParams.delete('original');
+  video.src = url.toString();
+  video.addEventListener('loadedmetadata', () => { video.currentTime = at; if (playing) video.play().catch(() => {}); }, { once: true });
+  btn.dataset.on = original ? '1' : '';
+  btn.textContent = original ? 'Ver na versão leve' : 'Ver no original';
+  const label = btn.parentElement.querySelector('[data-video-label]'); if (label) label.textContent = original ? 'Original' : 'Versão leve · 720p';
+});

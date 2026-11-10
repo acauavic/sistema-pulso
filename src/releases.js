@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.60.0', date: '2026-11-10', title: 'Vídeos sem travar',
+    items: [
+      { kind: 'correcao', text: 'Os vídeos travavam porque o player tocava o arquivo original, pesado demais para assistir pela internet: cortes verticais em 4K a 90 Mbps (um corte de 1 minuto tinha 650 MB) e episódios de 12 a 18 GB. Agora o sistema prepara uma versão leve só para assistir (720p, cerca de 2 a 3 Mbps, começa na hora e pula para qualquer ponto sem esperar). O mesmo corte de 650 MB fica com 13 MB.' },
+      { kind: 'ajuste', text: 'Baixar e publicar nas redes continuam usando o original, na qualidade enviada. Na revisão do episódio e na página do corte, "Ver no original" troca o player para o arquivo enviado sem perder o ponto em que você estava.' },
+      { kind: 'ajuste', text: 'A versão leve é preparada sozinha depois de cada envio, numa fila separada (não atrasa cortes nem a finalização). Os vídeos que já estão no sistema entram aos poucos, dos mais novos para os mais antigos. Até ela ficar pronta, o player toca o original, como antes.' },
+    ],
+  },
+  {
     version: '1.59.0', date: '2026-11-08', title: 'Mensagens da equipe',
     items: [
       { kind: 'novo', text: 'Mensagens: conversas individuais e grupos dentro do sistema. Dá para editar e apagar o que você enviou, reagir com emoji, responder em thread, anexar arquivos e mandar áudio com transcrição.' },

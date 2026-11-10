@@ -98,7 +98,8 @@ router.get(['/convidado/:token/cortes/:id', '/convidado/:token/cortes/:id/baixar
   if (!clip) return res.status(404).end();
   const { rows: [row] } = await db.query('SELECT storage_key FROM episode_clips WHERE id = $1', [clip.id]);
   const download = req.path.endsWith('/baixar') ? `${fmt.slugify(clip.post_title || clip.title) || `corte-${clip.id}`}.mp4` : null;
-  res.set('Cache-Control', 'private, max-age=60').redirect(302, await b2.presignGet(row.storage_key, { expires: 6 * 3600, download }));
+  // assistir no portal: a versão leve (o convidado vê no celular); baixar: o original
+  res.set('Cache-Control', 'private, max-age=60').redirect(302, download ? await b2.presignGet(row.storage_key, { expires: 6 * 3600, download }) : await require('../services/videoViews').playUrl(row.storage_key));
 }));
 
 // Vídeo do episódio: só se a equipe liberou no cadastro do convidado.

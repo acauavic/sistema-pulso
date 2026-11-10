@@ -252,8 +252,9 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     c.request_id ? require('../services/contentRequests').get(c.request_id) : null,
     clips.versionsOf(c.id), clips.replaceState(c),
   ]);
+  const light = Boolean(await require('../services/videoViews').viewKeyFor(c.storage_key));
   res.render('content/clip', {
-    comments: thread, request, versions, replace,
+    comments: thread, request, versions, replace, light,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C,
     running: ['enviando', 'processando'].includes(c.status) || pubs.rows.some((p) => p.status === 'enviando'),
@@ -333,7 +334,9 @@ router.post('/cortes/:id/excluir', requirePerm('episodes.read'), wrap(async (req
 
 router.get('/cortes/:id/video', requirePerm('episodes.read'), wrap(async (req, res) => {
   const c = await findClip(req); if (!c || !c.storage_key || c.status === 'enviando') return notFound(res);
-  const url = await b2.presignGet(c.storage_key, { expires: 3600, download: req.query.baixar === '1' ? `${fmt.slugify(c.title) || `corte-${c.id}`}.mp4` : null });
+  // assistir: a versão leve (720p), se já existe; baixar e "?original=1" entregam o arquivo enviado
+  const url = req.query.baixar === '1' ? await b2.presignGet(c.storage_key, { expires: 3600, download: `${fmt.slugify(c.title) || `corte-${c.id}`}.mp4` })
+    : await require('../services/videoViews').playUrl(c.storage_key, { original: req.query.original === '1', expires: 3600 });
   res.set('Cache-Control', 'private, max-age=60').redirect(302, url);
 }));
 

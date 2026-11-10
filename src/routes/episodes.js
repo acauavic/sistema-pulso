@@ -298,6 +298,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: reviewComments,
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
+    reviewLight: latestEdited ? Boolean(await videoViews.viewKeyFor(latestEdited.storage_key)) : false, // player com a versão leve: mostra "ver no original"
     reviewNote: reviewSvc.NOTE, reviewFps: reviewSvc.FPS, // revisão: minutagem é orientação; marcadores para o programa de edição
     epComments,
     content: { ...contentRows.rows[0], total: contentRows.rows[0].clips + contentRows.rows[0].posts }, tabs, defaultTab, publications: pubRows.rows, social, uploadPost, uploadLive: ls.live, testAt: ls.testAt, provider,
@@ -576,6 +577,7 @@ router.post('/episodios/:id/arquivos/:fid/concluir', uploadAccess, wrap(async (r
     if (check.error) { await prod.deleteFile(f); return uploadError(res, 422, check.error); }
     if (check.fps || check.width) await db.query('UPDATE episode_files SET fps = coalesce($2, fps), width = coalesce($3, width), height = coalesce($4, height) WHERE id = $1', [f.id, check.fps || null, check.width || null, check.height || null]); // marcadores no quadro certo e sequência do Premiere no tamanho do vídeo
     const fixed = await reviewSvc.versionUploaded(f); // o que o editor marcou como feito entra nesta versão
+    await videoViews.ensure(f.storage_key).catch((err) => console.error('Versão leve:', err.message)); // assistir sem travar
     await reviewSvc.newVersionNotice(f, fixed, req.user).catch((err) => console.error('Aviso de versão nova:', err.message));
   }
   await prod.addFileEvent(f, req.user.id);
@@ -602,6 +604,8 @@ const redirectToFile = (inline) => wrap(async (req, res) => {
     const sent = await require('../services/webImage').send(req, res, { key: file.storage_key, mime: file.content_type, maxSide: 2400, headers: { 'Cache-Control': 'private, max-age=86400' }, fallback: () => false });
     if (sent !== false) return sent;
   }
+  // assistir: a versão leve (720p), se já existe; "?original=1" ou baixar = o arquivo enviado
+  if (inline && isVideo && req.query.original !== '1' && await videoViews.viewKeyFor(file.storage_key)) return res.set('Cache-Control', 'no-store').redirect(302, await videoViews.playUrl(file.storage_key));
   const url = await b2.presignGet(file.storage_key, {
     expires: inline ? 6 * 3600 : 900,
     download: inline ? null : file.filename,
@@ -810,6 +814,7 @@ router.post('/episodios/:id/tarefas/:tid/excluir', requirePerm('production.manag
 }));
 
 // ---- revisão: comentários na minutagem ----
+const videoViews = require('../services/videoViews'); // versão leve para assistir
 const reviewSvc = require('../services/review');
 // Um comentário já renderizado (para a tela trocar o item sem recarregar).
 async function commentHtml(res, epId, id, ep) {

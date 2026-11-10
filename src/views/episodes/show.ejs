@@ -409,7 +409,8 @@
       <% if (!latestEdited) { %><p class="muted">Quando o editor enviar o vídeo, ele aparece aqui para a gestão assistir e comentar na minutagem.</p><% } else { %>
       <p class="small muted">Versão <strong>v<%= latestEdited.version %></strong> · <%= latestEdited.filename %></p>
       <div class="review" data-review data-csrf="<%= csrf %>" data-url="/episodios/<%= ep.id %>/comentarios" data-file="<%= latestEdited.id %>">
-        <video controls preload="metadata" playsinline src="<%= fileBase + latestEdited.id %>/ver#t=0.1" data-video></video>
+        <video controls preload="metadata" playsinline src="<%= fileBase + latestEdited.id %>/ver#t=0.1" data-video id="review-video"></video>
+        <% if (reviewLight) { %><p class="video-quality small muted"><span class="mono" data-video-label>Versão leve · 720p</span> <button type="button" class="link small" data-video-swap="review-video">Ver no original</button></p><% } %>
         <div class="review-timeline" data-timeline aria-label="Comentários na linha do tempo do vídeo (clique para ir até o ponto)"></div>
         <div class="player-controls" role="group" aria-label="Controles do vídeo">
           <button type="button" class="pc" data-skip="-10" title="Voltar 10 segundos (J)"><%- icon('rotate-ccw', 16) %> 10 s</button>

@@ -1577,3 +1577,7 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
   .msg.show-tools { flex-wrap: wrap; }
   .msg-tools .react-pop { position: absolute; right: 8px; top: 100%; }
 }
+
+/* Versão leve do vídeo: a frase pequena embaixo do player */
+.video-quality { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; } .video-quality .mono { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.clip-player { min-width: 0; }

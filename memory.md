@@ -88,6 +88,12 @@
 - **Formulário do patrocinador em etapas (2026-10-08)**: `sponsors.js` tem `BRIEF_QUESTIONS` (8 perguntas; `skippable` e `na`), `briefState` (respondida | nao_se_aplica | pendente | aberta, derivado do conteúdo + colunas `skipped`/`na` de `sponsor_briefs`, migration 012), `applyAnswer`, `reconcileBrief` (tira pendência/NA do que passou a ter resposta e marca `brief_completed_at` só quando as 8 estão respondidas). Rotas públicas `POST /patrocinador/resposta` e `/concluir` (JSON, CSRF no cabeçalho, limite próprio de 150/10 min); o `POST /cadastro` antigo segue para quem está sem JS (vazios puláveis viram pendência). `closeBrief` registra evento e avisa o responsável uma vez por situação. Visual: `.steps` (patrocinador.css) e `.fp-steps` (painel).
 - **Fora do escopo/pendente**: publicar de verdade (precisa o dono conectar TikTok e ligar `UPLOAD_POST_LIVE`), Spotify (sem API de upload), carrossel/foto no Instagram via API, aprovação de moldura/QR pelo patrocinador, WhatsApp.
 
+## Vídeos sem travar (1.60.0)
+
+- **Causa medida** (10/11): cortes verticais em 4K a ~91 Mbps (58 s = 653 MB), episódios 1080p a 19,3 Mbps (12 a 18 GB), bucket em `us-east-005` (~220 ms por pedido a partir do Brasil). Todos já tinham o índice no começo (faststart).
+- **Solução**: `video_views` (ligada por `source_key`) + trabalho `video_leve` (pista `video` da fila, separada de cortes e finalização). Teste real: corte de 653 MB virou 12,8 MB (1,8 Mbps) em 31 s no Mac. `deps.inspect`/`deps.transcode` trocáveis nos testes.
+- **Próximo passo, se ainda travar**: CDN na frente do Backblaze (Cloudflare, sem custo de saída), que precisa do DNS do dono (Hostinger).
+
 ## Mensagens (1.59.0)
 
 - **Dados** (migração 065): `chat_conversations` (`direct_key` única, `rev`), `chat_members` (`role`, `left_at`, `last_read_id`, `notified_upto`), `chat_messages` (`client_id` único por autor, `parent_id` = thread de um nível, `rev`, `deleted_at`), `chat_reactions`, `chat_outbox`, `chat_summaries`. Anexo com `entity_type = 'chat'`.
@@ -136,6 +142,8 @@
 - **Pegadinha**: rotas públicas do patrocinador com fetch precisam estar na lista de `Origin: null` em `originCheck` (já incluí `resposta|concluir`).
 
 ## Últimas Decisões
+
+- **Versão leve para assistir (1.60.0)**: em vez de pedir ao editor arquivos menores, o sistema faz a cópia de 720p; o original segue para baixar e publicar (as redes recebem a qualidade enviada).
 
 - **Mensagens com RabbitMQ (1.59.0)**: o dono pediu o Rabbit dele, em outra máquina. O Postgres continua sendo a fonte da verdade; o Rabbit é transporte, e o chat cai para o Postgres se ele sair do ar. Rabbit não carrega conteúdo porque fica fora do servidor.
 

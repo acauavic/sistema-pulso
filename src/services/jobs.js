@@ -12,6 +12,8 @@ const WORKER_ID = `${os.hostname()}:${process.pid}`;
 const CHANNEL = 'pulso_jobs';
 // Duas pistas por processo: a pesada (FFmpeg + IA, minutos) não segura a leve (e-mails, ideias), que roda em paralelo.
 const HEAVY = ['corte', 'finalizacao', 'transcricao'];
+// Pista própria para a versão leve dos vídeos: um episódio inteiro leva minutos e não pode segurar cortes e finalização.
+const VIDEO = ['video_leve'];
 // onError(job, err): avisar alguém quando o trabalho falha de vez (ex.: notificação de rotina do sistema).
 const register = (kind, fn, { onError } = {}) => { handlers.set(kind, fn); if (onError) errorHooks.set(kind, onError); };
 
@@ -40,14 +42,14 @@ async function enqueue(kind, { episodeId = null, refId = null, payload = {}, max
 const update = (id, { message, progress }) => db.query(
   'UPDATE jobs SET message = coalesce($2, message), progress = coalesce($3, progress), heartbeat_at = now() WHERE id = $1', [id, message ?? null, progress ?? null]);
 
-// lane: 'pesada' (só HEAVY), 'leve' (o resto) ou null (qualquer um).
+// lane: 'pesada' (só HEAVY), 'video' (só VIDEO), 'leve' (o resto) ou null (qualquer um).
 async function claim(lane = null) {
-  const filter = lane === 'pesada' ? 'AND kind = ANY($2::text[])' : lane === 'leve' ? 'AND NOT (kind = ANY($2::text[]))' : '';
+  const filter = lane === 'pesada' || lane === 'video' ? 'AND kind = ANY($2::text[])' : lane === 'leve' ? 'AND NOT (kind = ANY($2::text[]))' : '';
   const { rows } = await db.query(
     `UPDATE jobs SET status = 'running', started_at = now(), heartbeat_at = now(), attempts = attempts + 1, worker = $1,
             message = CASE WHEN attempts > 0 THEN 'Tentando de novo…' ELSE 'Começando…' END, progress = 0
       WHERE id = (SELECT id FROM jobs WHERE status = 'queued' AND run_after <= now() ${filter} ORDER BY run_after, id LIMIT 1 FOR UPDATE SKIP LOCKED)
-      RETURNING *`, lane ? [WORKER_ID, HEAVY] : [WORKER_ID]);
+      RETURNING *`, lane ? [WORKER_ID, lane === 'pesada' ? HEAVY : lane === 'video' ? VIDEO : [...HEAVY, ...VIDEO]] : [WORKER_ID]);
   return rows[0] || null;
 }
 
@@ -113,7 +115,7 @@ const retryJob = (id) => db.query(
   .then(async (r) => { if (r.rows[0]) await db.query('SELECT pg_notify($1, $2)', [CHANNEL, String(id)]).catch(() => {}); return r.rows[0] || null; });
 
 let timer = null; let stopping = false; let listener = null;
-const lanes = { pesada: { busy: false, running: null }, leve: { busy: false, running: null } };
+const lanes = { pesada: { busy: false, running: null }, video: { busy: false, running: null }, leve: { busy: false, running: null } };
 async function drainLane(name) {
   const l = lanes[name];
   if (l.busy || stopping) return;
@@ -127,7 +129,7 @@ async function drainLane(name) {
     }
   } catch (err) { console.error(`worker (${name}):`, err.message); } finally { l.busy = false; l.running = null; }
 }
-const drain = () => { drainLane('pesada'); drainLane('leve'); };
+const drain = () => { drainLane('pesada'); drainLane('video'); drainLane('leve'); };
 
 // Liga o processador neste processo: acorda com NOTIFY e, por garantia, confere a fila a cada `intervalMs`.
 async function startWorker({ intervalMs = 5000 } = {}) {
@@ -157,4 +159,4 @@ async function stopWorker({ waitMs = 8000 } = {}) {
 const latest = (episodeId, kind, refId = null) => db.query(
   'SELECT * FROM jobs WHERE episode_id = $1 AND kind = $2 AND ref_id IS NOT DISTINCT FROM $3 ORDER BY id DESC LIMIT 1', [episodeId, kind, refId]).then((r) => r.rows[0] || null);
 
-module.exports = { WORKER_ID, HEAVY, register, enqueue, update, runNext, recoverStuck, retryJob, retryDelay, startWorker, stopWorker, latest };
+module.exports = { WORKER_ID, HEAVY, VIDEO, register, enqueue, update, runNext, recoverStuck, retryJob, retryDelay, startWorker, stopWorker, latest };

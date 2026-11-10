@@ -42,7 +42,8 @@
         <% if (perm.cut && replace.allowed) { %><button class="btn sm" type="button" data-modal-open="modal-trocar"><%- icon('upload', 14) %> Trocar vídeo</button><% } %>
       </div>
       <div class="clip-media">
-        <video controls preload="metadata" playsinline src="/cortes/<%= clip.id %>/video<%= clip.version > 1 ? '?v=' + clip.version : '' %>#t=0.1"></video>
+        <div class="clip-player"><video controls preload="metadata" playsinline src="/cortes/<%= clip.id %>/video<%= clip.version > 1 ? '?v=' + clip.version : '' %>#t=0.1" id="clip-video"></video>
+        <% if (light) { %><p class="video-quality small muted"><span class="mono" data-video-label>Versão leve · 720p</span> <button type="button" class="link small" data-video-swap="clip-video">Ver no original</button></p><% } %></div>
         <div>
           <p class="kicker">Capa<%= covers.length ? '' : ' (ainda sem sugestões)' %></p>
           <div class="clip-covers">

@@ -28,6 +28,7 @@ function registerRoutines() {
   scheduler.every('portal-convidado', 10 * 60_000, () => require('./services/guestPortal').tick(), { delayMs: 80_000 }); // posts novos em collab: avisa o convidado
   scheduler.every('cadencia', 30 * 60_000, () => require('./services/outreach').dailyNotice(), { delayMs: 70_000 });
   scheduler.every('automacoes', 5 * 60_000, () => require('./services/social').runRules(), { delayMs: 60_000 });
+  scheduler.every('versao-leve', 5 * 60_000, () => require('./services/videoViews').tick(), { delayMs: 90_000 }); // vídeos sem versão leve (os mais novos primeiro) e limpeza
   scheduler.every('financeiro', 3600_000, () => require('./services/finance').tick(), { delayMs: 45_000 });
   scheduler.every('limpeza', 6 * 3600_000, async () => {
     await purgeExpired();
@@ -58,6 +59,7 @@ async function main() {
   require('./services/social');
   require('./services/notify');
   require('./services/push'); // registra o trabalho 'push_notificacao'
+  require('./services/videoViews'); // registra 'video_leve' (versão leve para assistir)
   const chat = require('./services/chat'); // registra 'chat_tarefa'
 
   let server = null;

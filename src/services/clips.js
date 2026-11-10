@@ -328,6 +328,7 @@ async function runProcess(job, { update }) {
       try { covers = (await buildCovers(clip.id, clip.created_by)).length; } catch (err) { notes.push(`Capas não montadas: ${String(err.message).slice(0, 120)}.`); }
     }
     await db.query("UPDATE episode_clips SET status = 'pronto', note = $2, error = NULL, updated_at = now() WHERE id = $1", [clip.id, notes.join(' ') || null]);
+    await require('./videoViews').ensure(clip.storage_key).catch((err) => console.error('[corte] versão leve:', err.message)); // assistir sem travar
     if (replaced) {
       await announceNewVersion(clip).catch((err) => console.error('[corte] aviso de nova versão:', err.message));
       return { clip_id: clip.id, version: clip.version, duration_ms: info.duration_ms, covers };
