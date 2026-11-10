@@ -23,6 +23,7 @@ const MAX_PART = 70 * 1024 * 1024;
 const POST_KINDS = ['post_quote', 'post_split', 'carousel'];
 const canCut = (role) => can(role, 'production.review') || can(role, 'production.edit');
 const canPublish = (role) => can(role, 'production.review');
+const canCover = (role) => can(role, 'covers.edit'); // escolher e editar a capa (a produtora também)
 const wantsJson = (req) => /json/.test(req.get('accept') || '');
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Não encontrado.' });
 const deny = (req, res, msg = 'Seu perfil não faz isso.') => (wantsJson(req) ? res.status(403).json({ ok: false, error: msg }) : res.status(403).render('error', { title: 'Sem permissão', message: msg }));
@@ -85,7 +86,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     pedir, today: new Date().toISOString().slice(0, 10), isLate: R.isLate, stageLabel: board.STAGE_LABEL,
     title: 'Conteúdo', clips: list, episodes: episodes.rows, postGroups, only, onlyEpisode: only ? byEpisode[only] || null : null,
     moments, running, storageReady: config.storageConfigured, aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,
-    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role), request: R.canRequest(req.user.role), review: R.canReview(req.user.role), approve: can(req.user.role, 'production.review') || can(req.user.role, 'production.manage') }, C,
+    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role), request: R.canRequest(req.user.role), review: R.canReview(req.user.role), approve: can(req.user.role, 'production.review') || can(req.user.role, 'production.manage'), cover: canCover(req.user.role) }, C,
   });
 }));
 
@@ -258,7 +259,7 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C,
     running: ['enviando', 'processando'].includes(c.status) || pubs.rows.some((p) => p.status === 'enviando'),
-    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role), guest: can(req.user.role, 'guests.write') },
+    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role), guest: can(req.user.role, 'guests.write'), cover: canCover(req.user.role) },
   });
 }));
 
@@ -341,7 +342,7 @@ router.get('/cortes/:id/video', requirePerm('episodes.read'), wrap(async (req, r
 }));
 
 router.post('/cortes/:id/capa', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canCut(req.user.role)) return deny(req, res);
+  if (!canCover(req.user.role)) return deny(req, res);
   const c = await findClip(req); if (!c) return notFound(res);
   if (!isIntId(req.body.cover_id)) return notFound(res);
   const { rows: [cv] } = await db.query("SELECT id FROM episode_covers WHERE id = $1 AND clip_id = $2 AND kind = 'reel_cover'", [req.body.cover_id, c.id]);

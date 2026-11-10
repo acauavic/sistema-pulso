@@ -310,6 +310,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     perm: {
       manage: can(req.user.role, 'production.manage'), upload: can(req.user.role, 'production.upload'),
       edit: can(req.user.role, 'production.edit'), review: can(req.user.role, 'production.review'), write: can(req.user.role, 'episodes.write'),
+      cover: can(req.user.role, 'covers.edit'),
     },
   });
 }));

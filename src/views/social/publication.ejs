@@ -111,7 +111,10 @@
     </section>
     <% if (images.length) { %>
     <section class="card">
-      <h2><%= images.length > 1 ? 'Imagens' : 'Imagem' %></h2>
+      <div class="row spread">
+        <h2><%= pub.media === 'video' ? 'Capa' : images.length > 1 ? 'Imagens' : 'Imagem' %></h2>
+        <% if (canCover && notYetOut) { %><a class="btn sm" href="/capas/<%= images[0] %>/editar?voltar=<%= encodeURIComponent('/social/publicacoes/' + pub.id) %>"><%- icon('pencil', 14) %> <%= pub.media === 'video' ? 'Editar capa' : images.length > 1 ? 'Editar imagens' : 'Editar imagem' %></a><% } %>
+      </div>
       <div class="pub-media"><% images.forEach(function (id) { %><img src="/capas/<%= id %>/imagem" alt="Imagem da publicação" loading="lazy"><% }) %></div>
     </section>
     <% } %>

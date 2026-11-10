@@ -75,6 +75,19 @@ describe('Instagram: collab e marcação na publicação', () => {
     assert.equal(st.platforms[0].platformSpecificData.collaborators, undefined);
   });
 
+  it('Novo post: a produtora edita a imagem antes de mandar para a revisão e o editor volta ao post', async () => {
+    const page = (await as.prod.get('/social/novo?tipo=imagem')).text;
+    assert.match(page, /data-cover-edit data-tipo="imagem" hidden/, 'o botão só aparece depois de escolher o item');
+    assert.match(page, new RegExp(`data-cover="${cover.id}"`));
+    const back = `/social/novo?tipo=imagem&item=${cover.id}`;
+    const ed = await as.prod.get(`/capas/${cover.id}/editar?voltar=${encodeURIComponent(back)}`);
+    assert.equal(ed.status, 200);
+    assert.match(ed.text, /Voltar ao post/);
+    assert.ok(ed.text.includes(`href="${back.replace(/&/g, '&amp;')}"`), 'volta para o post com o item escolhido');
+    const evil = await as.prod.get(`/capas/${cover.id}/editar?voltar=${encodeURIComponent('https://exemplo.com/social/novo')}`);
+    assert.doesNotMatch(evil.text, /Voltar ao post|exemplo\.com/, 'endereço de fora é ignorado');
+  });
+
   it('pela tela "Novo post": o pedido guarda collab e marcação e o envio leva os campos para a rede', async () => {
     const page = (await as.gestao.get('/social/novo?tipo=imagem')).text;
     assert.match(page, /data-ig-people/); assert.match(page, /data-photo="1"/); assert.match(page, /static\/igpeople\.js/);

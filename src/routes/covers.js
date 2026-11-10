@@ -16,7 +16,10 @@ const router = express.Router();
 const MAX_IMAGE = 12 * 1024 * 1024;
 const KINDS = { youtube_thumb: 'Thumbnail do YouTube', reel_cover: 'Capa de Reels/TikTok', post_quote: 'Post de frase', post_split: 'Tela dividida', carousel: 'Carrossel', entrega: 'Imagem entregue' };
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Capa não encontrada.' });
-const canDesign = (role) => can(role, 'production.review') || can(role, 'production.edit'); // gestão e editor; a produtora só sobe material bruto
+const canDesign = (role) => can(role, 'covers.edit'); // gestão, editor e produtora (ela ajusta a capa ao agendar o post)
+const canGenerate = (role) => can(role, 'production.review') || can(role, 'production.edit'); // gerar com a IA é passo da finalização
+// Volta para o post de onde a pessoa veio (Novo post ou a publicação): só endereços nossos, nunca um link de fora.
+const safeBack = (v) => (typeof v === 'string' && /^\/social\/(novo\?[\w=&,%-]*|publicacoes\/\d+)$/.test(v) ? v : null);
 const deny = (res) => res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita capas e posts.' });
 
 // As capas respondem em dois endereços: /episodios/:id/capas/:cid/… (do episódio) e /capas/:cid/… (genérico: cortes ainda sem episódio).
@@ -70,7 +73,7 @@ router.get(both('/imagem'), requirePerm('episodes.read'), wrap(async (req, res) 
 }));
 
 router.post('/episodios/:id/capas/gerar', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canDesign(req.user.role)) return deny(res);
+  if (!canGenerate(req.user.role)) return deny(res);
   if (!isIntId(req.params.id)) return notFound(res);
   const kinds = [].concat(req.body.kinds || ['youtube_thumb', 'post_quote', 'post_split', 'carousel']).filter((k) => KINDS[k]);
   try {
@@ -93,9 +96,12 @@ router.get(both('/editar'), requirePerm('episodes.read'), wrap(async (req, res) 
   const siblings = c.clip_id
     ? await db.query('SELECT id, label, position FROM episode_covers WHERE clip_id = $1 ORDER BY position', [c.clip_id])
     : await db.query('SELECT id, label, position FROM episode_covers WHERE episode_id = $1 AND kind = $2 AND group_key IS NOT DISTINCT FROM $3 ORDER BY position', [c.episode_id, c.kind, c.group_key]);
+  const voltar = safeBack(req.query.voltar);
   res.render('episodes/editor', {
-    title: `Editar — ${KINDS[c.kind]}`, ep, cover: c, kindLabel: KINDS[c.kind], siblings: siblings.rows, backUrl: homeOf(c),
-    backLabel: c.clip_id ? 'Voltar ao corte' : (c.kind === 'youtube_thumb' ? 'Voltar ao episódio' : 'Voltar ao conteúdo'),
+    title: `Editar — ${KINDS[c.kind]}`, ep, cover: c, kindLabel: KINDS[c.kind], voltar,
+    // Vindo do post: a capa do corte é a escolhida (as outras sugestões não entram); slides do carrossel continuam com os números.
+    siblings: voltar && c.clip_id ? [] : siblings.rows, backUrl: voltar || homeOf(c),
+    backLabel: voltar ? 'Voltar ao post' : (c.clip_id ? 'Voltar ao corte' : (c.kind === 'youtube_thumb' ? 'Voltar ao episódio' : 'Voltar ao conteúdo')),
     editorData: {
       spec: c.spec, ctx: c.ctx, lint: c.lint, frames, format: engine.FORMATS[c.spec.format], saveUrl: `/capas/${c.id}`, uploadUrl: c.clip_id ? `/capas/imagem?corte=${c.clip_id}` : `/capas/imagem?episodio=${c.episode_id}`,
       imageBase: '/quadros/', brand: engine.BRAND, photos: await episodePhotos(await episodeOfCover(c)), photoUrl: `/capas/${c.id}/foto`,

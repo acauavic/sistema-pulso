@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.61.0', date: '2026-11-10', title: 'Capa editável na hora de agendar',
+    items: [
+      { kind: 'novo', text: 'A produtora agora edita capas: trocar o quadro, usar uma foto do episódio, enviar uma imagem e mudar o texto, e também escolher qual capa o corte usa. Gerar capas com a IA continua com a finalização.' },
+      { kind: 'novo', text: 'Novo post: depois de escolher o corte ou a imagem, aparece "Editar capa" (ou "Editar imagem"). O editor volta para o post com o item escolhido, e o que você já escreveu na legenda continua lá.' },
+      { kind: 'ajuste', text: 'Na publicação que ainda não saiu (em revisão, devolvida ou agendada), a capa tem o botão "Editar capa". A mudança vale para o envio, porque a capa é lida na hora de publicar.' },
+    ],
+  },
+  {
     version: '1.60.0', date: '2026-11-10', title: 'Vídeos sem travar',
     items: [
       { kind: 'correcao', text: 'Os vídeos travavam porque o player tocava o arquivo original, pesado demais para assistir pela internet: cortes verticais em 4K a 90 Mbps (um corte de 1 minuto tinha 650 MB) e episódios de 12 a 18 GB. Agora o sistema prepara uma versão leve só para assistir (720p, cerca de 2 a 3 Mbps, começa na hora e pula para qualquer ponto sem esperar). O mesmo corte de 650 MB fica com 13 MB.' },

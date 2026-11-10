@@ -22,6 +22,7 @@ const ACTIONS = {
   'production.upload': { text: 'subir material bruto, bastidores e fotos do episódio', where: 'Episódio > Material' },
   'production.edit': { text: 'assumir a edição, subir o vídeo editado e enviá-lo para revisão', where: 'Episódio > Material' },
   'production.review': { text: 'revisar o vídeo (aprovar ou pedir ajustes), finalizar e publicar o episódio', where: 'Episódio > Revisão e Finalização' },
+  'covers.edit': { text: 'editar capas e posts de imagem (trocar o quadro, usar uma foto do episódio, enviar uma imagem, mudar o texto) e escolher a capa do corte', where: 'Novo post > Editar capa, ou a página do corte' },
   'production.checklists': { text: 'criar e editar os modelos de checklist', where: 'Episódio > Checklists' },
   'social.read': { text: 'ver publicações, ideias, insights e automações das redes', where: 'Social' },
   'social.ideas': { text: 'pedir ideias à IA e tocá-las (aprovar, pedir ao editor)', where: 'Social > Ideias' },

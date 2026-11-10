@@ -139,11 +139,11 @@ describe('fotografias do episódio como fundo da capa e IA nos textos', () => {
     assert.equal(row.spec.bg.rot, 90); assert.equal(row.spec.bg.flipX, true); assert.equal(row.spec.bg.adjust.saturate, 0);
   });
 
-  it('recusa HEIC, foto de outro episódio, vídeo e perfil sem edição de capa', async () => {
+  it('recusa HEIC, foto de outro episódio e vídeo; a produtora também troca a foto da capa', async () => {
     assert.equal((await postForm(as.gestao, `/capas/${cover.id}/foto`, { arquivo: heic.id })).status, 404);
     assert.equal((await postForm(as.gestao, `/capas/${cover.id}/foto`, { arquivo: otherPhoto.id })).status, 404);
     assert.equal((await postForm(as.gestao, `/capas/${cover.id}/foto`, { arquivo: 'abc' })).status, 400);
-    assert.equal((await postForm(as.prod, `/capas/${cover.id}/foto`, { arquivo: photo.id })).status, 403);
+    assert.equal((await postForm(as.prod, `/capas/${cover.id}/foto`, { arquivo: photo.id })).status, 200, 'a produtora ajusta a capa ao agendar o post');
   });
 
   it('IA nos textos: sem chave do Gemini avisa (503); limpa as opções e respeita o tamanho do campo', async () => {

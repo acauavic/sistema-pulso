@@ -3,7 +3,7 @@
   <div><span class="kicker"><%= cover.clip_id ? 'Corte' : 'Episódio' %> · <%= ep && ep.number ? 'EP.' + String(ep.number).padStart(3, '0') : (ep && ep.title ? ep.title : (cover.clip_id ? 'sem episódio ainda' : '')) %></span><h1><%= kindLabel %></h1></div>
   <div class="row">
     <a class="btn ghost" href="<%= backUrl %>"><%- icon('arrow-left') %> <%= backLabel %></a>
-    <% siblings.length > 1 && siblings.forEach(function (s) { %><a class="btn sm <%= s.id === cover.id ? 'on' : '' %>" href="/capas/<%= s.id %>/editar"><%= s.position + 1 %></a><% }) %>
+    <% siblings.length > 1 && siblings.forEach(function (s) { %><a class="btn sm <%= s.id === cover.id ? 'on' : '' %>" href="/capas/<%= s.id %>/editar<%= voltar ? '?voltar=' + encodeURIComponent(voltar) : '' %>"><%= s.position + 1 %></a><% }) %>
   </div>
 </div>
 

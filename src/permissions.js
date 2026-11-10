@@ -30,6 +30,7 @@ const PERMISSIONS = {
   'production.upload': ['superadmin', 'gestao', 'produtora'], // subir brutos, bastidores, fotos (o editor recebe o material pronto; ele sobe só o vídeo editado)
   'production.edit': ['superadmin', 'gestao', 'editor_video'],              // assumir a edição, subir o editado, enviar para revisão
   'production.review': ['superadmin', 'gestao'],                            // aprovar, pedir ajustes, finalizar, publicar
+  'covers.edit': ['superadmin', 'gestao', 'produtora', 'editor_video'],      // editar capas e posts de imagem (trocar quadro, foto, texto), escolher a capa do corte
   'production.checklists': ['superadmin', 'gestao', 'editor_video'],        // criar/editar modelos de checklist
   // social (redes)
   'social.read': ['superadmin', 'gestao', 'produtora'],  // ver publicações, ideias, insights e automações

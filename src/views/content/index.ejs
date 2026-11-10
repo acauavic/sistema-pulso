@@ -167,11 +167,11 @@
             </span>
             <span class="row">
               <a class="btn sm" href="/capas/<%= c.id %>/imagem?baixar=1"><%- icon('download', 14) %> Baixar</a>
-              <% if (perm.cut) { %><a class="btn sm" href="/capas/<%= c.id %>/editar">Editar</a><% } %>
+              <% if (perm.cover) { %><a class="btn sm" href="/capas/<%= c.id %>/editar">Editar</a><% } %>
               <% if (perm.publish) { %>
               <form method="post" action="/capas/<%= c.id %>/aprovar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="aprovar" value="<%= c.approved ? '0' : '1' %>"><button class="btn sm <%= c.approved ? '' : 'primary' %>" type="submit"><%= c.approved ? 'Tirar aprovação' : 'Aprovar' %></button></form>
               <% } %>
-              <% if (perm.cut) { %><form method="post" action="/capas/<%= c.id %>/excluir" class="inline" data-confirm="Excluir esta imagem?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">excluir</button></form><% } %>
+              <% if (perm.cover) { %><form method="post" action="/capas/<%= c.id %>/excluir" class="inline" data-confirm="Excluir esta imagem?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">excluir</button></form><% } %>
             </span>
           </figcaption>
         </figure>

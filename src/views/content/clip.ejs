@@ -50,14 +50,14 @@
             <% covers.forEach(function (cv) { %>
             <form method="post" action="/cortes/<%= clip.id %>/capa" class="inline">
               <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="cover_id" value="<%= cv.id %>">
-              <button type="<%= perm.cut ? 'submit' : 'button' %>" class="cover-pick <%= cv.id === clip.cover_id ? 'on' : '' %>" title="<%= cv.label %>" <%= perm.cut ? '' : 'disabled' %>>
+              <button type="<%= perm.cover ? 'submit' : 'button' %>" class="cover-pick <%= cv.id === clip.cover_id ? 'on' : '' %>" title="<%= cv.label %>" <%= perm.cover ? '' : 'disabled' %>>
                 <img src="/capas/<%= cv.id %>/imagem?v=<%= new Date(cv.updated_at).getTime() %>" alt="<%= cv.label %>" loading="lazy" width="108" height="192">
                 <span class="handle"><%= cv.id === clip.cover_id ? 'escolhida' : 'usar' %></span>
               </button>
             </form>
             <% }) %>
           </div>
-          <% if (chosen && perm.cut) { %><p class="row small"><a class="btn sm" href="/capas/<%= chosen.id %>/editar">Editar capa</a><span class="muted">Troque o quadro ou envie uma imagem sua.</span></p><% } %>
+          <% if (chosen && perm.cover) { %><p class="row small"><a class="btn sm" href="/capas/<%= chosen.id %>/editar">Editar capa</a><span class="muted">Troque o quadro ou envie uma imagem sua.</span></p><% } %>
         </div>
       </div>
       <% if (versions.length) { %>

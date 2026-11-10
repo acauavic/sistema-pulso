@@ -103,7 +103,7 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
     providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
     testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
     editable: okPlatforms.filter(canEditNet), notEditable: okPlatforms.filter((p) => !canEditNet(p)),
-    canPublish: can(req.user.role, 'social.publish'), mine: String(pub.created_by) === String(req.user.id), attempts, warningText,
+    canPublish: can(req.user.role, 'social.publish'), canCover: can(req.user.role, 'covers.edit'), mine: String(pub.created_by) === String(req.user.id), attempts, warningText,
   });
 }));
 
@@ -199,7 +199,7 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
   const [clips, images, conn, ls] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), socialApi.connectedAll(), socialApi.liveState()]);
   res.render('social/new', {
     title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
-    connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), pick: req.query.item || '',
+    connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), canCover: can(req.user.role, 'covers.edit'), pick: req.query.item || '',
   });
 }));
 

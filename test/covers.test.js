@@ -295,13 +295,14 @@ describe('capas e posts do episódio (rotas, B2 e permissões)', () => {
     assert.equal(key, row.storage_key); assert.ok(h.b2Store.has(key));
   });
 
-  it('permissões: produtora não gera nem edita; editor edita mas não aprova; só gestão aprova', async () => {
+  it('permissões: produtora edita (ajusta a capa ao agendar) mas não gera; editor edita mas não aprova; só gestão aprova', async () => {
     const [c] = await covers();
     const prodGen = await as.prod.post(`/episodios/${ep.id}/capas/gerar`, { _csrf: await as.prod.csrf('/episodios') });
-    assert.equal(prodGen.status, 403);
-    assert.equal((await as.prod.get(`/episodios/${ep.id}/capas/${c.id}/editar`)).status, 403);
-    const prodSave = await postJson(as.prod, `/episodios/${ep.id}/capas/${c.id}`, { spec: c.spec, ctx: c.ctx });
-    assert.equal(prodSave.status, 403);
+    assert.equal(prodGen.status, 403, 'gerar com a IA continua com a finalização');
+    const thumb = (await covers()).find((x) => x.kind === 'youtube_thumb');
+    assert.equal((await as.prod.get(`/episodios/${ep.id}/capas/${thumb.id}/editar`)).status, 200);
+    const prodSave = await postJson(as.prod, `/episodios/${ep.id}/capas/${thumb.id}`, { spec: thumb.spec, ctx: thumb.ctx });
+    assert.equal(prodSave.status, 200, prodSave.text);
     assert.equal((await as.editor.get(`/episodios/${ep.id}/capas/${c.id}/editar`)).status, 200);
     const edApprove = await as.editor.post(`/episodios/${ep.id}/capas/${c.id}/aprovar`, { _csrf: await as.editor.csrf('/episodios') });
     assert.equal(edApprove.status, 403);
@@ -350,7 +351,8 @@ describe('capas e posts do episódio (rotas, B2 e permissões)', () => {
     const png = createCanvas(900, 1200); const g = png.getContext('2d'); g.fillStyle = '#335'; g.fillRect(0, 0, 900, 1200); g.fillStyle = '#eec'; g.beginPath(); g.ellipse(450, 400, 150, 190, 0, 0, Math.PI * 2); g.fill();
     const send = (c, body, type = 'image/png') => fetch(`${app.base}/episodios/${ep.id}/capas/imagem`, { method: 'POST', headers: { cookie: c.cookie(), 'x-csrf-token': c.__token, 'content-type': type, accept: 'application/json' }, body });
     for (const c of Object.values(as)) c.__token = await c.csrf('/episodios');
-    assert.equal((await send(as.prod, png.toBuffer('image/png'))).status, 403, 'produtora não envia');
+    const prodUp = await send(as.prod, png.toBuffer('image/png'));
+    assert.equal(prodUp.status, 200, 'a produtora também envia imagem própria para a capa');
     const bad = await send(as.gestao, Buffer.from('isto não é uma imagem'), 'text/plain');
     assert.equal(bad.status, 400); assert.match((await bad.json()).error, /abrir esta imagem/);
     const tiny = createCanvas(100, 100); tiny.getContext('2d').fillRect(0, 0, 100, 100);

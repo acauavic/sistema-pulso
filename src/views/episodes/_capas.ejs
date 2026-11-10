@@ -1,11 +1,11 @@
 <%# Capas e posts do episódio. Variáveis: ep, covers, perm, csrf, C, fmt %>
-<% var designers = perm.review || perm.edit; var approvers = perm.review;
+<% var designers = perm.cover; var approvers = perm.review;
    var KINDS = { youtube_thumb: 'Thumbnails do YouTube' };
    var order = ['youtube_thumb']; %>
 <div id="capas" class="capas">
   <div class="row spread">
     <span class="small muted"><%= covers.length ? 'Aprove uma opção para usar na publicação.' : '' %></span>
-    <% if (designers && aiReady && frames.length) { %>
+    <% if ((perm.review || perm.edit) && aiReady && frames.length) { %>
     <form method="post" action="/episodios/<%= ep.id %>/capas/gerar" class="inline" data-busy="Gerando as capas…"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="kinds" value="youtube_thumb"><button class="btn sm" type="submit"><%= covers.length ? 'Gerar de novo' : 'Gerar thumbnails' %></button></form>
     <% } %>
   </div>
