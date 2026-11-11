@@ -73,9 +73,9 @@ router.get('/auditoria', requirePerm('audit.read'), wrap(async (req, res) => {
 // ---- integrações: status + testes seguros (sem expor segredos) ----
 router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, res) => {
   res.render('integrations', {
-    google: { ...(await require('../services/googleCalendar').status()), types: await require('../services/googleCalendar').settings() },
+    google: { ...(await require('../services/googleCalendar').status()), types: await require('../services/googleCalendar').settings(), meet: config.googleMeetConfigured, meetSubject: config.google.subject },
     inviteOn: await require('../services/calendarInvites').enabled(),
-    calTypes: require('../services/calendar').TYPES, timed: require('../services/googleCalendar').TIMED,
+    calTypes: require('../services/googleCalendar').MIRROR_TYPES(), timed: require('../services/googleCalendar').TIMED,
     title: 'Integrações',
     smtp: { ok: config.mailConfigured, dry: config.mailDryRun, host: config.brevo.host, port: config.brevo.port, from: config.brevo.from },
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
@@ -211,6 +211,12 @@ router.post('/integracoes/google', requirePerm('integrations.manage'), wrap(asyn
       await audit(req, 'integracao.google_sync', 'system', null, { ...r, errors: r.errors.length });
       const txt = `Google Agenda: ${r.created} criado(s), ${r.updated} atualizado(s), ${r.removed} removido(s), ${r.unchanged} sem mudança.`;
       await req.flash(r.errors.length ? 'error' : 'ok', r.errors.length ? `${txt} Falhas: ${r.errors.slice(0, 3).join(' | ')}` : txt);
+    } else if (req.body.acao === 'reunioes') {
+      const r = await require('../services/sponsorMeetings').check();
+      await audit(req, 'integracao.google_reunioes', 'system', null, { ok: r.ok, meet: r.meet || false });
+      await req.flash(r.ok && r.meet && r.invite ? 'ok' : 'error', r.ok
+        ? (r.meet && r.invite ? 'Reuniões com Meet funcionando: o Google criou um evento de teste com Meet e convidado, remarcou e apagou (sem enviar e-mail).' : `O Google criou o evento de teste, mas sem ${r.meet ? 'convidado' : 'Meet'}. Confira a delegação no Admin do Workspace.`)
+        : r.error);
     } else {
       const r = await gcal.ping();
       await req.flash('ok', `Google Agenda respondeu. A conta de serviço ${r.serviceAccount} consegue acessar a agenda.`);

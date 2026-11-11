@@ -1,0 +1,94 @@
+<%#
+  Aba "Reuniões" do patrocinador. Variáveis: sponsor, meetings ({ upcoming, past }), meetingCtx, canWrite, csrfField, csrf.
+  Próxima reunião em cartão (Meet, convidados com a resposta, Remarcar, cancelar); anteriores em linhas com o resumo dentro.
+%>
+<%
+  var allMeet = meetings.upcoming.length + meetings.past.length;
+  var endOf = function (m) { return new Date(new Date(m.starts_at).getTime() + m.minutes * 60000); };
+  var hhmm = function (d) { return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(d); };
+  var respChip = { accepted: 'b-gray', declined: 'b-red', tentative: 'b-amber', needsAction: '' };
+%>
+<div class="pane" id="pane-reunioes" data-pane-id="reunioes">
+  <% if (!allMeet) { %>
+  <section class="card">
+    <div class="empty"><%- include('../partials/pulse-line') %>
+      <strong>Nenhuma reunião com <%= sponsor.company %> ainda</strong>
+      <span>Marque aqui: a reunião vai para o Google Agenda do Pulso, o Google cria o Meet e manda o convite. Depois da reunião, o resumo fica guardado nela.</span>
+      <% if (canWrite) { %><p class="top-gap"><button class="btn primary" type="button" data-modal-open="modal-reuniao-nova"><%- icon('plus') %> Marcar reunião</button></p><% } %>
+    </div>
+  </section>
+  <% } else { %>
+  <div class="row spread">
+    <h2><%= meetings.upcoming.length ? (meetings.upcoming.length > 1 ? 'Próximas reuniões' : 'Próxima reunião') : 'Reuniões' %></h2>
+    <% if (canWrite) { %><button class="btn primary" type="button" data-modal-open="modal-reuniao-nova"><%- icon('plus') %> Marcar reunião</button><% } %>
+  </div>
+  <% if (!meetings.upcoming.length) { %><p class="small muted">Nenhuma reunião à frente.</p><% } %>
+  <% meetings.upcoming.forEach(function (m) { %>
+  <section class="card meet-card" id="reuniao-<%= m.id %>">
+    <div class="row spread align-start">
+      <div>
+        <span class="kicker mono"><%= fmt.formatDateTime(m.starts_at) %> – <%= hhmm(endOf(m)) %> · <%= m.minutes %> min</span>
+        <h3 class="meet-title"><%= m.title %></h3>
+      </div>
+      <span class="badge b-gray"><%= m.mode === 'meet' ? 'Meet' : 'Presencial' %></span>
+    </div>
+    <% if (m.google_state === 'erro') { %>
+    <div class="conn-alert"><%- icon('triangle-alert') %><div><strong>Não foi para o Google.</strong> <%= m.google_error %></div>
+      <% if (canWrite) { %><form method="post" action="/patrocinadores/<%= sponsor.id %>/reunioes/<%= m.id %>/tentar" class="inline" data-busy="Enviando…"><%- csrfField %><button class="btn sm" type="submit">Tentar de novo</button></form><% } %>
+    </div>
+    <% } else if (m.google_state === 'pendente') { %>
+    <p class="notice small"><%= m.google_error || 'Aguardando o Google.' %></p>
+    <% } %>
+    <div class="row meet-actions">
+      <% if (m.meet_url) { %><a class="btn" href="<%= m.meet_url %>" target="_blank" rel="noopener"><%- icon('video') %> Entrar no Meet</a>
+      <% } else if (m.mode === 'meet' && canWrite && m.google_state === 'ok') { %><form method="post" action="/patrocinadores/<%= sponsor.id %>/reunioes/<%= m.id %>/meet" class="inline" data-busy="Criando…"><%- csrfField %><button class="btn" type="submit"><%- icon('video') %> Criar link do Meet</button></form><% } %>
+      <% if (m.mode === 'presencial' && m.location) { %><span class="small"><%- icon('map-pin', 14) %> <%= m.location %></span><% } %>
+      <% if (canWrite) { %><button class="btn" type="button" data-modal-open="modal-reuniao-<%= m.id %>"><%- icon('pencil') %> Remarcar</button><% } %>
+    </div>
+    <dl class="kv top-gap">
+      <dt>Convidados</dt>
+      <dd><ul class="plain meet-people">
+        <% (m.attendees || []).forEach(function (a) { %><li><span class="mono small"><%= a.email %></span> <span class="badge <%= respChip[a.response] || '' %>"><%= meetingCtx.RESPONSES[a.response] || 'sem resposta' %></span></li><% }) %>
+      </ul></dd>
+      <dt>Responsável</dt><dd><%= m.owner_name || '—' %><%= m.team_names && m.team_names.length ? ' · com ' + m.team_names.join(', ') : '' %></dd>
+      <% if (m.agenda) { %><dt>Pauta</dt><dd class="small"><%= m.agenda %></dd><% } %>
+    </dl>
+    <% if (canWrite) { %>
+    <form method="post" action="/patrocinadores/<%= sponsor.id %>/reunioes/<%= m.id %>/cancelar" class="inline meet-cancel" data-confirm="Cancelar a reunião de <%= fmt.formatDateTime(m.starts_at) %>? O Google avisa os convidados.">
+      <%- csrfField %><button class="link danger small" type="submit">cancelar reunião</button>
+    </form>
+    <% } %>
+  </section>
+  <% }) %>
+
+  <% if (meetings.past.length) { %>
+  <section class="card top-gap">
+    <h2>Anteriores</h2>
+    <ul class="plain meet-past">
+      <% meetings.past.forEach(function (m) { var cancelled = m.status === 'cancelada'; %>
+      <li id="reuniao-<%= m.id %>">
+        <details>
+          <summary class="meet-row">
+            <span class="mono small"><%= fmt.formatDateTime(m.starts_at) %></span>
+            <strong class="meet-row-title"><%= m.title %></strong>
+            <span class="badge b-gray"><%= m.mode === 'meet' ? 'Meet' : 'Presencial' %></span>
+            <% if (cancelled) { %><span class="badge b-red">Cancelada</span>
+            <% } else { %><span class="badge <%= m.summary ? 'b-gray' : 'b-amber' %>"><%= m.summary ? 'Resumo recebido' : 'Aguardando resumo' %></span><% } %>
+          </summary>
+          <div class="meet-summary">
+            <% if (m.summary) { %>
+            <div class="rich-content"><%- fmt.richHtml(m.summary) %></div>
+            <p class="small muted top-gap mono"><%= m.summary_source === 'webhook' ? 'Recebido automaticamente' : 'Registrado' + (m.summary_by_name ? ' por ' + m.summary_by_name : '') %> · <%= fmt.formatDateTime(m.summary_at) %></p>
+            <% } else if (!cancelled) { %>
+            <p class="small muted">O resumo desta reunião ainda não chegou.</p>
+            <% } %>
+            <% if (canWrite && !cancelled) { %><button class="btn sm top-gap" type="button" data-modal-open="modal-resumo-<%= m.id %>"><%- icon('pencil') %> <%= m.summary ? 'Editar resumo' : 'Colar resumo' %></button><% } %>
+          </div>
+        </details>
+      </li>
+      <% }) %>
+    </ul>
+  </section>
+  <% } %>
+  <% } %>
+</div>

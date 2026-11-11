@@ -23,6 +23,7 @@ function registerRoutines() {
   scheduler.every('tarefas-vencendo', 15 * 60_000, () => require('./services/tasks').dueTick(), { delayMs: 20_000 });
   scheduler.every('lembretes', 5 * 60_000, () => require('./services/reminders').tick(), { delayMs: 30_000 });
   scheduler.every('google-agenda', 60_000, () => require('./services/googleCalendar').tick(), { delayMs: 40_000 });
+  scheduler.every('reunioes', 15 * 60_000, () => require('./services/sponsorMeetings').tick(), { delayMs: 100_000 }); // reuniões com patrocinador: reenvia ao Google e lê o que mudou lá
   scheduler.every('convite-agenda', 60_000, () => require('./services/calendarInvites').tick(), { delayMs: 50_000 });
   scheduler.every('plateia-lembrete', 30 * 60_000, () => require('./services/audience').reminderTick(), { delayMs: 75_000 });
   scheduler.every('portal-convidado', 10 * 60_000, () => require('./services/guestPortal').tick(), { delayMs: 80_000 }); // posts novos em collab: avisa o convidado

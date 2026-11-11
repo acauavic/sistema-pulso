@@ -24,6 +24,7 @@
   var tabs = [{ key: 'resumo', label: 'Resumo' }];
   if (afterWon || hasBrief) tabs.push({ key: 'briefing', label: 'Briefing', badge: afterWon && formState.answered < formState.total ? formState.answered + '/' + formState.total : '' });
   if (afterWon) tabs.push({ key: 'entregas', label: 'Entregas', badge: deliverables.length || '' });
+  tabs.push({ key: 'reunioes', label: 'Reuniões', badge: meetings.upcoming.length || '' });
   tabs.push({ key: 'links', label: 'Links' });
   tabs.push({ key: 'historico', label: 'Histórico', badge: events.length });
 %>
@@ -135,6 +136,9 @@
   <div class="pane" id="pane-resumo" data-pane-id="resumo">
     <div class="grid-2 align-start">
       <div class="stack-lg">
+        <% if (meetings.upcoming.length) { var nm = meetings.upcoming[0]; %>
+        <a class="card meet-next" href="#reunioes"><%- icon('handshake') %> <span>Próxima reunião: <span class="mono"><%= fmt.formatDateTime(nm.starts_at) %></span> · <%= nm.mode === 'meet' ? 'Meet' : 'Presencial' %></span></a>
+        <% } %>
         <section class="card" id="dados">
           <h2>Dados</h2>
           <dl class="kv">
@@ -399,6 +403,9 @@
     </section>
   </div>
 
+  <!-- ================= REUNIÕES ================= -->
+  <%- include('_meetings', { canWrite: canWrite, csrfField: csrfField }) %>
+
   <!-- ================= HISTÓRICO ================= -->
   <div class="pane" id="pane-historico" data-pane-id="historico">
     <section class="card" id="timeline">
@@ -417,6 +424,19 @@
 </div>
 
 <% if (canWrite) { %>
+<%- include('_meeting-form', { m: null, dialogId: 'modal-reuniao-nova' }) %>
+<% meetings.upcoming.forEach(function (m) { %><%- include('_meeting-form', { m: m, dialogId: 'modal-reuniao-' + m.id }) %><% }) %>
+<% meetings.past.filter(function (m) { return m.status !== 'cancelada'; }).forEach(function (m) { %>
+<dialog class="modal" id="modal-resumo-<%= m.id %>" aria-labelledby="mr-<%= m.id %>-h">
+  <form method="post" action="/patrocinadores/<%= sponsor.id %>/reunioes/<%= m.id %>/resumo" class="stack">
+    <%- csrfField %>
+    <h2 id="mr-<%= m.id %>-h">Resumo da reunião</h2>
+    <p class="small muted mono"><%= fmt.formatDateTime(m.starts_at) %> · <%= m.title %></p>
+    <%- include('../partials/rich-editor', { name: 'resumo_html', attach: 'resumo_anexos', html: m.summary || '', placeholder: 'O que foi conversado, próximos passos, valores e prazos combinados…', label: 'Resumo', size: 'sm' }) %>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar resumo</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% }) %>
 <dialog class="modal" id="modal-etapa" aria-labelledby="m-etapa-h">
   <form method="post" action="/patrocinadores/<%= sponsor.id %>/etapa" class="stack">
     <%- csrfField %>

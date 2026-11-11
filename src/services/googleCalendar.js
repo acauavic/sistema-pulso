@@ -23,11 +23,13 @@ const eventId = (key) => `pulso${Buffer.from(String(key)).toString('hex')}`; // 
 
 // ---------------------------------------------------------------- o que vai para a agenda (Gestão > Integrações)
 // { gravacao: { enabled, minutes }, ... } — só gravações ligadas por padrão.
+// Tipos que o espelho envia: as reuniões com patrocinador já são criadas no Google por conta própria (services/sponsorMeetings.js).
+const MIRROR_TYPES = () => cal.TYPES.filter((t) => !t.noMirror);
 async function settings() {
   let saved = {};
   try { saved = JSON.parse(await settingsSvc.get('gcal_types') || '{}'); } catch { /* usa o padrão */ }
   const out = {};
-  for (const t of cal.TYPES) {
+  for (const t of MIRROR_TYPES()) {
     const s = saved[t.key] || {};
     out[t.key] = { enabled: s.enabled !== undefined ? Boolean(s.enabled) : t.key === 'gravacao', minutes: TIMED.has(t.key) ? clampMinutes(s.minutes, DEFAULT_MINUTES[t.key]) : null };
   }
@@ -38,7 +40,7 @@ const clampMinutes = (v, fallback) => { const n = Math.round(Number(v)); return 
 // body: { on_<tipo>: 'on', min_<tipo>: '90' }
 async function saveSettings(body) {
   const cur = await settings(); const next = {};
-  for (const t of cal.TYPES) next[t.key] = { enabled: body[`on_${t.key}`] === 'on' || body[`on_${t.key}`] === '1', minutes: TIMED.has(t.key) ? clampMinutes(body[`min_${t.key}`], cur[t.key].minutes) : null };
+  for (const t of MIRROR_TYPES()) next[t.key] = { enabled: body[`on_${t.key}`] === 'on' || body[`on_${t.key}`] === '1', minutes: TIMED.has(t.key) ? clampMinutes(body[`min_${t.key}`], cur[t.key].minutes) : null };
   await settingsSvc.set('gcal_types', JSON.stringify(next));
   return next;
 }
@@ -54,35 +56,40 @@ function credentials() {
   } catch { return null; }
 }
 
-let cached = { token: null, until: 0 };
-async function accessToken() {
+// subject: e-mail do Workspace em nome de quem agir (delegação; só as reuniões com patrocinador usam). Um token guardado por subject.
+let cache = new Map();
+async function accessToken({ subject = null } = {}) {
+  const cached = cache.get(subject || '') || { token: null, until: 0 };
   if (cached.token && Date.now() < cached.until - 60_000) return cached.token;
   const c = credentials();
   if (!c) throw new Error('Chave da conta de serviço inválida (GOOGLE_SERVICE_ACCOUNT_B64 ou _JSON).');
   const now = Math.floor(Date.now() / 1000);
-  const unsigned = `${b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${b64url(JSON.stringify({ iss: c.email, scope: SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 }))}`;
+  const unsigned = `${b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${b64url(JSON.stringify({ iss: c.email, scope: SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600, ...(subject ? { sub: subject } : {}) }))}`;
   const sig = crypto.createSign('RSA-SHA256').update(unsigned).sign(c.key).toString('base64url');
   const res = await fetch(TOKEN_URL, {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${sig}` }), signal: AbortSignal.timeout(15_000),
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.access_token) throw new Error(`Google recusou a chave: ${json.error_description || json.error || `HTTP ${res.status}`}`);
-  cached = { token: json.access_token, until: Date.now() + (json.expires_in || 3600) * 1000 };
-  return cached.token;
+  if (!res.ok || !json.access_token) throw Object.assign(new Error(`Google recusou a chave: ${json.error_description || json.error || `HTTP ${res.status}`}`), { google: json.error || null });
+  cache.set(subject || '', { token: json.access_token, until: Date.now() + (json.expires_in || 3600) * 1000 });
+  return json.access_token;
 }
 
 // Chamada à API de eventos. Devolve { status, json }. Não lança em 404/409/410 (quem chama decide).
-async function api(method, path, body) {
+// opts.query: parâmetros (conferenceDataVersion, sendUpdates); opts.organizer: em nome da conta do Pulso (reuniões: convite e Meet).
+async function api(method, path, body, { query = null, organizer = false } = {}) {
   if (!config.googleConfigured) throw new Error('Google Agenda não configurado (GOOGLE_CALENDAR_ID e a chave da conta de serviço).');
-  const res = await fetch(`${API}/calendars/${encodeURIComponent(config.google.calendarId)}/events${path}`, {
-    method, headers: { authorization: `Bearer ${await accessToken()}`, 'content-type': 'application/json' },
+  const qs = query ? `${path.includes('?') ? '&' : '?'}${new URLSearchParams(query)}` : '';
+  const token = await accessToken(organizer ? { subject: config.google.subject } : {});
+  const res = await fetch(`${API}/calendars/${encodeURIComponent(config.google.calendarId)}/events${path}${qs}`, {
+    method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15_000),
   });
   const json = res.status === 204 ? {} : await res.json().catch(() => ({}));
   if (!res.ok && ![404, 409, 410].includes(res.status)) {
     const msg = (json.error && (json.error.message || json.error.status)) || `HTTP ${res.status}`;
-    throw new Error(`Google Agenda: ${msg}`);
+    throw Object.assign(new Error(`Google Agenda: ${msg}`), { status: res.status });
   }
   return { status: res.status, json };
 }
@@ -144,7 +151,7 @@ async function sync() {
   if (!config.googleConfigured) return out;
   const cfg = await settings();
   const today = cal.todayISO();
-  const enabled = cal.TYPES.map((t) => t.key).filter((k) => cfg[k].enabled);
+  const enabled = MIRROR_TYPES().map((t) => t.key).filter((k) => cfg[k].enabled);
   const list = enabled.length ? await cal.events({ user: ALL_USER, from: today, to: cal.addDays(today, WINDOW_DAYS), types: enabled }) : [];
   const present = new Map(list.map((e) => [e.id, e]));
   const { rows: have } = await db.query("SELECT key, type, hash, to_char(day, 'YYYY-MM-DD') AS day FROM gcal_events");
@@ -222,6 +229,7 @@ async function status() {
 
 module.exports = {
   api, sync, tick, ping, status, payload, eventId, credentials, settings, saveSettings, kick, kickOnWrite, kickDelay, TIMED, DEFAULT_MINUTES,
-  _reset: () => { cached = { token: null, until: 0 }; },
+  MIRROR_TYPES, accessToken,
+  _reset: () => { cache = new Map(); },
   _cancelKick: () => { if (kickTimer) clearTimeout(kickTimer); kickTimer = null; },
 };

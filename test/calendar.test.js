@@ -153,7 +153,7 @@ describe('calendário: tudo que tem data, filtros por perfil e visualizações',
       assert.match(mes, /<details class="cal-filter" data-popover>/, 'os filtros ficam atrás de um botão');
       assert.match(mes, /<summary class="btn sm">[\s\S]*?Filtros <span class="nav-count">1<\/span>/);
       assert.match(mes, /<legend>Mostrar<\/legend>/); assert.match(mes, /data-check-all="tipos"/); assert.match(mes, /type="submit">Aplicar</);
-      assert.equal((mes.match(/type="checkbox" name="tipos" value="/g) || []).length, 9, 'um item por tipo que o superadmin enxerga');
+      assert.equal((mes.match(/type="checkbox" name="tipos" value="/g) || []).length, 10, 'um item por tipo que o superadmin enxerga (com as reuniões com patrocinador)');
       assert.doesNotMatch((await as.admin.get('/calendario')).text, /Filtros <span class="nav-count">/, 'sem filtro, sem contador');
       assert.match(mes, /Março de 2030/); assert.match(mes, /Gravação: Dra\. Cal/); assert.match(mes, /\+R\$\s197,00/);
       assert.match(mes, /\+1 mais/, 'dia lotado (4 tarefas) mostra 3 e vira "+1 mais"'); assert.match(mes, /href="\/calendario\?f=1&amp;visao=semana[^"]*data=2030-03-25/);

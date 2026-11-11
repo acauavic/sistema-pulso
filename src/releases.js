@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.64.0', date: '2026-11-11', title: 'Reuniões com patrocinador no Google Agenda',
+    items: [
+      { kind: 'novo', text: 'Aba Reuniões no patrocinador: marque data, horário, Google Meet ou presencial, os convidados da empresa e o responsável. A reunião vai para o Google Agenda do Pulso, o Google cria o Meet e manda o convite.' },
+      { kind: 'novo', text: 'Remarcar e cancelar avisam todo mundo pelo Google. O que muda direto no Google Agenda (horário, Meet criado lá, quem confirmou ou recusou) aparece no sistema em até 15 minutos.' },
+      { kind: 'novo', text: 'Depois da reunião, o resumo fica guardado nela (por enquanto colado à mão; o envio automático vem numa próxima etapa). As reuniões aparecem no Calendário do painel e na linha do tempo do patrocinador.' },
+    ],
+  },
+  {
     version: '1.63.2', date: '2026-11-11', title: 'Publicação nas redes mais segura',
     items: [
       { kind: 'correcao', text: 'Marcar pessoas num Reel fazia o Instagram recusar o post (pela Outstand ele só aceita marcação em foto). Agora, no vídeo, o campo "Marcar pessoas" não aparece (fica só o collab), e uma marcação antiga sai do envio com um aviso na publicação.' },

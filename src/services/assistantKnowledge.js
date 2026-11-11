@@ -76,10 +76,11 @@ const TOPICS = [
     ],
   },
   {
-    key: 'patrocinadores', title: 'Patrocinadores, planos e media kit', words: ['patrocinador', 'patrocinadores', 'patrocínio', 'cota', 'ouro', 'diamond', 'media kit', 'mediakit', 'portal', 'formulário', 'entregável', 'entregaveis', 'plano', 'planos', 'galeria', 'quem já sentou'],
+    key: 'patrocinadores', title: 'Patrocinadores, planos e media kit', words: ['patrocinador', 'patrocinadores', 'patrocínio', 'cota', 'ouro', 'diamond', 'media kit', 'mediakit', 'portal', 'reunião', 'reuniões', 'meet', 'google meet', 'formulário', 'entregável', 'entregaveis', 'plano', 'planos', 'galeria', 'quem já sentou'],
     where: '/patrocinadores', perm: 'sponsors.write',
     steps: [
       'Etapas: Prospecção, Em negociação, Ganho (formulário de cadastro), Ativo (portal e entregas), mais Inativo e Perdido. A página do patrocinador guia o próximo passo.',
+      'Reuniões: na aba Reuniões do patrocinador, "Marcar reunião" pede data e hora, duração, Google Meet ou presencial (com endereço), os e-mails da empresa e o responsável. A reunião vai para o Google Agenda do Pulso, o Google cria o Meet e manda o convite. Remarcar e cancelar avisam todo mundo; o que muda no Google Agenda (horário, Meet, quem confirmou) aparece em até 15 minutos. Depois da reunião, o resumo fica guardado nela ("Colar resumo"). Se aparecer "Não foi para o Google", o motivo vem junto e "Tentar de novo" envia outra vez.',
       'Cada patrocinador recebe um link reutilizável (sem criar conta) para o media kit, o formulário de cadastro e o portal. "Quero ser patrocinador" no media kit leva à negociação e abre o WhatsApp comercial.',
       'Planos (Ouro e Diamond), com preço e entregáveis, ficam em Gestão > Planos de patrocínio e alimentam o media kit, a cota e as entregas do portal.',
       'O slide "Quem já sentou à mesa" do media kit mostra os episódios gravados (publicados ou ainda em produção) que a gestão escolher em Gestão > Galeria do media kit (alcance e frase editáveis). O slide mostra um convidado em destaque, que troca sozinho, e todos os escolhidos numa grade de fotos quadradas, sem passar de página.',

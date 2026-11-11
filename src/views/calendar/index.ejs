@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <% var meta = Object.fromEntries(types.map(function (t) { return [t.key, t]; }));
-   ['receber', 'pagar', 'gravacao', 'lembrete', 'tarefa', 'episodio', 'post', 'patrocinio'].forEach(function (k) { if (!meta[k]) meta[k] = { icon: 'calendar' }; });
+   ['receber', 'pagar', 'gravacao', 'lembrete', 'tarefa', 'episodio', 'post', 'patrocinio', 'reuniao'].forEach(function (k) { if (!meta[k]) meta[k] = { icon: 'calendar' }; });
    var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
    var MODE_ICON = { mes: 'calendar', semana: 'columns-3', lista: 'list' };
    var dow = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']; %>

@@ -21,6 +21,8 @@ const TYPES = [
   { key: 'receber', label: 'A receber', icon: 'wallet', perm: 'finance.read', hasOwner: false },
   { key: 'pagar', label: 'A pagar', icon: 'wallet', perm: 'finance.read', hasOwner: false },
   { key: 'patrocinio', label: 'Início e fim de parcerias', icon: 'shield-check', perm: 'sponsors.read', hasOwner: true },
+  // noMirror: já é criada no Google por conta própria (services/sponsorMeetings.js), o espelho do painel não manda de novo
+  { key: 'reuniao', label: 'Reuniões com patrocinador', icon: 'handshake', perm: 'sponsors.read', hasOwner: true, noMirror: true },
 ];
 const TYPE_BY_KEY = Object.fromEntries(TYPES.map((t) => [t.key, t]));
 const MODES = { mes: 'Mês', semana: 'Semana', lista: 'Lista' };
@@ -180,6 +182,18 @@ const SOURCES = {
     });
   },
 
+  async reuniao({ from, to, owner }) {
+    const p = [from, to]; let w = "m.status = 'marcada' AND (m.starts_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $1::date AND $2::date";
+    if (owner) { p.push(owner); w += ` AND (m.owner_id = $${p.length} OR $${p.length} = ANY(m.team_ids))`; }
+    const { rows } = await db.query(
+      `SELECT m.id, m.sponsor_id, m.mode, m.owner_id, u.name AS who, s.company,
+              to_char(m.starts_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS day, to_char(m.starts_at AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI') AS time,
+              (m.starts_at + make_interval(mins => m.minutes)) < now() AS over
+         FROM sponsor_meetings m JOIN sponsors s ON s.id = m.sponsor_id LEFT JOIN users u ON u.id = m.owner_id
+        WHERE ${w} ORDER BY m.starts_at LIMIT ${MAX_PER_TYPE}`, p);
+    return rows.map((m) => ({ type: 'reuniao', id: `reuniao-${m.id}`, title: `Reunião: ${m.company}`, sub: m.mode === 'presencial' ? 'presencial' : 'Google Meet', day: m.day, time: m.time, url: `/patrocinadores/${m.sponsor_id}#reunioes`, done: m.over, late: false, who: m.who, whoId: m.owner_id }));
+  },
+
   async patrocinio({ from, to, owner }, today) {
     const p = [from, to]; let w = "s.stage IN ('ganho', 'ativo') AND (s.starts_on BETWEEN $1::date AND $2::date OR s.ends_on BETWEEN $1::date AND $2::date)";
     if (owner) { p.push(owner); w += ` AND s.owner_id = $${p.length}`; }
@@ -211,7 +225,7 @@ async function events({ user, from, to, types, owner = null, hideDone = false })
   }
   const today = todayISO();
   const jobs = [];
-  for (const k of ['tarefa', 'gravacao', 'lembrete', 'episodio', 'post', 'patrocinio', 'cobranca']) if (wanted.has(k)) jobs.push(SOURCES[k]({ from, to, owner: ownerFor[k] || null }, today));
+  for (const k of ['tarefa', 'gravacao', 'lembrete', 'episodio', 'post', 'patrocinio', 'reuniao', 'cobranca']) if (wanted.has(k)) jobs.push(SOURCES[k]({ from, to, owner: ownerFor[k] || null }, today));
   if (wanted.has('receber') || wanted.has('pagar')) jobs.push(SOURCES.financeiro({ from, to }, today, wanted));
   let list = (await Promise.all(jobs)).flat();
   if (wanted.has('cobranca')) { // a conta da plateia aparece uma vez só: como cobrança

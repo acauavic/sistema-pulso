@@ -80,6 +80,9 @@ const config = {
     calendarId: env.GOOGLE_CALENDAR_ID || '',
     serviceAccount: env.GOOGLE_SERVICE_ACCOUNT_B64 || env.GOOGLE_SERVICE_ACCOUNT_JSON || '',
     eventMinutes: Math.max(15, Number(env.GOOGLE_EVENT_MINUTES) || 120),
+    // Reuniões com patrocinador (convite e Meet pelo Google): e-mail da conta do Workspace em nome de quem a conta de serviço age
+    // (delegação em todo o domínio, escopo calendar.events). Sem ele, as reuniões ficam só no painel, "aguardando autorização".
+    subject: String(env.GOOGLE_IMPERSONATE || '').trim(),
   },
 
   // InfinitePay (checkout): links de pagamento da plateia. Handle = InfiniteTag (sem o $). O endereço do webhook leva um segredo
@@ -103,6 +106,7 @@ config.zernioConfigured = Boolean(config.zernio.key);
 config.uploadDirect = String(env.UPLOAD_DIRECT ?? 'true').toLowerCase() !== 'false';
 config.outstandConfigured = Boolean(config.outstand.key);
 config.googleConfigured = Boolean(config.google.calendarId && config.google.serviceAccount);
+config.googleMeetConfigured = Boolean(config.googleConfigured && config.google.subject);
 config.infinitepayConfigured = Boolean(config.infinitepay.handle);
 config.yourlsConfigured = Boolean(config.yourls.base && config.yourls.key);
 

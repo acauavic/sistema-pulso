@@ -161,8 +161,10 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
   const outreach = require('../services/outreach');
   const pOut = Promise.all([outreach.history('sponsor', sponsor.id), outreach.knownAddresses('sponsor', sponsor.id, sponsor), sponsor.stage === outreach.KINDS.sponsor.stage ? outreach.evaluateAll('sponsor', { ids: [sponsor.id] }) : new Map()]);
   const finSvc = require('../services/finance');
-  const [[agenda, guestLinks], [thread, linkedTasks], [outHist, outKnown, outEval], finSummary] = await Promise.all([
-    pAgenda, pThread, pOut, can(req.user.role, 'finance.read') ? finSvc.sponsorSummary(sponsor.id) : null]);
+  const meetingsSvc = require('../services/sponsorMeetings');
+  const [[agenda, guestLinks], [thread, linkedTasks], [outHist, outKnown, outEval], finSummary, meetings, team] = await Promise.all([
+    pAgenda, pThread, pOut, can(req.user.role, 'finance.read') ? finSvc.sponsorSummary(sponsor.id) : null,
+    meetingsSvc.listFor(sponsor.id), require('../services/team').activeUsers()]);
   const outSm = outEval.get(sponsor.id) || null;
   const finView = can(req.user.role, 'finance.read')
     ? { finSummary, fin: finSvc, money: fmtMoney, today: finSvc.todayISO(), here: req.originalUrl } : { finSummary: null };
@@ -170,6 +172,7 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
     outreachCtx: { kind: 'sponsor', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (sponsor.contact_phone ? 'whatsapp' : sponsor.contact_email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/patrocinadores', subjectId: sponsor.id },
     ...finView, openModal: ['ganho', 'ativo'].includes(req.query.abrir) ? req.query.abrir : null, agenda: agenda.rows, guestLinks: guestLinks.rows, guestStatuses: C.STATUS_BY_KEY,
     comments: thread, linkedTasks: linkedTasks.rows,
+    meetings, meetingCtx: { team: team.rows, DURATIONS: meetingsSvc.DURATIONS, MODES: meetingsSvc.MODES, RESPONSES: meetingsSvc.RESPONSES, ready: config.googleMeetConfigured, inputValue: require('../utils/format').toInputValue },
     title: sponsor.company, sponsor, events: events.rows, brief, files: files.rows,
     formState: sponsorsSvc.briefState(brief, { hasLogo: files.rows.some((f) => f.kind === 'logo') }), formQuestions: sponsorsSvc.BRIEF_QUESTIONS, deliverables, planInfo: await require('../services/plans').plans(),
     roleByEpisode: Object.fromEntries(linked.rows.map((r) => [r.episode_id, r.role])), episodes: episodes.rows, clicks,
@@ -519,6 +522,72 @@ router.post('/patrocinadores/:id/excluir', requirePerm('sponsors.delete'), wrap(
   await recordChanges.deleted({ type: 'sponsor', row: gone, actor: req.user });
   await req.flash('ok', `${sponsor.company} foi para a lixeira.`, t && { undo: t.batch });
   res.redirect('/patrocinadores');
+}));
+
+// ---- reuniões com patrocinador (Google Agenda em nome da conta do Pulso: convite e Meet pelo Google) ----
+const meetings = require('../services/sponsorMeetings');
+async function findMeeting(req) {
+  if (!isIntId(req.params.id) || !isIntId(req.params.mid)) return {};
+  const sponsor = await findSponsor(req.params.id);
+  const m = sponsor && await meetings.get(req.params.mid);
+  return m && m.sponsor_id === sponsor.id ? { sponsor, m } : {};
+}
+// Depois de uma ação: o que deu certo e, se o Google não aceitou, o motivo (a reunião fica guardada mesmo assim).
+async function tellMeeting(req, r, ok) {
+  if (r.error) return req.flash('error', r.error);
+  const m = r.meeting;
+  if (m.google_state === 'ok' || m.status === 'cancelada' && !m.google_error) return req.flash('ok', ok);
+  return req.flash('error', `${ok.replace(/\.$/, '')}, mas ainda não foi para o Google: ${m.google_error || meetings.WAITING}`);
+}
+
+router.post('/patrocinadores/:id/reunioes', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const sponsor = await findSponsor(req.params.id);
+  if (!sponsor) return notFound(res);
+  const r = await meetings.create(sponsor.id, meetings.parseInput(req.body, sponsor), req.user);
+  if (!r.error) await audit(req, 'patrocinador.reuniao_marcada', 'sponsor', sponsor.id, { reuniao: r.meeting.id });
+  await tellMeeting(req, r, r.meeting && r.meeting.mode === 'meet' ? 'Reunião marcada: o convite com o Meet foi enviado.' : 'Reunião marcada: o convite foi enviado.');
+  res.redirect(back(sponsor.id, '#reunioes'));
+}));
+
+router.post('/patrocinadores/:id/reunioes/:mid', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const { sponsor, m } = await findMeeting(req);
+  if (!m) return notFound(res);
+  const r = await meetings.update(m.id, meetings.parseInput(req.body, sponsor), req.user);
+  if (!r.error) await audit(req, 'patrocinador.reuniao_alterada', 'sponsor', sponsor.id, { reuniao: m.id });
+  await tellMeeting(req, r, 'Reunião atualizada: os convidados foram avisados.');
+  res.redirect(back(sponsor.id, '#reunioes'));
+}));
+
+router.post('/patrocinadores/:id/reunioes/:mid/cancelar', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const { sponsor, m } = await findMeeting(req);
+  if (!m) return notFound(res);
+  const r = await meetings.cancel(m.id, req.user);
+  if (!r.error) await audit(req, 'patrocinador.reuniao_cancelada', 'sponsor', sponsor.id, { reuniao: m.id });
+  await tellMeeting(req, r, 'Reunião cancelada: os convidados foram avisados.');
+  res.redirect(back(sponsor.id, '#reunioes'));
+}));
+
+router.post('/patrocinadores/:id/reunioes/:mid/meet', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const { sponsor, m } = await findMeeting(req);
+  if (!m) return notFound(res);
+  const r = await meetings.addMeet(m.id, req.user);
+  await tellMeeting(req, r, 'Link do Meet criado e enviado aos convidados.');
+  res.redirect(back(sponsor.id, '#reunioes'));
+}));
+
+router.post('/patrocinadores/:id/reunioes/:mid/tentar', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const { sponsor, m } = await findMeeting(req);
+  if (!m) return notFound(res);
+  await tellMeeting(req, await meetings.retry(m.id), 'Reunião enviada ao Google Agenda.');
+  res.redirect(back(sponsor.id, '#reunioes'));
+}));
+
+router.post('/patrocinadores/:id/reunioes/:mid/resumo', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const { sponsor, m } = await findMeeting(req);
+  if (!m) return notFound(res);
+  const r = await meetings.saveSummary(m.id, req.body.resumo_html, { source: 'manual', user: req.user });
+  await req.flash(r.error ? 'error' : 'ok', r.error || (r.meeting.summary ? 'Resumo da reunião salvo.' : 'Resumo apagado.'));
+  res.redirect(back(sponsor.id, `#reuniao-${m.id}`));
 }));
 
 module.exports = router;

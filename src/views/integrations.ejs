@@ -197,6 +197,19 @@
       <button class="btn" type="submit" name="acao" value="sincronizar">Sincronizar agora</button>
     </form>
     <button class="btn" type="button" data-modal-open="modal-google">O que vai para a agenda</button>
+    <div class="gcal-meet top-gap">
+      <h3>Reuniões com patrocinador</h3>
+      <p><span class="badge <%= google.meet ? 'b-gray' : 'b-amber' %>"><%= google.meet ? 'Convite e Meet pelo Google' : 'Aguardando autorização' %></span></p>
+      <% if (google.meet) { %>
+      <p class="small muted">As reuniões marcadas no cadastro do patrocinador saem em nome de <code><%= google.meetSubject %></code>: o Google manda o convite, cria o Meet e devolve as respostas.</p>
+      <form method="post" action="/integracoes/google" data-busy="Testando…">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn" type="submit" name="acao" value="reunioes">Testar reuniões (cria e apaga um evento, sem e-mail)</button>
+      </form>
+      <% } else { %>
+      <p class="small muted">Para o Google mandar o convite e criar o Meet: no Admin do Google Workspace, em Segurança &gt; Controles de API &gt; Delegação em todo o domínio, autorize o ID do cliente da conta de serviço com o escopo <code>https://www.googleapis.com/auth/calendar.events</code> e defina GOOGLE_IMPERSONATE no servidor com o e-mail da conta dona da agenda.</p>
+      <% } %>
+    </div>
     <% } else { %><p class="small muted">Defina GOOGLE_CALENDAR_ID e a chave da conta de serviço no servidor (passo a passo no .env.example).</p><% } %>
   </section>
 </div>
