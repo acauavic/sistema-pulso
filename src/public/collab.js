@@ -185,16 +185,41 @@
     if (document.hidden || !badge) return;
     try { const data = await (await fetch('/notificacoes/resumo', { headers: { Accept: 'application/json' } })).json(); setUnread(data.unread); } catch { /* tenta de novo depois */ }
   };
-  // aviso flutuante: some sozinho em 8 s; clicar abre o item
+  // Som das mensagens: dois toques curtos feitos na hora (Web Audio, sem arquivo). O navegador só libera o som depois do primeiro
+  // toque/clique na página, por isso o contexto nasce ali. Desligável em Notificações > Alertas neste aparelho (fica no aparelho).
+  const SOUND_KEY = 'pulso-som-mensagens';
+  const soundOn = () => { try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch { return true; } };
+  let audio = null;
+  const unlock = () => { try { audio ||= new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch { /* sem áudio */ } };
+  ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => document.addEventListener(ev, unlock, { once: true, passive: true, capture: true }));
+  window.pulsoChime = () => {
+    if (!soundOn()) return;
+    try {
+      unlock(); if (!audio || audio.state !== 'running') return;
+      const t0 = audio.currentTime;
+      [[880, 0], [1318.5, 0.13]].forEach(([freq, at]) => {
+        const o = audio.createOscillator(); const g = audio.createGain();
+        o.type = 'sine'; o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, t0 + at); g.gain.exponentialRampToValueAtTime(0.28, t0 + at + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.32);
+        o.connect(g).connect(audio.destination); o.start(t0 + at); o.stop(t0 + at + 0.34);
+      });
+    } catch { /* sem áudio */ }
+    try { navigator.vibrate?.([160, 70, 160]); } catch { /* sem vibração */ }
+  };
+  window.pulsoSound = { key: SOUND_KEY, on: soundOn, set: (on) => { try { localStorage.setItem(SOUND_KEY, on ? 'on' : 'off'); } catch { /* sem armazenamento */ } if (on) { unlock(); window.pulsoChime(); } } };
+  document.querySelectorAll('[data-sound-toggle]').forEach((box) => { box.checked = soundOn(); box.addEventListener('change', () => window.pulsoSound.set(box.checked)); });
+
+  // aviso flutuante: some sozinho em 8 s (mensagem: 15 s, com destaque); clicar abre o item
   window.pulsoToast = (t) => {
     if (!toasts) return;
     const el = document.createElement(t.url ? 'a' : 'div');
     el.className = `toast ${t.tone || ''}`; if (t.url) el.href = t.url;
+    if (t.tone === 'chat') { const k = document.createElement('span'); k.className = 'kicker'; k.textContent = 'Mensagem'; el.appendChild(k); }
     el.setAttribute('role', 'status');
     const strong = document.createElement('strong'); strong.textContent = t.title || ''; el.appendChild(strong);
     if (t.body) { const p = document.createElement('span'); p.textContent = t.body; el.appendChild(p); }
     toasts.appendChild(el);
-    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, 8000);
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, t.tone === 'chat' ? 15000 : 8000);
   };
   if (window.EventSource) {
     const es = new EventSource('/eventos');
@@ -209,7 +234,9 @@
     es.addEventListener('notification', (e) => {
       let n; try { n = JSON.parse(e.data); } catch { return; }
       if (badge) setUnread(Number(badge.textContent || 0) + 1);
-      window.pulsoToast({ title: n.title, body: n.body, url: n.url });
+      const chat = n.kind === 'mensagem';
+      window.pulsoToast({ title: n.title, body: n.body, url: n.url, tone: chat ? 'chat' : '' });
+      if (chat) window.pulsoChime();
       window.pulsoBrowserAlert?.(n); // aba em segundo plano: alerta do sistema (push.js)
     });
   }

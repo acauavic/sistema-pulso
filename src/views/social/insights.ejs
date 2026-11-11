@@ -1,57 +1,141 @@
+<%# Jornada: alguém da equipe abre Insights para saber como as redes vão (seguidores, crescimento, alcance do mês, o que mais rendeu).
+    Resumo primeiro (uma linha por rede); a rede abre na própria aba; o que a equipe publicou fica na última aba.
+    Cada rede é lida no provedor em que está conectada (services/socialInsights.js). %>
 <%- include('../partials/head') %>
 <%- include('../partials/social-nav') %>
 <%
   var num = function (v) { return v == null ? '—' : Number(v).toLocaleString('pt-BR'); };
-  var names = Object.keys(data.platforms);
+  var label = function (p) { return platforms[p] ? platforms[p].label : p; };
+  var at = function (h) { return h ? '@' + String(h).replace(/^@/, '') : ''; };
+  var signed = function (v) { return v == null ? '' : (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '') + num(Math.abs(v)); };
+  var nets = data.networks;
+  var PERIOD = [['views', 'Visualizações'], ['reach', 'Alcance'], ['likes', 'Curtidas'], ['comments', 'Comentários'], ['shares', 'Compartilhados'], ['saves', 'Salvos'], ['interactions', 'Interações']];
 %>
 <div class="toolbar">
-  <span class="small muted"><%= data.updatedAt ? 'Atualizado ' + fmt.formatDateTime(data.updatedAt) + ' (os números são lidos no máximo uma vez por hora)' : 'Números das contas conectadas no Upload-Post' %></span>
+  <span class="small muted"><% if (data.updatedAt) { %>Atualizado <span class="mono"><%= fmt.formatDateTime(data.updatedAt) %></span><%= data.refreshing ? ' · conferindo se há números novos' : '' %><% } else { %>Números das contas conectadas<% } %></span>
   <% if (data.ok) { %><a class="btn sm" href="/social/insights?atualizar=1"><%- icon('refresh-cw') %> Atualizar agora</a><% } %>
 </div>
 <% if (data.error) { %><p class="flash flash-error"><%= data.error %></p><% } %>
 
-<% if (!names.length && !data.error) { %>
-<div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma rede conectada.</strong></p><p class="muted small">Conecte as contas no Upload-Post para ver seguidores, visualizações e alcance aqui.</p></div>
-<% } %>
+<div class="tabs-wrap" data-tabs data-default="resumo">
+  <div class="tabbar" role="tablist" aria-label="Redes">
+    <button type="button" role="tab" data-tab-btn="resumo">Resumo</button>
+    <% nets.forEach(function (d) { %><button type="button" role="tab" data-tab-btn="<%= d.net %>"><%= label(d.net) %></button><% }) %>
+    <button type="button" role="tab" data-tab-btn="equipe">O que publicamos</button>
+  </div>
 
-<div class="stack-lg">
-  <% names.forEach(function (p) { var d = data.platforms[p]; %>
-  <section class="card platform-card">
-    <div class="row spread"><h2><%= platforms[p] ? platforms[p].label : p %></h2><span class="handle muted"><%= d.handle ? '@' + String(d.handle).replace(/^@/, '') : '' %></span></div>
-    <% if (!d.current) { %><p class="muted small">Sem números desta rede agora.</p><% } else { %>
-    <div class="stat-grid">
-      <% d.metrics.forEach(function (m) { if (m.value == null) return; %>
-      <div class="stat">
-        <span class="stat-label"><%= m.label %></span>
-        <span class="stat-n"><%= num(m.value) %></span>
-        <span class="delta <%= m.delta > 0 ? 'up' : (m.delta < 0 ? 'down' : '') %>"><%= m.delta == null ? 'sem comparação ainda' : (m.delta > 0 ? '▲ ' : m.delta < 0 ? '▼ ' : '') + num(Math.abs(m.delta)) + ' em 7 dias' %></span>
-      </div>
+  <div class="pane" data-pane-id="resumo">
+    <% if (!nets.length) { %>
+    <div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma rede com números ainda.</strong></p><p class="muted small">Conecte as contas em Integrações &gt; Redes sociais. Cada rede aparece aqui com os números do provedor em que está conectada.</p></div>
+    <% } else { %>
+    <div class="req-list">
+      <% nets.forEach(function (d) { %>
+      <a class="req-row ins-row" href="#<%= d.net %>">
+        <span class="ins-who"><strong><%= label(d.net) %></strong><span class="mono small muted"><%= at(d.handle) %> · via <%= d.providerLabel %></span></span>
+        <span class="ins-big">
+          <span class="ins-n"><%= num(d.followers) %></span>
+          <span class="mono small muted"><%= d.net === 'youtube' ? 'inscritos' : 'seguidores' %></span>
+          <span class="delta <%= d.week7 > 0 ? 'up' : (d.week7 < 0 ? 'down' : '') %>"><%= d.week7 == null ? 'sem comparação ainda' : signed(d.week7) + ' em 7 dias' %></span>
+        </span>
+      </a>
       <% }) %>
     </div>
     <% } %>
-  </section>
+  </div>
+
+  <% nets.forEach(function (d) {
+       var p = d.period || {}; var pts = (d.series && d.series.points) || [];
+       var max = pts.reduce(function (m, x) { return Math.max(m, x.v); }, 0);
+       var min = d.series && d.series.kind === 'total' ? pts.reduce(function (m, x) { return Math.min(m, x.v); }, Infinity) : 0;
+       if (min === Infinity) min = 0;
+       var floor = d.series && d.series.kind === 'total' ? Math.max(0, min - Math.max(1, Math.round((max - min) * 0.25))) : 0; %>
+  <div class="pane" data-pane-id="<%= d.net %>" hidden>
+    <div class="stack-lg">
+      <section class="card platform-card">
+        <div class="row spread"><h2><%= label(d.net) %></h2><span class="mono small muted"><%= at(d.handle) %> · via <%= d.providerLabel %></span></div>
+        <% if (d.failed) { %><p class="notice small">Não consegui ler agora (<%= d.failed %>). Estes são os números de <span class="mono"><%= fmt.formatDateTime(d.updatedAt) %></span>.</p>
+        <% } else if (d.stale) { %><p class="notice small">Números de <span class="mono"><%= fmt.formatDateTime(d.updatedAt) %></span>: hoje ainda não foi possível ler esta rede.</p><% } %>
+        <% if (d.note) { %><p class="small muted"><%= d.note %></p><% } %>
+        <div class="stat-grid">
+          <div class="stat">
+            <span class="stat-label"><%= d.net === 'youtube' ? 'Inscritos' : 'Seguidores' %></span>
+            <span class="stat-n"><%= num(d.followers) %></span>
+            <span class="delta <%= d.week7 > 0 ? 'up' : (d.week7 < 0 ? 'down' : '') %>"><%= d.week7 == null ? 'sem comparação ainda' : signed(d.week7) + ' em 7 dias' %></span>
+          </div>
+          <% if (d.growth && d.growth.net != null) { %>
+          <div class="stat">
+            <span class="stat-label">Em 30 dias</span>
+            <span class="stat-n"><%= d.growth.net > 0 ? '+' + num(d.growth.net) : num(d.growth.net) %></span>
+            <span class="delta"><%= d.growth.gained != null ? 'entraram ' + num(d.growth.gained) + ' · saíram ' + num(d.growth.lost) : (d.net === 'youtube' ? 'inscritos' : 'seguidores') %></span>
+          </div>
+          <% } %>
+          <% if (d.posts != null) { %><div class="stat"><span class="stat-label"><%= d.net === 'youtube' ? 'Vídeos' : 'Publicações' %></span><span class="stat-n"><%= num(d.posts) %></span><span class="delta">no perfil</span></div><% } %>
+          <% if (d.lifetime && d.lifetime.views != null) { %><div class="stat"><span class="stat-label">Visualizações</span><span class="stat-n"><%= num(d.lifetime.views) %></span><span class="delta">total do canal</span></div><% } %>
+          <% if (d.lifetime && d.lifetime.likes != null) { %><div class="stat"><span class="stat-label">Curtidas</span><span class="stat-n"><%= num(d.lifetime.likes) %></span><span class="delta">total da conta</span></div><% } %>
+        </div>
+
+        <% if (d.period) { %>
+        <h3 class="kicker">Últimos <%= p.days || 30 %> dias</h3>
+        <div class="stat-grid">
+          <% PERIOD.forEach(function (m) { if (p[m[0]] == null) return; %>
+          <div class="stat"><span class="stat-label"><%= m[1] %></span><span class="stat-n"><%= num(p[m[0]]) %></span></div>
+          <% }) %>
+          <% if (d.stories && d.stories.views != null) { %><div class="stat"><span class="stat-label">Stories</span><span class="stat-n"><%= num(d.stories.views) %></span><span class="delta">visualizações · alcance <%= num(d.stories.reach) %></span></div><% } %>
+        </div>
+        <% } %>
+      </section>
+
+      <% if (pts.length > 1) { var w = 300; var hgt = 80; var gap = 1; var bw = Math.max(1, w / pts.length - gap); %>
+      <section class="card">
+        <div class="row spread"><h2><%= d.series.kind === 'novos' ? 'Novos seguidores por dia' : (d.net === 'youtube' ? 'Inscritos por dia' : 'Seguidores por dia') %></h2><span class="mono small muted">máx. <%= num(max) %></span></div>
+        <svg class="ins-chart" viewBox="0 0 <%= w %> <%= hgt %>" preserveAspectRatio="none" role="img" aria-label="<%= d.series.kind === 'novos' ? 'Novos seguidores' : 'Seguidores' %> de <%= pts[0].d %> a <%= pts[pts.length - 1].d %>">
+          <% pts.forEach(function (x, i) { var span = Math.max(1, max - floor); var bh = Math.max(1, Math.round(((x.v - floor) / span) * (hgt - 2))); %><rect x="<%= (i * (w / pts.length)).toFixed(2) %>" y="<%= hgt - bh %>" width="<%= bw.toFixed(2) %>" height="<%= bh %>"><title><%= x.d.split('-').reverse().slice(0, 2).join('/') %>: <%= num(x.v) %></title></rect><% }) %>
+        </svg>
+        <div class="row spread mono small muted"><span><%= pts[0].d.split('-').reverse().slice(0, 2).join('/') %></span><span><%= pts[pts.length - 1].d.split('-').reverse().slice(0, 2).join('/') %></span></div>
+      </section>
+      <% } %>
+
+      <section class="card">
+        <h2>O que mais rendeu</h2>
+        <p class="small muted"><%= d.provider === 'zernio' ? 'Posts dos últimos 30 dias, inclusive os feitos fora do painel, por visualizações.' : 'Posts que saíram pelo painel nos últimos 30 dias, por visualizações.' %></p>
+        <% if (!d.top || !d.top.length) { %><p class="small muted">Nada para mostrar ainda: os números de cada post aparecem algumas horas depois que ele sai.</p><% } else { %>
+        <ol class="plain ins-top">
+          <% d.top.forEach(function (t) { %>
+          <li class="ins-post">
+            <span class="ins-post-main"><strong><%= t.title %></strong><span class="mono small muted"><%= t.at ? fmt.shortDate(t.at) : '' %></span></span>
+            <span class="ins-post-n mono small"><span><%= num(t.views) %> <span class="muted">visualiz.</span></span><span><%= num(t.likes) %> <span class="muted">curtidas</span></span><span><%= num(t.comments) %> <span class="muted">coment.</span></span></span>
+            <% if (t.url) { %><a class="btn sm ghost" href="<%= t.url %>" target="_blank" rel="noopener noreferrer"><%- icon('external-link', 14) %> Abrir</a><% } %>
+          </li>
+          <% }) %>
+        </ol>
+        <% } %>
+      </section>
+    </div>
+  </div>
   <% }) %>
 
-  <section class="card">
-    <h2>O que a equipe publicou</h2>
-    <p class="small muted">Últimos 30 dias, pelos registros do painel.</p>
-    <div class="stat-grid">
-      <a class="stat" href="/social/publicacoes?status=publicado"><span class="stat-label">Publicadas</span><span class="stat-n"><%= ours.published %></span></a>
-      <a class="stat" href="/social/publicacoes?status=agendado"><span class="stat-label">Agendadas</span><span class="stat-n"><%= ours.scheduled %></span></a>
-      <a class="stat" href="/social/publicacoes?status=erro"><span class="stat-label">Com erro</span><span class="stat-n"><%= ours.failed %></span></a>
-      <a class="stat" href="/social/publicacoes?status=simulado"><span class="stat-label">Testes</span><span class="stat-n"><%= ours.tested %></span></a>
-    </div>
-    <div class="grid-2 tight">
-      <div>
-        <h3>Por tipo</h3>
-        <dl class="kv"><% ours.byMedia.forEach(function (m) { %><dt><%= MEDIA[m.media] %></dt><dd class="mono"><%= m.n %></dd><% }) %></dl>
+  <div class="pane" data-pane-id="equipe" hidden>
+    <section class="card">
+      <h2>O que a equipe publicou</h2>
+      <p class="small muted">Últimos 30 dias, pelos registros do painel.</p>
+      <div class="stat-grid">
+        <a class="stat" href="/social/publicacoes?status=publicado"><span class="stat-label">Publicadas</span><span class="stat-n"><%= ours.published %></span></a>
+        <a class="stat" href="/social/publicacoes?status=agendado"><span class="stat-label">Agendadas</span><span class="stat-n"><%= ours.scheduled %></span></a>
+        <a class="stat" href="/social/publicacoes?status=erro"><span class="stat-label">Com erro</span><span class="stat-n"><%= ours.failed %></span></a>
+        <a class="stat" href="/social/publicacoes?status=simulado"><span class="stat-label">Testes</span><span class="stat-n"><%= ours.tested %></span></a>
       </div>
-      <div>
-        <h3>Por rede</h3>
-        <% if (!ours.byPlatform.length) { %><p class="muted small">Nada publicado nos últimos 30 dias.</p><% } %>
-        <dl class="kv"><% ours.byPlatform.forEach(function (r) { %><dt><%= platforms[r.platform] ? platforms[r.platform].label : r.platform %></dt><dd class="mono"><%= r.n %></dd><% }) %></dl>
+      <div class="grid-2 tight">
+        <div>
+          <h3>Por tipo</h3>
+          <dl class="kv"><% ours.byMedia.forEach(function (m) { %><dt><%= MEDIA[m.media] %></dt><dd class="mono"><%= m.n %></dd><% }) %></dl>
+        </div>
+        <div>
+          <h3>Por rede</h3>
+          <% if (!ours.byPlatform.length) { %><p class="muted small">Nada publicado nos últimos 30 dias.</p><% } %>
+          <dl class="kv"><% ours.byPlatform.forEach(function (r) { %><dt><%= label(r.platform) %></dt><dd class="mono"><%= r.n %></dd><% }) %></dl>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
 </div>
 <%- include('../partials/foot') %>

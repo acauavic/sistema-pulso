@@ -1,7 +1,7 @@
 // Provedor de publicação nas redes: Upload-Post, Zernio ou Outstand, escolhido pela gestão em Integrações (app_settings.social_provider).
 // As telas e a publicação usam só esta camada; cada publicação guarda por qual provedor saiu (episode_publications.provider),
 // e o andamento é consultado sempre nele, mesmo que a escolha mude depois.
-// Insights, comentários, directs e automações continuam pelo Upload-Post.
+// Insights seguem a rota de cada rede (services/socialInsights.js). Comentários, directs e automações continuam pelo Upload-Post.
 const config = require('../config');
 const settings = require('./settings');
 const up = require('./uploadPost');

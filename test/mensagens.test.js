@@ -108,6 +108,20 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
       const rows = await q('SELECT * FROM chat_reactions WHERE message_id = $1', [json.message.id]);
       assert.equal(rows.length, 2);
     });
+
+    it('reação avisa quem escreveu (a própria não avisa; tirar e pôr de novo não repete)', async () => {
+      const { json } = await say(c.ana, dm, 'Ficou bom o corte?');
+      const mid = json.message.id;
+      const avisos = () => q("SELECT title, body, url FROM notifications WHERE user_id = $1 AND title LIKE '%reagiu%' AND dedupe_key LIKE $2", [u.ana.id, `chat-reacao-${mid}-%`]);
+      await post(c.ana, `/mensagens/m/${mid}/reagir`, { emoji: '👍' });
+      assert.equal((await avisos()).length, 0);
+      await post(c.bia, `/mensagens/m/${mid}/reagir`, { emoji: '🎉' });
+      await post(c.bia, `/mensagens/m/${mid}/reagir`, { emoji: '🎉' });
+      await post(c.bia, `/mensagens/m/${mid}/reagir`, { emoji: '🎉' });
+      const list = await avisos();
+      assert.equal(list.length, 1);
+      assert.match(list[0].title, /reagiu 🎉 à sua mensagem/); assert.match(list[0].body, /Ficou bom o corte/); assert.equal(list[0].url, `/mensagens/${dm}`);
+    });
   });
 
   describe('garantir a entrega', () => {
@@ -264,8 +278,15 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
     it('quem entra vê o histórico, mas ele não conta como não lido', async () => {
       await say(c.ana, g, 'Antes do Edu chegar');
       assert.equal((await post(c.ana, `/mensagens/conversas/${g}/pessoas`, { pessoas: [u.edu.id] })).status, 200);
-      assert.equal((await get(c.edu, `/mensagens/conversas/${g}/mensagens`)).json.messages.length, 1);
-      assert.equal((await get(c.edu, '/mensagens/nao-lidas')).json.n, 0);
+      const seen = (await get(c.edu, `/mensagens/conversas/${g}/mensagens`)).json.messages;
+      assert.equal(seen.filter((m) => !m.event).length, 1);
+      assert.deepEqual(seen.filter((m) => m.event).map((m) => [m.event, m.text]), [['criou', 'Ana Gestão criou o grupo'], ['renomeou', 'Ana Gestão mudou o nome do grupo para Edição do EP.020'], ['adicionou', 'Ana Gestão adicionou Edu Editor']]);
+      assert.equal((await get(c.edu, '/mensagens/nao-lidas')).json.n, 0, 'o aviso do grupo não conta como não lido');
+      const [added] = await q("SELECT title, url FROM notifications WHERE user_id = $1 AND title LIKE '%adicionou você%'", [u.edu.id]);
+      assert.equal(added.title, 'Ana Gestão adicionou você ao grupo Edição do EP.020'); assert.equal(added.url, `/mensagens/${g}`);
+      const ev = seen.find((m) => m.event);
+      assert.equal((await post(c.ana, `/mensagens/m/${ev.id}/apagar`)).status, 409, 'aviso do grupo não se apaga');
+      assert.equal((await say(c.ana, g, 'thread no aviso', { parent_id: ev.id })).status, 404);
       await say(c.ana, g, 'Oi, Edu');
       assert.equal((await get(c.edu, '/mensagens/nao-lidas')).json.n, 1);
     });
@@ -276,6 +297,9 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
       assert.equal((await say(c.edu, g, 'Ainda aqui?')).status, 404);
       assert.equal((await post(c.ana, `/mensagens/conversas/${g}/pessoas`, { pessoas: [u.edu.id] })).status, 200);
       assert.equal((await q('SELECT count(*)::int AS n FROM chat_members WHERE conversation_id = $1 AND user_id = $2', [g, u.edu.id]))[0].n, 1);
+      assert.equal((await post(c.ana, `/mensagens/conversas/${g}/pessoas`, { pessoas: [u.edu.id] })).status, 409, 'quem já está não entra de novo');
+      const texts = (await get(c.bia, `/mensagens/conversas/${g}/mensagens`)).json.messages.filter((m) => m.event).map((m) => m.text);
+      assert.ok(texts.includes('Ana Gestão tirou Edu Editor do grupo'));
     });
 
     it('o grupo sempre tem quem administre', async () => {
@@ -285,6 +309,8 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
       const d = (await get(c.bia, `/mensagens/conversas/${g}`)).json.conversation;
       assert.equal(d.people.length, 2); assert.equal(d.people.find((p) => p.id === u.bia.id).role, 'admin', 'quem entrou primeiro assume');
       assert.equal((await get(c.ana, `/mensagens/conversas/${g}`)).status, 404);
+      const [conv] = (await get(c.bia, '/mensagens/conversas')).json.conversations.filter((x) => x.id === g);
+      assert.equal(conv.preview, 'Ana Gestão saiu do grupo'); assert.equal(conv.preview_author, null);
     });
 
     it('conversa individual não vira grupo', async () => {
@@ -296,7 +322,7 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
   describe('avisos', () => {
     let g2;
     before(async () => { g2 = (await post(c.ana, '/mensagens/conversas', { tipo: 'grupo', nome: 'Avisos', pessoas: [u.bia.id, u.edu.id] })).json.id; });
-    const notices = (who) => q("SELECT * FROM notifications WHERE user_id = $1 AND type = 'mensagem' AND url = $2 ORDER BY id", [who.id, `/mensagens/${g2}`]);
+    const notices = (who) => q("SELECT * FROM notifications WHERE user_id = $1 AND type = 'mensagem' AND url = $2 AND title NOT LIKE '%adicionou você%' ORDER BY id", [who.id, `/mensagens/${g2}`]);
 
     it('quem leu nos 20 segundos não recebe aviso; quem não leu recebe; quem escreveu, nunca', async () => {
       const { json: { message: m } } = await say(c.ana, g2, 'Bom dia');

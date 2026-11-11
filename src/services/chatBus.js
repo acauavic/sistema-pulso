@@ -2,7 +2,8 @@
 // - evento.*: cada cópia do painel tem a sua fila temporária e entrega para as abas abertas.
 // - tarefa.*: fila durável, consumida pelo worker (avisos e resumos). Só sai da fila depois de confirmada;
 //   falhou 5 vezes, vai para pulso.chat.mortas (a contagem aparece em Integrações).
-// - espera.*: fila com prazo: a mensagem fica 20 s e cai em tarefa.aviso (quem leu nesse tempo não recebe aviso).
+// - espera.*: fila com prazo: a mensagem fica 8 s e cai em tarefa.aviso (quem está com a conversa aberta já leu e não recebe aviso).
+//   O prazo é argumento da fila (x-message-ttl): mudar o prazo pede uma fila com outro nome, e a antiga é desligada em topology().
 const os = require('os');
 const crypto = require('crypto');
 const amqp = require('amqplib');
@@ -11,9 +12,10 @@ const config = require('../config');
 const EXCHANGE = 'pulso.chat';
 const DEAD_EXCHANGE = 'pulso.chat.mortas';
 const Q_TASKS = 'pulso.chat.tarefas';
-const Q_WAIT = 'pulso.chat.espera';
+const Q_WAIT = 'pulso.chat.espera.8s';
+const OLD_WAITS = ['pulso.chat.espera']; // prazo de 20 s (até a v1.62): sem ligação, para o aviso não sair duas vezes
 const Q_DEAD = 'pulso.chat.mortas';
-const WAIT_MS = 20_000;
+const WAIT_MS = 8_000;
 const CONFIRM_MS = 5_000;
 const DELIVERY_LIMIT = 5;
 
@@ -31,7 +33,7 @@ const isConfigured = () => Boolean(url || config.rabbit.url);
 const isConnected = () => connected && Boolean(pub);
 const safeError = (err) => String(err?.message || err).replace(/amqps?:\/\/[^@\s]+@/g, 'amqp://***@'); // o log nunca mostra a senha
 
-async function topology(ch) {
+async function topology(ch, connection) {
   await ch.assertExchange(EXCHANGE, 'topic', { durable: true });
   await ch.assertExchange(DEAD_EXCHANGE, 'fanout', { durable: true });
   await ch.assertQueue(Q_DEAD, { durable: true });
@@ -40,6 +42,11 @@ async function topology(ch) {
   await ch.bindQueue(Q_TASKS, EXCHANGE, 'tarefa.#');
   await ch.assertQueue(Q_WAIT, { durable: true, arguments: { 'x-message-ttl': WAIT_MS, 'x-dead-letter-exchange': EXCHANGE, 'x-dead-letter-routing-key': 'tarefa.aviso' } });
   await ch.bindQueue(Q_WAIT, EXCHANGE, 'espera.#');
+  for (const old of OLD_WAITS) {
+    // canal à parte: se a fila antiga não existir, o erro fecha só este canal; o que estava esperando nela ainda cai em tarefa.aviso
+    const tmp = await connection.createChannel(); tmp.on('error', () => {});
+    try { await tmp.checkQueue(old); await tmp.unbindQueue(old, EXCHANGE, 'espera.#'); await tmp.close(); } catch { /* já não existe */ }
+  }
 }
 
 const decode = (msg) => JSON.parse(msg.content.toString('utf8'));
@@ -95,7 +102,7 @@ function connect() {
       c.on('close', () => dropped(c));
       const ch = await c.createConfirmChannel();
       ch.on('error', (err) => console.error('[mensagens] canal do RabbitMQ:', safeError(err)));
-      await topology(ch);
+      await topology(ch, c);
       conn = c; pub = ch;
       if (handlers.live) await consumeLive(handlers.live);
       if (handlers.tasks) await consumeTasks(handlers.tasks);

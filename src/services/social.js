@@ -333,39 +333,7 @@ async function runRules() {
   return total;
 }
 
-// ---------------------------------------------------------------- insights
-const METRICS = [['followers', 'Seguidores'], ['views', 'Visualizações'], ['reach', 'Alcance'], ['likes', 'Curtidas'], ['comments', 'Comentários'], ['shares', 'Compartilhamentos']];
-const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-
-// Números atuais (no máximo uma consulta por hora, guardados como a foto do dia) + a foto de 7 dias atrás para comparar.
-async function insights({ force = false } = {}) {
-  const out = { ok: config.uploadPostConfigured, error: null, platforms: {}, updatedAt: null };
-  if (!config.uploadPostConfigured) { out.error = 'Upload-Post não configurado neste servidor.'; return out; }
-  const conn = await up.connected();
-  if (!conn.ok) { out.error = conn.error; return out; }
-  const names = Object.keys(conn.platforms).filter((p) => ['instagram', 'tiktok', 'youtube', 'facebook', 'linkedin', 'x', 'threads'].includes(p));
-  const { rows: fresh } = await db.query("SELECT platform, data, updated_at FROM social_snapshots WHERE taken_on = $1 AND updated_at > now() - interval '1 hour'", [today()]);
-  let current = Object.fromEntries(fresh.map((r) => [r.platform, r.data]));
-  if (force || !fresh.length) { // rede que não devolve números não força nova consulta
-    try {
-      current = await up.analytics(names);
-      for (const [p, data] of Object.entries(current)) {
-        await db.query(`INSERT INTO social_snapshots (taken_on, platform, data) VALUES ($1,$2,$3)
-                        ON CONFLICT (taken_on, platform) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`, [today(), p, JSON.stringify(data)]);
-      }
-    } catch (err) { out.error = `Não foi possível ler os números agora: ${err.message}`; }
-  }
-  const { rows: week } = await db.query("SELECT DISTINCT ON (platform) platform, data FROM social_snapshots WHERE taken_on <= ($1::date - 7) ORDER BY platform, taken_on DESC", [today()]);
-  const before = Object.fromEntries(week.map((r) => [r.platform, r.data]));
-  for (const p of names) {
-    const cur = current[p] || null;
-    out.platforms[p] = { handle: conn.platforms[p].handle, current: cur, metrics: METRICS.map(([k, label]) => ({ key: k, label, value: cur?.[k] ?? null, delta: cur?.[k] != null && before[p]?.[k] != null ? cur[k] - before[p][k] : null })) };
-  }
-  const { rows: [u] } = await db.query('SELECT max(updated_at) AS at FROM social_snapshots WHERE taken_on = $1', [today()]);
-  out.updatedAt = u?.at || null;
-  return out;
-}
-
+// ---------------------------------------------------------------- insights (números das redes: services/socialInsights.js)
 // O que a equipe publicou nos últimos 30 dias (dos nossos registros).
 async function ourActivity() {
   const { rows } = await db.query(
@@ -381,6 +349,6 @@ async function ourActivity() {
 }
 
 module.exports = {
-  USED, STATUS_LABEL, IDEA_KINDS, METRICS, unusedClips, unusedImages, availableClips, availableImages, listPublications, editPublication,
-  fingerprint, similar, doneFor, generateIdeas, has, runRules, runCommentRule, runDirectRule, insights, ourActivity,
+  USED, STATUS_LABEL, IDEA_KINDS, unusedClips, unusedImages, availableClips, availableImages, listPublications, editPublication,
+  fingerprint, similar, doneFor, generateIdeas, has, runRules, runCommentRule, runDirectRule, ourActivity,
 };

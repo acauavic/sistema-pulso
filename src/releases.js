@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.62.0', date: '2026-11-10', title: 'Insights de todas as redes e mensagens que avisam',
+    items: [
+      { kind: 'novo', text: 'Insights mostra cada rede pela conta em que ela está conectada: Instagram, Facebook, TikTok e Threads pela Outstand; YouTube e X pela Zernio. Resumo com seguidores e a variação em 7 dias, e uma aba por rede com os números dos últimos 30 dias (visualizações, alcance, curtidas, comentários, compartilhados, salvos e Stories), o gráfico de seguidores por dia e os posts que mais renderam.' },
+      { kind: 'novo', text: 'Mensagens: avisos com som e vibração. Mensagem ou reação nova toca no app aberto e aparece em destaque; com o app fechado, o aviso do celular toca, vibra e fica na tela até você ver. O som pode ser desligado em Notificações.' },
+      { kind: 'novo', text: 'Reagiram à sua mensagem? Você recebe o aviso. E o aviso de mensagem nova chega em cerca de 8 segundos (antes, 20).' },
+      { kind: 'ajuste', text: 'Grupos: a conversa mostra quem criou o grupo, quem entrou, quem saiu e quando o nome mudou. Quem é adicionado recebe um aviso na hora, mesmo antes da primeira mensagem.' },
+      { kind: 'correcao', text: 'No celular, o aviso "Sistema atualizado" cobria o botão "Nova conversa" em Mensagens. Agora ele aparece na próxima tela.' },
+    ],
+  },
+  {
     version: '1.61.0', date: '2026-11-10', title: 'Capa editável na hora de agendar',
     items: [
       { kind: 'novo', text: 'A produtora agora edita capas: trocar o quadro, usar uma foto do episódio, enviar uma imagem e mudar o texto, e também escolher qual capa o corte usa. Gerar capas com a IA continua com a finalização.' },

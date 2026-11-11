@@ -316,7 +316,7 @@ router.post('/social/ideias/:id/:acao(aprovar|feita|descartar|reabrir)', require
 
 // ---------------------------------------------------------------- insights
 router.get('/social/insights', requirePerm('social.read'), wrap(async (req, res) => {
-  const [data, ours] = await Promise.all([social.insights({ force: req.query.atualizar === '1' }), social.ourActivity()]);
+  const [data, ours] = await Promise.all([require('../services/socialInsights').overview({ force: req.query.atualizar === '1' }), social.ourActivity()]);
   res.render('social/insights', { title: 'Insights', tab: 'insights', data, ours, platforms: up.PLATFORMS, MEDIA });
 }));
 

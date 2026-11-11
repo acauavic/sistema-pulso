@@ -2,6 +2,7 @@
 // Entrega sem perder nem duplicar: (1) o navegador manda um client_id e o banco recusa o repetido; (2) a mensagem e o "falta publicar"
 // (chat_outbox) entram na mesma transação; (3) toda escrita sobe a rev da conversa com a linha travada, e quem esteve fora pede
 // "o que mudou depois da rev N". O transporte (RabbitMQ, ou o Postgres se ele faltar) só acelera a chegada.
+const crypto = require('crypto');
 const db = require('../db/pool');
 const config = require('../config');
 const fmt = require('../utils/format');
@@ -32,6 +33,22 @@ const num = (v) => (v == null ? null : Number(v));
 const bump = async (c, conversationId) => num((await c.query('UPDATE chat_conversations SET rev = rev + 1 WHERE id = $1 RETURNING rev', [conversationId])).rows[0]?.rev);
 const activeIds = async (c, conversationId) => (await c.query('SELECT user_id FROM chat_members WHERE conversation_id = $1 AND left_at IS NULL', [conversationId])).rows.map((r) => r.user_id);
 const emit = (c, routingKey, payload) => c.query('INSERT INTO chat_outbox (routing_key, payload) VALUES ($1, $2)', [routingKey, JSON.stringify(payload)]);
+// Acontecimento do grupo (criou, entrou, saiu, mudou o nome): vira uma linha na própria conversa, com a rev nova, e chega ao vivo a quem participa.
+// Não conta como não lida (quem entra recebe o aviso no sino e no celular) nem entra no resumo da IA.
+async function addEvent(c, conversationId, user, event, text) {
+  const rev = await bump(c, conversationId);
+  const { rows: [m] } = await c.query(
+    'INSERT INTO chat_messages (conversation_id, author_id, client_id, body, event, rev) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at',
+    [conversationId, user.id, crypto.randomUUID(), text.slice(0, 400), event, rev]);
+  await c.query('UPDATE chat_conversations SET last_message_id = $2, last_message_at = $3 WHERE id = $1', [conversationId, m.id, m.created_at]);
+  await c.query('UPDATE chat_members SET last_read_id = GREATEST(last_read_id, $3), notified_upto = GREATEST(notified_upto, $3) WHERE conversation_id = $1 AND user_id = $2', [conversationId, user.id, m.id]);
+  await emit(c, 'evento.mensagem', { conversationId: Number(conversationId), rev, messageIds: [Number(m.id)], users: await activeIds(c, conversationId) });
+  return Number(m.id);
+}
+const nameOf = (user) => user.name || 'Alguém';
+const joinNames = (items) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} e ${items.at(-1)}` : items[0] || '');
+const namesOf = async (c, ids) => (await c.query('SELECT name FROM users WHERE id = ANY($1::uuid[]) ORDER BY name', [ids])).rows.map((r) => r.name || 'Sem nome');
+
 const memberOf = async (q, conversationId, userId) => (await q.query('SELECT * FROM chat_members WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL', [conversationId, userId])).rows[0] || null;
 
 async function canSeeMessage(userId, messageId) {
@@ -65,7 +82,7 @@ async function views(rows) {
     const name = m.author_id ? names.get(String(m.author_id)) || 'Sem nome' : 'Ex-integrante';
     return {
       id: Number(m.id), rev: Number(m.rev), conversation_id: Number(m.conversation_id), parent_id: num(m.parent_id), client_id: m.client_id,
-      author_id: m.author_id, author: name, initials: fmt.initials(name), html: deleted ? '' : m.body_html || '', text: deleted ? '' : m.body,
+      author_id: m.author_id, author: name, initials: fmt.initials(name), html: deleted ? '' : m.body_html || '', text: deleted ? '' : m.body, event: m.event || null,
       created_at: m.created_at, edited: Boolean(m.edited_at) && !deleted, deleted, reply_count: m.reply_count, last_reply_at: m.last_reply_at,
       reactions: deleted ? [] : (byMsg[m.id] || []).sort((a, b) => EMOJIS.indexOf(a.emoji) - EMOJIS.indexOf(b.emoji)), attachments: deleted ? [] : files[m.id] || [],
     };
@@ -74,7 +91,7 @@ async function views(rows) {
 const viewsByIds = async (ids) => views((await db.query('SELECT * FROM chat_messages WHERE id = ANY($1::bigint[]) ORDER BY id', [ids])).rows);
 
 // ---------------------------------------------------------------- conversas
-const UNREAD = `(SELECT count(*)::int FROM chat_messages x WHERE x.conversation_id = c.id AND x.id > m.last_read_id AND x.deleted_at IS NULL AND x.author_id IS DISTINCT FROM m.user_id)`;
+const UNREAD = `(SELECT count(*)::int FROM chat_messages x WHERE x.conversation_id = c.id AND x.id > m.last_read_id AND x.deleted_at IS NULL AND x.event IS NULL AND x.author_id IS DISTINCT FROM m.user_id)`;
 
 function conversationView(r) {
   const direct = r.kind === 'direct';
@@ -84,7 +101,7 @@ function conversationView(r) {
   return {
     id: Number(r.id), kind: r.kind, name, initials: fmt.initials(name), rev: Number(r.rev), role: r.role, unread: r.unread, last_read_id: Number(r.last_read_id),
     last_message_id: num(r.last_id), last_at: r.last_message_at || r.created_at,
-    preview: preview.replace(/\s+/g, ' ').slice(0, 120), preview_author: r.last_author_name && !direct ? fmt.firstName(r.last_author_name) : null,
+    preview: preview.replace(/\s+/g, ' ').slice(0, 120), preview_author: r.last_author_name && !direct && !r.last_event ? fmt.firstName(r.last_author_name) : null,
     members: r.members,
   };
 }
@@ -93,7 +110,7 @@ const LIST_SQL = `
   SELECT c.*, m.role, m.last_read_id, ${UNREAD} AS unread,
          (SELECT count(*)::int FROM chat_members a WHERE a.conversation_id = c.id AND a.left_at IS NULL) AS members,
          (SELECT u.name FROM chat_members o JOIN users u ON u.id = o.user_id WHERE o.conversation_id = c.id AND o.user_id <> m.user_id LIMIT 1) AS other_name,
-         l.id AS last_id, l.body AS last_body, l.deleted_at IS NOT NULL AS last_deleted, la.name AS last_author_name,
+         l.id AS last_id, l.body AS last_body, l.event AS last_event, l.deleted_at IS NOT NULL AS last_deleted, la.name AS last_author_name,
          (SELECT a.kind FROM attachments a WHERE a.entity_type = 'chat' AND a.entity_id = l.id ORDER BY a.id LIMIT 1) AS last_kind
     FROM chat_members m JOIN chat_conversations c ON c.id = m.conversation_id
     LEFT JOIN chat_messages l ON l.id = c.last_message_id LEFT JOIN users la ON la.id = l.author_id
@@ -115,7 +132,7 @@ async function detail(conversationId, userId) {
 }
 
 const unreadCount = (userId) => db.query(
-  `SELECT count(*)::int AS n FROM chat_members m JOIN chat_messages x ON x.conversation_id = m.conversation_id AND x.id > m.last_read_id AND x.deleted_at IS NULL AND x.author_id IS DISTINCT FROM m.user_id
+  `SELECT count(*)::int AS n FROM chat_members m JOIN chat_messages x ON x.conversation_id = m.conversation_id AND x.id > m.last_read_id AND x.deleted_at IS NULL AND x.event IS NULL AND x.author_id IS DISTINCT FROM m.user_id
     WHERE m.user_id = $1 AND m.left_at IS NULL`, [userId]).then((r) => r.rows[0].n);
 
 const activeUsers = async (ids) => (await db.query('SELECT id FROM users WHERE active AND id = ANY($1::uuid[])', [ids.filter((i) => UUID_RE.test(String(i)))])).rows.map((r) => r.id);
@@ -144,14 +161,25 @@ async function createGroup(user, name, memberIds) {
     const { rows: [g] } = await c.query("INSERT INTO chat_conversations (kind, name, created_by) VALUES ('group', $1, $2) RETURNING id", [title, user.id]);
     await c.query("INSERT INTO chat_members (conversation_id, user_id, role) VALUES ($1, $2, 'admin')", [g.id, user.id]);
     await c.query('INSERT INTO chat_members (conversation_id, user_id) SELECT $1, u FROM unnest($2::uuid[]) AS u', [g.id, others]);
+    await addEvent(c, g.id, user, 'criou', `${nameOf(user)} criou o grupo`);
     await emit(c, 'evento.conversa', { conversationId: Number(g.id), users: [user.id, ...others] });
     return g.id;
   });
   relay.kick();
+  await tellAdded(id, user, others, title);
   return { id: Number(id) };
 }
 
-// Altera o grupo: só administrador. fn(c, grupo, usuários ativos) pode devolver { error, status } para desistir.
+// Quem entrou num grupo fica sabendo (aviso no sino e no celular), mesmo antes da primeira mensagem.
+async function tellAdded(conversationId, user, ids, groupName) {
+  if (!ids.length) return;
+  try {
+    await require('./notify').notify({ type: 'mensagem', users: ids, title: `${nameOf(user)} adicionou você ao grupo ${groupName}`, body: 'Abra para ver a conversa.', url: `/mensagens/${conversationId}`, actorId: user.id, dedupe: `chat-grupo-${conversationId}-${Date.now()}` });
+  } catch (err) { console.error('[mensagens] aviso de grupo:', err.message); }
+}
+
+// Altera o grupo: só administrador. fn(c, grupo) pode devolver { error, status } para desistir, ou { event, text, added } para registrar
+// o acontecimento na conversa (e avisar quem entrou).
 async function manage(conversationId, user, fn) {
   const out = await tx(async (c) => {
     const { rows: [g] } = await c.query('SELECT * FROM chat_conversations WHERE id = $1 FOR UPDATE', [conversationId]);
@@ -163,19 +191,22 @@ async function manage(conversationId, user, fn) {
     const r = await fn(c, g);
     if (r?.error) return r;
     await bump(c, conversationId);
+    if (r?.event) await addEvent(c, conversationId, user, r.event, r.text);
     const after = await activeIds(c, conversationId);
     await emit(c, 'evento.conversa', { conversationId: Number(conversationId), users: [...new Set([...before, ...after].map(String))] });
-    return { ok: true };
+    return { ok: true, added: r?.added || [], name: r?.name || g.name };
   });
-  if (out.ok) relay.kick();
-  return out;
+  if (out.ok) { relay.kick(); await tellAdded(conversationId, user, out.added, out.name); }
+  return out.ok ? { ok: true } : out;
 }
 
 const renameGroup = (conversationId, user, name) => manage(conversationId, user, async (c) => {
   const title = cleanName(name);
   if (!title) return fail(400, 'Dê um nome ao grupo.');
+  const { rows: [g] } = await c.query('SELECT name FROM chat_conversations WHERE id = $1', [conversationId]);
+  if (g.name === title) return null;
   await c.query('UPDATE chat_conversations SET name = $2 WHERE id = $1', [conversationId, title]);
-  return null;
+  return { event: 'renomeou', text: `${nameOf(user)} mudou o nome do grupo para ${title}`, name: title };
 });
 
 const addMembers = (conversationId, user, ids) => manage(conversationId, user, async (c, g) => {
@@ -183,11 +214,14 @@ const addMembers = (conversationId, user, ids) => manage(conversationId, user, a
   if (!people.length) return fail(400, 'Escolha pelo menos uma pessoa.');
   // quem entra vê o histórico, mas ele não conta como "não lido"
   const upto = num(g.last_message_id) || 0;
+  const already = new Set((await activeIds(c, conversationId)).map(String));
+  const fresh = people.filter((id) => !already.has(String(id)));
+  if (!fresh.length) return fail(409, 'Essas pessoas já estão no grupo.');
   await c.query(
     `INSERT INTO chat_members (conversation_id, user_id, last_read_id, notified_upto) SELECT $1, u, $3, $3 FROM unnest($2::uuid[]) AS u
      ON CONFLICT (conversation_id, user_id) DO UPDATE SET left_at = NULL, role = 'member', joined_at = now(), last_read_id = $3, notified_upto = $3 WHERE chat_members.left_at IS NOT NULL`,
-    [conversationId, people, upto]);
-  return null;
+    [conversationId, fresh, upto]);
+  return { event: 'adicionou', text: `${nameOf(user)} adicionou ${joinNames(await namesOf(c, fresh))}`, added: fresh };
 });
 
 const adminCount = async (c, conversationId) => (await c.query("SELECT count(*)::int AS n FROM chat_members WHERE conversation_id = $1 AND left_at IS NULL AND role = 'admin'", [conversationId])).rows[0].n;
@@ -197,7 +231,7 @@ const removeMember = (conversationId, user, targetId) => manage(conversationId, 
   const target = await memberOf(c, conversationId, targetId);
   if (!target) return fail(404, 'Esta pessoa não está no grupo.');
   await c.query('UPDATE chat_members SET left_at = now() WHERE conversation_id = $1 AND user_id = $2', [conversationId, targetId]);
-  return null;
+  return { event: 'removeu', text: `${nameOf(user)} tirou ${joinNames(await namesOf(c, [targetId]))} do grupo` };
 });
 
 const setRole = (conversationId, user, targetId, role) => manage(conversationId, user, async (c) => {
@@ -221,7 +255,7 @@ async function leaveGroup(conversationId, user) {
     if (me.role === 'admin' && await adminCount(c, conversationId) === 0) {
       await c.query(`UPDATE chat_members SET role = 'admin' WHERE conversation_id = $1 AND user_id = (SELECT user_id FROM chat_members WHERE conversation_id = $1 AND left_at IS NULL ORDER BY joined_at LIMIT 1)`, [conversationId]);
     }
-    await bump(c, conversationId);
+    await addEvent(c, conversationId, user, 'saiu', `${nameOf(user)} saiu do grupo`);
     await emit(c, 'evento.conversa', { conversationId: Number(conversationId), users: before.map(String) });
     return { ok: true };
   });
@@ -240,8 +274,8 @@ async function send({ user, conversationId, clientId, html, attachmentIds = [], 
     if (!await memberOf(c, conversationId, user.id)) return fail(403, 'Você não participa desta conversa.');
     const rev = await bump(c, conversationId);
     if (parentId) {
-      const { rows: [root] } = await c.query('SELECT id, parent_id, deleted_at FROM chat_messages WHERE id = $1 AND conversation_id = $2', [parentId, conversationId]);
-      if (!root || root.parent_id) return fail(404, 'A mensagem original não está disponível.');
+      const { rows: [root] } = await c.query('SELECT id, parent_id, deleted_at, event FROM chat_messages WHERE id = $1 AND conversation_id = $2', [parentId, conversationId]);
+      if (!root || root.parent_id || root.event) return fail(404, 'A mensagem original não está disponível.');
       if (root.deleted_at) return fail(409, 'Esta mensagem foi apagada.');
     }
     const { rows: [m] } = await c.query(
@@ -276,6 +310,7 @@ async function touch(messageId, user, fn) {
     if (!await memberOf(c, conversationId, user.id)) return fail(403, 'Você não participa desta conversa.');
     const rev = await bump(c, conversationId);
     const { rows: [m] } = await c.query('SELECT * FROM chat_messages WHERE id = $1 FOR UPDATE', [messageId]);
+    if (m.event) return fail(409, 'Este aviso do grupo não pode ser alterado.');
     const r = await fn(c, m, rev);
     if (r?.error) return r;
     await c.query('UPDATE chat_messages SET rev = $2 WHERE id = $1', [messageId, rev]);
@@ -305,15 +340,24 @@ const remove = (messageId, user) => touch(messageId, user, async (c, m) => {
   return null;
 });
 
-const react = (messageId, user, emoji) => {
-  if (!EMOJIS.includes(emoji)) return Promise.resolve(fail(400, 'Reação inválida.'));
-  return touch(messageId, user, async (c, m) => {
+async function react(messageId, user, emoji) {
+  if (!EMOJIS.includes(emoji)) return fail(400, 'Reação inválida.');
+  let added = null;
+  const out = await touch(messageId, user, async (c, m) => {
     if (m.deleted_at) return fail(409, 'Esta mensagem foi apagada.');
     const { rowCount } = await c.query('DELETE FROM chat_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3', [m.id, user.id, emoji]);
-    if (!rowCount) await c.query('INSERT INTO chat_reactions (message_id, user_id, emoji) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [m.id, user.id, emoji]);
+    if (!rowCount) { await c.query('INSERT INTO chat_reactions (message_id, user_id, emoji) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [m.id, user.id, emoji]); added = m; }
     return null;
   });
-};
+  // quem escreveu fica sabendo da reação (a própria não avisa; tirar e pôr de novo não repete o aviso)
+  if (!out.error && added && added.author_id && String(added.author_id) !== String(user.id)) {
+    const said = (added.body || 'Áudio ou anexo').replace(/\s+/g, ' ');
+    try {
+      await require('./notify').notify({ type: 'mensagem', users: [added.author_id], title: `${nameOf(user)} reagiu ${emoji} à sua mensagem`, body: said.length > 120 ? `${said.slice(0, 117)}…` : said, url: `/mensagens/${added.conversation_id}`, actorId: user.id, dedupe: `chat-reacao-${added.id}-${user.id}-${emoji}` });
+    } catch (err) { console.error('[mensagens] aviso de reação:', err.message); }
+  }
+  return out;
+}
 
 // Página de mensagens (sem as respostas de thread), da mais antiga para a mais nova.
 async function history(conversationId, { before = null, limit = PAGE } = {}) {
@@ -360,7 +404,7 @@ async function markRead(conversationId, user, upto) {
 const SCOPES = { nao_lidas: 'as não lidas', '24h': 'as últimas 24 horas', '7d': 'os últimos 7 dias', thread: 'esta thread' };
 
 function summaryWhere(s) {
-  const args = [s.conversation_id]; const where = ['x.conversation_id = $1', 'x.deleted_at IS NULL'];
+  const args = [s.conversation_id]; const where = ['x.conversation_id = $1', 'x.deleted_at IS NULL', 'x.event IS NULL'];
   if (s.parent_id) { args.push(s.parent_id); where.push(`(x.id = $${args.length} OR x.parent_id = $${args.length})`); }
   if (s.from_id) { args.push(s.from_id); where.push(`x.id >= $${args.length}`); }
   if (s.since) { args.push(s.since); where.push(`x.created_at >= $${args.length}`); }
@@ -437,12 +481,12 @@ async function runSummary(summaryId) {
 // ---------------------------------------------------------------- avisos (20 s depois: quem leu nesse tempo não recebe)
 async function runNotice({ conversationId, messageId }) {
   const { rows: [m] } = await db.query('SELECT x.*, u.name AS author_name FROM chat_messages x LEFT JOIN users u ON u.id = x.author_id WHERE x.id = $1', [messageId]);
-  if (!m || m.deleted_at) return { skipped: true };
+  if (!m || m.deleted_at || m.event) return { skipped: true };
   // mensagens em sequência viram um aviso só: quem avisa é a última
-  const { rows: newer } = await db.query("SELECT 1 FROM chat_messages WHERE conversation_id = $1 AND id > $2 AND deleted_at IS NULL AND created_at < $3::timestamptz + interval '20 seconds' LIMIT 1", [conversationId, messageId, m.created_at]);
+  const { rows: newer } = await db.query("SELECT 1 FROM chat_messages WHERE conversation_id = $1 AND id > $2 AND deleted_at IS NULL AND event IS NULL AND created_at < $3::timestamptz + interval '20 seconds' LIMIT 1", [conversationId, messageId, m.created_at]);
   if (newer.length) return { skipped: true };
   const { rows: people } = await db.query(
-    `SELECT m.user_id, m.notified_upto, (SELECT count(*)::int FROM chat_messages x WHERE x.conversation_id = m.conversation_id AND x.id > GREATEST(m.last_read_id, m.notified_upto) AND x.id <= $2 AND x.deleted_at IS NULL AND x.author_id IS DISTINCT FROM m.user_id) AS n
+    `SELECT m.user_id, m.notified_upto, (SELECT count(*)::int FROM chat_messages x WHERE x.conversation_id = m.conversation_id AND x.id > GREATEST(m.last_read_id, m.notified_upto) AND x.id <= $2 AND x.deleted_at IS NULL AND x.event IS NULL AND x.author_id IS DISTINCT FROM m.user_id) AS n
        FROM chat_members m WHERE m.conversation_id = $1 AND m.left_at IS NULL AND m.user_id IS DISTINCT FROM $3 AND m.last_read_id < $2 AND m.notified_upto < $2`,
     [conversationId, messageId, m.author_id]);
   if (!people.length) return { notified: 0 };

@@ -66,12 +66,18 @@ self.addEventListener('push', (event) => {
     // painel aberto e em primeiro plano: o aviso flutuante da própria página já mostra; não duplica
     const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (data.tag !== 'teste' && open.some((c) => c.focused && c.visibilityState === 'visible')) return;
+    const chat = data.kind === 'mensagem';
     await self.registration.showNotification(data.title || 'Pulso', {
       body: data.body || '',
       tag: data.tag || undefined,
       icon: '/static/icon-192.png',
       badge: '/static/badge-72.png',
       data: { url: data.url || '/notificacoes' },
+      // mensagem e reação: toca e vibra mesmo substituindo o aviso anterior da conversa, e fica na tela até a pessoa ver
+      silent: false,
+      renotify: Boolean(chat && data.tag),
+      requireInteraction: chat,
+      vibrate: chat ? [200, 90, 200, 90, 320] : [120],
     });
   })());
 });

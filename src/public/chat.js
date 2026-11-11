@@ -78,6 +78,11 @@
   }
   function makeLi(m, opts) {
     const li = document.createElement('li');
+    if (m.event) { // acontecimento do grupo: uma linha discreta, sem ferramentas
+      li.className = 'msg chat-event'; li.dataset.id = m.id; li.dataset.client = m.client_id; li.dataset.author = 'evento'; li.dataset.at = m.created_at;
+      li.innerHTML = `<span class="small">${esc(m.text)}</span> <time class="mono small" datetime="${esc(m.created_at)}">${esc(hourFmt.format(new Date(m.created_at)))}</time>`;
+      return li;
+    }
     li.className = `msg${m.deleted ? ' is-deleted' : ''}`; li.dataset.id = m.id; li.dataset.client = m.client_id; li.dataset.author = m.author_id || ''; li.dataset.at = m.created_at;
     li.innerHTML = msgHtml(m, opts);
     return li;
@@ -93,8 +98,8 @@
       if (newDay) { const d = document.createElement('li'); d.className = 'chat-day mono'; d.textContent = dayLabel(li.dataset.at); li.before(d); }
       const id = Number(li.dataset.id);
       let line = false;
-      if (unread && !marked && id >= unread && li.dataset.author !== me) { marked = true; line = true; const u = document.createElement('li'); u.className = 'chat-unread-line mono'; u.textContent = 'Novas'; li.before(u); }
-      li.classList.toggle('cont', Boolean(prev) && !newDay && !line && prev.dataset.author === li.dataset.author && new Date(li.dataset.at) - new Date(prev.dataset.at) < 300000 && !prev.classList.contains('is-deleted'));
+      if (unread && !marked && id >= unread && li.dataset.author !== me && li.dataset.author !== 'evento') { marked = true; line = true; const u = document.createElement('li'); u.className = 'chat-unread-line mono'; u.textContent = 'Novas'; li.before(u); }
+      li.classList.toggle('cont', Boolean(prev) && !newDay && !line && li.dataset.author !== 'evento' && prev.dataset.author === li.dataset.author && new Date(li.dataset.at) - new Date(prev.dataset.at) < 300000 && !prev.classList.contains('is-deleted'));
       prev = li;
     });
   }

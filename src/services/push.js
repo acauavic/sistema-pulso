@@ -47,7 +47,8 @@ async function sendToUser(userId, payload) {
   let sent = 0;
   for (const s of rows) {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 12 * 3600, urgency: 'normal', timeout: 10_000 }); // serviço de push lento não segura a fila
+      // mensagem é 'high': o Android entrega na hora mesmo com o aparelho em repouso
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 12 * 3600, urgency: payload.kind === 'mensagem' ? 'high' : 'normal', timeout: 10_000 }); // serviço de push lento não segura a fila
       await db.query('UPDATE push_subscriptions SET last_ok_at = now(), failures = 0 WHERE id = $1', [s.id]);
       sent += 1;
     } catch (err) {
@@ -60,7 +61,8 @@ async function sendToUser(userId, payload) {
   return { sent };
 }
 
-const payloadFor = (n) => ({ id: String(n.id), title: n.title, body: n.body || '', url: n.url ? `/notificacoes/${n.id}/abrir` : '/notificacoes', tag: `n-${n.id}` });
+// Mensagem: um alerta por conversa (o novo substitui o anterior e toca de novo: renotify no sw.js).
+const payloadFor = (n) => ({ id: String(n.id), kind: n.type, title: n.title, body: n.body || '', url: n.url ? `/notificacoes/${n.id}/abrir` : '/notificacoes', tag: n.type === 'mensagem' && n.url ? `chat-${n.url}` : `n-${n.id}` });
 
 // Chamado por notify() para cada notificação nova: vai pela fila (leve), fora da requisição.
 async function queue(notification) {
