@@ -98,7 +98,7 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   const canResend = can(req.user.role, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
   const resend = canResend ? await resendChoices(pub) : null;
   res.render('social/publication', {
-    resend,
+    resend, videoTags: await socialApi.videoTags(),
     title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: providers.every((p) => p.live()), provider: providers[0], providers,
     providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
     testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
@@ -198,7 +198,7 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
   const showUsed = req.query.publicados === '1';
   const [clips, images, conn, ls] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), socialApi.connectedAll(), socialApi.liveState()]);
   res.render('social/new', {
-    title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
+    videoTags: await socialApi.videoTags(), title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
     connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), canCover: can(req.user.role, 'covers.edit'), pick: req.query.item || '',
   });
 }));

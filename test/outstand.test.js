@@ -50,6 +50,7 @@ describe('Outstand como terceira via para publicar nas redes', () => {
         state.post = { id: 'op1', scheduled: !state.notScheduled, scheduledAt: null, socialAccounts: accounts.map((a) => ({ id: a.id, network: a.network, username: a.username, status: 'pending', error: null, platformPostId: null, platformPostUrl: null })) };
         return Response.json({ success: true, warnings: ['instagram rejects videos containing edit lists.'], post: state.post }, { status: state.notScheduled ? 202 : 200 });
       }
+      if (method === 'DELETE' && path === '/v1/posts/op1') { state.post = null; return Response.json({ success: true }); }
       if (method === 'PATCH' && path === '/v1/posts/op1') { state.post.scheduled = true; return Response.json({ success: true, rescheduled: true, post: state.post }); }
       if (method === 'GET' && path === '/v1/posts/op1') return state.post ? Response.json({ success: true, post: state.post }) : Response.json({ error: 'Post not found' }, { status: 404 });
       if (method === 'GET' && path === '/v1/posts/nope') return Response.json({ error: 'Post not found' }, { status: 404 });
@@ -63,13 +64,15 @@ describe('Outstand como terceira via para publicar nas redes', () => {
   });
   const sent = () => calls.filter((c) => c.method === 'POST' && c.path === '/v1/posts').at(-1);
 
-  it('monta o corte vertical no formato da Outstand: Shorts, Reel com capa, collab e marcação com x e y, TikTok direto, Reel no Facebook', () => {
+  it('monta o corte vertical no formato da Outstand: Shorts, Reel com capa, collab (marcação só em foto), TikTok direto, Reel no Facebook', () => {
     const accounts = { youtube: { accountId: 'YT1' }, instagram: { accountId: 'IG1' }, tiktok: { accountId: 'TT1' }, facebook: { accountId: 'FB1' } };
     const b = ost.buildPost({ id: 7, kind: 'clip', platforms: ['youtube', 'instagram', 'tiktok', 'facebook'], title: 'Saúde e negócios', description: 'Legenda do corte #pulso', videoUrl: 'https://b2.test/v/corte.mp4?X-Amz-Signature=abc', coverUrl: 'https://b2.test/c.jpg', tags: ['saude'], accounts, instagram: { collaborators: ['lia.prado', 'marca'], tags: [{ username: 'ana.foto' }] } });
     assert.deepEqual(b.accounts, ['YT1', 'IG1', 'TT1', 'FB1']);
     assert.deepEqual(b.containers, [{ content: 'Legenda do corte #pulso', media: [{ url: 'https://b2.test/v/corte.mp4?X-Amz-Signature=abc', filename: 'corte.mp4' }] }]);
     assert.equal(b.youtube.title, 'Saúde e negócios'); assert.equal(b.youtube.isShort, true); assert.equal(b.youtube.privacyStatus, 'public'); assert.equal(b.youtube.content, 'Legenda do corte #pulso'); assert.equal(b.youtube.thumbnailUrl, undefined, 'Shorts não levam capa pela API');
-    assert.equal(b.instagram.reelCoverUrl, 'https://b2.test/c.jpg'); assert.deepEqual(b.instagram.collaborators, ['lia.prado', 'marca']); assert.deepEqual(b.instagram.userTags, [{ username: 'ana.foto', x: 0.5, y: 0.5 }], 'a Outstand exige x e y');
+    assert.equal(b.instagram.reelCoverUrl, 'https://b2.test/c.jpg'); assert.deepEqual(b.instagram.collaborators, ['lia.prado', 'marca']); assert.equal(b.instagram.userTags, undefined, 'a Outstand exige x e y e o Instagram recusa posição em vídeo: no Reel a marcação fica de fora');
+    assert.match(b._notes[0], /@ana\.foto ficou de fora\. Para o post aparecer no perfil da pessoa, use o collab/);
+    assert.equal(ost.heavy(400 * 1024 * 1024), true, 'acima de 300 MB a Outstand ajusta o vídeo'); assert.equal(ost.heavy(260 * 1024 * 1024), false);
     assert.equal(b.tiktok.postMode, 'DIRECT_POST'); assert.equal(b.facebook.publishAsReel, true);
     assert.ok(b.idempotency.startsWith('pulso-7-')); assert.deepEqual(b._missing, []);
     assert.equal(b.processMedia, undefined, 'sem ajustar o vídeo, nada é refeito (nem cobrado)');
@@ -176,6 +179,30 @@ describe('Outstand como terceira via para publicar nas redes', () => {
       assert.equal(done.results.find((r) => r.platform === 'youtube').url, 'https://www.youtube.com/watch?v=yt123');
       assert.match(done.results.find((r) => r.platform === 'tiktok').error, /reached_active_user_cap/);
       assert.equal((await q('SELECT youtube_url FROM episodes WHERE id = $1', [ep.id]))[0].youtube_url, null, 'link de corte não vira o link do episódio');
+    } finally { h.config.outstand.live = false; }
+  });
+
+  it('envio parado na Outstand: depois de 30 min cancela lá, a rede vira nova tentativa e o reenvio pede o vídeo ajustado', async () => {
+    h.config.outstand.live = true; ost.resetCache(); state.accounts = ACCOUNTS();
+    try {
+      calls.length = 0;
+      const pub = await publishing.create({ clipId: clip.id, platforms: ['instagram'], title: 'Corte parado', description: 'Legenda', userId: u.gestao.id });
+      assert.equal(pub.status, 'enviando'); assert.equal(sent().body.processMedia, undefined, 'arquivo leve vai como está');
+      assert.equal(pub.options.clip, clip.id, 'a publicação guarda o corte (se ele for apagado, nunca vira o episódio)');
+      assert.equal((await publishing.refresh(pub.id)).status, 'enviando', 'antes de 30 min, só espera');
+      assert.ok(!calls.some((c) => c.method === 'DELETE'));
+      await q("UPDATE publication_attempts SET started_at = now() - interval '31 minutes' WHERE publication_id = $1", [pub.id]);
+      const done = await publishing.refresh(pub.id);
+      assert.ok(calls.some((c) => c.method === 'DELETE' && c.path === '/v1/posts/op1'), 'cancelou o post parado na Outstand (não sai depois, duplicado)');
+      assert.equal(done.status, 'erro');
+      const ig = done.results.find((r) => r.platform === 'instagram');
+      assert.equal(ig.code, 'travado'); assert.ok(ig.retry_at, 'volta sozinho'); assert.match(ig.hint, /cancelamos lá, e a próxima tentativa manda o vídeo ajustado/);
+      assert.equal(done.options.process_media, true);
+      const due = new Date(Date.now() - 1000).toISOString();
+      await q('UPDATE episode_publications SET retry_at = $2, results = $3 WHERE id = $1', [pub.id, due, JSON.stringify(done.results.map((r) => ({ ...r, retry_at: due })))]);
+      calls.length = 0;
+      await publishing.retryDue();
+      assert.equal(sent().body.processMedia, true, 'a nova tentativa manda a Outstand ajustar o vídeo');
     } finally { h.config.outstand.live = false; }
   });
 

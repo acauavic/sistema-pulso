@@ -294,6 +294,14 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     const ig = E.classify('Error publishing Instagram post: Failed to create Instagram media container: 400 - {"error":{"message":"Invalid user id","type":"OAuthException","code":110,"error_subcode":2207018,"is_transient":false,"error_user_title":"Cannot load user with a private profile or invalid username","error_user_msg":"The following user(s) cannot be accessed: acauvic"}}');
     assert.equal(ig.code, 'ig_perfil'); assert.equal(ig.terminal, true);
     assert.match(ig.hint, /não encontrou o perfil @acauvic do collab ou da marcação/);
+    // pub 42 (10/11): marcação com posição em vídeo vinha como "reconectar a conta" (OAuthException), e a conta estava boa
+    const tag = E.classify('Error publishing Instagram post: Failed to create Instagram media container: 400 - {"error":{"message":"Invalid parameter","type":"OAuthException","code":100,"error_subcode":2207064,"is_transient":false,"error_user_title":"Invalid user tag position for video media","error_user_msg":"User tag positions should not be specified for video media."}}');
+    assert.equal(tag.code, 'ig_marcacao'); assert.equal(tag.terminal, true); assert.match(tag.hint, /A conta do Pulso está conectada/);
+    assert.equal(E.classify('400 - {"error":{"message":"Invalid parameter","type":"OAuthException","code":100,"error_subcode":2207999,"is_transient":false}}').code, 'formato', 'parâmetro inválido é o post, não a conta');
+    const blip = E.classify('400 - {"error":{"message":"An unexpected error has occurred","type":"OAuthException","code":2,"is_transient":true}}');
+    assert.equal(blip.code, 'rede'); assert.ok(blip.retryAt, 'o que a Meta marca como passageiro tenta de novo');
+    assert.equal(E.classify('{"error":{"message":"Error validating access token: Session has expired","type":"OAuthException","code":190}}').code, 'conta', 'token vencido continua pedindo para reconectar');
+    assert.equal(E.classify('', { code: 'travado' }).kind, 'rede');
   });
 
   it('duração por rede: corte de 2 min não agenda Reels do Facebook (a Outstand recusaria o post inteiro); no X é só aviso', async () => {

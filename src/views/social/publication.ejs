@@ -174,7 +174,7 @@
     <label><%= pub.media === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" value="<%= resend.text.title %>" maxlength="300" required></label>
     <label><%= pub.media === 'video' ? 'Descrição / legenda' : 'Legenda' %><textarea name="description" rows="6" maxlength="5000"><%= resend.text.description || '' %></textarea></label>
     <p class="small muted">O texto vale só para as redes marcadas. O que já está no ar não muda.</p>
-    <% if (pub.media !== 'story') { %><%- include('../partials/ig-people', { episodeId: pub.episode_id, photo: resend.photo, img: resend.img ? '/capas/' + resend.img + '/imagem' : '', initial: igNow }) %><% } %>
+    <% if (pub.media !== 'story') { %><%- include('../partials/ig-people', { episodeId: pub.episode_id, photo: resend.photo, img: resend.img ? '/capas/' + resend.img + '/imagem' : '', initial: igNow, videoTags }) %><% } %>
     <div class="row modal-actions">
       <button class="btn primary" type="submit" data-resend-go>Reenviar</button>
       <button class="btn ghost" type="button" data-modal-close>Cancelar</button>

@@ -91,6 +91,20 @@ describe('Instagram: collab e marcação na publicação', () => {
   it('pela tela "Novo post": o pedido guarda collab e marcação e o envio leva os campos para a rede', async () => {
     const page = (await as.gestao.get('/social/novo?tipo=imagem')).text;
     assert.match(page, /data-ig-people/); assert.match(page, /data-photo="1"/); assert.match(page, /static\/igpeople\.js/);
+    // vídeo com o Instagram pela Outstand: ela não marca pessoas em vídeo (o Instagram recusa a posição), então só aparece o collab
+    const settings = require('../src/services/settings');
+    await settings.set('social_routes', JSON.stringify({ instagram: 'outstand' }));
+    const conf = h.config.outstandConfigured; h.config.outstandConfigured = true;
+    try {
+      assert.equal(await require('../src/services/socialApi').videoTags(), false);
+      const ejs = require('ejs'); const { icon } = require('../src/utils/icons');
+      const part = (locals) => ejs.renderFile(require('path').join(__dirname, '../src/views/partials/ig-people.ejs'), { icon, assetV: 't', ...locals });
+      const vid = await part({ photo: false, videoTags: false });
+      assert.match(vid, /<strong>Collab<\/strong>/); assert.doesNotMatch(vid, /Marcar pessoas/);
+      assert.match(await part({ photo: true, videoTags: false }), /Marcar pessoas/, 'em imagem a marcação continua');
+      assert.match(await part({ photo: false }), /Marcar pessoas/, 'por outro provedor, o vídeo também marca');
+      assert.match((await as.gestao.get('/social/novo?tipo=imagem')).text, /Marcar pessoas/);
+    } finally { h.config.outstandConfigured = conf; await settings.set('social_routes', '{}'); }
     assert.match(page, new RegExp(`value="${cover.id}" data-episode="${ep.id}"`), 'cada item diz de qual episódio é (para sugerir o convidado)');
     const r = await as.gestao.act('/social/publicar', { tipo: 'imagem', cover_ids: String(cover.id), platforms: 'instagram', title: 'Frase', description: 'Legenda', confirmar: '1', ig_collab: ['@lia.prado', 'marca.parceira'], ig_tag: ['ana.foto|0.25|0.6'] }, { from: '/social/novo' });
     assert.equal(r.status, 302, r.text);

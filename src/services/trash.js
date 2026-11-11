@@ -16,6 +16,7 @@ const ATTACH_TYPE = { tasks: 'task', content_requests: 'content_request', commen
 // Colunas que guardam o caminho de um arquivo no Backblaze.
 const FILE_COLUMNS = { episode_files: 'storage_key', episode_clips: 'storage_key', episode_covers: 'storage_key', episode_frames: 'storage_key', sponsor_files: 'storage_key', attachments: 'storage_key', guests: 'photo_key', plateia_partners: 'logo_key', clip_versions: 'storage_key' };
 
+const PUB_PENDING = "clip_id::text = $1 AND (status IN ('agendado','revisao') OR retry_at IS NOT NULL)";
 const epTag = (n) => (n ? `EP.${String(n).padStart(3, '0')}` : '');
 const COVER_KINDS = { youtube_thumb: 'Thumbnail do YouTube', reel_cover: 'Capa de Reels/TikTok', post_quote: 'Post de frase', post_split: 'Tela dividida', carousel: 'Carrossel', entrega: 'Imagem entregue' };
 const KINDS = {
@@ -23,7 +24,11 @@ const KINDS = {
   guest: { table: 'guests', label: 'Convidado', title: (r) => r.name, url: (r) => `/convidados/${r.id}` },
   sponsor: { table: 'sponsors', label: 'Patrocinador', title: (r) => r.company, url: (r) => `/patrocinadores/${r.id}` },
   task: { table: 'tasks', label: 'Tarefa', title: (r) => r.title, url: (r) => `/tarefas/${r.id}` },
-  clip: { table: 'episode_clips', label: 'Corte', title: (r) => r.title, url: (r) => `/cortes/${r.id}` },
+  // as publicações do corte que ainda não saíram param junto (sem o vídeo, nada a mandar) e voltam como estavam se o corte for restaurado
+  clip: { table: 'episode_clips', label: 'Corte', title: (r) => r.title, url: (r) => `/cortes/${r.id}`,
+    states: (id) => [{ table: 'episode_publications', where: PUB_PENDING, params: [String(id)] }],
+    before: (id) => (q) => q(`UPDATE episode_publications SET status = CASE WHEN status IN ('agendado','revisao') THEN 'erro' ELSE status END, retry_at = NULL,
+      error = 'O corte foi para a lixeira: esta publicação não sai.', updated_at = now() WHERE ${PUB_PENDING}`, [String(id)]) },
   cover: { table: 'episode_covers', label: 'Imagem', title: (r) => r.label || COVER_KINDS[r.kind] || 'Imagem', url: (r) => (r.request_id ? `/conteudo/pedidos/${r.request_id}` : r.clip_id ? `/cortes/${r.clip_id}` : '/conteudo?vista=posts') },
   request: { table: 'content_requests', label: 'Pedido de conteúdo', title: (r) => r.title, url: (r) => `/conteudo/pedidos/${r.id}` },
   episode_file: { table: 'episode_files', label: 'Arquivo do episódio', title: (r) => r.filename, url: (r) => `/episodios/${r.episode_id}#material` },
@@ -118,11 +123,12 @@ async function remove(kind, id, { user = null, batch = null, extra = [], states 
   const q = (text, params) => client.query(text, params);
   try {
     await q('BEGIN');
-    const snap = await capture(q, def.table, id, { extra, states });
+    const snap = await capture(q, def.table, id, { extra, states: [...states, ...(def.states ? def.states(id) : [])] });
     if (!snap) { await q('ROLLBACK'); return null; }
     const root = snap.rows[0].row;
     const context = await contextOf(q, kind, root);
     if (before) await before(q);
+    if (def.before) await def.before(id)(q);
     // apaga o item (o banco leva a cascata) e o que não tem chave estrangeira (comentários, anexos, extras), da última para a primeira
     const m = await schema(q);
     const tables = [...new Set(snap.rows.map((r) => r.table))].reverse();

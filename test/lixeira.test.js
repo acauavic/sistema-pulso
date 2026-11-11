@@ -2,6 +2,7 @@ const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const trash = require('../src/services/trash');
+const publishing = require('../src/services/publishing');
 
 describe('Lixeira e ações em massa no Conteúdo', () => {
   let app; const as = {}; const u = {}; let ep; let ep2;
@@ -59,6 +60,28 @@ describe('Lixeira e ações em massa no Conteúdo', () => {
     assert.equal((await q("SELECT 1 FROM comments WHERE entity_type = 'clip' AND entity_id = $1", [c.id])).length, 1);
     assert.equal((await q('SELECT clip_id FROM episode_publications WHERE id = $1', [pub.id]))[0].clip_id, c.id, 'a publicação volta a apontar para o corte');
     assert.equal((await q('SELECT 1 FROM trash_items')).length, 0);
+  });
+
+  it('apagar um corte para as publicações dele que ainda não saíram (nunca sai o episódio no lugar); Desfazer devolve o agendamento', async () => {
+    const c = await clip('Corte agendado');
+    const [ag] = await q("INSERT INTO episode_publications (episode_id, clip_id, title, platforms, status, scheduled_at, options) VALUES ($1, $2, 'Post agendado', '{instagram,tiktok}', 'agendado', now() + interval '1 day', '{}') RETURNING *", [ep.id, c.id]);
+    const [yt] = await q("INSERT INTO episode_publications (episode_id, clip_id, title, platforms, status, retry_at, options) VALUES ($1, $2, 'Short', '{youtube}', 'erro', now() + interval '1 hour', $3) RETURNING *", [ep.id, c.id, JSON.stringify({ clip: c.id })]);
+    const [ok] = await q("INSERT INTO episode_publications (episode_id, clip_id, title, platforms, status) VALUES ($1, $2, 'Já saiu', '{instagram}', 'publicado') RETURNING *", [ep.id, c.id]);
+    const r = await act('gestao', `/cortes/${c.id}/excluir`, {});
+    const [a] = await q('SELECT * FROM episode_publications WHERE id = $1', [ag.id]);
+    assert.equal(a.status, 'erro'); assert.equal(a.clip_id, null); assert.match(a.error, /O corte foi para a lixeira/);
+    const [b] = await q('SELECT * FROM episode_publications WHERE id = $1', [yt.id]);
+    assert.equal(b.retry_at, null, 'nova tentativa marcada não sai sem o corte');
+    assert.equal((await q('SELECT status FROM episode_publications WHERE id = $1', [ok.id]))[0].status, 'publicado', 'o que já saiu fica como está');
+    assert.equal(publishing.orphanClip(a), true); assert.equal(publishing.orphanClip(b), true, 'Short sem o corte não vira o episódio inteiro no YouTube');
+    await q("UPDATE episode_publications SET status = 'agendado' WHERE id = $1", [a.id]);
+    const d = await publishing.dispatch(a.id, { trigger: 'agendado' });
+    assert.equal(d.status, 'erro'); assert.ok(d.results.every((x) => x.code === 'removido'), 'nada foi enviado no lugar do corte');
+    const batch = await undoAfter('gestao', r.location);
+    await act('gestao', `/lixeira/lote/${batch}/restaurar`, { voltar: '/conteudo' });
+    const [back] = await q('SELECT * FROM episode_publications WHERE id = $1', [ag.id]);
+    assert.equal(back.status, 'agendado'); assert.equal(back.clip_id, c.id); assert.equal(back.error, null);
+    assert.ok((await q('SELECT retry_at FROM episode_publications WHERE id = $1', [yt.id]))[0].retry_at, 'a nova tentativa volta marcada');
   });
 
   it('episódio vai com tarefas, cortes e o financeiro cancelado; restaurar devolve o lançamento como era', async () => {

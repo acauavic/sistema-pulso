@@ -24,9 +24,11 @@ const PROVIDERS = {
     connected: (o) => ost.connected(o), resetCache: () => ost.resetCache(),
     // o vídeo e as imagens chegam aqui já hospedados no armazenamento da Outstand (publishing.prepareMedia): o TikTok só busca de
     // domínio verificado, e se a hospedagem falha a publicação espera e tenta de novo (nunca sai com o link do Backblaze)
-    sendVideo: async (args) => ost.send({ ...ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: await ost.processMedia() }), _durationSec: args.durationSec || null }),
+    // ajusta o vídeo para cada rede se a gestão ligou em Integrações, se o arquivo é pesado (ost.heavy) ou se o envio anterior travou
+    sendVideo: async (args) => ost.send({ ...ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: Boolean(args.processMedia) || ost.heavy(args.sizeBytes) || await ost.processMedia() }), _durationSec: args.durationSec || null }),
     sendPhotos: async (args) => ost.send(ost.buildPhotoPost({ ...args, tiktokMode: await ost.tiktokMode() })),
     status: ({ request_id, job_id }) => ost.status({ request_id, job_id }),
+    cancel: (requestId) => ost.cancel(requestId),
     canEdit: false, // a Outstand só edita post que ainda não saiu (e o agendamento é nosso): depois de publicado, edite pelo app da rede
   },
   zernio: {
@@ -98,6 +100,8 @@ async function plan(platforms) {
   for (const net of platforms) { const id = map[net] || (await activeId()); if (!groups.has(id)) groups.set(id, []); groups.get(id).push(net); }
   return [...groups].map(([id, nets]) => ({ provider: PROVIDERS[id], platforms: nets }));
 }
+// Marcar pessoas em vídeo do Instagram: a Outstand exige posição e o Instagram recusa posição em vídeo, então por ela não vai.
+const videoTags = async () => (await plan(['instagram']))[0]?.provider.id !== 'outstand';
 // Contas conectadas por rede, cada uma vinda do provedor que atende a rede: { ok, platforms: { rede: { handle, reauth, provider… } }, errors }.
 async function connectedAll({ force = false } = {}) {
   const map = await routeMap(); const ids = [...new Set(Object.values(map))];
@@ -160,4 +164,4 @@ function sentMessage(pub, { trail = '' } = {}) {
   return `Enviado ${joinNames(ps.map((x) => x.to))}.${trail}`;
 }
 
-module.exports = { syncLive, setLive, liveSource, sentMessage, PROVIDERS, PLATFORMS: up.PLATFORMS, DEFAULTS: up.DEFAULTS, MAX_LINK_SECONDS: up.MAX_LINK_SECONDS, get, active, activeId, state, choose, list, routes, setRoutes, routeMap, plan, connectedAll, providersOf, joinNames, liveState };
+module.exports = { videoTags, syncLive, setLive, liveSource, sentMessage, PROVIDERS, PLATFORMS: up.PLATFORMS, DEFAULTS: up.DEFAULTS, MAX_LINK_SECONDS: up.MAX_LINK_SECONDS, get, active, activeId, state, choose, list, routes, setRoutes, routeMap, plan, connectedAll, providersOf, joinNames, liveState };

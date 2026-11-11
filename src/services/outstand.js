@@ -120,14 +120,24 @@ const setProcessMedia = (on) => settings.set('outstand_process_media', on ? 'tru
 
 const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && !(Array.isArray(v) && !v.length)));
 
-// Collab e marcação do Instagram no formato da Outstand: userTags exige x e y (vídeo não usa posição: centro).
+// Collab e marcação do Instagram no formato da Outstand. userTags exige x e y, e o Instagram recusa posição em vídeo ("User tag
+// positions should not be specified for video media", erro de 10/11/2026): por isso a marcação só vai em foto; no Reel, só o collab.
 function instagramData(ig, { photo = false } = {}) {
   if (!ig) return {};
   const d = {};
   if (ig.collaborators?.length) d.collaborators = ig.collaborators.slice(0, 3);
-  if (ig.tags?.length) d.userTags = ig.tags.map((t) => ({ username: t.username, x: t.x ?? 0.5, y: t.y ?? (photo ? 0.85 : 0.5) }));
+  if (photo && ig.tags?.length) d.userTags = ig.tags.map((t) => ({ username: t.username, x: t.x ?? 0.5, y: t.y ?? 0.85 }));
   return d;
 }
+// Aviso na publicação quando a marcação ficou de fora do vídeo.
+const videoTagNote = (ig) => (ig?.tags?.length
+  ? [`Marcação no Reel não vai pela Outstand (o Instagram só aceita marcar pessoas em foto por ela): ${ig.tags.map((t) => `@${String(t.username).replace(/^@/, '')}`).join(', ')} ficou de fora. Para o post aparecer no perfil da pessoa, use o collab.`]
+  : []);
+
+// Vídeo pesado demais para mandar como está: acima disso a Outstand ajusta o vídeo (1080p, até 10 Mbps) antes de mandar às redes.
+// Corte 4K de 622 MB ficou horas parado na Outstand (11/11/2026); os de até 260 MB saíram como estavam.
+const HEAVY_BYTES = 300 * 1024 * 1024;
+const heavy = (size) => Number(size) > HEAVY_BYTES;
 
 // Opções de cada rede (o bloco com o nome da rede). Devolve { instagram?, youtube?, tiktok?, facebook? }.
 function networkBlocks(platforms, { kind, media, title, description, coverUrl, thumbnailUrl, tags, instagram, tiktokPostMode }) {
@@ -175,6 +185,7 @@ function buildPost({ id, kind, platforms, title, description, videoUrl, coverUrl
     ...(scheduledAt ? { scheduledAt } : {}), // só para testes: o agendamento do painel é nosso e o envio é imediato
     ...networkBlocks(platforms, { kind, media: 'video', title, description, coverUrl, thumbnailUrl, tags, instagram, tiktokPostMode }),
     _missing: missingOf(platforms, accounts), _networks: platforms, _accountOf: accountMap(platforms, accounts), _tiktok: accounts.tiktok?.accountId, idempotency: key || idempotencyKey(id),
+    _notes: platforms.includes('instagram') ? videoTagNote(instagram) : [],
   };
 }
 
@@ -239,7 +250,7 @@ async function tiktokCreator(accountId) {
 // Envia. Devolve { simulated, request_id (id do post na Outstand), job_id, results, preFailed, done, fieldNames, warnings }. Sem OUTSTAND_LIVE não chama nada.
 // A rede que não dá para mandar (sem conta, TikTok sem a privacidade ou com vídeo longo demais) falha SÓ ela: as outras seguem.
 async function send(body) {
-  const { idempotency, _missing: missing = [], _networks: networks = [], _tiktok: tiktokId = null, _accountOf: accountOf = {}, _durationSec: durationSec = null, ...payload } = body;
+  const { idempotency, _missing: missing = [], _networks: networks = [], _tiktok: tiktokId = null, _accountOf: accountOf = {}, _durationSec: durationSec = null, _notes: notes = [], ...payload } = body;
   const names = Object.keys(payload);
   const rascunho = payload.tiktok?.postMode === 'MEDIA_UPLOAD';
   if (!config.outstand.live) return { simulated: true, status: 'simulado', fieldNames: names, results: networks.map((p) => ({ platform: p, ok: true, simulated: true, status: 'simulado', url: null, error: null })) };
@@ -265,7 +276,13 @@ async function send(body) {
     if (payload.accounts.includes(id) && !got.has(id)) preFailed.push({ platform: p, code: 'sem_conta', error: 'A Outstand não reconheceu a conta conectada desta rede. Teste a conexão em Integrações e reconecte a conta.' });
   }
   const failedRows = preFailed.map((f) => ({ platform: f.platform, ok: false, skipped: false, status: 'failed', url: null, post_id: null, error: f.error, code: f.code || null }));
-  return { simulated: false, request_id: post.id, job_id: rascunho ? 'tiktok-rascunho' : null, results: [...normalizeResults(post, { draft: rascunho }), ...failedRows], preFailed, done: false, fieldNames: names, warnings: json.warnings || [] };
+  return { simulated: false, request_id: post.id, job_id: rascunho ? 'tiktok-rascunho' : null, results: [...normalizeResults(post, { draft: rascunho }), ...failedRows], preFailed, done: false, fieldNames: names, warnings: [...notes, ...(json.warnings || [])] };
+}
+
+// Cancela um post que ainda não saiu: DELETE /v1/posts/:id tira o envio da fila deles e apaga o post. 404: já não existe (cancelado).
+async function cancel(requestId) {
+  try { await call('DELETE', `/v1/posts/${encodeURIComponent(requestId)}`, { timeout: 20_000 }); } catch (err) { if (err.status !== 404) throw err; }
+  return true;
 }
 
 // O arquivo vai antes para o armazenamento da Outstand (POST /v1/media/upload -> PUT -> confirm, 60 dias): o TikTok só busca de domínio
@@ -338,4 +355,4 @@ async function status({ request_id, job_id = null }) {
   return { state, results, error };
 }
 
-module.exports = { NETWORKS, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator };
+module.exports = { NETWORKS, HEAVY_BYTES, heavy, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator };

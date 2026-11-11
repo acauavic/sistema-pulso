@@ -231,7 +231,8 @@ async function buildCovers(clipId, userId = null) {
   }
   const { rows: [cur] } = await db.query('SELECT cover_id FROM episode_clips WHERE id = $1', [clipId]);
   const keep = cur.cover_id && (await db.query('SELECT 1 FROM episode_covers WHERE id = $1', [cur.cover_id])).rows.length;
-  if (!keep && rows[0]) await db.query('UPDATE episode_clips SET cover_id = $2, updated_at = now() WHERE id = $1', [clipId, rows[0].id]);
+  // duas refações ao mesmo tempo (atribuir em massa): a outra pode ter apagado estas capas; liga a primeira que ainda existe
+  if (!keep && rows[0]) await db.query('UPDATE episode_clips SET cover_id = (SELECT id FROM episode_covers WHERE clip_id = $1 ORDER BY (id = $2) DESC, position, id DESC LIMIT 1), updated_at = now() WHERE id = $1', [clipId, rows[0].id]);
   return rows;
 }
 

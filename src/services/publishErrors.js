@@ -38,6 +38,13 @@ const RULES = [
   // perfil no collab ou marcado que o Instagram não acha (privado ou nome errado): vem como OAuthException 110, mas a conta está boa
   { re: /2207018|private profile or invalid username|user\(s\) cannot be accessed/i, code: 'ig_perfil', kind: 'conteudo',
     hint: (m) => { const who = (m.input.match(/cannot be accessed:\s*([\w.,@ ]+)/i)?.[1] || '').split(/[,\s]+/).filter(Boolean).map((h) => `@${h.replace(/^@/, '')}`); return `O Instagram não encontrou ${who.length ? (who.length > 1 ? `os perfis ${who.join(', ')}` : `o perfil ${who[0]}`) : 'um perfil'} do collab ou da marcação (conta privada ou nome errado). A conta do Pulso está conectada: tire ou corrija esse perfil e publique de novo no Instagram`; } },
+  // marcação com posição em vídeo (a Outstand exige x/y e o Instagram recusa em vídeo): vem como OAuthException, mas a conta está boa
+  { re: /user tag positions? (?:should not|for video)|invalid user tag position/i, code: 'ig_marcacao', kind: 'conteudo',
+    hint: () => 'O Instagram recusou a marcação de pessoas no vídeo (pela Outstand ela só vale em foto). A conta do Pulso está conectada: reenvie no Instagram, que a marcação fica de fora (use o collab para aparecer no perfil da pessoa)' },
+  // a Meta manda quase todo erro como OAuthException: o que ela marca como passageiro tenta de novo; parâmetro inválido (100) ou erro
+  // de mídia (2207xxx) é o post, não a conta. Conta para reconectar fica para o token (190) e as frases de acesso abaixo.
+  { re: /"is_transient"\s*:\s*true/i, code: 'rede', kind: 'rede', wait: (t) => backoff(t), hint: () => 'Falha passageira na rede' },
+  { re: /"error_subcode"\s*:\s*2207\d{3}|"code"\s*:\s*100\b/i, code: 'formato', kind: 'conteudo', hint: () => 'A rede recusou o arquivo ou um campo do post (veja a resposta abaixo)' },
   { re: /access_token_invalid|scope_not_authorized|token (?:has )?expired|expired token|access token|re-?auth|reconnect|session has been invalidated|oauthexception|invalid_grant|unauthori[sz]ed|\b401\b|not authorized|needs? reconnection/i,
     code: 'conta', kind: 'conta', hint: () => 'A conta desta rede precisa ser reconectada em Integrações > Redes sociais' },
   { re: /duplicate|already been posted|identical content|content already exists/i, code: 'repetido', kind: 'conteudo', hint: () => 'A rede recusou por ser conteúdo repetido' },
@@ -64,6 +71,7 @@ const OWN = {
   tiktok_privado: { kind: 'conta', hint: 'O app do TikTok só publica como privado: em Integrações, mande o TikTok como rascunho' },
   interrompido: { kind: 'rede', hint: 'O envio foi interrompido (o servidor reiniciou no meio)' },
   sem_resposta: { kind: 'conteudo', hint: 'O provedor não respondeu sobre este envio por mais de 2 dias' },
+  travado: { kind: 'rede', hint: 'A Outstand não andou com o envio por mais de 30 minutos (o normal é sair em segundos): cancelamos lá, e a próxima tentativa manda o vídeo ajustado para as redes' },
 };
 
 // tries: quantas tentativas esta rede já teve, contando a que acabou de falhar.

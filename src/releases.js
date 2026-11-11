@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.63.2', date: '2026-11-11', title: 'Publicação nas redes mais segura',
+    items: [
+      { kind: 'correcao', text: 'Marcar pessoas num Reel fazia o Instagram recusar o post (pela Outstand ele só aceita marcação em foto). Agora, no vídeo, o campo "Marcar pessoas" não aparece (fica só o collab), e uma marcação antiga sai do envio com um aviso na publicação.' },
+      { kind: 'correcao', text: 'Recusas do Instagram que não têm a ver com a conta (marcação, formato, campo inválido) não pedem mais para reconectar a conta; falha que a própria Meta marca como passageira tenta de novo sozinha.' },
+      { kind: 'correcao', text: 'Envio parado na Outstand por mais de 30 minutos é cancelado lá (para não sair depois, repetido) e tenta de novo com o vídeo ajustado para as redes. Corte acima de 300 MB já vai ajustado (1080p).' },
+      { kind: 'correcao', text: 'Apagar um corte para as publicações dele que ainda não saíram, e "Desfazer" devolve o agendamento. Antes, uma publicação sem o corte podia ser tratada como se fosse do episódio inteiro.' },
+    ],
+  },
+  {
     version: '1.63.1', date: '2026-11-11', title: 'Mensagens com aviso próprio e lembretes para a produção',
     items: [
       { kind: 'ajuste', text: 'Mensagens não entram mais na lista de Notificações nem no número do sino. O aviso de mensagem, menção, reação e "adicionou você ao grupo" chega no celular com som e vibração, aparece em destaque no painel aberto e soma no contador de Mensagens.' },

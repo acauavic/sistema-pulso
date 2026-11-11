@@ -27,6 +27,14 @@ const names = (list) => list.map(labelOf).join(', ');
 // enviado ou lido de novo, o conserto mais comum de um arquivo ruim) espera e tenta de novo.
 const targetError = (code, message) => Object.assign(new Error(message), { code });
 
+// Publicação de corte cujo corte foi apagado: o banco zera clip_id (ON DELETE SET NULL) e ela pareceria do episódio inteiro. Nunca
+// manda o episódio no lugar do corte: o episódio inteiro só vai ao YouTube, e a publicação de corte guarda o corte em options.clip.
+const orphanClip = (pub) => pub.media === 'video' && !pub.clip_id && (Boolean(pub.options?.clip) || (pub.platforms || []).some((p) => p !== 'youtube'));
+function targetOf(pub) {
+  if (orphanClip(pub)) return Promise.reject(targetError('removido', 'O corte desta publicação foi apagado.'));
+  return loadTarget({ episodeId: pub.episode_id, clipId: pub.clip_id, media: pub.media, coverIds: pub.cover_ids });
+}
+
 async function loadTarget({ episodeId, clipId, media = 'video', coverIds = [] }) {
   if (media !== 'video') { // imagens geradas no editor de capas (post, carrossel, story)
     const ids = [...new Set((coverIds || []).map(Number).filter(Number.isInteger))];
@@ -114,7 +122,7 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
       ({ rows: [pub] } = await client.query(
         `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-        [row.episodeId, row.clipId, list, row.title, description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(routesMap ? { routes: routesMap } : {}), ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
+        [row.episodeId, row.clipId, list, row.title, description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(row.clipId ? { clip: row.clipId } : {}), ...(routesMap ? { routes: routesMap } : {}), ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
           target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, row.coverIds, provider.id]));
     }
     await client.query('COMMIT');
@@ -198,7 +206,7 @@ async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {
   const attempt = await startAttempt(pub.id, trigger, platforms);
   let outcomes = [];
   try {
-    const target = await loadTarget({ episodeId: pub.episode_id, clipId: pub.clip_id, media: pub.media, coverIds: pub.cover_ids });
+    const target = await targetOf(pub);
     // agendado/revisão: sai pelos provedores atuais na hora de enviar (a gestão pode ter trocado nesse meio-tempo)
     const groups = await social.plan(platforms);
     const planned = Object.fromEntries(groups.flatMap((g) => g.platforms.map((p) => [p, g.provider.id])));
@@ -217,6 +225,7 @@ async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {
             id: pub.id, kind: target.kind, platforms: g.platforms, title: g.title, description: g.description, videoUrl: media.videoFor(g),
             coverUrl: target.kind === 'clip' ? media.coverFor(g) : null, thumbnailUrl: target.kind === 'episode' ? media.coverFor(g) : null, tags: pub.options?.tags || [], accounts: conn.platforms,
             instagram: pub.options?.instagram || null, durationSec: target.durationMs ? target.durationMs / 1000 : null, idempotencyKey: key,
+            sizeBytes: target.size || null, processMedia: Boolean(pub.options?.process_media),
           });
         outcomes.push({ g, sent, key });
       } catch (err) { outcomes.push({ g, error: err, key }); }
@@ -427,6 +436,7 @@ async function refresh(pubId) {
   try {
     const sts = [];
     for (const part of parts) sts.push({ part, st: await social.get(part.provider).status({ request_id: part.request_id, job_id: part.job_id }) });
+    await stallCheck(pub, sts);
     const sendErrors = pub.options?.send_errors || [];
     const kept = pub.options?.kept_results || []; // o que já tinha saído antes de um reenvio parcial
     const errNets = new Set(sendErrors.map((e) => e.platform));
@@ -462,6 +472,31 @@ async function refresh(pubId) {
     console.error(`[publicação ${pub.id}] não consegui consultar o status:`, err.message);
     return pub;
   }
+}
+
+// Envio parado na Outstand: o normal é sair em segundos (alguns minutos, se ela ajusta o vídeo). Passado STALL_MS da tentativa com
+// alguma rede ainda "pendente", cancela o post lá (para não sair depois, duplicado) e essas redes viram falha passageira: a próxima
+// tentativa cria um post novo, com o vídeo ajustado para as redes (process_media). Se o cancelamento falhar, segue esperando.
+const STALL_MS = Number(process.env.PUBLISH_STALL_MIN || 30) * 60_000;
+async function stallCheck(pub, sts) {
+  const stuck = sts.filter(({ part, st }) => part.provider === 'outstand' && part.request_id && st.state === 'enviando');
+  if (!stuck.length) return [];
+  const attempt = await openAttempt(pub.id);
+  const since = Date.parse(attempt?.started_at || pub.created_at);
+  if (!Number.isFinite(since) || Date.now() - since < STALL_MS) return [];
+  const done = [];
+  for (const x of stuck) {
+    try { await social.get('outstand').cancel(x.part.request_id); } catch (err) { console.warn(`[publicação ${pub.id}] envio parado na Outstand, não consegui cancelar ${x.part.request_id}: ${err.message}`); continue; }
+    const results = (x.st.results || []).map((r) => (r.status === 'processing' ? { ...r, ok: false, status: 'failed', error: 'A Outstand não andou com o envio por mais de 30 minutos: cancelamos lá.', code: 'travado' } : r));
+    x.st = { state: finalState(results), results, error: null };
+    done.push(x.part);
+    console.warn(`[publicação ${pub.id}] envio parado na Outstand desde ${new Date(since).toISOString()}: cancelado (${x.part.request_id})`);
+  }
+  if (done.length) {
+    await db.query("UPDATE episode_publications SET options = options || '{\"process_media\": true}'::jsonb WHERE id = $1", [pub.id]);
+    pub.options = { ...(pub.options || {}), process_media: true };
+  }
+  return done;
 }
 
 // Se a rede não conseguiu baixar a cópia hospedada na Outstand, a próxima tentativa sobe o arquivo de novo.
@@ -575,7 +610,7 @@ async function precheckScheduled() {
   if (!pub) return null;
   const precheck = { at: new Date().toISOString(), ok: true };
   try {
-    const target = await loadTarget({ episodeId: pub.episode_id, clipId: pub.clip_id, media: pub.media, coverIds: pub.cover_ids });
+    const target = await targetOf(pub);
     const groups = await social.plan(pub.platforms);
     if (groups.some((g) => g.provider.live())) await prepareMedia(pub, target, groups);
   } catch (err) {
@@ -614,7 +649,7 @@ async function resend(pubId, { platforms = [], title, description, instagram } =
   // a mesma conferência de quando se publica, só para as redes que vão agora
   const nt = String(title ?? cur.title); const nd = String(description ?? cur.description ?? '');
   let target;
-  try { target = await loadTarget({ episodeId: cur.episode_id, clipId: cur.clip_id, media: cur.media, coverIds: cur.cover_ids }); } catch (err) { return { error: err.message }; }
+  try { target = await targetOf(cur); } catch (err) { return { error: err.message }; }
   const check = target.kind === 'photo'
     ? up.validatePhotos({ media: cur.media, platforms: targets, title: nt, description: nd, scheduledAt: null, count: target.covers.length })
     : up.validate({ kind: target.kind, platforms: targets, title: nt, description: nd, scheduledAt: null });
@@ -771,4 +806,4 @@ async function resubmit(pubId, user) {
   return pub || null;
 }
 
-module.exports = { networkOf, parseLinks, markManual, createManual, loadTarget, create, dispatch, refresh, tick, retry, resend, textOf, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };
+module.exports = { stallCheck, orphanClip, networkOf, parseLinks, markManual, createManual, loadTarget, create, dispatch, refresh, tick, retry, resend, textOf, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };
