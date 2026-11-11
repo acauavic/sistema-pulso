@@ -75,13 +75,13 @@ router.get('/notificacoes', wrap(async (req, res) => {
   const pg = pageOf(req, 100);
   const [raw, counts, mutes] = await Promise.all([
     notifySvc.list(req.user.id, { type, unread, limit: pg.limit, offset: pg.offset }),
-    db.query('SELECT type, count(*) FILTER (WHERE read_at IS NULL)::int AS unread FROM notifications WHERE user_id = $1 GROUP BY type', [req.user.id]),
+    db.query('SELECT type, count(*)::int AS total, count(*) FILTER (WHERE read_at IS NULL)::int AS unread FROM notifications WHERE user_id = $1 GROUP BY type', [req.user.id]),
     db.query('SELECT type FROM notification_mutes WHERE user_id = $1', [req.user.id]),
   ]);
   const { rows: items, pager } = paginate(req, raw, pg);
   res.render('notifications/index', {
     title: 'Notificações', items, pager, type, unread, types: C.NOTIFICATION_TYPES,
-    unreadBy: Object.fromEntries(counts.rows.map((r) => [r.type, r.unread])), muted: mutes.rows.map((r) => r.type),
+    unreadBy: Object.fromEntries(counts.rows.map((r) => [r.type, r.unread])), totalBy: Object.fromEntries(counts.rows.map((r) => [r.type, r.total])), muted: mutes.rows.map((r) => r.type),
     pushKey: push.publicKey(), tab: 'avisos', dueNow: (await reminders.queue()).now.length,
   });
 }));

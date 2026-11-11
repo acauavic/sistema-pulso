@@ -60,7 +60,7 @@ describe('Reações com emoji nos comentários', () => {
   it('o aviso liga por padrão; quem silencia "Reações" deixa de receber, e a reação continua valendo; a gestão desliga para todos', async () => {
     const page = (await as.ana.get('/notificacoes')).text;
     assert.match(page, /name="silenciar" value="reacao" *>/, 'ligado por padrão: caixa de silenciar desmarcada');
-    assert.match(page, /Silenciar reações/);
+    assert.match(page, /Silenciar tipos de aviso/); assert.match(page, /value="reacao" *> Reações/);
     await as.ana.act('/notificacoes/preferencias', { silenciar: ['reacao'] }, { from: '/notificacoes' });
     const n0 = (await notes('ana')).length;
     const r = await react('bia', 'comment', cid, '❤️');

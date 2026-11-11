@@ -78,6 +78,28 @@
   }
   window.PulsoPush = { enable, state, explain, isIos, standalone };
 
+  // ---------------------------------------------------------------- Notificações: cartão "Ligue os alertas neste aparelho"
+  // Só aparece quando ligar é possível e ainda não foi feito (ou no iPhone fora do app instalado, explicando o caminho).
+  const banner = document.querySelector('[data-push-banner]');
+  async function paintBanner() {
+    if (!banner) return;
+    const st = await state();
+    const on = banner.querySelector('[data-push-banner-on]');
+    const txt = banner.querySelector('[data-push-banner-text]');
+    banner.hidden = !(st === 'off' || st === 'ios-browser');
+    on.hidden = st !== 'off';
+    if (st === 'ios-browser') txt.textContent = 'No iPhone: toque em Compartilhar > Adicionar à Tela de Início e abra o Pulso por lá para receber os alertas.';
+  }
+  if (banner) {
+    banner.querySelector('[data-push-banner-on]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget; btn.disabled = true;
+      try { await enable(); banner.hidden = true; window.pulsoToast?.({ title: 'Alertas ligados neste aparelho', body: 'Os avisos chegam mesmo com o Pulso fechado.' }); document.dispatchEvent(new Event('pulso:push')); } catch (err) {
+        const [msg, tip] = explain(err); banner.querySelector('[data-push-banner-text]').textContent = tip ? `${msg} ${tip}` : msg;
+      } finally { btn.disabled = false; }
+    });
+    paintBanner();
+  }
+
   // ---------------------------------------------------------------- Notificações > Alertas neste aparelho
   const box = document.querySelector('[data-push]');
   if (!box) return;
@@ -95,7 +117,7 @@
       show(false); btnOn.hidden = true;
       return say('Este navegador não recebe alertas.', isIos && !standalone ? 'No iPhone: toque em Compartilhar > Adicionar à Tela de Início e abra o Pulso por lá para ligar os alertas.' : 'Use Chrome, Edge, Firefox ou Safari atualizados.');
     }
-    if (Notification.permission === 'denied') { show(false); btnOn.hidden = true; return say('Alertas bloqueados neste navegador.', 'Libere as notificações nas configurações do site (cadeado ao lado do endereço) e recarregue a página.'); }
+    if (Notification.permission === 'denied') { show(false); btnOn.hidden = true; return say('Alertas bloqueados neste aparelho.', standalone ? 'Libere as notificações do Pulso nos ajustes do celular (Ajustes > Notificações > Pulso, ou segure o ícone do app > Informações > Notificações) e abra o app de novo.' : 'Libere as notificações nas configurações do site (cadeado ao lado do endereço) e recarregue a página.'); }
     if (!key) { show(false); btnOn.hidden = true; return say('Alertas com o painel fechado ainda não estão configurados no servidor.'); }
     const sub = await currentSub();
     show(Boolean(sub));
@@ -108,7 +130,7 @@
     try {
       if (await Notification.requestPermission() !== 'granted') return render();
       await enable();
-      await render();
+      await render(); paintBanner();
     } catch (err) {
       say(...explain(err));
       // a permissão foi dada: com a aba aberta o alerta do sistema funciona (reserva); deixa tentar de novo
@@ -118,8 +140,9 @@
   btnOff.addEventListener('click', async () => {
     const sub = await currentSub();
     if (sub) { await post('/notificacoes/push/sair', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
-    render();
+    render(); paintBanner();
   });
+  document.addEventListener('pulso:push', render);
   btnTest.addEventListener('click', async () => {
     btnTest.disabled = true;
     try { await post('/notificacoes/push/teste', {}); say('Alerta de teste enviado. Deve aparecer em alguns segundos.'); } catch (err) { say(err.message); } finally { btnTest.disabled = false; }

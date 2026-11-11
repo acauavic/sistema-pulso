@@ -94,6 +94,10 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
     it('a página lista, filtra por tipo e o resumo traz o contador de não lidas', async () => {
       const page = (await as.editor.get('/notificacoes')).text;
       assert.match(page, /Tarefa A/); assert.match(page, /Análise pronta/);
+      const chips = page.slice(page.indexOf('class="filter-list"'), page.indexOf('</nav>', page.indexOf('class="filter-list"')));
+      assert.match(chips, /Tarefas/); assert.match(chips, /Rotinas do sistema/);
+      assert.doesNotMatch(chips, /Financeiro|Plateia/, 'o filtro só mostra os tipos que a pessoa já recebeu');
+      assert.ok(page.indexOf('Tarefa A') < page.indexOf('id="notif-config"'), 'a lista vem antes; alertas e silenciar ficam na janela');
       assert.match((await as.editor.get('/notificacoes?tipo=tarefa')).text, /Tarefa A/);
       assert.doesNotMatch((await as.editor.get('/notificacoes?tipo=tarefa')).text, /Análise pronta/);
       const r = await json(as.editor, 'GET', '/notificacoes/resumo');

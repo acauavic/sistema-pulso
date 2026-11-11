@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.62.1', date: '2026-11-10', title: 'Notificações mais simples no celular',
+    items: [
+      { kind: 'ajuste', text: 'Notificações abre direto na lista de avisos. O filtro por tipo virou uma linha de botões que desliza e mostra só os tipos que você já recebeu.' },
+      { kind: 'ajuste', text: 'Alertas do aparelho, som das mensagens e "silenciar" ficam no botão Alertas, no topo. Se os alertas estiverem desligados neste aparelho, um cartão curto acima da lista oferece ligar.' },
+      { kind: 'ajuste', text: 'Cada aviso mostra a hora ("23:33" hoje, "09/11 08:13" em outro dia) e o botão de marcar como lida virou um ícone. Avisos de mensagem ganharam o ícone deles.' },
+      { kind: 'correcao', text: 'No celular, o aviso "Sistema atualizado" cobria os botões do topo da página. Agora ele aparece embaixo, acima do assistente.' },
+    ],
+  },
+  {
     version: '1.62.0', date: '2026-11-10', title: 'Insights de todas as redes e mensagens que avisam',
     items: [
       { kind: 'novo', text: 'Insights mostra cada rede pela conta em que ela está conectada: Instagram, Facebook, TikTok e Threads pela Outstand; YouTube e X pela Zernio. Resumo com seguidores e a variação em 7 dias, e uma aba por rede com os números dos últimos 30 dias (visualizações, alcance, curtidas, comentários, compartilhados, salvos e Stories), o gráfico de seguidores por dia e os posts que mais renderam.' },
