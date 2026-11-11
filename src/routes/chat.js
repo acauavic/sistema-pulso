@@ -31,6 +31,10 @@ router.get('/mensagens', use, page);
 router.get('/mensagens/nao-lidas', use, wrap(async (req, res) => res.json({ ok: true, n: await chat.unreadCount(req.user.id) })));
 router.get('/mensagens/conversas', use, wrap(async (req, res) => res.json({ ok: true, conversations: await chat.listConversations(req.user.id) })));
 router.get('/mensagens/:id(\\d+)', use, page);
+// # numa mensagem: episódios, cortes, convidados, patrocinadores, publicações e tarefas que a pessoa pode ver
+router.get('/mensagens/referencias', use, wrap(async (req, res) => res.set('Cache-Control', 'no-store').json({ ok: true, items: await require('../services/search').references(req.query.q, req.user) })));
+// minha preferência para grupos (tudo | mencoes)
+router.post('/mensagens/avisos', use, wrap(async (req, res) => out(res, await chat.setDefaultNotify(req.user, req.body.modo))));
 
 router.post('/mensagens/conversas', use, wrap(async (req, res) => {
   if (req.body.tipo === 'grupo') return out(res, await chat.createGroup(req.user, req.body.nome, req.body.pessoas));
@@ -43,6 +47,7 @@ router.post('/mensagens/conversas/:id/nome', use, member, wrap(async (req, res) 
 router.post('/mensagens/conversas/:id/pessoas', use, member, wrap(async (req, res) => out(res, await chat.addMembers(req.params.id, req.user, req.body.pessoas))));
 router.post('/mensagens/conversas/:id/pessoas/:uid/remover', use, member, wrap(async (req, res) => (isUuid(req.params.uid) ? out(res, await chat.removeMember(req.params.id, req.user, req.params.uid)) : nope(res))));
 router.post('/mensagens/conversas/:id/pessoas/:uid/papel', use, member, wrap(async (req, res) => (isUuid(req.params.uid) ? out(res, await chat.setRole(req.params.id, req.user, req.params.uid, req.body.papel)) : nope(res))));
+router.post('/mensagens/conversas/:id/avisos', use, member, wrap(async (req, res) => out(res, await chat.setNotify(req.params.id, req.user, req.body.modo))));
 router.post('/mensagens/conversas/:id/sair', use, member, wrap(async (req, res) => out(res, await chat.leaveGroup(req.params.id, req.user))));
 
 router.get('/mensagens/conversas/:id/mensagens', use, member, wrap(async (req, res) => res.json({ ok: true, ...await chat.history(req.params.id, { before: intOr(req.query.antes), limit: intOr(req.query.limite, 50) }) })));

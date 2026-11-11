@@ -49,6 +49,22 @@ const nameOf = (user) => user.name || 'Alguém';
 const joinNames = (items) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} e ${items.at(-1)}` : items[0] || '');
 const namesOf = async (c, ids) => (await c.query('SELECT name FROM users WHERE id = ANY($1::uuid[]) ORDER BY name', [ids])).rows.map((r) => r.name || 'Sem nome');
 
+// @menções num grupo: quem participa e foi citado por "@Nome completo" (ou "@Primeiro", se ninguém mais no grupo tem esse primeiro nome),
+// e "@todos". Conversa individual não tem menção: a outra pessoa já recebe tudo.
+const lower = (v) => String(v || '').toLocaleLowerCase('pt-BR');
+async function findMentions(c, conversationId, text, authorId) {
+  const body = lower(text);
+  if (!body.includes('@')) return { mentions: [], all: false };
+  const { rows: [conv] } = await c.query('SELECT kind FROM chat_conversations WHERE id = $1', [conversationId]);
+  if (conv?.kind !== 'group') return { mentions: [], all: false };
+  const hit = (needle) => { let i = body.indexOf(`@${needle}`); while (i >= 0) { const after = body[i + needle.length + 1]; if (!after || !/[\p{L}\p{N}]/u.test(after)) return true; i = body.indexOf(`@${needle}`, i + 1); } return false; };
+  const { rows: people } = await c.query('SELECT u.id, u.name FROM chat_members m JOIN users u ON u.id = m.user_id WHERE m.conversation_id = $1 AND m.left_at IS NULL', [conversationId]);
+  const firsts = {};
+  for (const u of people) { const f = lower(u.name).split(/\s+/)[0]; firsts[f] = (firsts[f] || 0) + 1; }
+  const mentions = people.filter((u) => String(u.id) !== String(authorId) && (hit(lower(u.name)) || (firsts[lower(u.name).split(/\s+/)[0]] === 1 && hit(lower(u.name).split(/\s+/)[0])))).map((u) => u.id);
+  return { mentions, all: hit('todos') };
+}
+
 const memberOf = async (q, conversationId, userId) => (await q.query('SELECT * FROM chat_members WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL', [conversationId, userId])).rows[0] || null;
 
 async function canSeeMessage(userId, messageId) {
@@ -82,7 +98,7 @@ async function views(rows) {
     const name = m.author_id ? names.get(String(m.author_id)) || 'Sem nome' : 'Ex-integrante';
     return {
       id: Number(m.id), rev: Number(m.rev), conversation_id: Number(m.conversation_id), parent_id: num(m.parent_id), client_id: m.client_id,
-      author_id: m.author_id, author: name, initials: fmt.initials(name), html: deleted ? '' : m.body_html || '', text: deleted ? '' : m.body, event: m.event || null,
+      author_id: m.author_id, author: name, initials: fmt.initials(name), html: deleted ? '' : m.body_html || '', text: deleted ? '' : m.body, event: m.event || null, mentions: deleted ? [] : (m.mentions || []).map(String), mention_all: !deleted && Boolean(m.mention_all),
       created_at: m.created_at, edited: Boolean(m.edited_at) && !deleted, deleted, reply_count: m.reply_count, last_reply_at: m.last_reply_at,
       reactions: deleted ? [] : (byMsg[m.id] || []).sort((a, b) => EMOJIS.indexOf(a.emoji) - EMOJIS.indexOf(b.emoji)), attachments: deleted ? [] : files[m.id] || [],
     };
@@ -103,16 +119,22 @@ function conversationView(r) {
     last_message_id: num(r.last_id), last_at: r.last_message_at || r.created_at,
     preview: preview.replace(/\s+/g, ' ').slice(0, 120), preview_author: r.last_author_name && !direct && !r.last_event ? fmt.firstName(r.last_author_name) : null,
     members: r.members,
+    notify: r.notify || null, // escolha desta conversa (nulo = padrão)
+    notify_effective: r.notify || (direct ? 'tudo' : r.chat_notify || 'tudo'),
+    my_default: r.chat_notify || 'tudo',
+    mentions_unread: r.mentions_unread || 0,
   };
 }
 
 const LIST_SQL = `
-  SELECT c.*, m.role, m.last_read_id, ${UNREAD} AS unread,
+  SELECT c.*, m.role, m.last_read_id, m.notify, me.chat_notify, ${UNREAD} AS unread,
+         (SELECT count(*)::int FROM chat_messages x WHERE x.conversation_id = c.id AND x.id > m.last_read_id AND x.deleted_at IS NULL AND x.event IS NULL
+             AND x.author_id IS DISTINCT FROM m.user_id AND (x.mention_all OR m.user_id = ANY(x.mentions))) AS mentions_unread,
          (SELECT count(*)::int FROM chat_members a WHERE a.conversation_id = c.id AND a.left_at IS NULL) AS members,
          (SELECT u.name FROM chat_members o JOIN users u ON u.id = o.user_id WHERE o.conversation_id = c.id AND o.user_id <> m.user_id LIMIT 1) AS other_name,
          l.id AS last_id, l.body AS last_body, l.event AS last_event, l.deleted_at IS NOT NULL AS last_deleted, la.name AS last_author_name,
          (SELECT a.kind FROM attachments a WHERE a.entity_type = 'chat' AND a.entity_id = l.id ORDER BY a.id LIMIT 1) AS last_kind
-    FROM chat_members m JOIN chat_conversations c ON c.id = m.conversation_id
+    FROM chat_members m JOIN chat_conversations c ON c.id = m.conversation_id JOIN users me ON me.id = m.user_id
     LEFT JOIN chat_messages l ON l.id = c.last_message_id LEFT JOIN users la ON la.id = l.author_id
    WHERE m.user_id = $1 AND m.left_at IS NULL`;
 
@@ -278,10 +300,11 @@ async function send({ user, conversationId, clientId, html, attachmentIds = [], 
       if (!root || root.parent_id || root.event) return fail(404, 'A mensagem original não está disponível.');
       if (root.deleted_at) return fail(409, 'Esta mensagem foi apagada.');
     }
+    const tags = await findMentions(c, conversationId, rich.text, user.id);
     const { rows: [m] } = await c.query(
-      `INSERT INTO chat_messages (conversation_id, parent_id, author_id, client_id, body, body_html, rev) VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO chat_messages (conversation_id, parent_id, author_id, client_id, body, body_html, rev, mentions, mention_all) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (author_id, client_id) DO NOTHING RETURNING *`,
-      [conversationId, parentId, user.id, clientId, rich.text.slice(0, 4000), rich.html || null, rev]);
+      [conversationId, parentId, user.id, clientId, rich.text.slice(0, 4000), rich.html || null, rev, tags.mentions, tags.all]);
     if (!m) return { duplicate: true }; // já recebida: o clique repetido ou a nova tentativa da rede não cria outra
     if (ids.length) await c.query("UPDATE attachments SET entity_type = 'chat', entity_id = $2 WHERE id = ANY($1::int[]) AND entity_id IS NULL AND uploaded_by = $3", [ids, m.id, user.id]);
     await c.query('UPDATE chat_conversations SET last_message_id = $2, last_message_at = $3 WHERE id = $1', [conversationId, m.id, m.created_at]);
@@ -322,16 +345,50 @@ async function touch(messageId, user, fn) {
   return { message: (await viewsByIds([messageId]))[0] };
 }
 
-const edit = (messageId, user, html) => touch(messageId, user, async (c, m) => {
+async function edit(messageId, user, html) {
+  let fresh = []; let conv = null;
+  const out = await editRaw(messageId, user, html, (ids, cid) => { fresh = ids; conv = cid; });
+  if (!out.error && fresh.length) await mentionNotice({ conversationId: conv, messageId, users: fresh, actor: user, edited: true });
+  return out;
+}
+const editRaw = (messageId, user, html, onFresh) => touch(messageId, user, async (c, m) => {
   if (String(m.author_id) !== String(user.id)) return fail(403, 'Só quem enviou pode editar.');
   if (m.deleted_at) return fail(409, 'Esta mensagem foi apagada.');
   const rich = richText.sanitize(html || '');
   const { rows: [{ n }] } = await c.query("SELECT count(*)::int AS n FROM attachments WHERE entity_type = 'chat' AND entity_id = $1", [m.id]);
   if (!rich.text && !rich.html && !n) return fail(400, 'A mensagem não pode ficar vazia. Para tirar, apague.');
   if (rich.attachmentIds.length) await c.query("UPDATE attachments SET entity_type = 'chat', entity_id = $2 WHERE id = ANY($1::int[]) AND entity_id IS NULL AND uploaded_by = $3", [rich.attachmentIds, m.id, user.id]);
-  await c.query('UPDATE chat_messages SET body = $2, body_html = $3, edited_at = now() WHERE id = $1', [m.id, rich.text.slice(0, 4000), rich.html || null]);
+  const tags = await findMentions(c, m.conversation_id, rich.text, user.id);
+  await c.query('UPDATE chat_messages SET body = $2, body_html = $3, mentions = $4, mention_all = $5, edited_at = now() WHERE id = $1', [m.id, rich.text.slice(0, 4000), rich.html || null, tags.mentions, tags.all]);
+  const before = new Set((m.mentions || []).map(String));
+  onFresh(tags.mentions.filter((id) => !before.has(String(id))), m.conversation_id); // quem passou a ser marcado na edição recebe o aviso
   return null;
 });
+
+// Avisa na hora quem foi marcado numa mensagem editada (respeita "nada" da conversa).
+async function mentionNotice({ conversationId, messageId, users, actor }) {
+  const { rows: people } = await db.query("SELECT user_id FROM chat_members WHERE conversation_id = $1 AND left_at IS NULL AND user_id = ANY($2::uuid[]) AND coalesce(notify, '') <> 'nada'", [conversationId, users]);
+  if (!people.length) return;
+  const { rows: [conv] } = await db.query('SELECT name FROM chat_conversations WHERE id = $1', [conversationId]);
+  const { rows: [m] } = await db.query('SELECT body FROM chat_messages WHERE id = $1', [messageId]);
+  const said = String(m?.body || '').replace(/\s+/g, ' ');
+  try {
+    await require('./notify').notify({ type: 'mensagem', users: people.map((p) => p.user_id), title: `${nameOf(actor)} mencionou você em ${conv?.name || 'uma conversa'}`, body: said.length > 160 ? `${said.slice(0, 157)}…` : said, url: `/mensagens/${conversationId}`, actorId: actor.id, dedupe: `chat-mencao-${messageId}-edit` });
+  } catch (err) { console.error('[mensagens] aviso de menção:', err.message); }
+}
+
+// Avisos desta conversa: 'padrao' (segue a preferência da pessoa) | tudo | mencoes | nada.
+async function setNotify(conversationId, user, mode) {
+  if (!['padrao', 'tudo', 'mencoes', 'nada'].includes(mode)) return fail(400, 'Escolha como quer ser avisado.');
+  await db.query('UPDATE chat_members SET notify = $3 WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL', [conversationId, user.id, mode === 'padrao' ? null : mode]);
+  return { ok: true, conversation: await detail(conversationId, user.id) };
+}
+// Preferência da pessoa para grupos: tudo | mencoes (conversa individual sempre avisa).
+async function setDefaultNotify(user, mode) {
+  if (!['tudo', 'mencoes'].includes(mode)) return fail(400, 'Escolha como quer ser avisado.');
+  await db.query('UPDATE users SET chat_notify = $2 WHERE id = $1', [user.id, mode]);
+  return { ok: true };
+}
 
 const remove = (messageId, user) => touch(messageId, user, async (c, m) => {
   if (String(m.author_id) !== String(user.id)) return fail(403, 'Só quem enviou pode apagar.');
@@ -350,7 +407,8 @@ async function react(messageId, user, emoji) {
     return null;
   });
   // quem escreveu fica sabendo da reação (a própria não avisa; tirar e pôr de novo não repete o aviso)
-  if (!out.error && added && added.author_id && String(added.author_id) !== String(user.id)) {
+  const quiet = added ? (await db.query("SELECT 1 FROM chat_members WHERE conversation_id = $1 AND user_id = $2 AND notify = 'nada'", [added.conversation_id, added.author_id])).rows.length > 0 : true;
+  if (!out.error && added && !quiet && added.author_id && String(added.author_id) !== String(user.id)) {
     const said = (added.body || 'Áudio ou anexo').replace(/\s+/g, ' ');
     try {
       await require('./notify').notify({ type: 'mensagem', users: [added.author_id], title: `${nameOf(user)} reagiu ${emoji} à sua mensagem`, body: said.length > 120 ? `${said.slice(0, 117)}…` : said, url: `/mensagens/${added.conversation_id}`, actorId: user.id, dedupe: `chat-reacao-${added.id}-${user.id}-${emoji}` });
@@ -485,12 +543,22 @@ async function runNotice({ conversationId, messageId }) {
   // mensagens em sequência viram um aviso só: quem avisa é a última
   const { rows: newer } = await db.query("SELECT 1 FROM chat_messages WHERE conversation_id = $1 AND id > $2 AND deleted_at IS NULL AND event IS NULL AND created_at < $3::timestamptz + interval '20 seconds' LIMIT 1", [conversationId, messageId, m.created_at]);
   if (newer.length) return { skipped: true };
-  const { rows: people } = await db.query(
-    `SELECT m.user_id, m.notified_upto, (SELECT count(*)::int FROM chat_messages x WHERE x.conversation_id = m.conversation_id AND x.id > GREATEST(m.last_read_id, m.notified_upto) AND x.id <= $2 AND x.deleted_at IS NULL AND x.event IS NULL AND x.author_id IS DISTINCT FROM m.user_id) AS n
-       FROM chat_members m WHERE m.conversation_id = $1 AND m.left_at IS NULL AND m.user_id IS DISTINCT FROM $3 AND m.last_read_id < $2 AND m.notified_upto < $2`,
+  const range = 'x.conversation_id = m.conversation_id AND x.id > GREATEST(m.last_read_id, m.notified_upto) AND x.id <= $2 AND x.deleted_at IS NULL AND x.event IS NULL AND x.author_id IS DISTINCT FROM m.user_id';
+  const { rows: everyone } = await db.query(
+    `SELECT m.user_id, m.notified_upto, m.notify, u.chat_notify,
+            (SELECT count(*)::int FROM chat_messages x WHERE ${range}) AS n,
+            (SELECT count(*)::int FROM chat_messages x WHERE ${range} AND (x.mention_all OR m.user_id = ANY(x.mentions))) AS mn
+       FROM chat_members m JOIN users u ON u.id = m.user_id
+      WHERE m.conversation_id = $1 AND m.left_at IS NULL AND m.user_id IS DISTINCT FROM $3 AND m.last_read_id < $2 AND m.notified_upto < $2`,
     [conversationId, messageId, m.author_id]);
-  if (!people.length) return { notified: 0 };
+  if (!everyone.length) return { notified: 0 };
   const { rows: [conv] } = await db.query('SELECT kind, name FROM chat_conversations WHERE id = $1', [conversationId]);
+  // quem escolheu "nada", ou "só menções" sem ter sido marcado, não recebe; conversa individual segue "tudo" por padrão
+  const modeOf = (p) => p.notify || (conv.kind === 'direct' ? 'tudo' : p.chat_notify || 'tudo');
+  const people = everyone.filter((p) => modeOf(p) === 'tudo' || (modeOf(p) === 'mencoes' && p.mn > 0));
+  const skipped = everyone.filter((p) => !people.includes(p));
+  for (const p of skipped) await db.query('UPDATE chat_members SET notified_upto = GREATEST(notified_upto, $3) WHERE conversation_id = $1 AND user_id = $2', [conversationId, p.user_id, messageId]);
+  if (!people.length) return { notified: 0 };
   const { rows: [att] } = await db.query("SELECT kind FROM attachments WHERE entity_type = 'chat' AND entity_id = $1 ORDER BY id LIMIT 1", [messageId]);
   const said = m.body || (att?.kind === 'audio' ? 'Áudio' : 'Anexo');
   const preview = said.length > 160 ? `${said.slice(0, 157)}…` : said;
@@ -499,7 +567,8 @@ async function runNotice({ conversationId, messageId }) {
     const count = Math.max(1, p.n);
     const who = m.author_name || 'Alguém';
     let title;
-    if (conv.kind === 'group') title = count > 1 ? `${conv.name}: ${count} mensagens novas` : `${who} em ${conv.name}`;
+    if (conv.kind === 'group' && p.mn > 0) title = `${who} mencionou você em ${conv.name}`;
+    else if (conv.kind === 'group') title = count > 1 ? `${conv.name}: ${count} mensagens novas` : `${who} em ${conv.name}`;
     else title = count > 1 ? `${who}: ${count} mensagens novas` : `${who} enviou uma mensagem`;
     // a chave repetida não cria outro aviso: se esta tarefa rodar duas vezes, a pessoa recebe um só
     await notify({ type: 'mensagem', users: [p.user_id], title, body: conv.kind === 'group' && count === 1 ? preview : `${fmt.firstName(who)}: ${preview}`, url: `/mensagens/${conversationId}`, actorId: m.author_id, dedupe: `chat-${conversationId}-${messageId}` });
@@ -542,6 +611,6 @@ async function stop() {
 }
 
 module.exports = {
-  EMOJIS, SCOPES, canSeeMessage, listConversations, detail, unreadCount, openDirect, createGroup, renameGroup, addMembers, removeMember, setRole, leaveGroup,
+  EMOJIS, SCOPES, canSeeMessage, listConversations, detail, setNotify, setDefaultNotify, findMentions, unreadCount, openDirect, createGroup, renameGroup, addMembers, removeMember, setRole, leaveGroup,
   send, edit, remove, react, history, thread, conversationOf, changes, markRead, requestSummary, getSummary, runSummary, runNotice, handleTask, handleLive, memberOf, start, stop,
 };

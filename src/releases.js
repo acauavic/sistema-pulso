@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.63.0', date: '2026-11-11', title: 'Marcar pessoas e citar itens nas mensagens',
+    items: [
+      { kind: 'novo', text: 'Nos grupos, escreva @ e escolha a pessoa para marcá-la; @todos marca o grupo inteiro. Quem foi marcado recebe "fulano mencionou você", e a conversa ganha um @ na lista.' },
+      { kind: 'novo', text: 'Escreva # para citar um episódio, corte, convidado, patrocinador, publicação ou tarefa: o item entra na mensagem como um link clicável, que abre a página dele. Vale nos grupos e nas conversas individuais.' },
+      { kind: 'novo', text: 'Você escolhe como quer ser avisado. Em Notificações > Alertas: mensagens de grupo, todas ou só quando marcarem você (conversa individual e reação à sua mensagem sempre avisam). Em cada conversa, tocando no nome dela: padrão, todas, só quando me marcarem ou nenhum.' },
+      { kind: 'ajuste', text: 'O som toca no instante em que a mensagem chega, se a conversa avisa você e você não está olhando para ela.' },
+    ],
+  },
+  {
     version: '1.62.1', date: '2026-11-10', title: 'Notificações mais simples no celular',
     items: [
       { kind: 'ajuste', text: 'Notificações abre direto na lista de avisos. O filtro por tipo virou uma linha de botões que desliza e mostra só os tipos que você já recebeu.' },

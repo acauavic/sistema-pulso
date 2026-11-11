@@ -48,7 +48,7 @@
       + `<span class="avatar sm">${c.kind === 'group' ? ic('users') : esc(c.initials)}</span>`
       + `<span class="chat-item-main"><span class="chat-item-top"><strong>${esc(c.name)}</strong><time class="mono small muted">${c.last_at ? esc(when(c.last_at)) : ''}</time></span>`
       + `<span class="chat-item-prev small muted">${c.preview_author ? `${esc(c.preview_author)}: ` : ''}${esc(c.preview || (c.kind === 'group' ? 'Grupo criado' : 'Sem mensagens'))}</span></span>`
-      + `${c.unread ? `<span class="nav-count">${c.unread}</span>` : ''}</a>`).join('');
+      + `${c.mentions_unread ? '<span class="chat-at" title="Marcaram você">@</span>' : ''}${c.unread ? `<span class="nav-count">${c.unread}</span>` : ''}${c.notify_effective === 'nada' ? '<span class="mono small muted chat-muted" title="Sem avisos desta conversa">mudo</span>' : ''}</a>`).join('');
   }
   const refreshConvs = debounce(async () => {
     try { S.convs = (await api('/mensagens/conversas')).conversations; paintConvs(); } catch { /* a próxima conferência acerta */ }
@@ -67,7 +67,7 @@
   };
   function msgHtml(m, { inThread = false } = {}) {
     const mine = String(m.author_id) === me;
-    const body = m.deleted ? '<p class="msg-deleted small muted">Mensagem apagada</p>' : `${m.html ? `<div class="rich-content msg-text">${m.html}</div>` : ''}${filesHtml(m)}`;
+    const body = m.deleted ? '<p class="msg-deleted small muted">Mensagem apagada</p>' : `${m.html ? `<div class="rich-content msg-text" data-mentions="1"${m.mention_all ? ' data-mentions-all="1"' : ''}>${m.html}</div>` : ''}${filesHtml(m)}`;
     const replies = !inThread && m.reply_count ? `<button type="button" class="msg-replies small" data-chat-open-thread>${ic('message-square')} ${m.reply_count} ${m.reply_count === 1 ? 'resposta' : 'respostas'}${m.last_reply_at ? ` <span class="mono muted">${esc(when(m.last_reply_at))}</span>` : ''}</button>` : '';
     const tools = m.deleted ? '' : `<div class="msg-tools">`
       + `<button type="button" class="icon-btn" data-chat-react-open aria-label="Reagir" title="Reagir">${ic('smile-plus')}</button>`
@@ -83,11 +83,41 @@
       li.innerHTML = `<span class="small">${esc(m.text)}</span> <time class="mono small" datetime="${esc(m.created_at)}">${esc(hourFmt.format(new Date(m.created_at)))}</time>`;
       return li;
     }
-    li.className = `msg${m.deleted ? ' is-deleted' : ''}`; li.dataset.id = m.id; li.dataset.client = m.client_id; li.dataset.author = m.author_id || ''; li.dataset.at = m.created_at;
+    li.className = `msg${m.deleted ? ' is-deleted' : ''}${mentionsMe(m) ? ' mentions-me' : ''}`; li.dataset.id = m.id; li.dataset.client = m.client_id; li.dataset.author = m.author_id || ''; li.dataset.at = m.created_at;
     li.innerHTML = msgHtml(m, opts);
     return li;
   }
   const hydrate = (scope) => window.PulsoRich?.hydrate(scope);
+  const mentionsMe = (m) => !m.deleted && String(m.author_id) !== me && (m.mention_all || (m.mentions || []).includes(me));
+
+  // @ no editor: quem participa do grupo aberto (e "todos"); conversa individual não tem menção. Os membros vêm do detalhe da conversa.
+  const people = new Map();
+  async function membersOf(id) {
+    if (!people.has(id)) {
+      try { people.set(id, (await api(`/mensagens/conversas/${id}`)).conversation.people.filter((p) => String(p.id) !== me)); } catch { people.set(id, []); }
+    }
+    return people.get(id);
+  }
+  const mentionSource = () => {
+    if (!S.cur || S.cur.kind !== 'group') return [];
+    const list = (people.get(S.cur.id) || []).map((p) => ({ id: p.id, name: p.name, ini: p.initials }));
+    return [{ id: 'todos', name: 'todos', ini: '@', hint: 'avisa o grupo inteiro' }, ...list];
+  };
+  $$('[data-rich]').forEach((r) => { if (r.closest('[data-chat-form], [data-chat-thread-form], [data-chat-edit-form]')) r.mentionSource = mentionSource; });
+
+  // Som na hora em que a mensagem chega (sem esperar o aviso do servidor), se a conversa avisa a pessoa e ela não está olhando para ela.
+  const chimed = new Set();
+  function maybeChime(m) {
+    if (String(m.author_id) === me || m.event || chimed.has(m.id) || Date.now() - Date.parse(m.created_at) > 60000) return; // editada ou reagida não toca
+    const c = S.convs.find((x) => x.id === m.conversation_id);
+    if (!c) return;
+    const looking = S.cur && S.cur.id === m.conversation_id && document.visibilityState === 'visible';
+    const mode = c.notify_effective || 'tudo';
+    if (looking || mode === 'nada' || (mode === 'mencoes' && !mentionsMe(m))) return;
+    chimed.add(m.id);
+    window.pulsoLastChatChime = Date.now(); // o aviso do servidor que chega logo depois não toca de novo (collab.js)
+    if (window.pulsoChime) window.pulsoChime();
+  }
 
   // Marca de dia, "novas" e mensagens seguidas da mesma pessoa, sem recriar as mensagens (o áudio que está tocando continua).
   function decorate(list, { unread = null } = {}) {
@@ -166,6 +196,7 @@
     if (!conv) { try { S.convs = (await api('/mensagens/conversas')).conversations; } catch { return; } if (!S.convs.find((c) => c.id === id)) { location.href = `/mensagens/${id}`; return; } return open(id, { push }); }
     closeThread();
     S.cur = conv; S.msgs = new Map(); S.maxId = conv.last_message_id || 0;
+    if (conv.kind === 'group') membersOf(id); // para o @ do editor
     S.unreadCount = conv.unread; S.firstUnread = conv.unread ? conv.last_read_id + 1 : null;
     el.msgs.replaceChildren(); el.jump.hidden = true;
     el.pick.hidden = true; el.conv.hidden = false;
@@ -306,6 +337,7 @@
     // no computador, Enter envia e Shift+Enter quebra a linha; no celular, Enter quebra a linha e o botão envia
     rich.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' || e.shiftKey || e.isComposing || !e.target.classList?.contains('rte-area') || window.matchMedia('(pointer: coarse)').matches) return;
+      if (rich.querySelector('[data-rte-mentions]:not([hidden])')) return; // lista de @ ou # aberta: o Enter escolhe o item (richtext.js)
       e.preventDefault(); e.stopPropagation(); submit();
     }, true);
   }
@@ -419,7 +451,34 @@
     $('[data-chat-d-add-people]', dInfo).innerHTML = checks(outside);
     $('[data-chat-d-leave]', dInfo).hidden = info.kind !== 'group';
     $('[data-chat-d-err]', dInfo).hidden = true;
+    paintNotify();
   }
+  // Avisos desta conversa: padrão (a preferência da pessoa; individual sempre avisa), todas, só menções (grupo) ou nenhum
+  const NOTIFY_TXT = { tudo: 'todas as mensagens', mencoes: 'só quando me marcarem' };
+  function paintNotify() {
+    const group = info.kind === 'group';
+    const def = group ? info.my_default : 'tudo';
+    $('[data-chat-d-default]', dInfo).textContent = `Padrão (${NOTIFY_TXT[def]})`;
+    $('[data-chat-d-only-group]', dInfo).hidden = !group;
+    const cur = info.notify || 'padrao';
+    $$('input[name="avisos"]', dInfo).forEach((i) => { i.checked = i.value === cur; });
+    let hint;
+    if (info.notify_effective === 'nada') hint = 'Você não recebe aviso desta conversa; as mensagens continuam aqui, com o contador.';
+    else if (!group) hint = 'Conversa individual: você recebe aviso de cada mensagem.';
+    else if (info.notify_effective === 'mencoes') hint = 'Você recebe aviso quando alguém escrever @ seu nome ou @todos, e quando reagirem à sua mensagem.';
+    else hint = 'Você recebe aviso de cada mensagem nova. O padrão dos grupos se muda em Notificações > Alertas.';
+    $('[data-chat-d-notify-hint]', dInfo).textContent = hint;
+  }
+  dInfo.addEventListener('change', async (e) => {
+    if (e.target.name !== 'avisos') return;
+    try {
+      info = (await api(`/mensagens/conversas/${info.id}/avisos`, { modo: e.target.value })).conversation;
+      paintNotify();
+      const c = S.convs.find((x) => x.id === info.id);
+      if (c) { Object.assign(c, { notify: info.notify, notify_effective: info.notify_effective }); paintConvs(); }
+      if (S.cur && S.cur.id === info.id) Object.assign(S.cur, { notify: info.notify, notify_effective: info.notify_effective });
+    } catch (x) { dErr(x); }
+  });
   const dErr = (x) => { const n = $('[data-chat-d-err]', dInfo); n.textContent = x.message; n.hidden = false; };
   $('[data-chat-info]').addEventListener('click', async () => { try { await loadInfo(); dInfo.showModal(); } catch (x) { showErr(x); } });
   const afterManage = async () => { await loadInfo(); S.convs = (await api('/mensagens/conversas')).conversations; S.cur = S.convs.find((c) => c.id === S.cur.id) || S.cur; paintHead(); paintConvs(); };
@@ -490,11 +549,12 @@
   function onEvent(ev) {
     let d; try { d = JSON.parse(ev.data); } catch { return; }
     if (d.kind === 'mensagem') {
-      (d.messages || []).forEach(merge);
+      (d.messages || []).forEach((m) => { merge(m); maybeChime(m); });
       if (S.cur?.id === d.conversationId) markRead();
       refreshConvs();
     } else if (d.kind === 'lida') refreshConvs();
     else if (d.kind === 'conversa') {
+      people.delete(d.conversationId);
       refreshConvs();
       if (S.cur?.id === d.conversationId) api(`/mensagens/conversas/${d.conversationId}`).then((r) => { Object.assign(S.cur, r.conversation); paintHead(); }, () => closeConv());
     } else if (d.kind === 'resumo' && d.summaryId === sumId) pollSum();

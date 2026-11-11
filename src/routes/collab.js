@@ -82,7 +82,7 @@ router.get('/notificacoes', wrap(async (req, res) => {
   res.render('notifications/index', {
     title: 'Notificações', items, pager, type, unread, types: C.NOTIFICATION_TYPES,
     unreadBy: Object.fromEntries(counts.rows.map((r) => [r.type, r.unread])), totalBy: Object.fromEntries(counts.rows.map((r) => [r.type, r.total])), muted: mutes.rows.map((r) => r.type),
-    pushKey: push.publicKey(), tab: 'avisos', dueNow: (await reminders.queue()).now.length,
+    pushKey: push.publicKey(), chatNotify: (await db.query('SELECT chat_notify FROM users WHERE id = $1', [req.user.id])).rows[0]?.chat_notify || 'tudo', tab: 'avisos', dueNow: (await reminders.queue()).now.length,
   });
 }));
 
@@ -135,6 +135,13 @@ router.post('/notificacoes/:id/lida', wrap(async (req, res) => {
 router.post('/notificacoes/lidas', wrap(async (req, res) => {
   await notifySvc.markAllRead(req.user.id, req.body.tipo || null);
   res.redirect(backTo(req, '/notificacoes'));
+}));
+
+// preferência pessoal: avisos de mensagens de grupo (tudo | só quando me marcam)
+router.post('/notificacoes/mensagens', wrap(async (req, res) => {
+  const r = await require('../services/chat').setDefaultNotify(req.user, req.body.modo);
+  await req.flash(r.error ? 'error' : 'ok', r.error || (req.body.modo === 'mencoes' ? 'Grupos: você só recebe aviso quando alguém marcar você (ou @todos). Conversas individuais continuam avisando.' : 'Grupos: você recebe aviso de todas as mensagens.'));
+  res.redirect('/notificacoes');
 }));
 
 // preferência pessoal: silenciar tipos

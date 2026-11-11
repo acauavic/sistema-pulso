@@ -34,6 +34,8 @@ const TOPICS = [
       '"Resumir" usa a IA para resumir as não lidas, as últimas 24 horas, os últimos 7 dias ou uma thread, com decisões e pendências.',
       'Sem conexão, a mensagem fica guardada e sai sozinha quando a conexão voltar. Quem não leu em cerca de 8 segundos recebe um aviso no sino e no celular, com som e vibração; reação à sua mensagem também avisa. O som do painel aberto se desliga em Notificações (cada pessoa também pode silenciar o tipo Mensagens ali).',
       'No grupo, a conversa mostra quem criou, quem entrou, quem saiu e quando o nome mudou; quem é adicionado recebe um aviso.',
+      'Para marcar alguém num grupo, escreva @ e escolha a pessoa (@todos marca todo mundo). Para citar um episódio, corte, convidado, patrocinador, publicação ou tarefa, escreva # e o nome: o item entra como link clicável.',
+      'Avisos de mensagens: em Notificações > Alertas, escolha receber todas as mensagens de grupo ou só quando marcarem você (conversa individual sempre avisa). Em cada conversa, toque no nome dela para escolher: padrão, todas, só quando me marcarem ou nenhum.',
     ],
   },
   {

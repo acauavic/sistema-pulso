@@ -23,7 +23,7 @@
       <button class="chat-new-pill mono" type="button" data-chat-jump hidden>Novas mensagens</button>
       <p class="chat-offline small" data-chat-offline role="status" hidden>Sem conexão. O que você enviar fica guardado e sai sozinho quando a conexão voltar.</p>
       <form class="chat-composer" data-chat-form>
-        <%- include('../partials/rich-editor', { name: 'html', attach: 'anexos', placeholder: 'Escreva uma mensagem', label: 'Mensagem', audio: true, size: 'sm' }) %>
+        <%- include('../partials/rich-editor', { name: 'html', attach: 'anexos', placeholder: 'Mensagem (@ marca alguém, # cita um episódio, corte…)', label: 'Mensagem', audio: true, size: 'sm', mentions: true, refs: true }) %>
         <button class="btn primary chat-send" type="submit" aria-label="Enviar"><%- icon('send', 16) %></button>
       </form>
     </div>
@@ -37,7 +37,7 @@
     </header>
     <div class="chat-scroll" data-chat-thread-scroll><ol class="chat-msgs" data-chat-thread-parent></ol><p class="kicker chat-thread-label">Respostas</p><ol class="chat-msgs" data-chat-thread-msgs aria-live="polite"></ol></div>
     <form class="chat-composer" data-chat-thread-form>
-      <%- include('../partials/rich-editor', { name: 'html_thread', attach: 'anexos', placeholder: 'Responder na thread', label: 'Resposta', audio: true, size: 'sm' }) %>
+      <%- include('../partials/rich-editor', { name: 'html_thread', attach: 'anexos', placeholder: 'Responder na thread', label: 'Resposta', audio: true, size: 'sm', mentions: true, refs: true }) %>
       <button class="btn primary chat-send" type="submit" aria-label="Enviar resposta"><%- icon('send', 16) %></button>
     </form>
   </aside>
@@ -64,6 +64,15 @@
   <details data-chat-d-add hidden><summary class="btn sm">Adicionar pessoas</summary>
     <form class="stack top-gap" data-chat-d-add-form><ul class="plain chat-checks" data-chat-d-add-people></ul><div class="row"><button class="btn sm" type="submit">Adicionar</button></div></form>
   </details>
+  <fieldset class="top-gap" data-chat-d-notify><legend>Avisos desta conversa</legend>
+    <div class="chips-radio">
+      <label class="chip-radio"><input type="radio" name="avisos" value="padrao"><span data-chat-d-default>Padrão</span></label>
+      <label class="chip-radio"><input type="radio" name="avisos" value="tudo"><span>Todas as mensagens</span></label>
+      <label class="chip-radio" data-chat-d-only-group><input type="radio" name="avisos" value="mencoes"><span>Só quando me marcarem</span></label>
+      <label class="chip-radio"><input type="radio" name="avisos" value="nada"><span>Nenhum</span></label>
+    </div>
+    <p class="small muted" data-chat-d-notify-hint></p>
+  </fieldset>
   <p class="small err" data-chat-d-err role="alert" hidden></p>
   <div class="row spread modal-actions"><button class="link small danger-link" type="button" data-chat-d-leave hidden>Sair do grupo</button><button class="btn ghost" type="button" data-modal-close>Fechar</button></div>
 </dialog>
@@ -71,7 +80,7 @@
 <dialog class="modal" id="chat-edit" aria-labelledby="chat-edit-h">
   <form class="stack" data-chat-edit-form>
     <h2 id="chat-edit-h">Editar mensagem</h2>
-    <div class="chat-rte"><%- include('../partials/rich-editor', { name: 'html_edit', attach: 'anexos_edit', label: 'Mensagem', size: 'sm' }) %></div>
+    <div class="chat-rte"><%- include('../partials/rich-editor', { name: 'html_edit', attach: 'anexos_edit', label: 'Mensagem', size: 'sm', mentions: true, refs: true }) %></div>
     <p class="small err" data-chat-edit-err role="alert" hidden></p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>

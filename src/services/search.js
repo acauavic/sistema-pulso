@@ -227,4 +227,17 @@ async function suggestions(app) {
   return out.filter((s) => !skip.has(s.key));
 }
 
-module.exports = { ACTIONS, PROVIDERS, TECHNICAL, norm, search, actionsFor, log, suggestions, pagesOf };
+// Itens que dá para citar com # numa mensagem (link clicável): os mesmos provedores da busca, só os que têm página própria,
+// respeitando o que a pessoa pode ver. data-ref = o tipo (ver richText.REF_PATHS).
+const REFS = { episodes: ['episodio', 'Episódio'], clips: ['corte', 'Corte'], guests: ['convidado', 'Convidado'], sponsors: ['patrocinador', 'Patrocinador'], publications: ['publicacao', 'Publicação'], tasks: ['tarefa', 'Tarefa'] };
+async function references(q, user) {
+  const query = String(q || '').trim().slice(0, 60);
+  if (!query) return [];
+  const { isRef } = require('./richText');
+  const lists = await Promise.all(PROVIDERS.filter((p) => REFS[p.key] && allowed(user, p.perm)).map(async (p) => {
+    try { return (await p.search(query, user)).slice(0, 4).map((r) => ({ kind: REFS[p.key][0], label: REFS[p.key][1], title: r.title, sub: r.sub, url: r.url })); } catch { return []; }
+  }));
+  return lists.flat().filter((r) => isRef(r.kind, r.url)).slice(0, 12);
+}
+
+module.exports = { ACTIONS, PROVIDERS, TECHNICAL, REFS, norm, search, references, actionsFor, log, suggestions, pagesOf };

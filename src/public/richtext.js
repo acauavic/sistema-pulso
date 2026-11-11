@@ -264,29 +264,66 @@
       if (next) { const r = document.createRange(); r.selectNodeContents(next); r.collapse(true); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
     });
 
-    // ---- @menções (comentários)
-    let mStart = null; let mPos = 0; let mOpts = [];
-    const mHide = () => { if (mentionList) mentionList.hidden = true; mStart = null; };
+    // ---- @menções (comentários e mensagens) e # (itens do sistema, nas mensagens)
+    // root.mentionSource(): quem pode ser marcado (o chat passa os membros do grupo e "todos"); sem ela, a equipe toda.
+    // data-refs="1": "#" busca episódios, cortes, convidados, patrocinadores, publicações e tarefas e insere um link clicável.
+    let mStart = null; let mPos = 0; let mOpts = []; let mKind = '@'; let refSeq = 0; let refTimer = null;
+    const mHide = () => { if (mentionList) mentionList.hidden = true; mStart = null; clearTimeout(refTimer); refSeq += 1; };
+    const paintOpts = () => {
+      if (!mOpts.length) { mentionList.hidden = true; return; }
+      mPos = 0;
+      mentionList.innerHTML = mOpts.map((o, i) => (mKind === '#'
+        ? `<li role="option" data-i="${i}" class="ref-opt${i === 0 ? ' on' : ''}"><span class="mono ref-kind">${esc(o.label)}</span><span class="ref-title">${esc(o.title)}</span>${o.sub ? `<span class="small muted ref-sub">${esc(o.sub)}</span>` : ''}</li>`
+        : `<li role="option" data-i="${i}" class="${i === 0 ? 'on' : ''}"><span class="dot-av">${esc(o.ini)}</span>${esc(o.name)}${o.hint ? ` <span class="small muted">${esc(o.hint)}</span>` : ''}</li>`)).join('');
+      mentionList.hidden = false;
+    };
     function mentionCheck() {
       if (!mentionList) return;
       const s = window.getSelection(); const n = s.anchorNode;
-      if (!n || n.nodeType !== 3 || !inArea(n)) { mHide(); return; }
+      if (!n || n.nodeType !== 3 || !inArea(n) || n.parentElement.closest('a')) { mHide(); return; }
       const upto = n.nodeValue.slice(0, s.anchorOffset);
-      const m = upto.match(/(^|\s)@([\p{L}\p{N} ]{0,30})$/u);
+      const at = upto.match(/(^|\s)@([\p{L}\p{N} ]{0,30})$/u);
+      const hash = root.dataset.refs === '1' ? upto.match(/(^|\s)#([\p{L}\p{N} .-]{1,40})$/u) : null;
+      const m = at || hash;
       if (!m) { mHide(); return; }
+      mKind = at ? '@' : '#';
       mStart = { node: n, from: upto.length - m[2].length - 1, to: s.anchorOffset };
       const q = norm(m[2]);
-      mOpts = team.filter((u) => norm(u.name).startsWith(q) || norm(u.name).includes(` ${q}`)).slice(0, 6);
-      if (!mOpts.length) { mHide(); return; }
-      mPos = 0;
-      mentionList.innerHTML = mOpts.map((u, i) => `<li role="option" data-i="${i}" class="${i === 0 ? 'on' : ''}"><span class="dot-av">${esc(u.ini)}</span>${esc(u.name)}</li>`).join('');
-      mentionList.hidden = false;
+      if (mKind === '@') {
+        const people = typeof root.mentionSource === 'function' ? root.mentionSource() : team;
+        mOpts = people.filter((u) => norm(u.name).startsWith(q) || norm(u.name).includes(` ${q}`)).slice(0, 6);
+        paintOpts();
+        return;
+      }
+      const seq = ++refSeq; const term = m[2].trim();
+      clearTimeout(refTimer);
+      if (term.length < 2) { mentionList.innerHTML = '<li class="small muted ref-hint">Digite para buscar episódio, corte, convidado, patrocinador…</li>'; mentionList.hidden = false; mOpts = []; return; }
+      refTimer = setTimeout(async () => {
+        try {
+          const r = await (await fetch(`/mensagens/referencias?q=${encodeURIComponent(term)}`, { headers: { Accept: 'application/json' } })).json();
+          if (seq !== refSeq || !mStart) return;
+          mOpts = r.items || [];
+          if (!mOpts.length) { mentionList.innerHTML = '<li class="small muted ref-hint">Nada encontrado com esse nome.</li>'; mentionList.hidden = false; return; }
+          paintOpts();
+        } catch { /* sem conexão: segue digitando */ }
+      }, 180);
     }
-    function mPick(u) {
-      if (!mStart) return;
+    function mPick(o) {
+      if (!mStart || !o) return;
       const { node, from, to } = mStart;
-      node.nodeValue = `${node.nodeValue.slice(0, from)}@${u.name} ${node.nodeValue.slice(to)}`;
-      const r = document.createRange(); r.setStart(node, from + u.name.length + 2); r.collapse(true); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      const before = node.nodeValue.slice(0, from); const after = node.nodeValue.slice(to);
+      const r = document.createRange(); const sel = window.getSelection();
+      if (mKind === '#') { // link interno com o tipo: o servidor só aceita os caminhos conhecidos
+        node.nodeValue = before;
+        const a = document.createElement('a'); a.href = o.url; a.dataset.ref = o.kind; a.textContent = o.title;
+        const rest = document.createTextNode(`\u00a0${after}`);
+        node.after(a, rest);
+        r.setStart(rest, 1);
+      } else {
+        node.nodeValue = `${before}@${o.name}\u00a0${after}`; // espaço que o editor não engole no fim da linha
+        r.setStart(node, from + o.name.length + 2);
+      }
+      r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
       mHide(); sync();
     }
     mentionList?.addEventListener('mousedown', (e) => { const li = e.target.closest('li'); if (li) { e.preventDefault(); mPick(mOpts[Number(li.dataset.i)]); } });
@@ -352,8 +389,8 @@
       if (parent && parent.tagName === 'P' && parent.textContent.trim() === a.textContent.trim()) parent.replaceWith(card); else a.replaceWith(card);
     }
   }
-  function highlightMentions(scope) {
-    const names = [...new Set(team.flatMap((u) => [u.name, u.name.split(/\s+/)[0]]))].filter(Boolean).sort((x, y) => y.length - x.length);
+  function highlightMentions(scope, extra = []) {
+    const names = [...new Set([...team.flatMap((u) => [u.name, u.name.split(/\s+/)[0]]), ...extra])].filter(Boolean).sort((x, y) => y.length - x.length);
     if (!names.length) return;
     const re = new RegExp(`@(?:${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\p{L}\\p{N}])`, 'giu');
     const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement.closest('a, code, pre, .mention') ? NodeFilter.FILTER_REJECT : (re.lastIndex = 0, re.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT)) });
@@ -367,7 +404,7 @@
   function hydrate(scope = document) {
     scope.querySelectorAll('.rich-content:not(.rte-area)').forEach((el) => { // o editor não vira miniatura: lá o link fica editável
       hydrateCards(el);
-      if (el.dataset.mentions === '1') highlightMentions(el);
+      if (el.dataset.mentions === '1') highlightMentions(el, el.dataset.mentionsAll === '1' ? ['todos'] : []);
       el.querySelectorAll('img').forEach((img) => { img.tabIndex = 0; img.title = 'Abrir em tamanho real'; });
     });
   }

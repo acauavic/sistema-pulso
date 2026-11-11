@@ -236,7 +236,7 @@
       if (badge) setUnread(Number(badge.textContent || 0) + 1);
       const chat = n.kind === 'mensagem';
       window.pulsoToast({ title: n.title, body: n.body, url: n.url, tone: chat ? 'chat' : '' });
-      if (chat) window.pulsoChime();
+      if (chat && !(Date.now() - (window.pulsoLastChatChime || 0) < 20000)) window.pulsoChime(); // a tela de Mensagens já tocou quando a mensagem chegou
       window.pulsoBrowserAlert?.(n); // aba em segundo plano: alerta do sistema (push.js)
     });
   }

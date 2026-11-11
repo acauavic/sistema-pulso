@@ -5,6 +5,9 @@ const sanitizeHtml = require('sanitize-html');
 const MAX_HTML = 60_000;
 const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote', 'h2', 'h3', 'ul', 'ol', 'li', 'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr'];
 const ATTACHMENT_SRC = /^\/anexos\/(\d+)$/;
+// Itens do sistema citados com # nas mensagens: link interno (abre na mesma aba) com o tipo em data-ref. Só estes caminhos valem.
+const REF_PATHS = { episodio: /^\/episodios\/\d+$/, corte: /^\/cortes\/\d+$/, convidado: /^\/convidados\/\d+$/, patrocinador: /^\/patrocinadores\/\d+$/, publicacao: /^\/social\/publicacoes\/\d+$/, tarefa: /^\/tarefas\/\d+$/ };
+const isRef = (kind, href) => Boolean(REF_PATHS[kind] && REF_PATHS[kind].test(String(href || '')));
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
@@ -12,14 +15,16 @@ const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').repla
 function sanitize(input) {
   const html = sanitizeHtml(String(input ?? '').slice(0, MAX_HTML * 2), {
     allowedTags: ALLOWED_TAGS,
-    allowedAttributes: { a: ['href', 'rel', 'target', 'data-card'], img: ['src', 'alt'] },
+    allowedAttributes: { a: ['href', 'rel', 'target', 'data-card', 'data-ref'], img: ['src', 'alt'] },
     allowedSchemes: ['http', 'https', 'mailto'],
     allowProtocolRelative: false,
     disallowedTagsMode: 'discard',
     nonTextTags: ['style', 'script', 'textarea', 'option', 'noscript', 'title'],
     transformTags: {
       b: 'strong', i: 'em', strike: 's', del: 's', div: 'p', h1: 'h2', h4: 'h3', h5: 'h3', h6: 'h3',
-      a: (tag, attribs) => ({ tagName: 'a', attribs: { href: attribs.href || '', rel: 'noopener noreferrer nofollow', target: '_blank', ...(attribs['data-card'] === '1' ? { 'data-card': '1' } : {}) } }),
+      a: (tag, attribs) => (isRef(attribs['data-ref'], attribs.href)
+        ? { tagName: 'a', attribs: { href: attribs.href, 'data-ref': attribs['data-ref'] } }
+        : { tagName: 'a', attribs: { href: attribs.href || '', rel: 'noopener noreferrer nofollow', target: '_blank', ...(attribs['data-card'] === '1' ? { 'data-card': '1' } : {}) } }),
       img: (tag, attribs) => ({ tagName: 'img', attribs: { src: attribs.src || '', alt: String(attribs.alt || '').slice(0, 120) } }),
     },
     exclusiveFilter: (frame) => (frame.tag === 'img' && !ATTACHMENT_SRC.test(frame.attribs.src || '')) || (frame.tag === 'a' && !frame.attribs.href),
@@ -53,4 +58,4 @@ const attachmentIds = (html) => [...new Set([...String(html || '').matchAll(/src
 // O que a tela mostra: o HTML guardado ou, para registros antigos, o texto puro formatado.
 const display = (html, plain) => (html && String(html).trim() ? html : fromPlain(plain));
 
-module.exports = { sanitize, toText, fromPlain, attachmentIds, display, isEmpty, esc, MAX_HTML };
+module.exports = { REF_PATHS, isRef, sanitize, toText, fromPlain, attachmentIds, display, isEmpty, esc, MAX_HTML };

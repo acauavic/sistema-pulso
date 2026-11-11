@@ -69,6 +69,17 @@
       <button class="link small" type="button" data-push-off hidden>Desativar</button>
     </div>
   </section>
+  <form method="post" action="/notificacoes/mensagens" class="stack top-gap">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <fieldset><legend>Mensagens de grupo</legend>
+      <div class="chips-radio">
+        <label class="chip-radio"><input type="radio" name="modo" value="tudo" <%= chatNotify === 'tudo' ? 'checked' : '' %>><span>Todas as mensagens</span></label>
+        <label class="chip-radio"><input type="radio" name="modo" value="mencoes" <%= chatNotify === 'mencoes' ? 'checked' : '' %>><span>Só quando me marcarem</span></label>
+      </div>
+    </fieldset>
+    <p class="small muted">"Marcar" é escrever @ seu nome ou @todos. Conversas individuais e reações às suas mensagens sempre avisam. Cada conversa pode ter a regra dela: toque no nome da conversa, em Mensagens.</p>
+    <div><button class="btn sm" type="submit">Salvar</button></div>
+  </form>
   <label class="check small top-gap"><input type="checkbox" data-sound-toggle checked> Tocar som quando chegar mensagem ou reação, com o Pulso aberto</label>
   <details class="top-gap">
     <summary>Silenciar tipos de aviso<% if (muted.length) { %> <span class="mono small muted">(<%= muted.length %>)</span><% } %></summary>
