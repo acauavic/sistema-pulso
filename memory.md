@@ -91,7 +91,7 @@
 ## Insights por provedor (1.62.0)
 
 - **`services/socialInsights.js`**: cada rede é lida no provedor da rota (`socialApi.routeMap`); sem conta lá, em outro provedor configurado que tenha. Em produção: Instagram, Facebook, TikTok, Threads pela Outstand (`GET /v1/social-accounts/:id/metrics`, 30 dias; top posts = os nossos que saíram pela Outstand, `GET /v1/posts/:ref/analytics`, ref vem de `episode_publications.results[].ref`); YouTube e X pela Zernio (`/v1/accounts/follower-stats` com série diária + `/v1/analytics?accountId=` que inclui posts feitos fora). Upload-Post só para rede roteada a ele.
-- **Formato único** guardado em `social_snapshots.data` (com `provider`): followers, period (30 dias), lifetime (YouTube/TikTok só devolvem total), growth, series (`novos` do Instagram ou `total`), stories, top, note. Leitura no máximo 1×/hora; **X pela Outstand 1×/dia** (cobrado ~US$ 0,005 por post lido). A tela não espera: com dados velhos mostra e atualiza por trás.
+- **Formato único** guardado em `social_snapshots.data` (com `provider`): followers, period (30 dias), lifetime (YouTube/TikTok só devolvem total), growth, series (`novos` do Instagram ou `total`), stories, top, note. Leitura no máximo 1×/hora; **X pela Outstand 1×/dia** (cobrado ~US$ 0,005 por post lido). A tela não espera: com dados velhos mostra e atualiza por trás. O worker também lê a cada 3 h (`scheduler insights`), para a série diária não ter buracos.
 - **Limites reais** (10/11): Facebook devolve só seguidores (Meta tirou insights da página); Threads devolve visualizações, sem seguidores; X tem 0 seguidores.
 
 ## Vídeos sem travar (1.60.0)

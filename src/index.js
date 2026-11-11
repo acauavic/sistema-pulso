@@ -27,6 +27,7 @@ function registerRoutines() {
   scheduler.every('plateia-lembrete', 30 * 60_000, () => require('./services/audience').reminderTick(), { delayMs: 75_000 });
   scheduler.every('portal-convidado', 10 * 60_000, () => require('./services/guestPortal').tick(), { delayMs: 80_000 }); // posts novos em collab: avisa o convidado
   scheduler.every('cadencia', 30 * 60_000, () => require('./services/outreach').dailyNotice(), { delayMs: 70_000 });
+  scheduler.every('insights', 3 * 3600_000, () => require('./services/socialInsights').refresh(), { delayMs: 120_000 }); // foto do dia das redes mesmo sem ninguém abrir Insights (TikTok e Facebook não têm histórico no provedor)
   scheduler.every('automacoes', 5 * 60_000, () => require('./services/social').runRules(), { delayMs: 60_000 });
   scheduler.every('versao-leve', 5 * 60_000, () => require('./services/videoViews').tick(), { delayMs: 90_000 }); // vídeos sem versão leve (os mais novos primeiro) e limpeza
   scheduler.every('financeiro', 3600_000, () => require('./services/finance').tick(), { delayMs: 45_000 });
