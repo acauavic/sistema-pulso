@@ -263,7 +263,7 @@ async function check() {
   if (!config.googleMeetConfigured) return { ok: false, error: config.googleConfigured ? WAITING : 'Google Agenda não configurado.' };
   let id = null;
   try {
-    const start = new Date(Date.now() + 365 * 86_400_000); const end = new Date(start.getTime() + 30 * 60_000);
+    const start = new Date(Math.ceil((Date.now() + 365 * 86_400_000) / 60_000) * 60_000); const end = new Date(start.getTime() + 30 * 60_000); // minuto cheio: o Google não guarda milissegundos
     const body = { summary: 'Teste do Pulso Gestão (pode apagar)', start: { dateTime: start.toISOString(), timeZone: TZ }, end: { dateTime: end.toISOString(), timeZone: TZ }, attendees: [{ email: 'teste-pulso@example.com' }], conferenceData: { createRequest: { requestId: `pulso-teste-${crypto.randomBytes(4).toString('hex')}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } } };
     const c = await gcal.api('POST', '', body, ORG('none'));
     if (c.status >= 400) throw Object.assign(new Error(`Google Agenda: HTTP ${c.status}`), { status: c.status });
