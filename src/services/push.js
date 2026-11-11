@@ -61,8 +61,7 @@ async function sendToUser(userId, payload) {
   return { sent };
 }
 
-// Mensagem: um alerta por conversa (o novo substitui o anterior e toca de novo: renotify no sw.js).
-const payloadFor = (n) => ({ id: String(n.id), kind: n.type, title: n.title, body: n.body || '', url: n.url ? `/notificacoes/${n.id}/abrir` : '/notificacoes', tag: n.type === 'mensagem' && n.url ? `chat-${n.url}` : `n-${n.id}` });
+const payloadFor = (n) => ({ id: String(n.id), kind: n.type, title: n.title, body: n.body || '', url: n.url ? `/notificacoes/${n.id}/abrir` : '/notificacoes', tag: `n-${n.id}` });
 
 // Chamado por notify() para cada notificação nova: vai pela fila (leve), fora da requisição.
 async function queue(notification) {
@@ -71,12 +70,32 @@ async function queue(notification) {
   if (has) await jobs.enqueue('push_notificacao', { refId: notification.id, maxAttempts: 2 });
 }
 
+// Número do ícone do app instalado (Badging API): avisos não lidos + mensagens não lidas.
+async function badgeFor(userId) {
+  const [{ rows: [c] }, chat] = await Promise.all([
+    db.query('SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [userId]),
+    require('./chat').unreadCount(userId),
+  ]);
+  return c.n + chat;
+}
+
 jobs.register('push_notificacao', async (job) => {
   const { rows: [n] } = await db.query('SELECT n.* FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.id = $1 AND u.active', [job.ref_id]);
   if (!n || n.read_at) return { skipped: true };
-  // número de não lidas vai junto: o app instalado mostra no ícone (Badging API)
-  const { rows: [c] } = await db.query('SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [n.user_id]);
-  return sendToUser(n.user_id, { ...payloadFor(n), unread: c.n });
+  return sendToUser(n.user_id, { ...payloadFor(n), unread: await badgeFor(n.user_id) });
 });
 
-module.exports = { configured, publicKey: () => config.push.publicKey || '', subscribe, unsubscribe, countFor, sendToUser, queue };
+// Aviso de mensagem (services/chatAlerts.js): abre direto a conversa; um alerta por conversa (o novo substitui e toca de novo).
+async function queueChat(alert) {
+  if (!configured()) return;
+  const { rows: [has] } = await db.query('SELECT 1 FROM push_subscriptions WHERE user_id = $1 LIMIT 1', [alert.user_id]);
+  if (has) await jobs.enqueue('push_mensagem', { refId: alert.id, maxAttempts: 2 });
+}
+jobs.register('push_mensagem', async (job) => {
+  const { rows: [a] } = await db.query('SELECT a.* FROM chat_alerts a JOIN users u ON u.id = a.user_id WHERE a.id = $1 AND u.active', [job.ref_id]);
+  if (!a) return { skipped: true };
+  const url = a.url || '/mensagens';
+  return sendToUser(a.user_id, { id: `c${a.id}`, kind: 'mensagem', title: a.title, body: a.body || '', url, tag: `chat-${url}`, unread: await badgeFor(a.user_id) });
+});
+
+module.exports = { configured, publicKey: () => config.push.publicKey || '', subscribe, unsubscribe, countFor, sendToUser, queue, queueChat };

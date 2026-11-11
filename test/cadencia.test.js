@@ -149,11 +149,14 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
   it('aviso diário: um resumo por pessoa, sem repetir no mesmo dia', async () => {
     const noon = new Date(`${cal.todayISO()}T15:00:00Z`);
     const weekday = ![0, 6].includes(new Date(`${cal.todayISO()}T12:00:00Z`).getUTCDay());
+    const gil = await guest('Convidado da Gestão', { owner: u.gestao.id }); await enter(gil, 5); // atrasado, responsável é da gestão
     const n = await outreach.dailyNotice(noon);
     if (!weekday) return assert.equal(n, 0, 'fim de semana não avisa');
     assert.ok(n >= 1);
     const notes = (await q("SELECT user_id, title FROM notifications WHERE type = 'cadencia'")).rows;
     assert.ok(notes.some((x) => x.user_id === u.prod.id && /Follow-ups de hoje/.test(x.title)));
+    assert.ok(!notes.some((x) => [u.gestao.id, u.admin.id].includes(x.user_id)), 'follow-up é da produção: gestão e superadmin não recebem');
+    assert.equal(notes.filter((x) => x.user_id === u.prod.id).length, 1, 'o follow-up de quem é da gestão entra no resumo da produtora');
     assert.equal(await outreach.dailyNotice(noon), 0, 'já avisou hoje');
     assert.equal(await outreach.dailyNotice(new Date(`${cal.todayISO()}T08:00:00Z`)), 0, 'antes das 8h (Brasília) não avisa');
   });

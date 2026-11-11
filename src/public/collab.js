@@ -234,10 +234,17 @@
     es.addEventListener('notification', (e) => {
       let n; try { n = JSON.parse(e.data); } catch { return; }
       if (badge) setUnread(Number(badge.textContent || 0) + 1);
-      const chat = n.kind === 'mensagem';
-      window.pulsoToast({ title: n.title, body: n.body, url: n.url, tone: chat ? 'chat' : '' });
-      if (chat && !(Date.now() - (window.pulsoLastChatChime || 0) < 20000)) window.pulsoChime(); // a tela de Mensagens já tocou quando a mensagem chegou
+      window.pulsoToast({ title: n.title, body: n.body, url: n.url });
       window.pulsoBrowserAlert?.(n); // aba em segundo plano: alerta do sistema (push.js)
+    });
+    // Mensagem não é Notificação: não soma no sino; tem o aviso próprio (destaque e som) e o contador de Mensagens
+    es.addEventListener('chat-alert', (e) => {
+      let n; try { n = JSON.parse(e.data); } catch { return; }
+      if (chatBadges.length) refreshChatBadge();
+      const here = location.pathname === n.url && document.visibilityState === 'visible';
+      if (!here) window.pulsoToast({ title: n.title, body: n.body, url: n.url, tone: 'chat' });
+      if (!here && !(Date.now() - (window.pulsoLastChatChime || 0) < 20000)) window.pulsoChime(); // a tela de Mensagens já tocou quando a mensagem chegou
+      window.pulsoBrowserAlert?.({ ...n, id: `c${n.id}`, kind: 'mensagem' });
     });
   }
   setInterval(refresh, 120_000);

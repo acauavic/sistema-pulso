@@ -97,9 +97,10 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
       const event = { conversationId: dm, messageId: json.message.id };
       await chat.handleTask('tarefa.aviso', event);
       await chat.handleTask('tarefa.aviso', event);
-      const rows = await q("SELECT * FROM notifications WHERE user_id = $1 AND type = 'mensagem' AND dedupe_key = $2", [u.bia.id, `chat-${dm}-${json.message.id}`]);
+      const rows = await q("SELECT * FROM chat_alerts WHERE user_id = $1 AND dedupe_key = $2", [u.bia.id, `chat-${dm}-${json.message.id}`]);
       assert.equal(rows.length, 1);
       assert.equal(rows[0].url, `/mensagens/${dm}`);
+      assert.equal((await q("SELECT count(*)::int AS n FROM notifications WHERE url LIKE '/mensagens%'"))[0].n, 0, 'mensagem não entra na lista de Notificações (nem no sino)');
     });
 
     it('reagir com o mesmo emoji ao mesmo tempo não conta duas vezes', async () => {
@@ -112,7 +113,7 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
     it('reação avisa quem escreveu (a própria não avisa; tirar e pôr de novo não repete)', async () => {
       const { json } = await say(c.ana, dm, 'Ficou bom o corte?');
       const mid = json.message.id;
-      const avisos = () => q("SELECT title, body, url FROM notifications WHERE user_id = $1 AND title LIKE '%reagiu%' AND dedupe_key LIKE $2", [u.ana.id, `chat-reacao-${mid}-%`]);
+      const avisos = () => q("SELECT title, body, url FROM chat_alerts WHERE user_id = $1 AND title LIKE '%reagiu%' AND dedupe_key LIKE $2", [u.ana.id, `chat-reacao-${mid}-%`]);
       await post(c.ana, `/mensagens/m/${mid}/reagir`, { emoji: '👍' });
       assert.equal((await avisos()).length, 0);
       await post(c.bia, `/mensagens/m/${mid}/reagir`, { emoji: '🎉' });
@@ -282,7 +283,7 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
       assert.equal(seen.filter((m) => !m.event).length, 1);
       assert.deepEqual(seen.filter((m) => m.event).map((m) => [m.event, m.text]), [['criou', 'Ana Gestão criou o grupo'], ['renomeou', 'Ana Gestão mudou o nome do grupo para Edição do EP.020'], ['adicionou', 'Ana Gestão adicionou Edu Editor']]);
       assert.equal((await get(c.edu, '/mensagens/nao-lidas')).json.n, 0, 'o aviso do grupo não conta como não lido');
-      const [added] = await q("SELECT title, url FROM notifications WHERE user_id = $1 AND title LIKE '%adicionou você%'", [u.edu.id]);
+      const [added] = await q("SELECT title, url FROM chat_alerts WHERE user_id = $1 AND title LIKE '%adicionou você%'", [u.edu.id]);
       assert.equal(added.title, 'Ana Gestão adicionou você ao grupo Edição do EP.020'); assert.equal(added.url, `/mensagens/${g}`);
       const ev = seen.find((m) => m.event);
       assert.equal((await post(c.ana, `/mensagens/m/${ev.id}/apagar`)).status, 409, 'aviso do grupo não se apaga');
@@ -322,7 +323,7 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
   describe('avisos', () => {
     let g2;
     before(async () => { g2 = (await post(c.ana, '/mensagens/conversas', { tipo: 'grupo', nome: 'Avisos', pessoas: [u.bia.id, u.edu.id] })).json.id; });
-    const notices = (who) => q("SELECT * FROM notifications WHERE user_id = $1 AND type = 'mensagem' AND url = $2 AND title NOT LIKE '%adicionou você%' ORDER BY id", [who.id, `/mensagens/${g2}`]);
+    const notices = (who) => q("SELECT * FROM chat_alerts WHERE user_id = $1 AND url = $2 AND title NOT LIKE '%adicionou você%' ORDER BY id", [who.id, `/mensagens/${g2}`]);
 
     it('quem leu nos 20 segundos não recebe aviso; quem não leu recebe; quem escreveu, nunca', async () => {
       const { json: { message: m } } = await say(c.ana, g2, 'Bom dia');
@@ -343,10 +344,13 @@ describe('Mensagens: conversas, grupos, threads, edição, reações, áudio, re
       assert.match(list[1].title, /Avisos: 3 mensagens novas/);
     });
 
-    it('abrir a conversa dá o aviso por lido', async () => {
+    it('abrir a conversa zera o contador de Mensagens (o sino não muda: mensagem não é Notificação)', async () => {
       const { rows: [{ last_message_id: last }] } = await h.db.query('SELECT last_message_id FROM chat_conversations WHERE id = $1', [g2]);
+      const bell = (await q('SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [u.edu.id]))[0].n;
       await post(c.edu, `/mensagens/conversas/${g2}/lida`, { ate: Number(last) });
-      assert.ok((await notices(u.edu)).every((n) => n.read_at));
+      const [conv] = (await get(c.edu, '/mensagens/conversas')).json.conversations.filter((x) => x.id === g2);
+      assert.equal(conv.unread, 0);
+      assert.equal((await q('SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [u.edu.id]))[0].n, bell);
     });
   });
 

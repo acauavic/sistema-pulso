@@ -16,7 +16,7 @@
     if (await currentSub()) return; // o push já avisa este aparelho
     const r = await reg; if (!r) return;
     const chat = n.kind === 'mensagem';
-    r.showNotification(n.title || 'Pulso', { body: n.body || '', tag: n.id ? `n-${n.id}` : undefined, icon: '/static/icon-192.png', badge: '/static/badge-72.png', data: { url: n.url || '/notificacoes' }, silent: false, requireInteraction: chat, vibrate: chat ? [200, 90, 200, 90, 320] : [120] });
+    r.showNotification(n.title || 'Pulso', { body: n.body || '', tag: chat && n.url ? `chat-${n.url}` : (n.id ? `n-${n.id}` : undefined), renotify: chat && Boolean(n.url), icon: '/static/icon-192.png', badge: '/static/badge-72.png', data: { url: n.url || '/notificacoes' }, silent: false, requireInteraction: chat, vibrate: chat ? [200, 90, 200, 90, 320] : [120] });
   };
 
   const key = document.querySelector('meta[name="push-key"]')?.content || document.querySelector('[data-push]')?.dataset.pushKey || '';

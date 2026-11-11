@@ -82,7 +82,6 @@ const TASK_STATUSES = { a_fazer: 'A fazer', fazendo: 'Fazendo', feito: 'Feito', 
 const NOTIFICATION_TYPES = {
   tarefa: { label: 'Tarefas', hint: 'Tarefa atribuída a você, bloqueada, concluída, vencendo hoje ou atrasada.' },
   comentario: { label: 'Comentários', hint: 'Comentários em convidados, patrocinadores, episódios, cortes e tarefas de que você participa, e menções com @.' },
-  mensagem: { label: 'Mensagens', hint: 'Mensagem nova numa conversa ou grupo seu, quando você não está com ela aberta.' },
   reacao: { label: 'Reações', hint: 'Alguém reagiu com um emoji a um comentário seu.' },
   agendamento: { label: 'Agendamentos concluídos', hint: 'Convidado com gravação agendada (data, estúdio, hosts e convidado confirmados).' },
   plateia: { label: 'Plateia', hint: 'Nova inscrição pedida pela página pública do Pulso Podcast com Plateia.' },

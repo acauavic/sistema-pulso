@@ -192,11 +192,11 @@ async function createGroup(user, name, memberIds) {
   return { id: Number(id) };
 }
 
-// Quem entrou num grupo fica sabendo (aviso no sino e no celular), mesmo antes da primeira mensagem.
+// Quem entrou num grupo fica sabendo (aviso de mensagem: celular e painel, fora do sino), mesmo antes da primeira mensagem.
 async function tellAdded(conversationId, user, ids, groupName) {
   if (!ids.length) return;
   try {
-    await require('./notify').notify({ type: 'mensagem', users: ids, title: `${nameOf(user)} adicionou você ao grupo ${groupName}`, body: 'Abra para ver a conversa.', url: `/mensagens/${conversationId}`, actorId: user.id, dedupe: `chat-grupo-${conversationId}-${Date.now()}` });
+    await require('./chatAlerts').alert({ users: ids, title: `${nameOf(user)} adicionou você ao grupo ${groupName}`, body: 'Abra para ver a conversa.', url: `/mensagens/${conversationId}`, actorId: user.id, dedupe: `chat-grupo-${conversationId}-${Date.now()}` });
   } catch (err) { console.error('[mensagens] aviso de grupo:', err.message); }
 }
 
@@ -373,7 +373,7 @@ async function mentionNotice({ conversationId, messageId, users, actor }) {
   const { rows: [m] } = await db.query('SELECT body FROM chat_messages WHERE id = $1', [messageId]);
   const said = String(m?.body || '').replace(/\s+/g, ' ');
   try {
-    await require('./notify').notify({ type: 'mensagem', users: people.map((p) => p.user_id), title: `${nameOf(actor)} mencionou você em ${conv?.name || 'uma conversa'}`, body: said.length > 160 ? `${said.slice(0, 157)}…` : said, url: `/mensagens/${conversationId}`, actorId: actor.id, dedupe: `chat-mencao-${messageId}-edit` });
+    await require('./chatAlerts').alert({ users: people.map((p) => p.user_id), title: `${nameOf(actor)} mencionou você em ${conv?.name || 'uma conversa'}`, body: said.length > 160 ? `${said.slice(0, 157)}…` : said, url: `/mensagens/${conversationId}`, actorId: actor.id, dedupe: `chat-mencao-${messageId}-edit` });
   } catch (err) { console.error('[mensagens] aviso de menção:', err.message); }
 }
 
@@ -411,7 +411,7 @@ async function react(messageId, user, emoji) {
   if (!out.error && added && !quiet && added.author_id && String(added.author_id) !== String(user.id)) {
     const said = (added.body || 'Áudio ou anexo').replace(/\s+/g, ' ');
     try {
-      await require('./notify').notify({ type: 'mensagem', users: [added.author_id], title: `${nameOf(user)} reagiu ${emoji} à sua mensagem`, body: said.length > 120 ? `${said.slice(0, 117)}…` : said, url: `/mensagens/${added.conversation_id}`, actorId: user.id, dedupe: `chat-reacao-${added.id}-${user.id}-${emoji}` });
+      await require('./chatAlerts').alert({ users: [added.author_id], title: `${nameOf(user)} reagiu ${emoji} à sua mensagem`, body: said.length > 120 ? `${said.slice(0, 117)}…` : said, url: `/mensagens/${added.conversation_id}`, actorId: user.id, dedupe: `chat-reacao-${added.id}-${user.id}-${emoji}` });
     } catch (err) { console.error('[mensagens] aviso de reação:', err.message); }
   }
   return out;
@@ -451,7 +451,6 @@ async function markRead(conversationId, user, upto) {
     `UPDATE chat_members m SET last_read_id = LEAST(GREATEST(m.last_read_id, $3), coalesce(c.last_message_id, 0)) FROM chat_conversations c
       WHERE c.id = m.conversation_id AND m.conversation_id = $1 AND m.user_id = $2 AND m.left_at IS NULL AND m.last_read_id < LEAST($3, coalesce(c.last_message_id, 0))
       RETURNING m.last_read_id`, [conversationId, user.id, upto]);
-  await db.query("UPDATE notifications SET read_at = now() WHERE user_id = $1 AND type = 'mensagem' AND read_at IS NULL AND url = $2", [user.id, `/mensagens/${conversationId}`]);
   if (!rows.length) return { ok: true };
   await tx((c) => emit(c, 'evento.lida', { conversationId: Number(conversationId), lastReadId: Number(rows[0].last_read_id), users: [user.id] }));
   relay.kick();
@@ -562,7 +561,7 @@ async function runNotice({ conversationId, messageId }) {
   const { rows: [att] } = await db.query("SELECT kind FROM attachments WHERE entity_type = 'chat' AND entity_id = $1 ORDER BY id LIMIT 1", [messageId]);
   const said = m.body || (att?.kind === 'audio' ? 'Áudio' : 'Anexo');
   const preview = said.length > 160 ? `${said.slice(0, 157)}…` : said;
-  const { notify } = require('./notify');
+  const { alert } = require('./chatAlerts');
   for (const p of people) {
     const count = Math.max(1, p.n);
     const who = m.author_name || 'Alguém';
@@ -571,7 +570,7 @@ async function runNotice({ conversationId, messageId }) {
     else if (conv.kind === 'group') title = count > 1 ? `${conv.name}: ${count} mensagens novas` : `${who} em ${conv.name}`;
     else title = count > 1 ? `${who}: ${count} mensagens novas` : `${who} enviou uma mensagem`;
     // a chave repetida não cria outro aviso: se esta tarefa rodar duas vezes, a pessoa recebe um só
-    await notify({ type: 'mensagem', users: [p.user_id], title, body: conv.kind === 'group' && count === 1 ? preview : `${fmt.firstName(who)}: ${preview}`, url: `/mensagens/${conversationId}`, actorId: m.author_id, dedupe: `chat-${conversationId}-${messageId}` });
+    await alert({ users: [p.user_id], title, body: conv.kind === 'group' && count === 1 ? preview : `${fmt.firstName(who)}: ${preview}`, url: `/mensagens/${conversationId}`, actorId: m.author_id, dedupe: `chat-${conversationId}-${messageId}` });
     await db.query('UPDATE chat_members SET notified_upto = GREATEST(notified_upto, $3) WHERE conversation_id = $1 AND user_id = $2', [conversationId, p.user_id, messageId]);
   }
   return { notified: people.length };

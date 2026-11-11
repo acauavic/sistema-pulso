@@ -32,7 +32,7 @@ const TOPICS = [
       'O microfone grava áudio com transcrição; o clipe anexa arquivo.',
       'Toque no nome da conversa para ver os participantes. Quem administra o grupo renomeia, adiciona, remove e escolhe outros administradores; qualquer pessoa pode sair.',
       '"Resumir" usa a IA para resumir as não lidas, as últimas 24 horas, os últimos 7 dias ou uma thread, com decisões e pendências.',
-      'Sem conexão, a mensagem fica guardada e sai sozinha quando a conexão voltar. Quem não leu em cerca de 8 segundos recebe um aviso no sino e no celular, com som e vibração; reação à sua mensagem também avisa. O som do painel aberto se desliga em Notificações (cada pessoa também pode silenciar o tipo Mensagens ali).',
+      'Sem conexão, a mensagem fica guardada e sai sozinha quando a conexão voltar. Quem não leu em cerca de 8 segundos recebe um aviso no celular, com som e vibração, e em destaque no painel aberto; reação à sua mensagem também avisa. Mensagem não entra na lista de Notificações nem no sino: o número fica no ícone de Mensagens. O som do painel aberto se desliga em Notificações > Alertas; para calar uma conversa, toque no nome dela e escolha Nenhum.',
       'No grupo, a conversa mostra quem criou, quem entrou, quem saiu e quando o nome mudou; quem é adicionado recebe um aviso.',
       'Para marcar alguém num grupo, escreva @ e escolha a pessoa (@todos marca todo mundo). Para citar um episódio, corte, convidado, patrocinador, publicação ou tarefa, escreva # e o nome: o item entra como link clicável.',
       'Avisos de mensagens: em Notificações > Alertas, escolha receber todas as mensagens de grupo ou só quando marcarem você (conversa individual sempre avisa). Em cada conversa, toque no nome dela para escolher: padrão, todas, só quando me marcarem ou nenhum.',
@@ -176,7 +176,7 @@ const TOPICS = [
     key: 'notificacoes', title: 'Notificações e lembretes da gravação', words: ['notificação', 'notificacao', 'notificações', 'aviso', 'avisos', 'alerta', 'push', 'lembrete', 'lembretes'],
     where: '/notificacoes', perm: null,
     steps: [
-      'O sino mostra os avisos (tarefas, comentários e menções, agendamentos, plateia, financeiro, etapas do episódio e corte disponível para a gestão, follow-ups). Cada pessoa liga os alertas do navegador em Notificações > Avisos (no iPhone, só com o painel na Tela de Início). Quem é responsável por um convidado, patrocinador, episódio, corte ou tarefa também recebe aviso quando outra pessoa altera ou exclui esse cadastro (tipos "Cadastro alterado" e "Cadastro excluído"); a gestão liga ou desliga em Gestão > Notificações e cada pessoa pode silenciar.',
+      'O sino mostra os avisos (tarefas, comentários e menções, agendamentos, plateia, financeiro, etapas do episódio e corte disponível para a gestão, follow-ups, que vão só para as produtoras; mensagens não entram no sino, têm aviso próprio). Cada pessoa liga os alertas do navegador em Notificações > Avisos (no iPhone, só com o painel na Tela de Início). Quem é responsável por um convidado, patrocinador, episódio, corte ou tarefa também recebe aviso quando outra pessoa altera ou exclui esse cadastro (tipos "Cadastro alterado" e "Cadastro excluído"); a gestão liga ou desliga em Gestão > Notificações e cada pessoa pode silenciar.',
       'Lembretes da gravação (3 dias, 1 dia, no dia de manhã e 3 horas antes) ficam em Notificações > Lembretes da gravação, com a mensagem pronta e o botão do WhatsApp; a produtora envia e marca como enviado.',
       'Pelo assistente: "notificacoes" mostra as não lidas.',
     ],

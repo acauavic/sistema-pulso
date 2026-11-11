@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.63.1', date: '2026-11-11', title: 'Mensagens com aviso próprio e lembretes para a produção',
+    items: [
+      { kind: 'ajuste', text: 'Mensagens não entram mais na lista de Notificações nem no número do sino. O aviso de mensagem, menção, reação e "adicionou você ao grupo" chega no celular com som e vibração, aparece em destaque no painel aberto e soma no contador de Mensagens.' },
+      { kind: 'ajuste', text: 'O resumo diário de follow-ups vai só para a produção. Cada produtora recebe os dela; o que está com alguém da gestão ou sem responsável vai para as produtoras. Gestão e superadmin não recebem mais esse aviso.' },
+      { kind: 'ajuste', text: 'Os lembretes do portal do convidado (avisar no WhatsApp que saiu post em collab e pedir a collab no YouTube) vão só para a produção.' },
+    ],
+  },
+  {
     version: '1.63.0', date: '2026-11-11', title: 'Marcar pessoas e citar itens nas mensagens',
     items: [
       { kind: 'novo', text: 'Nos grupos, escreva @ e escolha a pessoa para marcá-la; @todos marca o grupo inteiro. Quem foi marcado recebe "fulano mencionou você", e a conversa ganha um @ na lista.' },

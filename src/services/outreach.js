@@ -213,16 +213,21 @@ async function report(days) {
 }
 
 // ---------------------------------------------------------------- aviso diário (rotina)
-// Um aviso por pessoa por dia, depois das 8h: quantos follow-ups hoje/atrasados e quantos parecem perdidos.
+// Um aviso por dia, depois das 8h, para a PRODUÇÃO (nunca para a gestão nem o superadmin): quantos follow-ups hoje/atrasados e
+// quantos parecem perdidos. Cada produtora recebe os dela; o que é de outra pessoa (gestão, editor) ou não tem responsável vai
+// para todas as produtoras ativas.
 async function dailyNotice(now = new Date()) {
   const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' }).format(now));
   if (hour < 8) return 0;
   const today = cal.todayISO(); if (!isWeekday(today)) return 0;
   const [g, s] = await Promise.all([evaluateAll('guest'), evaluateAll('sponsor')]);
+  const { rows: prod } = await db.query("SELECT id FROM users WHERE active AND role = 'produtora'");
+  const producers = new Set(prod.map((r) => String(r.id)));
   const byOwner = new Map();
   for (const x of [...g.values(), ...s.values()]) {
-    if (!x.owner_id || !NEEDS.has(x.state)) continue;
-    const o = byOwner.get(x.owner_id) || { due: 0, lost: 0 }; if (x.state === 'possivel_perdido') o.lost += 1; else o.due += 1; byOwner.set(x.owner_id, o);
+    if (!NEEDS.has(x.state)) continue;
+    const to = x.owner_id && producers.has(String(x.owner_id)) ? [String(x.owner_id)] : [...producers];
+    for (const id of to) { const o = byOwner.get(id) || { due: 0, lost: 0 }; if (x.state === 'possivel_perdido') o.lost += 1; else o.due += 1; byOwner.set(id, o); }
   }
   const notify = require('./notify'); let n = 0;
   for (const [userId, o] of byOwner) {

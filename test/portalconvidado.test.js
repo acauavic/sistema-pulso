@@ -18,7 +18,7 @@ describe('Portal do convidado', () => {
 
   before(async () => {
     await h.resetDb(); app = await h.startServer(); anon = h.client(app.base);
-    for (const [k, role] of [['gestao', 'gestao'], ['editor', 'editor_video']]) { await h.createUser({ name: k, email: `${k}@pc.com`, role }); as[k] = h.client(app.base); await as[k].login(`${k}@pc.com`); }
+    for (const [k, role] of [['gestao', 'gestao'], ['editor', 'editor_video'], ['prod', 'produtora']]) { await h.createUser({ name: k, email: `${k}@pc.com`, role }); as[k] = h.client(app.base); await as[k].login(`${k}@pc.com`); }
     g = (await one("INSERT INTO guests (name, status, instagram, email, phone) VALUES ('Mari Vabo', 'gravado', '@MariVabo', 'mari@ex.com', '(11) 98888-7777') RETURNING id")).id;
     ep = (await one("INSERT INTO episodes (number, title, guest_id, status, aired_on) VALUES (12, 'Gestão de clínicas', $1, 'publicado', '2030-11-08') RETURNING id", [g])).id;
   });
@@ -139,8 +139,9 @@ describe('Portal do convidado', () => {
     assert.equal((await one('SELECT portal_yt_channel FROM guests WHERE id = $1', [g])).portal_yt_channel, '@marivabo');
     assert.match((await anon.get(base)).text, /Pedido recebido para o canal/);
     let n;
-    for (let i = 0; i < 20 && !n; i += 1) { n = await one("SELECT title FROM notifications WHERE title LIKE '%collab no YouTube%'"); if (!n) await new Promise((x) => setTimeout(x, 50)); }
-    assert.ok(n, 'a equipe recebe o aviso');
+    for (let i = 0; i < 20 && !n; i += 1) { n = await one("SELECT title FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.title LIKE '%collab no YouTube%' AND u.role = 'produtora'"); if (!n) await new Promise((x) => setTimeout(x, 50)); }
+    assert.ok(n, 'a produtora recebe o aviso');
+    assert.ok(!(await one("SELECT 1 AS x FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.title LIKE '%collab no YouTube%' AND u.role <> 'produtora'")), 'a gestão não recebe o lembrete do portal');
     assert.match((await as.gestao.get(`/convidados/${g}`)).text, /Marcar como feita/);
     await act('gestao', `/convidados/${g}/portal/youtube`, { feito: '1' });
     r = await anon.get(base);

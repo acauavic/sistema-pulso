@@ -43,6 +43,7 @@ function registerRoutines() {
     await db.query("DELETE FROM jobs WHERE status = 'done' AND finished_at < now() - interval '30 days'");
     await db.query("DELETE FROM worker_heartbeats WHERE seen_at < now() - interval '1 day'");
     await db.query("DELETE FROM chat_outbox WHERE published_at < now() - interval '7 days'");
+    await require('./services/chatAlerts').purge(); // avisos de mensagem já entregues (30 dias)
   }, { delayMs: 120_000 });
   return scheduler;
 }

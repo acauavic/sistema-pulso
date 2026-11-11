@@ -18,7 +18,7 @@ describe('Mensagens: menções, citações e avisos sob medida', () => {
   const get = async (who, path) => { const r = await fetch(`${app.base}${path}`, { headers: { cookie: who.cookie(), accept: 'application/json' } }); return { status: r.status, json: await r.json().catch(() => null) }; };
   const say = (who, conv, html) => post(who, `/mensagens/conversas/${conv}/mensagens`, { client_id: uid(), html: `<p>${html}</p>` });
   const notice = async (conv, msg) => chat.handleTask('tarefa.aviso', { conversationId: conv, messageId: msg });
-  const avisos = (who, conv) => q("SELECT title FROM notifications WHERE user_id = $1 AND type = 'mensagem' AND url = $2 AND title NOT LIKE '%adicionou você%' ORDER BY id", [who.id, `/mensagens/${conv}`]);
+  const avisos = (who, conv) => q("SELECT title FROM chat_alerts WHERE user_id = $1 AND url = $2 AND title NOT LIKE '%adicionou você%' ORDER BY id", [who.id, `/mensagens/${conv}`]);
 
   before(async () => {
     await h.resetDb(); app = await h.startServer();
@@ -70,7 +70,7 @@ describe('Mensagens: menções, citações e avisos sob medida', () => {
     assert.equal((await avisos(u.bia, g)).length, before);
     const mine = (await say(c.bia, g, 'Feito')).json.message;
     await post(c.ana, `/mensagens/m/${mine.id}/reagir`, { emoji: '👍' });
-    assert.equal((await q("SELECT 1 FROM notifications WHERE user_id = $1 AND title LIKE '%reagiu%'", [u.bia.id])).length, 0);
+    assert.equal((await q("SELECT 1 FROM chat_alerts WHERE user_id = $1 AND title LIKE '%reagiu%'", [u.bia.id])).length, 0);
     assert.equal((await post(c.bia, `/mensagens/conversas/${g}/avisos`, { modo: 'padrao' })).json.conversation.notify, null);
     assert.equal((await post(c.bia, `/mensagens/conversas/${g}/avisos`, { modo: 'qualquer' })).status, 400);
   });
@@ -79,7 +79,7 @@ describe('Mensagens: menções, citações e avisos sob medida', () => {
     const m = (await say(c.ana, g, 'Revisão pronta')).json.message;
     const r = await post(c.ana, `/mensagens/m/${m.id}/editar`, { html: '<p>Revisão pronta, @Edu Editor</p>' });
     assert.equal(r.status, 200); assert.deepEqual(r.json.message.mentions, [u.edu.id]);
-    assert.ok((await q("SELECT 1 FROM notifications WHERE user_id = $1 AND dedupe_key = $2", [u.edu.id, `chat-mencao-${m.id}-edit`])).length);
+    assert.ok((await q("SELECT 1 FROM chat_alerts WHERE user_id = $1 AND dedupe_key = $2", [u.edu.id, `chat-mencao-${m.id}-edit`])).length);
   });
 
   it('# cita itens do sistema: a busca traz o episódio e o link entra clicável; caminho estranho vira link comum', async () => {

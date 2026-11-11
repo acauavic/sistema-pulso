@@ -271,8 +271,9 @@ async function requestYoutube(g, channel) {
 const youtubeUrl = (channel) => (channel ? `https://www.youtube.com/${channel}` : null);
 
 // Quem cuida dos convidados recebe os lembretes do portal (pedido de collab no YouTube, aviso pendente no WhatsApp).
+// Lembretes do portal (avisar o convidado de post em collab, pedir a collab no YouTube) são da produção, não da gestão.
 async function teamIds() {
-  const { rows } = await db.query("SELECT id FROM users WHERE active AND role IN ('superadmin', 'gestao', 'produtora')");
+  const { rows } = await db.query("SELECT id FROM users WHERE active AND role = 'produtora'");
   return rows.map((r) => r.id);
 }
 
