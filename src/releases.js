@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.65.0', date: '2026-11-12', title: 'Duplicatas de convidados e patrocinadores',
+    items: [
+      { kind: 'novo', text: 'Ao cadastrar um convidado ou patrocinador que parece já existir (mesmo @, e-mail, telefone, empresa ou site, ou nome parecido), o sistema mostra o que já está cadastrado antes de criar outro. Se for outra pessoa ou empresa, "Cadastrar mesmo assim".' },
+      { kind: 'novo', text: 'O cadastro que tem uma duplicata mostra uma faixa no topo com "Comparar e juntar": você escolhe qual fica e o valor de cada campo diferente, e o histórico, as abordagens, os comentários, as tarefas, os episódios e as reuniões do outro passam para ele. O que sai vai para a lixeira.' },
+      { kind: 'novo', text: 'Gestão > Sistema > Duplicatas lista todos os pares de convidados e de patrocinadores. "Não é duplicata" tira o aviso daquele par.' },
+      { kind: 'correcao', text: 'O botão de criar convidado ou patrocinador trava depois do primeiro clique, para o cadastro não sair em dobro.' },
+    ],
+  },
+  {
     version: '1.64.1', date: '2026-11-12', title: 'Follow-up não vence no fim de semana',
     items: [
       { kind: 'ajuste', text: 'Se o próximo follow-up cair num sábado ou domingo, ele passa para a segunda. Vale para convidados e patrocinadores, no quadro, na lista, no Início e no aviso do dia.' },

@@ -54,7 +54,7 @@ dispensado.
 
 ## Juntar
 
-Janela **Comparar e juntar** (`<dialog>`, rota `GET /duplicatas/:tipo/:a/:b` devolve a página da comparação quando aberta direto):
+Janela **Comparar e juntar** (página própria em `GET /duplicatas/:tipo/:a/:b`: mais espaço para os dois cartões e igual no celular):
 - Dois cartões lado a lado (no celular, um embaixo do outro): nome, etapa, responsável, criado em (mono) e contagens em mono do que
   cada um tem (abordagens, comentários, tarefas, episódio, reuniões, lançamentos, arquivos).
 - **Qual fica**: `.seg-radio` com os dois; já vem marcado o de etapa mais avançada (ordem do funil) e, empatando, o com mais

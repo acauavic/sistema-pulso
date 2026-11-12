@@ -62,6 +62,7 @@ function createApp() {
   app.use(require('./routes/releases')); // Novidades: versões do sistema e aviso de atualização
   app.use(require('./routes/calendar')); // Calendário: tudo que tem data, com filtros e visualizações salvas
   app.use(require('./routes/gestao'));
+  app.use(require('./routes/duplicates')); // duplicatas: comparar e juntar cadastros, Gestão > Duplicatas
   app.use(require('./routes/trash')); // Lixeira: o que foi apagado fica 15 dias e pode voltar
   app.use(require('./routes/plans')); // Gestão > Planos de patrocínio
   app.use(require('./routes/plateiaAdmin')); // Plateia: inscrições, resultados e ajustes (e controles no convidado)

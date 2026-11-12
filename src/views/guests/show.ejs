@@ -41,6 +41,8 @@
   </div>
 </div>
 
+<%- include('../partials/duplicate-alert', { dupKind: 'guest', selfId: guest.id }) %>
+
 <ol class="stepper s5" aria-label="Etapas do convidado">
   <% FUNNEL.forEach(function (k, i) { %>
   <li class="<%= closed ? '' : (i < idx ? 'done' : (i === idx ? 'now' : '')) %>"><span class="step-n mono"><%= String(i + 1).padStart(2, '0') %></span><span class="step-l"><%= statuses.find(function (s) { return s.key === k; }).label %></span></li>

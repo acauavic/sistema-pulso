@@ -143,6 +143,15 @@ router.get('/episodios/novo', requirePerm('episodes.write'), wrap(async (req, re
 router.post('/episodios', requirePerm('episodes.write'), wrap(async (req, res) => {
   const { values: v, error } = await parseNew(req.body);
   if (error) return res.status(400).render('episodes/new', await formLocals({ title: 'Novo episódio', error, values: echo(req.body, {}) }));
+  // patrocinador ou convidado "novo" que já está cadastrado (duplicata certa): escolher o que existe em vez de criar outro
+  const dupSvc = require('../services/duplicates');
+  const sureDup = async (kind, rec) => (await dupSvc.findFor(kind, rec)).find((d) => d.level === 'certa');
+  const dupSp = v.newSponsor && await sureDup('sponsor', { company: v.newSponsor.company });
+  const dupGu = v.newGuest && await sureDup('guest', { name: v.newGuest.name, instagram: v.newGuest.instagram });
+  if (dupSp || dupGu) {
+    const msg = dupSp ? `${dupSp.name} já está cadastrado como patrocinador: escolha na lista em vez de criar outro.` : `${dupGu.name} já está cadastrado como convidado (${dupGu.reasons.join(', ')}): escolha na lista em vez de criar outro.`;
+    return res.status(400).render('episodes/new', await formLocals({ title: 'Novo episódio', error: msg, values: echo(req.body, {}) }));
+  }
   const sponsorsSvc2 = require('../services/sponsors');
   if (v.newSponsor) {
     const { rows: [sp] } = await db.query("INSERT INTO sponsors (company, kind, stage, owner_id, created_by) VALUES ($1, $2, 'negociacao', $3, $3) RETURNING id, company", [v.newSponsor.company, v.newSponsor.kind, req.user.id]);

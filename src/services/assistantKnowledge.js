@@ -213,6 +213,16 @@ const TOPICS = [
     ],
   },
   {
+    key: 'duplicatas', title: 'Cadastros duplicados (convidados e patrocinadores)', words: ['duplicata', 'duplicado', 'duplicados', 'duplicada', 'repetido', 'cadastro repetido', 'cadastrado duas vezes', 'em dobro', 'juntar', 'mesclar', 'unir cadastros'],
+    where: '/gestao/duplicatas', perm: null,
+    steps: [
+      'Ao cadastrar um convidado ou patrocinador que parece já existir, o formulário mostra o que já está cadastrado antes de criar outro. Se for outra pessoa ou empresa, use "Cadastrar mesmo assim".',
+      'Duplicata certa: convidado com o mesmo @, e-mail ou telefone; patrocinador com a mesma empresa ou o mesmo site. Possível: nome parecido, ou o mesmo e-mail ou telefone de contato no patrocinador (grupos de empresas costumam dividir e-mail).',
+      'O cadastro que tem duplicata mostra uma faixa no topo. "Comparar e juntar" abre os dois lado a lado: escolha qual fica e, onde os dois são diferentes, qual valor fica. O histórico, as abordagens, os comentários, as tarefas, os episódios, os lançamentos e as reuniões do outro passam para ele, e o outro vai para a lixeira (o valor que não ficou vai para as observações).',
+      '"Não é duplicata" tira o aviso daquele par. A gestão vê todos os pares em Gestão > Sistema > Duplicatas e pode voltar a avisar.',
+    ],
+  },
+  {
     key: 'lixeira', title: 'Lixeira (restaurar o que foi apagado)', words: ['lixeira', 'restaurar', 'recuperar', 'apaguei', 'apagado', 'excluído', 'excluido', 'desfazer', 'voltar item', 'deletei'],
     where: '/lixeira', perm: null,
     steps: [

@@ -47,6 +47,8 @@
   </div>
 </div>
 
+<%- include('../partials/duplicate-alert', { dupKind: 'sponsor', selfId: sponsor.id }) %>
+
 <ol class="stepper s4" aria-label="Etapas do patrocinador">
   <% FUNNEL.forEach(function (k, i) { %>
   <li class="<%= idx < 0 ? '' : (i < idx ? 'done' : (i === idx ? 'now' : '')) %>"><span class="step-n mono"><%= String(i + 1).padStart(2, '0') %></span><span class="step-l"><%= C.SPONSOR_STAGE_BY_KEY[k].label %></span></li>

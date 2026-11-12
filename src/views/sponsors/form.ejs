@@ -10,8 +10,9 @@
 <div class="card form-card wide">
   <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
   <% if (notice) { %><div class="flash flash-error"><%= notice %> Complete abaixo e salve.</div><% } %>
-  <form method="post" action="<%= sponsor ? '/patrocinadores/' + sponsor.id : '/patrocinadores' %>" class="stack">
+  <form method="post" action="<%= sponsor ? '/patrocinadores/' + sponsor.id : '/patrocinadores' %>" class="stack"<%- sponsor ? '' : ' data-busy="Salvando…"' %>>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <%- include('../partials/duplicate-notice') %>
 
     <h2 class="form-section">Empresa</h2>
     <div class="grid-2 tight">

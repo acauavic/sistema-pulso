@@ -11,8 +11,9 @@
 <div class="card form-card wide">
   <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
   <% if (typeof notice !== 'undefined' && notice) { %><div class="flash flash-error"><%= notice %> Complete abaixo e salve.</div><% } %>
-  <form method="post" action="<%= guest ? '/convidados/' + guest.id : '/convidados' %>" class="stack" data-guest-form>
+  <form method="post" action="<%= guest ? '/convidados/' + guest.id : '/convidados' %>" class="stack" data-guest-form<%- guest ? '' : ' data-busy="Salvando…"' %>>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <%- include('../partials/duplicate-notice') %>
 
     <h2 class="form-section">Cadastro</h2>
     <label>Nome * <small class="muted">(como aparece no convite; para dupla: "Dr. João e Dra. Maria")</small>

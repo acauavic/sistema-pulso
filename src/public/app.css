@@ -1635,3 +1635,31 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
 .meet-row::-webkit-details-marker { display: none; }
 .meet-row-title { font-family: var(--f-display); flex: 1 1 200px; }
 .meet-summary { padding: 0 14px 14px; }
+
+/* Duplicatas: aviso no formulário, faixa no cadastro, comparação e lista da gestão */
+.dup-notice { margin: 0 0 8px; padding: 12px 14px; border-left: 3px solid var(--st-edicao-fg); background: var(--raised); border-radius: 0 var(--r-card) var(--r-card) 0; color: var(--text-2); display: grid; gap: 8px; justify-items: start; }
+.dup-notice.sure { border-left-color: var(--bad); }
+.dup-notice strong { color: var(--text); }
+.dup-list { gap: 6px; width: 100%; }
+.dup-list li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dup-name, .dup-card-name { font-family: var(--f-display); font-weight: 600; letter-spacing: -.02em; color: var(--text); }
+.dup-alert { align-items: center; flex-wrap: wrap; }
+.dup-alert.maybe { border-left-color: var(--st-edicao-fg); } .dup-alert.maybe .icon { color: var(--st-edicao-fg); }
+.dup-alert-text { display: grid; gap: 2px; flex: 1 1 220px; min-width: 0; }
+.dup-alert-actions { gap: 12px; align-items: center; }
+.dup-compare { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.dup-compare legend { margin-bottom: 8px; }
+.dup-card { display: grid; gap: 10px; cursor: pointer; border: 1px solid var(--line); }
+.dup-card:has(input:checked) { border-color: var(--text); background: var(--raised); }
+.dup-card input[type=radio] { accent-color: var(--action); width: 18px; height: 18px; }
+.dup-card-name { display: block; font-size: 20px; margin-top: 4px; }
+.dup-card-meta { gap: 8px; align-items: center; }
+.dup-counts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--text-2); }
+.dup-choice label span { overflow-wrap: anywhere; }
+.dup-row-actions { gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.dup-off li { gap: 8px; align-items: center; }
+@media (max-width: 720px) {
+  .dup-compare { grid-template-columns: 1fr; }
+  .dup-row { grid-template-columns: 1fr; }
+  .dup-row-actions { justify-content: flex-start; }
+}

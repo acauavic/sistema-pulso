@@ -255,7 +255,7 @@ const TOOLS = [
   },
   {
     perm: 'guests.write',
-    decl: { name: 'criar_convidado', description: 'Cadastra um convidado novo em Prospecção, com a pessoa que pediu como responsável. SÓ use quando a pessoa pedir claramente para cadastrar. Nome, Instagram e perfil são obrigatórios: se faltar algum, pergunte antes de chamar. perfil: médico, influencer, empresário ou profissional da saúde.', parameters: { type: 'OBJECT', properties: { nome: { type: 'STRING' }, instagram: { type: 'STRING' }, perfil: { type: 'STRING' }, genero: { type: 'STRING', enum: ['m', 'f'] }, email: { type: 'STRING' }, whatsapp: { type: 'STRING' }, motivo_do_convite: { type: 'STRING' }, tema: { type: 'STRING' } }, required: ['nome', 'instagram', 'perfil'] } },
+    decl: { name: 'criar_convidado', description: 'Cadastra um convidado novo em Prospecção, com a pessoa que pediu como responsável. SÓ use quando a pessoa pedir claramente para cadastrar. Nome, Instagram e perfil são obrigatórios: se faltar algum, pergunte antes de chamar. perfil: médico, influencer, empresário ou profissional da saúde.', parameters: { type: 'OBJECT', properties: { nome: { type: 'STRING' }, instagram: { type: 'STRING' }, perfil: { type: 'STRING' }, genero: { type: 'STRING', enum: ['m', 'f'] }, email: { type: 'STRING' }, whatsapp: { type: 'STRING' }, motivo_do_convite: { type: 'STRING' }, tema: { type: 'STRING' }, confirmado: { type: 'BOOLEAN' } }, required: ['nome', 'instagram', 'perfil'] } },
     async run(a, user) {
       const name = clean(a.nome, 150);
       const instagram = rules.normalizeInstagram(a.instagram);
@@ -269,8 +269,10 @@ const TOOLS = [
       if (email && !isEmail(email)) problems.push('e-mail inválido');
       if (gender === null) problems.push('gênero (m ou f)');
       if (problems.length) return { erro: `Faltam ou estão inválidos: ${problems.join(', ')}. Peça à pessoa e tente de novo.` };
-      const { rows: [dup] } = await db.query("SELECT id, name, status FROM guests WHERE lower(instagram) = $1 OR ($2 <> '' AND lower(email) = $2) LIMIT 1", [instagram, email]);
-      if (dup) return { erro: `Já existe um convidado com esse Instagram ou e-mail: ${dup.name} (${C.STATUS_BY_KEY[dup.status].label}).`, link: `/convidados/${dup.id}` };
+      const dups = await require('./duplicates').findFor('guest', { name, instagram, email, phone: clean(a.whatsapp, 40) });
+      const sure = dups.find((d) => d.level === 'certa');
+      if (sure) return { erro: `Já existe um convidado com esse ${sure.reasons[0].replace(/^mesmo /, '')}: ${sure.name} (${sure.stage_label}).`, link: `/convidados/${sure.id}` };
+      if (dups.length && a.confirmado !== true) return { precisa_confirmar: true, aviso: `Pode ser alguém já cadastrado: ${dups.slice(0, 3).map((d) => `${d.name} (${d.stage_label}, ${d.reasons.join(', ')})`).join('; ')}. Pergunte se é outra pessoa; se for, chame de novo com confirmado=true.`, link: `/convidados/${dups[0].id}` };
       const { rows: [g] } = await db.query(
         `INSERT INTO guests (name, instagram, phone, profile, email, invite_reason, topic, gender, owner_id, created_by, status)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,'prospect') RETURNING id`,

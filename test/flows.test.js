@@ -10,7 +10,8 @@ const as = {}; // clientes logados por perfil
 const lastMail = (to) => [...h.mailer.outbox].reverse().find((m) => !to || m.to === to);
 const linkIn = (mail, re) => mail.html.match(re)?.[0];
 // campos mínimos de um convidado válido (nome, Instagram e perfil são obrigatórios)
-const min = (o = {}) => ({ instagram: '@pulso.teste', profile: 'medico', ...o });
+// confirmar_duplicata: os fluxos cadastram vários convidados parecidos de propósito (o aviso de duplicata tem teste próprio)
+const min = (o = {}) => ({ instagram: '@pulso.teste', profile: 'medico', confirmar_duplicata: '1', ...o });
 const JSON_HEADERS = (csrf) => ({ accept: 'application/json', 'x-csrf-token': csrf });
 
 describe('fluxos ponta a ponta', () => {
@@ -546,7 +547,7 @@ describe('fluxos ponta a ponta', () => {
     it('cadastro inicial: nome, Instagram e perfil; Instagram é normalizado; WhatsApp, e-mail e motivo são opcionais', async () => {
       const r = await as.prod.act('/convidados', {
         name: 'Rita Regras', instagram: 'https://www.instagram.com/Rita.Regras/?igsh=abc', profile: 'Profissional da saúde',
-        invite_reason: 'Referência em nutrição esportiva', owner_id: produtora.id,
+        invite_reason: 'Referência em nutrição esportiva', owner_id: produtora.id, confirmar_duplicata: '1',
       }, { from: '/convidados/novo' });
       assert.equal(r.status, 302);
       id = r.location.split('/').pop();

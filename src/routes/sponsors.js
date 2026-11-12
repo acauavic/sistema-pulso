@@ -122,6 +122,10 @@ router.get('/patrocinadores/novo', requirePerm('sponsors.write'), wrap(async (re
 router.post('/patrocinadores', requirePerm('sponsors.write'), wrap(async (req, res) => {
   const { values, error } = await parseSponsorForm(req.body);
   if (error) return res.status(400).render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error, notice: null, values: echo(req.body, values), ...(await formOptions()) });
+  if (req.body.confirmar_duplicata !== '1') {
+    const duplicates = await require('../services/duplicates').findFor('sponsor', values);
+    if (duplicates.length) return res.render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error: null, notice: null, duplicates, dupKind: 'sponsor', values: echo(req.body, values), ...(await formOptions()) });
+  }
   const { rows: [s] } = await db.query(
     `INSERT INTO sponsors (${COLUMNS.join(', ')}, created_by) VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}) RETURNING id`,
     [...columnValues(values), req.user.id]);
@@ -169,6 +173,7 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
   const finView = can(req.user.role, 'finance.read')
     ? { finSummary, fin: finSvc, money: fmtMoney, today: finSvc.todayISO(), here: req.originalUrl } : { finSummary: null };
   res.render('sponsors/show', {
+    dupes: can(req.user.role, 'sponsors.write') ? await require('../services/duplicates').findFor('sponsor', sponsor, { excludeId: sponsor.id }) : [],
     outreachCtx: { kind: 'sponsor', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (sponsor.contact_phone ? 'whatsapp' : sponsor.contact_email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/patrocinadores', subjectId: sponsor.id },
     ...finView, openModal: ['ganho', 'ativo'].includes(req.query.abrir) ? req.query.abrir : null, agenda: agenda.rows, guestLinks: guestLinks.rows, guestStatuses: C.STATUS_BY_KEY,
     comments: thread, linkedTasks: linkedTasks.rows,

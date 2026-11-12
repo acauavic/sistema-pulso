@@ -174,6 +174,10 @@ router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) =>
   if (error) {
     return formView(res, 400, { title: 'Novo convidado', guest: null, error, values: echoValues(req.body, values), ...(await formOptions()) });
   }
+  if (req.body.confirmar_duplicata !== '1') {
+    const duplicates = await require('../services/duplicates').findFor('guest', values);
+    if (duplicates.length) return formView(res, 200, { title: 'Novo convidado', guest: null, error: null, duplicates, dupKind: 'guest', values: echoValues(req.body, values), ...(await formOptions()) });
+  }
   const { rows: [guest] } = await db.query(
     `INSERT INTO guests (${COLUMNS.join(', ')}, created_by)
      VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}) RETURNING id, photo_key`,
@@ -241,6 +245,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   } : null;
   const outSm = outEval.get(guest.id) || null;
   res.render('guests/show', {
+    dupes: can(req.user.role, 'guests.write') ? await require('../services/duplicates').findFor('guest', guest, { excludeId: guest.id }) : [],
     outreachCtx: { kind: 'guest', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (guest.instagram ? 'instagram' : guest.phone ? 'whatsapp' : guest.email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/convidados', subjectId: guest.id },
     reminderList, photoFrame: guestPhotos.FRAME,
     pagePlateia, portalTab, plateia: { ...pl, price: guest.audience_enabled ? audience.money(audience.priceOf(guest, audSettings)) : null, generalPrice: guest.audience_enabled ? audience.money(audSettings.priceCents) : null, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,

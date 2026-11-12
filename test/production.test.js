@@ -29,7 +29,7 @@ describe('produção de episódios', () => {
   // ---------------------------------------------------------------- utilidades
   const ep = (id) => h.db.query('SELECT * FROM episodes WHERE id=$1', [id]).then((r) => r.rows[0]);
   const guestFields = (o = {}) => ({
-    name: 'Dr. Marcos Lima', instagram: '@marcoslima', profile: 'medico', email: 'marcos@exemplo.com', owner_id: produtora.id, ...o,
+    name: 'Dr. Marcos Lima', instagram: '@marcoslima', profile: 'medico', email: 'marcos@exemplo.com', owner_id: produtora.id, confirmar_duplicata: '1', ...o,
   });
   const scheduled = { status: 'agendado', proposed_at: '2026-11-20T15:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1' };
 

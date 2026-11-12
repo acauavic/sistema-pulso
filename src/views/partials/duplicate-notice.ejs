@@ -1,0 +1,20 @@
+<%#
+  Aviso de duplicata no formulário de cadastro (dentro do <form>): o que já existe e "Cadastrar mesmo assim".
+  Variáveis: duplicates (de duplicates.findFor), dupKind ('guest' | 'sponsor').
+%>
+<% if (typeof duplicates !== 'undefined' && duplicates && duplicates.length) { var sure = duplicates.some(function (d) { return d.level === 'certa'; }); var base = dupKind === 'guest' ? '/convidados/' : '/patrocinadores/'; %>
+<div class="dup-notice <%= sure ? 'sure' : '' %>" role="alert">
+  <p><strong><%= sure ? (dupKind === 'guest' ? 'Este convidado já está cadastrado.' : 'Este patrocinador já está cadastrado.') : 'Pode já estar cadastrado.' %></strong> Confira antes de criar outro:</p>
+  <ul class="plain dup-list">
+    <% duplicates.slice(0, 5).forEach(function (d) { %>
+    <li>
+      <span class="dup-name"><%= d.name %></span>
+      <span class="badge b-st-<%= d.stage %>"><%= d.stage_label %></span>
+      <span class="mono small muted"><%= d.reasons.join(' · ') %><%= d.owner_name ? ' · ' + d.owner_name : '' %></span>
+      <a class="link small" href="<%= base + d.id %>" target="_blank" rel="noopener">Abrir cadastro</a>
+    </li>
+    <% }) %>
+  </ul>
+  <button class="btn sm" type="submit" name="confirmar_duplicata" value="1">Cadastrar mesmo assim</button>
+</div>
+<% } %>

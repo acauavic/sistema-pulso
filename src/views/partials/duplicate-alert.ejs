@@ -1,0 +1,18 @@
+<%#
+  Faixa no topo do cadastro: outro cadastro parece ser o mesmo. Variáveis: dupes (duplicates.findFor com excludeId), dupKind, selfId, csrf.
+%>
+<% if (typeof dupes !== 'undefined' && dupes && dupes.length) { var slug = dupKind === 'guest' ? 'convidados' : 'patrocinadores'; %>
+<% dupes.slice(0, 3).forEach(function (d) { %>
+<div class="conn-alert dup-alert <%= d.level === 'certa' ? '' : 'maybe' %>" role="alert">
+  <%- icon('copy', 16) %>
+  <div class="dup-alert-text">
+    <strong><%= d.level === 'certa' ? 'Duplicata' : 'Possível duplicata' %> de <a href="/<%= slug %>/<%= d.id %>"><%= d.name %></a></strong>
+    <span class="mono small"><%= d.stage_label %> · <%= d.reasons.join(' · ') %></span>
+  </div>
+  <div class="row dup-alert-actions">
+    <a class="btn sm" href="/duplicatas/<%= slug %>/<%= selfId %>/<%= d.id %>"><%- icon('layers', 14) %> Comparar e juntar</a>
+    <form method="post" action="/duplicatas/<%= slug %>/<%= selfId %>/<%= d.id %>/dispensar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="/<%= slug %>/<%= selfId %>"><button class="link small" type="submit">não é duplicata</button></form>
+  </div>
+</div>
+<% }) %>
+<% } %>
