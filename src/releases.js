@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.64.1', date: '2026-11-12', title: 'Follow-up não vence no fim de semana',
+    items: [
+      { kind: 'ajuste', text: 'Se o próximo follow-up cair num sábado ou domingo, ele passa para a segunda. Vale para convidados e patrocinadores, no quadro, na lista, no Início e no aviso do dia.' },
+    ],
+  },
+  {
     version: '1.64.0', date: '2026-11-11', title: 'Reuniões com patrocinador no Google Agenda',
     items: [
       { kind: 'novo', text: 'Aba Reuniões no patrocinador: marque data, horário, Google Meet ou presencial, os convidados da empresa e o responsável. A reunião vai para o Google Agenda do Pulso, o Google cria o Meet e manda o convite.' },

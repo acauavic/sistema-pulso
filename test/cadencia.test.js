@@ -6,7 +6,10 @@ const cal = require('../src/services/calendar');
 const notifySvc = require('../src/services/notify');
 
 describe('cadência de abordagem: follow-ups por canal, possível perdido, meta diária e painel', () => {
-  const day = (n) => cal.addDays(cal.todayISO(), n);
+  // "Hoje" fixo numa quarta-feira (a mais recente): o follow-up que cai no fim de semana passa para a segunda, e o resultado
+  // não pode depender do dia em que a suíte roda.
+  let wed = cal.todayISO(); while (new Date(`${wed}T12:00:00Z`).getUTCDay() !== 3) wed = cal.addDays(wed, -1);
+  const day = (n) => cal.addDays(wed, n);
   const q = (sql, p) => h.db.query(sql, p);
   let app; const as = {}; const u = {};
   const ago = (n) => `${day(-n)} 12:00-03`;
@@ -22,8 +25,9 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
       as[k] = h.client(app.base); assert.equal((await as[k].login(`${k}@t.com`)).status, 302);
     }
     require('../src/services/googleCalendar').kickDelay.ms = 600_000;
+    outreach.clock.today = () => wed;
   });
-  after(async () => { await app.close(); await h.db.close(); });
+  after(async () => { outreach.clock.today = () => cal.todayISO(); await app.close(); await h.db.close(); });
 
   const evalOne = async (kind, id) => (await outreach.evaluateAll(kind, { ids: [id] })).get(id);
 
@@ -35,7 +39,7 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
     await enter(id, 5); e = await evalOne('guest', id); assert.deepEqual([e.state, e.daysTo], ['atrasado', -2]);
 
     await attempt('guest', id, 'instagram', 0); e = await evalOne('guest', id);
-    assert.deepEqual([e.state, e.attempts, e.daysTo], ['em_dia', 1, 4], 'depois da 1ª abordagem espera 4 dias (2º intervalo)');
+    assert.deepEqual([e.state, e.attempts, e.daysTo], ['em_dia', 1, 5], 'depois da 1ª abordagem espera 4 dias (2º intervalo): cai no domingo e passa para a segunda');
     await q('UPDATE outreach_attempts SET at = $2 WHERE subject_id = $1', [id, ago(4)]); assert.equal((await evalOne('guest', id)).state, 'hoje');
     // 4 abordagens em canais e endereços diferentes: a cadência acaba e, passada a última espera, é possível perdido
     await q('DELETE FROM outreach_attempts'); await enter(id, 40);
@@ -43,10 +47,23 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
     e = await evalOne('guest', id);
     assert.deepEqual([e.state, e.attempts, e.byChannel.email, e.byChannel.instagram, e.byChannel.whatsapp], ['possivel_perdido', 4, 2, 1, 1]);
     await q('UPDATE outreach_attempts SET at = $2 WHERE subject_id = $1 AND channel = $3 AND address = $4', [id, ago(3), 'email', 'b@x.com']);
-    e = await evalOne('guest', id); assert.deepEqual([e.state, e.daysTo], ['em_dia', 4], 'ainda esperando a última resposta');
+    e = await evalOne('guest', id); assert.deepEqual([e.state, e.daysTo], ['em_dia', 5], 'ainda esperando a última resposta (domingo vira segunda)');
     // respondeu: a cadência para
     await attempt('guest', id, 'instagram', 0, { result: 'respondeu' });
     e = await evalOne('guest', id); assert.equal(e.state, 'respondeu'); assert.equal(e.replyChannel, 'instagram');
+  });
+
+  it('follow-up nunca vence no fim de semana: sábado e domingo passam para a segunda', () => {
+    const cfg = { guest: [3, 4], sponsor: [3, 5] };
+    assert.deepEqual(['2026-11-13', '2026-11-14', '2026-11-15', '2026-11-16'].map(outreach.weekdayOnOrAfter), ['2026-11-13', '2026-11-16', '2026-11-16', '2026-11-16']);
+    let e = outreach.evaluate('guest', '2026-11-12T15:00:00Z', [], cfg, '2026-11-12'); // quinta + 3 = domingo
+    assert.deepEqual([e.due, e.daysTo, e.state], ['2026-11-16', 4, 'em_dia']);
+    e = outreach.evaluate('sponsor', '2026-11-01T15:00:00Z', [{ channel: 'email', result: 'enviado', at: '2026-11-11T15:00:00Z' }], cfg, '2026-11-14'); // quarta + 3 = sábado
+    assert.deepEqual([e.due, e.state], ['2026-11-16', 'em_dia'], 'no sábado ainda não está vencido');
+    e = outreach.evaluate('sponsor', '2026-11-01T15:00:00Z', [{ channel: 'email', result: 'enviado', at: '2026-11-11T15:00:00Z' }], cfg, '2026-11-16');
+    assert.equal(e.state, 'hoje', 'vence na segunda');
+    e = outreach.evaluate('guest', '2026-11-09T15:00:00Z', [], cfg, '2026-11-12'); // segunda + 3 = quinta: dia útil não muda
+    assert.deepEqual([e.due, e.state], ['2026-11-12', 'hoje']);
   });
 
   it('reentrar na etapa começa um ciclo novo; sair da etapa tira da cadência', async () => {
@@ -82,7 +99,7 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
     await post('prod', { canal: 'instagram', addr_instagram: '__novo', novo_instagram: 'perfil.novo', quando: day(-2) });
     assert.equal((await q("SELECT address FROM outreach_attempts WHERE subject_id = $1 AND address = '@perfil.novo'", [id])).rowCount, 1, 'o @ é completado');
     assert.equal((await q('SELECT 1 FROM outreach_attempts WHERE subject_id = $1', [id])).rowCount, 3);
-    await post('prod', { canal: 'telefone', addr_telefone: '+5511999990000', quando: day(1) }); // futuro
+    await post('prod', { canal: 'telefone', addr_telefone: '+5511999990000', quando: cal.addDays(cal.todayISO(), 1) }); // futuro
     await post('prod', { canal: 'inexistente' });
     assert.equal((await q('SELECT 1 FROM outreach_attempts WHERE subject_id = $1', [id])).rowCount, 3, 'data futura e canal inválido não gravam');
 
@@ -105,7 +122,7 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
     const late = await guest('Duda Atrasada'); await enter(late, 9);
     const ok = await guest('Edu EmDia'); await enter(ok, 0);
     const board = (await as.prod.get('/convidados')).text;
-    assert.match(board, /outreach-chip bad/); assert.match(board, /atrasado 6d/); assert.match(board, /follow-up em 3d/);
+    assert.match(board, /outreach-chip bad/); assert.match(board, /atrasado 6d/); assert.match(board, /follow-up em 5d/, 'entrou na quarta: o follow-up do sábado passa para a segunda');
     const only = (await as.prod.get('/convidados?view=lista&followup=1')).text;
     assert.match(only, /Duda Atrasada/); assert.doesNotMatch(only, /Edu EmDia/); assert.match(only, /Só follow-ups pendentes/);
   });

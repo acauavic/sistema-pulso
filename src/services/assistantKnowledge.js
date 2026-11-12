@@ -69,7 +69,7 @@ const TOPICS = [
     where: 'Convidado em Convite enviado e patrocinador em Prospecção (botão "Registrar abordagem"); painel em Gestão > Cadência', perm: 'guests.write',
     steps: [
       'Quem está sendo abordado (convidado em "Convite enviado", patrocinador em "Prospecção") tem um estado de follow-up: em dia, hoje, atrasado ou possível perdido (muitas tentativas sem resposta).',
-      '"Registrar abordagem" abre uma janela curta: canal (Instagram, e-mail, WhatsApp, telefone, outro), qual endereço, se enviou ou se respondeu, quando e uma observação. Cada canal tem seu intervalo até o próximo follow-up.',
+      '"Registrar abordagem" abre uma janela curta: canal (Instagram, e-mail, WhatsApp, telefone, outro), qual endereço, se enviou ou se respondeu, quando e uma observação. Cada canal tem seu intervalo até o próximo follow-up. Follow-up nunca vence no fim de semana: se cair no sábado ou no domingo, passa para a segunda.',
       'Para patrocinadores há uma meta diária de abordagens por pessoa. O Início mostra os follow-ups e a meta do dia; de manhã, quem tem pendências recebe um aviso.',
       'Gestão > Cadência (gestão) mostra o painel por canal e por pessoa e configura intervalos e metas.',
       'Pelo assistente: "follow_ups" mostra quem precisa de abordagem e "registrar_abordagem" registra uma abordagem feita.',

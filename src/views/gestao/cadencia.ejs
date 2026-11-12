@@ -122,7 +122,7 @@
     <label>Patrocinadores: dias de espera entre as abordagens
       <input type="text" name="sponsor" value="<%= r.cfg.sponsor.join(', ') %>" inputmode="numeric" placeholder="3, 5, 7, 14">
     </label>
-    <p class="small muted">Cada número é a espera depois de uma abordagem, até o próximo follow-up. O último vale também como espera final: se ninguém responder depois dele, o card é indicado como possível perdido (a pessoa decide). Hoje: convidados <strong><%= r.cfg.guest.length %></strong> follow-ups, patrocinadores <strong><%= r.cfg.sponsor.length %></strong>.</p>
+    <p class="small muted">Cada número é a espera depois de uma abordagem, até o próximo follow-up. Se o follow-up cair num sábado ou domingo, ele passa para a segunda. O último número vale também como espera final: se ninguém responder depois dele, o card é indicado como possível perdido (a pessoa decide). Hoje: convidados <strong><%= r.cfg.guest.length %></strong> follow-ups, patrocinadores <strong><%= r.cfg.sponsor.length %></strong>.</p>
     <label>Meta diária de abordagens de patrocinadores (produtoras)
       <input type="number" name="goal_default" min="0" max="200" value="<%= r.cfg.sponsorGoal %>">
     </label>

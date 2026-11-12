@@ -20,6 +20,10 @@ const MAX_STEPS = 10;
 const dayOf = (ts) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(ts));
 const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
 const isWeekday = (iso) => { const d = new Date(`${iso}T12:00:00Z`).getUTCDay(); return d >= 1 && d <= 5; };
+// Follow-up não vence em fim de semana: sábado e domingo passam para a segunda.
+const weekdayOnOrAfter = (iso) => { const d = new Date(`${iso}T12:00:00Z`).getUTCDay(); return d === 6 ? cal.addDays(iso, 2) : d === 0 ? cal.addDays(iso, 1) : iso; };
+// "Hoje" da avaliação (os testes fixam um dia da semana para o resultado não depender de quando rodam).
+const clock = { today: () => cal.todayISO() };
 
 // ---------------------------------------------------------------- configuração
 const parseSteps = (text, fallback) => {
@@ -63,7 +67,7 @@ async function goals(users) {
 
 // ---------------------------------------------------------------- avaliação de um assunto
 // attempts: abordagens do ciclo atual (desde que entrou na etapa), de qualquer ordem.
-function evaluate(kind, enteredAt, attempts, cfg, today = cal.todayISO()) {
+function evaluate(kind, enteredAt, attempts, cfg, today = clock.today()) {
   const steps = cfg[kind]; const list = [...attempts].sort((a, b) => new Date(a.at) - new Date(b.at));
   const sends = list.filter((a) => a.result === 'enviado'); const replies = list.filter((a) => a.result === 'respondeu');
   const byChannel = {}; for (const a of sends) byChannel[a.channel] = (byChannel[a.channel] || 0) + 1;
@@ -73,7 +77,7 @@ function evaluate(kind, enteredAt, attempts, cfg, today = cal.todayISO()) {
   if (kind === 'sponsor' && !sends.length) return { ...out, state: 'a_abordar' };
   const ref = lastSend ? dayOf(lastSend.at) : dayOf(enteredAt);
   const idx = kind === 'guest' ? sends.length : sends.length - 1;
-  out.due = cal.addDays(ref, steps[Math.min(idx, steps.length - 1)]);
+  out.due = weekdayOnOrAfter(cal.addDays(ref, steps[Math.min(idx, steps.length - 1)]));
   out.daysTo = daysBetween(today, out.due);
   if (out.daysTo > 0) return { ...out, state: 'em_dia' };
   if (idx >= steps.length) return { ...out, state: 'possivel_perdido' };
@@ -238,4 +242,4 @@ async function dailyNotice(now = new Date()) {
   return n;
 }
 
-module.exports = { describe, dayOf, CHANNELS, RESULTS, KINDS, NEEDS, DEFAULTS, config, saveConfig, goals, evaluate, evaluateAll, knownAddresses, history, register, remove, todayFor, report, dailyNotice, sponsorSendsToday, parseSteps };
+module.exports = { clock, weekdayOnOrAfter, describe, dayOf, CHANNELS, RESULTS, KINDS, NEEDS, DEFAULTS, config, saveConfig, goals, evaluate, evaluateAll, knownAddresses, history, register, remove, todayFor, report, dailyNotice, sponsorSendsToday, parseSteps };
