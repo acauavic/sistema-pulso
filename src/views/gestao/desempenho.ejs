@@ -1,0 +1,95 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Gestão</span><h1>Desempenho</h1></div>
+  <div class="seg" role="group" aria-label="Período">
+    <a class="<%= r.days === 7 ? 'on' : '' %>" href="/gestao/desempenho?dias=7"<%- r.days === 7 ? ' aria-current="page"' : '' %>>7 dias</a>
+    <a class="<%= r.days === 30 ? 'on' : '' %>" href="/gestao/desempenho?dias=30"<%- r.days === 30 ? ' aria-current="page"' : '' %>>30 dias</a>
+  </div>
+</div>
+<%- include('../partials/gestao-nav', { active: 'desempenho' }) %>
+<%
+  var unit = function (metric, v) { if (v == null) return '—'; return metric === 'CLS' ? Number(v).toFixed(2) : (v >= 1000 ? (v / 1000).toFixed(1).replace('.', ',') + ' s' : Math.round(v) + ' ms'); };
+  var chip = { bom: 'b-gray', melhorar: 'b-amber', ruim: 'b-red' };
+  var METRICS = [['LCP', 'Aparece'], ['INP', 'Responde ao clique'], ['CLS', 'Pula na tela'], ['TTFB', 'Servidor']];
+  var ms = function (v) { return v >= 1000 ? (v / 1000).toFixed(1).replace('.', ',') + ' s' : v + ' ms'; };
+%>
+<p class="lead">Quanto o painel demora para quem usa, onde o servidor demora e o que pesa no banco. Últimos <span class="mono"><%= r.days %></span> dias.</p>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="real">
+  <div class="tabbar" role="tablist" aria-label="Desempenho">
+    <button type="button" role="tab" data-tab-btn="real" aria-controls="pane-real">Velocidade real</button>
+    <button type="button" role="tab" data-tab-btn="lentas" aria-controls="pane-lentas">Requisições lentas<% if (r.slow.length) { %> <span class="count"><%= r.slow.reduce(function (n, s) { return n + s.n; }, 0) %></span><% } %></button>
+    <button type="button" role="tab" data-tab-btn="banco" aria-controls="pane-banco">Consultas do banco</button>
+  </div>
+
+  <div class="pane" id="pane-real" data-pane-id="real">
+    <% if (!r.pages.length) { %>
+      <div class="empty"><%- include('../partials/pulse-line') %><h3>Ainda sem medições</h3><p>Cada página aberta no painel manda o tempo que levou no navegador da pessoa. Os números aparecem aqui depois das primeiras visitas.</p></div>
+    <% } else { %>
+      <p class="small muted">Valor de 3 em cada 4 visitas (p75). Cinza = bom, âmbar = dá para melhorar, vermelho = lento. Aparece = maior elemento na tela (LCP, bom até <span class="mono">2,5 s</span>); responde ao clique (INP, bom até <span class="mono">200 ms</span>); pula na tela (CLS, bom até <span class="mono">0,10</span>); servidor = primeira resposta (TTFB, bom até <span class="mono">800 ms</span>).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Página</th><th class="num">Visitas</th><% METRICS.forEach(function (m) { %><th class="num"><%= m[1] %></th><% }) %></tr></thead>
+          <tbody>
+            <% r.pages.forEach(function (p) { %>
+            <tr>
+              <td class="mono"><%= p.page %></td>
+              <td class="num mono"><%= p.n %></td>
+              <% METRICS.forEach(function (m) { var v = p.m[m[0]]; %>
+              <td class="num"><% if (v) { %><span class="badge <%= chip[v.grade] %>"><%= unit(m[0], v.p75) %></span><% } else { %><span class="muted">—</span><% } %></td>
+              <% }) %>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="pane" id="pane-lentas" data-pane-id="lentas" hidden>
+    <% if (!r.slow.length) { %>
+      <div class="empty"><%- include('../partials/pulse-line') %><h3>Nenhuma resposta lenta</h3><p>Toda resposta do servidor acima de <span class="mono"><%= ms(r.slowMs) %></span> entra aqui, com o tempo que foi gasto no banco.</p></div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Rota</th><th class="num">Vezes</th><th class="num">Mediana</th><th class="num">Pior</th><th class="num">No banco</th><th class="num">Consultas</th></tr></thead>
+          <tbody>
+            <% r.slow.forEach(function (s) { %>
+            <tr><td class="mono"><%= s.method %> <%= s.route %></td><td class="num mono"><%= s.n %></td><td class="num mono"><%= ms(s.p50) %></td><td class="num mono"><%= ms(s.max) %></td><td class="num mono"><%= ms(s.db_ms) %></td><td class="num mono"><%= s.db_count %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <details class="top-gap">
+        <summary>Últimas respostas lentas</summary>
+        <ul class="plain results">
+          <% r.recent.forEach(function (s) { %>
+          <li><span class="mono small"><%= fmt.formatDateTime(s.at) %></span> <span class="mono"><%= s.method %> <%= s.path %></span> <span class="badge <%= s.status >= 500 ? 'b-red' : 'b-gray' %>"><%= s.status %></span> <span class="mono small muted"><%= ms(s.ms) %> · banco <%= ms(s.db_ms) %> em <%= s.db_count %> consultas<%= s.user_name ? ' · ' + s.user_name : '' %></span></li>
+          <% }) %>
+        </ul>
+      </details>
+    <% } %>
+    <p class="small muted top-gap">Cada resposta leva o cabeçalho <span class="mono">Server-Timing</span> (tempo total e do banco), visível na aba Rede do navegador.<% if (r.otlp) { %> As lentas também vão para a ferramenta de OpenTelemetry configurada.<% } %></p>
+  </div>
+
+  <div class="pane" id="pane-banco" data-pane-id="banco" hidden>
+    <% if (r.statements === null) { %>
+      <div class="empty"><%- include('../partials/pulse-line') %><h3>Medição do banco desligada</h3><p>Ligue a extensão <span class="mono">pg_stat_statements</span> no Postgres para ver aqui as consultas que mais tomam tempo.</p></div>
+    <% } else if (!r.statements.length) { %>
+      <div class="empty"><%- include('../partials/pulse-line') %><h3>Ainda sem dados</h3><p>As consultas aparecem conforme o painel é usado.</p></div>
+    <% } else { %>
+      <p class="small muted">Desde que o banco foi reiniciado, ordenadas pelo tempo total (o que mais pesa somando todas as vezes).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Consulta</th><th class="num">Vezes</th><th class="num">Média</th><th class="num">Total</th></tr></thead>
+          <tbody>
+            <% r.statements.forEach(function (q) { %>
+            <tr><td><code class="query-text"><%= q.query %></code></td><td class="num mono"><%= q.calls %></td><td class="num mono"><%= q.mean_ms %> ms</td><td class="num mono"><%= ms(Math.round(q.total_ms)) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('../partials/foot') %>

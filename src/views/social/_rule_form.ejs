@@ -1,0 +1,40 @@
+<%# Formulário da automação. Variáveis: r (regra ou null), action (URL), submit (texto do botão), igPosts (opcional). %>
+<% r = r || { trigger: 'comentario', platform: 'instagram', scope: 'recentes', action: 'dm', keywords: [], buttons: [] };
+   var sel = function (a, b) { return a === b ? 'selected' : ''; }; var chk = function (a, b) { return a === b ? 'checked' : ''; };
+   var btn = function (n, k) { return (r.buttons && r.buttons[n] && r.buttons[n][k]) || ''; }; %>
+<form method="post" action="<%= action %>" class="stack" data-when-form>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <label>Nome<input type="text" name="name" value="<%= r.name || '' %>" maxlength="120" placeholder="Ex.: Link do episódio para quem comentar EPISODIO" required></label>
+  <div class="choice-row" role="radiogroup" aria-label="Quando disparar">
+    <label class="choice"><input type="radio" name="trigger" value="comentario" <%= chk(r.trigger, 'comentario') %>><span><strong>Comentário</strong><small class="muted">alguém comenta num post</small></span></label>
+    <label class="choice"><input type="radio" name="trigger" value="direct" <%= chk(r.trigger, 'direct') %>><span><strong>Direct</strong><small class="muted">alguém manda mensagem no Instagram</small></span></label>
+  </div>
+  <div class="grid-2 tight" data-when="trigger=comentario">
+    <label>Rede
+      <select name="platform"><% commentPlatforms.forEach(function (p) { %><option value="<%= p %>" <%= sel(r.platform, p) %>><%= platforms[p].label %></option><% }) %></select>
+    </label>
+    <label>Quais posts
+      <select name="scope"><option value="recentes" <%= sel(r.scope, 'recentes') %>>Os 10 posts mais recentes</option><option value="post" <%= sel(r.scope, 'post') %>>Um post específico</option></select>
+    </label>
+  </div>
+  <div data-when="scope=post">
+    <label>Link do post<input type="url" name="post_url" value="<%= r.post_url || '' %>" maxlength="500" placeholder="https://www.instagram.com/p/…" list="ig-posts"></label>
+    <% if (typeof igPosts !== 'undefined' && igPosts.length) { %><datalist id="ig-posts"><% igPosts.forEach(function (p) { %><option value="<%= p.url %>"><%= p.title %></option><% }) %></datalist><% } %>
+  </div>
+  <label>Palavras-chave <small class="muted">(separadas por vírgula; vazio = responde todo mundo; maiúsculas e acentos não importam)</small>
+    <input type="text" name="keywords" value="<%= (r.keywords || []).join(', ') %>" maxlength="600" placeholder="episodio, link, quero">
+  </label>
+  <label data-when="trigger=comentario">O que fazer
+    <select name="action"><% Object.keys(actions).forEach(function (a) { %><option value="<%= a %>" <%= sel(r.action, a) %>><%= actions[a] %></option><% }) %></select>
+  </label>
+  <label data-when="action=dm ambos">Mensagem do direct<textarea name="message" rows="4" maxlength="1000" placeholder="Oi! Aqui está o link da conversa completa."><%= r.message || '' %></textarea></label>
+  <label data-when="action=resposta ambos">Resposta pública ao comentário<textarea name="reply_text" rows="3" maxlength="1000" placeholder="Te mandamos o link no direct."><%= r.reply_text || '' %></textarea></label>
+  <fieldset data-when="action=dm ambos">
+    <legend>Botões no direct (opcional, até 3)</legend>
+    <% [0, 1, 2].forEach(function (n) { %>
+    <div class="grid-2 tight"><label class="sr-only" for="bt<%= n %>">Texto do botão</label><input id="bt<%= n %>" type="text" name="button_title_<%= n %>" value="<%= btn(n, 'title') %>" maxlength="20" placeholder="Texto (até 20)"><label class="sr-only" for="bu<%= n %>">Link do botão</label><input id="bu<%= n %>" type="url" name="button_url_<%= n %>" value="<%= btn(n, 'url') %>" maxlength="500" placeholder="https://"></div>
+    <% }) %>
+  </fieldset>
+  <p class="small muted">Regras do Instagram: o direct para quem comentou só vale para comentários com menos de 7 dias; responder um direct só vale até 24 h depois da mensagem da pessoa. Cada comentário ou mensagem é respondido uma vez só.</p>
+  <div class="row modal-actions"><button class="btn primary" type="submit"><%= submit %></button><% if (typeof cancel !== 'undefined' && cancel) { %><button class="btn ghost" type="button" data-modal-close>Cancelar</button><% } %></div>
+</form>

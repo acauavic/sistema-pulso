@@ -1,0 +1,43 @@
+<%# Cadência de abordagem de um convidado/patrocinador. Variáveis: kind ('guest'|'sponsor'), sm (avaliação), d (describe), hist, canWrite, base, subjectId. %>
+<section class="card" id="abordagens">
+  <div class="row spread">
+    <h2>Abordagens</h2>
+    <% if (sm) { %><span class="badge <%= { ok: 'b-green', warn: 'b-amber', bad: 'b-red', muted: 'b-gray' }[d.tone] %>"><%= d.short %></span><% } %>
+  </div>
+  <% if (sm) { %>
+    <% if (sm.state === 'possivel_perdido' || sm.state === 'respondeu') { %><p class="small <%= d.tone === 'bad' ? 'err' : 'muted' %>"><%= d.text %></p><% } %>
+    <% if (sm.attempts) { %>
+    <p class="mono-line muted"><% Object.keys(CHANNELS).forEach(function (ch) { if (sm.byChannel[ch]) { %><span><%= CHANNELS[ch].toUpperCase() %> <%= sm.byChannel[ch] %></span><% } }) %></p>
+    <% } %>
+    <% if (sm.state === 'possivel_perdido' && canWrite) { %>
+    <div class="next-actions">
+      <% if (kind === 'guest') { %><button class="btn sm" type="button" data-modal-open="modal-perda">Marcar como perdido</button>
+      <% } else { %><form method="post" action="<%= base %>/<%= subjectId %>/avancar" class="inline" data-confirm="Marcar como perdido?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="para" value="perdido"><button class="btn sm" type="submit">Marcar como perdido</button></form><% } %>
+      <span class="small muted">ou registre mais uma abordagem, se ainda fizer sentido.</span>
+    </div>
+    <% } %>
+  <% } else if (!hist.length) { %>
+    <p class="small muted">Nenhuma abordagem registrada ainda.</p>
+  <% } %>
+
+  <% if (!hist.length && sm) { %>
+    <div class="empty"><%- include('pulse-line') %><strong>Registre cada contato</strong><span>Instagram, e-mail, WhatsApp ou telefone, com o endereço usado. O sistema avisa quando é hora do próximo follow-up.</span></div>
+  <% } %>
+
+  <% if (hist.length) { %>
+  <details class="more" <%= hist.length <= 3 ? 'open' : '' %>>
+    <summary>Histórico (<%= hist.length %>)</summary>
+    <ul class="plain outreach-list">
+      <% hist.forEach(function (a) { %>
+      <li>
+        <span class="mono small muted"><%= fmt.formatDateTime(a.at) %></span>
+        <span><strong><%= CHANNELS[a.channel] %></strong><% if (a.address) { %> <span class="mono small raw"><%= a.address %></span><% } %> <span class="badge <%= a.result === 'respondeu' ? 'b-green' : 'b-gray' %>"><%= RESULTS[a.result] %></span>
+          <% if (a.note) { %><span class="small muted"> · <%= a.note %></span><% } %>
+          <span class="small muted"> · <%= a.user_name || 'sistema' %></span></span>
+        <% if (canWrite) { %><form method="post" action="/abordagens/<%= a.id %>/excluir" class="inline" data-confirm="Apagar este registro?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit" aria-label="Apagar o registro de <%= fmt.formatDateTime(a.at) %>">Apagar</button></form><% } %>
+      </li>
+      <% }) %>
+    </ul>
+  </details>
+  <% } %>
+</section>

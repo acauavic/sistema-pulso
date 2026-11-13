@@ -1,0 +1,4 @@
+<%# Botão flutuante: dúvida antes de pedir participação vai direto ao WhatsApp da produtora (só quando o número está informado). %>
+<% if (s.whatsapp) { const waText = typeof waGuest !== 'undefined' && waGuest ? `Olá, vim pela página da plateia com ${waGuest} e tenho uma dúvida.` : 'Olá, vim pela página da plateia do Pulso Podcast e tenho uma dúvida.'; %>
+<a class="pl-wa" href="https://wa.me/<%= s.whatsapp %>?text=<%= encodeURIComponent(waText) %>" target="_blank" rel="noopener noreferrer" data-wa-float><%- icon('whatsapp', 22) %><span>Dúvidas? Fale com a produção</span></a>
+<% } %>

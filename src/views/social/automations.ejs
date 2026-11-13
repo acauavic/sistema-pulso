@@ -1,0 +1,33 @@
+<%- include('../partials/head') %>
+<%- include('../partials/social-nav') %>
+<div class="toolbar">
+  <span class="small muted">Respostas automáticas a comentários e directs, no estilo ManyChat. Toda automação nasce pausada.</span>
+  <% if (canAutomate) { %><button class="btn primary" type="button" data-modal-open="modal-rule"><%- icon('plus') %> Nova automação</button><% } %>
+</div>
+<% if (!configured) { %><p class="flash flash-error">Upload-Post não configurado neste servidor: as automações não conseguem ler comentários nem directs.</p><% } %>
+
+<% if (!rules.length) { %>
+<div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma automação ainda.</strong></p><p class="muted small">Exemplo: quem comentar "episódio" num Reels recebe o link da conversa completa no direct.</p></div>
+<% } else { %>
+<div class="card p-0">
+  <% rules.forEach(function (r) { %>
+  <div class="rule-row">
+    <div>
+      <h3><a href="/social/automacoes/<%= r.id %>"><%= r.name %></a></h3>
+      <p class="small muted"><%= triggers[r.trigger] %><%= r.trigger === 'comentario' ? ' no ' + platforms[r.platform].label + (r.scope === 'post' ? ' (um post)' : ' (posts recentes)') : ' no Instagram' %> · <%= r.keywords.length ? 'palavras: ' + r.keywords.join(', ') : 'qualquer mensagem' %></p>
+      <p class="mono small muted"><%= r.answered %> RESPOSTA<%= r.answered === 1 ? '' : 'S' %><%= r.errors ? ' · ' + r.errors + ' ERRO' + (r.errors === 1 ? '' : 'S') : '' %><%= r.last_run_at ? ' · ÚLTIMA LEITURA ' + fmt.formatDateTime(r.last_run_at) : '' %></p>
+      <% if (r.last_error) { %><p class="small bad-text"><%= r.last_error %></p><% } %>
+    </div>
+    <span class="badge <%= r.active ? 'b-green' : 'b-gray' %>"><%= r.active ? (live ? 'Ativa' : 'Ativa · teste') : 'Pausada' %></span>
+  </div>
+  <% }) %>
+</div>
+<% } %>
+
+<% if (canAutomate) { %>
+<dialog class="modal modal-wide" id="modal-rule" aria-labelledby="m-rule-h" <%= openNew ? 'data-open-on-load' : '' %>>
+  <h2 id="m-rule-h">Nova automação</h2>
+  <%- include('_rule_form', { r: null, action: '/social/automacoes', submit: 'Criar (pausada)', cancel: true, igPosts: igPosts }) %>
+</dialog>
+<% } %>
+<%- include('../partials/foot') %>

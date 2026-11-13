@@ -1,0 +1,40 @@
+<%#
+  Cartão "Link do estúdio": o estúdio sobe o material da gravação direto para o episódio. Variáveis: studio (studioLinks.panelState),
+  studioWa (link do WhatsApp com a mensagem pronta, ou null), epId, csrf.
+%>
+<% var csrfF = '<input type="hidden" name="_csrf" value="' + csrf + '">'; var st = studio; %>
+<div class="studio-link" id="link-estudio">
+  <div class="row spread align-start">
+    <div>
+      <span class="kicker">Link do estúdio</span>
+      <% if (!st) { %>
+      <p class="small muted m-0">O estúdio sobe o material da gravação por um link, sem precisar de WeTransfer.</p>
+      <% } else if (st.state === 'aguardando') { %>
+      <p class="small muted m-0">Aguardando o envio · criado <span class="mono"><%= fmt.formatDateTime(st.link.created_at) %></span></p>
+      <% } else if (st.state === 'enviando') { %>
+      <p class="small m-0"><strong>O estúdio está enviando.</strong> <span class="mono small muted"><%= st.ready %> pronto<%= st.ready === 1 ? '' : 's' %><%= st.sending ? ' · ' + st.sending + ' subindo' : '' %> · <%= fmt.formatBytes(st.bytes) %> · última atividade <%= fmt.formatDateTime(st.link.last_activity_at || st.link.created_at) %></span></p>
+      <% } else if (st.state === 'concluido') { %>
+      <p class="small m-0"><strong>Material recebido</strong> <span class="mono small muted"><%= fmt.formatDateTime(st.link.finished_at) %> · <%= st.ready %> arquivo<%= st.ready === 1 ? '' : 's' %> · <%= fmt.formatBytes(st.bytes) %></span></p>
+      <% } else { %>
+      <p class="small muted m-0">Link fechado<%= st.link.close_reason === 'expirado' ? ' (7 dias sem uso)' : '' %>.</p>
+      <% } %>
+    </div>
+    <% if (st && ['aguardando', 'enviando'].indexOf(st.state) >= 0) { %><span class="badge <%= st.state === 'enviando' ? 'b-amber' : 'b-gray' %>"><%= st.state === 'enviando' ? 'enviando' : 'aberto' %></span><% } %>
+  </div>
+  <% if (st && ['aguardando', 'enviando'].indexOf(st.state) >= 0) { %>
+  <p class="mono small studio-link-url"><%= st.url %></p>
+  <div class="row studio-link-actions">
+    <button class="btn sm <%= st.state === 'aguardando' ? 'primary' : '' %>" type="button" data-copy="<%= st.url %>"><%- icon('copy', 14) %> Copiar link</button>
+    <% if (studioWa) { %><a class="btn sm" href="<%= studioWa %>" target="_blank" rel="noopener noreferrer"><%- icon('send', 14) %> Mandar no WhatsApp</a><% } %>
+    <form method="post" action="/episodios/<%= epId %>/estudio/fechar" class="inline" data-confirm="Fechar o link do estúdio? Ele para de funcionar na hora; o que já chegou fica no episódio."><%- csrfF %><button class="link small" type="submit">fechar link</button></form>
+  </div>
+  <% } else if (st && st.state === 'concluido') { %>
+  <div class="row studio-link-actions">
+    <form method="post" action="/episodios/<%= epId %>/estudio/reenvio" class="inline" data-busy="Gerando…" data-confirm="Pedir o reenvio do material? Sai um link novo, que substitui o antigo. O que já chegou continua no episódio."><%- csrfF %><button class="btn sm" type="submit"><%- icon('rotate-ccw', 14) %> Pedir reenvio</button></form>
+  </div>
+  <% } else { %>
+  <div class="row studio-link-actions">
+    <form method="post" action="/episodios/<%= epId %>/estudio/gerar" class="inline" data-busy="Gerando…"><%- csrfF %><button class="btn sm" type="submit"><%- icon('link', 14) %> <%= st ? 'Gerar link novo' : 'Gerar link do estúdio' %></button></form>
+  </div>
+  <% } %>
+</div>

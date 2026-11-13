@@ -1,0 +1,61 @@
+<%#
+  Janela de marcar (m = null) ou remarcar (m = reunião) uma reunião com o patrocinador. Variáveis: sponsor, m, meetingCtx, csrf, dialogId.
+%>
+<%
+  var isNew = !m;
+  var dur = m ? m.minutes : 45;
+  var mode = m ? m.mode : 'meet';
+  var emails = m ? (m.attendees || []).map(function (a) { return a.email; }).join(', ') : (sponsor.contact_email || '');
+  var owner = m ? m.owner_id : (sponsor.owner_id || '');
+  var team = m ? (m.team_ids || []) : [];
+  var hid = dialogId + '-h';
+%>
+<dialog class="modal" id="<%= dialogId %>" aria-labelledby="<%= hid %>">
+  <form method="post" action="/patrocinadores/<%= sponsor.id %>/reunioes<%= isNew ? '' : '/' + m.id %>" class="stack" data-when-form data-busy="<%= isNew ? 'Marcando…' : 'Salvando…' %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="<%= hid %>"><%= isNew ? 'Marcar reunião' : 'Remarcar ou alterar' %></h2>
+    <div class="grid-2 tight">
+      <label>Data e hora<input type="datetime-local" name="inicio" required value="<%= m ? meetingCtx.inputValue(m.starts_at) : '' %>"></label>
+      <div class="seg-wrap">
+        <span class="seg-label">Duração</span>
+        <div class="seg-radio" role="radiogroup" aria-label="Duração">
+          <% var durs = meetingCtx.DURATIONS.indexOf(dur) >= 0 ? meetingCtx.DURATIONS : meetingCtx.DURATIONS.concat([dur]); durs.forEach(function (d) { %><label><input type="radio" name="duracao" value="<%= d %>" <%= d === dur ? 'checked' : '' %>> <span class="mono"><%= d %></span> min</label><% }) %>
+        </div>
+      </div>
+    </div>
+    <div class="seg-wrap">
+      <span class="seg-label">Formato</span>
+      <div class="seg-radio" role="radiogroup" aria-label="Formato">
+        <label><input type="radio" name="formato" value="meet" <%= mode === 'meet' ? 'checked' : '' %>> <%- icon('video', 14) %> Google Meet</label>
+        <label><input type="radio" name="formato" value="presencial" <%= mode === 'presencial' ? 'checked' : '' %>> <%- icon('map-pin', 14) %> Presencial</label>
+      </div>
+    </div>
+    <label data-when="formato=presencial">Endereço<input type="text" name="local" maxlength="300" value="<%= m && m.location || '' %>" placeholder="Rua, número, sala e cidade"></label>
+    <p class="small muted" data-when="formato=meet">O link do Meet é criado pelo Google e vai no convite.</p>
+    <label>Convidados do patrocinador
+      <input type="text" name="emails" required value="<%= emails %>" placeholder="nome@empresa.com, outra@empresa.com" autocomplete="off" spellcheck="false">
+      <span class="small muted">Separe os e-mails por vírgula. Cada um recebe o convite do Google.</span>
+    </label>
+    <div class="grid-2 tight">
+      <label>Responsável
+        <select name="responsavel" required>
+          <option value="">Escolha</option>
+          <% meetingCtx.team.forEach(function (u) { %><option value="<%= u.id %>" <%= String(u.id) === String(owner) ? 'selected' : '' %>><%= u.name %></option><% }) %>
+        </select>
+      </label>
+      <label>Assunto<input type="text" name="titulo" maxlength="200" value="<%= m ? m.title : 'Reunião · ' + sponsor.company %>"></label>
+    </div>
+    <details class="meet-more"<%= team.length ? ' open' : '' %>>
+      <summary class="small">Mais alguém da equipe</summary>
+      <div class="chips-radio top-gap">
+        <% meetingCtx.team.forEach(function (u) { %><label class="chip-radio"><input type="checkbox" name="equipe" value="<%= u.id %>" <%= team.indexOf(u.id) >= 0 ? 'checked' : '' %>><span><%= u.name %></span></label><% }) %>
+      </div>
+    </details>
+    <label>Pauta (opcional)<textarea name="pauta" rows="3" maxlength="2000" placeholder="O que vamos conversar. Vai junto no convite."><%= m && m.agenda || '' %></textarea></label>
+    <% if (!meetingCtx.ready) { %><p class="notice small">A conta do Pulso ainda não autorizou convites e Meet no Google: a reunião fica guardada aqui e vai para o Google quando a autorização estiver feita.</p><% } %>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit"><%= isNew ? 'Marcar e enviar convite' : 'Salvar e avisar os convidados' %></button>
+      <button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+    </div>
+  </form>
+</dialog>

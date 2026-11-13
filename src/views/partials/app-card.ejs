@@ -1,0 +1,12 @@
+<%# Início no celular: convite para instalar o app e, já instalado, para ligar os alertas. O pwa.js decide qual mostrar (ou nenhum). %>
+<aside class="app-card" data-app-card hidden aria-live="polite">
+  <span class="app-card-ico" aria-hidden="true"><%- icon('smartphone', 20) %></span>
+  <div class="app-card-txt">
+    <strong data-app-card-title></strong>
+    <span class="small" data-app-card-body></span>
+  </div>
+  <div class="app-card-act">
+    <button class="btn sm primary" type="button" data-app-card-go></button>
+    <button class="icon-btn" type="button" data-app-card-close aria-label="Agora não" title="Agora não"><%- icon('x') %></button>
+  </div>
+</aside>

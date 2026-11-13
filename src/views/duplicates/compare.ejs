@@ -1,0 +1,68 @@
+<%- include('../partials/head') %>
+<%
+  var nameOf = function (r) { return kind === 'guest' ? r.name : r.company; };
+  var stageOf = function (r) { return kind === 'guest' ? r.status : r.stage; };
+  var other = function (r) { return r.id === A.id ? B : A; };
+  var noun = kind === 'guest' ? 'convidado' : 'patrocinador';
+%>
+<div class="page-head">
+  <div><span class="kicker"><%= kind === 'guest' ? 'Convidados' : 'Patrocinadores' %> · Duplicata</span><h1>Comparar e juntar</h1></div>
+  <div class="row"><a class="btn ghost" href="<%= back %>"><%- icon('arrow-left') %> Voltar</a></div>
+</div>
+<p class="lead">
+  <% if (cmp) { %><span class="badge <%= cmp.level === 'certa' ? 'b-red' : 'b-amber' %>"><%= cmp.level === 'certa' ? 'Duplicata' : 'Possível duplicata' %></span> <span class="mono small"><%= cmp.reasons.join(' · ') %></span>
+  <% } else { %>Estes dois cadastros não parecem iguais pelas regras do sistema. Junte só se tiver certeza de que são o mesmo <%= noun %>.<% } %>
+</p>
+
+<form method="post" action="/duplicatas/<%= slug %>/<%= A.id %>/<%= B.id %>/juntar" class="stack" data-busy="Juntando…" data-confirm="Juntar os dois cadastros? O que sai vai para a lixeira; o histórico dele passa para o que fica.">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <input type="hidden" name="voltar" value="<%= back %>">
+  <fieldset class="dup-compare">
+    <legend class="seg-label">Qual cadastro fica</legend>
+    <% [A, B].forEach(function (r) { var s = r.id === A.id ? sA : sB; var lost = r.id === A.id ? lostA : lostB; %>
+    <label class="card dup-card">
+      <span class="row spread align-start">
+        <span>
+          <span class="kicker mono">#<%= r.id %> · criado em <%= fmt.formatDateTime(r.created_at) %></span>
+          <span class="dup-card-name"><%= nameOf(r) %></span>
+        </span>
+        <input type="radio" name="manter" value="<%= r.id %>" <%= Number(r.id) === Number(keepId) ? 'checked' : '' %> aria-label="Manter o cadastro #<%= r.id %>">
+      </span>
+      <span class="row dup-card-meta">
+        <span class="badge b-st-<%= stageOf(r) %>"><%= labelOf(stageOf(r)) %></span>
+        <span class="mono small muted"><%= r.owner_name || 'sem responsável' %></span>
+      </span>
+      <span class="dup-counts">
+        <% s.items.forEach(function (it) { %><span class="<%= it.n ? '' : 'muted' %>"><span class="mono"><%= it.n %></span> <%= it.label.toLowerCase() %></span><% }) %>
+      </span>
+      <% if (lost.length) { %><span class="notice small">Se este sair: <%= lost.join(', ') %> deixa<%= lost.length > 1 ? 'm' : '' %> de funcionar.</span><% } %>
+      <a class="link small" href="/<%= slug %>/<%= r.id %>" target="_blank" rel="noopener">Abrir cadastro</a>
+    </label>
+    <% }) %>
+  </fieldset>
+
+  <% if (conflicts.length) { %>
+  <section class="card">
+    <h2>O que fica onde os dois são diferentes</h2>
+    <p class="small muted">O que estiver vazio num cadastro é preenchido com o do outro. O valor que não ficar vai para as observações.</p>
+    <div class="stack top-gap">
+      <% conflicts.forEach(function (c) { var keepIsA = Number(keepId) === Number(A.id); %>
+      <div class="seg-wrap">
+        <span class="seg-label"><%= c.label %></span>
+        <div class="seg-radio dup-choice" role="radiogroup" aria-label="<%= c.label %>">
+          <label><input type="radio" name="campo_<%= c.field %>" value="<%= A.id %>" <%= keepIsA ? 'checked' : '' %>> <span><%= String(c.a).slice(0, 120) %></span></label>
+          <label><input type="radio" name="campo_<%= c.field %>" value="<%= B.id %>" <%= keepIsA ? '' : 'checked' %>> <span><%= String(c.b).slice(0, 120) %></span></label>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  </section>
+  <% } %>
+
+  <p class="small muted">O cadastro que sai vai para a lixeira. Restaurar devolve os dados dele, mas o histórico continua no que ficou.</p>
+  <div class="row">
+    <button class="btn primary" type="submit"><%- icon('layers') %> Juntar os dois cadastros</button>
+    <a class="btn ghost" href="<%= back %>">Cancelar</a>
+  </div>
+</form>
+<%- include('../partials/foot') %>

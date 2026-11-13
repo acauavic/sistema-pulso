@@ -1,0 +1,19 @@
+# HTTPS automático (Let's Encrypt) para o domínio do painel. O DNS do domínio precisa apontar para este servidor.
+{$DOMINIO} {
+	encode zstd gzip
+	# as cópias do painel (serviço "web") são descobertas pelo DNS do Docker; uma que cair sai da roda por 30 s
+	reverse_proxy {
+		dynamic a {
+			name web
+			port 3100
+			refresh 10s
+		}
+		lb_policy least_conn
+		lb_try_duration 5s
+		fail_duration 30s
+		flush_interval -1   # tempo real (SSE) sem buffer
+	}
+	request_body {
+		max_size 300MB
+	}
+}

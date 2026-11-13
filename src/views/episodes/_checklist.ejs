@@ -1,0 +1,29 @@
+<%# Lista de itens de checklist. Variáveis: items, gate, ep, csrf, tickable, perm %>
+<% if (!items.length) { %>
+  <p class="muted small"><%= ['disponivel_edicao', 'em_edicao', 'em_revisao', 'em_finalizacao', 'pronto_publicar', 'publicado'].indexOf(ep.status) < 0 ? 'Os checklists padrão são aplicados quando o episódio é liberado para edição.' : 'Nenhum item.' %></p>
+<% } else { %>
+  <% var done = items.filter(function (i) { return i.done; }).length; %>
+  <p class="handle muted"><%= done %>/<%= items.length %> concluídos<%= items.some(function (i) { return i.required && !i.done; }) ? ' · há obrigatórios em aberto' : '' %></p>
+  <ul class="plain checklist">
+    <% items.forEach(function (i) { %>
+    <li>
+      <label class="check">
+        <input type="checkbox" data-check="/episodios/<%= ep.id %>/checklist/<%= i.id %>/marcar" data-csrf="<%= csrf %>" <%= i.done ? 'checked' : '' %> <%= tickable ? '' : 'disabled' %>>
+        <span><%= i.text %><% if (i.required) { %> <span class="req" title="Obrigatório para avançar">obrigatório</span><% } %></span>
+      </label>
+      <% if (i.template_id == null && tickable) { %><form method="post" action="/episodios/<%= ep.id %>/checklist/<%= i.id %>/excluir" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit" aria-label="Remover item">remover</button></form><% } %>
+    </li>
+    <% }) %>
+  </ul>
+<% } %>
+<% if (tickable) { %>
+<details class="more top-gap">
+  <summary>Adicionar item só deste episódio</summary>
+  <form method="post" action="/episodios/<%= ep.id %>/checklist" class="deliv-row top-gap">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="gate" value="<%= gate %>">
+    <input type="text" name="text" maxlength="300" placeholder="O que falta conferir?" class="grow" aria-label="Novo item">
+    <label class="check"><input type="checkbox" name="required" value="1"> obrigatório</label>
+    <button class="btn sm" type="submit">Adicionar</button>
+  </form>
+</details>
+<% } %>

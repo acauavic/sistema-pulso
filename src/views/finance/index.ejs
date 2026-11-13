@@ -1,0 +1,80 @@
+<%- include('../partials/head') %>
+<%
+  var late = ov.late.out + ov.late.in;
+  var firstRun = !ov.attention.length && !ov.forecast.some(function (r) { return r.in || r.out; }) && !ov.perEpisode.list.some(function (r) { return r.total; });
+%>
+<div class="page-head">
+  <div><span class="kicker">Financeiro · <%= ov.month.label %></span><h1>Caixa e contas</h1></div>
+  <% if (can('finance.write')) { %><button class="btn primary" type="button" data-modal-open="modal-novo"><%- icon('plus') %> Novo lançamento</button><% } %>
+</div>
+<%- include('_nav', { active: 'resumo', counts: counts }) %>
+
+<section class="stat-grid" aria-label="Números do mês">
+  <a class="stat" href="/financeiro/regras"><span class="stat-label">Caixa hoje</span><span class="stat-n money"><%= money(ov.cash) %></span></a>
+  <a class="stat" href="/financeiro/lancamentos"><span class="stat-label">A pagar em 7 dias</span><span class="stat-n money"><%= money(ov.out7) %></span></a>
+  <a class="stat" href="/financeiro/lancamentos"><span class="stat-label">Atrasado</span><span class="stat-n money <%= late ? 'err' : '' %>"><%= money(late) %></span></a>
+  <a class="stat" href="/financeiro/lancamentos?escopo=historico"><span class="stat-label">Resultado do mês</span><span class="stat-n money"><%= money(ov.month.result) %></span></a>
+</section>
+
+<% if (firstRun) { %>
+<div class="empty card">
+  <%- include('../partials/pulse-line') %>
+  <p><strong>Nada lançado ainda</strong></p>
+  <p class="muted small">Os custos nascem sozinhos quando uma gravação é agendada e quando o episódio é gravado. Confira o valor do estúdio em <a href="/financeiro/regras">Custos automáticos</a>, cadastre as canecas e caixas em <a href="/financeiro/estoque">Estoque</a> e combine o pagamento de cada patrocinador na página dele.</p>
+</div>
+<% } %>
+
+<div class="grid-2 align-start">
+  <section class="card">
+    <div class="row spread"><h2>Precisa de atenção</h2><a class="small" href="/financeiro/lancamentos">Ver todas as contas</a></div>
+    <% if (!ov.attention.length) { %><p class="muted small">Nada vence nos próximos 7 dias.</p><% } %>
+    <ul class="plain plan-list fin-list">
+      <% ov.attention.forEach(function (e) { %><%- include('_row', { e: e, here: here }) %><% }) %>
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="row spread"><h2>Estoque para repor</h2><% if (can('stock.read')) { %><a class="small" href="/financeiro/estoque">Abrir estoque</a><% } %></div>
+    <% if (!ov.stock.length) { %><p class="muted small">Tudo em dia. O aviso aparece antes de acabar, contando o prazo de reposição de cada item.</p><% } %>
+    <ul class="plain plan-list">
+      <% ov.stock.forEach(function (i) { %>
+      <li>
+        <div class="plan-list-main"><strong><%= i.name %></strong><span class="small muted"><%= i.runs_out ? 'Dura até ' + fmt.formatDay(i.runs_out) + (i.buy_by ? ' · comprar até ' + fmt.formatDay(i.buy_by) : '') : 'Abaixo do mínimo' %></span></div>
+        <span class="mono small"><%= i.qty %> <%= i.unit %></span>
+        <span class="badge <%= i.state === 'atencao' ? 'b-amber' : 'b-red' %>"><%= fin.STOCK_STATE[i.state] %></span>
+      </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+
+<section class="card top-gap">
+  <div class="row spread"><h2>Próximos meses</h2><span class="small muted">Só o que já está lançado. Custos mensais entram até 3 meses à frente.</span></div>
+  <div class="table-wrap flat">
+    <table class="fin-table">
+      <thead><tr><th>Mês</th><th class="num">Entra</th><th class="num">Sai</th><th class="num">Saldo do mês</th><th class="num">Caixa previsto</th></tr></thead>
+      <tbody>
+        <% ov.forecast.forEach(function (r) { %>
+        <tr><td class="mono"><%= r.label %></td><td class="num mono"><%= money(r.in) %></td><td class="num mono"><%= money(r.out) %></td><td class="num mono"><%= money(r.net) %></td><td class="num mono <%= r.balance < 0 ? 'err' : '' %>"><%= money(r.balance) %></td></tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% if (ov.late.out || ov.late.in) { %><p class="small muted top-gap">O atrasado entra no mês atual.</p><% } %>
+</section>
+
+<section class="card top-gap">
+  <div class="row spread"><h2>Custo por episódio</h2><span class="small muted">Média <span class="mono"><%= money(ov.perEpisode.average) %></span></span></div>
+  <% if (!ov.perEpisode.list.length) { %><p class="muted small">Quando o primeiro episódio for gravado, o custo dele aparece aqui.</p><% } %>
+  <ul class="plain plan-list">
+    <% ov.perEpisode.list.forEach(function (r) { %>
+    <li>
+      <div class="plan-list-main"><a href="/episodios/<%= r.id %>#financeiro"><strong><%= r.number ? 'EP.' + String(r.number).padStart(3, '0') + ' · ' : '' %><%= r.title %></strong></a><span class="small muted">Contas <%= money(r.costs) %><%= r.stock ? ' · material usado ' + money(r.stock) : '' %></span></div>
+      <span class="mono"><%= money(r.total) %></span><span></span>
+    </li>
+    <% }) %>
+  </ul>
+</section>
+
+<%- include('_entry-modals', { episodes: episodes, sponsors: sponsors, suppliers: suppliers }) %>
+<%- include('../partials/foot') %>

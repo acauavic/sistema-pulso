@@ -1,0 +1,53 @@
+<%- include('../partials/head') %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var TABS = [['convidados', 'Convidados', data.guest], ['patrocinadores', 'Patrocinadores', data.sponsor]];
+  var first = data.guest.pairs.length || !data.sponsor.pairs.length ? 'convidados' : 'patrocinadores';
+%>
+<div class="page-head"><div><span class="kicker">Gestão · Cadastros</span><h1>Duplicatas</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'duplicatas' }) %>
+<p class="lead">Convidados e patrocinadores que parecem cadastrados em dobro. <strong>Duplicata</strong>: mesmo @, e-mail ou telefone (convidado), mesma empresa ou site (patrocinador). <strong>Possível</strong>: nome parecido, ou o mesmo e-mail ou telefone de contato no patrocinador.</p>
+
+<div class="tabs-wrap top-gap" data-tabs data-default="<%= first %>">
+  <div class="tabbar" role="tablist" aria-label="Duplicatas">
+    <% TABS.forEach(function (t) { %><button type="button" role="tab" data-tab-btn="<%= t[0] %>" aria-controls="pane-<%= t[0] %>"><%= t[1] %><% if (t[2].pairs.length) { %> <span class="count"><%= t[2].pairs.length %></span><% } %></button><% }) %>
+  </div>
+  <% TABS.forEach(function (t) { var d = t[2]; %>
+  <div class="pane" id="pane-<%= t[0] %>" data-pane-id="<%= t[0] %>">
+    <% if (!d.pairs.length) { %>
+    <div class="empty"><%- include('../partials/pulse-line') %><h3>Nenhuma duplicata</h3><p>O sistema confere a cada cadastro novo e avisa antes de criar outro igual.</p></div>
+    <% } else { %>
+    <div class="req-list">
+      <% d.pairs.forEach(function (p) { %>
+      <div class="req-row dup-row">
+        <span>
+          <span class="mono small muted"><%= p.reasons.join(' · ') %></span><br>
+          <a href="/<%= t[0] %>/<%= p.a.id %>"><strong><%= p.a.name %></strong></a> <span class="badge b-st-<%= p.a.stage %>"><%= p.a.stage_label %></span>
+          <span class="muted">e</span>
+          <a href="/<%= t[0] %>/<%= p.b.id %>"><strong><%= p.b.name %></strong></a> <span class="badge b-st-<%= p.b.stage %>"><%= p.b.stage_label %></span>
+          <span class="meta"><span>#<%= p.a.id %> · <%= fmt.shortDate(p.a.created_at) %></span><span>#<%= p.b.id %> · <%= fmt.shortDate(p.b.created_at) %></span></span>
+        </span>
+        <span class="row dup-row-actions">
+          <span class="badge <%= p.level === 'certa' ? 'b-red' : 'b-amber' %>"><%= p.level === 'certa' ? 'Duplicata' : 'Possível' %></span>
+          <a class="btn sm" href="/duplicatas/<%= t[0] %>/<%= p.a.id %>/<%= p.b.id %>?voltar=/gestao/duplicatas"><%- icon('layers', 14) %> Comparar e juntar</a>
+          <form method="post" action="/duplicatas/<%= t[0] %>/<%= p.a.id %>/<%= p.b.id %>/dispensar" class="inline"><%- csrfField %><input type="hidden" name="voltar" value="/gestao/duplicatas#<%= t[0] %>"><button class="link small" type="submit">não é duplicata</button></form>
+        </span>
+      </div>
+      <% }) %>
+    </div>
+    <% } %>
+    <% if (d.dismissed.length) { %>
+    <details class="top-gap">
+      <summary class="small">Marcados como não duplicata <span class="mono">(<%= d.dismissed.length %>)</span></summary>
+      <ul class="plain top-gap dup-off">
+        <% d.dismissed.forEach(function (p) { %>
+        <li class="row spread"><span><%= p.a.name %> <span class="muted">e</span> <%= p.b.name %> <span class="mono small muted"><%= p.reasons.join(' · ') %></span></span>
+          <form method="post" action="/duplicatas/<%= t[0] %>/<%= p.a.id %>/<%= p.b.id %>/avisar" class="inline"><%- csrfField %><input type="hidden" name="voltar" value="/gestao/duplicatas#<%= t[0] %>"><button class="link small" type="submit">voltar a avisar</button></form></li>
+        <% }) %>
+      </ul>
+    </details>
+    <% } %>
+  </div>
+  <% }) %>
+</div>
+<%- include('../partials/foot') %>

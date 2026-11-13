@@ -1,0 +1,17 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker">Sistema · versão <%= appVersion %></span><h1>Novidades</h1></div></div>
+<% releases.forEach(function (r, i) { %>
+<section class="card release <%= i === 0 ? 'release-now' : '' %>">
+  <header class="release-head">
+    <span class="mono release-v">v<%= r.version %></span>
+    <h2><%= r.title %></h2>
+    <span class="mono small muted"><%= r.date.split('-').reverse().join('/') %></span>
+  </header>
+  <ul class="plain release-items">
+    <% r.items.forEach(function (it) { %>
+    <li><span class="badge <%= it.kind === 'novo' ? 'b-green' : it.kind === 'correcao' ? 'b-amber' : 'b-gray' %>"><%= kinds[it.kind] %></span><span><%= it.text %></span></li>
+    <% }) %>
+  </ul>
+</section>
+<% }) %>
+<%- include('../partials/foot') %>

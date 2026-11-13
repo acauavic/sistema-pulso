@@ -1,0 +1,170 @@
+<%- include('../partials/head') %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var json = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
+  var brl = function (c) { return (Number(c) / 100).toFixed(2).replace('.', ','); };
+  var canBuy = can('finance.write'); var seeMoney = can('finance.read');
+  var qtyTxt = function (n) { return String(Math.round(n * 100) / 100).replace('.', ','); };
+  var REASONS = { compra: 'Compra', episodio: 'Usado no episódio', ajuste: 'Ajuste', perda: 'Perda ou quebra', brinde: 'Brinde avulso' };
+%>
+<div class="page-head">
+  <div><span class="kicker">Financeiro</span><h1>Estoque</h1></div>
+  <% if (can('stock.write')) { %><button class="btn primary" type="button" data-modal-open="modal-item-novo"><%- icon('plus') %> Novo item</button><% } %>
+</div>
+<%- include('_nav', { active: 'estoque', counts: counts }) %>
+<p class="lead">O que sai a cada episódio gravado desconta sozinho. O aviso de reposição conta o prazo que leva para chegar e considera <span class="mono"><%= String(settings.episodes_per_month).replace('.', ',') %></span> episódios por mês<% if (can('finance.write')) { %> (muda em <a href="/financeiro/regras">Custos automáticos</a>)<% } %>.</p>
+
+<% if (!items.length) { %>
+<div class="empty card"><%- include('../partials/pulse-line') %>
+  <p><strong>Nenhum item no estoque</strong></p>
+  <p class="muted small">Cadastre canecas, caixas de presente, cartões de visita… com quanto sai por episódio. Daí em diante o saldo cai a cada gravação e você sabe quando comprar.</p></div>
+<% } %>
+
+<ul class="plain stock-list">
+  <% items.forEach(function (i) { %>
+  <li class="card stock-item <%= i.active ? '' : 'is-off' %>">
+    <div class="row spread">
+      <div class="plan-list-main">
+        <h3><%= i.name %> <% if (!i.active) { %><span class="badge b-gray">Arquivado</span><% } %></h3>
+        <span class="small muted">
+          <% if (i.per_episode > 0) { %>Sai <span class="mono"><%= qtyTxt(i.per_episode) %></span> <%= i.unit %> por episódio<% } else { %>Sem uso fixo por episódio<% } %>
+          <% if (seeMoney && i.unit_cost_cents) { %> · custo médio <span class="mono"><%= money(i.unit_cost_cents) %></span><% } %>
+          <%= i.supplier ? ' · ' + i.supplier : '' %>
+        </span>
+      </div>
+      <div class="stock-qty"><span class="stat-n"><%= qtyTxt(i.qty) %></span><span class="mono small muted"><%= i.unit %></span></div>
+    </div>
+    <div class="row spread top-gap">
+      <p class="small <%= i.state === 'ok' ? 'muted' : (i.state === 'atencao' ? 'warn' : 'err') %> grow">
+        <% if (i.active) { %>
+          <strong><%= fin.STOCK_STATE[i.state] %></strong><% if (i.episodes != null) { %> · dá para ~<span class="mono"><%= qtyTxt(i.episodes) %></span> episódios, acaba por volta de <span class="mono"><%= fmt.formatDay(i.runs_out) %></span> · comprar até <span class="mono"><%= fmt.formatDay(i.buy_by) %></span><% } else if (i.min_qty > 0) { %> · avisa em <span class="mono"><%= qtyTxt(i.min_qty) %></span><% } %>
+        <% } %>
+      </p>
+      <% if (can('stock.write')) { %>
+      <div class="row">
+        <% if (canBuy && i.active) { %><button class="btn sm" type="button" data-fill-modal="modal-comprar" data-fill-mode="new" data-fill-action="/financeiro/estoque/<%= i.id %>/comprar" data-fill='<%- json({ _label: i.name + ' (' + i.unit + ')', qty: '', total: '', installments: '1', due_on: fin.todayISO(), paid: '0', category: 'brindes', supplier: i.supplier || '' }) %>'><%- icon('plus', 14) %> Registrar compra</button><% } %>
+        <details class="row-menu">
+          <summary class="btn sm ghost" aria-label="Mais ações para <%= i.name %>">Mais</summary>
+          <div class="row-menu-list">
+            <button class="link" type="button" data-fill-modal="modal-ajuste" data-fill-mode="new" data-fill-action="/financeiro/estoque/<%= i.id %>/ajustar" data-fill='<%- json({ _label: i.name + ' · hoje ' + qtyTxt(i.qty) + ' ' + i.unit, acao: 'contagem', qty: String(i.qty).replace('.', ','), note: '' }) %>'>Acertar ou dar baixa</button>
+            <button class="link" type="button" data-fill-modal="modal-item" data-fill-mode="edit" data-fill-action="/financeiro/estoque/<%= i.id %>" data-fill='<%- json({ name: i.name, unit: i.unit, per_episode: qtyTxt(i.per_episode), min_qty: qtyTxt(i.min_qty), lead_days: String(i.lead_days), supplier: i.supplier || '', notes: i.notes || '', active: i.active ? '1' : '0' }) %>'>Editar item</button>
+          </div>
+        </details>
+      </div>
+      <% } %>
+    </div>
+    <% if (i.moves.length) { %>
+    <details class="more top-gap">
+      <summary>Últimos movimentos</summary>
+      <ul class="plain plan-list">
+        <% i.moves.forEach(function (m) { %>
+        <li><div class="plan-list-main"><span><%= REASONS[m.reason] %><%= m.ep_number ? ' · EP.' + String(m.ep_number).padStart(3, '0') : '' %></span><span class="small muted"><%= fmt.formatDate(m.created_at) %><%= m.note ? ' · ' + m.note : '' %><%= m.user_name ? ' · ' + m.user_name : '' %></span></div><span class="mono"><%= m.qty > 0 ? '+' : '' %><%= qtyTxt(m.qty) %></span><span></span></li>
+        <% }) %>
+      </ul>
+    </details>
+    <% } %>
+  </li>
+  <% }) %>
+</ul>
+<% if (archived && !showArchived) { %><p class="small muted"><a href="/financeiro/estoque?arquivados=1">Mostrar <%= archived %> item<%= archived === 1 ? '' : 'ns' %> arquivado<%= archived === 1 ? '' : 's' %></a></p><% } %>
+
+<% if (can('stock.write')) { %>
+<dialog class="modal modal-wide" id="modal-item-novo" aria-labelledby="min-h">
+  <form method="post" action="/financeiro/estoque" class="stack">
+    <%- csrfField %>
+    <h2 id="min-h">Novo item de estoque</h2>
+    <label>Nome<input type="text" name="name" maxlength="80" required placeholder="Ex.: Caneca Pulso"></label>
+    <div class="grid-2 tight">
+      <label>Quanto tem agora<input type="text" name="qty" inputmode="decimal" placeholder="0"></label>
+      <label>Sai por episódio <small class="muted">(0 se não é fixo)</small><input type="text" name="per_episode" inputmode="decimal" value="0"></label>
+    </div>
+    <details class="more">
+      <summary>Reposição e custo</summary>
+      <div class="stack top-gap">
+        <div class="grid-2 tight">
+          <label>Unidade<input type="text" name="unit" value="un" maxlength="20"></label>
+          <label>Prazo para repor (dias)<input type="number" name="lead_days" min="0" max="365" value="15"></label>
+        </div>
+        <div class="grid-2 tight">
+          <label>Avisar quando restar<input type="text" name="min_qty" inputmode="decimal" value="0"></label>
+          <% if (seeMoney) { %><label>Custo por unidade (R$)<input type="text" name="unit_cost" inputmode="decimal" placeholder="35,00"></label><% } %>
+        </div>
+        <label>Fornecedor<input type="text" name="supplier" maxlength="120"></label>
+      </div>
+    </details>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Adicionar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal modal-wide" id="modal-item" aria-labelledby="mi-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %>
+    <h2 id="mi-h">Editar item</h2>
+    <label>Nome<input type="text" name="name" maxlength="80" required></label>
+    <div class="grid-2 tight">
+      <label>Sai por episódio<input type="text" name="per_episode" inputmode="decimal"></label>
+      <label>Unidade<input type="text" name="unit" maxlength="20"></label>
+    </div>
+    <details class="more">
+      <summary>Reposição e detalhes</summary>
+      <div class="stack top-gap">
+        <div class="grid-2 tight">
+          <label>Prazo para repor (dias)<input type="number" name="lead_days" min="0" max="365"></label>
+          <label>Avisar quando restar<input type="text" name="min_qty" inputmode="decimal"></label>
+        </div>
+        <label>Fornecedor<input type="text" name="supplier" maxlength="120"></label>
+        <label>Observações<textarea name="notes" rows="2" maxlength="500"></textarea></label>
+        <label>Situação<select name="active"><option value="1">Acompanhando</option><option value="0">Arquivado (para de avisar)</option></select></label>
+      </div>
+    </details>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="modal-ajuste" aria-labelledby="ma-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %>
+    <h2 id="ma-h">Acertar o estoque</h2>
+    <label>Item<input type="text" name="_label" readonly></label>
+    <div class="grid-2 tight">
+      <label>O que aconteceu
+        <select name="acao">
+          <option value="contagem">Contei e tenho</option><option value="entrada">Recebi mais</option><option value="perda">Perda ou quebra</option><option value="brinde">Brinde avulso</option>
+        </select>
+      </label>
+      <label>Quantidade<input type="text" name="qty" inputmode="decimal" required autofocus></label>
+    </div>
+    <label>Anotação <small class="muted">(opcional)</small><input type="text" name="note" maxlength="200"></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<% if (canBuy) { %>
+<dialog class="modal modal-wide" id="modal-comprar" aria-labelledby="mc-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %>
+    <h2 id="mc-h">Registrar compra</h2>
+    <label>Item<input type="text" name="_label" readonly></label>
+    <div class="grid-2 tight">
+      <label>Quantidade comprada<input type="text" name="qty" inputmode="decimal" required autofocus></label>
+      <label>Valor total (R$)<input type="text" name="total" inputmode="decimal" required placeholder="1.200,00"></label>
+    </div>
+    <div class="grid-2 tight">
+      <label>Parcelas<input type="number" name="installments" min="1" max="24"></label>
+      <label>Primeiro vencimento<input type="date" name="due_on" required></label>
+    </div>
+    <label>Pagamento<select name="paid"><option value="0">Vou pagar no vencimento</option><option value="1">Já paguei (a primeira parcela)</option></select></label>
+    <details class="more">
+      <summary>Mais detalhes</summary>
+      <div class="stack top-gap">
+        <label>Categoria<select name="category"><% Object.keys(C.FIN_OUT).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_OUT[k] %></option><% }) %></select></label>
+        <label>Fornecedor<input type="text" name="supplier" maxlength="120"></label>
+      </div>
+    </details>
+    <p class="small muted">A compra entra no estoque e vira conta a pagar. O custo médio do item é atualizado.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Registrar compra</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<%- include('../partials/foot') %>

@@ -1,0 +1,41 @@
+<%# Janela "Registrar abordagem". Variáveis: kind, subjectId, base, known (endereços por canal), firstChannel, today. %>
+<dialog class="modal" id="modal-abordagem" aria-labelledby="m-abord-h">
+  <form method="post" action="<%= base %>/<%= subjectId %>/abordagens" class="stack" data-when-form>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="m-abord-h">Registrar abordagem</h2>
+    <div class="seg-wrap">
+      <span class="seg-label">Canal</span>
+      <div class="seg-radio" role="radiogroup" aria-label="Canal">
+        <% Object.keys(CHANNELS).forEach(function (ch) { %><label><input type="radio" name="canal" value="<%= ch %>" <%= ch === firstChannel ? 'checked' : '' %>> <%= CHANNELS[ch] %></label><% }) %>
+      </div>
+    </div>
+    <% Object.keys(CHANNELS).forEach(function (ch) { var list = known[ch] || []; %>
+    <div data-when="canal=<%= ch %>" class="stack">
+      <% if (list.length) { %>
+      <label><%= ch === 'instagram' ? 'Qual perfil' : ch === 'email' ? 'Qual e-mail' : ch === 'outro' ? 'Qual contato' : 'Qual número' %>
+        <select name="addr_<%= ch %>">
+          <% list.forEach(function (v) { %><option value="<%= v %>"><%= v %></option><% }) %>
+          <option value="__novo">Outro endereço…</option>
+        </select>
+      </label>
+      <label data-when="addr_<%= ch %>=__novo">Novo endereço<input type="text" name="novo_<%= ch %>" maxlength="160" placeholder="<%= ch === 'instagram' ? '@perfil' : ch === 'email' ? 'nome@exemplo.com' : ch === 'outro' ? 'ex.: LinkedIn, recado com a assessoria' : '+55 11 91234-5678' %>"></label>
+      <% } else { %>
+      <input type="hidden" name="addr_<%= ch %>" value="__novo">
+      <label><%= ch === 'instagram' ? 'Qual perfil' : ch === 'email' ? 'Qual e-mail' : ch === 'outro' ? 'Qual contato' : 'Qual número' %><input type="text" name="novo_<%= ch %>" maxlength="160" placeholder="<%= ch === 'instagram' ? '@perfil' : ch === 'email' ? 'nome@exemplo.com' : ch === 'outro' ? 'ex.: LinkedIn, recado com a assessoria' : '+55 11 91234-5678' %>"></label>
+      <% } %>
+    </div>
+    <% }) %>
+    <div class="seg-wrap">
+      <span class="seg-label">O que aconteceu</span>
+      <div class="seg-radio" role="radiogroup" aria-label="Resultado">
+        <label><input type="radio" name="resultado" value="enviado" checked> Enviei a mensagem</label>
+        <label><input type="radio" name="resultado" value="respondeu"> Respondeu</label>
+      </div>
+    </div>
+    <div class="grid-2 tight">
+      <label>Quando<input type="date" name="quando" value="<%= today %>" max="<%= today %>"></label>
+      <label>Observação (opcional)<input type="text" name="nota" maxlength="500" placeholder="ex.: visualizou e não respondeu"></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Registrar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>

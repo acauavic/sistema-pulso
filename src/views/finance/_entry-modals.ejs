@@ -1,0 +1,90 @@
+<%# Janelas dos lançamentos: novo, editar e pagar/receber. Variáveis: here, episodes, sponsors, episodePre (opcional), today. %>
+<% var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">'; %>
+<% if (can('finance.write')) { %>
+<datalist id="fin-suppliers"><% (typeof suppliers !== 'undefined' ? suppliers : []).forEach(function (n) { %><option value="<%= n %>"><% }) %></datalist>
+<dialog class="modal modal-wide" id="modal-novo" aria-labelledby="mn-h">
+  <form method="post" action="/financeiro/lancamentos" class="stack" data-when-form>
+    <%- csrfField %><input type="hidden" name="voltar" value="<%= here %>">
+    <h2 id="mn-h">Novo lançamento</h2>
+    <div class="seg-radio" role="radiogroup" aria-label="Tipo">
+      <label><input type="radio" name="direction" value="saida" checked> A pagar</label>
+      <label><input type="radio" name="direction" value="entrada"> A receber</label>
+    </div>
+    <label>O que é<input type="text" name="description" maxlength="200" required placeholder="Ex.: Uber dos hosts, caixas de presente"></label>
+    <div class="grid-2 tight">
+      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="150,00"></label>
+      <label>Vence em<input type="date" name="due_on" value="<%= today %>" required></label>
+    </div>
+    <label class="check" data-when="direction=saida"><input type="checkbox" name="paid" value="1"> Já foi pago</label>
+    <label class="check" data-when="direction=entrada"><input type="checkbox" name="paid" value="1"> Já foi recebido</label>
+    <details class="more">
+      <summary>Mais detalhes</summary>
+      <div class="stack top-gap">
+        <div class="grid-2 tight">
+          <label>Categoria
+            <select name="category">
+              <% Object.keys(C.FIN_OUT).forEach(function (k) { %><option value="<%= k %>" data-when="direction=saida"><%= C.FIN_OUT[k] %></option><% }) %>
+              <% Object.keys(C.FIN_IN).forEach(function (k) { %><option value="<%= k %>" data-when="direction=entrada"><%= C.FIN_IN[k] %></option><% }) %>
+            </select>
+          </label>
+          <label>Parcelas <small class="muted">(mensais)</small><input type="number" name="installments" min="1" max="24" value="1"></label>
+        </div>
+        <label>Fornecedor ou pessoa<input type="text" name="supplier" maxlength="120" list="fin-suppliers"></label>
+        <div class="grid-2 tight">
+          <label>Episódio<select name="episode_id"><option value="">Nenhum</option><% episodes.forEach(function (ep) { %><option value="<%= ep.id %>" <%= typeof episodePre !== 'undefined' && String(episodePre) === String(ep.id) ? 'selected' : '' %>><%= ep.number ? 'EP.' + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %></option><% }) %></select></label>
+          <label>Patrocinador<select name="sponsor_id"><option value="">Nenhum</option><% sponsors.forEach(function (s) { %><option value="<%= s.id %>"><%= s.company %></option><% }) %></select></label>
+        </div>
+        <label>Observações<textarea name="notes" rows="2" maxlength="1000"></textarea></label>
+      </div>
+    </details>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Lançar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal modal-wide" id="modal-lanc" aria-labelledby="ml-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %><input type="hidden" name="voltar" value="">
+    <h2 id="ml-h">Editar lançamento</h2>
+    <label>O que é<input type="text" name="description" maxlength="200" required></label>
+    <div class="grid-2 tight">
+      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required></label>
+      <label>Vence em<input type="date" name="due_on" required></label>
+    </div>
+    <details class="more">
+      <summary>Mais detalhes</summary>
+      <div class="stack top-gap">
+        <label>Categoria
+          <select name="category">
+            <optgroup label="Saídas"><% Object.keys(C.FIN_OUT).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_OUT[k] %></option><% }) %></optgroup>
+            <optgroup label="Entradas"><% Object.keys(C.FIN_IN).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_IN[k] %></option><% }) %></optgroup>
+          </select>
+        </label>
+        <label>Fornecedor ou pessoa<input type="text" name="supplier" maxlength="120" list="fin-suppliers"></label>
+        <div class="grid-2 tight">
+          <label>Episódio<select name="episode_id"><option value="">Nenhum</option><% episodes.forEach(function (ep) { %><option value="<%= ep.id %>"><%= ep.number ? 'EP.' + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %></option><% }) %></select></label>
+          <label>Patrocinador<select name="sponsor_id"><option value="">Nenhum</option><% sponsors.forEach(function (s) { %><option value="<%= s.id %>"><%= s.company %></option><% }) %></select></label>
+        </div>
+        <label>Observações<textarea name="notes" rows="2" maxlength="1000"></textarea></label>
+      </div>
+    </details>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+      <button class="link small danger-link push-right" type="submit" data-fill-remove-btn formnovalidate>Excluir</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="modal-pagar" aria-labelledby="mg-h">
+  <form method="post" action="" class="stack" data-fill-form>
+    <%- csrfField %><input type="hidden" name="voltar" value="">
+    <h2 id="mg-h"><span data-mode="saida">Registrar pagamento</span><span data-mode="entrada" hidden>Registrar recebimento</span></h2>
+    <label>Lançamento<input type="text" name="_label" readonly></label>
+    <div class="grid-2 tight">
+      <label><span data-mode="saida">Valor pago (R$)</span><span data-mode="entrada" hidden>Valor recebido (R$)</span><input type="text" name="amount" inputmode="decimal" required autofocus></label>
+      <label><span data-mode="saida">Pago em</span><span data-mode="entrada" hidden>Recebido em</span><input type="date" name="paid_on" required></label>
+    </div>
+    <p class="small muted">Se o valor mudou (ex.: o estúdio cobrou outro total), ajuste aqui: o lançamento guarda o que foi pago de verdade.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Confirmar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>

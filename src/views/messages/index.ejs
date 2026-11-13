@@ -1,0 +1,111 @@
+<%# Jornada: alguém da equipe abre Mensagens para falar com uma pessoa ou um grupo; vê as conversas (não lidas em cima), entra, lê e responde;
+    assunto paralelo vai para uma thread ao lado. Editar, gerenciar grupo e resumir ficam em janelas. Comportamento em chat.js. %>
+<%- include('../partials/head') %>
+<section class="chat" data-chat data-view="<%= openId ? 'conv' : 'list' %>" data-me="<%= currentUser.id %>" data-open="<%= openId || '' %>" data-ai="<%= aiOn ? '1' : '' %>" aria-label="Mensagens">
+  <aside class="chat-side">
+    <header class="chat-side-head"><h1>Mensagens</h1><button class="btn primary sm" type="button" data-chat-new><%- icon('plus', 14) %> Nova conversa</button></header>
+    <nav class="chat-convs" data-chat-convs aria-label="Conversas"></nav>
+    <div class="empty" data-chat-noconv hidden><%- include('../partials/pulse-line') %><strong>Nenhuma conversa ainda</strong><span class="small">Toque em Nova conversa para falar com alguém da equipe ou criar um grupo.</span></div>
+  </aside>
+
+  <div class="chat-main">
+    <div class="empty chat-pick" data-chat-pick><%- include('../partials/pulse-line') %><strong>Escolha uma conversa</strong><span class="small">As mensagens aparecem aqui.</span></div>
+    <div class="chat-conv" data-chat-conv hidden>
+      <header class="chat-head">
+        <button class="icon-btn chat-back" type="button" data-chat-back aria-label="Voltar para as conversas"><%- icon('arrow-left', 20) %></button>
+        <button class="chat-title" type="button" data-chat-info title="Detalhes da conversa"><span class="avatar sm" data-chat-avatar></span><span class="chat-title-txt"><strong data-chat-name></strong><span class="mono small muted" data-chat-sub></span></span></button>
+        <% if (aiOn) { %><button class="btn sm ghost" type="button" data-chat-summary><%- icon('sparkles', 14) %> <span>Resumir</span></button><% } %>
+      </header>
+      <div class="chat-scroll" data-chat-scroll>
+        <div class="chat-older"><button class="btn sm ghost" type="button" data-chat-older hidden>Mensagens anteriores</button></div>
+        <ol class="chat-msgs" data-chat-msgs aria-live="polite"></ol>
+      </div>
+      <button class="chat-new-pill mono" type="button" data-chat-jump hidden>Novas mensagens</button>
+      <p class="chat-offline small" data-chat-offline role="status" hidden>Sem conexão. O que você enviar fica guardado e sai sozinho quando a conexão voltar.</p>
+      <form class="chat-composer" data-chat-form>
+        <%- include('../partials/rich-editor', { name: 'html', attach: 'anexos', placeholder: 'Mensagem (@ marca alguém, # cita um episódio, corte…)', label: 'Mensagem', audio: true, size: 'sm', mentions: true, refs: true }) %>
+        <button class="btn primary chat-send" type="submit" aria-label="Enviar"><%- icon('send', 16) %></button>
+      </form>
+    </div>
+  </div>
+
+  <aside class="chat-thread" data-chat-thread hidden aria-label="Thread">
+    <header class="chat-head">
+      <button class="icon-btn" type="button" data-chat-thread-close aria-label="Fechar a thread"><%- icon('x', 18) %></button>
+      <span class="chat-title-txt"><strong>Thread</strong><span class="mono small muted" data-chat-thread-sub></span></span>
+      <% if (aiOn) { %><button class="btn sm ghost" type="button" data-chat-thread-summary><%- icon('sparkles', 14) %> <span>Resumir</span></button><% } %>
+    </header>
+    <div class="chat-scroll" data-chat-thread-scroll><ol class="chat-msgs" data-chat-thread-parent></ol><p class="kicker chat-thread-label">Respostas</p><ol class="chat-msgs" data-chat-thread-msgs aria-live="polite"></ol></div>
+    <form class="chat-composer" data-chat-thread-form>
+      <%- include('../partials/rich-editor', { name: 'html_thread', attach: 'anexos', placeholder: 'Responder na thread', label: 'Resposta', audio: true, size: 'sm', mentions: true, refs: true }) %>
+      <button class="btn primary chat-send" type="submit" aria-label="Enviar resposta"><%- icon('send', 16) %></button>
+    </form>
+  </aside>
+</section>
+
+<dialog class="modal" id="chat-new" aria-labelledby="chat-new-h">
+  <h2 id="chat-new-h">Nova conversa</h2>
+  <div class="seg" role="group" aria-label="Tipo de conversa"><button type="button" class="on" data-chat-new-tab="pessoa">Pessoa</button><button type="button" data-chat-new-tab="grupo">Grupo</button></div>
+  <div class="stack" data-chat-new-pane="pessoa"><ul class="plain chat-people" data-chat-people></ul></div>
+  <form class="stack" data-chat-new-pane="grupo" data-chat-group-form hidden>
+    <label>Nome do grupo<input type="text" name="nome" maxlength="80" placeholder="Ex.: Edição do EP.020"></label>
+    <fieldset><legend>Quem participa</legend><ul class="plain chat-checks" data-chat-group-people></ul></fieldset>
+    <p class="small err" data-chat-group-err role="alert" hidden></p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar grupo</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+  <div class="row modal-actions" data-chat-new-pane="pessoa"><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+</dialog>
+
+<dialog class="modal" id="chat-details" aria-labelledby="chat-details-h">
+  <div class="row spread"><h2 id="chat-details-h" data-chat-d-name></h2><button class="link small" type="button" data-chat-d-rename hidden>Renomear</button></div>
+  <form class="row" data-chat-d-rename-form hidden><input type="text" name="nome" maxlength="80" aria-label="Nome do grupo"><button class="btn sm" type="submit">Salvar</button><button class="link small" type="button" data-chat-d-rename-cancel>Cancelar</button></form>
+  <span class="kicker" data-chat-d-count></span>
+  <ul class="plain chat-members" data-chat-d-members></ul>
+  <details data-chat-d-add hidden><summary class="btn sm">Adicionar pessoas</summary>
+    <form class="stack top-gap" data-chat-d-add-form><ul class="plain chat-checks" data-chat-d-add-people></ul><div class="row"><button class="btn sm" type="submit">Adicionar</button></div></form>
+  </details>
+  <fieldset class="top-gap" data-chat-d-notify><legend>Avisos desta conversa</legend>
+    <div class="chips-radio">
+      <label class="chip-radio"><input type="radio" name="avisos" value="padrao"><span data-chat-d-default>Padrão</span></label>
+      <label class="chip-radio"><input type="radio" name="avisos" value="tudo"><span>Todas as mensagens</span></label>
+      <label class="chip-radio" data-chat-d-only-group><input type="radio" name="avisos" value="mencoes"><span>Só quando me marcarem</span></label>
+      <label class="chip-radio"><input type="radio" name="avisos" value="nada"><span>Nenhum</span></label>
+    </div>
+    <p class="small muted" data-chat-d-notify-hint></p>
+  </fieldset>
+  <p class="small err" data-chat-d-err role="alert" hidden></p>
+  <div class="row spread modal-actions"><button class="link small danger-link" type="button" data-chat-d-leave hidden>Sair do grupo</button><button class="btn ghost" type="button" data-modal-close>Fechar</button></div>
+</dialog>
+
+<dialog class="modal" id="chat-edit" aria-labelledby="chat-edit-h">
+  <form class="stack" data-chat-edit-form>
+    <h2 id="chat-edit-h">Editar mensagem</h2>
+    <div class="chat-rte"><%- include('../partials/rich-editor', { name: 'html_edit', attach: 'anexos_edit', label: 'Mensagem', size: 'sm', mentions: true, refs: true }) %></div>
+    <p class="small err" data-chat-edit-err role="alert" hidden></p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<% if (aiOn) { %>
+<dialog class="modal" id="chat-resumo" aria-labelledby="chat-resumo-h">
+  <h2 id="chat-resumo-h">Resumir com IA</h2>
+  <form class="stack" data-chat-sum-form>
+    <fieldset data-chat-sum-scopes><legend>O que resumir</legend><div class="chips-radio">
+      <label class="chip-radio" data-chat-sum-unread hidden><input type="radio" name="alcance" value="nao_lidas"><span>Não lidas <span class="mono" data-chat-sum-n></span></span></label>
+      <label class="chip-radio"><input type="radio" name="alcance" value="24h" checked><span>Últimas 24 horas</span></label>
+      <label class="chip-radio"><input type="radio" name="alcance" value="7d"><span>Últimos 7 dias</span></label></div>
+    </fieldset>
+    <p class="small muted" data-chat-sum-thread hidden>Resume a mensagem original e as respostas desta thread.</p>
+    <div class="row modal-actions" data-chat-sum-actions><button class="btn primary" type="submit"><%- icon('sparkles', 14) %> Resumir</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+  <p class="small muted" data-chat-sum-wait role="status" hidden>Lendo as mensagens…</p>
+  <p class="small err" data-chat-sum-err role="alert" hidden></p>
+  <div class="chat-sum" data-chat-sum-result hidden></div>
+  <div class="row modal-actions" data-chat-sum-done hidden><button class="btn ghost" type="button" data-modal-close>Fechar</button></div>
+</dialog>
+<% } %>
+
+<template data-chat-icons><% ['pencil', 'trash-2', 'smile-plus', 'message-square', 'clock', 'rotate-cw', 'file-text', 'users', 'check', 'x'].forEach(function (n) { %><span data-i="<%= n %>"><%- icon(n, 14) %></span><% }) %></template>
+<script type="application/json" id="chat-data"><%- JSON.stringify({ conversations: conversations, emojis: reactionEmojis }).replace(/</g, '\\u003c') %></script>
+<script src="/static/chat.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

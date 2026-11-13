@@ -1,0 +1,48 @@
+<%- include('_top') %>
+  <section class="studio-card" data-studio data-base="<%= base %>" data-files="<%= JSON.stringify(files) %>">
+    <span class="kicker mono"><%= tag %><%= link.guest_name ? ' · ' + link.guest_name.toUpperCase() : '' %></span>
+    <h1>Material da gravação</h1>
+    <p class="muted">Envie aqui os arquivos da gravação: vídeos das câmeras, áudio e fotos. Pode arrastar as pastas inteiras ou os arquivos soltos, tudo de uma vez.</p>
+
+    <% if (!storageReady) { %>
+    <p class="notice">O envio está indisponível agora. Fale com a produção.</p>
+    <% } else { %>
+    <div class="studio-drop" data-studio-drop tabindex="0">
+      <%- icon('upload', 20) %>
+      <p><strong>Arraste aqui as pastas ou os arquivos</strong></p>
+      <div class="row studio-pick">
+        <button class="btn" type="button" data-studio-pick="files">Escolher arquivos</button>
+        <button class="btn" type="button" data-studio-pick="folder">Escolher pasta</button>
+      </div>
+      <input type="file" multiple hidden data-studio-input="files" aria-label="Escolher arquivos">
+      <input type="file" multiple webkitdirectory hidden data-studio-input="folder" aria-label="Escolher pasta">
+    </div>
+    <p class="small muted studio-note" data-studio-note aria-live="polite"></p>
+    <p class="notice small" data-studio-keep hidden>Mantenha esta página aberta até terminar. Se a internet cair, o envio continua sozinho quando ela voltar; se fechar a página, escolha os mesmos arquivos de novo e ele segue de onde parou.</p>
+    <% } %>
+
+    <div data-upl-mount class="studio-list"></div>
+
+    <% var ready = files.filter(function (f) { return f.status === 'pronto'; }); %>
+    <% if (ready.length) { %>
+    <details class="studio-sent">
+      <summary class="small">Já recebidos por este link <span class="mono">(<%= ready.length %>)</span></summary>
+      <ul class="plain studio-files">
+        <% ready.forEach(function (f) { %><li><%- icon('check', 14) %> <span class="mono small"><%= f.path %></span></li><% }) %>
+      </ul>
+    </details>
+    <% } %>
+
+    <form method="post" action="/estudio/<%= link.token %>/terminei" class="studio-finish" data-studio-finish>
+      <input type="hidden" name="mesmo_assim" value="<%= typeof pending !== 'undefined' && pending ? '1' : '0' %>">
+      <% if (typeof pending !== 'undefined' && pending) { %>
+      <p class="notice small"><%= pending %> arquivo<%= pending === 1 ? ' ficou' : 's ficaram' %> pela metade. Se não for mandar de novo, termine assim mesmo: o que chegou inteiro fica com a produção.</p>
+      <% } %>
+      <button class="btn primary lg" type="submit" data-studio-done <%= ready.length ? '' : 'disabled' %>><%= typeof pending !== 'undefined' && pending ? 'Terminar mesmo assim' : 'Terminei o envio' %></button>
+      <p class="small muted">Clique quando todos os arquivos estiverem enviados. Depois disso, este link fecha.</p>
+    </form>
+  </section>
+<template data-upl-icons><span data-i="x"><%- icon('x', 14) %></span><span data-i="rotate-cw"><%- icon('rotate-cw', 14) %></span><span data-i="chevron-up"><%- icon('chevron-up', 16) %></span></template>
+<script src="/static/uploads.js?v=<%= assetV %>" defer></script>
+<script src="/static/estudio.js?v=<%= assetV %>" defer></script>
+<%- include('_bottom') %>
