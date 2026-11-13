@@ -1663,3 +1663,26 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
   .dup-row { grid-template-columns: 1fr; }
   .dup-row-actions { justify-content: flex-start; }
 }
+
+/* Link do estúdio: página pública de envio do material da gravação (/estudio/<token>) e o cartão no painel */
+.studio-page { min-height: 100vh; background: var(--bg); }
+.studio-main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; display: grid; gap: 24px; }
+.studio-mark { font-size: 32px; }
+.studio-card { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 24px; }
+.studio-card h1 { font-size: 28px; }
+.studio-drop { display: grid; justify-items: center; gap: 10px; padding: 32px 16px; border: 1px dashed var(--line-strong); border-radius: var(--r-card); background: var(--bg); text-align: center; color: var(--text-2); transition: border-color var(--t) var(--ease), background var(--t) var(--ease); }
+.studio-drop.over, .studio-drop:focus-visible { border-color: var(--text); background: var(--raised); outline: none; }
+.studio-drop p { margin: 0; color: var(--text); }
+.studio-pick { gap: 8px; justify-content: center; flex-wrap: wrap; }
+.studio-note:empty { display: none; }
+.studio-list .upl-tray.upl-inline { position: static; width: 100%; right: auto; bottom: auto; z-index: auto; }
+.studio-list .upl-inline .upl-body { max-height: none; }
+.studio-list .upl-inline .upl-chev { display: none; }
+.studio-files { gap: 6px; } .studio-files li { display: flex; gap: 8px; align-items: center; color: var(--text-2); overflow-wrap: anywhere; }
+.studio-finish { display: grid; gap: 8px; justify-items: start; padding-top: 8px; border-top: 1px solid var(--line); }
+.studio-total { color: var(--text-2); }
+.studio-link { display: grid; gap: 10px; margin: 12px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-card); }
+.studio-link-url { overflow-wrap: anywhere; color: var(--text-2); }
+.studio-link-actions { gap: 8px; flex-wrap: wrap; align-items: center; }
+.file-tag { font: 500 10px var(--f-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-tag); padding: 1px 5px; }
+@media (max-width: 720px) { .studio-main { padding-top: 24px; } .studio-card { padding: 18px; } }

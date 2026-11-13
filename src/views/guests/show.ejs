@@ -128,8 +128,10 @@
     <h2><%= aired ? 'No ar' : 'Conversa gravada' %></h2>
     <p class="muted"><%= aired ? 'Obrigado por sentar à mesa. Os links ficam aqui para compartilhar com ' + (guest.gender === 'f' ? 'a convidada' : 'o convidado') + '.' : 'A parte do convidado terminou. Daqui em diante é o episódio: edição, revisão e publicação.' %></p>
     <% if (episode && !aired) { %><p class="mono-line muted"><span><%= epNo %> · <%= (episodeStages[episode.status] || '').toUpperCase() %></span></p><% } %>
+    <% if (studio && !aired) { %><p class="small muted">O estúdio já pode subir o material da gravação por este link (mande pelo WhatsApp):</p><p class="mono small studio-link-url"><%= studio.url %></p><% } %>
     <div class="next-actions">
-      <% if (episode) { %><a class="btn <%= aired ? '' : 'primary' %>" href="/episodios/<%= episode.id %>"><%- icon('film') %> Abrir <%= epNo %></a><% } %>
+      <% if (studio && !aired) { %><button class="btn primary" type="button" data-copy="<%= studio.url %>"><%- icon('copy') %> Copiar link do estúdio</button><% } %>
+      <% if (episode) { %><a class="btn <%= aired || studio ? '' : 'primary' %>" href="/episodios/<%= episode.id %>"><%- icon('film') %> Abrir <%= epNo %></a><% } %>
       <% if (aired && episode.youtube_url) { %><a class="btn" href="<%= episode.youtube_url %>" target="_blank" rel="noopener noreferrer"><%- icon('external-link') %> YouTube</a><% } %>
       <% if (aired && episode.spotify_url) { %><a class="btn" href="<%= episode.spotify_url %>" target="_blank" rel="noopener noreferrer"><%- icon('external-link') %> Spotify</a><% } %>
     </div>

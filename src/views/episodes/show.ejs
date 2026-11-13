@@ -154,12 +154,13 @@
             <li<% if (f.status === 'pronto') { %> data-dl-item data-zip="f<%= f.id %>" data-href="<%= fileBase + f.id %>/baixar" data-name="<%= f.filename %>" data-bytes="<%= Number(f.size_bytes || 0) %>"<% } %>>
               <% if (f.status === 'pronto') { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= f.filename %>"><% } %>
               <span>
-                <%= f.label ? f.label + ' · ' : '' %><span class="mono small"><%= f.filename %></span>
+                <%= f.label ? f.label + ' · ' : '' %><span class="mono small"><%= f.filename %></span><% if (f.upload_link_id) { %> <span class="file-tag" title="Enviado pelo link do estúdio">estúdio</span><% } %>
                 <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %></span>
                 <% if (f.stalled) { %><span class="badge b-red" title="O envio parou no meio. Envie o mesmo arquivo de novo: continua de onde parou.">não terminou</span><% } else if (f.status === 'enviando') { %><span class="badge b-amber">enviando</span><% } %>
               </span>
               <span class="row">
                 <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
+                <% if (perm.upload && f.status === 'pronto' && f.kind !== 'editado') { %><button class="icon-btn" type="button" data-fill-modal="modal-organizar" data-fill-action="<%= fileBase + f.id %>/organizar" data-fill="<%= JSON.stringify({ kind: f.kind, rotulo: f.label || '' }) %>" aria-label="Organizar: tipo e rótulo de <%= f.filename %>" title="Organizar"><%- icon('pencil', 14) %></button><% } %>
                 <% if (perm.upload) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo do armazenamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover o arquivo" title="Remover"><%- icon('trash-2', 14) %></button></form><% } %>
               </span>
             </li>
@@ -193,6 +194,7 @@
           </div>
         </div>
         <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
+        <% if (perm.upload && storageReady) { %><%- include('_studio-link', { studio: studio, studioWa: studioWa, epId: ep.id, csrf: csrf }) %><% } %>
         <% if (canRaw) { %>
         <div class="uploader quiet" data-material data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-where="<%= where %>" data-hash="material">
           <input type="file" multiple hidden data-material-files aria-label="Escolher arquivos">
@@ -256,6 +258,22 @@
         </div>
         <% } %>
       </section>
+      <% if (perm.upload) { %>
+      <dialog class="modal" id="modal-organizar" aria-labelledby="org-h">
+        <form method="post" action="" class="stack" data-fill-form>
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <h2 id="org-h">Organizar arquivo</h2>
+          <label>Tipo
+            <select name="kind">
+              <% ['bruto_video', 'bruto_audio', 'bastidor', 'foto', 'outro'].forEach(function (k) { %><option value="<%= k %>"><%= kindLabels[k] %></option><% }) %>
+            </select>
+          </label>
+          <label>Rótulo<input type="text" name="rotulo" maxlength="80" placeholder="Ex.: Câmera 2, Áudio do host"></label>
+          <p class="small muted">Os vídeos e áudios são agrupados pelo rótulo dentro da pasta.</p>
+          <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+        </form>
+      </dialog>
+      <% } %>
       <% if (gallery.length) { %>
       <dialog class="modal gallery" id="modal-galeria" aria-labelledby="gal-h" data-gallery data-g-zip="<%= ep.number ? 'ep' + String(ep.number).padStart(3, '0') : 'episodio' %>">
         <div class="gal-head">

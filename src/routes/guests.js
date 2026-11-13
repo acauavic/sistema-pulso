@@ -244,7 +244,10 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
     hasPhone: Boolean(require('../services/contacts').normalizeNumber(pg.phone)), hasEmail: isEmail(pg.email || ''),
   } : null;
   const outSm = outEval.get(guest.id) || null;
+  const epRow = episode.rows[0] || null;
+  const studio = epRow && can(req.user.role, 'production.upload') ? await require('../services/studioLinks').panelState(epRow.id) : null;
   res.render('guests/show', {
+    studio: studio && studio.state === 'aguardando' ? studio : null,
     dupes: can(req.user.role, 'guests.write') ? await require('../services/duplicates').findFor('guest', guest, { excludeId: guest.id }) : [],
     outreachCtx: { kind: 'guest', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (guest.instagram ? 'instagram' : guest.phone ? 'whatsapp' : guest.email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/convidados', subjectId: guest.id },
     reminderList, photoFrame: guestPhotos.FRAME,

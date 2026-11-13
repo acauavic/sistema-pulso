@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.66.0', date: '2026-11-13', title: 'Link do estúdio para o material da gravação',
+    items: [
+      { kind: 'novo', text: 'Ao marcar como gravado, o episódio ganha um link para o estúdio subir o material direto para o sistema, sem WeTransfer e sem precisar baixar e subir de novo. O link fica na aba Material do episódio e no convidado, com "Copiar link".' },
+      { kind: 'novo', text: 'A página do estúdio abre sem login, aceita pastas inteiras ou arquivos soltos (as quatro câmeras com o mesmo nome de arquivo não se confundem), sobe em partes direto para o armazenamento e continua de onde parou se a internet cair. No fim, "Terminei o envio" fecha o link e avisa a equipe.' },
+      { kind: 'novo', text: '"Pedir reenvio" gera um link novo (o antigo para de funcionar na hora) e o material que já chegou continua no episódio. O link fecha sozinho depois de 7 dias sem uso.' },
+      { kind: 'novo', text: 'Organizar: cada arquivo do material bruto tem um botão para mudar o tipo e o rótulo (por exemplo, "Câmera 2"). Gestão > WhatsApp dos convites ganhou o número do estúdio, para o botão "Mandar no WhatsApp" com a mensagem pronta.' },
+    ],
+  },
+  {
     version: '1.65.0', date: '2026-11-12', title: 'Duplicatas de convidados e patrocinadores',
     items: [
       { kind: 'novo', text: 'Ao cadastrar um convidado ou patrocinador que parece já existir (mesmo @, e-mail, telefone, empresa ou site, ou nome parecido), o sistema mostra o que já está cadastrado antes de criar outro. Se for outra pessoa ou empresa, "Cadastrar mesmo assim".' },

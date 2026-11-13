@@ -17,6 +17,8 @@
     return;
   }
 
+  // Página pública do link do estúdio: a lista fica na própria página ([data-upl-mount]), sem o quadro de navegação do painel e sem sumir.
+  const MOUNT = document.querySelector('[data-upl-mount]');
   const FILE_LIMIT = 4; // arquivos ao mesmo tempo
   const PART_LIMIT = 6; // partes em voo no total: o navegador só abre 6 conexões por servidor (o Backblaze fala HTTP/1.1); mais que isso só fica na fila
   // Envio direto ao Backblaze: o navegador envia cada parte para um link assinado do bucket, sem passar pelo servidor, e só avisa o
@@ -183,7 +185,7 @@
     if (!it.serverId) {
       const init = await json(it, `${it.ctx.base}iniciar`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: it.kind, rotulo: it.label, nome: it.file.name, tamanho: it.file.size, tipo: it.file.type, substituir: it.replaceId || '' }),
+        body: JSON.stringify({ kind: it.kind, rotulo: it.label, nome: it.name || it.file.name, caminho: it.path || '', tamanho: it.file.size, tipo: it.file.type, substituir: it.replaceId || '' }),
       });
       it.serverId = init.id; it.partSize = init.partSize; it.totalParts = init.totalParts;
     }
@@ -311,7 +313,7 @@
     const wrap = (file) => (file instanceof File ? file : new File([file], file.name, { type: file.type, lastModified: file.lastModified })); // cópia leve (mesmo conteúdo) no mundo da janela de cima
     entries.forEach((e) => {
       items.push({
-        id: (seq += 1), file: wrap(e.file), kind: e.kind, label: e.label || '', ctx, status: 'queued', started: false, aborted: false,
+        id: (seq += 1), file: wrap(e.file), name: e.name || '', path: e.path || '', kind: e.kind, label: e.label || '', ctx, status: 'queued', started: false, aborted: false,
         serverId: e.resumeId || null, replaceId: e.replaceId || null, resumed: Boolean(e.resumeId),
         partSize: 0, totalParts: 0, doneBytes: 0, live: {}, xhrs: new Set(), error: '', note: '', fatal: false,
       });
@@ -341,8 +343,9 @@
   }
   const retryAll = () => { blocked = ''; items.filter((x) => x.status === 'error' && !x.fatal).forEach(retry); };
   // Este arquivo já está na fila (na mesma pasta de destino)? A janela de envio usa para não mandar duas vezes.
-  const has = (base, name, size) => items.some((x) => isActive(x) && x.ctx.base === base && x.file.name === name && x.file.size === size);
-  window.PulsoUploads = { add, has, retryAll, active: activeCount, on(fn) { listeners.add(fn); return () => listeners.delete(fn); }, fmtBytes };
+  const has = (base, name, size) => items.some((x) => isActive(x) && x.ctx.base === base && (x.name || x.file.name) === name && x.file.size === size);
+  const list = () => items.map((x) => ({ name: x.name || x.file.name, size: x.file.size, status: x.status, fatal: x.fatal }));
+  window.PulsoUploads = { add, has, list, retryAll, active: activeCount, on(fn) { listeners.add(fn); return () => listeners.delete(fn); }, fmtBytes };
 
   // ---------------------------------------------------------------- avisos ao sair
   window.addEventListener('beforeunload', (e) => { if (activeCount()) { e.preventDefault(); e.returnValue = ''; } });
@@ -373,7 +376,7 @@
     return frame;
   }
   window.addEventListener('click', (e) => { // na bolha, depois dos tratadores da própria página
-    if (!activeCount() || frame || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (MOUNT || !activeCount() || frame || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const a = e.target.closest && e.target.closest('a[href]');
     if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return;
     const u = new URL(a.href, location.href);
@@ -383,7 +386,7 @@
     ensureFrame().src = u.href;
   });
   window.addEventListener('submit', (e) => {
-    if (!activeCount() || frame || e.defaultPrevented) return;
+    if (MOUNT || !activeCount() || frame || e.defaultPrevented) return;
     const f = e.target;
     if (!f || f.tagName !== 'FORM' || (f.target && f.target !== '_self') || f.getAttribute('action') === '/logout') return;
     ensureFrame();
@@ -402,7 +405,7 @@
     tray.className = 'upl-tray'; tray.setAttribute('aria-label', 'Envios de arquivos'); tray.hidden = true;
     tray.innerHTML = '<button type="button" class="upl-head" aria-expanded="true"><span class="upl-head-txt"><strong class="upl-title"></strong><span class="upl-meta mono small"></span></span><span class="upl-chev"></span><span class="upl-bar" aria-hidden="true"><i></i></span></button>'
       + '<div class="upl-body"><p class="upl-alert small" data-upl-alert hidden></p><ul class="plain upl-list" aria-live="polite"></ul><div class="upl-foot"><button type="button" class="link small" data-upl-retry-all hidden>Tentar todos de novo</button><button type="button" class="link small" data-upl-clear>Limpar concluídos</button></div></div>';
-    document.body.appendChild(tray);
+    if (MOUNT) { tray.classList.add('upl-inline'); MOUNT.appendChild(tray); } else document.body.appendChild(tray);
     headBtn = tray.querySelector('.upl-head'); titleEl = tray.querySelector('.upl-title'); metaEl = tray.querySelector('.upl-meta');
     barEl = tray.querySelector('.upl-bar i'); bodyEl = tray.querySelector('.upl-body'); listEl = tray.querySelector('.upl-list');
     tray.querySelector('.upl-chev').innerHTML = icon('chevron-up');
@@ -480,8 +483,9 @@
         if (isActive(it)) actions.push(`<button type="button" class="icon-btn" data-act="cancel" aria-label="Cancelar envio" title="Cancelar envio">${icon('x')}</button>`);
         else if (it.status !== 'done') actions.push(`<button type="button" class="icon-btn" data-act="dismiss" aria-label="Tirar da lista" title="Tirar da lista">${icon('x')}</button>`);
         li.innerHTML = '<div class="upl-row"><div class="upl-name"><span class="u-name"></span><span class="small muted mono u-where"></span></div><span class="small u-state"></span><span class="upl-act">' + actions.join('') + '</span></div><div class="bar"><i></i></div>';
-        li.querySelector('.u-name').textContent = it.label ? `${it.label} · ${it.file.name}` : it.file.name;
-        li.querySelector('.u-name').title = it.file.name;
+        const shown = it.name || it.file.name;
+        li.querySelector('.u-name').textContent = it.label ? `${it.label} · ${shown}` : shown;
+        li.querySelector('.u-name').title = shown;
         li.querySelector('.u-where').textContent = `${it.ctx.where ? `${it.ctx.where} · ` : ''}${fmtBytes(it.file.size)}`;
         return li;
       }));
@@ -498,10 +502,10 @@
   function scheduleHide() {
     clearTimeout(hideTimer);
     const failed = items.some((i) => i.status === 'error');
-    if (failed) expanded = true; // quem precisa de atenção fica à vista
+    if (failed || MOUNT) expanded = true; // quem precisa de atenção fica à vista (e a página do estúdio mostra sempre a lista)
     else if (!userToggled) expanded = false;
     paint();
-    if (failed) return;
+    if (failed || MOUNT) return;
     hideTimer = setTimeout(() => { if (!activeCount() && !items.some((i) => i.status === 'error')) { items.length = 0; paint(); } }, 9000);
   }
 })();

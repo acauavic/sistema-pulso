@@ -43,6 +43,7 @@ function createApp() {
   app.use(require('./routes/plateia')); // Pulso Podcast com Plateia: página pública de inscrição (sem login)
   app.use(require('./routes/sponsorPublic')); // media kit, formulário e portal do patrocinador (idem)
   app.use(require('./routes/guestPortalPublic')); // portal do convidado: posts em collab, cortes exclusivos e fotos (token na URL)
+  app.use(require('./routes/studioUpload')); // link do estúdio: envio do material da gravação (token na URL, sem login)
 
   app.use(mw.attachSession);
   // modo de teste/publicação de verdade das redes (Integrações): relido do banco a cada 15 s, no máximo

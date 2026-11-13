@@ -13,6 +13,14 @@ const GROUPS = {
       portal: { key: 'whatsapp_msg_portal', label: 'No portal do convidado', hint: 'Abre quando o convidado clica em "Falar com a produção" no portal (por exemplo, para combinar outra forma de collab).', fallback: 'Olá! Sou {nome}. Vi o meu portal do {podcast} e queria combinar com a produção a forma das collabs.' },
     },
   },
+  estudio: {
+    label: 'Estúdio (material da gravação)', who: 'estúdio', envKey: 'whatsappEstudio', numberKey: 'whatsapp_estudio',
+    desc: 'Recebe o link do estúdio pelo botão "Mandar no WhatsApp" do episódio, para subir o material da gravação.',
+    names: '{nome} para o nome do convidado e {link} para o link de envio',
+    messages: {
+      link: { key: 'whatsapp_msg_estudio', label: 'Link do material', hint: 'Abre quando alguém da equipe clica em "Mandar no WhatsApp" no cartão do link do estúdio.', fallback: 'Oi! Segue o link para subir o material da gravação de {nome}: {link}' },
+    },
+  },
   patrocinio: {
     label: 'Comercial (patrocinadores)', who: 'patrocinador', envKey: 'whatsappPatrocinio', numberKey: 'whatsapp_patrocinio',
     messages: {
@@ -46,12 +54,20 @@ async function current() {
   return out;
 }
 
-const fill = (text, vars) => String(text).replace(/\{(nome|podcast)\}/g, (all, k) => vars[k]);
+const fill = (text, vars) => String(text).replace(/\{(nome|podcast|link)\}/g, (all, k) => vars[k] ?? all);
 
 // Link wa.me com a mensagem pronta. group: 'producao' | 'patrocinio'; kind: chave da mensagem; name: quem clicou.
 async function waUrl(group, kind, name) {
   const cur = (await current())[group];
   const text = fill(cur.messages[kind].text, { nome: name, podcast: config.podcastName });
+  return `https://wa.me/${cur.number}?text=${encodeURIComponent(text)}`;
+}
+
+// WhatsApp do estúdio com o link de envio (null sem número configurado: o cartão mostra só "Copiar link").
+async function studioWaUrl(name, link) {
+  const cur = (await current()).estudio;
+  if (!cur.number) return null;
+  const text = fill(cur.messages.link.text, { nome: name || 'o episódio', podcast: config.podcastName, link });
   return `https://wa.me/${cur.number}?text=${encodeURIComponent(text)}`;
 }
 
@@ -69,4 +85,4 @@ async function save(group, body) {
   return { ok: true };
 }
 
-module.exports = { GROUPS, current, waUrl, save, normalizeNumber, pretty };
+module.exports = { GROUPS, current, waUrl, studioWaUrl, save, normalizeNumber, pretty };

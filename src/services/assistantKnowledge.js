@@ -213,6 +213,17 @@ const TOPICS = [
     ],
   },
   {
+    key: 'link_estudio', title: 'Link do estúdio (material da gravação)', words: ['link do estúdio', 'link do estudio', 'estúdio', 'estudio', 'danilo', 'wetransfer', 'we transfer', 'material bruto', 'subir material', 'enviar material', 'câmeras', 'reenvio do material'],
+    where: '/episodios', perm: 'production.upload',
+    steps: [
+      'Quando o convidado é marcado como gravado, o episódio ganha um link para o estúdio subir o material da gravação. Ele aparece no próximo passo do convidado ("Copiar link do estúdio") e na aba Material do episódio.',
+      'Copie o link e mande ao estúdio pelo WhatsApp (ou use "Mandar no WhatsApp", se o número do estúdio estiver em Gestão > WhatsApp dos convites). O estúdio abre sem login, arrasta as pastas ou os arquivos e espera subir; se a internet cair, continua de onde parou.',
+      'No fim, o estúdio clica "Terminei o envio": o link fecha e a equipe recebe o aviso. O material aparece na aba Material, com a marca "estúdio".',
+      'Precisa de mais material? "Pedir reenvio" na aba Material gera um link novo (o antigo deixa de funcionar); o que já chegou continua. O link também fecha sozinho depois de 7 dias sem uso.',
+      'Para organizar, use o lápis de cada arquivo: muda o tipo (vídeo bruto, áudio, bastidores, foto, outro) e o rótulo (ex.: Câmera 2).',
+    ],
+  },
+  {
     key: 'duplicatas', title: 'Cadastros duplicados (convidados e patrocinadores)', words: ['duplicata', 'duplicado', 'duplicados', 'duplicada', 'repetido', 'cadastro repetido', 'cadastrado duas vezes', 'em dobro', 'juntar', 'mesclar', 'unir cadastros'],
     where: '/gestao/duplicatas', perm: null,
     steps: [

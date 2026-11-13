@@ -303,7 +303,11 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   files.rows.forEach((f) => { f.stalled = prod.isStalled(f); }); // envio que parou no meio: "não terminou"
   const edited = files.rows.filter((f) => f.kind === 'editado' && f.status === 'pronto');
   const latestEdited = edited[0] || null; // a mais nova primeiro
+  const studioLinks = require('../services/studioLinks');
+  const studio = can(req.user.role, 'production.upload') ? await studioLinks.panelState(ep.id) : null;
+  const studioWa = studio && ['aguardando', 'enviando'].includes(studio.state) ? await require('../services/contacts').studioWaUrl(ep.guest_name || ep.title, studio.url) : null;
   res.render('episodes/show', {
+    studio, studioWa, kindLabels: C.EPISODE_FILE_KINDS,
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: reviewComments,
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
@@ -322,6 +326,44 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
       cover: can(req.user.role, 'covers.edit'),
     },
   });
+}));
+
+// ---- link do estúdio (o estúdio sobe o material da gravação por um link público) ----
+const studioRoute = (action) => wrap(async (req, res) => {
+  const ep = await findEpisode(req.params.id);
+  if (!ep) return notFound(res);
+  const studioLinks = require('../services/studioLinks');
+  const cur = await studioLinks.current(ep.id);
+  if (action === 'fechar') {
+    if (cur && studioLinks.isOpen(cur)) {
+      await studioLinks.close(cur, req.user.id, 'fechado');
+      await prod.addEvent(ep.id, req.user.id, 'arquivo', `Link do estúdio fechado por ${req.user.name}`);
+      await audit(req, 'estudio.link_fechado', 'episode', ep.id, {});
+    }
+    await req.flash('ok', 'Link do estúdio fechado.');
+  } else {
+    const fresh = action === 'reenvio' ? await studioLinks.resend(ep.id, req.user.id) : await studioLinks.create(ep.id, req.user.id);
+    const msg = action === 'reenvio' ? `Reenvio do material pedido por ${req.user.name}: link novo do estúdio` : `Link do estúdio gerado por ${req.user.name}`;
+    if (!cur || cur.id !== fresh.id) { await prod.addEvent(ep.id, req.user.id, 'arquivo', msg); await audit(req, action === 'reenvio' ? 'estudio.reenvio' : 'estudio.link_gerado', 'episode', ep.id, {}); }
+    await req.flash('ok', action === 'reenvio' ? 'Link novo pronto. O antigo deixou de funcionar.' : 'Link do estúdio pronto.');
+  }
+  res.redirect(back(ep.id, '#link-estudio'));
+});
+router.post('/episodios/:id/estudio/gerar', requirePerm('production.upload'), studioRoute('gerar'));
+router.post('/episodios/:id/estudio/reenvio', requirePerm('production.upload'), studioRoute('reenvio'));
+router.post('/episodios/:id/estudio/fechar', requirePerm('production.upload'), studioRoute('fechar'));
+
+// Organizar um arquivo do material bruto: tipo e rótulo (o estúdio só envia; a equipe organiza depois).
+router.post('/episodios/:id/arquivos/:fid/organizar', requirePerm('production.upload'), wrap(async (req, res) => {
+  const file = await loadFile(req);
+  if (!file || file.kind === 'editado') return notFound(res);
+  const kind = String(req.body.kind || '');
+  if (!['bruto_video', 'bruto_audio', 'bastidor', 'foto', 'outro'].includes(kind)) { await req.flash('error', 'Escolha o tipo do arquivo.'); return res.redirect(back(file.episode_id, '#material')); }
+  const label = clean(req.body.rotulo, 80) || null;
+  await db.query('UPDATE episode_files SET kind = $2, label = $3 WHERE id = $1', [file.id, kind, label]);
+  if (kind !== file.kind || label !== file.label) await prod.addEvent(file.episode_id, req.user.id, 'arquivo', `Arquivo organizado: ${file.filename} → ${C.EPISODE_FILE_KINDS[kind]}${label ? ` · ${label}` : ''}`);
+  await req.flash('ok', 'Arquivo organizado.');
+  res.redirect(back(file.episode_id, '#material'));
 }));
 
 router.get('/episodios/:id/editar', requirePerm('episodes.write'), wrap(async (req, res) => {

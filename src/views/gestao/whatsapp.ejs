@@ -6,11 +6,11 @@
   <% Object.keys(contacts.GROUPS).forEach(function (name) { var g = contacts.GROUPS[name], c = cur[name]; %>
   <section class="card">
     <div class="row spread">
-      <div><h2><%= g.label %></h2><p class="small muted">Recebe quem clica nos botões do <%= name === 'producao' ? 'convite do convidado' : 'media kit e do portal do patrocinador' %>.</p></div>
+      <div><h2><%= g.label %></h2><p class="small muted"><%= g.desc || ('Recebe quem clica nos botões do ' + (name === 'producao' ? 'convite do convidado' : 'media kit e do portal do patrocinador') + '.') %></p></div>
       <button class="btn sm" type="button" data-modal-open="m-<%= name %>"><%- icon('pencil', 14) %> Editar</button>
     </div>
     <dl class="kv">
-      <dt>WhatsApp</dt><dd><span class="mono"><%= contacts.pretty(c.number) %></span> <a class="small" href="https://wa.me/<%= c.number %>" target="_blank" rel="noopener noreferrer">testar</a><% if (c.numberFromEnv) { %> <span class="small muted">· padrão do servidor</span><% } %></dd>
+      <dt>WhatsApp</dt><dd><span class="mono"><%= c.number ? contacts.pretty(c.number) : 'não definido' %></span><% if (c.number) { %> <a class="small" href="https://wa.me/<%= c.number %>" target="_blank" rel="noopener noreferrer">testar</a><% } %><% if (c.numberFromEnv) { %> <span class="small muted">· padrão do servidor</span><% } %></dd>
       <% Object.keys(g.messages).forEach(function (k) { %>
       <dt><%= g.messages[k].label %></dt><dd class="pre small"><%= c.messages[k].text %><% if (!c.messages[k].custom) { %> <span class="muted">(mensagem padrão)</span><% } %></dd>
       <% }) %>
@@ -39,7 +39,7 @@
     </label>
     <p class="small muted"><%= m.hint %></p>
     <% }) %>
-    <p class="small muted">Use <span class="mono">{nome}</span> para o nome d<%= name === 'producao' ? 'o convidado' : 'a empresa' %> e <span class="mono">{podcast}</span> para o nome do podcast. Exemplo com <%= sample[name] %>.</p>
+    <p class="small muted"><% if (g.names) { %>Use <span class="mono">{nome}</span> para o nome do convidado e <span class="mono">{link}</span> para o link de envio.<% } else { %>Use <span class="mono">{nome}</span> para o nome d<%= name === 'producao' ? 'o convidado' : 'a empresa' %> e <span class="mono">{podcast}</span> para o nome do podcast. Exemplo com <%= sample[name] %>.<% } %></p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>

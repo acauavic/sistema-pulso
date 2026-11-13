@@ -271,6 +271,8 @@ async function createEpisode({ title, guestId = null, recordedOn = null, userId 
   await createTasks(ep.id, actor || null, requests);
   try { await require('./finance').onEpisodeCreated(ep.id); } catch (err) { console.error('Financeiro (episódio):', err.message); }
   await addEvent(ep.id, userId, 'criado', `Episódio criado${origin ? ` a partir de ${origin}` : ''} (gravação feita)`);
+  // link para o estúdio subir o material da gravação direto para o episódio
+  try { await require('./studioLinks').create(ep.id, userId); await addEvent(ep.id, userId, 'arquivo', 'Link do estúdio gerado para o envio do material'); } catch (err) { console.error('Link do estúdio:', err.message); }
   return ep;
 }
 
