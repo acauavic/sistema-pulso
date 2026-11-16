@@ -53,7 +53,7 @@
               <% if (k.chip) { %><span class="<%= k.chip === 'erro' ? 'late' : '' %>"><%= k.chip %></span><% } %>
               <% if (k.warn) { %><span class="warn"><%= k.warn %></span><% } %>
               <% if (k.slides) { %><span><%= k.slides %> slides</span><% } %>
-              <% if (k.pub) { %><span class="nets"><%= k.pub.stage === 'fila' ? k.pub.label + ' · ' : '' %><%= k.pub.platforms.join(' · ') %><%= k.pub.at ? ' · ' + dayShort(k.pub.at) : '' %></span><% } %>
+              <% if (k.pub) { %><span class="nets"><%= k.pub.stage === 'fila' ? k.pub.label + ' · ' : '' %><%= k.pub.platforms.join(' · ') %><%= k.pub.at ? ' · ' + dayShort(k.pub.at) : '' %></span><% if (k.pub.trial) { %> <span class="badge b-trial" title="Reel de teste no Instagram: aparece primeiro só para quem não segue">Reel de teste</span><% } %><% } %>
             </span>
           </a>
           <% }) %>

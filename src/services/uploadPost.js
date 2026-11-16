@@ -94,7 +94,8 @@ function buildFields({ id, kind, platforms, title, description, videoUrl, coverU
     if (kind === 'episode' && thumbnailUrl) f.push(['thumbnail_url', thumbnailUrl]); // Shorts não aceitam thumbnail personalizada
   }
   if (platforms.includes('instagram')) {
-    f.push(['instagram_title', description || title], ['media_type', 'REELS'], ['share_to_feed', 'true']);
+    f.push(['instagram_title', description || title], ['media_type', 'REELS']);
+    if (!require('./igPeople').trialOf(instagram)) f.push(['share_to_feed', 'true']); // Reel de teste: share_mode no lugar (igPeople)
     if (coverUrl) f.push(['cover_url', coverUrl]);
     f.push(...require('./igPeople').uploadPostFields(instagram)); // collab e marcação (só o @ em vídeo)
   }

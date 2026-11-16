@@ -1243,6 +1243,10 @@ dialog.modal.gallery[open] { display: flex; flex-direction: column; }
 /* ---- Instagram na publicação: collab e marcação (busca com sugestões, chips, posição na imagem) ---- */
 .igp { display: grid; gap: 14px; border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 14px 14px; margin: 0; min-width: 0; }
 .igp[hidden] { display: none; }
+.igp-sub { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 14px; } .igp-sub[hidden] { display: none; }
+.igp-trial { display: grid; gap: 8px; } .igp-trial .check { margin: 0; } .igp-trial-mode { display: grid; gap: 6px; } .igp-trial-mode[hidden] { display: none; }
+/* Reel de teste: chip tracejado e neutro (provisório até liberar para os seguidores; nunca lime) */
+.b-trial { background: transparent; border: 1px dashed var(--line-strong); color: var(--text-2); padding: 2px 7px; }
 .igp legend { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; font: 500 11px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .igp-field { position: relative; display: grid; gap: 6px; min-width: 0; }
 .igp-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; } .igp-head strong { font-size: 13px; }

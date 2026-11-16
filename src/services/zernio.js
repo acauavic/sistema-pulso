@@ -87,7 +87,7 @@ function platformEntry(p, { kind, media, title, description, coverUrl, accounts,
     if (description) entry.customContent = description;
   } else if (p === 'instagram') {
     if (media === 'story') psd.contentType = 'story';
-    else if (kind !== 'photo') { psd.shareToFeed = true; if (coverUrl) psd.instagramThumbnail = coverUrl; }
+    else if (kind !== 'photo') { if (!require('./igPeople').trialOf(instagram)) psd.shareToFeed = true; if (coverUrl) psd.instagramThumbnail = coverUrl; } // Reel de teste não vai ao feed
     if (media !== 'story') Object.assign(psd, require('./igPeople').zernioData(instagram, { photo: kind === 'photo' })); // collab e marcação
     entry.customContent = caption;
   } else if (p === 'tiktok') {

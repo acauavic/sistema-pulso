@@ -183,6 +183,17 @@
       autoCollab = false; drawDots();
     }
 
+    // ---- Reel de teste: marcado, mostra como liberar e desliga o collab (o Instagram não aceita collab em Reel de teste)
+    const trialOn = fs.querySelector('[data-igp-trial-on]'); const trialMode = fs.querySelector('[data-igp-trial-mode]');
+    const collabWrap = fs.querySelector('[data-igp-collab-wrap]');
+    const syncTrial = () => {
+      const on = Boolean(trialOn?.checked);
+      if (trialMode) trialMode.hidden = !on;
+      if (collabWrap) { collabWrap.hidden = on; collabWrap.disabled = on; }
+    };
+    trialOn?.addEventListener('change', syncTrial);
+    syncTrial();
+
     // ---- aparece só com o Instagram marcado
     const ig = () => form.querySelector('input[name="platforms"][value="instagram"]');
     const toggle = () => { const on = Boolean(ig()?.checked); fs.hidden = !on; fs.disabled = !on; }; // desligado: nada vai no formulário

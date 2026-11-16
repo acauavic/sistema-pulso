@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.67.0', date: '2026-11-16', title: 'Reel de teste no Instagram',
+    items: [
+      { kind: 'novo', text: 'Ao publicar um corte, o bloco do Instagram tem "Reel de teste": o Reel aparece primeiro só para quem não segue o Pulso. Dá para escolher se o Instagram libera sozinho para os seguidores quando for bem ou se a equipe libera no app.' },
+      { kind: 'novo', text: 'Depois de publicado, a marca "Reel de teste" aparece na publicação (com o que fazer para liberar), na lista de publicações, na página do corte e no quadro do Conteúdo.' },
+      { kind: 'ajuste', text: 'O Instagram não aceita collab em Reel de teste: com a opção marcada, o collab sai do formulário.' },
+    ],
+  },
+  {
     version: '1.66.0', date: '2026-11-13', title: 'Link do estúdio para o material da gravação',
     items: [
       { kind: 'novo', text: 'Ao marcar como gravado, o episódio ganha um link para o estúdio subir o material direto para o sistema, sem WeTransfer e sem precisar baixar e subir de novo. O link fica na aba Material do episódio e no convidado, com "Copiar link".' },

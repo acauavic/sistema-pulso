@@ -62,8 +62,11 @@
         <% if (pub.options && pub.options.manual) { %><dt>Saiu</dt><dd>por fora, pelo app da rede (registrado aqui)</dd><% } else if (pub.provider) { %><dt>Saiu <%= providers.length > 1 ? 'por' : (provider.by.split(' ')[0]) %></dt><dd><%= providerNames %></dd><% } %>
         <% var igo = pub.options && pub.options.instagram; %>
         <% if (igo && igo.collaborators && igo.collaborators.length) { %><dt>Collab no Instagram</dt><dd class="pub-people mono"><% igo.collaborators.forEach(function (h) { %><span>@<%= h %></span><% }) %></dd><% } %>
+        <% var trial = igo && igo.trial && pub.platforms.indexOf('instagram') >= 0 ? igo.trial : null; %>
+        <% if (trial) { %><dt>Instagram</dt><dd><span class="badge b-trial">Reel de teste</span> <span class="small muted"><%= trial === 'manual' ? 'a equipe libera no app' : 'libera sozinho se for bem' %></span></dd><% } %>
         <% if (igo && igo.tags && igo.tags.length) { %><dt>Marcados</dt><dd class="pub-people mono"><% igo.tags.forEach(function (t) { %><span>@<%= t.username %></span><% }) %></dd><% } %>
       </dl>
+      <% if (trial) { %><p class="small muted">Reel de teste: aparece primeiro só para quem não segue o Pulso. <%= trial === 'manual' ? 'Para mostrar aos seguidores, abra o Reel no app do Instagram e escolha compartilhar com os seguidores.' : 'Se for bem nas primeiras 72 horas, o Instagram mostra aos seguidores sozinho; dá para liberar antes no app.' %></p><% } %>
       <% if (igo && igo.collaborators && igo.collaborators.length) { %><p class="small muted">O convite de collab chega para cada perfil no Instagram: o post só aparece no perfil deles depois que aceitarem.</p><% } %>
       <% (pub.options && pub.options.provider_warnings || []).forEach(function (w) { %><p class="notice small"><%- icon('info', 14) %> Aviso <%= providers.some(function (p) { return p.id === 'outstand'; }) ? 'da Outstand' : 'do provedor' %>: <%= warningText(w) %></p><% }) %>
       <% if (pub.retry_at) { %><p class="notice small top-gap"><%- icon('refresh-cw', 14) %> <span>Nova tentativa automática às <span class="mono"><%= fmt.formatSoon(pub.retry_at) %></span>. Quem pediu recebe um aviso quando sair.</span></p><% } %>
@@ -72,6 +75,7 @@
         <li>
           <strong><%= label(k) %></strong>
           <span class="badge <%= r.draft ? 'b-amber' : r.ok ? (r.simulated ? 'b-gray' : 'b-green') : again ? 'b-amber' : (r.error ? 'b-red' : 'b-amber') %>"><%= r.simulated ? 'Simulado' : r.draft ? 'Rascunho' : r.ok ? 'No ar' : again ? 'Nova tentativa' : r.error ? (r.action ? 'Precisa de ação' : 'Erro') : (pub.status === 'agendado' ? 'Agendado' : pending ? 'Não enviado' : 'Aguardando') %></span>
+          <% if (trial && k === 'instagram') { %><span class="badge b-trial">Reel de teste</span><% } %>
           <% if (again) { %><span class="mono small">às <%= fmt.formatSoon(r.retry_at) %></span><% } %>
           <% if (r.url) { %><a class="small" href="<%= r.url %>" target="_blank" rel="noopener noreferrer">abrir <%- icon('external-link', 14) %></a><% } %>
           <% if (!r.ok && r.hint) { %><span class="small <%= again ? '' : 'bad-text' %>"><%= r.hint %></span><span class="small muted">Resposta: <%= r.error %></span><% } else if (r.error) { %><span class="small bad-text"><%= r.error %></span><% } %>

@@ -122,9 +122,12 @@ const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !=
 
 // Collab e marcação do Instagram no formato da Outstand. userTags exige x e y, e o Instagram recusa posição em vídeo ("User tag
 // positions should not be specified for video media", erro de 10/11/2026): por isso a marcação só vai em foto; no Reel, só o collab.
+// Reel de teste: instagram.trialReel = { graduationStrategy: MANUAL | SS_PERFORMANCE } (só em Reel).
 function instagramData(ig, { photo = false } = {}) {
   if (!ig) return {};
   const d = {};
+  const strategy = photo ? null : require('./igPeople').strategy(ig);
+  if (strategy) d.trialReel = { graduationStrategy: strategy };
   if (ig.collaborators?.length) d.collaborators = ig.collaborators.slice(0, 3);
   if (photo && ig.tags?.length) d.userTags = ig.tags.map((t) => ({ username: t.username, x: t.x ?? 0.5, y: t.y ?? 0.85 }));
   return d;

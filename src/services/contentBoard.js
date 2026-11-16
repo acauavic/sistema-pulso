@@ -22,7 +22,7 @@ const PLATFORM = (p) => up.PLATFORMS[p]?.label || p;
 // Índice das publicações: por corte e por imagem. Cada entrada guarda a mais "avançada" (publicado vence fila).
 async function publicationIndex() {
   const { rows } = await db.query(
-    'SELECT id, clip_id, cover_ids, media, status, platforms, results, scheduled_at, updated_at FROM episode_publications WHERE status = ANY($1) ORDER BY updated_at', [COUNTS]);
+    'SELECT id, clip_id, cover_ids, media, status, platforms, results, options, scheduled_at, updated_at FROM episode_publications WHERE status = ANY($1) ORDER BY updated_at', [COUNTS]);
   const byClip = new Map(); const byCover = new Map();
   const put = (map, key, p) => { const list = map.get(key) || []; list.push(p); map.set(key, list); };
   for (const p of rows) {
@@ -32,18 +32,21 @@ async function publicationIndex() {
   return { byClip, byCover };
 }
 
-// Resumo de um conjunto de publicações: etapa, rótulo curto, redes e data.
+// Reel de teste no Instagram (a publicação foi ou vai como trial reel).
+const trialPub = (p) => Boolean(p.options?.instagram?.trial) && p.platforms.includes('instagram');
+
+// Resumo de um conjunto de publicações: etapa, rótulo curto, redes, data e se o Instagram foi Reel de teste.
 function stateOf(pubs) {
   if (!pubs?.length) return null;
   const done = pubs.filter((p) => ['publicado', 'parcial'].includes(p.status));
   if (done.length) {
     const nets = [...new Set(done.flatMap((p) => ((p.results || []).filter((r) => r.ok).map((r) => r.platform).length ? (p.results || []).filter((r) => r.ok).map((r) => r.platform) : p.platforms)))];
     const last = done[done.length - 1];
-    return { stage: 'publicado', label: 'publicado', platforms: nets.map(PLATFORM), at: last.updated_at, pubId: last.id, count: done.length };
+    return { stage: 'publicado', label: 'publicado', platforms: nets.map(PLATFORM), at: last.updated_at, pubId: last.id, count: done.length, trial: done.some(trialPub) };
   }
   const next = pubs[pubs.length - 1];
   const label = next.status === 'revisao' ? 'post em revisão' : next.status === 'agendado' ? 'agendado' : 'enviando';
-  return { stage: 'fila', label, platforms: next.platforms.map(PLATFORM), at: next.scheduled_at || next.updated_at, pubId: next.id };
+  return { stage: 'fila', label, platforms: next.platforms.map(PLATFORM), at: next.scheduled_at || next.updated_at, pubId: next.id, trial: trialPub(next) };
 }
 // Para um carrossel: todas as imagens precisam ter saído juntas; vale a publicação de qualquer slide.
 const stateOfCovers = (idx, ids) => stateOf([...new Map(ids.flatMap((id) => idx.byCover.get(id) || []).map((p) => [p.id, p])).values()]);

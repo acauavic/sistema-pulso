@@ -213,6 +213,16 @@ const TOPICS = [
     ],
   },
   {
+    key: 'reel_teste', title: 'Reel de teste no Instagram', words: ['reel de teste', 'reels de teste', 'trial reel', 'trial reels', 'teste no instagram', 'testar reel', 'não seguidores', 'nao seguidores', 'quem não segue'],
+    where: '/conteudo', perm: 'social.publish',
+    steps: [
+      'Abra o corte e clique em publicar. Com o Instagram marcado, marque "Reel de teste" no bloco do Instagram.',
+      'Escolha como liberar para os seguidores: "Libera sozinho se for bem" (o Instagram decide nas primeiras 72 horas) ou "Eu libero no app".',
+      'Reel de teste não aceita collab: com a opção marcada, o collab sai do formulário.',
+      'Depois de publicado, a marca "Reel de teste" aparece na publicação, na lista de publicações, no corte e no quadro do Conteúdo. Para mostrar aos seguidores, abra o Reel no app do Instagram e escolha compartilhar com os seguidores.',
+    ],
+  },
+  {
     key: 'link_estudio', title: 'Link do estúdio (material da gravação)', words: ['link do estúdio', 'link do estudio', 'estúdio', 'estudio', 'danilo', 'wetransfer', 'we transfer', 'material bruto', 'subir material', 'enviar material', 'câmeras', 'reenvio do material'],
     where: '/episodios', perm: 'production.upload',
     steps: [
