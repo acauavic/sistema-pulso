@@ -57,6 +57,7 @@ async function renderInvite(guest, { rsvpState = null, closed = false, preview =
   const base = `/convite/${token}`;
   const vars = tpl.buildVariables(guest, {
     owner: ownerName,
+    showcase: await require('./inviteShowcase').get().catch((err) => { console.error('[convite] vitrine:', err.message); return null; }),
     links: preview ? {} : { aceitar: `${base}/aceitar`, producao: `${base}/producao` },
   });
   vars.bloco_resposta = tpl.responseBlock(preview ? '#' : `${base}/responder`, { state: rsvpState, closed });

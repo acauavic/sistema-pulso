@@ -15,6 +15,7 @@ const FIELDS = {
   titulo: { label: 'título do post', max: 60, rule: 'título do post do corte: de 4 a 9 palavras, até 60 caracteres, abre com o gancho, sem ponto final, sem clickbait' },
   descricao: { label: 'legenda do post', max: 600, rule: 'legenda para Instagram/TikTok: 1 a 3 frases curtas (até 300 caracteres) que contextualizam e convidam a ver; sem "link na bio"; sem hashtags (a não ser que o pedido peça)' },
   titulo_youtube: { label: 'título do YouTube', max: 100, rule: 'título do episódio no YouTube: até 70 caracteres de preferência (no máximo 100), com o nome do convidado ou o tema central, sem caixa alta gritada, sem clickbait' },
+  convite_motivo: { label: 'texto "Por que você" do convite', max: 600, rule: 'duas ou três frases curtas (até 350 caracteres) falando diretamente com a pessoa convidada ("você"), dizendo por que o Pulso quer conversar com ela: o que ela construiu, o que ela pensa ou faz de diferente e por que isso interessa ao profissional da saúde ou ao público que quer viver com mais saúde. Concreto, caloroso, sem bajulação, sem superlativo vazio, sem exclamações. Use só os dados fornecidos; se faltar dado, fique no que existe' },
   descricao_youtube: { label: 'descrição do YouTube', max: 3000, rule: 'descrição do episódio no YouTube: um parágrafo de abertura (2 a 3 frases) sobre a conversa, depois quem é o convidado em uma frase; sem links inventados' },
 };
 // Tipo de capa -> qual regra de texto usar.
@@ -36,8 +37,9 @@ const shortcutsFor = (field) => Object.entries(SHORTCUTS).filter(([, s]) => !s.o
 
 const SCHEMA = { type: 'OBJECT', properties: { opcoes: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['opcoes'] };
 
-async function context({ episodeId = null, clipId = null }) {
+async function context({ episodeId = null, clipId = null, guestId = null }) {
   let clip = null; let episode = null; let guest = null; let transcript = '';
+  if (guestId) ({ rows: [guest] } = await db.query('SELECT * FROM guests WHERE id = $1', [guestId]));
   if (clipId) {
     ({ rows: [clip] } = await db.query('SELECT id, title, post_title, caption, transcript, episode_id FROM episode_clips WHERE id = $1', [clipId]));
     if (clip?.episode_id) episodeId = clip.episode_id;
@@ -66,18 +68,28 @@ function tidyOption(s, field) {
 }
 
 // field: chave de FIELDS (ou 'capa' com coverKind para escolher a regra certa). Devolve { opcoes } ou { error, status }.
-async function suggest({ field, coverKind = null, current = '', shortcut = null, prompt = '', episodeId = null, clipId = null }) {
+// Dados do convidado para o texto do convite (nunca vai o contato).
+function guestBrief(g) {
+  return ['Convidado (ainda não gravou):', `Nome: ${g.name}`, g.job_title && `Cargo: ${g.job_title}`, g.company && `Empresa: ${g.company}`, g.positioning && `Posicionamento: ${g.positioning}`,
+    g.topic && `Temas: ${g.topic}`, g.bio && `Biografia: ${String(g.bio).slice(0, 1500)}`, g.invite_reason && `Motivo interno do convite (anotação da equipe): ${g.invite_reason}`,
+    g.instagram && `Instagram: @${String(g.instagram).replace(/^@/, '')}`, `Formato da gravação: ${g.invite_format === 'plateia' ? 'com plateia' : 'de mesa (sem plateia)'}`,
+    g.is_plural ? 'É uma dupla: fale com "vocês".' : ''].filter(Boolean).join('\n');
+}
+
+async function suggest({ field, coverKind = null, current = '', shortcut = null, prompt = '', episodeId = null, clipId = null, guestId = null }) {
   if (!config.geminiConfigured) return { error: 'A IA não está configurada neste servidor.', status: 503 };
   const key = field === 'capa' && COVER_FIELD[coverKind] ? COVER_FIELD[coverKind] : field;
   if (!FIELDS[key]) return { error: 'Campo desconhecido.', status: 400 };
-  const ask = shortcut && SHORTCUTS[shortcut] ? SHORTCUTS[shortcut].ask : '';
+  const ask = shortcut && SHORTCUTS[shortcut] ? SHORTCUTS[shortcut].ask : (key === 'convite_motivo' ? 'Escreva o texto a partir dos dados do convidado.' : '');
   const own = String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 300);
   if (!ask && !own) return { error: 'Escolha um atalho ou escreva o que quer.', status: 400 };
-  const ctx = await context({ episodeId, clipId });
+  const ctx = await context({ episodeId, clipId, guestId: key === 'convite_motivo' ? guestId : null });
+  if (key === 'convite_motivo' && !ctx.guest) return { error: 'Convidado não encontrado.', status: 404 };
   const now = String(current || '').trim().slice(0, 1500);
   const parts = [{ text: [
     fin.MARCA, '',
-    ctx.episode ? fin.buildContext({ episode: ctx.episode, guest: ctx.guest, sponsors: [] }) : 'Podcast: Pulso (corte ainda sem episódio definido).',
+    key === 'convite_motivo' ? `Missão do Pulso: ajudar o profissional da saúde a ser um profissional melhor e levar ao público mais saúde e qualidade de vida. Eixos: saúde e inovação, mentalidade, estilo de vida e histórias inspiradoras.\n${guestBrief(ctx.guest)}`
+      : ctx.episode ? fin.buildContext({ episode: ctx.episode, guest: ctx.guest, sponsors: [] }) : 'Podcast: Pulso (corte ainda sem episódio definido).',
     ctx.clip ? `Corte: ${ctx.clip.post_title || ctx.clip.title}` : '',
     '', `Campo: ${FIELDS[key].label}. Regras: ${FIELDS[key].rule}.`,
     now ? `Texto atual: ${now}` : 'O campo está vazio.',

@@ -223,6 +223,16 @@ const TOPICS = [
     ],
   },
   {
+    key: 'convite_formato', title: 'Convite: com plateia ou de mesa e "Por que você"', words: ['convite', 'plateia', 'de mesa', 'por que você', 'porque você', 'motivo do convite', 'formato do convite', 'cortes no convite'],
+    where: '/convidados', perm: 'guests.write',
+    steps: [
+      'Abra o convidado e vá na aba Convite. O cartão "Como o convite chega" mostra o formato e o texto "Por que você".',
+      'Clique em Editar: escolha De mesa (só o convidado e os hosts) ou Com plateia (mostra a plateia, as fotos e o vídeo "Veja como é").',
+      'Escreva o "Por que você" (duas ou três frases falando com a pessoa) ou use "Sugerir com IA", que escreve a partir da bio, dos temas e do motivo interno. Vazio, o convite usa a frase padrão.',
+      'Use "Ver convite" para conferir. O número de episódios e os cortes de quem já veio se atualizam sozinhos.',
+    ],
+  },
+  {
     key: 'link_estudio', title: 'Link do estúdio (material da gravação)', words: ['link do estúdio', 'link do estudio', 'estúdio', 'estudio', 'danilo', 'wetransfer', 'we transfer', 'material bruto', 'subir material', 'enviar material', 'câmeras', 'reenvio do material'],
     where: '/episodios', perm: 'production.upload',
     steps: [

@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.68.0', date: '2026-11-17', title: 'Convite do convidado: com plateia ou de mesa, "Por que você" e cortes de verdade',
+    items: [
+      { kind: 'novo', text: 'O convite tem dois formatos: de mesa (só o convidado e os hosts) e com plateia. O de plateia mostra como é a gravação com público, as fotos da recepção e da plateia e o botão "Veja como é", que abre o vídeo da gravação com plateia numa janela.' },
+      { kind: 'novo', text: '"Por que você": na aba Convite do convidado, um texto curto dizendo por que o Pulso quer conversar com aquela pessoa, com "Sugerir com IA" a partir da bio, dos temas e do motivo interno. Ele aparece no topo do convite, no lugar da frase padrão.' },
+      { kind: 'novo', text: 'As fotos de quem já sentou à mesa abrem uma janela com dois ou três cortes daquela pessoa, e uma seção nova, "Os cortes", mostra cortes recentes que o Pulso produziu.' },
+      { kind: 'ajuste', text: 'O convite deixa de dizer "uma manhã" e "14 episódios até set/2026": o período sai da hora marcada (manhã, tarde ou noite) e o número de episódios é o real. Os eixos agora são saúde e inovação, mentalidade, estilo de vida e histórias inspiradoras.' },
+    ],
+  },
+  {
     version: '1.67.0', date: '2026-11-16', title: 'Reel de teste no Instagram',
     items: [
       { kind: 'novo', text: 'Ao publicar um corte, o bloco do Instagram tem "Reel de teste": o Reel aparece primeiro só para quem não segue o Pulso. Dá para escolher se o Instagram libera sozinho para os seguidores quando for bem ou se a equipe libera no app.' },

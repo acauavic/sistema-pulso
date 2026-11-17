@@ -206,12 +206,13 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
 // IA nos textos (capa, título, legenda, YouTube): 3 opções a partir de um atalho ou de um pedido livre. Não grava nada.
 const aiLimiter = require('../auth/rateLimit').createLimiter({ name: 'ia-texto', max: 40, windowMs: 10 * 60_000 });
 router.post('/ia/texto', wrap(async (req, res) => {
-  if (!req.user || !(can(req.user.role, 'episodes.read') || can(req.user.role, 'social.read'))) return res.status(403).json({ ok: false, error: 'Seu perfil não usa a IA nos textos.' });
+  const forInvite = String(req.body.campo || '') === 'convite_motivo';
+  if (!req.user || !(forInvite ? can(req.user.role, 'guests.write') : (can(req.user.role, 'episodes.read') || can(req.user.role, 'social.read')))) return res.status(403).json({ ok: false, error: 'Seu perfil não usa a IA nos textos.' });
   if (!await aiLimiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitos pedidos seguidos. Espere alguns minutos.' });
   const id = (v) => (isIntId(String(v || '')) ? Number(v) : null);
   const r = await require('../services/aiText').suggest({
     field: String(req.body.campo || ''), coverKind: req.body.tipo_capa ? String(req.body.tipo_capa) : null, current: req.body.atual,
-    shortcut: req.body.atalho ? String(req.body.atalho) : null, prompt: req.body.pedido, episodeId: id(req.body.episodio), clipId: id(req.body.corte),
+    shortcut: req.body.atalho ? String(req.body.atalho) : null, prompt: req.body.pedido, episodeId: id(req.body.episodio), clipId: id(req.body.corte), guestId: id(req.body.convidado),
   });
   if (r.error) return res.status(r.status || 400).json({ ok: false, error: r.error });
   res.json({ ok: true, opcoes: r.opcoes });

@@ -454,6 +454,20 @@ router.post('/convidados/:id/convite', requirePerm('guests.invite'), wrap(async 
   res.redirect(`/convidados/${guest.id}#convite`);
 }));
 
+// Formato do convite (mesa | plateia) e o texto "Por que você" que aparece no topo dele.
+router.post('/convidados/:id/convite/ajustes', requirePerm('guests.write'), wrap(async (req, res) => {
+  const guest = await findGuest(req.params.id);
+  if (!guest) return notFound(res);
+  const format = req.body.invite_format === 'plateia' ? 'plateia' : 'mesa';
+  const why = String(req.body.invite_why || '').replace(/\r\n?/g, '\n').trim().slice(0, 600) || null;
+  await db.query('UPDATE guests SET invite_format = $2, invite_why = $3, updated_at = now() WHERE id = $1', [guest.id, format, why]);
+  const changed = [format !== guest.invite_format && `formato: ${format === 'plateia' ? 'com plateia' : 'de mesa'}`, (why || null) !== (guest.invite_why || null) && (why ? 'texto "Por que você" atualizado' : 'texto "Por que você" retirado')].filter(Boolean);
+  if (changed.length) await guestsSvc.addEvent(guest.id, req.user.id, 'convite_ajustado', `Convite: ${changed.join(', ')}`);
+  await audit(req, 'convite.ajustado', 'guest', guest.id, { format, why: Boolean(why) });
+  await req.flash('ok', 'Convite atualizado. Veja como ficou em "Ver convite".');
+  res.redirect(`/convidados/${guest.id}#convite`);
+}));
+
 // ---- prévia do convite (mesmo HTML que o convidado vê, sem botões ativos) ----
 router.get('/convidados/:id/previa', requirePerm('guests.read'), wrap(async (req, res) => {
   const guest = await findGuest(req.params.id);

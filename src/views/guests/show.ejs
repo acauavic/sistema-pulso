@@ -257,7 +257,14 @@
 
   <% if (showInvite) { %>
   <div class="pane" id="pane-convite" data-pane-id="convite">
-    <section class="card" id="convite">
+    <section class="card invite-setup">
+      <div class="row spread"><h2>Como o convite chega</h2><% if (canW) { %><button class="btn sm" type="button" data-modal-open="modal-convite-ajustes"><%- icon('pencil', 14) %> Editar</button><% } %></div>
+      <dl class="kv">
+        <dt>Formato</dt><dd><span class="badge b-gray"><%= guest.invite_format === 'plateia' ? 'Com plateia' : 'De mesa' %></span> <span class="small muted"><%= guest.invite_format === 'plateia' ? 'mostra a plateia, as fotos e o vídeo "Veja como é"' : 'conversa só com os hosts, sem plateia' %></span></dd>
+        <dt>Por que você</dt><dd><% if (guest.invite_why) { %><span class="pre"><%= guest.invite_why %></span><% } else { %><span class="muted">Sem texto: o convite usa a frase padrão ("Escolhemos você pela trajetória…").</span><% } %></dd>
+      </dl>
+    </section>
+    <section class="card top-gap" id="convite">
       <% if (!guest.invite_token) { %>
         <h2>Convite</h2>
         <p class="muted">Ainda não há link. Ao gerar, criamos uma página exclusiva do convite com os dados deste convidado<%= yourlsReady ? ' e um link curto' : '' %>.</p>
@@ -707,6 +714,24 @@
     <div class="row modal-actions"><button class="btn primary" type="submit">Enviar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>
+<% } %>
+
+<% if (canW && showInvite) { %>
+<dialog class="modal" id="modal-convite-ajustes" aria-labelledby="m-cv-h">
+  <form method="post" action="/convidados/<%= guest.id %>/convite/ajustes" class="stack">
+    <%- csrfField %>
+    <h2 id="m-cv-h">Como o convite chega</h2>
+    <div class="seg-radio" role="radiogroup" aria-label="Formato da gravação">
+      <label><input type="radio" name="invite_format" value="mesa" <%= guest.invite_format !== 'plateia' ? 'checked' : '' %>>De mesa</label>
+      <label><input type="radio" name="invite_format" value="plateia" <%= guest.invite_format === 'plateia' ? 'checked' : '' %>>Com plateia</label>
+    </div>
+    <p class="small muted">Com plateia, o convite mostra como é a gravação com público, as fotos e o vídeo da plateia.</p>
+    <label>Por que você<textarea name="invite_why" rows="4" maxlength="600" data-ai="convite_motivo" data-ai-guest="<%= guest.id %>" placeholder="Ex.: Sua forma de falar de obesidade sem culpa conversa com quem atende e com quem quer cuidar da saúde."><%= guest.invite_why || '' %></textarea></label>
+    <p class="small muted">Aparece no topo do convite, logo abaixo do nome. Fale com a pessoa (você), em duas ou três frases. Vazio: o convite usa a frase padrão.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<%- include('../partials/ai-assist') %>
 <% } %>
 
 <% if (canW) { %>

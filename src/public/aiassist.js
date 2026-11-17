@@ -18,7 +18,7 @@
   document.addEventListener('pointerdown', (e) => { if (openPanel && !openPanel.contains(e.target) && !openPanel.previousElementSibling?.contains(e.target)) closeAll(); });
 
   function contextOf(field) {
-    const out = { episodio: field.dataset.aiEpisode || '', corte: field.dataset.aiClip || '', tipo_capa: field.dataset.aiKind || '' };
+    const out = { episodio: field.dataset.aiEpisode || '', corte: field.dataset.aiClip || '', tipo_capa: field.dataset.aiKind || '', convidado: field.dataset.aiGuest || '' };
     if (field.dataset.aiScope === 'form') { // "Novo post": o contexto é o item escolhido
       const r = field.form?.querySelector('input[type="radio"][name="clip_id"]:checked, input[type="radio"][name="cover_ids"]:checked');
       if (r?.name === 'clip_id') out.corte = r.value;
