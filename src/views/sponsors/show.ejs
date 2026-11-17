@@ -35,6 +35,11 @@
       <% if (canWrite) { %><button class="badge badge-btn b-st-<%= sponsor.stage %>" type="button" data-modal-open="modal-etapa" aria-label="Mudar a etapa (agora: <%= stageInfo.label %>)" title="Mudar a etapa"><%= stageInfo.label %> <%- icon('chevron-down', 12) %></button>
       <% } else { %><span class="badge b-st-<%= sponsor.stage %>"><%= stageInfo.label %></span><% } %></h1>
     <p class="muted top-gap"><%= [sponsor.tier ? C.SPONSOR_TIERS[sponsor.tier] : '', sponsor.value_cents != null ? fmt.formatBRL(sponsor.value_cents) : '', sponsor.contact_name].filter(Boolean).join(' · ') %></p>
+    <% if (canWrite && (sponsor.kit_show || ['ganho', 'ativo', 'inativo'].includes(sponsor.stage))) { %>
+    <form method="post" action="/patrocinadores/<%= sponsor.id %>/media-kit" class="inline"><%- csrfField %><input type="hidden" name="mostrar" value="<%= sponsor.kit_show ? '0' : '1' %>">
+      <% if (sponsor.kit_show) { %><span class="badge b-gray">no media kit</span> <button class="link small" type="submit">tirar do media kit</button><% } else { %><button class="btn sm" type="submit"><%- icon('eye', 14) %> Mostrar no media kit</button> <span class="small muted">entra em "Marcas que escolheram estar nessas conversas"<%= hasLogo ? '' : ' (sem logo: aparece o nome)' %></span><% } %>
+    </form>
+    <% } %>
   </div>
   <div class="row">
     <a class="btn ghost" href="/patrocinadores"><%- icon('arrow-left') %> Voltar</a>
@@ -394,7 +399,7 @@
         </label>
         <% }) %>
         <ul class="plain small">
-          <li>Media kit · “Quero ser patrocinador”: <strong><%= clicks.quero.total %></strong> · “Falar com a equipe”: <strong><%= clicks.equipe.total %></strong></li>
+          <li>Media kit · “Agendar uma conversa”: <strong><%= clicks.quero.total %></strong> · “Falar com a equipe”: <strong><%= clicks.equipe.total %></strong></li>
         </ul>
         <% if (canWrite) { %>
         <form method="post" action="/patrocinadores/<%= sponsor.id %>/links" class="inline" data-confirm="Gerar novos links? Os atuais (media kit, formulário e portal) deixarão de funcionar e os acessos abertos serão encerrados.">

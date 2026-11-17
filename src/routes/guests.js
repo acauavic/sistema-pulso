@@ -53,6 +53,7 @@ async function parseGuestForm(body, guest = null) {
     instagram: rules.normalizeInstagram(body.instagram),
     profile: rules.normalizeProfile(body.profile),
     invite_reason: clean(body.invite_reason, 1000),
+    reach: clean(body.reach, 20),
     company: clean(body.company, 150),
     job_title: clean(body.job_title, 150),
     positioning: clean(body.positioning, 1000),
@@ -104,10 +105,10 @@ const echoValues = (body, values) => ({
   ...values, instagram: body.instagram || '', profile: body.profile || '', proposed_at: body.proposed_at,
 });
 
-const COLUMNS = ['name', 'email', 'phone', 'instagram', 'profile', 'invite_reason', 'company', 'job_title', 'positioning', 'topic', 'bio',
+const COLUMNS = ['name', 'email', 'phone', 'instagram', 'profile', 'invite_reason', 'reach', 'company', 'job_title', 'positioning', 'topic', 'bio',
   'notes', 'proposed_at', 'owner_id', 'status', 'gender', 'is_plural', 'scheduled_studio', 'scheduled_hosts', 'scheduled_guest',
   'sponsor_id', 'sponsor_relation', 'loss_reason', 'loss_note'];
-const NULLABLE = new Set(['email', 'phone', 'invite_reason', 'company', 'job_title', 'positioning', 'topic', 'bio', 'notes', 'loss_reason', 'loss_note']);
+const NULLABLE = new Set(['email', 'phone', 'invite_reason', 'reach', 'company', 'job_title', 'positioning', 'topic', 'bio', 'notes', 'loss_reason', 'loss_note']);
 const columnValues = (values) => COLUMNS.map((c) => (NULLABLE.has(c) ? values[c] || null : values[c]));
 
 // ---- quadro / lista ----

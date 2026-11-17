@@ -110,21 +110,21 @@ router.get('/patrocinador/kit', withSession(), wrap(async (req, res) => {
     const { rowCount } = await db.query('UPDATE sponsors SET kit_viewed_at = now() WHERE id = $1 AND kit_viewed_at IS NULL', [sponsor.id]);
     if (rowCount) await sponsorsSvc.addEvent(sponsor.id, null, 'kit_visto', 'Abriu o media kit');
   }
-  const html = tpl.render(tpl.mediaKitHtml(), { link_quero: '/patrocinador/quero', link_equipe: '/patrocinador/equipe', agenda_html: await sponsorsSvc.kitAgendaHtml(), guests_json: tpl.safeJson(await require('../services/kitGallery').items()), kit_rodape: await require('../services/kitGallery').footText(), ...(await require('../services/plans').kitHtml()) });
+  const html = tpl.render(tpl.mediaKitHtml(), { link_quero: '/patrocinador/quero', link_equipe: '/patrocinador/equipe', agenda_html: await sponsorsSvc.kitAgendaHtml(), vagas_html: await sponsorsSvc.kitSlotsHtml(), marcas_html: await sponsorsSvc.kitBrandsHtml(), guests_json: tpl.safeJson(await require('../services/kitGallery').items()), kit_rodape: await require('../services/kitGallery').footText(), ...(await require('../services/plans').kitHtml()) });
   res.set(tpl.publicHeaders("'none'", { pixel: true })).type('html').send(pixel.inject(html, { content: 'Media kit', category: 'patrocinador', v: res.locals.assetV, absolute: true }));
 }));
 
-// "Quero ser patrocinador": conta o clique, leva a Prospecção para Em negociação e abre o WhatsApp comercial.
+// "Agendar uma conversa" (era "Quero ser patrocinador"): conta o clique, leva a Prospecção para Em negociação e abre o WhatsApp comercial.
 router.get('/patrocinador/quero', withSession(), wrap(async (req, res) => {
   const sponsor = req.sp.sponsor;
   const target = await sponsorsSvc.whatsappUrl('quero', sponsor);
   await sponsorsSvc.recordClick(sponsor.id, 'quero');
   const { rowCount } = await db.query("UPDATE sponsors SET stage = 'negociacao', updated_at = now() WHERE id = $1 AND stage = 'prospect'", [sponsor.id]);
   if (rowCount) {
-    await sponsorsSvc.addEvent(sponsor.id, null, 'etapa', 'Clicou em “Quero ser patrocinador” no media kit: Prospecção → Em negociação');
-    await notifyOwner(sponsor, `${sponsor.company} quer ser patrocinador`, 'Clicou em “Quero ser patrocinador” no media kit e foi levado(a) ao WhatsApp comercial.');
+    await sponsorsSvc.addEvent(sponsor.id, null, 'etapa', 'Pediu uma conversa pelo media kit (“Agendar uma conversa”): Prospecção → Em negociação');
+    await notifyOwner(sponsor, `${sponsor.company} quer agendar uma conversa`, 'Clicou em “Agendar uma conversa” no media kit e foi levado(a) ao WhatsApp comercial. Marque a reunião na aba Reuniões.');
   } else {
-    await sponsorsSvc.addEvent(sponsor.id, null, 'clique', 'Clicou de novo em “Quero ser patrocinador”');
+    await sponsorsSvc.addEvent(sponsor.id, null, 'clique', 'Clicou de novo em “Agendar uma conversa”');
   }
   return res.redirect(302, target);
 }));

@@ -255,48 +255,106 @@ async function sendFile(res, file, { inline = true, req = null } = {}) {
 }
 
 // ---- agenda do media kit: convidados em Agendado (gravação confirmada), em uma galeria que passa sozinha e abre ao clicar ----
+// Agenda do media kit ("Quem vem por aí"): episódios gravados com data de estreia marcada e, depois, convidados com gravação
+// marcada (ainda sem episódio). Foto, nome, @ e alcance saem do cadastro do convidado (o alcance cai para o do episódio no kit).
 async function kitAgendaHtml() {
   const { rows } = await db.query(
-    `SELECT id, name, instagram, proposed_at, (photo_key IS NOT NULL) AS has_photo FROM guests WHERE status = 'agendado' AND (proposed_at IS NULL OR proposed_at >= now() - interval '1 day')
-      ORDER BY proposed_at NULLS LAST, lower(name) LIMIT 24`);
+    `SELECT * FROM (
+       SELECT g.id, g.name, g.instagram, (g.photo_key IS NOT NULL) AS has_photo, coalesce(nullif(g.reach, ''), e.kit_audience) AS reach,
+              e.aired_on::timestamp AS at, 'estreia' AS kind, 0 AS ord
+         FROM episodes e JOIN guests g ON g.id = e.guest_id
+        WHERE e.status <> 'publicado' AND e.aired_on >= CURRENT_DATE
+       UNION ALL
+       SELECT g.id, g.name, g.instagram, (g.photo_key IS NOT NULL), nullif(g.reach, ''), g.proposed_at, 'gravacao', 1
+         FROM guests g
+        WHERE g.status = 'agendado' AND (g.proposed_at IS NULL OR g.proposed_at >= now() - interval '1 day')
+          AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.guest_id = g.id)
+     ) x ORDER BY ord, at NULLS LAST, lower(name) LIMIT 24`);
   const { esc } = require('./inviteTemplate');
   if (!rows.length) return '<p class="slide-lede">A agenda dos próximos convidados é fechada semana a semana. Pergunte à equipe quem vem por aí.</p>';
   const tz = 'America/Sao_Paulo';
   const part = (d, opts, type) => new Intl.DateTimeFormat('pt-BR', { timeZone: tz, ...opts }).formatToParts(d).find((x) => x.type === type).value;
-  const short = (d) => (d ? `${part(d, { day: '2-digit' }, 'day')} ${part(d, { month: 'short' }, 'month').replace('.', '').toUpperCase()}` : 'EM BREVE');
-  const long = (d) => (d ? `${Number(part(d, { day: 'numeric' }, 'day'))} de ${part(d, { month: 'long' }, 'month')}` : 'Em breve');
+  const dayOf = (r) => (r.kind === 'estreia' ? new Date(`${new Date(r.at).toISOString().slice(0, 10)}T12:00:00Z`) : new Date(r.at)); // data de estreia é só dia
+  const short = (r) => (r.at ? `${r.kind === 'estreia' ? 'ESTREIA' : 'GRAVAÇÃO'} ${part(dayOf(r), { day: '2-digit' }, 'day')} ${part(dayOf(r), { month: 'short' }, 'month').replace('.', '').toUpperCase()}` : 'EM BREVE');
+  const long = (r) => (r.at ? `${r.kind === 'estreia' ? 'Estreia em' : 'Gravação em'} ${Number(part(dayOf(r), { day: 'numeric' }, 'day'))} de ${part(dayOf(r), { month: 'long' }, 'month')}` : 'Em breve');
   const cards = rows.map((g) => {
     const src = g.has_photo ? guestPhotos.signedUrl(g.id) : '';
-    const handle = g.instagram ? String(g.instagram).replace(/^@/, '') : '';
+    const handle = g.instagram ? String(g.instagram).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '') : '';
+    const reach = g.reach && g.reach !== '—' ? String(g.reach).slice(0, 20) : '';
     return `
-        <button type="button" class="agenda-card" data-agenda-open data-name="${esc(g.name)}" data-handle="${esc(handle)}" data-date="${esc(long(g.proposed_at))}" data-src="${esc(src)}" aria-label="Ver ${esc(g.name)}">
+        <button type="button" class="agenda-card" data-agenda-open data-name="${esc(g.name)}" data-handle="${esc(handle)}" data-date="${esc(long(g))}" data-reach="${esc(reach)}" data-src="${esc(src)}" aria-label="Ver ${esc(g.name)}">
           ${g.has_photo
     ? `<span class="agenda-photo img-slot has-photo"><img src="${esc(src)}" alt="${esc(g.name)}" loading="lazy" width="${guestPhotos.FRAME.width / 4}" height="${guestPhotos.FRAME.height / 4}"></span>`
     : '<span class="agenda-photo img-slot"><span class="plus">+</span><span class="cap">Foto</span></span>'}
-          <span class="agenda-date">${esc(short(g.proposed_at))}</span>
+          <span class="agenda-date">${esc(short(g))}</span>
           <span class="agenda-name">${esc(g.name)}</span>
           ${handle ? `<span class="agenda-handle">@${esc(handle)}</span>` : ''}
+          ${reach ? `<span class="agenda-reach">${esc(reach)}<span class="lbl">seguidores</span></span>` : ''}
         </button>`;
   }).join('');
   return `<div class="agenda-carousel" data-agenda>
       <button type="button" class="agenda-nav prev" data-agenda-prev aria-label="Anteriores">&larr;</button>
-      <div class="agenda-track" data-agenda-track tabindex="0" role="list" aria-label="Convidados confirmados">${cards}
+      <div class="agenda-track" data-agenda-track tabindex="0" role="list" aria-label="Próximos convidados">${cards}
       </div>
       <button type="button" class="agenda-nav next" data-agenda-next aria-label="Próximos">&rarr;</button>
     </div>
     <p class="agenda-hint">Clique em um convidado para ver de perto.</p>
-    <div class="agenda-modal" data-agenda-modal hidden role="dialog" aria-modal="true" aria-label="Convidado confirmado">
+    <div class="agenda-modal" data-agenda-modal hidden role="dialog" aria-modal="true" aria-label="Próximo convidado">
       <div class="agenda-modal-box">
         <button type="button" class="agenda-close" data-agenda-close aria-label="Fechar">&times;</button>
         <div class="agenda-modal-photo img-slot" data-agenda-photo></div>
         <div class="agenda-modal-info">
           <div class="agenda-date" data-agenda-date></div>
           <div class="agenda-modal-name" data-agenda-name></div>
+          <div class="agenda-modal-reach" data-agenda-reach hidden></div>
           <a class="agenda-modal-handle" data-agenda-handle target="_blank" rel="noopener noreferrer" hidden></a>
         </div>
         <div class="agenda-modal-nav"><button type="button" data-agenda-mprev aria-label="Anterior">&larr;</button><button type="button" data-agenda-mnext aria-label="Próximo">&rarr;</button></div>
       </div>
     </div>`;
+}
+
+// Vagas do media kit: no máximo N marcas ao mesmo tempo (Gestão > Planos). Ocupada = patrocinador Ativo. Número real, sem inventar.
+async function kitSlots() {
+  const max = Math.max(1, Math.min(20, Number(await require('./settings').get('kit_max_sponsors')) || 3));
+  const { rows: [r] } = await db.query("SELECT count(*)::int AS n FROM sponsors WHERE stage = 'ativo'");
+  const taken = Math.min(max, r.n);
+  return { max, taken, open: max - taken };
+}
+
+async function kitSlotsHtml() {
+  const { max, taken, open } = await kitSlots();
+  const dots = Array.from({ length: max }, (_, i) => `<span${i < taken ? ' class="on"' : ''}></span>`).join('');
+  const text = open
+    ? `Hoje ${taken === 0 ? 'nenhuma está ocupada' : `${taken} ${taken === 1 ? 'está ocupada' : 'estão ocupadas'}`}. Quando as ${max} estiverem preenchidas, a próxima marca entra quando uma parceria terminar.`
+    : `Hoje as ${max} estão ocupadas. Converse com a gente para ser a próxima quando uma parceria terminar.`;
+  return `<div class="vagas">
+        <div class="vagas-num">${open}<small>de ${max} ${open === 1 ? 'vaga aberta' : 'vagas abertas'}</small></div>
+        <div><h4>No máximo ${max} marcas ao mesmo tempo.</h4><p>Para que cada marca apareça de verdade nos episódios, sem disputar espaço. ${text}</p><div class="vagas-dots" aria-hidden="true">${dots}</div></div>
+      </div>`;
+}
+
+// Prova social do media kit: marcas marcadas "Mostrar no media kit" (logo quando houver; senão, o nome).
+async function kitBrandsHtml() {
+  const { rows } = await db.query(
+    `SELECT s.id, s.company, s.starts_on, (SELECT f.storage_key FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo' ORDER BY f.id DESC LIMIT 1) AS logo_key
+       FROM sponsors s WHERE s.kit_show ORDER BY s.starts_on NULLS LAST, s.id`);
+  if (!rows.length) return '';
+  const { esc } = require('./inviteTemplate');
+  const cards = [];
+  for (const r of rows) {
+    const logo = r.logo_key && config.storageConfigured ? await b2.presignGet(r.logo_key, { expires: 12 * 3600 }).catch(() => null) : null;
+    cards.push(`<div class="brand">${logo ? `<img src="${esc(logo)}" alt="${esc(r.company)}" loading="lazy">` : `<span class="brand-name">${esc(r.company)}</span>`}</div>`);
+  }
+  return `<!-- 10 — MARCAS QUE JÁ ESTÃO COM O PULSO -->
+<section class="slide white" id="s09b">
+    <div class="slide-content">
+      <div class="eyebrow"><span class="num">10</span> Quem já está com a gente</div>
+      <h2 class="slide-title">Marcas que escolheram estar nessas conversas.</h2>
+      <p class="slide-lede">Empresas que já patrocinaram ou patrocinam o Pulso.</p>
+      <div class="brands">${cards.join('')}</div>
+    </div>
+  </section>`;
 }
 
 // ---- dados do portal do patrocinador ativo ----
@@ -330,5 +388,5 @@ async function portalData(sponsor) {
 module.exports = {
   addEvent, missingFor, STAGE_HINTS, publicPath, publicUrl, ensureToken, whatsappUrl, recordClick, clickStats,
   BRIEF_QUESTIONS, QUESTION_KEYS, briefState, briefStatus, reconcileBrief, applyAnswer, hasLogoFile,
-  parseBrief, loadBrief, saveBrief, storeFile, deleteFile, sendFile, portalData, kitAgendaHtml,
+  parseBrief, loadBrief, saveBrief, storeFile, deleteFile, sendFile, portalData, kitAgendaHtml, kitSlots, kitSlotsHtml, kitBrandsHtml,
 };

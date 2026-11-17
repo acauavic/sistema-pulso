@@ -24,7 +24,7 @@ const GROUPS = {
   patrocinio: {
     label: 'Comercial (patrocinadores)', who: 'patrocinador', envKey: 'whatsappPatrocinio', numberKey: 'whatsapp_patrocinio',
     messages: {
-      quero: { key: 'whatsapp_msg_quero', label: 'Ao querer ser patrocinador', hint: 'Abre depois do clique em "Quero ser patrocinador" no media kit.', fallback: 'Oi, quero ser um patrocinador do {podcast}! Sou da {nome}.' },
+      quero: { key: 'whatsapp_msg_quero', label: 'Ao pedir uma conversa', hint: 'Abre depois do clique em "Agendar uma conversa" no media kit.', fallback: 'Oi! Quero agendar uma conversa sobre patrocínio do {podcast}. Sou da {nome}.' },
       equipe: { key: 'whatsapp_msg_equipe', label: 'Ao falar com a equipe', hint: 'Abre quando o patrocinador clica em "Falar com a equipe".', fallback: 'Oi, quero saber mais sobre como funciona para ser parceiro do {podcast}. Sou da {nome}.' },
     },
   },

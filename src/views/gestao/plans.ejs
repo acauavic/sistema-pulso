@@ -6,7 +6,15 @@
   var moneyVal = function (c) { return (Number(c) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
   var json = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
 %>
-<p class="lead">O que está aqui vale no <strong>media kit</strong>, no <strong>portal do patrocinador</strong> e nos entregáveis de cada patrocinador da cota. Para mudar só um patrocinador, use a aba Entregas dele.</p>
+<p class="lead">Os entregáveis daqui valem no <strong>portal do patrocinador</strong> e nas entregas de cada patrocinador da cota. O <strong>media kit</strong> mostra só a lista do que a marca pode ter, sem nome de plano nem preço: o formato sai da conversa. Para mudar só um patrocinador, use a aba Entregas dele.</p>
+
+<section class="card rule-card">
+  <form method="post" action="/gestao/patrocinios/vagas" class="row spread">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div><strong>Vagas no media kit</strong><p class="small muted">O kit diz "no máximo <span class="mono"><%= slots.max %></span> marcas ao mesmo tempo" e mostra as vagas abertas de verdade: hoje <span class="mono"><%= slots.taken %></span> ocupada<%= slots.taken === 1 ? '' : 's' %> (patrocinadores Ativos), <span class="mono"><%= slots.open %></span> aberta<%= slots.open === 1 ? '' : 's' %>.</p></div>
+    <div class="row"><label class="sr-only" for="max-marcas">Máximo de marcas</label><input id="max-marcas" type="number" name="max" min="1" max="20" value="<%= slots.max %>" class="mono num-input"><button class="btn" type="submit">Salvar</button></div>
+  </form>
+</section>
 
 <section class="card rule-card">
   <form method="post" action="/gestao/patrocinios/regras" class="row spread" data-autosubmit-form>

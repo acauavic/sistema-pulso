@@ -290,7 +290,7 @@ describe('central de patrocinadores', () => {
       t = (await c.get('/patrocinador/kit')).text;
       assert.match(t, /Dra\. &lt;i&gt;Kit&lt;\/i&gt;/, 'nome escapado');
       assert.match(t, /@dra\.kit/);
-      assert.match(t, /data-agenda-track/); assert.match(t, /class="agenda-date">\d{2} [A-Z]{3}</, 'data curta no cartão'); assert.match(t, /data-handle="dra\.kit"/);
+      assert.match(t, /data-agenda-track/); assert.match(t, /class="agenda-date">GRAVAÇÃO \d{2} [A-Z]{3}</, 'data curta no cartão'); assert.match(t, /data-handle="dra\.kit"/);
       assert.doesNotMatch(t, /Só Em Agendamento/, 'só quem está com a data confirmada');
       await h.db.query("DELETE FROM guests WHERE id=$1 OR instagram='emag'", [g.id]);
     });
@@ -332,22 +332,22 @@ describe('central de patrocinadores', () => {
       assert.equal((await h.db.query("SELECT count(*)::int n FROM sponsor_events WHERE sponsor_id=$1 AND type='kit_visto'", [id])).rows[0].n, 1);
     });
 
-    it('"Quero ser patrocinador": conta o clique, vai para Em negociação, avisa a equipe e abre o WhatsApp comercial', async () => {
+    it('"Agendar uma conversa": conta o clique, vai para Em negociação, avisa a equipe e abre o WhatsApp comercial', async () => {
       h.mailer.outbox.length = 0;
       const { c } = await enter(token);
       const r = await c.get('/patrocinador/quero');
       assert.equal(r.status, 302);
-      assert.match(r.location, /^https:\/\/wa\.me\/5511971739061\?text=Oi%2C%20quero%20ser%20um%20patrocinador/);
+      assert.match(r.location, /^https:\/\/wa\.me\/5511971739061\?text=Oi!%20Quero%20agendar%20uma%20conversa/);
       assert.equal((await sponsor(id)).stage, 'negociacao');
       assert.equal((await h.db.query("SELECT count(*)::int n FROM sponsor_clicks WHERE sponsor_id=$1 AND kind='quero'", [id])).rows[0].n, 1);
       const mail = lastMail('prod@t.com');
       assert.ok(mail, 'responsável da equipe avisado');
-      assert.match(mail.subject, /Marca Pessoal Bia quer ser patrocinador/);
+      assert.match(mail.subject, /Marca Pessoal Bia quer agendar uma conversa/);
       h.mailer.outbox.length = 0;
       await c.get('/patrocinador/quero');
       assert.equal(h.mailer.outbox.length, 0, 'segundo clique não repete o aviso');
       assert.equal((await h.db.query("SELECT count(*)::int n FROM sponsor_clicks WHERE sponsor_id=$1 AND kind='quero'", [id])).rows[0].n, 2);
-      assert.match((await as.prod.get(`/patrocinadores/${id}`)).text, /“Quero ser patrocinador”: <strong>2<\/strong>/);
+      assert.match((await as.prod.get(`/patrocinadores/${id}`)).text, /“Agendar uma conversa”: <strong>2<\/strong>/);
     });
 
     it('"Falar com a equipe" só conta e redireciona; o primeiro clique entra na linha do tempo', async () => {

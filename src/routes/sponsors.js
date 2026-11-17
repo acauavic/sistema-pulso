@@ -179,6 +179,7 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
     comments: thread, linkedTasks: linkedTasks.rows,
     meetings, meetingCtx: { team: team.rows, DURATIONS: meetingsSvc.DURATIONS, MODES: meetingsSvc.MODES, RESPONSES: meetingsSvc.RESPONSES, ready: config.googleMeetConfigured, inputValue: require('../utils/format').toInputValue },
     title: sponsor.company, sponsor, events: events.rows, brief, files: files.rows,
+    hasLogo: files.rows.some((f) => f.kind === 'logo'),
     formState: sponsorsSvc.briefState(brief, { hasLogo: files.rows.some((f) => f.kind === 'logo') }), formQuestions: sponsorsSvc.BRIEF_QUESTIONS, deliverables, planInfo: await require('../services/plans').plans(),
     roleByEpisode: Object.fromEntries(linked.rows.map((r) => [r.episode_id, r.role])), episodes: episodes.rows, clicks,
     stageInfo: C.SPONSOR_STAGE_BY_KEY[sponsor.stage], C, stages: C.SPONSOR_STAGES,
@@ -220,6 +221,17 @@ router.post('/patrocinadores/:id', requirePerm('sponsors.write'), wrap(async (re
 const STEP_MODAL = { ganho: 'ganho', ativo: 'ativo' };
 
 // ---- mudar etapa (formulário ou arrastar no quadro) ----
+// Prova social: a marca aparece em "Marcas que escolheram estar nessas conversas" no media kit.
+router.post('/patrocinadores/:id/media-kit', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const on = req.body.mostrar === '1';
+  const { rows: [s] } = await db.query('UPDATE sponsors SET kit_show = $2, updated_at = now() WHERE id = $1 RETURNING id, company', [Number(req.params.id) || 0, on]);
+  if (!s) return res.redirect('/patrocinadores');
+  await sponsorsSvc.addEvent(s.id, req.user.id, 'kit', on ? 'Passou a aparecer no media kit (marcas que já estão com o Pulso)' : 'Saiu do media kit (marcas que já estão com o Pulso)');
+  await audit(req, on ? 'patrocinador.kit_mostra' : 'patrocinador.kit_tira', 'sponsor', s.id);
+  await req.flash('ok', on ? `${s.company} aparece no media kit.` : `${s.company} saiu do media kit.`);
+  res.redirect(`/patrocinadores/${s.id}`);
+}));
+
 router.post('/patrocinadores/:id/etapa', requirePerm('sponsors.write'), wrap(async (req, res) => {
   const sponsor = await findSponsor(req.params.id);
   if (!sponsor) return wantsJson(req) ? res.status(404).json({ ok: false }) : notFound(res);

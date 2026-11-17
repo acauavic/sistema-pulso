@@ -168,6 +168,7 @@
             <dt>Responsável</dt><dd><%- include('../partials/dot', { type: 'guest', id: guest.id, user: guest.owner_id ? { id: guest.owner_id, name: guest.owner_name } : null, editable: canW, label: true }) %></dd>
             <% if (guest.phone) { %><dt>WhatsApp</dt><dd class="handle"><%= guest.phone %></dd><% } %>
             <% if (guest.email) { %><dt>E-mail</dt><dd><%= guest.email %></dd><% } %>
+            <% if (guest.reach) { %><dt>Alcance</dt><dd class="mono"><%= guest.reach %> seguidores</dd><% } %>
             <% if (guest.invite_reason) { %><dt>Motivo do convite</dt><dd class="pre"><%= guest.invite_reason %></dd><% } %>
             <% if (guest.positioning) { %><dt>Posicionamento</dt><dd class="pre"><%= guest.positioning %></dd><% } %>
             <% if (guest.topic) { %><dt>Temas</dt><dd class="pre"><%= guest.topic %></dd><% } %>

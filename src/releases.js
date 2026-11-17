@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.70.0', date: '2026-11-17', title: 'Media kit que leva para uma conversa',
+    items: [
+      { kind: 'ajuste', text: 'O media kit dos patrocinadores não mostra mais planos nem preços. No lugar, "O que a sua marca pode ter" lista tudo o que o Pulso entrega, e o botão principal virou "Agendar uma conversa" (abre o WhatsApp comercial e leva o patrocinador para Em negociação).' },
+      { kind: 'novo', text: 'Vagas reais: o kit diz "no máximo 3 marcas ao mesmo tempo" e mostra quantas estão abertas, contando os patrocinadores Ativos. O máximo muda em Gestão > Planos.' },
+      { kind: 'novo', text: 'Prova social: "Marcas que escolheram estar nessas conversas" mostra os patrocinadores marcados com "Mostrar no media kit" na página de cada um, com a logo quando houver.' },
+      { kind: 'novo', text: 'Agenda "Quem vem por aí": data de estreia dos episódios já gravados (e de gravação de quem está agendado), foto, nome, @ e alcance. O convidado ganhou o campo Alcance no cadastro.' },
+      { kind: 'ajuste', text: 'O QR Code agora aparece como "Leve a audiência direto para o seu site ou aplicativo" (aparece pelo menos 5 vezes no episódio), e as cadeiras na plateia (até 5 por gravação) entraram no que a marca pode ter.' },
+    ],
+  },
+  {
     version: '1.69.0', date: '2026-11-17', title: 'Convite: a mesa do media kit, cortes escolhidos e "com plateia" em destaque',
     items: [
       { kind: 'novo', text: '"Quem já sentou à mesa" no convite agora é a mesma galeria do media kit dos patrocinadores: um convidado em destaque, trocando sozinho, e todos numa grade de fotos. Quem tem cortes ganha "Ver cortes" no destaque, que abre os vídeos numa janela.' },

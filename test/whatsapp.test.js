@@ -22,7 +22,7 @@ describe('WhatsApp dos convites: número e mensagens configuráveis na gestão',
     const cur = await contacts.current();
     assert.equal(cur.producao.numberFromEnv, true); assert.match(cur.producao.number, /^55\d{10,11}$/);
     assert.match(await contacts.waUrl('producao', 'aceitar', 'Dra. Ana'), /^https:\/\/wa\.me\/55\d+\?text=Ol%C3%A1!%20Sou%20Dra\.%20Ana%20e%20aceito%20o%20convite/);
-    assert.match(await contacts.waUrl('patrocinio', 'quero', 'Clínica X'), /quero%20ser%20um%20patrocinador.*Cl%C3%ADnica%20X/);
+    assert.match(await contacts.waUrl('patrocinio', 'quero', 'Clínica X'), /agendar%20uma%20conversa.*Cl%C3%ADnica%20X/);
   });
 
   it('a gestão troca o número e a mensagem; o botão do convite já usa; vazio volta ao padrão', async () => {

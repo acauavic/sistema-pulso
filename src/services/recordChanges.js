@@ -8,7 +8,7 @@ const PLACES = {
   guest: {
     table: 'guests', label: 'convidado', art: 'o', title: 'name', responsible: 'owner_id', url: (id) => `/convidados/${id}`,
     fields: {
-      name: 'nome', email: 'e-mail', phone: 'telefone', instagram: 'Instagram', profile: 'perfil', invite_reason: 'motivo do convite', company: 'empresa', job_title: 'cargo',
+      name: 'nome', email: 'e-mail', phone: 'telefone', instagram: 'Instagram', profile: 'perfil', invite_reason: 'motivo do convite', reach: 'alcance', company: 'empresa', job_title: 'cargo',
       positioning: 'posicionamento', topic: 'tema', bio: 'bio', notes: 'observações', proposed_at: 'data da gravação', owner_id: 'responsável', status: 'etapa',
       scheduled_studio: 'estúdio', scheduled_hosts: 'hosts', scheduled_guest: 'confirmação do convidado', sponsor_id: 'patrocinador', sponsor_relation: 'relação com o patrocinador',
       loss_reason: 'motivo da perda', loss_note: 'nota da perda',

@@ -28,9 +28,13 @@ describe('planos de patrocínio (Ouro e Diamond)', () => {
     assert.equal((await delivs(sid)).length, 6);
     assert.equal((await delivs(sid2)).length, 8);
     const t = await kit();
-    assert.match(t, /Plano Ouro/); assert.match(t, /R\$ 6\.000/); assert.match(t, /R\$ 15\.000/);
-    assert.match(t, /Tudo do plano Ouro/); assert.match(t, /Escolha 1 de 4/); assert.match(t, /Episódio especial dedicado/);
-    assert.match(t, /<th class="plan-col">Diamond<\/th>/);
+    // o media kit não sugere plano nem preço: mostra o que a marca pode ter e leva para uma conversa
+    assert.doesNotMatch(t, /Plano Ouro|R\$ 6\.000|R\$ 15\.000|class="plan-col"|Escolha 1 de/);
+    assert.match(t, /O que a sua marca pode ter/); assert.match(t, /Episódio especial dedicado/); assert.match(t, /Inserção nos episódios/);
+    assert.match(t, /Leve a audiência direto para o seu site ou aplicativo/); assert.match(t, /pelo menos 5 vezes durante o episódio/);
+    assert.match(t, /Cadeiras na plateia/); assert.match(t, /Até 5 cadeiras/);
+    assert.match(t, /Agendar uma conversa/); assert.doesNotMatch(t, /Quero ser patrocinador/);
+    assert.equal((t.match(/<h4>Inserção nos episódios<\/h4>/g) || []).length, 1, 'item herdado pelo Diamond não repete');
   });
 
   it('só a gestão mexe nos planos', async () => {
@@ -47,8 +51,7 @@ describe('planos de patrocínio (Ouro e Diamond)', () => {
     assert.equal((await plan('ouro')).name, 'Ouro Prime');
     assert.equal(C.SPONSOR_TIERS.ouro, 'Ouro Prime');
     const t = await kit();
-    assert.match(t, /Plano Ouro Prime/); assert.match(t, /R\$ 7\.500/); assert.match(t, /5 episódios patrocinados/); assert.match(t, /Marca presente\./);
-    assert.match(t, /<th class="plan-col">Ouro Prime<\/th>/);
+    assert.doesNotMatch(t, /Ouro Prime|R\$ 7\.500/, 'o kit não mostra plano nem preço');
     assert.match(await portal(), /Patrocínio Ouro Prime/);
     assert.match((await as.prod.get('/patrocinadores/novo')).text, /Ouro Prime/);
     assert.match((await as.prod.get(`/patrocinadores/${sid}`)).text, /Plano <strong>Ouro Prime<\/strong>/);

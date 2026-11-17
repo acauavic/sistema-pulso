@@ -10,7 +10,7 @@ const clean = (v, max) => String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, m
 async function candidates() {
   const { rows } = await db.query(
     `SELECT e.id, e.number, e.title, e.status, e.kit_featured, e.kit_audience, e.kit_credential,
-            g.id AS guest_id, g.name AS guest_name, g.instagram, g.job_title, g.company, g.bio, (g.photo_key IS NOT NULL) AS has_photo
+            g.id AS guest_id, g.name AS guest_name, g.instagram, g.job_title, g.company, g.bio, g.reach AS guest_reach, (g.photo_key IS NOT NULL) AS has_photo
        FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
       ORDER BY e.number NULLS LAST, e.id`);
   return rows;
@@ -42,7 +42,7 @@ async function items() {
   return rows.map((r) => ({
     name: r.guest_name,
     photo: r.has_photo ? guestPhotos.signedUrl(r.guest_id) : null,
-    audience: r.kit_audience || '—',
+    audience: r.kit_audience || r.guest_reach || '—',
     credential: credentialOf(r),
     handle: r.instagram ? String(r.instagram).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '') : null,
     ep: r.number,

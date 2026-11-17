@@ -86,51 +86,32 @@ async function deliverablesOf(sponsorId) {
 const money = (cents) => `R$ ${new Intl.NumberFormat('pt-BR').format(Math.round(cents / 100))}`;
 const deliver = (i, cls = '') => `<div class="deliver-item${cls}"><h4>${esc(i.title)}</h4>${i.description ? `<p>${esc(i.description)}</p>` : ''}</div>`;
 
-// Slides 10 (Ouro), 11 (Diamond) e 14 (comparativo) do media kit, gerados do que está cadastrado.
+// Benefício que não é entregável de plano: cadeiras na plateia para a marca presentear.
+const EXTRA_ITEMS = [{ title: 'Cadeiras na plateia', description: 'Até 5 cadeiras nas gravações com plateia, para presentear parceiros ou a própria equipe.' }];
+
+// Slide "O que a sua marca pode ter" do media kit: tudo o que os planos entregam, sem nome de plano nem preço (o formato e o
+// investimento saem da conversa). Os itens vêm do cadastro dos planos (Gestão > Planos), sem repetir.
 async function kitHtml() {
   const all = await plans();
-  const out = { slide_ouro_html: '', slide_diamond_html: '', compare_html: '' };
-  const [first, second] = all;
-  const slide = (p, n, dark) => {
-    const own = p.items;
-    const inherited = p.includes ? all.find((x) => x.key === p.includes) : null;
-    const cls = dark ? ' diamond-inherit' : '';
-    return `
-      <div class="eyebrow"${dark ? ' style="color:var(--lime); margin-bottom:18px;"' : ''}><span class="num">${n}</span> Patrocínio ${esc(p.name)}</div>
-      <div class="plan-badge"><span class="plan-badge-name">Plano ${esc(p.name)}</span>${p.tag ? `<span class="plan-badge-tag">${esc(p.tag)}</span>` : ''}</div>
-      <div class="plan-head">
-        <div>
-          <h2 class="slide-title" style="margin-bottom:8px;">${esc(p.headline || '')}</h2>
-          ${p.lede ? `<p class="slide-lede" style="margin-bottom:0;">${esc(p.lede)}</p>` : ''}
-        </div>
-        <div class="plan-price"${dark ? ' style="font-size:clamp(24px,3.2vw,38px);"' : ''}>${money(p.price_cents)}<span class="unit">investimento</span></div>
-      </div>
-      <div class="deliver-list">
-        ${inherited ? deliver({ title: `Tudo do plano ${inherited.name}`, description: `Todos os entregáveis do ${inherited.name}, inclusos.` }, cls) : ''}
-        ${own.map((i) => deliver(i, cls)).join('\n        ')}
-      </div>
-      ${p.choices.length ? `<div class="choice-label"><span class="choice-badge">Escolha 1 de ${p.choices.length}</span> ${esc(p.choice_label || '')}</div>
-      <div class="choice-grid">${p.choices.map((i) => `<div class="choice-item"><h4>${esc(i.title)}</h4>${i.description ? `<p>${esc(i.description)}</p>` : ''}</div>`).join('')}</div>` : ''}
-      ${p.note ? `<div class="note-box">${esc(p.note)}</div>` : ''}`;
-  };
-  if (first) out.slide_ouro_html = slide(first, 10, false);
-  if (second) out.slide_diamond_html = slide(second, 11, true);
-  if (first && second) {
-    const rows = [];
-    rows.push(`<tr><td class="feat">Episódios patrocinados</td><td>${esc(first.episodes_label || '—')}</td><td>${esc(second.episodes_label || '—')}</td></tr>`);
-    const seen = new Set();
-    for (const p of [first, second]) {
-      for (const i of effectiveItems(all, p.key).filter((x) => x.fromPlan === p.key)) {
-        const k = i.title.toLowerCase(); if (seen.has(k)) continue; seen.add(k);
-        const inFirst = chain(all, first.key).some((c) => c.items.some((x) => x.id === i.id));
-        rows.push(`<tr><td class="feat">${esc(i.title)}</td><td${inFirst ? ' class="yes">✓' : '>—'}</td><td class="yes">✓</td></tr>`);
-      }
-    }
-    if (second.choices.length) rows.push(`<tr><td class="feat">${esc(second.choice_label || 'Participação da marca no episódio especial')}</td><td>—</td><td class="yes">✓</td></tr>`);
-    rows.push(`<tr><td class="feat">Investimento</td><td>${money(first.price_cents)}</td><td>${money(second.price_cents)}</td></tr>`);
-    out.compare_html = `<table class="compare"><thead><tr><th>Entrega</th><th class="plan-col">${esc(first.name)}</th><th class="plan-col">${esc(second.name)}</th></tr></thead><tbody>${rows.join('\n            ')}</tbody></table>`;
+  const seen = new Set();
+  const items = [];
+  for (const i of [...all.flatMap((p) => p.items), ...EXTRA_ITEMS]) {
+    const k = String(i.title).toLowerCase();
+    if (!seen.has(k)) { seen.add(k); items.push(i); }
   }
-  return out;
+  const choices = [];
+  for (const i of all.flatMap((p) => p.choices)) if (!choices.some((c) => c.title === i.title)) choices.push(i);
+  const oferta_html = `
+      <div class="eyebrow"><span class="num">11</span> O que a sua marca pode ter</div>
+      <h2 class="slide-title" style="margin-bottom:10px;">Presença sob medida, desenhada com você.</h2>
+      <p class="slide-lede">Não trabalhamos com pacote fechado. Na conversa, entendemos o objetivo da marca e montamos juntos a combinação que faz sentido.</p>
+      <div class="deliver-list">
+        ${items.map((i) => deliver(i)).join('\n        ')}
+      </div>
+      ${choices.length ? `<div class="choice-label"><span class="choice-badge">Episódio especial</span> Num episódio feito com a marca, ela pode:</div>
+      <div class="choice-grid">${choices.map((i) => `<div class="choice-item"><h4>${esc(i.title)}</h4>${i.description ? `<p>${esc(i.description)}</p>` : ''}</div>`).join('')}</div>` : ''}
+      <div class="closing-cta" style="margin-top:22px;"><a class="btn lime-fill" href="/patrocinador/quero" target="_blank" rel="noopener">Agendar uma conversa →</a></div>`;
+  return { oferta_html };
 }
 
 module.exports = { KEYS, plans, syncNames, middleware, effectiveItems, chain, applyToSponsor, resyncPlan, usage, deliverablesOf, kitHtml, money, fmt };

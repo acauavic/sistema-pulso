@@ -43,7 +43,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
   Em agendamento → Agendado → Gravado → Publicado, mais Perdido/Cancelado), visão em lista, filtros por
   responsável, linha do tempo com anotações e histórico automático. [Cadastro e regras](#etapas-do-convidado-e-regras-para-avançar).
 - **Importação por CSV**: planilha com nome, Instagram e perfil (+ opcionais), com prévia de erros e duplicados.
-- **Central de patrocinadores**: CRM em quadro (Prospecção → Em negociação → Ganho → Ativo, mais Inativo/Perdido), media kit, formulário de cadastro com voz e portal do patrocinador, tudo por **magic link reutilizável** (sem criar conta). [Detalhes](#central-de-patrocinadores).
+- **Central de patrocinadores**: CRM em quadro (Prospecção → Em negociação → Ganho → Ativo, mais Inativo/Perdido), media kit (sem planos nem preços: o que a marca pode ter, vagas reais, marcas que já estão com o Pulso e "Agendar uma conversa"), formulário de cadastro com voz e portal do patrocinador, tudo por **magic link reutilizável** (sem criar conta). [Detalhes](#central-de-patrocinadores).
 - **Episódios (linha de produção)**: do convidado agendado até a publicação — material bruto no Backblaze, edição, revisão com comentários na minutagem, análise por IA, capas e posts com editor visual, cortes verticais e publicação nas redes. [Detalhes](#produção-de-episódios).
 - **Convite fixo**: gera link exclusivo + link curto no YOURLS, prévia, envio por e-mail (Brevo). Os botões do
   convite levam ao WhatsApp da produção **passando por um redirecionador próprio que conta os cliques**.
@@ -65,8 +65,8 @@ Para mudar, edite só `src/permissions.js` — todas as telas e rotas consultam 
 ## Etapas do convidado e regras para avançar
 
 **Convidado é a pessoa; episódio é o produto.** O funil do convidado vai de Prospecção até **Gravado** (o fim dele). Antes da
-gravação existe só a **agenda**: convidados em Agendado, com a data confirmada, aparecem no **media kit** ("Quem já está na agenda", em galeria,
-com a data no cartão) e podem ser **reservados por patrocinadores** (aparecem no portal deles). Quando a conversa é gravada, **nasce o
+gravação existe só a **agenda**: convidados em Agendado, com a data confirmada, aparecem no **media kit** ("Quem vem por aí", em galeria,
+com a data no cartão; episódios já gravados entram com a data de estreia, e todos levam o alcance do cadastro) e podem ser **reservados por patrocinadores** (aparecem no portal deles). Quando a conversa é gravada, **nasce o
 episódio** (com as tarefas das rotinas e a data da gravação) e as reservas viram vínculo do episódio. O que se publica é o episódio.
 
 Convidado de episódio patrocinado: pode ser **alguém do patrocinador** ou **alguém indicado por ele** (campo "Ligado a um

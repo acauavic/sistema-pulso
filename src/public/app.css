@@ -1690,3 +1690,4 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
 .studio-link-actions { gap: 8px; flex-wrap: wrap; align-items: center; }
 .file-tag { font: 500 10px var(--f-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-tag); padding: 1px 5px; }
 @media (max-width: 720px) { .studio-main { padding-top: 24px; } .studio-card { padding: 18px; } }
+.num-input { width: 5.5em; }

@@ -15,7 +15,7 @@ const text = (v, n) => String(v ?? '').replace(/\r/g, '').trim().slice(0, n) || 
 
 router.get('/gestao/patrocinios', requirePerm('plans.manage'), wrap(async (req, res) => {
   const [plans, usage] = await Promise.all([plansSvc.plans(), plansSvc.usage()]);
-  res.render('gestao/plans', { title: 'Planos de patrocínio', blockInsertion: await require('../services/settings').blockInsertion(), plans, usage, kinds: C.DELIVERABLE_KINDS, money: plansSvc.money });
+  res.render('gestao/plans', { title: 'Planos de patrocínio', slots: await require('../services/sponsors').kitSlots(), blockInsertion: await require('../services/settings').blockInsertion(), plans, usage, kinds: C.DELIVERABLE_KINDS, money: plansSvc.money });
 }));
 
 router.post('/gestao/patrocinios/regras', requirePerm('plans.manage'), wrap(async (req, res) => {
@@ -23,6 +23,16 @@ router.post('/gestao/patrocinios/regras', requirePerm('plans.manage'), wrap(asyn
   await require('../services/settings').set('block_insertion_in_exclusive', on);
   await audit(req, 'patrocinio.regra_exclusivo', 'settings', null, { ligada: on });
   await req.flash('ok', on ? 'Episódio exclusivo de um patrocinador não recebe inserção de outro.' : 'Episódio exclusivo agora aceita inserção de outros patrocinadores.');
+  res.redirect(back());
+}));
+
+// Vagas do media kit: no máximo N marcas ao mesmo tempo (ocupada = patrocinador Ativo).
+router.post('/gestao/patrocinios/vagas', requirePerm('plans.manage'), wrap(async (req, res) => {
+  const n = Math.round(Number(req.body.max));
+  if (!Number.isFinite(n) || n < 1 || n > 20) { await req.flash('error', 'Use um número de 1 a 20.'); return res.redirect(back()); }
+  await require('../services/settings').set('kit_max_sponsors', n);
+  await audit(req, 'patrocinio.vagas', 'settings', null, { max: n });
+  await req.flash('ok', `O media kit agora fala em no máximo ${n} marcas ao mesmo tempo.`);
   res.redirect(back());
 }));
 
