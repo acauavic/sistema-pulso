@@ -84,6 +84,15 @@ describe('Copy das redes: capa, título e legenda com critério e a chamada cert
     assert.equal(p2.options.ctas, undefined);
   });
 
+  it('quadro de Conteúdo: publicado há mais de 60 dias some do quadro geral com aviso na coluna, mas aparece no quadro do episódio', async () => {
+    const [ep] = await q('SELECT episode_id FROM episode_clips WHERE id = $1', [clip.id]);
+    await q("UPDATE episode_publications SET status = 'publicado', updated_at = now() - interval '90 days' WHERE clip_id = $1", [clip.id]);
+    const geral = (await as.gestao.get('/conteudo')).text;
+    assert.match(geral, /class="link small col-more"[^>]*>\+ <span class="mono">1<\/span> publicados há mais de 60 dias/);
+    const doEp = (await as.gestao.get(`/conteudo?episodio=${ep.episode_id}`)).text;
+    assert.doesNotMatch(doEp, /col-more/); assert.match(doEp, new RegExp(`href="/cortes/${clip.id}"`));
+  });
+
   it('novo post: as chamadas padrão vêm no formulário e as do corte escolhido entram pelo próprio item', async () => {
     const page = (await as.gestao.get('/social/novo?tipo=video&publicados=1')).text;
     assert.match(page, /name="cta_youtube" value="Inscreva-se/);

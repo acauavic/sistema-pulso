@@ -1699,3 +1699,4 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
 .cta-box .cta-list { display: grid; gap: 8px; margin-top: 10px; }
 .cta-box .cta-list label { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 8px; margin: 0; }
 @media (max-width: 640px) { .cta-box .cta-list label { grid-template-columns: 1fr; gap: 4px; } }
+.column .col-more { display: block; padding: 8px 4px; }

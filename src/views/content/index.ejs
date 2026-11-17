@@ -57,6 +57,7 @@
             </span>
           </a>
           <% }) %>
+          <% if (col.key === 'publicado' && hiddenOld) { %><a class="link small col-more" href="<%= boardHref(tipo) %>&publicados=todos">+ <span class="mono"><%= hiddenOld %></span> publicados há mais de 60 dias</a><% } %>
         </div>
       </section>
       <% }) %>

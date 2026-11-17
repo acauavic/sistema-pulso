@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.72.1', date: '2026-11-17', title: 'Quadro de Conteúdo mostra o que já saiu há mais tempo',
+    items: [
+      { kind: 'correcao', text: 'No quadro de um episódio, a coluna Publicado mostra todos os cortes que já saíram, mesmo os de meses atrás. No quadro geral, o publicado há mais de 60 dias continua guardado, mas a própria coluna avisa quantos são e leva até eles.' },
+    ],
+  },
+  {
     version: '1.72.0', date: '2026-11-17', title: 'Cortes lidos em paralelo',
     items: [
       { kind: 'ajuste', text: 'Quando vários cortes sobem de uma vez, o sistema lê até 5 ao mesmo tempo (quadros, título, legenda, chamadas e capas). Dez cortes ficam prontos em uns 3 minutos, e não mais em 12.' },

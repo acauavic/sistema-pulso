@@ -59,8 +59,9 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   ]);
   const board = require('../services/contentBoard');
   const R = require('../services/contentRequests');
+  // quadro de um episódio: mostra tudo o que já saiu; o geral esconde o publicado há mais de 60 dias (com aviso na coluna)
   const [built, idx, reqs, people, episodeList] = await Promise.all([
-    board.build({ episodeId: only, recentDays: req.query.publicados === 'todos' ? null : 60 }), board.publicationIndex(),
+    board.build({ episodeId: only, recentDays: req.query.publicados === 'todos' || only ? null : 60 }), board.publicationIndex(),
     R.list({ episodeId: only }), db.query("SELECT id, name, role FROM users WHERE active AND role IN ('editor_video','gestao','superadmin') ORDER BY (role = 'editor_video') DESC, name"),
     db.query('SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 80'),
   ]);
