@@ -1044,7 +1044,7 @@ describe('fluxos ponta a ponta', () => {
     it('injeta nome, gênero e dupla como JSON; mantém intro/JS; imagens estáticas existem', async () => {
       const f = await guestFlow({ name: 'Ana Paula Lima', gender: 'f' });
       assert.equal(f.page.status, 200);
-      assert.match(f.page.text, /const G = \{"nome":"Ana Paula Lima","plural":false,"sexo":"f","motivo":false\};/);
+      assert.match(f.page.text, /const G = \{"nome":"Ana Paula Lima","plural":false,"sexo":"f","motivo":false,"plateia":false\};/);
       assert.match(f.page.text, /intro-overlay/);
       assert.doesNotMatch(f.page.text, /\{\{/);
       assert.match(f.page.text, new RegExp(`action="/convite/${f.token}/responder"`));

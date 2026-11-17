@@ -13,7 +13,7 @@ const inviteHtml = () => (templateCache ??= fs.readFileSync(TEMPLATE_FILE, 'utf8
 let kitCache = null;
 const mediaKitHtml = () => (kitCache ??= fs.readFileSync(path.join(__dirname, '..', 'templates', 'media-kit.html'), 'utf8'));
 
-const RAW = new Set(['bloco_resposta', 'guest_json', 'agenda_html', 'slide_ouro_html', 'slide_diamond_html', 'compare_html', 'guests_json', 'cortes_html', 'plateia_html', 'vitrine_json']); // únicas variáveis inseridas sem escape (geradas aqui, nunca digitadas)
+const RAW = new Set(['bloco_resposta', 'guest_json', 'agenda_html', 'slide_ouro_html', 'slide_diamond_html', 'compare_html', 'guests_json', 'cortes_html', 'plateia_html', 'vitrine_json', 'hero_formato_html', 'intro_formato_html']); // únicas variáveis inseridas sem escape (geradas aqui, nunca digitadas)
 
 // JSON que pode ir dentro de <script> sem fechar a tag nem quebrar a linha (</script>, <!--, U+2028).
 function safeJson(obj) {
@@ -59,15 +59,17 @@ function clipsSection(highlights = []) {
     <figure class="clip-card"><video controls playsinline preload="none"${c.poster ? ` poster="${esc(c.poster)}"` : ''} src="${esc(c.src)}"></video>${c.title ? `<figcaption>${esc(c.title)}</figcaption>` : ''}</figure>`).join('')}
   </div>` : '';
   return `<section>
-  <div class="section-header">
-    <div class="section-number">04 · OS CORTES</div>
+  <div class="clips-head">
     <div>
+      <div class="section-number">04 · OS CORTES</div>
       <div class="section-eyebrow">O QUE A GENTE PRODUZ</div>
-      <h2 class="section-title">Cortes que<br>trabalham<br>por você.</h2>
+      <h2 class="section-title">Cortes que<br>trabalham por você.</h2>
     </div>
-  </div>
-  <p class="clips-intro">Cada conversa vira de 15 a 30 cortes verticais, editados pela nossa equipe, com legenda e capa. Eles saem em collab no seu perfil e no do Pulso, ao longo das semanas da estreia, e ficam com você para usar como quiser.</p>
-  <div class="clips-facts"><span>15 a 30 cortes por episódio</span><span>Postados em collab</span><span>Instagram · TikTok · YouTube</span></div>${grid}
+    <div>
+      <p class="clips-intro">Cada conversa vira de 15 a 30 cortes verticais, editados pela nossa equipe, com legenda e capa. Eles saem em collab no seu perfil e no do Pulso, ao longo das semanas da estreia, e ficam com você para usar como quiser.</p>
+      <div class="clips-facts"><span>15 a 30 cortes por episódio</span><span>Postados em collab</span><span>Instagram · TikTok · YouTube</span></div>
+    </div>
+  </div>${grid}
 </section>`;
 }
 
@@ -106,8 +108,11 @@ function buildVariables(guest, { owner, links = {}, showcase = null } = {}) {
       ? 'Uma sessão de 60 a 90 minutos no Estúdio GH, diante de uma plateia selecionada, com equipe técnica completa, múltiplas câmeras e áudio profissional. Você só precisa aparecer e conversar.'
       : 'Uma sessão de 60 a 90 minutos no Estúdio GH, só você e os hosts, com equipe técnica completa. Iluminação cinematográfica, múltiplas câmeras e áudio profissional: você só precisa aparecer e conversar.',
     plateia_html: plateia ? plateiaBlock() : '',
+    hero_formato_html: plateia ? `<div class="hero-format"><span class="hero-format-tag">Podcast com plateia</span><span class="hero-format-text">A conversa é gravada diante de uma plateia pequena e selecionada, com recepção e comes e bebes.</span>${sc.plateia ? '<button type="button" class="hero-format-play" data-plateia-video>Veja como é</button>' : ''}</div>` : '',
+    intro_formato_html: plateia ? '<div class="intro-format">Podcast com plateia</div>' : '',
+    rodape_mesa: sc.foot || `${sc.episodes || 0} episódios publicados · 1 novo por semana`,
     cortes_html: clipsSection(sc.highlights || []),
-    vitrine_json: safeJson({ cortes: sc.guests || {}, plateia: plateia ? sc.plateia || null : null }),
+    vitrine_json: safeJson({ mesa: sc.mesa || [], cortes: sc.guests || {}, plateia: plateia ? sc.plateia || null : null }),
     nome: guest.name,
     primeiro_nome: firstName(guest.name),
     tema: guest.topic || '',
@@ -118,7 +123,7 @@ function buildVariables(guest, { owner, links = {}, showcase = null } = {}) {
     plural: guest.is_plural ? '1' : '',
     link_aceitar: links.aceitar || '#',
     link_producao: links.producao || '#',
-    guest_json: safeJson({ nome: guest.name || '', plural: Boolean(guest.is_plural), sexo: guest.gender === 'f' ? 'f' : 'm', motivo: Boolean(why) }),
+    guest_json: safeJson({ nome: guest.name || '', plural: Boolean(guest.is_plural), sexo: guest.gender === 'f' ? 'f' : 'm', motivo: Boolean(why), plateia }),
     bloco_resposta: '', // o serviço de convidados preenche com o estado real
   };
 }

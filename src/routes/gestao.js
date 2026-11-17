@@ -102,19 +102,29 @@ router.post('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req,
 router.get('/gestao/galeria-kit', requirePerm('plans.manage'), wrap(async (req, res) => {
   const kit = require('../services/kitGallery');
   const rows = await kit.candidates();
-  res.render('gestao/galeria-kit', { title: 'Galeria do media kit', rows, kit, statuses: require('../constants').EPISODE_STATUSES, photoUrl: require('../services/guestPhotos').signedUrl, openId: Number(req.query.editar) || null });
+  const clipChoices = await require('../services/inviteShowcase').pickCandidates();
+  res.render('gestao/galeria-kit', { title: 'Galeria do media kit', rows, kit, clipChoices, maxPicks: require('../services/inviteShowcase').MAX_PICKS, statuses: require('../constants').EPISODE_STATUSES, photoUrl: require('../services/guestPhotos').signedUrl, openId: Number(req.query.editar) || null });
 }));
 
 router.post('/gestao/galeria-kit/:id/mostrar', requirePerm('plans.manage'), wrap(async (req, res) => {
   const on = req.body.mostrar === '1';
   if (!await require('../services/kitGallery').setFeatured(Number(req.params.id), on)) await req.flash('error', 'Episódio não encontrado.');
-  else await audit(req, on ? 'kit.galeria_inclui' : 'kit.galeria_tira', 'episode', req.params.id);
+  else { await audit(req, on ? 'kit.galeria_inclui' : 'kit.galeria_tira', 'episode', req.params.id); require('../services/inviteShowcase').reset(); }
   res.redirect('/gestao/galeria-kit');
+}));
+
+// Cortes de exemplo do convite (até 4, só com capa): a ordem marcada é a ordem no convite.
+router.post('/gestao/galeria-kit/cortes', requirePerm('plans.manage'), wrap(async (req, res) => {
+  const ids = [].concat(req.body.cortes || []);
+  const n = await require('../services/inviteShowcase').setPicks(ids);
+  await audit(req, 'convite.cortes_exemplo', null, null, { n });
+  await req.flash('ok', n ? `${n} ${n === 1 ? 'corte escolhido' : 'cortes escolhidos'} para o convite.${ids.length > n ? ' O convite mostra no máximo 4.' : ''}` : 'Nenhum corte escolhido: o convite mostra os mais recentes publicados.');
+  res.redirect('/gestao/galeria-kit#cortes-convite');
 }));
 
 router.post('/gestao/galeria-kit/:id', requirePerm('plans.manage'), wrap(async (req, res) => {
   if (!await require('../services/kitGallery').save(Number(req.params.id), req.body)) await req.flash('error', 'Episódio não encontrado.');
-  else { await audit(req, 'kit.galeria_edita', 'episode', req.params.id); await req.flash('ok', 'Salvo. O media kit já mostra o novo texto.'); }
+  else { await audit(req, 'kit.galeria_edita', 'episode', req.params.id); require('../services/inviteShowcase').reset(); await req.flash('ok', 'Salvo. O media kit e o convite já mostram o novo texto.'); }
   res.redirect('/gestao/galeria-kit');
 }));
 

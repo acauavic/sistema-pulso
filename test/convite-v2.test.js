@@ -45,18 +45,40 @@ describe('Convite v2: formato, "Por que você", episódios reais e cortes de que
   it('a prévia mostra os episódios publicados, os cortes da Tamiris e os destaques; sem "14 episódios" nem "manhã" fixos', async () => {
     showcase.reset();
     const html = (await gestao.get(`/convidados/${guest.id}/previa`)).text;
-    assert.match(html, /<strong>2 episódios<\/strong> publicados/);
     assert.doesNotMatch(html, /14 episódios|até set\/2026|Uma manhã de conversa/);
     assert.match(html, /Uma tarde de conversa\. Produção completa incluída/);
     const v = vitrine(html);
-    assert.equal(v.cortes.tamiris.length, 1); assert.equal(v.cortes.tamiris[0].title, 'Toda vez que a tela ocupa um espaço');
-    assert.match(v.cortes.tamiris[0].src, /^https:\/\//, 'link assinado do armazenamento');
-    assert.equal(v.cortes.guto, undefined, 'sem cortes: a foto não abre janela');
-    assert.match(html, /data-guest="tamiris"/);
-    assert.match(html, /04 · OS CORTES/); assert.match(html, /class="clip-card"/);
+    assert.ok(v.mesa.some((g) => g.name === 'Dra. Tamiris Mariano' && g.ep === 3), 'sem galeria escolhida: a de lançamento');
+    assert.equal(v.cortes['3'].length, 1); assert.equal(v.cortes['3'][0].title, 'Toda vez que a tela ocupa um espaço');
+    assert.match(v.cortes['3'][0].src, /^https:\/\//, 'link assinado do armazenamento');
+    assert.equal(v.cortes['11'], undefined, 'sem cortes: o destaque não mostra "Ver cortes"');
+    assert.match(html, /id="mesaGrid"/); assert.match(html, /2 episódios no ar/);
+    assert.match(html, /class="clips-head"/); assert.match(html, /04 · OS CORTES/);
+    assert.doesNotMatch(html, /class="clip-card"/, 'corte sem capa não entra nos destaques');
     assert.match(html, /Saúde e inovação/); assert.match(html, /Histórias inspiradoras/);
     assert.match(html, /Escolhemos você pela trajetória/, 'sem "Por que você": frase padrão');
-    assert.doesNotMatch(html, /class="plateia-gallery"/);
+    assert.doesNotMatch(html, /class="plateia-gallery"/); assert.doesNotMatch(html, /class="hero-format"/);
+  });
+
+  it('galeria do media kit vira a mesa do convite; cortes de exemplo escolhidos (com capa) na gestão', async () => {
+    const [ep3] = await q('SELECT id FROM episodes WHERE number = 3');
+    await gestao.act(`/gestao/galeria-kit/${ep3.id}/mostrar`, { mostrar: '1' }, { from: '/gestao/galeria-kit' });
+    // um corte com capa para poder ser escolhido
+    const [clip] = await q("SELECT id, episode_id FROM episode_clips WHERE title = 'Corte 5'");
+    h.b2Store.set('capas/c5.jpg', { body: Buffer.alloc(10), contentType: 'image/jpeg' });
+    const [cv] = await q("INSERT INTO episode_covers (episode_id, clip_id, kind, spec, storage_key, mime, width, height, size_bytes, auto, approved) VALUES ($1, $2, 'reel_cover', '{}', 'capas/c5.jpg', 'image/jpeg', 1080, 1920, 10, false, true) RETURNING id", [clip.episode_id, clip.id]);
+    await q('UPDATE episode_clips SET cover_id = $2 WHERE id = $1', [clip.id, cv.id]);
+    const page = (await gestao.get('/gestao/galeria-kit')).text;
+    assert.match(page, /Cortes de exemplo no convite/); assert.match(page, new RegExp(`name="cortes" value="${clip.id}"`));
+    const r = await gestao.act('/gestao/galeria-kit/cortes', { cortes: [String(clip.id), '999999'] }, { from: '/gestao/galeria-kit' });
+    assert.equal(r.status, 302);
+    assert.ok((await q('SELECT invite_pick_at FROM episode_clips WHERE id = $1', [clip.id]))[0].invite_pick_at);
+    const html = (await gestao.get(`/convidados/${guest.id}/previa`)).text;
+    const v = vitrine(html);
+    assert.deepEqual(v.mesa.map((g) => g.name), ['Tamiris'], 'a mesa é a galeria escolhida');
+    assert.equal((html.match(/class="clip-card"/g) || []).length, 1); assert.match(html, /poster="https:/);
+    await gestao.act('/gestao/galeria-kit/cortes', {}, { from: '/gestao/galeria-kit' });
+    assert.equal((await q('SELECT invite_pick_at FROM episode_clips WHERE id = $1', [clip.id]))[0].invite_pick_at, null);
   });
 
   it('"Como o convite chega": salva formato e texto, registra no histórico e o convite muda', async () => {
@@ -70,6 +92,8 @@ describe('Convite v2: formato, "Por que você", episódios reais e cortes de que
     const html = (await gestao.get(`/convidados/${guest.id}/previa`)).text;
     assert.match(html, /Seu jeito de falar de obesidade sem culpa/); assert.match(html, /class="plateia-gallery"/); assert.match(html, /Convite · com plateia/);
     assert.match(html, /\/static\/convite\/plateia-1\.jpg/);
+    assert.match(html, /class="hero-format"><span class="hero-format-tag">Podcast com plateia/); assert.match(html, /class="intro-format">Podcast com plateia/);
+    assert.equal(JSON.parse(html.match(/const G = (\{.*\});/)[1]).plateia, true);
     await gestao.act(`/convidados/${guest.id}/convite/ajustes`, { invite_format: 'qualquer', invite_why: '   ' }, { from: `/convidados/${guest.id}` });
     assert.deepEqual((await q('SELECT invite_format, invite_why FROM guests WHERE id = $1', [guest.id]))[0], { invite_format: 'mesa', invite_why: null });
   });

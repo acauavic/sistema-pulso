@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.69.0', date: '2026-11-17', title: 'Convite: a mesa do media kit, cortes escolhidos e "com plateia" em destaque',
+    items: [
+      { kind: 'novo', text: '"Quem já sentou à mesa" no convite agora é a mesma galeria do media kit dos patrocinadores: um convidado em destaque, trocando sozinho, e todos numa grade de fotos. Quem tem cortes ganha "Ver cortes" no destaque, que abre os vídeos numa janela.' },
+      { kind: 'novo', text: 'Gestão > Galeria do media kit ganhou "Cortes de exemplo no convite": escolha até 4 cortes (só os que têm capa) para a seção "Os cortes". Sem escolha, o convite mostra o mais recente publicado de cada episódio, com capa.' },
+      { kind: 'ajuste', text: 'No convite com plateia, isso fica claro logo de cara: a abertura diz "Podcast com plateia", a frase do topo termina em "com plateia" e uma faixa explica o formato com o atalho "Veja como é".' },
+      { kind: 'ajuste', text: 'Na seção "Os cortes", título e texto ficam lado a lado, sem espaço perdido.' },
+    ],
+  },
+  {
     version: '1.68.0', date: '2026-11-17', title: 'Convite do convidado: com plateia ou de mesa, "Por que você" e cortes de verdade',
     items: [
       { kind: 'novo', text: 'O convite tem dois formatos: de mesa (só o convidado e os hosts) e com plateia. O de plateia mostra como é a gravação com público, as fotos da recepção e da plateia e o botão "Veja como é", que abre o vídeo da gravação com plateia numa janela.' },

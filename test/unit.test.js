@@ -105,7 +105,7 @@ test('YOURLS: keywords seguem a convenção dos links manuais (nome curto, depoi
 test('modelo: guest_json é seguro dentro de <script>', () => {
   const out = tpl.buildVariables({ name: '</script><!--\u2028"x"', gender: 'f', is_plural: true }).guest_json;
   assert.doesNotMatch(out, /[<>&\u2028\u2029]/);
-  assert.deepEqual(JSON.parse(out), { nome: '</script><!--\u2028"x"', plural: true, sexo: 'f', motivo: false });
+  assert.deepEqual(JSON.parse(out), { nome: '</script><!--\u2028"x"', plural: true, sexo: 'f', motivo: false, plateia: false });
   assert.equal(tpl.buildVariables({ name: 'A' }).genero, 'm');
   assert.equal(tpl.buildVariables({ name: 'A', gender: 'f' }).genero, 'f');
 });

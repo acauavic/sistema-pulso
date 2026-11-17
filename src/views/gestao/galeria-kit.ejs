@@ -5,7 +5,30 @@
 %>
 <div class="page-head"><div><span class="kicker">Gestão · Convites e parcerias</span><h1>Galeria do media kit</h1></div></div>
 <%- include('../partials/gestao-nav', { active: 'galeria' }) %>
-<p class="lead">Escolha quais episódios gravados, publicados ou ainda em produção, aparecem no slide "Quem já sentou à mesa" do media kit. O kit mostra um convidado em destaque, trocando sozinho, e todos os escolhidos numa grade de fotos quadradas, sem passar de página.</p>
+<p class="lead">Escolha quais episódios gravados, publicados ou ainda em produção, aparecem em "Quem já sentou à mesa", no media kit dos patrocinadores e no convite dos convidados. Os dois mostram um convidado em destaque, trocando sozinho, e todos os escolhidos numa grade de fotos quadradas; no convite, quem tem cortes ganha "Ver cortes".</p>
+<% var picked = clipChoices.filter(function (c) { return c.invite_pick_at; }); %>
+<section class="card" id="cortes-convite">
+  <div class="row spread"><h2>Cortes de exemplo no convite <span class="mono muted small"><%= picked.length %>/<%= maxPicks %></span></h2><% if (clipChoices.length) { %><button class="btn sm" type="button" data-modal-open="modal-cortes-convite"><%- icon('pencil', 14) %> Escolher cortes</button><% } %></div>
+  <% if (picked.length) { %>
+  <ul class="plain pick-grid top-gap">
+    <% picked.forEach(function (c) { %><li><figure class="pick"><img src="/capas/<%= c.cover_id %>/imagem" alt="Capa de <%= c.shown_title %>" loading="lazy" width="108" height="192"><span class="small"><%= c.shown_title %></span><span class="mono small muted"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') : '' %> · <%= c.guest_name || '' %></span></figure></li><% }) %>
+  </ul>
+  <% } else { %>
+  <p class="small muted">Nenhum escolhido: o convite mostra o corte publicado mais recente de cada episódio (só os que têm capa). Escolha até <%= maxPicks %> para mostrar os que mais representam o Pulso.</p>
+  <% } %>
+</section>
+<dialog class="modal modal-wide" id="modal-cortes-convite" aria-labelledby="mcc-h">
+  <form method="post" action="/gestao/galeria-kit/cortes" class="stack"><%- csrfField %>
+    <h2 id="mcc-h">Cortes de exemplo no convite</h2>
+    <p class="small muted">Marque até <%= maxPicks %>. Só aparecem cortes com capa (a capa é o que a pessoa vê antes de tocar). Os publicados nas redes vêm marcados com "no ar".</p>
+    <ul class="plain pick-grid">
+      <% clipChoices.forEach(function (c) { %>
+      <li><label class="pick"><input type="checkbox" name="cortes" value="<%= c.id %>" <%= c.invite_pick_at ? 'checked' : '' %>><img src="/capas/<%= c.cover_id %>/imagem" alt="" loading="lazy" width="108" height="192"><span class="small"><%= c.shown_title %></span><span class="mono small muted"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') : '' %><%= c.posted ? ' · no ar' : '' %></span></label></li>
+      <% }) %>
+    </ul>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar escolha</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
 
 <% if (!rows.length) { %>
 <div class="empty">
