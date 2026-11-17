@@ -57,7 +57,7 @@ describe('Convite v2: formato, "Por que você", episódios reais e cortes de que
     assert.doesNotMatch(html, /class="clip-card"/, 'corte sem capa não entra nos destaques');
     assert.match(html, /Saúde e inovação/); assert.match(html, /Histórias inspiradoras/);
     assert.match(html, /Escolhemos você pela trajetória/, 'sem "Por que você": frase padrão');
-    assert.doesNotMatch(html, /class="plateia-gallery"/); assert.doesNotMatch(html, /class="hero-format"/);
+    assert.doesNotMatch(html, /class="plateia-gallery"/);
   });
 
   it('galeria do media kit vira a mesa do convite; cortes de exemplo escolhidos (com capa) na gestão', async () => {
@@ -92,7 +92,7 @@ describe('Convite v2: formato, "Por que você", episódios reais e cortes de que
     const html = (await gestao.get(`/convidados/${guest.id}/previa`)).text;
     assert.match(html, /Seu jeito de falar de obesidade sem culpa/); assert.match(html, /class="plateia-gallery"/); assert.match(html, /Convite · com plateia/);
     assert.match(html, /\/static\/convite\/plateia-1\.jpg/);
-    assert.match(html, /class="hero-format"><span class="hero-format-tag">Podcast com plateia/); assert.match(html, /class="intro-format">Podcast com plateia/);
+    assert.doesNotMatch(html, /hero-format/, 'sem a faixa "Podcast com plateia" no topo'); assert.match(html, /class="intro-format">Podcast com plateia/);
     assert.equal(JSON.parse(html.match(/const G = (\{.*\});/)[1]).plateia, true);
     await gestao.act(`/convidados/${guest.id}/convite/ajustes`, { invite_format: 'qualquer', invite_why: '   ' }, { from: `/convidados/${guest.id}` });
     assert.deepEqual((await q('SELECT invite_format, invite_why FROM guests WHERE id = $1', [guest.id]))[0], { invite_format: 'mesa', invite_why: null });

@@ -1148,19 +1148,12 @@
   .clips-head .clips-intro { margin-bottom: 18px; }
   .clips-head .clips-facts { margin-bottom: 0; }
 
-  /* ===== destaque "podcast com plateia" no topo ===== */
-  .hero-format { display: flex; align-items: center; gap: 14px 18px; flex-wrap: wrap; margin: -24px 0 36px; padding: 14px 18px; border: 1px solid rgba(200,255,66,0.55); background: rgba(10,10,10,0.55); max-width: 760px; }
-  .hero-format-tag { background: var(--lime); color: var(--black); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.02em; text-transform: uppercase; padding: 8px 12px; }
-  .hero-format-text { color: var(--white); font-size: 15px; line-height: 1.45; flex: 1; min-width: 220px; }
-  .hero-format-play { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--white); border: 0; border-bottom: 1px solid rgba(255,255,255,0.6); padding: 2px 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; }
-  .hero-format-play::before { content: ''; width: 0; height: 0; border-left: 8px solid var(--lime); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
   .intro-format { display: inline-block; margin-top: 18px; background: var(--lime); color: var(--black); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; padding: 8px 14px; }
 
   @media (max-width: 900px) {
     .mesa { grid-template-columns: 1fr; gap: 24px; }
     .mesa-grid { grid-template-columns: repeat(3, 1fr); gap: 12px 10px; }
     .clips-head { grid-template-columns: 1fr; gap: 24px; }
-    .hero-format { margin-top: -16px; }
   }
 </style>
 </head>
@@ -1205,7 +1198,6 @@
     <div class="invite-statement" id="invite-statement">
       você é nosso <span class="highlight">convidado</span><br>para o Pulso Podcast.
     </div>
-    {{hero_formato_html}}
     <p class="invite-desc" id="invite-desc">{{convite_desc}}</p>
     <div class="invite-hero-cta">
       <a href="{{link_aceitar}}" class="btn-accept">Aceitar o convite →</a>

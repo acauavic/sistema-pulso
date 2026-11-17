@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.70.1', date: '2026-11-17', title: 'Convite com plateia mais limpo no topo',
+    items: [
+      { kind: 'ajuste', text: 'O topo do convite com plateia não tem mais a faixa "Podcast com plateia". O formato continua claro na frase "para o Pulso Podcast com plateia", no selo do canto e na abertura, e o "Veja como é" segue no bloco da plateia, em A experiência.' },
+    ],
+  },
+  {
     version: '1.70.0', date: '2026-11-17', title: 'Media kit que leva para uma conversa',
     items: [
       { kind: 'ajuste', text: 'O media kit dos patrocinadores não mostra mais planos nem preços. No lugar, "O que a sua marca pode ter" lista tudo o que o Pulso entrega, e o botão principal virou "Agendar uma conversa" (abre o WhatsApp comercial e leva o patrocinador para Em negociação).' },

@@ -13,7 +13,7 @@ const inviteHtml = () => (templateCache ??= fs.readFileSync(TEMPLATE_FILE, 'utf8
 let kitCache = null;
 const mediaKitHtml = () => (kitCache ??= fs.readFileSync(path.join(__dirname, '..', 'templates', 'media-kit.html'), 'utf8'));
 
-const RAW = new Set(['bloco_resposta', 'guest_json', 'agenda_html', 'slide_ouro_html', 'slide_diamond_html', 'compare_html', 'guests_json', 'oferta_html', 'marcas_html', 'vagas_html', 'cortes_html', 'plateia_html', 'vitrine_json', 'hero_formato_html', 'intro_formato_html']); // únicas variáveis inseridas sem escape (geradas aqui, nunca digitadas)
+const RAW = new Set(['bloco_resposta', 'guest_json', 'agenda_html', 'slide_ouro_html', 'slide_diamond_html', 'compare_html', 'guests_json', 'oferta_html', 'marcas_html', 'vagas_html', 'cortes_html', 'plateia_html', 'vitrine_json', 'intro_formato_html']); // únicas variáveis inseridas sem escape (geradas aqui, nunca digitadas)
 
 // JSON que pode ir dentro de <script> sem fechar a tag nem quebrar a linha (</script>, <!--, U+2028).
 function safeJson(obj) {
@@ -108,7 +108,6 @@ function buildVariables(guest, { owner, links = {}, showcase = null } = {}) {
       ? 'Uma sessão de 60 a 90 minutos no Estúdio GH, diante de uma plateia selecionada, com equipe técnica completa, múltiplas câmeras e áudio profissional. Você só precisa aparecer e conversar.'
       : 'Uma sessão de 60 a 90 minutos no Estúdio GH, só você e os hosts, com equipe técnica completa. Iluminação cinematográfica, múltiplas câmeras e áudio profissional: você só precisa aparecer e conversar.',
     plateia_html: plateia ? plateiaBlock() : '',
-    hero_formato_html: plateia ? `<div class="hero-format"><span class="hero-format-tag">Podcast com plateia</span><span class="hero-format-text">A conversa é gravada diante de uma plateia pequena e selecionada, com recepção e comes e bebes.</span>${sc.plateia ? '<button type="button" class="hero-format-play" data-plateia-video>Veja como é</button>' : ''}</div>` : '',
     intro_formato_html: plateia ? '<div class="intro-format">Podcast com plateia</div>' : '',
     rodape_mesa: sc.foot || `${sc.episodes || 0} episódios publicados · 1 novo por semana`,
     cortes_html: clipsSection(sc.highlights || []),
