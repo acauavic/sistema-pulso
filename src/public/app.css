@@ -1691,3 +1691,11 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
 .file-tag { font: 500 10px var(--f-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-tag); padding: 1px 5px; }
 @media (max-width: 720px) { .studio-main { padding-top: 24px; } .studio-card { padding: 18px; } }
 .num-input { width: 5.5em; }
+
+/* Chamada no fim da legenda, por rede (janela de publicar) */
+.cta-box { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.cta-box > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.cta-box .cta-box-title { color: var(--text); }
+.cta-box .cta-list { display: grid; gap: 8px; margin-top: 10px; }
+.cta-box .cta-list label { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 8px; margin: 0; }
+@media (max-width: 640px) { .cta-box .cta-list label { grid-template-columns: 1fr; gap: 4px; } }

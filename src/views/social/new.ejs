@@ -33,7 +33,7 @@
     <div class="pick-grid">
       <% if (tipo === 'video') { clips.forEach(function (c) { %>
       <label class="pick <%= c.pub ? 'used' : '' %>">
-        <input type="radio" name="clip_id" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.post_title || c.title %>" data-caption="<%= c.caption || '' %>" data-cover="<%= c.cover_id || '' %>" data-clip="<%= c.id %>">
+        <input type="radio" name="clip_id" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.post_title || c.title %>" data-caption="<%= c.caption || '' %>" data-ctas="<%= JSON.stringify(c.ctas || {}) %>" data-cover="<%= c.cover_id || '' %>" data-clip="<%= c.id %>">
         <% if (c.cover_id) { %><img src="/capas/<%= c.cover_id %>/imagem" alt="" loading="lazy"><% } else { %><span class="ph"><%- icon('film', 20) %></span><% } %>
         <strong><%= c.post_title || c.title %></strong>
         <span class="small muted"><%= c.request_id && !c.episode_id ? 'Avulso · ' + (requestKinds[c.request_kind] ? requestKinds[c.request_kind].label : 'pedido') : epLabel(c) %><%= c.duration_ms ? ' · ' + dur(c.duration_ms) : '' %></span>
@@ -95,6 +95,7 @@
     <label><%= tipo === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" maxlength="300" data-fill="title" data-ai="titulo" data-ai-scope="form"></label>
     <label>Legenda<textarea name="description" rows="6" maxlength="5000" data-fill="caption" data-ai="descricao" data-ai-scope="form"></textarea></label>
     <% } else { %><input type="hidden" name="title" value="Story" data-fill="title"><% } %>
+    <% if (tipo !== 'story') { %><%- include('../partials/cta-fields', { ctas: defaultCtas, nets: allowed.map(function (k) { return { key: k, label: platforms[k].label }; }) }) %><% } %>
     <label>Agendar <small class="muted">(vazio = <%= direct ? 'publicar agora' : 'publicar assim que a gestão aprovar' %>)</small><input type="datetime-local" name="agendar"></label>
     <% if (direct) { %>
     <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas</label>

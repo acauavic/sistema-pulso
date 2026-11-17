@@ -28,7 +28,7 @@ const scoreOf = (r) => (r.episode_status === 'publicado' ? 2e13 + new Date(r.pub
 async function availableClips({ includeUsed = false } = {}) {
   const board = require('./contentBoard');
   const [{ rows }, idx] = await Promise.all([db.query(
-    `SELECT c.id, c.title, c.post_title, c.caption, c.duration_ms, c.cover_id, c.episode_id, c.request_id, c.created_at, c.width, c.height,
+    `SELECT c.id, c.title, c.post_title, c.caption, c.ctas, c.duration_ms, c.cover_id, c.episode_id, c.request_id, c.created_at, c.width, c.height,
             e.number AS episode_number, e.title AS episode_title, e.status AS episode_status, e.published_at, e.aired_on, r.title AS request_title, r.kind AS request_kind, r.approved_at,
             EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status = 'simulado') AS tested
        FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id

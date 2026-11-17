@@ -1,4 +1,4 @@
-// Social: ao escolher um corte/imagem, o título e a legenda vêm preenchidos (se a pessoa ainda não escreveu por cima).
+// Social: ao escolher um corte/imagem, o título, a legenda e a chamada de cada rede vêm preenchidos (se a pessoa ainda não escreveu por cima).
 (function () {
   const form = document.querySelector('[data-compose]');
   if (!form) return;
@@ -43,7 +43,15 @@
     named().forEach((el) => { if (draft.values?.[el.name] != null) el.value = draft.values[el.name]; });
     for (const [value, on] of draft.platforms || []) { const el = form.querySelector(`input[name="platforms"][value="${CSS.escape(value)}"]`); if (el && !el.disabled) el.checked = on; }
   };
-  const apply = (input) => { fill(fields.title, input.dataset.title || ''); fill(fields.caption, input.dataset.caption || ''); coverButton(input); };
+  // chamada de cada rede: a que a IA escreveu para o corte escolhido (sem ela, fica a padrão que já veio no campo)
+  const ctaFields = [...form.querySelectorAll('[data-fill-cta]')];
+  ctaFields.forEach((el) => auto.set(el, el.value));
+  const fillCtas = (input) => {
+    let own = {};
+    try { own = JSON.parse(input.dataset.ctas || '{}'); } catch { /* sem chamadas próprias */ }
+    ctaFields.forEach((el) => { if (own[el.dataset.fillCta]) fill(el, own[el.dataset.fillCta]); });
+  };
+  const apply = (input) => { fill(fields.title, input.dataset.title || ''); fill(fields.caption, input.dataset.caption || ''); fillCtas(input); coverButton(input); };
   form.addEventListener('change', (e) => { if (e.target.matches('input[type="radio"]')) apply(e.target); });
   const checked = form.querySelector('input[type="radio"]:checked');
   if (checked) { apply(checked); restore(checked); }

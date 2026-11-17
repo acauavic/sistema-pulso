@@ -173,6 +173,20 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
     assert.match(hz.note, /horizontal/, 'avisa que corte horizontal não é o ideal para Reels/TikTok/Shorts');
   });
 
+  it('lote (cortes importados): reaproveita a fala, não avisa ninguém e mantém a nota de origem', async () => {
+    const [v] = (await h.db.query('SELECT * FROM episode_clips ORDER BY id')).rows;
+    await h.db.query("UPDATE episode_clips SET note = 'Veio do Drive: EP1 (CORTE 1.mp4).', post_title = NULL WHERE id = $1", [v.id]);
+    const groqBefore = h.groqCalls.length;
+    const notesBefore = (await h.db.query('SELECT count(*)::int n FROM notifications')).rows[0].n;
+    const r = await clips.runProcess({ ref_id: v.id, payload: { lote: true } }, { update: async () => {} });
+    assert.equal(r.lote, true); assert.equal(r.covers, 3);
+    const after = await clipRow(v.id);
+    assert.equal(after.status, 'pronto'); assert.equal(after.note, 'Veio do Drive: EP1 (CORTE 1.mp4).');
+    assert.equal(after.post_title, 'Prazo para sair do cargo, sem ego', 'título refeito');
+    assert.equal(h.groqCalls.length, groqBefore, 'não transcreve de novo');
+    assert.equal((await h.db.query('SELECT count(*)::int n FROM notifications')).rows[0].n, notesBefore, 'ninguém é avisado');
+  });
+
   it('a tela de conteúdo lista os cortes sem episódio e só oferece episódios já gravados', async () => {
     const page = await as.editor.get('/conteudo');
     assert.equal(page.status, 200);

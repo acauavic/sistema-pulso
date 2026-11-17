@@ -82,7 +82,7 @@
           <% if (r.note) { %><span class="small muted"><%= r.note %></span><% } %>
           <% if (r.manual) { %><span class="small muted">Postado por fora<%= r.manual_by ? ' · registrado por ' + r.manual_by : '' %><%= r.manual_at ? ' em ' + fmt.formatDateTime(r.manual_at) : '' %></span><% } %>
           <% if (canManual && !r.ok && !r.simulated) { %><button class="link small" type="button" data-fill-modal="modal-por-fora" data-fill-action="/social/publicacoes/<%= pub.id %>/por-fora" data-fill='<%- JSON.stringify({ platform: k, url: "" }) %>'>postei por fora</button><% } %>
-          <% if (pub.options && pub.options.texts && pub.options.texts[k]) { %><span class="small muted">Com texto próprio desta rede (editado no reenvio).</span><% } %>
+          <% if (pub.options && pub.options.texts && pub.options.texts[k]) { %><span class="small muted">Com texto próprio desta rede (editado no reenvio).</span><% } else if (pub.options && pub.options.ctas && pub.options.ctas[k]) { %><span class="small muted">Chamada no fim: <%= pub.options.ctas[k] %></span><% } %>
           <% if (resend && !r.ok && r.error && !r.retry_at) { var rn = resend.list.find(function (n) { return n.key === k; }); if (rn && !rn.noAccount) { %><button class="link small" type="button" data-resend-net="<%= k %>">Corrigir e reenviar só <%= label(k) %></button><% } } %>
         </li>
         <% }) %>

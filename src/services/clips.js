@@ -158,10 +158,14 @@ async function announceNewVersion(clip) {
 }
 
 // ---------------------------------------------------------------- textos (IA)
+const SC = require('./socialCopy');
 const TEXTS_SCHEMA = {
   type: 'OBJECT',
-  properties: { titulo: { type: 'STRING' }, legenda: { type: 'STRING' }, textos_capa: { type: 'ARRAY', items: { type: 'STRING' } } },
-  required: ['titulo', 'legenda', 'textos_capa'],
+  properties: {
+    titulo: { type: 'STRING' }, legenda: { type: 'STRING' }, textos_capa: { type: 'ARRAY', items: { type: 'STRING' } },
+    chamadas: { type: 'OBJECT', properties: Object.fromEntries(SC.NETWORKS.map((n) => [n, { type: 'STRING' }])), required: SC.NETWORKS },
+  },
+  required: ['titulo', 'legenda', 'textos_capa', 'chamadas'],
 };
 
 const cleanCoverText = (t) => {
@@ -171,25 +175,38 @@ const cleanCoverText = (t) => {
 const goodCover = (t) => t && t.split(/\s+/).length >= 2;
 const hashtagLine = (tags, n = 4) => [...new Set((tags || []).map((h) => `#${String(h).replace(/^#/, '').replace(/[^\p{L}\p{N}_]/gu, '')}`).filter((h) => h.length > 2))].slice(0, n).join(' ');
 
-// Título, legenda e 3 textos de capa a partir do que a pessoa fala no corte. Sem IA ou sem fala, devolve vazio (a equipe escreve).
-async function writeTexts({ episode = null, guest = null, transcript, hashtags = [] }) {
-  const empty = { post_title: null, caption: null, cover_texts: [] };
-  if (!config.geminiConfigured || !transcript || transcript.length < 20) return empty;
+// O pedido de textos do corte (exportado para o teste conferir as regras de copy).
+function textsPrompt({ episode = null, guest = null, transcript, avoid = [] }) {
   const context = episode ? fin.buildContext({ episode, guest, sponsors: [] }) : 'Podcast: Pulso (corte ainda sem episódio definido).';
-  const parts = [{ text: [
+  return [
     fin.MARCA, '', context, '',
-    'Abaixo está a fala de UM corte vertical de até 2 minutos. Devolva:',
-    '- titulo: de 4 a 9 palavras, até 60 caracteres; abre com o gancho; sem ponto final; sem clickbait e sem prometer o que o trecho não diz.',
-    '- legenda: 1 a 3 frases curtas (até 280 caracteres) que contextualizam o trecho e convidam a ver, sem "link na bio" nem exclamações. NÃO inclua hashtags.',
-    `- textos_capa: EXATAMENTE 3 textos para a capa do vídeo: de 2 a 4 palavras, no máximo ${L.LIMITS.thumbnailText.maxChars - 4} caracteres, de ângulos diferentes; PREFIRA um trecho curto que a pessoa realmente disse ou uma tensão; nunca um rótulo genérico ("Liderança"). Cada texto faz sentido sozinho.`,
+    'Abaixo está a fala de UM corte vertical de até 2 minutos para Reels, TikTok e Shorts. Escreva como um bom copywriter de redes sociais: o objetivo é a pessoa parar de rolar, assistir até o fim e querer mais do Pulso, sem prometer o que o trecho não diz.',
+    `- titulo: de 4 a 9 palavras, até 60 caracteres, sem ponto final. ${SC.COPY.titulo}`,
+    `- textos_capa: EXATAMENTE 3 textos para a capa do vídeo, de 2 a 5 palavras e no máximo ${L.LIMITS.thumbnailText.maxChars - 4} caracteres, cada um por um caminho diferente. ${SC.COPY.capa}`,
+    `- legenda: de 2 a 4 frases curtas (até 320 caracteres), sem hashtags e sem exclamações. ${SC.COPY.legenda}`,
+    `- chamadas: uma chamada por rede, em 1 frase de até ${SC.CTA_MAX} caracteres, que diz o que fazer e dá um motivo ligado ao tema deste corte (não um motivo genérico). ${SC.NETWORKS.map((n) => SC.CTA_RULE[n]).join('; ')}. Sem "link na bio", sem exclamações em sequência.`,
+    avoid.length ? `\nA versão anterior usou frases genéricas proibidas (${avoid.join(', ')}). Reescreva sem elas.` : '',
     '', `Fala: ${L.fitWords(transcript, 3000)}`,
-  ].join('\n') }];
+  ].filter((x) => x !== '').join('\n');
+}
+
+// Título, legenda, 3 textos de capa e a chamada de cada rede a partir do que a pessoa fala no corte. Sem IA ou sem fala, devolve
+// vazio (a equipe escreve). Legenda com frase genérica proibida ganha uma segunda tentativa.
+async function writeTexts({ episode = null, guest = null, transcript, hashtags = [] }) {
+  const empty = { post_title: null, caption: null, cover_texts: [], ctas: null };
+  if (!config.geminiConfigured || !transcript || transcript.length < 20) return empty;
   try {
-    const { data } = await gemini.generateJson({ parts, schema: TEXTS_SCHEMA, temperature: 0.6 });
+    let data; let avoid = [];
+    for (let round = 0; round < 2; round += 1) {
+      ({ data } = await gemini.generateJson({ parts: [{ text: textsPrompt({ episode, guest, transcript, avoid }) }], schema: TEXTS_SCHEMA, temperature: 0.7 }));
+      avoid = SC.bannedIn(`${data.titulo || ''} ${data.legenda || ''} ${(data.textos_capa || []).join(' ')}`);
+      if (!avoid.length) break;
+    }
     const title = L.fitWords(L.balanceQuotes(fin.stripEmoji(data.titulo || '')).replace(/[.]+$/, ''), 60);
     const cover = [...new Set((data.textos_capa || []).map(cleanCoverText).filter(goodCover))].slice(0, 3);
-    const body = L.fitWords(L.balanceQuotes(L.stripAngles(fin.stripEmoji(data.legenda || ''))), 320);
-    return { post_title: title || null, caption: L.tidy([body, hashtagLine(hashtags)].filter(Boolean).join('\n\n')) || null, cover_texts: cover };
+    const body = L.fitWords(L.balanceQuotes(L.stripAngles(fin.stripEmoji(data.legenda || ''))), 360);
+    const ctas = Object.fromEntries(SC.NETWORKS.map((n) => [n, SC.tidyCta(fin.stripEmoji(data.chamadas?.[n] || ''))]).filter(([, t]) => t));
+    return { post_title: title || null, caption: L.tidy([body, hashtagLine(hashtags)].filter(Boolean).join('\n\n')) || null, cover_texts: cover, ctas: Object.keys(ctas).length ? ctas : null };
   } catch (err) {
     console.error('Falha ao escrever textos do corte:', err.message);
     return empty;
@@ -274,8 +291,10 @@ async function runProcess(job, { update }) {
     if (info.duration_ms > 3 * 60_000) notes.push('Mais de 3 minutos: Reels e Shorts podem não aceitar.');
     await db.query('UPDATE episode_clips SET width = $2, height = $3, duration_ms = $4, updated_at = now() WHERE id = $1', [clip.id, info.width, info.height, info.duration_ms]);
 
+    // lote (cortes importados): a fala já foi transcrita na importação e ninguém precisa de aviso por corte
+    const batch = Boolean(job.payload?.lote);
     let transcript = clip.transcript || null;
-    if (config.groqConfigured && info.hasAudio) {
+    if (config.groqConfigured && info.hasAudio && !(batch && transcript)) {
       try {
         await update('Transcrevendo a fala…', 15);
         const chunks = await media.extractAudioChunks(src, dir, 1200);
@@ -319,8 +338,8 @@ async function runProcess(job, { update }) {
       const texts = await writeTexts({ episode, guest, transcript, hashtags: meta?.suggestions?.hashtags || [] });
       await db.query(
         `UPDATE episode_clips SET transcript = $2, post_title = coalesce($3, post_title), caption = coalesce(nullif(caption, ''), $4),
-           cover_texts = CASE WHEN $5::jsonb = '[]'::jsonb THEN cover_texts ELSE $5::jsonb END, updated_at = now() WHERE id = $1`,
-        [clip.id, transcript, texts.post_title, texts.caption, JSON.stringify(texts.cover_texts)]);
+           cover_texts = CASE WHEN $5::jsonb = '[]'::jsonb THEN cover_texts ELSE $5::jsonb END, ctas = coalesce($6::jsonb, ctas), updated_at = now() WHERE id = $1`,
+        [clip.id, transcript, texts.post_title, texts.caption, JSON.stringify(texts.cover_texts), texts.ctas ? JSON.stringify(texts.ctas) : null]);
     }
 
     let covers = 0;
@@ -328,16 +347,23 @@ async function runProcess(job, { update }) {
       await update('Montando as capas…', 85);
       try { covers = (await buildCovers(clip.id, clip.created_by)).length; } catch (err) { notes.push(`Capas não montadas: ${String(err.message).slice(0, 120)}.`); }
     }
-    await db.query("UPDATE episode_clips SET status = 'pronto', note = $2, error = NULL, updated_at = now() WHERE id = $1", [clip.id, notes.join(' ') || null]);
+    // no lote, a nota de origem (ex.: "Veio do Drive: …") fica; o que deu errado agora vai depois dela
+    const note = batch ? [clip.note, ...notes].filter(Boolean).join(' ') : notes.join(' ');
+    await db.query("UPDATE episode_clips SET status = 'pronto', note = $2, error = NULL, updated_at = now() WHERE id = $1", [clip.id, note || null]);
     await require('./videoViews').ensure(clip.storage_key).catch((err) => console.error('[corte] versão leve:', err.message)); // assistir sem travar
     if (replaced) {
       await announceNewVersion(clip).catch((err) => console.error('[corte] aviso de nova versão:', err.message));
       return { clip_id: clip.id, version: clip.version, duration_ms: info.duration_ms, covers };
     }
+    if (batch) return { clip_id: clip.id, duration_ms: info.duration_ms, covers, lote: true };
     await require('./notify').notify({ type: 'rotina', users: [clip.created_by], title: `${clip.title} está pronto`, body: notes.length ? notes.join(' ') : `${covers} capas sugeridas. Falta atribuir ao episódio e publicar.`, url: `/cortes/${clip.id}`, entity: { type: 'clip', id: clip.id } }).catch(() => {});
     await announceToReview(clip, covers).catch((err) => console.error('[corte] aviso à gestão:', err.message));
     return { clip_id: clip.id, duration_ms: info.duration_ms, width: info.width, height: info.height, covers, transcript: Boolean(transcript) };
   } catch (err) {
+    if (job.payload?.lote) { // lote: o corte já estava pronto; continua pronto, com a nota de origem, e quem rodou o lote vê o erro
+      await db.query("UPDATE episode_clips SET status = 'pronto', note = $2, updated_at = now() WHERE id = $1", [clip.id, clip.note]);
+      throw err;
+    }
     await db.query("UPDATE episode_clips SET status = 'erro', error = $2, updated_at = now() WHERE id = $1", [clip.id, String(err.message).slice(0, 500)]);
     await require('./notify').notify({ type: 'rotina', users: [clip.video_by || clip.created_by], title: `Não foi possível ler ${clip.title}`, body: String(err.message).slice(0, 300), url: `/cortes/${clip.id}`, entity: { type: 'clip', id: clip.id } }).catch(() => {});
     throw err;
@@ -385,4 +411,4 @@ async function announceToReview(clip, covers) {
 }
 
 jobs.register('corte', runProcess);
-module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, replaceState, pendingReplacement, cancelReplacement, startReplacement, finishReplacement, versionsOf, writeTexts, buildCovers, assign, runProcess, removeClip, momentsFor, cleanCoverText };
+module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, replaceState, pendingReplacement, cancelReplacement, startReplacement, finishReplacement, versionsOf, writeTexts, textsPrompt, buildCovers, assign, runProcess, removeClip, momentsFor, cleanCoverText };

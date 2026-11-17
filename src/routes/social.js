@@ -198,6 +198,7 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
   const showUsed = req.query.publicados === '1';
   const [clips, images, conn, ls] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), socialApi.connectedAll(), socialApi.liveState()]);
   res.render('social/new', {
+    defaultCtas: require('../services/socialCopy').forClip(null),
     videoTags: await socialApi.videoTags(), title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
     connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), canCover: can(req.user.role, 'covers.edit'), pick: req.query.item || '',
   });
@@ -248,7 +249,7 @@ router.post('/social/publicar', requirePerm('social.request'), wrap(async (req, 
   const ig = require('../services/igPeople').parse(req.body, { media, platforms });
   if (ig.error) return fail(ig.error);
   try {
-    const pub = await publishing.create({ ...target, media, platforms, title, description, scheduledAt, userId: req.user.id, review, instagram: ig.instagram });
+    const pub = await publishing.create({ ...target, media, platforms, title, description, scheduledAt, userId: req.user.id, review, instagram: ig.instagram, ctas: require('../services/socialCopy').readForm(req.body, platforms) });
     await audit(req, review ? 'publicacao.pedida' : 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, tipo: media, simulado: pub.status === 'simulado' });
     await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub));
     return res.redirect(`/social/publicacoes/${pub.id}`);

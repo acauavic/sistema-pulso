@@ -255,6 +255,7 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
   ]);
   const light = Boolean(await require('../services/videoViews').viewKeyFor(c.storage_key));
   res.render('content/clip', {
+    ctas: require('../services/socialCopy').forClip(c),
     comments: thread, request, versions, replace, light,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C, videoTags: await socialApi.videoTags(),
@@ -374,7 +375,8 @@ async function publish(req, res, { episodeId, clipId }) {
   if (ig.error) return fail(ig.error);
   if (req.body.confirmar !== '1' && !review) return fail('Confirme o envio marcando "Entendi que isto publica nas redes escolhidas".');
   try {
-    const pub = await publishing.create({ episodeId, clipId, ...form, userId: req.user.id, review, instagram: clipId ? ig.instagram : null });
+    const ctas = clipId ? require('../services/socialCopy').readForm(req.body, form.platforms) : null;
+    const pub = await publishing.create({ episodeId, clipId, ...form, userId: req.user.id, review, instagram: clipId ? ig.instagram : null, ctas });
     await audit(req, 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, simulado: pub.status === 'simulado' });
     if (wantsJson(req)) return res.json({ ok: true, publication: pub });
     await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub, { trail: ' O andamento aparece abaixo.' }));

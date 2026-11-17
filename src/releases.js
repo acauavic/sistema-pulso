@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.71.0', date: '2026-11-17', title: 'Copy das redes: capas, títulos e legendas que fazem parar de rolar, e a chamada certa em cada rede',
+    items: [
+      { kind: 'ajuste', text: 'A IA agora escreve título, texto da capa e legenda dos cortes com critério de copy: frase forte do convidado, tensão, promessa concreta, número ou pergunta. Rótulos genéricos e frases como "momento de reflexão" ou "assista ao trecho" estão proibidos, e a legenda que vier com elas é refeita.' },
+      { kind: 'novo', text: 'Chamada no fim da legenda, por rede: no YouTube, "inscreva-se"; no Instagram, "siga o perfil"; no TikTok, "segue"; no LinkedIn, com um motivo profissional. A IA escreve uma para cada corte, ligada ao tema dele, e a janela de publicar mostra todas para ajustar antes de enviar.' },
+      { kind: 'ajuste', text: 'A legenda fica sem a chamada: cada rede recebe a sua no envio, e a página da publicação mostra qual chamada foi para cada uma.' },
+    ],
+  },
+  {
     version: '1.70.1', date: '2026-11-17', title: 'Convite com plateia mais limpo no topo',
     items: [
       { kind: 'ajuste', text: 'O topo do convite com plateia não tem mais a faixa "Podcast com plateia". O formato continua claro na frase "para o Pulso Podcast com plateia", no selo do canto e na abertura, e o "Veja como é" segue no bloco da plateia, em A experiência.' },

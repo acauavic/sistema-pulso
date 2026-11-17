@@ -20,6 +20,7 @@ const E = require('./publishErrors');
 
 // Linha do tempo do episódio (conteúdo avulso, como o trailer do canal, não tem episódio: não registra).
 const addEvent = (episodeId, userId, message) => (!episodeId ? Promise.resolve() : db.query("INSERT INTO episode_events (episode_id, user_id, type, message) VALUES ($1,$2,'publicacao',$3)", [episodeId, userId || null, message]));
+const SC = require('./socialCopy');
 const labelOf = (p) => up.PLATFORMS[p]?.label || p;
 const names = (list) => list.map(labelOf).join(', ');
 
@@ -72,7 +73,7 @@ async function loadTarget({ episodeId, clipId, media = 'video', coverIds = [] })
 
 // Cria a publicação (já conferida) e envia na hora, ou deixa agendada.
 // review = true: quem pediu não publica direto (produtora); fica "em revisão" até a gestão aprovar ou recusar.
-async function create({ episodeId, clipId = null, media = 'video', coverIds = [], platforms, title, description = '', scheduledAt = null, tags = [], userId = null, review = false, instagram = null }) {
+async function create({ episodeId, clipId = null, media = 'video', coverIds = [], platforms, title, description = '', scheduledAt = null, tags = [], userId = null, review = false, instagram = null, ctas = null }) {
   const target = await loadTarget({ episodeId, clipId, media, coverIds });
   const list = [...new Set(platforms || [])];
   const check = target.kind === 'photo'
@@ -83,8 +84,10 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
     check.issues.push(...d.issues); check.warnings.push(...d.warnings);
     if (d.issues.length) check.ok = false;
   }
-  const caption = description || title;
+  // chamada do fim do texto, por rede (só as redes desta publicação; story não leva texto)
+  const chamadas = ctas && media !== 'story' ? Object.fromEntries(Object.entries(ctas).filter(([n, t]) => list.includes(n) && t)) : {};
   for (const net of ['x', 'threads']) { // texto curto nessas redes: vai a versão que cabe (L.fitText), e quem publica fica sabendo
+    const caption = SC.compose(description || title, chamadas[net]);
     const n = caption && list.includes(net) && media !== 'story' ? L.textLength(net, caption) : 0;
     if (n > L.TEXT_MAX[net]) check.warnings.push(`${labelOf(net)}: a legenda tem ${n} caracteres e a rede aceita ${L.TEXT_MAX[net]}; lá vai a versão curta, até onde cabe sem cortar palavra.`);
   }
@@ -122,7 +125,7 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
       ({ rows: [pub] } = await client.query(
         `INSERT INTO episode_publications (episode_id, clip_id, platforms, title, description, options, cover_id, scheduled_at, status, created_by, media, cover_ids, provider)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-        [row.episodeId, row.clipId, list, row.title, description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(row.clipId ? { clip: row.clipId } : {}), ...(routesMap ? { routes: routesMap } : {}), ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}) }),
+        [row.episodeId, row.clipId, list, row.title, description ? L.tidy(description) : null, JSON.stringify({ tags, warnings: check.warnings, ...(row.clipId ? { clip: row.clipId } : {}), ...(routesMap ? { routes: routesMap } : {}), ...(instagram && list.includes('instagram') && media !== 'story' ? { instagram } : {}), ...(Object.keys(chamadas).length ? { ctas: chamadas } : {}) }),
           target.kind === 'photo' ? target.covers[0].id : target.coverId, scheduledAt || null, review ? 'revisao' : (scheduledAt ? 'agendado' : 'enviando'), userId, media, row.coverIds, provider.id]));
     }
     await client.query('COMMIT');
@@ -166,7 +169,12 @@ function pendingKeys(pub, outcomes) {
 // `only`: reenvia só estas redes (as que falharam); `keep`: resultados das demais, que ficam como estão.
 // trigger: agora | agendado | aprovado | manual | automatico | retomado (vai para o histórico de tentativas).
 // Texto próprio de uma rede (reenvio editado: options.texts[rede] = { title, description }); sem ele, o texto da publicação.
-const textOf = (pub, net) => ({ title: pub.options?.texts?.[net]?.title ?? pub.title, description: pub.options?.texts?.[net]?.description ?? pub.description });
+// Sem texto próprio, a legenda leva no fim a chamada daquela rede (options.ctas), quando há.
+const textOf = (pub, net) => {
+  const own = pub.options?.texts?.[net];
+  const cta = pub.options?.ctas?.[net];
+  return { title: own?.title ?? pub.title, description: own?.description ?? (cta ? SC.compose(pub.description || '', cta) : pub.description) };
+};
 // Divide cada grupo de provedor pelas redes que levam o mesmo texto (cada variação é um envio, com a sua chave de repetição).
 function byText(pub, groups) {
   const out = [];

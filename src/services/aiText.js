@@ -6,14 +6,15 @@ const config = require('../config');
 const gemini = require('./gemini');
 const fin = require('./finalization');
 const L = require('./platformLimits');
+const SC = require('./socialCopy');
 
 // Cada campo: o que é, as regras e o tamanho máximo (a IA é instruída e o resultado é cortado se passar).
 const FIELDS = {
-  capa: { label: 'texto da capa', max: L.LIMITS.thumbnailText.maxChars, rule: `texto curto para pôr em cima da imagem: de 2 a 5 palavras, até ${L.LIMITS.thumbnailText.maxChars} caracteres, sem ponto final; o gancho que faz parar de rolar` },
+  capa: { label: 'texto da capa', max: L.LIMITS.thumbnailText.maxChars, rule: `texto curto para pôr em cima da imagem: de 2 a 5 palavras, até ${L.LIMITS.thumbnailText.maxChars} caracteres, sem ponto final. ${SC.COPY.capa}` },
   capa_frase: { label: 'frase do post', max: 200, rule: 'frase de impacto dita pelo convidado, de 8 a 30 palavras, até 200 caracteres; prefira um trecho literal da fala; sem aspas' },
   capa_slide: { label: 'texto do slide do carrossel', max: 140, rule: 'texto de um slide de carrossel: 1 ou 2 frases curtas, até 140 caracteres' },
-  titulo: { label: 'título do post', max: 60, rule: 'título do post do corte: de 4 a 9 palavras, até 60 caracteres, abre com o gancho, sem ponto final, sem clickbait' },
-  descricao: { label: 'legenda do post', max: 600, rule: 'legenda para Instagram/TikTok: 1 a 3 frases curtas (até 300 caracteres) que contextualizam e convidam a ver; sem "link na bio"; sem hashtags (a não ser que o pedido peça)' },
+  titulo: { label: 'título do post', max: 60, rule: `título do post do corte: de 4 a 9 palavras, até 60 caracteres, sem ponto final. ${SC.COPY.titulo}` },
+  descricao: { label: 'legenda do post', max: 600, rule: `legenda para Reels, TikTok e Shorts: de 2 a 4 frases curtas (até 320 caracteres); sem hashtags (a não ser que o pedido peça). ${SC.COPY.legenda}` },
   titulo_youtube: { label: 'título do YouTube', max: 100, rule: 'título do episódio no YouTube: até 70 caracteres de preferência (no máximo 100), com o nome do convidado ou o tema central, sem caixa alta gritada, sem clickbait' },
   convite_motivo: { label: 'texto "Por que você" do convite', max: 600, rule: 'duas ou três frases curtas (até 350 caracteres) falando diretamente com a pessoa convidada ("você"), dizendo por que o Pulso quer conversar com ela: o que ela construiu, o que ela pensa ou faz de diferente e por que isso interessa ao profissional da saúde ou ao público que quer viver com mais saúde. Concreto, caloroso, sem bajulação, sem superlativo vazio, sem exclamações. Use só os dados fornecidos; se faltar dado, fique no que existe' },
   descricao_youtube: { label: 'descrição do YouTube', max: 3000, rule: 'descrição do episódio no YouTube: um parágrafo de abertura (2 a 3 frases) sobre a conversa, depois quem é o convidado em uma frase; sem links inventados' },
