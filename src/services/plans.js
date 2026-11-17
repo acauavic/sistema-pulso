@@ -108,9 +108,8 @@ async function kitHtml() {
       <div class="deliver-list">
         ${items.map((i) => deliver(i)).join('\n        ')}
       </div>
-      ${choices.length ? `<div class="choice-label"><span class="choice-badge">Episódio especial</span> Num episódio feito com a marca, ela pode:</div>
-      <div class="choice-grid">${choices.map((i) => `<div class="choice-item"><h4>${esc(i.title)}</h4>${i.description ? `<p>${esc(i.description)}</p>` : ''}</div>`).join('')}</div>` : ''}
-      <div class="closing-cta" style="margin-top:22px;"><a class="btn lime-fill" href="/patrocinador/quero" target="_blank" rel="noopener">Agendar uma conversa →</a></div>`;
+      ${choices.length ? `<p class="offer-special"><span class="choice-badge">Episódio especial</span> a marca pode ${choices.map((i) => `<span>${esc(String(i.title).charAt(0).toLowerCase() + String(i.title).slice(1))}</span>`).join('<span class="sep">·</span>')}</p>` : ''}
+      <div class="offer-cta"><a class="btn lime-fill" href="/patrocinador/quero" target="_blank" rel="noopener">Agendar uma conversa →</a><span class="mono">O formato e o investimento saem da conversa.</span></div>`;
   return { oferta_html };
 }
 

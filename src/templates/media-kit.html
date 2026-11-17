@@ -219,6 +219,15 @@
   .vagas p{font-size:13px; line-height:1.5; color:var(--gray-300);}
   .vagas-dots{display:flex; gap:6px; margin-top:10px;} .vagas-dots span{width:22px; height:6px; background:rgba(255,255,255,0.18);} .vagas-dots span.on{background:var(--lime);}
   @media (max-width:700px){ .vagas{grid-template-columns:1fr; gap:10px;} }
+  /* o que a sua marca pode ter: cabe no slide (3 colunas, episódio especial numa linha) */
+  #s10 .deliver-list{grid-template-columns:repeat(3,1fr);}
+  #s10 .deliver-item{padding:13px 16px; gap:4px;}
+  #s10 .deliver-item p{font-size:12px;}
+  .offer-special{margin-top:14px; font-size:13px; line-height:1.6; color:var(--gray-300); display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;}
+  .offer-special .sep{color:var(--lime);}
+  .offer-cta{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:16px;}
+  .offer-cta .mono{font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gray-300);}
+  @media (max-width:900px){ #s10 .deliver-list{grid-template-columns:1fr;} }
   /* marcas que já estão com o Pulso */
   .brands{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1px; background:rgba(0,0,0,0.1); border:1px solid rgba(0,0,0,0.1); margin-top:26px;}
   .brand{background:var(--white); min-height:150px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:24px 20px; text-align:center;}
@@ -663,7 +672,7 @@
   <!-- 04 — NOMES CONFIRMADOS -->
 <section class="slide bone" id="s04">
     <div class="slide-content">
-      <div class="eyebrow"><span class="num">04</span> Nomes confirmados</div>
+      <div class="eyebrow"><span class="num">04</span> Próximos episódios</div>
       <h2 class="slide-title">Quem vem por aí.</h2>
       <p class="slide-lede">Os próximos episódios do Pulso, com a data de estreia e o alcance de cada convidado. A lista cresce a cada semana.</p>
       {{ agenda_html }}
