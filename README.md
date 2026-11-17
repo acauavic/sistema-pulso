@@ -502,8 +502,9 @@ Sem push no aparelho, mas com alertas permitidos, a aba aberta em segundo plano 
 Detalhes e decisões em [`docs/relatorio-arquitetura-2026-10.md`](docs/relatorio-arquitetura-2026-10.md).
 
 - **Processos** (`ROLE`): `web` atende o painel; `worker` roda a fila e as rotinas; `all` faz os dois (desenvolvimento).
-- **Fila** (`src/services/jobs.js`, tabela `jobs`): Postgres com `SKIP LOCKED`; acorda na hora com `LISTEN/NOTIFY`; **duas pistas**
-  por worker (pesada: corte e finalização; leve: e-mails e ideias); falha passageira tenta de novo (30 s, 2 min, 8 min; cota da IA,
+- **Fila** (`src/services/jobs.js`, tabela `jobs`): Postgres com `SKIP LOCKED`; acorda na hora com `LISTEN/NOTIFY`; **quatro pistas**
+  por worker (cortes: até 5 ao mesmo tempo, `CORTES_EM_PARALELO` de 1 a 10; pesada: finalização e transcrição, uma por vez; video:
+  versão leve, uma por vez; leve: e-mails e ideias); falha passageira tenta de novo (30 s, 2 min, 8 min; cota da IA,
   15 min); sinal de vida a cada 15 s e devolução do que ficou preso.
 - **Rotinas** (`src/services/scheduler.js`): publicar agendados (30 s), fila travada (1 min), tarefas vencendo (15 min), automações
   (5 min), limpeza (6 h). Cada uma roda em **uma réplica por vez** (trava consultiva do Postgres); a última execução fica em `scheduler_runs`.

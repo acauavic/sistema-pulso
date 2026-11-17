@@ -10,10 +10,17 @@ const handlers = new Map();
 const errorHooks = new Map();
 const WORKER_ID = `${os.hostname()}:${process.pid}`;
 const CHANNEL = 'pulso_jobs';
-// Duas pistas por processo: a pesada (FFmpeg + IA, minutos) não segura a leve (e-mails, ideias), que roda em paralelo.
-const HEAVY = ['corte', 'finalizacao', 'transcricao'];
-// Pista própria para a versão leve dos vídeos: um episódio inteiro leva minutos e não pode segurar cortes e finalização.
+// Pistas por processo, cada uma com quantos trabalhos roda ao mesmo tempo:
+// - cortes: a leitura de cada corte (quadros, IA, capas) leva ~1 min e quase todo esse tempo é espera de rede (IA, armazenamento),
+//   então vários correm juntos: 10 cortes enviados de uma vez ficam prontos em ~3 min, não em ~12. Padrão 5 (CORTES_EM_PARALELO).
+// - pesada: episódio inteiro (finalização, transcrição), um por vez. - video: versão leve dos vídeos, uma por vez.
+// - leve: o resto (e-mails, ideias), que nunca espera as outras.
+const CUTS = ['corte'];
+const HEAVY = ['finalizacao', 'transcricao'];
 const VIDEO = ['video_leve'];
+const SPECIAL = [...CUTS, ...HEAVY, ...VIDEO];
+const cutSlots = () => Math.min(10, Math.max(1, Number(process.env.CORTES_EM_PARALELO) || 5));
+const LANE_KINDS = { cortes: CUTS, pesada: HEAVY, video: VIDEO };
 // onError(job, err): avisar alguém quando o trabalho falha de vez (ex.: notificação de rotina do sistema).
 const register = (kind, fn, { onError } = {}) => { handlers.set(kind, fn); if (onError) errorHooks.set(kind, onError); };
 
@@ -42,14 +49,14 @@ async function enqueue(kind, { episodeId = null, refId = null, payload = {}, max
 const update = (id, { message, progress }) => db.query(
   'UPDATE jobs SET message = coalesce($2, message), progress = coalesce($3, progress), heartbeat_at = now() WHERE id = $1', [id, message ?? null, progress ?? null]);
 
-// lane: 'pesada' (só HEAVY), 'video' (só VIDEO), 'leve' (o resto) ou null (qualquer um).
+// lane: 'cortes', 'pesada', 'video' (só os tipos dela), 'leve' (o resto) ou null (qualquer um).
 async function claim(lane = null) {
-  const filter = lane === 'pesada' || lane === 'video' ? 'AND kind = ANY($2::text[])' : lane === 'leve' ? 'AND NOT (kind = ANY($2::text[]))' : '';
+  const filter = LANE_KINDS[lane] ? 'AND kind = ANY($2::text[])' : lane === 'leve' ? 'AND NOT (kind = ANY($2::text[]))' : '';
   const { rows } = await db.query(
     `UPDATE jobs SET status = 'running', started_at = now(), heartbeat_at = now(), attempts = attempts + 1, worker = $1,
             message = CASE WHEN attempts > 0 THEN 'Tentando de novo…' ELSE 'Começando…' END, progress = 0
       WHERE id = (SELECT id FROM jobs WHERE status = 'queued' AND run_after <= now() ${filter} ORDER BY run_after, id LIMIT 1 FOR UPDATE SKIP LOCKED)
-      RETURNING *`, lane ? [WORKER_ID, lane === 'pesada' ? HEAVY : lane === 'video' ? VIDEO : [...HEAVY, ...VIDEO]] : [WORKER_ID]);
+      RETURNING *`, lane ? [WORKER_ID, LANE_KINDS[lane] || SPECIAL] : [WORKER_ID]);
   return rows[0] || null;
 }
 
@@ -67,7 +74,11 @@ function retryDelay(err, attempt) {
 // Roda o próximo da fila (se houver). Devolve o trabalho final ou null.
 async function runNext({ lane = null } = {}) {
   const job = await claim(lane);
-  if (!job) return null;
+  return job ? execute(job) : null;
+}
+
+// Executa um trabalho já reservado (claim).
+async function execute(job) {
   const handler = handlers.get(job.kind);
   const beat = setInterval(() => db.query('UPDATE jobs SET heartbeat_at = now() WHERE id = $1', [job.id]).catch(() => {}), 15_000);
   beat.unref();
@@ -115,21 +126,34 @@ const retryJob = (id) => db.query(
   .then(async (r) => { if (r.rows[0]) await db.query('SELECT pg_notify($1, $2)', [CHANNEL, String(id)]).catch(() => {}); return r.rows[0] || null; });
 
 let timer = null; let stopping = false; let listener = null;
-const lanes = { pesada: { busy: false, running: null }, video: { busy: false, running: null }, leve: { busy: false, running: null } };
-async function drainLane(name) {
+// Cada pista tem `slots` voltas de trabalho; cada volta pega um trabalho por vez até a fila esvaziar.
+const lanes = {
+  cortes: { slots: cutSlots(), active: 0, running: new Set() },
+  pesada: { slots: 1, active: 0, running: new Set() },
+  video: { slots: 1, active: 0, running: new Set() },
+  leve: { slots: 1, active: 0, running: new Set() },
+};
+// Uma volta: reserva um trabalho; se conseguiu, abre outra volta (até `slots`) antes de executar, então a pista enche sozinha
+// quando há fila e, parada, faz uma consulta só por conferência.
+async function laneLoop(name) {
   const l = lanes[name];
-  if (l.busy || stopping) return;
-  l.busy = true;
+  l.active += 1;
   try {
     while (!stopping) {
-      l.running = runNext({ lane: name });
-      const job = await l.running;
-      l.running = null;
+      const job = await claim(name);
       if (!job) break;
+      drainLane(name);
+      const p = execute(job);
+      l.running.add(p);
+      try { await p; } finally { l.running.delete(p); }
     }
-  } catch (err) { console.error(`worker (${name}):`, err.message); } finally { l.busy = false; l.running = null; }
+  } catch (err) { console.error(`worker (${name}):`, err.message); } finally { l.active -= 1; }
 }
-const drain = () => { drainLane('pesada'); drainLane('video'); drainLane('leve'); };
+function drainLane(name) {
+  const l = lanes[name];
+  if (!stopping && l.active < l.slots) laneLoop(name);
+}
+const drain = () => Object.keys(lanes).forEach(drainLane);
 
 // Liga o processador neste processo: acorda com NOTIFY e, por garantia, confere a fila a cada `intervalMs`.
 async function startWorker({ intervalMs = 5000 } = {}) {
@@ -152,11 +176,11 @@ async function stopWorker({ waitMs = 8000 } = {}) {
   if (timer) clearInterval(timer);
   timer = null;
   if (listener) { listener.release(); listener = null; }
-  const current = Object.values(lanes).map((l) => l.running).filter(Boolean);
+  const current = Object.values(lanes).flatMap((l) => [...l.running]);
   if (current.length) await Promise.race([Promise.allSettled(current), new Promise((r) => setTimeout(r, waitMs))]);
 }
 
 const latest = (episodeId, kind, refId = null) => db.query(
   'SELECT * FROM jobs WHERE episode_id = $1 AND kind = $2 AND ref_id IS NOT DISTINCT FROM $3 ORDER BY id DESC LIMIT 1', [episodeId, kind, refId]).then((r) => r.rows[0] || null);
 
-module.exports = { WORKER_ID, HEAVY, VIDEO, register, enqueue, update, runNext, recoverStuck, retryJob, retryDelay, startWorker, stopWorker, latest };
+module.exports = { WORKER_ID, CUTS, HEAVY, VIDEO, cutSlots, lanes, register, enqueue, update, runNext, recoverStuck, retryJob, retryDelay, startWorker, stopWorker, latest };

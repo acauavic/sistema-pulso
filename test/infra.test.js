@@ -67,7 +67,28 @@ describe('infraestrutura: fila, rotinas, tempo real e limitador', () => {
       const light = await jobs.enqueue('email_teste', { refId: 901 });
       assert.equal((await jobs.runNext({ lane: 'leve' })).id, light.id, 'a pista leve pula o corte');
       assert.equal(await jobs.runNext({ lane: 'leve' }), null);
-      assert.equal((await jobs.runNext({ lane: 'pesada' })).id, heavy.id);
+      assert.equal(await jobs.runNext({ lane: 'pesada' }), null, 'corte tem pista própria');
+      assert.equal((await jobs.runNext({ lane: 'cortes' })).id, heavy.id);
+    });
+
+    it('cortes em paralelo: até 5 ao mesmo tempo por padrão (CORTES_EM_PARALELO muda, de 1 a 10)', async () => {
+      await h.db.query("UPDATE jobs SET status = 'done' WHERE status IN ('queued','running')");
+      assert.equal(jobs.cutSlots(), 5);
+      process.env.CORTES_EM_PARALELO = '50'; assert.equal(jobs.cutSlots(), 10);
+      process.env.CORTES_EM_PARALELO = '0'; assert.equal(jobs.cutSlots(), 5);
+      delete process.env.CORTES_EM_PARALELO;
+      let now = 0; let peak = 0;
+      jobs.register('corte', async () => { now += 1; peak = Math.max(peak, now); await new Promise((r) => setTimeout(r, 150)); now -= 1; return { ok: true }; });
+      for (let i = 0; i < 7; i += 1) await jobs.enqueue('corte', { refId: 950 + i });
+      await jobs.startWorker({ intervalMs: 50 });
+      try {
+        for (let t = 0; t < 100; t += 1) {
+          if ((await h.db.query("SELECT count(*)::int n FROM jobs WHERE kind = 'corte' AND status <> 'done'")).rows[0].n === 0) break;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      } finally { await jobs.stopWorker({ waitMs: 2000 }); }
+      assert.equal((await h.db.query("SELECT count(*)::int n FROM jobs WHERE kind = 'corte' AND status <> 'done'")).rows[0].n, 0);
+      assert.equal(peak, 5, 'cinco cortes ao mesmo tempo, nunca mais');
     });
 
     it('trabalho "rodando" sem sinal de vida volta para a fila (o processo caiu)', async () => {

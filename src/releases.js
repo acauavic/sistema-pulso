@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.72.0', date: '2026-11-17', title: 'Cortes lidos em paralelo',
+    items: [
+      { kind: 'ajuste', text: 'Quando vários cortes sobem de uma vez, o sistema lê até 5 ao mesmo tempo (quadros, título, legenda, chamadas e capas). Dez cortes ficam prontos em uns 3 minutos, e não mais em 12.' },
+    ],
+  },
+  {
     version: '1.71.0', date: '2026-11-17', title: 'Copy das redes: capas, títulos e legendas que fazem parar de rolar, e a chamada certa em cada rede',
     items: [
       { kind: 'ajuste', text: 'A IA agora escreve título, texto da capa e legenda dos cortes com critério de copy: frase forte do convidado, tensão, promessa concreta, número ou pergunta. Rótulos genéricos e frases como "momento de reflexão" ou "assista ao trecho" estão proibidos, e a legenda que vier com elas é refeita.' },
