@@ -96,7 +96,7 @@ router.get('/patrocinadores', requirePerm('sponsors.read'), wrap(async (req, res
   if (stage && view === 'lista') { params.push(stage); where.push(`s.stage = $${params.length}`); }
   const [{ rows: sponsors }, { rows: owners }, totals] = await Promise.all([
     db.query(
-      `SELECT s.id, s.company, s.kind, s.tier, s.value_cents, s.contact_name, s.stage, s.public_token, s.brief_completed_at, s.updated_at, s.owner_id, u.name AS owner_name,
+      `SELECT s.id, s.company, s.kind, s.tier, s.value_cents, s.contact_name, s.stage, s.public_token, s.brief_completed_at, s.updated_at, s.owner_id, u.name AS owner_name, s.origin,
               b.skipped AS b_skipped, b.na AS b_na, b.landing_url, b.landing_perk, b.offer, b.presentation, b.key_points, b.restrictions, b.slogan, b.goal, b.goal_other,
               EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo') AS has_logo
          FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id LEFT JOIN sponsor_briefs b ON b.sponsor_id = s.id

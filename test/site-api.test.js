@@ -594,3 +594,42 @@ describe('Site: formulários', () => {
     assert.equal((await h.db.query("SELECT utm FROM guests WHERE instagram = 'semutm'")).rows[0].utm, null);
   });
 });
+
+describe('Site: origem no painel', () => {
+  let app; let as; let gid; let sid; let gOther; let sOther;
+  const CHIP = /<span class="file-tag" title="Pediu pelo site">site<\/span>/g;
+  before(async () => {
+    await h.resetDb();
+    app = await h.startServer();
+    await h.createUser({ name: 'Gil Gestão', email: 'gestao@t.com', role: 'gestao' });
+    as = h.client(app.base);
+    assert.equal((await as.login('gestao@t.com')).status, 302);
+    gid = (await h.db.query(`INSERT INTO guests (name, instagram, profile, status, origin) VALUES ('Dra. Do Site', 'dra.dosite', 'medico', 'prospect', 'site') RETURNING id`)).rows[0].id;
+    gOther = (await h.db.query(`INSERT INTO guests (name, instagram, profile, status) VALUES ('Dr. Do Painel', 'dr.dopainel', 'medico', 'prospect') RETURNING id`)).rows[0].id;
+    sid = (await h.db.query(`INSERT INTO sponsors (company, stage, origin) VALUES ('Marca do Site', 'prospect', 'site') RETURNING id`)).rows[0].id;
+    sOther = (await h.db.query(`INSERT INTO sponsors (company, stage) VALUES ('Marca do Painel', 'prospect') RETURNING id`)).rows[0].id;
+  });
+  after(async () => { await app.close?.(); });
+
+  // Sem navegador nesta sessão: o chip é conferido no HTML que o servidor entrega.
+  it('convidado vindo do site leva o chip "site" na lista, no quadro e no cadastro', async () => {
+    for (const view of ['lista', 'quadro']) {
+      const r = await as.get(`/convidados?view=${view}`);
+      assert.equal(r.status, 200);
+      assert.equal((r.text.match(CHIP) || []).length, 1, view);
+      assert.match(r.text, /Dra\. Do Site<\/strong><\/a> <span class="file-tag"|Dra\. Do Site<\/strong> <span class="file-tag"/, view);
+    }
+    assert.equal(((await as.get(`/convidados/${gid}`)).text.match(CHIP) || []).length, 1);
+    assert.equal(((await as.get(`/convidados/${gOther}`)).text.match(CHIP) || []).length, 0);
+  });
+
+  it('patrocinador vindo do site leva o chip "site" na lista, no quadro e no cadastro', async () => {
+    for (const view of ['lista', 'quadro']) {
+      const r = await as.get(`/patrocinadores?view=${view}`);
+      assert.equal(r.status, 200);
+      assert.equal((r.text.match(CHIP) || []).length, 1, view);
+    }
+    assert.equal(((await as.get(`/patrocinadores/${sid}`)).text.match(CHIP) || []).length, 1);
+    assert.equal(((await as.get(`/patrocinadores/${sOther}`)).text.match(CHIP) || []).length, 0);
+  });
+});

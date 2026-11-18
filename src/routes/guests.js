@@ -130,7 +130,7 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   const [{ rows: guests }, { rows: owners }, { rows: sponsors }] = await Promise.all([
     db.query(
       `SELECT g.id, g.name, g.instagram, g.profile, g.company, g.job_title, g.topic, g.status, g.proposed_at, g.invite_sent_at, g.invite_viewed_at,
-              g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason
+              g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason, g.origin
          FROM guests g LEFT JOIN users u ON u.id = g.owner_id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY g.updated_at DESC LIMIT 500`, params),
