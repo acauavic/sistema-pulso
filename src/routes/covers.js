@@ -49,6 +49,7 @@ async function episodePhotos(episodeId) {
   return rows.filter((f) => PHOTO_EXT.test(f.filename)).map((f) => ({ id: f.id, name: f.filename, kind: f.kind, thumb: `/episodios/${episodeId}/arquivos/${f.id}/previa` }));
 }
 
+const THUMB_SIDE = require('../services/coverStore').THUMB_SIDE;
 const fileName = (ep, c) => `${ep?.number ? `ep${String(ep.number).padStart(3, '0')}` : (c.clip_id ? `corte${c.clip_id}` : 'episodio')}-${c.kind.replace(/_/g, '-')}-${c.position + 1}.jpg`;
 // Para onde voltar depois de aprovar/excluir: cada tipo de capa mora num lugar.
 const homeOf = (c) => (c.clip_id ? `/cortes/${c.clip_id}` : (c.kind === 'youtube_thumb' ? `/episodios/${c.episode_id}#capas` : `/conteudo?episodio=${c.episode_id}#posts`));
@@ -59,7 +60,7 @@ router.get(both('/imagem'), requirePerm('episodes.read'), wrap(async (req, res) 
   const current = String(req.query.v || '') === String(new Date(c.updated_at).getTime()) && req.query.baixar !== '1';
   if (req.query.baixar !== '1') { // para ver: WebP guardado no servidor (a versão entra na chave: capa refeita = WebP novo)
     const sent = await require('../services/webImage').send(req, res, {
-      key: c.storage_key, version: String(new Date(c.updated_at).getTime()), maxSide: 2400,
+      key: c.storage_key, version: String(new Date(c.updated_at).getTime()), maxSide: req.query.w === String(THUMB_SIDE) ? THUMB_SIDE : 2400, // ?w=640: miniatura das listas
       headers: { 'Cache-Control': current ? 'private, max-age=86400' : 'no-cache' }, fallback: () => false,
     });
     if (sent !== false) return sent;

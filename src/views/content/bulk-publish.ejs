@@ -11,7 +11,8 @@
 </div>
 <p class="lead">
   <%= platforms.map(labelOf).join(' · ') %>. <span class="mono"><%= opts.perDay %></span> por dia, das <span class="mono"><%= hhmm(opts.from) %></span> às <span class="mono"><%= hhmm(opts.to) %></span>, a partir de <span class="mono"><%= opts.start.split('-').reverse().join('/') %></span><%= days.length > 1 ? ', em ' + days.length + ' dias' : '' %>.
-  <% if (ig && trials) { %><span class="mono"><%= trials %></span> <%= trials === 1 ? 'vai' : 'vão' %> ao Instagram como Reel de teste (<%= opts.trialMode === 'manual' ? 'você libera no app' : 'libera sozinho se for bem' %>).<% } %>
+  <% if (auto) { %>Automação no Instagram: quem comentar a palavra recebe o link no direct por <span class="mono"><%= auto.days %></span> dias.<% } %>
+    <% if (ig && trials) { %><span class="mono"><%= trials %></span> <%= trials === 1 ? 'vai' : 'vão' %> ao Instagram como Reel de teste (<%= opts.trialMode === 'manual' ? 'você libera no app' : 'libera sozinho se for bem' %>).<% } %>
 </p>
 
 <% if (skipped.length) { %>
@@ -27,6 +28,7 @@
 <form method="post" action="/conteudo/em-massa/publicar" data-busy="Agendando…">
   <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="episodio" value="<%= episodio %>"><input type="hidden" name="teste_modo" value="<%= opts.trialMode %>">
   <% platforms.forEach(function (p) { %><input type="hidden" name="platforms" value="<%= p %>"><% }) %>
+  <% if (auto) { %><input type="hidden" name="auto_on" value="1"><input type="hidden" name="auto_palavra" value="<%= auto.keyword %>"><input type="hidden" name="auto_mensagem" value="<%= auto.message %>"><input type="hidden" name="auto_resposta" value="<%= auto.reply || '' %>"><input type="hidden" name="auto_dias" value="<%= auto.days %>"><% } %>
   <% days.forEach(function (d) { var mine = rows.filter(function (r) { return dayOf(r) === d; }); %>
   <section class="agenda-day">
     <h2><span class="mono"><%= d %></span> <span class="small muted"><%= mine.length %> <%= mine.length === 1 ? 'post' : 'posts' %></span></h2>
@@ -34,10 +36,10 @@
     <div class="agenda-row">
       <input type="hidden" name="ids" value="<%= c.id %>">
       <label class="when"><span class="sr-only">Horário de <%= c.post_title || c.title %></span><input type="datetime-local" name="at_<%= c.id %>" value="<%= fmt.toInputValue(r.at) %>" step="300" required></label>
-      <% if (r.cover) { %><img src="/capas/<%= r.cover.id %>/imagem?v=<%= new Date(r.cover.updated_at).getTime() %>" alt="" loading="lazy"><% } else { %><span class="poster-empty"><%- icon('film', 16) %></span><% } %>
+      <% if (r.cover) { %><img src="/capas/<%= r.cover.id %>/imagem?v=<%= new Date(r.cover.updated_at).getTime() %>&w=640" alt="" loading="lazy"><% } else { %><span class="poster-empty"><%- icon('film', 16) %></span><% } %>
       <div>
         <a href="/cortes/<%= c.id %>" target="_blank" rel="noopener"><strong><%= c.post_title || c.title %></strong></a>
-        <p class="handle muted m-0"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.title %><%= c.duration_ms ? ' · ' + fmt.formatClock(c.duration_ms) : '' %><%= r.cover ? '' : ' · sem capa' %></p>
+        <p class="handle muted m-0"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.title %><%= c.duration_ms ? ' · ' + fmt.formatClock(c.duration_ms) : '' %><%= r.cover ? '' : ' · sem capa' %><%= auto ? ' · comente ' + keywordOf(c) : '' %></p>
       </div>
       <% if (ig) { %><label class="check small trial-cell"><input type="checkbox" name="teste_<%= c.id %>" value="1" <%= r.trial ? 'checked' : '' %>> Reel de teste</label><% } %>
     </div>

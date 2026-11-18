@@ -42,7 +42,7 @@
       <% }); } else if (tipo === 'carrossel') { images.carousels.forEach(function (g) { %>
       <label class="pick <%= g.pub ? 'used' : '' %>">
         <input type="radio" name="cover_ids" value="<%= g.slides.map(function (s) { return s.id; }).join(',') %>" data-episode="<%= g.episode_id || (g.slides[0] && g.slides[0].episode_id) || '' %>" required <%= String(pick) === g.slides.map(function (s) { return s.id; }).join(',') ? 'checked' : '' %> data-title="<%= g.label || 'Carrossel' %>" data-cover="<%= g.slides[0] && g.slides[0].kind !== 'entrega' ? g.slides[0].id : '' %>">
-        <span class="slides"><% g.slides.slice(0, 3).forEach(function (s) { %><img src="/capas/<%= s.id %>/imagem" alt="" loading="lazy"><% }) %></span>
+        <span class="slides"><% g.slides.slice(0, 3).forEach(function (s) { %><img src="/capas/<%= s.id %>/imagem?w=640" alt="" loading="lazy"><% }) %></span>
         <strong><%= g.label || 'Carrossel' %></strong>
         <span class="small muted"><%= epLabel(g) %> · <span class="mono"><%= g.slides.length %></span> slides</span>
         <span class="row small"><%- usedChip(g) %></span>
@@ -50,7 +50,7 @@
       <% }); } else { items.forEach(function (c) { %>
       <label class="pick <%= c.pub ? 'used' : '' %>">
         <input type="radio" name="cover_ids" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.label || (tipo === 'story' ? 'Story' : 'Post') %>" data-cover="<%= c.kind !== 'entrega' ? c.id : '' %>">
-        <img class="<%= tipo === 'imagem' ? 'sq' : '' %>" src="/capas/<%= c.id %>/imagem" alt="" loading="lazy">
+        <img class="<%= tipo === 'imagem' ? 'sq' : '' %>" src="/capas/<%= c.id %>/imagem?w=640" alt="" loading="lazy">
         <strong><%= c.label || (c.kind === 'post_quote' ? 'Frase' : c.kind === 'post_split' ? 'Tela dividida' : tipo === 'story' ? 'Story' : 'Post') %></strong>
         <span class="small muted"><%= epLabel(c) %></span>
         <span class="row small"><%- usedChip(c) %></span>
@@ -65,7 +65,7 @@
         <% storyPosts.forEach(function (c) { %>
         <label class="pick">
           <input type="radio" name="cover_ids" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.label || 'Story' %>" data-cover="<%= c.kind !== 'entrega' ? c.id : '' %>">
-          <img class="sq" src="/capas/<%= c.id %>/imagem" alt="" loading="lazy">
+          <img class="sq" src="/capas/<%= c.id %>/imagem?w=640" alt="" loading="lazy">
           <strong><%= c.label || (c.kind === 'post_split' ? 'Tela dividida' : 'Frase') %></strong>
           <span class="small muted"><%= epLabel(c) %></span>
         </label>
@@ -95,7 +95,7 @@
     <label><%= tipo === 'video' ? 'Título' : 'Título interno' %><input type="text" name="title" maxlength="300" data-fill="title" data-ai="titulo" data-ai-scope="form"></label>
     <label>Legenda<textarea name="description" rows="6" maxlength="5000" data-fill="caption" data-ai="descricao" data-ai-scope="form"></textarea></label>
     <% } else { %><input type="hidden" name="title" value="Story" data-fill="title"><% } %>
-    <% if (tipo !== 'story') { %><%- include('../partials/cta-fields', { ctas: defaultCtas, nets: allowed.map(function (k) { return { key: k, label: platforms[k].label }; }) }) %><% } %>
+    <% if (tipo !== 'story') { %><%- include('../partials/cta-fields', { ctas: defaultCtas, nets: allowed.map(function (k) { return { key: k, label: platforms[k].label }; }) }) %><%- include('../partials/auto-fields', { auto: autoDefaults, bulk: true }) %><% } %>
     <label>Agendar <small class="muted">(vazio = <%= direct ? 'publicar agora' : 'publicar assim que a gestão aprovar' %>)</small><input type="datetime-local" name="agendar"></label>
     <% if (direct) { %>
     <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas</label>
@@ -111,5 +111,6 @@
 </form>
 <% } %>
 <script src="/static/social.js?v=<%= assetV %>" defer></script>
+<script src="/static/autocta.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>

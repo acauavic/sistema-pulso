@@ -120,7 +120,7 @@
       <div class="delivery-grid top-gap">
         <% images.forEach(function (im, i) { %>
         <figure>
-          <a href="/capas/<%= im.id %>/imagem" target="_blank" rel="noopener"><img src="/capas/<%= im.id %>/imagem?v=<%= new Date(im.updated_at).getTime() %>" alt="<%= r.kind === 'carrossel' ? 'Slide ' + (i + 1) : 'Imagem entregue' %>" loading="lazy" width="<%= im.width %>" height="<%= im.height %>"></a>
+          <a href="/capas/<%= im.id %>/imagem" target="_blank" rel="noopener"><img src="/capas/<%= im.id %>/imagem?v=<%= new Date(im.updated_at).getTime() %>&w=640" alt="<%= r.kind === 'carrossel' ? 'Slide ' + (i + 1) : 'Imagem entregue' %>" loading="lazy" width="<%= im.width %>" height="<%= im.height %>"></a>
           <figcaption>
             <span class="handle muted"><%= r.kind === 'carrossel' ? (i + 1) + ' · ' : '' %><%= im.width %>×<%= im.height %></span>
             <% if (r.status === 'aprovado' && k.publish !== 'carrossel') { %><span class="row small"><%- chipOf(im.pub) %></span><% } %>

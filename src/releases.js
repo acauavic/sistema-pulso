@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.74.0', date: '2026-11-17', title: 'Automação "comentou, recebe no direct" na hora de publicar, e listas mais rápidas',
+    items: [
+      { kind: 'novo', text: 'Ao publicar um corte, um post ou vários de uma vez, ligue "Automação no Instagram": quem comentar a palavra (por padrão, o primeiro nome do convidado, como TAMIRIS) recebe no direct o link do episódio, do canal do YouTube ou da comunidade no WhatsApp. A chamada do Instagram passa a pedir a palavra sozinha, e a publicação e o corte mostram quantas respostas já saíram.' },
+      { kind: 'novo', text: 'Social > Automações ganhou "Links que vão no direct" (canal do YouTube, comunidade no WhatsApp e Spotify). O link do episódio é o do próprio episódio no YouTube; antes da estreia, vai o do canal.' },
+      { kind: 'novo', text: 'Integrações > Comentários e directs: reconectar o Instagram com acesso às mensagens (pela Outstand) e o endereço e o segredo do aviso de comentários, com a hora do último aviso recebido.' },
+      { kind: 'ajuste', text: 'Quadro, cortes, posts e capas do episódio carregam miniaturas leves das capas em vez da imagem inteira, e a miniatura já fica pronta quando a capa nasce. Atribuir cortes a um episódio volta na hora: as capas são refeitas em segundo plano.' },
+      { kind: 'ajuste', text: 'Publicar em massa lembra as últimas escolhas (redes, horários, por dia, Reel de teste e automação) neste navegador.' },
+    ],
+  },
+  {
     version: '1.73.0', date: '2026-11-17', title: 'Conteúdo: filtro por episódio, ordem, publicar em massa e capas em lote',
     items: [
       { kind: 'novo', text: 'Publicar em massa: em Conteúdo > Cortes, marque os cortes e toque em "Publicar". Escolha as redes, a partir de quando, a janela do dia (ex.: das 08:00 às 22:00), quantos por dia e quantos vão ao Instagram como Reel de teste. O sistema distribui os horários na ordem da lista e mostra a agenda para conferir (dá para mudar um horário ou marcar e desmarcar o Reel de teste) antes de agendar. Cada corte sai com o próprio título, legenda, capa e chamada de cada rede.' },

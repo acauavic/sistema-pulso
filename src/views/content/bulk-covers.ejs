@@ -25,7 +25,7 @@
       <% c.covers.forEach(function (v) { %>
       <label class="cover-pick" title="<%= v.label || 'Capa' %>">
         <input type="radio" name="capa_<%= c.id %>" value="<%= v.id %>" <%= c.chosen && c.chosen.id === v.id ? 'checked' : '' %>>
-        <img src="/capas/<%= v.id %>/imagem?v=<%= new Date(v.updated_at).getTime() %>" alt="<%= v.label || 'Capa' %>" loading="lazy">
+        <img src="/capas/<%= v.id %>/imagem?v=<%= new Date(v.updated_at).getTime() %>&w=640" alt="<%= v.label || 'Capa' %>" loading="lazy">
       </label>
       <% }) %>
     </div>

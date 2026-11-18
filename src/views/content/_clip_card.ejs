@@ -7,7 +7,7 @@
 <article class="clip-card" data-clip="<%= c.id %>"<% if (pick) { %> data-dl-item data-id="<%= c.id %>"<% if (c.status === 'pronto' && c.storage_key) { %> data-zip="c<%= c.id %>" data-href="/cortes/<%= c.id %>/video?baixar=1" data-name="<%= c.title %>.mp4" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %><% } %>>
   <% if (pick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.title %>"><% } %>
   <a class="clip-poster" href="/cortes/<%= c.id %>" aria-label="Abrir <%= c.title %>"<%- pick ? ' data-dl-pick' : '' %>>
-    <% if (chosen) { %><img src="/capas/<%= chosen.id %>/imagem?v=<%= new Date(chosen.updated_at).getTime() %>" alt="Capa de <%= c.title %>" loading="lazy" width="108" height="192"><% } else { %><span class="poster-empty"><%- icon('film', 28) %></span><% } %>
+    <% if (chosen) { %><img src="/capas/<%= chosen.id %>/imagem?v=<%= new Date(chosen.updated_at).getTime() %>&w=640" alt="Capa de <%= c.title %>" loading="lazy" width="108" height="192"><% } else { %><span class="poster-empty"><%- icon('film', 28) %></span><% } %>
   </a>
   <div class="clip-body">
     <div class="row spread"><a href="/cortes/<%= c.id %>"><strong><%= c.title %></strong></a><span class="badge <%= st[0] %>" data-clip-badge><%= st[1] %></span></div>

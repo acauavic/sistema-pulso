@@ -31,6 +31,7 @@ function createApp() {
     }
   });
 
+  app.use(require('./routes/webhooks')); // avisos de fora (comentário na Outstand): antes dos leitores de corpo, para conferir a assinatura
   app.use(express.urlencoded({ extended: false, limit: '1mb' })); // CSV da importação vai no corpo do formulário
   app.use(express.json({ limit: '50kb' }));
   app.use(require('./utils/requestCache').middleware); // o mesmo ajuste lido várias vezes na página vai ao banco uma vez

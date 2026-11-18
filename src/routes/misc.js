@@ -86,7 +86,43 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
     social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), by: p.by, env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))), outstandTiktok: await require('../services/outstand').tiktokMode(), outstandProcess: await require('../services/outstand').processMedia(),
       routeMap: await require('../services/socialApi').routeMap(), overrides: await require('../services/socialApi').routes(), networks: Object.fromEntries(Object.entries(require('../services/socialApi').PLATFORMS).map(([k, v]) => [k, v.label])),
       accounts: await require('../services/socialHealth').overview(), problems: await require('../services/socialHealth').problems() },
+    comments: await commentsSetup(),
   });
+}));
+
+// Comentários e directs pela Outstand (automação de comentário → direct): estado, reconexão com acesso às mensagens e segredo do aviso.
+async function commentsSetup() {
+  const automation = require('../services/commentAutomation');
+  const ost = require('../services/outstand');
+  const conn = config.outstandConfigured ? await ost.connected().catch(() => ({ platforms: {} })) : { platforms: {} };
+  return { configured: config.outstandConfigured, handle: String(conn.platforms?.instagram?.handle || '').replace(/^@/, ''), status: await automation.state(), webhookUrl: `${config.appBaseUrl.replace(/\/$/, '')}/webhooks/outstand` };
+}
+router.post('/integracoes/outstand/segredo', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  await require('../services/commentAutomation').newSecret();
+  await audit(req, 'integracao.outstand_segredo', 'settings', null);
+  await req.flash('ok', 'Segredo gerado. Cole o endereço e o segredo no aviso (webhook) da Outstand.');
+  res.redirect('/integracoes#comentarios');
+}));
+router.post('/integracoes/outstand/mensagens', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  try {
+    const url = await require('../services/outstand').instagramAuthUrl(`${config.appBaseUrl.replace(/\/$/, '')}/integracoes/outstand/voltou`);
+    await audit(req, 'integracao.outstand_reconectar', 'settings', null);
+    return res.redirect(303, url);
+  } catch (err) {
+    await req.flash('error', `Não consegui abrir a reconexão: ${err.message}`);
+    return res.redirect('/integracoes#comentarios');
+  }
+}));
+router.get('/integracoes/outstand/voltou', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const automation = require('../services/commentAutomation');
+  if (req.query.error || !req.query.success) {
+    await req.flash('error', `O Instagram não foi reconectado${req.query.error ? `: ${String(req.query.error).slice(0, 120)}` : ''}. Tente de novo e aprove o acesso às mensagens.`);
+  } else {
+    await automation.note({ reconnected_at: new Date().toISOString(), reconnected_user: String(req.query.username || '').slice(0, 60) });
+    require('../services/outstand').resetCache();
+    await req.flash('ok', `Instagram${req.query.username ? ` @${String(req.query.username).slice(0, 60)}` : ''} reconectado com acesso às mensagens.`);
+  }
+  res.redirect('/integracoes#comentarios');
 }));
 
 // Envio direto ao Backblaze: liga ou desliga o CORS do bucket (a regra que deixa o navegador enviar as partes sem passar pelo servidor).

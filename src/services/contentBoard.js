@@ -52,7 +52,7 @@ function stateOf(pubs) {
 const stateOfCovers = (idx, ids) => stateOf([...new Map(ids.flatMap((id) => idx.byCover.get(id) || []).map((p) => [p.id, p])).values()]);
 
 const epLabel = (n, t) => (n ? `EP.${String(n).padStart(3, '0')}` : '') + (t ? `${n ? ' · ' : ''}${t}` : '');
-const thumb = (id, at) => `/capas/${id}/imagem?v=${new Date(at).getTime()}`;
+const thumb = (id, at) => `/capas/${id}/imagem?v=${new Date(at).getTime()}&w=640`; // miniatura leve (coverStore.THUMB_SIDE)
 
 // Todas as peças, já com etapa. episodeId: só de um episódio. recentDays: corta o "Publicado" antigo (null = tudo).
 async function build({ episodeId = null, recentDays = 60, today = new Date().toISOString().slice(0, 10) } = {}) {

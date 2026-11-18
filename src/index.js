@@ -60,6 +60,7 @@ async function main() {
   require('./services/transcriptionJob'); // transcrição do vídeo editado, logo depois do envio
   require('./services/clips');
   require('./services/social');
+  require('./services/commentAutomation'); // registra 'comentario_recebido' (automação de comentário → direct pela Outstand)
   require('./services/notify');
   require('./services/push'); // registra o trabalho 'push_notificacao'
   require('./services/videoViews'); // registra 'video_leve' (versão leve para assistir)

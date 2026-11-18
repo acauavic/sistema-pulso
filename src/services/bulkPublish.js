@@ -65,9 +65,9 @@ function plan(clipIds, { start, from, to, perDay, trialPerDay }, now = new Date(
 // Cortes que podem entrar: prontos, com episódio (ou de um pedido) e que ainda não saíram nem estão na fila. Mantém a ordem pedida.
 async function eligible(ids) {
   const { rows } = await db.query(
-    `SELECT c.id, c.title, c.post_title, c.caption, c.ctas, c.status, c.episode_id, c.request_id, c.cover_id, c.duration_ms, e.number AS ep_number,
+    `SELECT c.id, c.title, c.post_title, c.caption, c.ctas, c.status, c.episode_id, c.request_id, c.cover_id, c.duration_ms, e.number AS ep_number, g.name AS guest_name,
             (SELECT p.status FROM episode_publications p WHERE p.clip_id = c.id AND p.status = ANY($2) ORDER BY p.id DESC LIMIT 1) AS queued
-       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id WHERE c.id = ANY($1)`, [ids, QUEUED]);
+       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id WHERE c.id = ANY($1)`, [ids, QUEUED]);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const ok = []; const skipped = [];
   for (const id of ids) {
@@ -83,8 +83,10 @@ async function eligible(ids) {
 
 // Cria as publicações agendadas. items: [{ clipId, at, trial }]. Cada corte com o seu texto, capa e chamadas por rede.
 // Falha num corte não para os outros: volta em `failed` com o motivo.
-async function schedule(items, { platforms, trialMode = 'auto', userId, review = false }) {
+// auto: automação de comentário → direct (commentAutomation.readForm); palavra vazia = primeiro nome do convidado de cada corte.
+async function schedule(items, { platforms, trialMode = 'auto', userId, review = false, auto = null }) {
   const publishing = require('./publishing');
+  const automation = require('./commentAutomation');
   const { ok } = await eligible(items.map((i) => i.clipId));
   const byId = new Map(ok.map((c) => [c.id, c]));
   const created = []; const failed = [];
@@ -93,11 +95,13 @@ async function schedule(items, { platforms, trialMode = 'auto', userId, review =
     if (!c) { failed.push({ clipId: it.clipId, why: 'não pode mais ser publicado (já saiu, está na fila ou mudou)' }); continue; }
     const trial = it.trial && platforms.includes('instagram');
     try {
+      const prep = await automation.prepare(auto, { platforms, ctas: SC.forClip(c, platforms), guestName: c.guest_name || 'Episódio' });
       const pub = await publishing.create({
         episodeId: c.episode_id, clipId: c.id, platforms, title: c.post_title || c.title, description: c.caption || '', scheduledAt: it.at, userId, review,
-        instagram: trial ? { collaborators: [], tags: [], trial: trialMode } : null, ctas: SC.forClip(c, platforms),
+        instagram: trial ? { collaborators: [], tags: [], trial: trialMode } : null, ctas: prep.ctas,
       });
-      created.push({ clip: c, pub, trial });
+      const rule = auto ? await automation.attach(pub, auto, { keyword: prep.keyword, userId }) : null;
+      created.push({ clip: c, pub, trial, keyword: rule ? prep.keyword : null });
     } catch (err) { failed.push({ clipId: c.id, title: c.post_title || c.title, why: err.message }); }
   }
   return { created, failed };

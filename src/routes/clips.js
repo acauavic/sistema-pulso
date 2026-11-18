@@ -94,7 +94,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const columns = built.columns.map((col) => ({ ...col, cards: col.cards.filter(keep) }));
   const pedir = Object.prototype.hasOwnProperty.call(R.KINDS, req.query.pedir) ? req.query.pedir : (req.query.pedir === '1' ? 'trailer' : null);
   res.render('content/index', {
-    uploadPost: up, situacao, ordem, readyCount: clipRows.rows.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !board.stateOf(idx.byClip.get(c.id))).length,
+    uploadPost: up, autoDefaults: await require('../services/commentAutomation').formDefaults({}), situacao, ordem, readyCount: clipRows.rows.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !board.stateOf(idx.byClip.get(c.id))).length,
     columns, hiddenOld: built.hiddenOld, tipo, vista: ['quadro', 'cortes', 'posts', 'pedidos'].includes(req.query.vista) ? req.query.vista : 'quadro',
     requests: reqs, openRequests: reqs.filter((r) => R.OPEN.includes(r.status)), people: people.rows, episodeList: episodeList.rows, K: R.KINDS, S: R.STATUSES, F: R.FORMATS,
     pedir, today: new Date().toISOString().slice(0, 10), isLate: R.isLate, stageLabel: board.STAGE_LABEL,
@@ -268,8 +268,13 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     clips.versionsOf(c.id), clips.replaceState(c),
   ]);
   const light = Boolean(await require('../services/videoViews').viewKeyFor(c.storage_key));
+  const automation = require('../services/commentAutomation');
+  const [autoDefaults, autoOf] = await Promise.all([
+    automation.formDefaults({ guest: ep.rows[0]?.guest_name ? { name: ep.rows[0].guest_name } : null }),
+    Promise.all(pubs.rows.map(async (p) => [p.id, await automation.ofPublication(p.id)])).then((l) => Object.fromEntries(l.filter(([, r]) => r))),
+  ]);
   res.render('content/clip', {
-    ctas: require('../services/socialCopy').forClip(c),
+    ctas: require('../services/socialCopy').forClip(c), autoDefaults, autoOf,
     comments: thread, request, versions, replace, light,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C, videoTags: await socialApi.videoTags(),
@@ -299,7 +304,7 @@ router.post('/cortes/:id/atribuir', requirePerm('episodes.read'), wrap(async (re
   if (result.error) await req.flash('error', result.error);
   else {
     await audit(req, 'corte.atribuido', 'clip', c.id, { episodio: result.episode.id });
-    await req.flash('ok', `Atribuído ao ${result.episode.number ? `EP.${String(result.episode.number).padStart(3, '0')}` : 'episódio'} ${result.episode.title}.`);
+    await req.flash('ok', `Atribuído ao ${result.episode.number ? `EP.${String(result.episode.number).padStart(3, '0')}` : 'episódio'} ${result.episode.title}.${result.coversQueued ? ' As capas estão sendo refeitas com o convidado e o número do episódio.' : ''}`);
   }
   res.redirect(back);
 }));
@@ -389,8 +394,11 @@ async function publish(req, res, { episodeId, clipId }) {
   if (ig.error) return fail(ig.error);
   if (req.body.confirmar !== '1' && !review) return fail('Confirme o envio marcando "Entendi que isto publica nas redes escolhidas".');
   try {
-    const ctas = clipId ? require('../services/socialCopy').readForm(req.body, form.platforms) : null;
-    const pub = await publishing.create({ episodeId, clipId, ...form, userId: req.user.id, review, instagram: clipId ? ig.instagram : null, ctas });
+    const automation = require('../services/commentAutomation');
+    const auto = clipId ? automation.readForm(req.body) : null;
+    const prep = await automation.prepare(auto, { platforms: form.platforms, ctas: clipId ? require('../services/socialCopy').readForm(req.body, form.platforms) : null, clipId });
+    const pub = await publishing.create({ episodeId, clipId, ...form, userId: req.user.id, review, instagram: clipId ? ig.instagram : null, ctas: prep.ctas });
+    if (auto) await automation.attach(pub, auto, { keyword: prep.keyword, userId: req.user.id });
     await audit(req, 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, simulado: pub.status === 'simulado' });
     if (wantsJson(req)) return res.json({ ok: true, publication: pub });
     await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub, { trail: ' O andamento aparece abaixo.' }));

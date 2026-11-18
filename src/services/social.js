@@ -320,7 +320,7 @@ async function runRules() {
   running = true;
   let total = 0;
   try {
-    const { rows: rules } = await db.query('SELECT * FROM social_rules WHERE active ORDER BY id');
+    const { rows: rules } = await db.query("SELECT * FROM social_rules WHERE active AND provider = 'uploadpost' ORDER BY id"); // as da Outstand chegam por aviso (webhook)
     for (const rule of rules) {
       try {
         total += rule.trigger === 'direct' ? await runDirectRule(rule) : await runCommentRule(rule);
@@ -350,5 +350,5 @@ async function ourActivity() {
 
 module.exports = {
   USED, STATUS_LABEL, IDEA_KINDS, unusedClips, unusedImages, availableClips, availableImages, listPublications, editPublication,
-  fingerprint, similar, doneFor, generateIdeas, has, runRules, runCommentRule, runDirectRule, ourActivity,
+  fingerprint, similar, doneFor, generateIdeas, has, record, claimItem, runRules, runCommentRule, runDirectRule, ourActivity,
 };

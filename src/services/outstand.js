@@ -358,4 +358,27 @@ async function status({ request_id, job_id = null }) {
   return { state, results, error };
 }
 
-module.exports = { NETWORKS, HEAVY_BYTES, heavy, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator };
+// ---------------------------------------------------------------- comentários e directs (automação de comentário → direct)
+// Resposta no direct de quem comentou (Instagram "private reply"): uma por comentário, até 7 dias depois dele. O texto pode ter
+// links (ficam clicáveis); botões ficam de fora porque o Instagram recusa botão na primeira mensagem para quem não segue.
+async function privateReply({ accountId, commentId, authorId, content }) {
+  const { json } = await call('POST', '/v1/conversations', { body: { social_account_id: String(accountId), content, instagram: { comment_id: String(commentId), author_id: String(authorId) } }, timeout: 30_000 });
+  return { conversationId: json.conversation?.id || null, messageId: json.message?.id || null, status: json.message?.status || null };
+}
+
+// Resposta pública ao comentário (só em post que saiu pela Outstand).
+async function replyToComment({ postRef, commentId, content }) {
+  const { json } = await call('POST', `/v1/posts/${encodeURIComponent(postRef)}/replies`, { body: { content, parent_comment_id: String(commentId) }, timeout: 30_000 });
+  return { replyId: json.reply_id || null };
+}
+
+// Endereço para reconectar o Instagram com acesso às mensagens (a reconexão pelo painel da Outstand tira esse acesso).
+const MESSAGING_SCOPES = 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights,instagram_business_manage_messages';
+async function instagramAuthUrl(redirectUri) {
+  const { json } = await call('POST', '/v1/social-networks/instagram/auth-url', { body: { redirect_uri: redirectUri, scopes: MESSAGING_SCOPES }, timeout: 20_000 });
+  const url = json.data?.auth_url || json.auth_url || json.url || null;
+  if (!url || !/^https:\/\//.test(url)) throw new Error('A Outstand não devolveu o endereço de conexão.');
+  return url;
+}
+
+module.exports = { NETWORKS, HEAVY_BYTES, heavy, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator, privateReply, replyToComment, instagramAuthUrl, MESSAGING_SCOPES };

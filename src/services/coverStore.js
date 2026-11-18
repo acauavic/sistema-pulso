@@ -85,6 +85,16 @@ async function render(spec, buffers, ctxData, { thumb = false } = {}) {
 // Prefixo das imagens no bucket: cortes têm pasta própria (podem ainda não ter episódio).
 const ownerKey = (episodeId, clipId) => (clipId ? ['cortes', clipId] : ['episodios', episodeId]);
 
+// Miniatura das listas (quadro, cortes, posts, capas do episódio): WebP de até 640 px, feito na hora em que a capa nasce (a imagem
+// já está na memória), para a primeira visita não esperar a conversão.
+const THUMB_SIDE = 640;
+function prewarm(row, buffer) {
+  if (!row?.storage_key || !buffer) return;
+  setImmediate(() => {
+    require('./webImage').cached(row.storage_key, { version: String(new Date(row.updated_at).getTime()), maxSide: THUMB_SIDE, load: async () => buffer }).catch(() => {});
+  });
+}
+
 async function insertCover(episodeId, { kind, spec, ctx, lint, label, group, position = 0, clipId = null }, res, userId = null) {
   const key = await b2.keyFor(...ownerKey(episodeId, clipId), 'capas', `${kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.jpg`);
   await b2.putObject(key, res.buffer, 'image/jpeg');
@@ -92,6 +102,7 @@ async function insertCover(episodeId, { kind, spec, ctx, lint, label, group, pos
     `INSERT INTO episode_covers (episode_id, kind, group_key, position, label, spec, ctx, lint, storage_key, mime, width, height, size_bytes, created_by, clip_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'image/jpeg',$10,$11,$12,$13,$14) RETURNING *`,
     [episodeId, kind, group || null, position, label || null, JSON.stringify(spec), JSON.stringify(ctx || {}), JSON.stringify(lint || {}), key, res.width, res.height, res.buffer.length, userId, clipId]);
+  prewarm(row, res.buffer);
   return row;
 }
 
@@ -107,6 +118,7 @@ async function updateCover(cover, spec, ctx, userId) {
       WHERE id = $1 RETURNING *`,
     [cover.id, JSON.stringify(spec), JSON.stringify(ctx || {}), JSON.stringify(res.lint), key, res.width, res.height, res.buffer.length]);
   await b2.deleteObject(cover.storage_key).catch((err) => console.error('Falha ao apagar imagem antiga:', err.message));
+  prewarm(row, res.buffer);
   return { row, lint: res.lint };
 }
 
@@ -234,4 +246,4 @@ async function generateForEpisode(episodeId, { kinds = ['youtube_thumb', 'post_q
   return created;
 }
 
-module.exports = { ownerKey, addCustomImage, loadFrames, imageBuffers, refsOf, render, insertCover, updateCover, generateForEpisode, pickFrames, nearest };
+module.exports = { THUMB_SIDE, prewarm, ownerKey, addCustomImage, loadFrames, imageBuffers, refsOf, render, insertCover, updateCover, generateForEpisode, pickFrames, nearest };

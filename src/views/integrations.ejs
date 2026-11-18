@@ -124,6 +124,34 @@
       <% }) %>
     </div>
   </section>
+  <section class="card" id="comentarios">
+    <span class="kicker">Instagram pela Outstand</span>
+    <h2>Comentários e directs</h2>
+    <p class="small muted">Para a automação "comentou a palavra, recebe o link no direct" funcionar: o Instagram precisa estar conectado à Outstand com acesso às mensagens, e a Outstand precisa avisar o sistema quando chega um comentário.</p>
+    <% var ib = comments.status; %>
+    <dl class="kv">
+      <dt>Instagram</dt><dd class="mono"><%= comments.handle ? '@' + comments.handle : 'não conectado na Outstand' %></dd>
+      <dt>Acesso às mensagens</dt><dd class="mono"><%= ib.messaging_ok_at ? 'confirmado ' + fmt.formatDateTime(ib.messaging_ok_at) : ib.reconnected_at ? 'reconectado ' + fmt.formatDateTime(ib.reconnected_at) + ' · confirma na primeira resposta' : 'não confirmado' %></dd>
+      <dt>Último aviso recebido</dt><dd class="mono"><%= ib.last_event_at ? fmt.formatDateTime(ib.last_event_at) + (ib.last_event ? ' · ' + ib.last_event : '') : 'nenhum ainda' %></dd>
+    </dl>
+    <h3 class="top-gap">1. Reconectar o Instagram com acesso às mensagens</h3>
+    <p class="small muted">A reconexão feita pelo painel da Outstand tira o acesso às mensagens; por aqui ele vem junto. Abre a tela do Instagram para o dono da conta aprovar (a conta continua a mesma, com o histórico).</p>
+    <form method="post" action="/integracoes/outstand/mensagens" class="inline">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn <%= ib.reconnected_at || ib.messaging_ok_at ? '' : 'primary' %>" type="submit" <%= comments.configured ? '' : 'disabled' %>>Reconectar o Instagram</button>
+    </form>
+    <h3 class="top-gap">2. Ligar o aviso de comentários na Outstand</h3>
+    <p class="small muted">No painel da Outstand: Settings &gt; Webhooks &gt; Add Webhook. Cole o endereço e o segredo abaixo e marque o evento <span class="mono">comment.received</span>. Use "Test" lá para conferir: o aviso aparece aqui em "Último aviso recebido".</p>
+    <dl class="kv">
+      <dt>Endereço</dt><dd><span class="mono small"><%= comments.webhookUrl %></span> <button class="link small" type="button" data-copy="<%= comments.webhookUrl %>">copiar</button></dd>
+      <dt>Segredo</dt><dd>
+        <% if (ib.secret) { %><details class="inline-details"><summary class="small">mostrar</summary><span class="mono small"><%= ib.secret %></span></details> <button class="link small" type="button" data-copy="<%= ib.secret %>">copiar</button><% } else { %><span class="small muted">ainda não gerado</span><% } %>
+        <form method="post" action="/integracoes/outstand/segredo" class="inline" <%- ib.secret ? 'data-confirm="Gerar outro segredo? O aviso cadastrado na Outstand para de valer até você colar o novo lá."' : '' %>>
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="<%= ib.secret ? 'link small' : 'btn sm' %>" type="submit"><%= ib.secret ? 'gerar outro' : 'Gerar segredo' %></button>
+        </form>
+      </dd>
+    </dl>
+  </section>
   <% if (storage) { %>
   <section class="card" id="armazenamento">
     <h2>Armazenamento (Backblaze)</h2>

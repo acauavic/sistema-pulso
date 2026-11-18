@@ -119,7 +119,15 @@
         <h2><%= pub.media === 'video' ? 'Capa' : images.length > 1 ? 'Imagens' : 'Imagem' %></h2>
         <% if (canCover && notYetOut) { %><a class="btn sm" href="/capas/<%= images[0] %>/editar?voltar=<%= encodeURIComponent('/social/publicacoes/' + pub.id) %>"><%- icon('pencil', 14) %> <%= pub.media === 'video' ? 'Editar capa' : images.length > 1 ? 'Editar imagens' : 'Editar imagem' %></a><% } %>
       </div>
-      <div class="pub-media"><% images.forEach(function (id) { %><img src="/capas/<%= id %>/imagem" alt="Imagem da publicação" loading="lazy"><% }) %></div>
+      <div class="pub-media"><% images.forEach(function (id) { %><img src="/capas/<%= id %>/imagem?w=640" alt="Imagem da publicação" loading="lazy"><% }) %></div>
+    </section>
+    <% } %>
+    <% if (auto) { var autoOver = auto.expires_at && new Date(auto.expires_at) < new Date(); %>
+    <section class="card">
+      <div class="row spread"><h2>Automação no Instagram</h2><span class="badge <%= auto.active && !autoOver ? 'b-green' : 'b-gray' %>"><%= autoOver ? 'encerrada' : auto.active ? 'ativa' : 'pausada' %></span></div>
+      <p class="small">Quem comentar <span class="mono"><%= auto.keywords.join(', ') %></span> recebe o link no direct<%= auto.expires_at ? ' até ' + fmt.formatDateTime(auto.expires_at) : '' %>.</p>
+      <p class="mono small muted"><%= auto.answered %> <%= auto.answered === 1 ? 'RESPOSTA' : 'RESPOSTAS' %><%= auto.errors ? ' · ' + auto.errors + ' COM ERRO' : '' %></p>
+      <p class="small m-0"><a href="/social/automacoes/<%= auto.id %>">ver mensagem e respostas</a></p>
     </section>
     <% } %>
   </div>

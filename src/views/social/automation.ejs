@@ -28,11 +28,13 @@
     </form>
     <% } %>
   <% } else { %>
-    <h2>Rodando a cada 5 minutos</h2>
-    <p class="mono-line muted"><span><%= events.filter(function (e) { return e.status === 'enviado' || e.status === 'simulado'; }).length %> RESPOSTAS RECENTES</span><span><%= rule.last_run_at ? 'ÚLTIMA LEITURA ' + fmt.formatDateTime(rule.last_run_at) : 'AINDA NÃO RODOU' %></span></p>
+    <% var viaOutstand = rule.provider === 'outstand'; %>
+    <h2><%= viaOutstand ? 'Responde na hora' : 'Rodando a cada 5 minutos' %></h2>
+    <% if (viaOutstand) { %><p class="small muted">Cada comentário chega pela Outstand assim que é feito<%= rule.publication_id ? ', só no post desta publicação' : '' %>.<% if (rule.publication_id) { %> <a href="/social/publicacoes/<%= rule.publication_id %>">Ver a publicação</a><% } %><%= rule.expires_at ? ' Fica ativa até ' + fmt.formatDateTime(rule.expires_at) + '.' : '' %></p><% } %>
+    <p class="mono-line muted"><span><%= events.filter(function (e) { return e.status === 'enviado' || e.status === 'simulado'; }).length %> RESPOSTAS RECENTES</span><% if (!viaOutstand) { %><span><%= rule.last_run_at ? 'ÚLTIMA LEITURA ' + fmt.formatDateTime(rule.last_run_at) : 'AINDA NÃO RODOU' %></span><% } %></p>
     <% if (canAutomate) { %>
     <div class="next-actions">
-      <form method="post" action="/social/automacoes/<%= rule.id %>/rodar" class="inline"><%- csrfField %><button class="btn" type="submit"><%- icon('refresh-cw') %> Rodar agora</button></form>
+      <% if (!viaOutstand) { %><form method="post" action="/social/automacoes/<%= rule.id %>/rodar" class="inline"><%- csrfField %><button class="btn" type="submit"><%- icon('refresh-cw') %> Rodar agora</button></form><% } %>
       <form method="post" action="/social/automacoes/<%= rule.id %>/pausar" class="inline"><%- csrfField %><button class="btn ghost" type="submit"><%- icon('pause') %> Pausar</button></form>
     </div>
     <% } %>

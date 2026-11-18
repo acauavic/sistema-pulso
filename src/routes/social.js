@@ -98,7 +98,7 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   const canResend = can(req.user.role, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
   const resend = canResend ? await resendChoices(pub) : null;
   res.render('social/publication', {
-    resend, videoTags: await socialApi.videoTags(),
+    resend, videoTags: await socialApi.videoTags(), auto: await automation.ofPublication(pub.id),
     title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: providers.every((p) => p.live()), provider: providers[0], providers,
     providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
     testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
@@ -198,7 +198,7 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
   const showUsed = req.query.publicados === '1';
   const [clips, images, conn, ls] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), socialApi.connectedAll(), socialApi.liveState()]);
   res.render('social/new', {
-    defaultCtas: require('../services/socialCopy').forClip(null),
+    defaultCtas: require('../services/socialCopy').forClip(null), autoDefaults: await require('../services/commentAutomation').formDefaults({}),
     videoTags: await socialApi.videoTags(), title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
     connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), canCover: can(req.user.role, 'covers.edit'), pick: req.query.item || '',
   });
@@ -249,7 +249,11 @@ router.post('/social/publicar', requirePerm('social.request'), wrap(async (req, 
   const ig = require('../services/igPeople').parse(req.body, { media, platforms });
   if (ig.error) return fail(ig.error);
   try {
-    const pub = await publishing.create({ ...target, media, platforms, title, description, scheduledAt, userId: req.user.id, review, instagram: ig.instagram, ctas: require('../services/socialCopy').readForm(req.body, platforms) });
+    const automation = require('../services/commentAutomation');
+    const auto = media === 'story' ? null : automation.readForm(req.body);
+    const prep = await automation.prepare(auto, { platforms, ctas: require('../services/socialCopy').readForm(req.body, platforms), clipId: target.clipId || null, coverIds: target.coverIds || [] });
+    const pub = await publishing.create({ ...target, media, platforms, title, description, scheduledAt, userId: req.user.id, review, instagram: ig.instagram, ctas: prep.ctas });
+    if (auto) await automation.attach(pub, auto, { keyword: prep.keyword, userId: req.user.id });
     await audit(req, review ? 'publicacao.pedida' : 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, tipo: media, simulado: pub.status === 'simulado' });
     await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub));
     return res.redirect(`/social/publicacoes/${pub.id}`);
@@ -323,6 +327,7 @@ router.get('/social/insights', requirePerm('social.read'), wrap(async (req, res)
 }));
 
 // ---------------------------------------------------------------- automações
+const automation = require('../services/commentAutomation');
 const TRIGGERS = { comentario: 'Comentário', direct: 'Direct' };
 const ACTIONS = { dm: 'Mandar direct para quem comentou', resposta: 'Responder o comentário publicamente', ambos: 'Os dois' };
 const COMMENT_PLATFORMS = ['instagram', 'facebook', 'youtube'];
@@ -351,15 +356,27 @@ function parseRule(body) {
 router.get('/social/automacoes', requirePerm('social.read'), wrap(async (req, res) => {
   const { rows: rules } = await db.query(
     `SELECT r.*, (SELECT count(*)::int FROM social_events e WHERE e.rule_id = r.id AND e.status IN ('enviado','simulado')) AS answered,
-            (SELECT count(*)::int FROM social_events e WHERE e.rule_id = r.id AND e.status = 'erro') AS errors
-       FROM social_rules r ORDER BY r.active DESC, r.id DESC`);
+            (SELECT count(*)::int FROM social_events e WHERE e.rule_id = r.id AND e.status = 'erro') AS errors,
+            p.title AS pub_title, p.status AS pub_status, p.scheduled_at AS pub_at
+       FROM social_rules r LEFT JOIN episode_publications p ON p.id = r.publication_id
+      ORDER BY (r.active AND (r.expires_at IS NULL OR r.expires_at > now())) DESC, r.id DESC LIMIT 200`);
   const { rows: igPosts } = await db.query(
     `SELECT DISTINCT ON (r->>'url') p.title, r->>'url' AS url FROM episode_publications p, jsonb_array_elements(p.results) r
       WHERE r->>'platform' = 'instagram' AND (r->>'ok')::boolean AND coalesce(r->>'url', '') <> '' ORDER BY r->>'url', p.created_at DESC LIMIT 30`);
   res.render('social/automations', {
     title: 'Automações', tab: 'automacoes', rules, triggers: TRIGGERS, actions: ACTIONS, commentPlatforms: COMMENT_PLATFORMS, platforms: up.PLATFORMS, igPosts,
     live: live(), configured: config.uploadPostConfigured, canAutomate: can(req.user.role, 'social.automate'), openNew: req.query.nova === '1',
+    links: await automation.links(), inbox: await automation.state(), outstandLive: config.outstand.live, canIntegrate: can(req.user.role, 'integrations.manage'),
   });
+}));
+
+// Links que a automação manda no direct: canal do YouTube, comunidade do WhatsApp e Spotify.
+router.post('/social/automacoes/links', requirePerm('social.automate'), wrap(async (req, res) => {
+  const r = await automation.setLinks(req.body);
+  if (r.error) { await req.flash('error', r.error); return res.redirect('/social/automacoes'); }
+  await audit(req, 'automacao.links', 'settings', null);
+  await req.flash('ok', 'Links da automação salvos.');
+  res.redirect('/social/automacoes');
 }));
 
 router.post('/social/automacoes', requirePerm('social.automate'), wrap(async (req, res) => {
@@ -393,8 +410,9 @@ router.get('/social/automacoes/:id', requirePerm('social.read'), wrap(async (req
 router.post('/social/automacoes/:id', requirePerm('social.automate'), wrap(async (req, res) => {
   const rule = await findRule(req.params.id);
   if (!rule) return notFound(res);
-  const { values: v, error } = parseRule(req.body);
+  const { values: v, error } = parseRule(rule.scope === 'publicacao' ? { ...req.body, trigger: 'comentario', platform: 'instagram', scope: 'recentes' } : req.body);
   if (error) { await req.flash('error', error); return res.redirect(`/social/automacoes/${rule.id}`); }
+  if (rule.scope === 'publicacao') { v.scope = 'publicacao'; v.post_url = null; } // a de uma publicação continua presa ao post dela
   await db.query(
     `UPDATE social_rules SET name=$2, trigger=$3, platform=$4, scope=$5, post_url=$6, keywords=$7, action=$8, message=$9, reply_text=$10, buttons=$11, updated_at=now() WHERE id=$1`,
     [rule.id, v.name, v.trigger, v.platform, v.scope, v.post_url, v.keywords, v.action, v.message, v.reply_text, JSON.stringify(v.buttons)]);
@@ -420,6 +438,7 @@ router.post('/social/automacoes/:id/:acao(ativar|pausar|excluir|rodar)', require
     await req.flash('ok', 'Automação excluída.');
     return res.redirect('/social/automacoes');
   } else if (acao === 'rodar') {
+    if (rule.provider === 'outstand') { await req.flash('ok', 'Esta automação responde sozinha: cada comentário chega pela Outstand na hora.'); return res.redirect(`/social/automacoes/${rule.id}`); }
     if (!rule.active) { await req.flash('error', 'Ative a automação antes de rodar.'); return res.redirect(`/social/automacoes/${rule.id}`); }
     const n = await social.runRules();
     const { rows: [fresh] } = await db.query('SELECT last_error FROM social_rules WHERE id = $1', [rule.id]);

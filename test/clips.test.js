@@ -213,6 +213,8 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
 
     assert.equal((await post(as.editor, `/cortes/${v.id}/atribuir`, [['episode_id', String(ep.id)]])).status, 302);
     assert.equal((await clipRow(v.id)).episode_id, ep.id);
+    assert.equal((await h.db.query("SELECT count(*)::int n FROM jobs WHERE kind = 'capas_corte' AND ref_id = $1 AND status = 'queued'", [v.id])).rows[0].n, 1, 'as capas ficam para a fila: a tela volta na hora');
+    await runAll();
     assert.equal((await h.db.query('SELECT count(*)::int n FROM episode_covers WHERE clip_id=$1 AND episode_id=$2', [v.id, ep.id])).rows[0].n, 3, 'capas e quadros acompanham o corte');
     assert.equal((await h.db.query('SELECT count(*)::int n FROM episode_frames WHERE clip_id=$1 AND episode_id=$2', [v.id, ep.id])).rows[0].n, 6);
     const after = (await h.db.query('SELECT id, spec FROM episode_covers WHERE clip_id=$1 ORDER BY position', [v.id])).rows;

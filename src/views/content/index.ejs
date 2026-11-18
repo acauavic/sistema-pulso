@@ -182,7 +182,7 @@
         <% list.forEach(function (c) { var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
         <figure class="cover-card <%= c.approved ? 'approved' : '' %>"<% if (postCount > 1) { %> data-dl-item data-id="<%= c.id %>" data-zip="k<%= c.id %>" data-href="/capas/<%= c.id %>/imagem?baixar=1" data-name="<%= epTag + '-' + c.kind.replace(/_/g, '-') + '-' + (c.position + 1) + '.jpg' %>" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %>>
           <% if (postCount > 1) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.label || KINDS[kind] %>"><% } %>
-          <a href="/capas/<%= c.id %>/imagem" target="_blank" rel="noopener" data-dl-pick><img src="/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
+          <a href="/capas/<%= c.id %>/imagem" target="_blank" rel="noopener" data-dl-pick><img src="/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>&w=640" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
           <figcaption>
             <span class="small"><%= c.label || '' %></span>
             <span class="row small">
@@ -276,7 +276,7 @@
 <% } %>
 <% if (perm.cut && clips.length > 1 && perm.publish) { %>
 <dialog class="modal modal-wide" id="modal-massa-publicar" aria-labelledby="mmpub-h">
-  <form method="post" action="/conteudo/em-massa/publicar/previa" class="stack">
+  <form method="post" action="/conteudo/em-massa/publicar/previa" class="stack" data-remember="publicar-em-massa" data-remember-skip="_csrf,ids,inicio,episodio">
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
     <h2 id="mmpub-h">Publicar <span class="mono" data-dl-n>0</span> corte(s)</h2>
     <p class="small muted">Cada corte sai com o próprio título, legenda, capa escolhida e a chamada de cada rede, na ordem da lista. Antes de agendar, você confere a agenda.</p>
@@ -298,6 +298,7 @@
       </label>
     </div>
     <p class="small muted m-0">Os horários do dia ficam espalhados entre o começo e o fim. O Reel de teste aparece primeiro só para quem não segue o Pulso; as outras redes recebem o post normal.</p>
+    <%- include('../partials/auto-fields', { auto: autoDefaults, bulk: true }) %>
     <div class="row modal-actions"><button class="btn primary" type="submit">Ver a agenda</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>
@@ -353,4 +354,6 @@
 <% } %>
 <script src="/static/baixar.js?v=<%= assetV %>" defer></script>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<script src="/static/autocta.js?v=<%= assetV %>" defer></script>
+<script src="/static/lembrar.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/foot') %>

@@ -15,7 +15,7 @@ const CHANNEL = 'pulso_jobs';
 //   então vários correm juntos: 10 cortes enviados de uma vez ficam prontos em ~3 min, não em ~12. Padrão 5 (CORTES_EM_PARALELO).
 // - pesada: episódio inteiro (finalização, transcrição), um por vez. - video: versão leve dos vídeos, uma por vez.
 // - leve: o resto (e-mails, ideias), que nunca espera as outras.
-const CUTS = ['corte'];
+const CUTS = ['corte', 'capas_corte'];
 const HEAVY = ['finalizacao', 'transcricao'];
 const VIDEO = ['video_leve'];
 const SPECIAL = [...CUTS, ...HEAVY, ...VIDEO];

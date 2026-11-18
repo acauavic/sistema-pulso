@@ -16,7 +16,7 @@
   <div class="cover-grid cover-<%= kind %>">
     <% list.forEach(function (c) { var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
     <figure class="cover-card <%= c.approved ? 'approved' : '' %>">
-      <a href="/episodios/<%= ep.id %>/capas/<%= c.id %>/imagem" target="_blank" rel="noopener"><img src="/episodios/<%= ep.id %>/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
+      <a href="/episodios/<%= ep.id %>/capas/<%= c.id %>/imagem" target="_blank" rel="noopener"><img src="/episodios/<%= ep.id %>/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>&w=640" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
       <figcaption>
         <span class="small"><%= c.label || '' %></span>
         <span class="row small">

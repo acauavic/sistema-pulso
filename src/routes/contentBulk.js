@@ -178,8 +178,10 @@ router.post('/conteudo/em-massa/publicar/previa', requirePerm('episodes.read'), 
   const covers = await coverList(ok.map((c) => c.id));
   const rows = slots.map((s) => ({ ...s, clip: byId.get(s.clipId), cover: covers.find((v) => v.id === byId.get(s.clipId).cover_id) || covers.find((v) => v.clip_id === s.clipId) || null }));
   const days = [...new Set(rows.map((r) => fmt.formatDateTime(r.at).slice(0, 5)))];
+  const auto = platforms.includes('instagram') ? require('../services/commentAutomation').readForm(req.body) : null;
+  const automation = require('../services/commentAutomation');
   res.render('content/bulk-publish', {
-    title: 'Publicar em massa', rows, skipped, platforms, opts, days, labelOf: (p) => up.PLATFORMS[p]?.clipLabel || up.PLATFORMS[p]?.label || p,
+    title: 'Publicar em massa', rows, skipped, platforms, opts, days, auto, keywordOf: (c) => (auto ? auto.keyword || automation.keywordFor(c.guest_name || 'Episódio') : null), labelOf: (p) => up.PLATFORMS[p]?.clipLabel || up.PLATFORMS[p]?.label || p,
     review: !canPublishNow(req.user.role), episodio: isIntId(req.body.episodio) ? req.body.episodio : '', hhmm: bulk.hhmm,
   });
 }));
@@ -196,11 +198,12 @@ router.post('/conteudo/em-massa/publicar', requirePerm('episodes.read'), wrap(as
     return d ? { clipId: id, at: d.toISOString(), trial: req.body[`teste_${id}`] === '1' } : null;
   }).filter(Boolean);
   if (!items.length || !platforms.length) { await req.flash('error', 'Nada para agendar.'); return res.redirect(to); }
-  const { created, failed } = await bulk.schedule(items, { platforms, trialMode: req.body.teste_modo === 'manual' ? 'manual' : 'auto', userId: req.user.id, review });
+  const auto = require('../services/commentAutomation').readForm(req.body);
+  const { created, failed } = await bulk.schedule(items, { platforms, trialMode: req.body.teste_modo === 'manual' ? 'manual' : 'auto', userId: req.user.id, review, auto });
   await audit(req, review ? 'publicacao.pedida' : 'publicacao.criada', 'publication', null, { em_massa: true, ids: created.map((x) => x.pub.id), redes: platforms });
   const trials = created.filter((x) => x.trial).length;
   const msg = created.length
-    ? `${plural(created.length, review ? 'publicação foi para a revisão' : 'publicação agendada', review ? 'publicações foram para a revisão' : 'publicações agendadas')}${trials ? ` (${trials} como Reel de teste no Instagram)` : ''}.`
+    ? `${plural(created.length, review ? 'publicação foi para a revisão' : 'publicação agendada', review ? 'publicações foram para a revisão' : 'publicações agendadas')}${trials ? ` (${trials} como Reel de teste no Instagram)` : ''}.${created.some((x) => x.keyword) ? ` A automação do Instagram responde no direct quem comentar ${[...new Set(created.map((x) => x.keyword).filter(Boolean))].slice(0, 4).join(', ')}.` : ''}`
     : 'Nenhuma publicação foi agendada.';
   const why = failed.length ? ` ${plural(failed.length, 'ficou de fora', 'ficaram de fora')}: ${failed.slice(0, 3).map((f) => `${f.title || `corte ${f.clipId}`} (${f.why})`).join('; ')}${failed.length > 3 ? '…' : ''}` : '';
   await req.flash(created.length ? 'ok' : 'error', msg + why);

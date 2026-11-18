@@ -4,7 +4,18 @@
   <span class="small muted">Respostas automáticas a comentários e directs, no estilo ManyChat. Toda automação nasce pausada.</span>
   <% if (canAutomate) { %><button class="btn primary" type="button" data-modal-open="modal-rule"><%- icon('plus') %> Nova automação</button><% } %>
 </div>
-<% if (!configured) { %><p class="flash flash-error">Upload-Post não configurado neste servidor: as automações não conseguem ler comentários nem directs.</p><% } %>
+<% if (!inbox.last_event_at) { %><div class="conn-alert"><%- icon('unlink') %><div><strong>A Outstand ainda não avisou nenhum comentário.</strong> <span class="small">Para responder no direct, ligue o aviso de comentários e reconecte o Instagram com acesso às mensagens<%= canIntegrate ? '' : ' (a gestão faz em Integrações)' %>.</span></div><% if (canIntegrate) { %><a class="btn sm" href="/integracoes#comentarios">Abrir Integrações</a><% } %></div><% } %>
+
+<section class="card">
+  <div class="row spread"><h2>Links que vão no direct</h2><% if (canAutomate) { %><button class="btn sm" type="button" data-modal-open="modal-links"><%- icon('pencil', 14) %> Editar</button><% } %></div>
+  <dl class="kv">
+    <dt>Episódio</dt><dd class="small">o do próprio episódio no YouTube (antes da estreia, o do canal)</dd>
+    <dt>Canal do YouTube</dt><dd class="mono small"><%= links.youtube_channel || 'não cadastrado' %></dd>
+    <dt>Comunidade no WhatsApp</dt><dd class="mono small"><%= links.whatsapp_community || 'não cadastrado' %></dd>
+    <dt>Spotify</dt><dd class="mono small"><%= links.spotify_show || 'não cadastrado' %></dd>
+  </dl>
+  <p class="small muted m-0">Na hora de publicar, ligue "Automação no Instagram": quem comentar a palavra recebe a mensagem com esses links.<%= outstandLive ? '' : ' A Outstand está em modo de teste: as respostas são só simuladas.' %></p>
+</section>
 
 <% if (!rules.length) { %>
 <div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma automação ainda.</strong></p><p class="muted small">Exemplo: quem comentar "episódio" num Reels recebe o link da conversa completa no direct.</p></div>
@@ -14,16 +25,29 @@
   <div class="rule-row">
     <div>
       <h3><a href="/social/automacoes/<%= r.id %>"><%= r.name %></a></h3>
-      <p class="small muted"><%= triggers[r.trigger] %><%= r.trigger === 'comentario' ? ' no ' + platforms[r.platform].label + (r.scope === 'post' ? ' (um post)' : ' (posts recentes)') : ' no Instagram' %> · <%= r.keywords.length ? 'palavras: ' + r.keywords.join(', ') : 'qualquer mensagem' %></p>
+      <p class="small muted"><%= triggers[r.trigger] %><%= r.trigger === 'comentario' ? ' no ' + platforms[r.platform].label + (r.scope === 'publicacao' ? '' : r.scope === 'post' ? ' (um post)' : ' (posts recentes)') : ' no Instagram' %> · <%= r.keywords.length ? 'palavras: ' + r.keywords.join(', ') : 'qualquer mensagem' %><% if (r.scope === 'publicacao' && r.publication_id) { %> · <a href="/social/publicacoes/<%= r.publication_id %>"><%= r.pub_title || 'publicação' %></a><%= r.pub_status === 'agendado' && r.pub_at ? ' (sai ' + fmt.formatDateTime(r.pub_at) + ')' : '' %><% } %><%= r.expires_at ? ' · até ' + fmt.formatDateTime(r.expires_at).slice(0, 5) : '' %></p>
       <p class="mono small muted"><%= r.answered %> RESPOSTA<%= r.answered === 1 ? '' : 'S' %><%= r.errors ? ' · ' + r.errors + ' ERRO' + (r.errors === 1 ? '' : 'S') : '' %><%= r.last_run_at ? ' · ÚLTIMA LEITURA ' + fmt.formatDateTime(r.last_run_at) : '' %></p>
       <% if (r.last_error) { %><p class="small bad-text"><%= r.last_error %></p><% } %>
     </div>
-    <span class="badge <%= r.active ? 'b-green' : 'b-gray' %>"><%= r.active ? (live ? 'Ativa' : 'Ativa · teste') : 'Pausada' %></span>
+    <% var expired = r.expires_at && new Date(r.expires_at) < new Date(); var isLive = r.provider === 'outstand' ? outstandLive : live; %>
+    <span class="badge <%= r.active && !expired ? 'b-green' : 'b-gray' %>"><%= expired ? 'Encerrada' : r.active ? (isLive ? 'Ativa' : 'Ativa · teste') : 'Pausada' %></span>
   </div>
   <% }) %>
 </div>
 <% } %>
 
+<% if (canAutomate) { %>
+<dialog class="modal" id="modal-links" aria-labelledby="m-links-h">
+  <form method="post" action="/social/automacoes/links" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="m-links-h">Links que vão no direct</h2>
+    <label>Canal do YouTube<input type="url" name="youtube_channel" value="<%= links.youtube_channel %>" placeholder="https://www.youtube.com/@..."></label>
+    <label>Comunidade no WhatsApp<input type="url" name="whatsapp_community" value="<%= links.whatsapp_community %>" placeholder="https://chat.whatsapp.com/..."></label>
+    <label>Spotify (o podcast)<input type="url" name="spotify_show" value="<%= links.spotify_show %>" placeholder="https://open.spotify.com/show/..."></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <% if (canAutomate) { %>
 <dialog class="modal modal-wide" id="modal-rule" aria-labelledby="m-rule-h" <%= openNew ? 'data-open-on-load' : '' %>>
   <h2 id="m-rule-h">Nova automação</h2>

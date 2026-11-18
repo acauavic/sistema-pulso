@@ -298,10 +298,9 @@ async function assign(clipId, episodeId, userId = null) {
   await db.query('UPDATE episode_frames SET episode_id = $2 WHERE clip_id = $1', [clipId, episodeId]);
   await db.query('UPDATE episode_covers SET episode_id = $2 WHERE clip_id = $1', [clipId, episodeId]);
   await prod.addEvent(episodeId, userId, 'corte', `Corte atribuído: ${clip.title}`);
-  if (clip.status === 'pronto') {
-    try { await buildCovers(clipId, userId); } catch (err) { console.error('Capas do corte não refeitas:', err.message); }
-  }
-  return { ok: true, episode };
+  // as capas são refeitas em segundo plano (pista dos cortes): a tela volta na hora, em vez de esperar ~5 s por corte
+  if (clip.status === 'pronto') await jobs.enqueue('capas_corte', { refId: Number(clipId), payload: { userId } });
+  return { ok: true, episode, coversQueued: clip.status === 'pronto' };
 }
 
 // ---------------------------------------------------------------- leitura do corte (job "corte")
@@ -443,4 +442,5 @@ async function announceToReview(clip, covers) {
 }
 
 jobs.register('corte', runProcess);
+jobs.register('capas_corte', async (job) => ({ covers: (await buildCovers(job.ref_id, job.payload?.userId || null)).length }));
 module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, replaceState, pendingReplacement, cancelReplacement, startReplacement, finishReplacement, versionsOf, writeTexts, textsPrompt, buildCovers, coverTextOf, coverWithText, assign, runProcess, removeClip, momentsFor, cleanCoverText };

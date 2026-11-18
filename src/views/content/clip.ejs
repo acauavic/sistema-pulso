@@ -51,7 +51,7 @@
             <form method="post" action="/cortes/<%= clip.id %>/capa" class="inline">
               <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="cover_id" value="<%= cv.id %>">
               <button type="<%= perm.cover ? 'submit' : 'button' %>" class="cover-pick <%= cv.id === clip.cover_id ? 'on' : '' %>" title="<%= cv.label %>" <%= perm.cover ? '' : 'disabled' %>>
-                <img src="/capas/<%= cv.id %>/imagem?v=<%= new Date(cv.updated_at).getTime() %>" alt="<%= cv.label %>" loading="lazy" width="108" height="192">
+                <img src="/capas/<%= cv.id %>/imagem?v=<%= new Date(cv.updated_at).getTime() %>&w=640" alt="<%= cv.label %>" loading="lazy" width="108" height="192">
                 <span class="handle"><%= cv.id === clip.cover_id ? 'escolhida' : 'usar' %></span>
               </button>
             </form>
@@ -153,6 +153,7 @@
         <label>Título <small class="counter" data-counter-for="pub_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" id="pub_title" name="title" data-ai="titulo" data-ai-clip="<%= clip.id %>" value="<%= clip.post_title || clip.title %>" maxlength="100"></label>
         <label>Legenda <small class="counter" data-counter-for="pub_desc" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea id="pub_desc" name="description" data-ai="descricao" data-ai-clip="<%= clip.id %>" rows="5"><%= clip.caption || '' %></textarea></label>
         <%- include('../partials/cta-fields', { ctas: ctas, nets: boxes.map(function (b) { return { key: b.key, label: UP[b.key].label }; }) }) %>
+        <%- include('../partials/auto-fields', { auto: autoDefaults }) %>
         <label>Agendar (opcional, horário de Brasília)<input type="datetime-local" name="agendar"></label>
         <% if (perm.direct) { %>
         <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas.</label>
@@ -172,6 +173,7 @@
           <% var ptrial = p.options && p.options.instagram && p.options.instagram.trial; %>
           <% (p.results || []).forEach(function (r) { %><p class="small <%= r.ok || r.retry_at ? '' : 'err' %>"><%= UP[r.platform] ? UP[r.platform].label : r.platform %><% if (ptrial && r.platform === 'instagram') { %> <span class="badge b-trial">Reel de teste</span><% } %>: <%= r.simulated ? 'simulado, nada enviado' : (r.ok ? (r.url ? '' : (r.note || 'ok')) : (r.hint || r.error || r.status)) %><% if (r.url && /^https?:\/\//.test(r.url)) { %> <a href="<%= r.url %>" target="_blank" rel="noopener">abrir publicação</a><% } %></p><% }) %>
           <% if (p.error && !(p.results || []).some(function (r) { return r.hint; })) { %><p class="small err"><%= p.error %></p><% } %>
+          <% var au = autoOf[p.id]; if (au) { %><p class="small"><span class="muted">Automação:</span> quem comentar <span class="mono"><%= au.keywords.join(', ') %></span> recebe o link no direct · <span class="mono"><%= au.answered %></span> <%= au.answered === 1 ? 'resposta' : 'respostas' %><%= au.errors ? ' · ' + au.errors + ' com erro' : '' %> · <a href="/social/automacoes/<%= au.id %>">ver</a></p><% } %>
           <p class="row small">
             <a href="/social/publicacoes/<%= p.id %>">ver no Social</a>
             <% if (p.status === 'enviando') { %><form method="post" action="<%= p.episode_id ? '/episodios/' + p.episode_id + '/publicacoes/' + p.id : '/social/publicacoes/' + p.id %>/atualizar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link" type="submit">atualizar</button></form><% } %>
@@ -229,5 +231,6 @@
 </dialog>
 <% } %>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<script src="/static/autocta.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>

@@ -5,6 +5,8 @@
 <form method="post" action="<%= action %>" class="stack" data-when-form>
   <input type="hidden" name="_csrf" value="<%= csrf %>">
   <label>Nome<input type="text" name="name" value="<%= r.name || '' %>" maxlength="120" placeholder="Ex.: Link do episódio para quem comentar EPISODIO" required></label>
+  <% var fixedPost = r.scope === 'publicacao'; %>
+  <% if (fixedPost) { %><p class="small muted">Comentário no post desta publicação, no Instagram.</p><% } else { %>
   <div class="choice-row" role="radiogroup" aria-label="Quando disparar">
     <label class="choice"><input type="radio" name="trigger" value="comentario" <%= chk(r.trigger, 'comentario') %>><span><strong>Comentário</strong><small class="muted">alguém comenta num post</small></span></label>
     <label class="choice"><input type="radio" name="trigger" value="direct" <%= chk(r.trigger, 'direct') %>><span><strong>Direct</strong><small class="muted">alguém manda mensagem no Instagram</small></span></label>
@@ -21,6 +23,7 @@
     <label>Link do post<input type="url" name="post_url" value="<%= r.post_url || '' %>" maxlength="500" placeholder="https://www.instagram.com/p/…" list="ig-posts"></label>
     <% if (typeof igPosts !== 'undefined' && igPosts.length) { %><datalist id="ig-posts"><% igPosts.forEach(function (p) { %><option value="<%= p.url %>"><%= p.title %></option><% }) %></datalist><% } %>
   </div>
+  <% } %>
   <label>Palavras-chave <small class="muted">(separadas por vírgula; vazio = responde todo mundo; maiúsculas e acentos não importam)</small>
     <input type="text" name="keywords" value="<%= (r.keywords || []).join(', ') %>" maxlength="600" placeholder="episodio, link, quero">
   </label>
