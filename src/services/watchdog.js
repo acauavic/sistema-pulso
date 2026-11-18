@@ -7,13 +7,13 @@
 const db = require('../db/pool');
 
 const minutes = (s) => Math.max(1, Math.round(Number(s) / 60));
-const hourKey = (now = Date.now()) => new Date(now).toISOString().slice(0, 13);
+const dayKey = (now = Date.now()) => new Date(now).toISOString().slice(0, 10); // um aviso por dia por problema (antes, um por hora: três iguais na lista)
 
 async function check({ now = Date.now() } = {}) {
   const problems = [];
   const { rows: [w] } = await db.query("SELECT extract(epoch FROM now() - max(seen_at))::int AS idle, count(*)::int AS n FROM worker_heartbeats WHERE role <> 'web'");
   if (w.n && w.idle > 180) {
-    problems.push({ key: 'worker', title: 'O worker parou', body: `Sem sinal do processo que publica nas redes e roda a fila há ${minutes(w.idle)} min: agendados, novas tentativas, cortes e e-mails não andam. Confira o serviço worker na VPS.` });
+    problems.push({ key: 'worker', title: 'A fila de trabalhos parou', body: `Há ${minutes(w.idle)} min sem sinal do processo que publica os agendados e roda a fila: publicações, novas tentativas, cortes e e-mails não andam. Quem cuida do servidor precisa reiniciar o serviço da fila (worker).` });
   }
   const { rows: [r] } = await db.query("SELECT extract(epoch FROM now() - greatest(started_at, coalesce(finished_at, started_at)))::int AS idle FROM scheduler_runs WHERE name = 'publicacoes'");
   if (r && r.idle > 900 && !problems.length) {
@@ -27,7 +27,7 @@ async function check({ now = Date.now() } = {}) {
   const notify = require('./notify').notify;
   for (const p of problems) {
     console.warn(`[vigia] ${p.title}: ${p.body}`);
-    await notify({ type: 'integracao', broadcast: true, title: p.title, body: p.body, url: '/gestao/sistema', dedupe: `vigia-${p.key}-${hourKey(now)}` }).catch((err) => console.error('vigia:', err.message));
+    await notify({ type: 'integracao', broadcast: true, title: p.title, body: p.body, url: '/gestao/sistema', dedupe: `vigia-${p.key}-${dayKey(now)}` }).catch((err) => console.error('vigia:', err.message));
   }
   return problems;
 }

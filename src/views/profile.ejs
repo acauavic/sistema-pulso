@@ -6,7 +6,7 @@
   <div class="row spread"><h2>Dados</h2><button class="btn sm" type="button" data-modal-open="modal-nome"><%- icon('pencil', 14) %> Editar nome</button></div>
   <dl class="kv">
     <dt>Nome</dt><dd><strong><%= currentUser.name %></strong></dd>
-    <dt>E-mail</dt><dd class="mono small"><%= currentUser.email %></dd>
+    <dt>E-mail</dt><dd class="handle"><%= currentUser.email %></dd>
     <dt>Perfil</dt><dd><span class="badge b-role-<%= currentUser.role %>"><%= ROLES[currentUser.role].label %></span> <span class="small muted">quem muda é a gestão</span></dd>
   </dl>
   <div class="row spread top-gap profile-pass"><span class="small muted">Senha: a troca encerra as outras sessões abertas.</span><button class="btn sm" type="button" data-modal-open="modal-senha"><%- icon('key-round', 14) %> Trocar a senha</button></div>

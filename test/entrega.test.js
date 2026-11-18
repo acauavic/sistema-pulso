@@ -369,7 +369,7 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     assert.ok((await q("SELECT 1 FROM audit_log WHERE action = 'publicacao.tentativas_paradas'")).length);
   });
 
-  it('vigia: worker sem sinal e agendado atrasado avisam a gestão (uma vez por hora); banco que não responde reinicia o worker', async () => {
+  it('vigia: worker sem sinal e agendado atrasado avisam a gestão (uma vez por dia); banco que não responde reinicia o worker', async () => {
     const watchdog = require('../src/services/watchdog');
     await h.db.query('DELETE FROM worker_heartbeats'); await h.db.query("DELETE FROM notifications WHERE type = 'integracao'");
     await h.db.query("INSERT INTO worker_heartbeats (worker, role, seen_at) VALUES ('vps:1', 'worker', now() - interval '10 minutes')");
@@ -379,11 +379,11 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
       const found = await watchdog.check();
       assert.deepEqual(found.map((x) => x.key).sort(), ['atrasada', 'worker']);
       const n = await q("SELECT n.title, n.body, n.url, u.name FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.type = 'integracao' ORDER BY n.id");
-      assert.ok(n.some((x) => x.title === 'O worker parou' && /há 10 min/.test(x.body) && x.url === '/gestao/sistema'));
+      assert.ok(n.some((x) => x.title === 'A fila de trabalhos parou' && /Há 10 min/.test(x.body) && x.url === '/gestao/sistema'));
       assert.ok(n.some((x) => x.title === 'Publicação agendada atrasada' && /Atrasado \(\d{2}:\d{2}\) ainda não saiu/.test(x.body)));
       assert.deepEqual([...new Set(n.map((x) => x.name))].sort(), ['admin', 'gestao'], 'a gestão');
       await watchdog.check();
-      assert.equal((await q("SELECT 1 FROM notifications WHERE type = 'integracao'")).length, n.length, 'na mesma hora não repete');
+      assert.equal((await q("SELECT 1 FROM notifications WHERE type = 'integracao'")).length, n.length, 'no mesmo dia não repete');
       // banco travado (pool esgotado): duas conferências sem resposta e o worker sai para o Docker reiniciar
       const real = h.db.query; let exited = null;
       h.db.query = () => new Promise(() => {});

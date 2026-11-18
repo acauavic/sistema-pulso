@@ -34,7 +34,7 @@
       <form method="post" action="/lixeira/<%= t.id %>/restaurar" class="inline" data-busy="Restaurando…"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('rotate-ccw', 14) %> Restaurar</button></form>
       <% } %>
       <% if (all) { %>
-      <form method="post" action="/lixeira/<%= t.id %>/apagar" class="inline" data-confirm="Apagar de vez “<%= t.title %>”? Os arquivos saem do armazenamento e não há como voltar."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentPath %><%= group ? '?tipo=' + group : '' %>"><button class="link small err" type="submit">apagar de vez</button></form>
+      <form method="post" action="/lixeira/<%= t.id %>/apagar" class="inline" data-confirm="Apagar de vez “<%= t.title %>”? Os arquivos saem do armazenamento e não há como voltar."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentPath %><%= group ? '?tipo=' + group : '' %>"><button class="link small danger-link" type="submit">apagar de vez</button></form>
       <% } %>
     </span>
   </div>

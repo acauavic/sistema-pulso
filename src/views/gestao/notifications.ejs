@@ -13,11 +13,12 @@
       <label class="check"><input type="checkbox" name="<%= k %>_email" value="1" <%= s.email ? 'checked' : '' %>> Também por e-mail</label>
     </div>
     <fieldset class="roles-pick">
-      <legend><%= broad ? 'Quem recebe este aviso geral (além do responsável pelo item)' : 'Também avisar sempre estes perfis (opcional; o responsável e quem participa já recebem)' %></legend>
+      <legend>Quem também recebe</legend>
+      <p class="small muted m-0"><%= broad ? 'Aviso geral: vai para os perfis marcados, além do responsável pelo item.' : 'Opcional: o responsável e quem participa já recebem.' %></p>
       <% Object.keys(roles).forEach(function (r) { %><label class="check"><input type="checkbox" name="<%= k %>_roles" value="<%= r %>" <%= (s.roles || []).indexOf(r) >= 0 ? 'checked' : '' %>> <%= roles[r].label %></label><% }) %>
     </fieldset>
   </section>
   <% }) %>
-  <div><button class="btn primary" type="submit">Salvar configuração</button></div>
+  <div class="sticky-actions"><button class="btn primary" type="submit">Salvar configuração</button></div>
 </form>
 <%- include('../partials/foot') %>

@@ -21,7 +21,7 @@
       <% if (c.guest_name) { %><p class="small muted m-0"><%= c.guest_name %></p><% } %>
     </div>
     <div class="cover-picks" role="radiogroup" aria-label="Capa de <%= c.post_title || c.title %>">
-      <% if (!c.covers.length) { %><p class="small muted"><%= c.has_frames ? 'Sem capa ainda: escreva um texto para gerar a primeira.' : 'Sem capa e sem quadros lidos: use "Ler de novo" no corte.' %></p><% } %>
+      <% if (!c.covers.length) { %><p class="small muted"><%= c.has_frames ? 'Sem capa ainda: escreva um texto para gerar a primeira.' : 'Sem capa e sem quadros lidos: use "Refazer a leitura" na página do corte.' %></p><% } %>
       <% c.covers.forEach(function (v) { %>
       <label class="cover-pick" title="<%= v.label || 'Capa' %>">
         <input type="radio" name="capa_<%= c.id %>" value="<%= v.id %>" <%= c.chosen && c.chosen.id === v.id ? 'checked' : '' %>>

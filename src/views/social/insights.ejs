@@ -18,7 +18,7 @@
 <% if (data.error) { %><p class="flash flash-error"><%= data.error %></p><% } %>
 
 <div class="tabs-wrap" data-tabs data-default="resumo">
-  <div class="seg ins-seg" role="tablist" aria-label="Redes">
+  <div class="seg seg-tabs" role="tablist" aria-label="Redes">
     <button type="button" role="tab" data-tab-btn="resumo">Resumo</button>
     <% nets.forEach(function (d) { %><button type="button" role="tab" data-tab-btn="<%= d.net %>"><%= label(d.net) %></button><% }) %>
     <button type="button" role="tab" data-tab-btn="equipe">O que publicamos</button>

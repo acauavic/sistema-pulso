@@ -74,7 +74,7 @@
         <% pub.platforms.forEach(function (k) { var r = (pub.results || []).find(function (x) { return x.platform === k; }) || {}; var again = !r.ok && r.retry_at; %>
         <li>
           <strong><%= label(k) %></strong>
-          <span class="badge <%= r.draft ? 'b-amber' : r.ok ? (r.simulated ? 'b-gray' : 'b-st-publicado') : again ? 'b-amber' : (r.error ? 'b-red' : 'b-amber') %>"><%= r.simulated ? 'Simulado' : r.draft ? 'Rascunho' : r.ok ? 'No ar' : again ? 'Nova tentativa' : r.error ? (r.action ? 'Precisa de ação' : 'Erro') : (pub.status === 'agendado' ? 'Agendado' : pending ? 'Não enviado' : 'Aguardando') %></span>
+          <span class="badge <%= r.draft ? 'b-amber' : r.ok ? (r.simulated ? 'b-gray' : 'b-st-publicado') : again ? 'b-amber' : r.error ? 'b-red' : pub.status === 'agendado' ? 'b-st-agendado' : 'b-amber' %>"><%= r.simulated ? 'Simulado' : r.draft ? 'Rascunho' : r.ok ? 'No ar' : again ? 'Nova tentativa' : r.error ? (r.action ? 'Precisa de ação' : 'Erro') : (pub.status === 'agendado' ? 'Agendado' : pending ? 'Não enviado' : 'Aguardando') %></span>
           <% if (trial && k === 'instagram') { %><span class="badge b-trial">Reel de teste</span><% } %>
           <% if (again) { %><span class="mono small">às <%= fmt.formatSoon(r.retry_at) %></span><% } %>
           <% if (r.url) { %><a class="small" href="<%= r.url %>" target="_blank" rel="noopener noreferrer">abrir <%- icon('external-link', 14) %></a><% } %>

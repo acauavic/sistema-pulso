@@ -25,7 +25,7 @@
 %>
 <div class="page-head">
   <div>
-    <span class="kicker">Convidado<%= guest.instagram ? ' · @' + guest.instagram : '' %></span>
+    <span class="kicker">Convidado<% if (guest.instagram) { %> · <span class="nocaps">@<%= String(guest.instagram).replace(/^@/, '') %></span><% } %></span>
     <h1><%= guest.name %>
       <% if (canW) { %><button class="badge badge-btn b-st-<%= guest.status %>" type="button" data-modal-open="modal-etapa" aria-label="Mudar a etapa (agora: <%= statusInfo.label %>)" title="Mudar a etapa"><%= statusInfo.label %> <%- icon('chevron-down', 12) %></button>
       <% } else { %><span class="badge b-st-<%= guest.status %>"><%= statusInfo.label %></span><% } %></h1>

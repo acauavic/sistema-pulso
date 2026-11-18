@@ -28,7 +28,7 @@
           <option value="">Atribuir a um episódio…</option>
           <% episodes.forEach(function (e) { %><option value="<%= e.id %>"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
         </select>
-        <button class="btn sm" type="submit">Atribuir</button>
+        <button class="btn" type="submit">Atribuir</button>
       </form>
     <% } else if (c.status === 'pronto') { %><p class="small muted">Sem episódio ainda.</p><% } %>
   </div>

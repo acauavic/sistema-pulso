@@ -140,7 +140,8 @@
     <% } %>
 
     <% if (assigned.length) { %>
-    <h2 class="top-gap">Atribuídos (<%= assigned.length %>)</h2>
+    <% var assignedTotal = typeof clipTotals !== 'undefined' && clipTotals ? clipTotals.assigned : assigned.length; %>
+    <h2 class="top-gap">Atribuídos <span class="mono muted">(<%= assignedTotal %>)</span><% if (assignedTotal > assigned.length) { %> <span class="small muted">mostrando <%= assigned.length %></span><% } %></h2>
     <div class="clip-grid">
       <% assigned.forEach(function (c) { %><%- include('_clip_card', { c: c, pick: clipPick }) %><% }) %>
     </div>
@@ -161,7 +162,7 @@
       <div class="row spread">
         <div><span class="kicker"><%= g.episode.number ? 'EP.' + String(g.episode.number).padStart(3, '0') : 'Episódio' %></span><h2><a href="/episodios/<%= g.episode.id %>"><%= g.episode.title %></a></h2><% if (g.episode.guest_name) { %><p class="small muted"><%= g.episode.guest_name %></p><% } %></div>
         <% if (perm.cut && g.canGenerate && aiReady) { %>
-        <form method="post" action="/episodios/<%= g.episode.id %>/capas/gerar" class="inline" data-busy="Gerando as capas…">
+        <form method="post" action="/episodios/<%= g.episode.id %>/capas/gerar" class="inline" data-busy="Gerando as capas…"<%- g.covers.length ? ' data-confirm="Gerar os posts de novo? As imagens automáticas que ainda não foram aprovadas são refeitas; as aprovadas e as editadas ficam."' : '' %>>
           <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="conteudo">
           <% ['post_quote', 'post_split', 'carousel'].forEach(function (k) { %><input type="hidden" name="kinds" value="<%= k %>"><% }) %>
           <button class="btn sm" type="submit"><%= g.covers.length ? 'Gerar de novo' : 'Gerar posts' %></button>
@@ -259,7 +260,8 @@
       <div class="req-pick" data-filter-value="<%= r.status %><%= mineOf(r) ? ' meus' : '' %>"<% if (mayPick) { %> data-dl-item data-id="<%= r.id %>"<% } %>>
       <% if (mayPick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= r.title %>"><% } %>
       <a class="req-row" href="/conteudo/pedidos/<%= r.id %>"<%- mayPick ? ' data-dl-pick' : '' %>>
-        <span><span class="ktype mono small muted"><%= K[r.kind].label %><%= r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '' %></span><br><strong><%= String(r.title).toLowerCase() === String(K[r.kind].label).toLowerCase() && r.episode_title ? r.episode_title : r.title %></strong>
+        <% var sameAsKind = String(r.title).toLowerCase() === String(K[r.kind].label).toLowerCase(); %>
+        <span><span class="ktype mono small muted"><%= sameAsKind && r.episode_title ? (r.episode_number ? 'EP.' + String(r.episode_number).padStart(3, '0') + ' · ' : '') + r.episode_title : K[r.kind].label + (r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '') %></span><br><strong><%= r.title %></strong>
           <span class="meta"><span><%- icon('user', 12) %><%= r.assignee_name || 'qualquer editor' %></span><% if (r.due_on) { %><span class="<%= late ? 'err' : '' %>"><%- icon('calendar', 12) %><%= dueShort(r.due_on) %><%= late ? ' · atrasado' : '' %></span><% } %><% if (r.rounds) { %><span><%= r.rounds %>ª volta</span><% } %></span></span>
         <span class="badge <%= { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao' }[r.status] %>"><%= S[r.status] %></span>
       </a>

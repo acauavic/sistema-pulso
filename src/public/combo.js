@@ -50,7 +50,7 @@
         li.dataset.index = String(index);
         li.addEventListener('mousedown', (e) => e.preventDefault()); // não tira o foco da busca
         li.addEventListener('click', () => { if (!opt.disabled) choose(index); });
-        list.append(li); items.push({ li, opt, key: fold(`${li.textContent} ${opt.value}`) });
+        list.append(li); items.push({ li, opt, key: fold(li.textContent || opt.value) }); // só o texto: o valor é id do banco ("12" achava o EP.011)
       });
     };
     const sync = () => {

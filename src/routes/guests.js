@@ -142,7 +142,13 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   const followupOnly = req.query.followup === '1';
   const shown = followupOnly ? guests.filter((g) => g.outreach && outreach.NEEDS.has(g.outreach.state)) : guests;
   const columns = GUEST_STATUSES.map((s) => ({ ...s, guests: shown.filter((g) => g.status === s.key) }));
-  res.render('guests/index', { followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: shown, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
+  let listed = shown; let pager = null;
+  if (view === 'lista') {
+    const { pageOf, paginate } = require('../utils/pager');
+    const pg = pageOf(req, 100);
+    ({ rows: listed, pager } = paginate(req, shown.slice(pg.offset, pg.offset + pg.limit), pg));
+  }
+  res.render('guests/index', { pager, total: shown.length, followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: listed, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
 }));
 
 // ---- criar ----

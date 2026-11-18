@@ -19,8 +19,10 @@
 <section class="card rule-card">
   <form method="post" action="/gestao/patrocinios/regras" class="row spread" data-autosubmit-form>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <div><strong>Episódio exclusivo não recebe inserção</strong><p class="small muted">Quando o episódio é entrega de um patrocinador (exclusivo), a equipe não consegue incluir inserção de outro patrocinador nele. Hoje: <strong><%= blockInsertion ? 'ligado' : 'desligado' %></strong>.</p></div>
-    <button class="btn" type="submit" name="block_insertion" value="<%= blockInsertion ? '0' : '1' %>"><%= blockInsertion ? 'Desligar' : 'Ligar' %></button>
+    <div><strong>Episódio exclusivo não recebe inserção</strong><p class="small muted">Quando o episódio é entrega de um patrocinador (exclusivo), a equipe não consegue incluir inserção de outro patrocinador nele.</p></div>
+    <input type="hidden" name="block_insertion" value="0">
+    <label class="switch"><input type="checkbox" role="switch" name="block_insertion" value="1" <%= blockInsertion ? 'checked' : '' %> data-autosubmit aria-label="Episódio exclusivo não recebe inserção"><span class="switch-track" aria-hidden="true"></span><span class="mono small switch-state"><%= blockInsertion ? 'LIGADO' : 'DESLIGADO' %></span></label>
+    <noscript><button class="btn sm" type="submit">Salvar</button></noscript>
   </form>
 </section>
 

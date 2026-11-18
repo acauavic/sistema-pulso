@@ -202,7 +202,7 @@ describe('central de patrocinadores', () => {
       assert.match(page, new RegExp(`/patrocinador/${token}/cadastro`));
       assert.match(page, new RegExp(`/patrocinador/${token}/portal`));
       assert.match(page, /libera em Ganho/);
-      assert.match(page, /Magic links reutilizáveis/);
+      assert.match(page, /Links de acesso direto/);
     });
 
     it('abrir o link cria a sessão (cookie HttpOnly) e leva para uma URL limpa, sem o token', async () => {

@@ -4,6 +4,17 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.75.1', date: '2026-11-18', title: 'Segunda revisão da interface: celular, buscas e detalhes',
+    items: [
+      { kind: 'correcao', text: 'No celular, um tema longo em "Próximas gravações" alargava o Painel e empurrava a barra de baixo para fora da tela.' },
+      { kind: 'correcao', text: 'Busca (Ctrl+K): enquanto a busca nova carrega, o resultado anterior fica apagado e o Enter espera a resposta certa, em vez de abrir o item da busca de antes. Na lista com busca, digitar um número não acha mais o episódio errado.' },
+      { kind: 'novo', text: 'Listas longas dentro de janelas ganharam busca: "Escolher cortes" do media kit, "Gravações e episódios" do patrocinador e "Pedir ideias". O que já está marcado continua à vista durante a busca.' },
+      { kind: 'ajuste', text: 'Convidados em lista: 100 por página. O corte diz no topo se já saiu (publicado, na fila, em revisão ou pronto para postar). Cortes mostra o total de atribuídos, e não só os da página.' },
+      { kind: 'ajuste', text: '"Agendar N publicações" e "Salvar configuração" (avisos) ficam presos no pé da tela em páginas longas. "Gerar de novo" nos posts pede confirmação.' },
+      { kind: 'ajuste', text: 'Detalhes: o episódio exclusivo virou um interruptor; Desempenho e Insights com abas em controle segmentado; Saúde do sistema e Duplicatas sem números internos; galeria do media kit alinhada; o aviso de fila parada sai no máximo uma vez por dia e sem jargão; etapa atual visível no tema claro; cartões sem sombra no tema claro; "apagar de vez" em vermelho; barra do editor de texto sempre inteira.' },
+    ],
+  },
+  {
     version: '1.75.0', date: '2026-11-18', title: 'Revisão da interface inteira, números dos posts e agenda da semana',
     items: [
       { kind: 'novo', text: 'Listas longas com busca: todo seletor com muitas opções (episódio, convidado, patrocinador, pessoa) ganhou uma caixa de busca dentro dele. Digite parte do nome, sem se preocupar com acento.' },

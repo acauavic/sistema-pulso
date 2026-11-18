@@ -323,6 +323,30 @@
       list.querySelectorAll('[data-filter-value]').forEach((row) => { row.hidden = Boolean(b.dataset.value) && !row.dataset.filterValue.split(' ').includes(b.dataset.value); });
     });
   });
+  // filtro de uma lista longa dentro de uma janela: <input data-list-filter="#lista" data-list-item="li">; o que está marcado ou
+  // vinculado (checkbox marcada, select com valor) continua à vista, para não sumir da conta de quem está escolhendo
+  document.querySelectorAll('[data-list-filter]').forEach((input) => {
+    const box = document.querySelector(input.dataset.listFilter);
+    if (!box) return;
+    const sel = input.dataset.listItem || 'li';
+    const fold = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const count = input.parentElement.querySelector('[data-list-filter-count]');
+    const kept = (it) => it.querySelector('input[type="checkbox"]:checked, input[type="radio"]:checked') || [...it.querySelectorAll('select')].some((s) => s.value);
+    const run = () => {
+      const q = fold(input.value.trim()); let n = 0;
+      box.querySelectorAll(sel).forEach((it) => { const hit = !q || fold(it.textContent).includes(q) || kept(it); it.hidden = !hit; if (hit) n += 1; });
+      if (count) count.textContent = q ? `${n} ${n === 1 ? 'item' : 'itens'}` : '';
+    };
+    input.addEventListener('input', run);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); }); // Enter não envia a janela
+  });
+  // menu lateral: em tela baixa, o item da página aberta aparece (sem precisar rolar a lista para achar onde se está)
+  (() => {
+    const nav = document.querySelector('.sidebar .nav'); const cur = nav && nav.querySelector('a.active');
+    if (!cur || nav.scrollHeight <= nav.clientHeight) return;
+    const top = cur.offsetTop - nav.offsetTop;
+    if (top < nav.scrollTop || top + cur.offsetHeight > nav.scrollTop + nav.clientHeight) nav.scrollTop = Math.max(0, top - nav.clientHeight / 2);
+  })();
   // link para uma seção que abre (#sobre): ela já vem aberta
   try { const sec = location.hash.length > 1 && document.getElementById(decodeURIComponent(location.hash.slice(1))); if (sec && sec.tagName === 'DETAILS') sec.open = true; } catch { /* hash inválido */ }
 

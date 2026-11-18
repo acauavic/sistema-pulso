@@ -2,6 +2,11 @@
 <%
   var ST = { enviando: ['b-amber', 'enviando'], processando: ['b-amber', 'lendo o vídeo'], pronto: ['b-gray', 'pronto'], erro: ['b-red', 'erro'] }[clip.status];
   var PUB = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-st-agendado', 'agendado'], publicado: ['b-st-publicado', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] };
+  // o chip do topo diz se o corte já saiu (a pergunta de todo mundo); o estado do arquivo só aparece enquanto ele não está pronto
+  if (clip.status === 'pronto') {
+    var stOf = function (s) { return publications.some(function (p) { return p.status === s; }); };
+    ST = stOf('publicado') || stOf('parcial') ? ['b-st-publicado', 'publicado'] : stOf('agendado') || stOf('enviando') ? ['b-st-agendado', 'na fila'] : stOf('revisao') ? ['b-amber', 'em revisão'] : (clip.episode_id || clip.request_id ? ['b-st-pronto_publicar', 'pronto para postar'] : ['b-gray', 'sem episódio']);
+  }
   var UP = uploadPost.PLATFORMS;
   var ready = clip.status === 'pronto';
   var chosen = covers.find(function (x) { return x.id === clip.cover_id; });
@@ -112,7 +117,7 @@
           <option value="">Escolher episódio gravado…</option>
           <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= episode && episode.id === e.id ? 'selected' : '' %>><%= epLabel(e) %></option><% }) %>
         </select>
-        <button class="btn sm <%= episode ? '' : 'primary' %>" type="submit"><%= episode ? 'Mudar' : 'Atribuir' %></button>
+        <button class="btn <%= episode ? '' : 'primary' %>" type="submit"><%= episode ? 'Mudar' : 'Atribuir' %></button>
       </form>
       <p class="small muted">Ao atribuir, as capas são refeitas com o nome do convidado e o número do episódio.</p>
       <% if (episode) { %><div class="row modal-actions"><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div></dialog><% } %>

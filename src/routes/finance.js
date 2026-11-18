@@ -15,7 +15,7 @@ const text = (v, n) => String(v ?? '').replace(/\r/g, '').trim().slice(0, n) || 
 const num = (v) => { const raw = String(v ?? '').trim(); const n = Number(/,/.test(raw) ? raw.replace(/\./g, '').replace(',', '.') : raw); return Number.isFinite(n) ? n : NaN; };
 // Só volta para caminhos do próprio painel.
 const backTo = (req, fallback) => { const b = String(req.body.voltar || ''); return /^\/[A-Za-z0-9\-_/?=&%.#]*$/.test(b) && !b.startsWith('//') ? b : fallback; };
-const money = (c) => (Number(c) < 0 ? `− ${formatBRL(-Number(c))}` : formatBRL(c)); // negativo no mesmo formato das linhas: "− R$ 150,00"
+const money = (c) => (Number(c) < 0 ? `−\u00a0${formatBRL(-Number(c))}` : formatBRL(c)); // negativo no mesmo formato das linhas: "− R$ 150,00"
 
 // ---------------------------------------------------------------- resumo
 router.get('/financeiro', requirePerm('finance.read'), wrap(async (req, res) => {

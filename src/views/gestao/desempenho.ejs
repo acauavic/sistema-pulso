@@ -16,7 +16,7 @@
 <p class="lead">Quanto o painel demora para quem usa, onde o servidor demora e o que pesa no banco. Últimos <span class="mono"><%= r.days %></span> dias.</p>
 
 <div class="tabs-wrap top-gap" data-tabs data-default="real">
-  <div class="tabbar" role="tablist" aria-label="Desempenho">
+  <div class="seg seg-tabs" role="tablist" aria-label="Desempenho">
     <button type="button" role="tab" data-tab-btn="real" aria-controls="pane-real">Velocidade real</button>
     <button type="button" role="tab" data-tab-btn="lentas" aria-controls="pane-lentas">Requisições lentas<% if (r.slow.length) { %> <span class="count"><%= r.slow.reduce(function (n, s) { return n + s.n; }, 0) %></span><% } %></button>
     <button type="button" role="tab" data-tab-btn="banco" aria-controls="pane-banco">Consultas do banco</button>
@@ -33,7 +33,7 @@
           <tbody>
             <% r.pages.forEach(function (p) { %>
             <tr>
-              <td class="mono"><%= p.page %></td>
+              <td class="mono raw"><%= p.page %></td>
               <td class="num mono"><%= p.n %></td>
               <% METRICS.forEach(function (m) { var v = p.m[m[0]]; %>
               <td class="num"><% if (v) { %><span class="badge <%= chip[v.grade] %>"><%= unit(m[0], v.p75) %></span><% } else { %><span class="muted">—</span><% } %></td>
@@ -55,7 +55,7 @@
           <thead><tr><th>Rota</th><th class="num">Vezes</th><th class="num">Mediana</th><th class="num">Pior</th><th class="num">No banco</th><th class="num">Consultas</th></tr></thead>
           <tbody>
             <% r.slow.forEach(function (s) { %>
-            <tr><td class="mono"><%= s.method %> <%= s.route %></td><td class="num mono"><%= s.n %></td><td class="num mono"><%= ms(s.p50) %></td><td class="num mono"><%= ms(s.max) %></td><td class="num mono"><%= ms(s.db_ms) %></td><td class="num mono"><%= s.db_count %></td></tr>
+            <tr><td class="mono raw"><%= s.method %> <%= s.route %></td><td class="num mono"><%= s.n %></td><td class="num mono"><%= ms(s.p50) %></td><td class="num mono"><%= ms(s.max) %></td><td class="num mono"><%= ms(s.db_ms) %></td><td class="num mono"><%= s.db_count %></td></tr>
             <% }) %>
           </tbody>
         </table>

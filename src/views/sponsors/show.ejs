@@ -342,7 +342,8 @@
       <%- csrfField %>
       <h2 id="me-h">Gravações e episódios</h2>
       <p class="small muted">Reserve gravações marcadas (entram na agenda do portal); ao gravar, a reserva vira o episódio. "Fora" tira o vínculo.</p>
-      <div class="stage-pick">
+      <% if (agenda.length + episodes.length > 10) { %><div class="row list-filter"><input type="search" placeholder="Buscar pelo nome ou EP" aria-label="Buscar gravação ou episódio" data-list-filter="#sponsor-eps" autocomplete="off"><span class="mono small muted list-filter-count" data-list-filter-count></span></div><p class="small muted m-0">O que já está vinculado continua à vista durante a busca.</p><% } %>
+      <div class="stage-pick" id="sponsor-eps">
         <% if (agenda.length) { %><h3>Agenda</h3>
         <ul class="plain ep-pick">
           <% agenda.forEach(function (g) { %>
@@ -381,7 +382,7 @@
     <section class="card" id="links">
       <h2>Links do patrocinador</h2>
       <% if (!links) { %>
-        <p class="muted">Magic links reutilizáveis: ao abrir, o patrocinador entra direto (sem criar conta) e pode voltar pelo mesmo link quando quiser. Abrem o media kit, o formulário de cadastro (depois de Ganho) e o portal (quando Ativo). Gerar novos links derruba os acessos abertos.</p>
+        <p class="muted">Links de acesso direto: ao abrir, o patrocinador entra sem criar conta e pode voltar pelo mesmo link quando quiser. Abrem o media kit, o formulário de cadastro (depois de Ganho) e o portal (quando Ativo). Gerar novos links derruba os acessos abertos.</p>
         <% if (canWrite) { %>
         <form method="post" action="/patrocinadores/<%= sponsor.id %>/links"><%- csrfField %><button class="btn" type="submit"><%- icon('link') %> Gerar links</button></form>
         <% } %>
@@ -391,7 +392,7 @@
           ['Formulário de cadastro', links.form, afterWon ? formLine.toLowerCase() : 'libera em Ganho'],
           ['Portal do patrocinador', links.portal, sponsor.stage === 'ativo' || sponsor.stage === 'inativo' ? 'aberto' : 'libera em Ativo'],
         ]; %>
-        <p class="small muted">Magic links reutilizáveis: abrir o link dá acesso direto, sem criar conta. Gerar novos links encerra os acessos abertos.</p>
+        <p class="small muted">Links de acesso direto: quem abre entra sem criar conta. Gerar novos links encerra os acessos abertos.</p>
         <% rows.forEach(function (r) { %>
         <label class="copy-field"><%= r[0] %> <small class="muted">· <%= r[2] %></small>
           <div class="row">

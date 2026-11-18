@@ -88,7 +88,7 @@
       <legend class="field-label">Pedir ao editor junto com o episódio</legend>
       <input type="hidden" name="pedir_ok" value="1">
       <div class="chips-radio">
-        <% pedidoRoutines.forEach(function (r) { var on = marked ? marked.indexOf(String(r.id)) >= 0 : r.default_on; %><label class="chip-radio"><input type="checkbox" name="pedir" value="<%= r.id %>" <%= on ? 'checked' : '' %>><span><%= r.title %><% if (r.priority) { %>&nbsp;<small class="mono muted">PRIORIDADE</small><% } %></span></label><% }) %>
+        <% pedidoRoutines.forEach(function (r) { var on = marked ? marked.indexOf(String(r.id)) >= 0 : r.default_on; %><label class="chip-radio"><input type="checkbox" name="pedir" value="<%= r.id %>" <%= on ? 'checked' : '' %>><span><%= r.title %><% if (r.priority) { %><small class="muted"> · prioridade</small><% } %></span></label><% }) %>
       </div>
       <p class="small muted">Cada um vira um pedido de conteúdo para o editor, com prazo e responsável de Gestão &gt; Rotinas. A entrega sobe aqui no sistema. Os cortes chegam aos poucos e cada um já vai para o Social.</p>
     </fieldset>

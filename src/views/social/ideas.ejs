@@ -32,7 +32,8 @@
     <fieldset>
       <legend>Episódios <span class="mono small muted"><%= withText.length %></span></legend>
       <% if (withText.length > 1) { %><label class="check"><input type="checkbox" data-check-all> Todos os que têm transcrição</label><% } %>
-      <div class="check-list">
+      <% if (withText.length > 8) { %><div class="row list-filter"><input type="search" placeholder="Buscar episódio ou convidado" aria-label="Buscar episódio" data-list-filter="#ideas-eps" data-list-item="label" autocomplete="off"><span class="mono small muted list-filter-count" data-list-filter-count></span></div><% } %>
+      <div class="check-list" id="ideas-eps">
         <% withText.forEach(function (e) { %>
         <label class="check"><input type="checkbox" name="episodes" value="<%= e.id %>" data-check-item> <span class="mono"><%= epNo(e.number) %></span> <%= e.guest_name || e.title %><% if (e.ideas) { %> <span class="small muted">· <%= fmt.plural(e.ideas, 'ideia', 'ideias') %> já</span><% } %></label>
         <% }) %>

@@ -19,7 +19,7 @@ router.get('/gestao/patrocinios', requirePerm('plans.manage'), wrap(async (req, 
 }));
 
 router.post('/gestao/patrocinios/regras', requirePerm('plans.manage'), wrap(async (req, res) => {
-  const on = req.body.block_insertion === '1';
+  const on = [].concat(req.body.block_insertion || []).includes('1'); // o interruptor manda "0" (campo escondido) e, ligado, também "1"
   await require('../services/settings').set('block_insertion_in_exclusive', on);
   await audit(req, 'patrocinio.regra_exclusivo', 'settings', null, { ligada: on });
   await req.flash('ok', on ? 'Episódio exclusivo de um patrocinador não recebe inserção de outro.' : 'Episódio exclusivo agora aceita inserção de outros patrocinadores.');

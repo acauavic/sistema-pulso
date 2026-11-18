@@ -44,6 +44,7 @@
     const skeletonRows = () => { if (!box.querySelector('.palette-item')) box.innerHTML = `<div class="palette-skel" aria-hidden="true">${'<span class="skel"></span>'.repeat(5)}</div>`; };
     // A mesma busca de novo (apagou e redigitou, abriu a janela outra vez) sai da memória por 1 min; a anterior em andamento é cancelada.
     const memo = new Map(); let ctrl = null;
+    let shownQ = null; let enterPending = false; // a busca que está na tela; Enter com resultado velho espera a resposta nova
     async function load(q) {
       const my = ++seq;
       if (ctrl) ctrl.abort();
@@ -62,6 +63,8 @@
         let groups = data.groups || [];
         if (!q) { const rec = recents(); if (rec.length) groups = [{ label: 'Abertos recentemente', items: rec }, ...groups]; }
         render(groups);
+        shownQ = q; box.classList.remove('is-stale'); box.removeAttribute('aria-busy');
+        if (enterPending) { enterPending = false; if (items.length) choose(active, false); }
         if (tips) { tips.hidden = !data.tips; tips.textContent = data.tips ? `${data.tips} sugest${data.tips > 1 ? 'ões' : 'ão'} para melhorar a busca →` : ''; }
       } catch (err) { if (my === seq && err.name !== 'AbortError') box.innerHTML = '<p class="palette-empty">Não foi possível buscar agora.</p>'; } finally { clearTimeout(wait); }
     }
@@ -80,11 +83,20 @@
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); palette.open ? palette.close() : open(); }
       else if (e.key === '/' && !palette.open && !e.target.closest('input, textarea, select, [contenteditable]')) { e.preventDefault(); open(); }
     });
-    input.addEventListener('input', () => { clearTimeout(timer); const q = input.value.trim(); timer = setTimeout(() => { lastQ = q; load(q); }, 250); }); // espera a pessoa parar de digitar
+    input.addEventListener('input', () => {
+      clearTimeout(timer); const q = input.value.trim();
+      const stale = q !== shownQ; box.classList.toggle('is-stale', stale); if (stale) box.setAttribute('aria-busy', 'true');
+      timer = setTimeout(() => { lastQ = q; load(q); }, 250); // espera a pessoa parar de digitar
+    });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
-      else if (e.key === 'Enter') { e.preventDefault(); choose(active, e.metaKey || e.ctrlKey); }
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        const q = input.value.trim();
+        if (q !== shownQ) { enterPending = true; clearTimeout(timer); lastQ = q; load(q); return; } // não abre o resultado da busca anterior
+        choose(active, e.metaKey || e.ctrlKey);
+      }
     });
     box.addEventListener('click', (e) => { const el = e.target.closest('.palette-item'); if (!el) return; e.preventDefault(); choose(Number(el.dataset.i), e.metaKey || e.ctrlKey); });
     box.addEventListener('mousemove', (e) => { const el = e.target.closest('.palette-item'); if (el) setActive(Number(el.dataset.i)); });

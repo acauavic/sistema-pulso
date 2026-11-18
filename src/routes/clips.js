@@ -85,7 +85,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const ordem = ['antigos', 'episodio', 'duracao'].includes(req.query.ordem) ? req.query.ordem : 'recentes';
   const allClips = clipRows.rows.map((c) => ({ ...c, pub: board.stateOf(idx.byClip.get(c.id)) }));
   const readyCount = allClips.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !c.pub).length;
-  let list = []; let clipPager = null; let running = false;
+  let list = []; let clipPager = null; let clipTotals = null; let running = false;
   if (vista === 'cortes') {
     const natural = (a, b) => String(a.title).localeCompare(String(b.title), 'pt-BR', { numeric: true });
     const sorters = {
@@ -99,6 +99,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     const pg = pageOf(req, req.query.todos === '1' ? 1000 : 60);
     const out = paginate(req, filtered.slice(pg.offset, pg.offset + pg.limit), pg);
     clipPager = out.pager;
+    clipTotals = { assigned: filtered.filter((c) => c.episode_id).length, unassigned: filtered.filter((c) => !c.episode_id).length };
     const ids = out.rows.map((c) => c.id);
     const [{ rows: covers }, views] = await Promise.all([
       ids.length ? db.query('SELECT id, clip_id, updated_at FROM episode_covers WHERE clip_id = ANY($1) ORDER BY position', [ids]) : { rows: [] },
@@ -128,7 +129,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const moments = only && vista === 'cortes' ? await clips.momentsFor(only) : [];
   const pedir = Object.prototype.hasOwnProperty.call(R.KINDS, req.query.pedir) ? req.query.pedir : (req.query.pedir === '1' ? 'trailer' : null);
   res.render('content/index', {
-    uploadPost: up, autoDefaults: vista === 'cortes' ? await require('../services/commentAutomation').formDefaults({}) : null, situacao, ordem, readyCount, clipPager,
+    uploadPost: up, autoDefaults: vista === 'cortes' ? await require('../services/commentAutomation').formDefaults({}) : null, situacao, ordem, readyCount, clipPager, clipTotals,
     tabCounts: { cortes: allClips.length, posts: postCountRow.rows[0].n },
     columns, hiddenOld, tipo, vista,
     requests: reqs, openRequests: reqs.filter((r) => R.OPEN.includes(r.status)), people: people.rows, episodeList: episodeList.rows, K: R.KINDS, S: R.STATUSES, F: R.FORMATS,

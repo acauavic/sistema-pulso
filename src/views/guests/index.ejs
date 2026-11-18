@@ -49,7 +49,7 @@
           <% if (g.status === 'perdido' && g.loss_reason) { %><span class="mono"><%= lossReasons[g.loss_reason] %></span><% } %>
           <% if (g.proposed_at) { %><span><%- icon('calendar', 12) %><%= fmt.shortDate(g.proposed_at) %></span><% } %>
           <% if (g.outreach && g.outreach.state !== 'respondeu') { %><span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %>
-          <% if (g.invite_viewed_at) { %><span><%- icon('eye', 12) %>visto</span><% } else if (g.invite_sent_at) { %><span><%- icon('send', 12) %>enviado</span><% } else if (g.invite_token) { %><span><%- icon('link', 12) %>link pronto</span><% } %>
+          <% if (g.invite_viewed_at) { %><span title="Abriu o convite em <%= fmt.formatDateTime(g.invite_viewed_at) %>"><%- icon('eye', 12) %>abriu o convite</span><% } else if (g.invite_sent_at) { %><span title="Convite enviado em <%= fmt.formatDateTime(g.invite_sent_at) %>"><%- icon('send', 12) %>convite enviado</span><% } else if (g.invite_token) { %><span title="O link do convite está pronto, ainda não foi enviado"><%- icon('link', 12) %>link pronto</span><% } %>
         </span>
         <span class="card-foot"><%- include('../partials/dot', { type: 'guest', id: g.id, user: g.owner_id ? { id: g.owner_id, name: g.owner_name } : null, editable: can('guests.write'), inLink: true }) %></span>
       </a>
@@ -74,7 +74,7 @@
 <% } %>
 <div class="table-wrap">
 <table>
-  <thead><tr><% if (canBulk) { %><th class="check-col"><input type="checkbox" data-bulk-all aria-label="Marcar todos os convidados da lista"></th><% } %><th>Convidado</th><th>Perfil</th><th>Etapa</th><th>Gravação</th><th>Convite</th><th>Responsável</th></tr></thead>
+  <thead><tr><% if (canBulk) { %><th class="check-col"><input type="checkbox" data-bulk-all aria-label="Marcar todos os convidados da lista"></th><% } %><th>Convidado</th><th>Perfil</th><th>Etapa</th><th class="nowrap">Gravação</th><th class="nowrap">Convite</th><th class="nowrap">Responsável</th></tr></thead>
   <tbody>
     <% if (!guests.length) { %><tr><td colspan="<%= canBulk ? 7 : 6 %>"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum convidado por aqui ainda</strong><span>Cadastre o primeiro convidado ou ajuste os filtros.</span></div></td></tr><% } %>
     <% guests.forEach(function (g) { %>
@@ -84,13 +84,14 @@
       <td><%= g.profile ? profileLabels[g.profile].label : '—' %></td>
       <td><span class="badge b-st-<%= g.status %>"><%= statuses.find(function (s) { return s.key === g.status; }).label %></span></td>
       <td class="nowrap mono"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : '—' %></td>
-      <td class="small"><%= g.invite_viewed_at ? 'Visto' : g.invite_sent_at ? 'Enviado' : g.invite_token ? 'Link pronto' : '—' %></td>
+      <td class="small nowrap"<%- g.invite_viewed_at ? ' title="Abriu o convite em ' + fmt.formatDateTime(g.invite_viewed_at) + '"' : '' %>><%= g.invite_viewed_at ? 'Abriu' : g.invite_sent_at ? 'Enviado' : g.invite_token ? 'Link pronto' : '—' %></td>
       <td><%- include('../partials/dot', { type: 'guest', id: g.id, user: g.owner_id ? { id: g.owner_id, name: g.owner_name } : null, editable: can('guests.write'), label: true }) %></td>
     </tr>
     <% }) %>
   </tbody>
 </table>
 </div>
+<% if (typeof pager !== 'undefined' && pager) { %><%- include('../partials/pager', { pager }) %><% } %>
 <% if (canBulk) { %>
 <dialog class="modal" id="modal-massa" aria-labelledby="m-massa-h">
   <form method="post" action="/convidados/em-massa" id="form-massa" class="stack" data-bulk-form>

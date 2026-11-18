@@ -146,6 +146,7 @@ describe('planos de patrocínio (Ouro e Diamond)', () => {
     await put({ [`role_${sid}`]: 'exclusivo', [`role_${sid2}`]: 'insercao' });
     assert.equal((await roles()).length, 2, 'desligado: aceita');
     await as.gestao.act('/gestao/patrocinios/regras', { block_insertion: '1' }, { from: '/gestao/patrocinios' });
-    assert.match((await as.gestao.get('/gestao/patrocinios')).text, /Hoje: <strong>ligado/);
+    const page = (await as.gestao.get('/gestao/patrocinios')).text;
+    assert.match(page, /role="switch" name="block_insertion" value="1" checked/); assert.match(page, />LIGADO</);
   });
 });

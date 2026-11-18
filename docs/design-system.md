@@ -55,7 +55,7 @@
 
 - Base 4: 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64.
 - Raios: **2** tag/chip · **6** card/tabela · **10** campo · **full** botão.
-- Escuro: profundidade = superfície mais clara + borda, **sem sombra**. Claro: sombra única `0 8px 24px rgba(10,10,10,.08)` só em menus e modais.
+- Escuro: profundidade = superfície mais clara + borda, **sem sombra**. Claro: sombra única `0 8px 24px rgba(10,10,10,.08)` só em menus e modais (cartões, tabelas e métricas não têm sombra em nenhum tema).
 - Transições 160ms `cubic-bezier(.2,.8,.2,1)`; respeitar `prefers-reduced-motion`. Ponto "ao vivo" pulsa a 1,2s.
 
 ## Componentes
@@ -65,6 +65,10 @@
 - **Campo**: raio 10, borda `border/strong`; foco = borda lime + halo 15% (no claro: preto). Rótulo 13px acima, `text/secondary`. Obrigatório leva `*` e a legenda "* obrigatório" no topo do formulário; nada de "(opcional)" espalhado. Exemplo no placeholder começa com "ex.:" (para não parecer valor preenchido).
 - **Lista com busca** (`src/public/combo.js`, automático): todo `<select>` com 9 opções ou mais (ou com `data-search`) vira um botão com o valor atual que abre uma caixa de busca e a lista filtrada (sem acento, sem maiúscula; setas, Enter, Esc). No celular abre como folha embaixo. O `<select>` de verdade continua no formulário; `data-native` deixa o nativo. "Escolha…" num campo obrigatório fica apagado; "Todos os episódios" num filtro é uma escolha de verdade (texto normal).
 - **Filtros instantâneos**: select de filtro leva `data-autosubmit` (aplica ao escolher), a busca aplica no Enter, e não há botão "Filtrar". Com algum filtro ativo, aparece o link pequeno "Limpar filtros". Filtro de uma lista já carregada (ex.: pedidos por situação) é `.seg` com botões `data-row-filter` e não recarrega a página.
+- **Lista longa dentro de janela** (`data-list-filter="#lista"`, `data-list-item`): acima da lista de checkboxes ou de linhas com select, uma busca que filtra sem recarregar e mostra a contagem em mono; o que está marcado ou vinculado continua à vista. Vale para "Escolher cortes" do media kit, "Gravações e episódios" do patrocinador e "Pedir ideias".
+- **Ação final de página longa** (`.sticky-actions`): o botão que encerra uma página comprida (agendar a semana, salvar a configuração de avisos) fica preso no pé da tela, sobre o fundo, com filete em cima; no celular, acima da barra de baixo.
+- **Interruptor** (`.switch`, `role="switch"`): para ligar e desligar uma regra (ex.: episódio exclusivo não recebe inserção). Trilho neutro; ligado = trilho na cor do texto e o estado em mono ao lado (LIGADO/DESLIGADO). Nunca lime: configuração não é ação. Aplica ao tocar (`data-autosubmit`).
+- **Abas dentro do conteúdo** (`.seg.seg-tabs`): quando a página já está abaixo de um menu de abas (Gestão, Social), as abas internas são controle segmentado, nunca uma terceira barra sublinhada (Insights, Desempenho).
 - **Menu da linha** (`details.row-menu`, ícone `ellipsis`): ações raras e destrutivas (mandar para a lixeira, importar planilha, reenviar acesso) saem de perto de "Editar" e vão para esse menu. Apagar um registro pequeno (uma abordagem, uma imagem) é ícone `trash-2` discreto (`.icon-btn.row-del`, vermelho só no hover), com confirmação.
 - **Seleção**: checkbox/radio com `accent-color` lime; controle segmentado (Lista | Quadro | Calendário) é `.seg`.
 - **Tag/eixo**: mono caixa alta entre colchetes quando for tema (`[ NEGÓCIOS ]`). **Avatar**: círculo; host em plum, convidado em grafite.

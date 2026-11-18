@@ -1,5 +1,5 @@
 <%- include('../partials/head') %>
-<div class="page-head"><div><span class="kicker">Gestão</span><h1>Sistema</h1></div></div>
+<div class="page-head"><div><span class="kicker">Gestão</span><h1>Saúde do sistema</h1></div></div>
 <%- include('../partials/gestao-nav', { active: 'sistema' }) %>
 <%
   var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
@@ -7,7 +7,7 @@
   var age = function (d) { if (!d) return '—'; var s = Math.round((Date.now() - new Date(d).getTime()) / 1000); return s < 90 ? 'agora' : s < 3600 ? 'há ' + Math.round(s / 60) + ' min' : fmt.formatDateTime(d); };
 %>
 <p class="lead">Trabalhos em segundo plano (leitura de cortes, IA, e-mails), os processos que rodam a fila e as rotinas automáticas.</p>
-<% if (!alive.length) { %><p class="flash flash-error">Nenhum processo rodando a fila agora: cortes, análises e e-mails ficam esperando. Confira o serviço <span class="mono">worker</span>.</p><% } %>
+<% if (!alive.length) { %><p class="flash flash-error">Nenhum processo rodando a fila agora: cortes, análises e e-mails ficam esperando. Confira o serviço da fila (<span class="mono">worker</span>) no servidor.</p><% } %>
 
 <div class="stat-grid">
   <div class="stat"><span class="stat-label">Na fila</span><span class="stat-n"><%= counts.queued || 0 %></span></div>
