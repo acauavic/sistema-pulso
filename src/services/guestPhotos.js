@@ -29,11 +29,11 @@ function verify(id, exp, sig, now = Date.now()) {
 
 // Responde com a foto (o bucket é privado: tudo passa por aqui). Devolve false se não houver foto.
 // req: para ver em WebP (guardado no servidor) quando o navegador aceita; senão vai o original.
-async function send(res, guestId, req = null) {
+async function send(res, guestId, req = null, cacheControl = 'private, max-age=3600') {
   const { rows: [g] } = await db.query('SELECT photo_key FROM guests WHERE id = $1 AND photo_key IS NOT NULL', [guestId]);
   if (!g) return false;
   const headers = {
-    'Cache-Control': 'private, max-age=3600',
+    'Cache-Control': cacheControl,
     'Content-Security-Policy': "default-src 'none'; sandbox", 'Cross-Origin-Resource-Policy': 'cross-origin', // o media kit roda em sandbox (origem opaca): same-origin bloquearia a foto. Quem controla o acesso é a assinatura do endereço
   };
   const original = async () => {

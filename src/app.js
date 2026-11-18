@@ -46,6 +46,7 @@ function createApp() {
   app.use(require('./routes/guestPortalPublic')); // portal do convidado: posts em collab, cortes exclusivos e fotos (token na URL)
   app.use(require('./routes/postRecording')); // página pós-gravação (QR Code do cartão do convidado): pública, a mesma para todos, fora dos buscadores
   app.use(require('./routes/studioUpload')); // link do estúdio: envio do material da gravação (token na URL, sem login)
+  app.use(require('./routes/siteApi')); // API pública do site (podcastpulso.com): imagens assinadas; dados e formulários entram aqui
 
   app.use(mw.attachSession);
   // modo de teste/publicação de verdade das redes (Integrações): relido do banco a cada 15 s, no máximo

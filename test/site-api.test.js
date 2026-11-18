@@ -143,3 +143,81 @@ describe('Site: estreia prevista do convidado', () => {
     assert.equal(rows[0].aired_on, null);
   });
 });
+
+describe('Site: imagens assinadas', () => {
+  const siteImages = require('../src/services/siteImages');
+  let app; let guestId; let sponsorId; let coverId;
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
+  const path = (u) => u.replace(h.config.appBaseUrl, '');
+  before(async () => {
+    await h.resetDb();
+    app = await h.startServer();
+    guestId = (await h.db.query(`INSERT INTO guests (name) VALUES ('Dra. Foto') RETURNING id`)).rows[0].id;
+    await h.db.query('UPDATE guests SET photo_key = $2 WHERE id = $1', [guestId, 'pp/site/foto.png']);
+    h.b2Store.set('pp/site/foto.png', { body: png, contentType: 'image/png' });
+    sponsorId = (await h.db.query(`INSERT INTO sponsors (company) VALUES ('Marca L') RETURNING id`)).rows[0].id;
+    await h.db.query(`INSERT INTO sponsor_files (sponsor_id, kind, storage_key, content_type) VALUES ($1, 'logo', 'pp/site/logo-velha.png', 'image/png')`, [sponsorId]);
+    await h.db.query(`INSERT INTO sponsor_files (sponsor_id, kind, storage_key, content_type) VALUES ($1, 'logo', 'pp/site/logo.png', 'image/png')`, [sponsorId]);
+    h.b2Store.set('pp/site/logo.png', { body: png, contentType: 'image/png' });
+    const ep = (await h.db.query(`INSERT INTO episodes (title) VALUES ('Ep') RETURNING id`)).rows[0].id;
+    coverId = (await h.db.query(`INSERT INTO episode_covers (episode_id, kind, spec, storage_key, mime, width, height, size_bytes) VALUES ($1, 'post_quote', '{}', 'pp/site/capa.png', 'image/png', 1, 1, 1) RETURNING id`, [ep])).rows[0].id;
+    h.b2Store.set('pp/site/capa.png', { body: png, contentType: 'image/png' });
+  });
+  after(async () => { await app.close?.(); });
+
+  const T0 = 1_800_000_000_000;
+  it('signedUrl é absoluta e verify confere tipo, id e validade', () => {
+    const u = new URL(siteImages.signedUrl('foto', 7, T0));
+    assert.ok(siteImages.signedUrl('foto', 7).startsWith(`${h.config.appBaseUrl}/api/site/v1/imagem/foto/7?e=`));
+    const e = u.searchParams.get('e'); const s = u.searchParams.get('s');
+    assert.equal(siteImages.verify('foto', 7, e, s, T0), true);
+    assert.equal(siteImages.verify('logo', 7, e, s, T0), false); // assinatura presa ao tipo
+    assert.equal(siteImages.verify('foto', 8, e, s, T0), false); // e ao id
+    assert.equal(siteImages.verify('foto', 7, e, s, T0 + 25 * 3600_000), false);
+  });
+
+  it('assinatura errada ou vencida dá 404', async () => {
+    const ok = path(siteImages.signedUrl('foto', guestId));
+    const c = h.client(app.base);
+    const forged = ok.replace(/s=.{4}/, 's=AAAA');
+    const old = path(siteImages.signedUrl('foto', guestId, Date.now() - 25 * 3600_000));
+    const semAssinatura = `/api/site/v1/imagem/foto/${guestId}`;
+    const outroId = ok.replace(`/foto/${guestId}`, `/foto/${guestId + 1}`);
+    const outroTipo = ok.replace('/foto/', '/logo/');
+    const bodies = [];
+    for (const p of [forged, old, semAssinatura, outroId, outroTipo]) {
+      const r = await c.get(p); assert.equal(r.status, 404, p); bodies.push(r.text);
+    }
+    assert.equal(new Set(bodies).size, 1); // não revela o motivo
+  });
+
+  it('foto assinada responde 200 com imagem', async () => {
+    const r = await h.client(app.base).get(path(siteImages.signedUrl('foto', guestId)));
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('content-type'), /^image\//);
+    assert.match(r.headers.get('cache-control'), /public, max-age=3600/);
+  });
+
+  it('logo (a mais recente) e capa assinadas respondem 200', async () => {
+    const c = h.client(app.base);
+    const l = await c.get(path(siteImages.signedUrl('logo', sponsorId)));
+    assert.equal(l.status, 200); assert.match(l.headers.get('content-type'), /^image\//);
+    assert.match(l.headers.get('cache-control'), /public, max-age=3600/);
+    const v = await c.get(path(siteImages.signedUrl('capa', coverId)));
+    assert.equal(v.status, 200); assert.match(v.headers.get('content-type'), /^image\//);
+  });
+
+  it('sem imagem cadastrada dá 404', async () => {
+    const c = h.client(app.base);
+    assert.equal((await c.get(path(siteImages.signedUrl('foto', 999999)))).status, 404);
+    assert.equal((await c.get(path(siteImages.signedUrl('logo', 999999)))).status, 404);
+    assert.equal((await c.get(path(siteImages.signedUrl('capa', 999999)))).status, 404);
+  });
+
+  it('kind desconhecido dá 404', async () => {
+    const c = h.client(app.base);
+    const u = path(siteImages.signedUrl('foto', guestId)).replace('/foto/', '/video/');
+    assert.equal((await c.get(u)).status, 404);
+    assert.throws(() => siteImages.signedUrl('video', 1));
+  });
+});
