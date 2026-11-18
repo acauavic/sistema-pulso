@@ -76,10 +76,22 @@ const TOPICS = [
     ],
   },
   {
+    key: 'ordem-edicao', title: 'Ordem de edição (o que editar primeiro)', words: ['ordem de edição', 'ordem de edicao', 'prioridade', 'editar primeiro', 'qual editar', 'fila de edição', 'fila de edicao', 'data de veiculação', 'data de veiculacao', 'vai ao ar'],
+    where: 'Início do editor ("Ordem de edição"), Episódios (quadro e lista) e a página do episódio', perm: 'episodes.read',
+    steps: [
+      'O sistema monta a ordem de edição pela data de veiculação: o episódio que vai ao ar antes é o 1º, depois o 2º, e assim por diante. No mesmo dia, vale o número do episódio; sem data, ele vai para o fim.',
+      'Entram os episódios disponíveis para edição e os em edição, inclusive os que voltaram com ajustes pedidos (ajuste não fura a fila). Em revisão, finalização e pronto ficam de fora.',
+      'A data aparece em vermelho se já passou e o episódio não saiu, e em âmbar se vai ao ar hoje ou nos próximos 2 dias.',
+      'Ao liberar para edição um episódio sem data de veiculação, o sistema pergunta a data (dá para liberar sem; aí ele vai para o fim). O aviso ao editor diz em que posição o episódio entrou.',
+      'Para mudar a ordem, mude a data de veiculação do episódio em Editar.',
+    ],
+  },
+  {
     key: 'resumo-dia', title: 'Resumo do dia no Início', words: ['resumo do dia', 'resumo', 'painel', 'início', 'inicio', 'dashboard', 'números do dia', 'numeros do dia', 'convites enviados', 'convites aceitos', 'seguidores', 'inscritos', 'cortes postados', 'cortes subidos', 'revisões', 'revisoes', 'reels de teste', 'tarefas atrasadas'],
     where: 'Início (a primeira tela), bloco "Resumo do dia"', perm: 'production.manage',
     steps: [
-      'O Início abre com o Resumo do dia: convites enviados, aceitos e perdidos; em agendamento e agendados; episódios gravados a publicar e publicados; cortes subidos pelo editor, revisões (versão nova de um corte), cortes postados e Reels de teste; seguidores no Instagram, inscritos no YouTube e tarefas atrasadas.',
+      'O Início abre com o Resumo do dia: convites enviados, aceitos (e quantos estão em agendamento), agendados e perdidos; episódios gravados e publicados; cortes subidos pelo editor, revisões (versão nova de um corte), agendados para hoje (cortes e posts: quantos já saíram e quantos ainda vão sair), cortes postados e Reels de teste; seguidores no Instagram, inscritos no YouTube (com o saldo da semana) e tarefas atrasadas.',
+      'Os dois caminhos (do convite ao episódio e o do conteúdo) têm um ponto em cada passo: aceso quando algo aconteceu naquele passo no dia.',
       'O número grande é o do dia; embaixo, como estava no fim daquele dia (hoje: até agora). Mudança de etapa desfeita no mesmo dia não conta.',
       'As setas mudam o dia, o calendário escolhe qualquer dia desde o primeiro convidado e "Hoje" volta. O dia fica no endereço, então dá para mandar o link de um dia.',
       'Cada número leva à lista dele: convidados da etapa, cortes, publicações, Insights ou tarefas.',

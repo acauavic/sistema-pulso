@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.77.0', date: '2026-11-18', title: 'Ordem de edição e Resumo do dia redesenhado',
+    items: [
+      { kind: 'novo', text: 'Ordem de edição: o editor vê o que editar primeiro (1º, 2º, 3º…), pela data em que cada episódio vai ao ar, no Início dele, em Episódios (quadro e lista) e na página do episódio. A data fica vermelha se já passou e âmbar se é hoje ou nos próximos 2 dias; sem data, o episódio vai para o fim.' },
+      { kind: 'novo', text: '"Liberar para edição" pergunta a data de veiculação quando o episódio ainda não tem, e o aviso ao editor já diz em que posição ele entra na ordem.' },
+      { kind: 'novo', text: 'Resumo do dia: "Agendados para hoje" (cortes e posts marcados para o dia: quantos já saíram, quantos ainda vão sair e se algum deu erro) e o saldo de seguidores e inscritos da semana.' },
+      { kind: 'ajuste', text: 'Resumo do dia redesenhado: um painel só, com o caminho do convite ao episódio e o do conteúdo desenhados como uma linha com pontos (o ponto aceso é onde algo aconteceu no dia). Número zerado fica apagado, e o ponto "ao vivo" marca o dia de hoje.' },
+    ],
+  },
+  {
     version: '1.76.0', date: '2026-11-18', title: 'Resumo do dia no Início',
     items: [
       { kind: 'novo', text: 'Resumo do dia no Início: convites enviados, aceitos e perdidos; quantos estão em agendamento e agendados; episódios gravados a publicar e publicados; cortes subidos pelo editor, revisões (versão nova de um corte), cortes postados e Reels de teste; seguidores no Instagram, inscritos no YouTube e tarefas atrasadas. Abre em hoje; as setas e o calendário levam a qualquer dia desde 13/10, e cada número leva à lista dele.' },

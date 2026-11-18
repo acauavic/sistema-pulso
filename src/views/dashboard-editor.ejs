@@ -1,46 +1,53 @@
 <%- include('partials/head') %>
 <%
   var epNo = function (e) { return e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'Episódio'; };
-  var inEdit = mine.filter(function (e) { return e.status === 'em_edicao'; }).length;
   var inReview = mine.filter(function (e) { return e.status === 'em_revisao'; }).length;
 %>
 <header class="hello">
   <span class="kicker"><%= fmt.todayLabel() %> · <%= podcastName %></span>
   <h1><%= fmt.greeting() %>, <%= currentUser.name.split(' ')[0] %>.</h1>
-  <p class="voz"><%= adjustCount ? adjustCount + (adjustCount === 1 ? ' episódio seu tem' : ' episódios seus têm') + ' ajustes pedidos.' : (queue.length ? queue.length + (queue.length === 1 ? ' episódio espera' : ' episódios esperam') + ' na fila de edição.' : 'Nada na fila de edição agora.') %></p>
+  <p class="voz"><%= adjustCount ? adjustCount + (adjustCount === 1 ? ' episódio seu tem' : ' episódios seus têm') + ' ajustes pedidos.' : (order.length ? 'Comece pelo ' + epNo(order[0]) + (order[0].aired ? ': ' + order[0].air.line + '.' : '.') : 'Nada na fila de edição agora.') %></p>
 </header>
 <%- include('partials/app-card') %>
 
 <section class="stat-grid" aria-label="Produção">
   <a class="stat" href="/episodios?view=lista"><span class="stat-label">Na fila</span><span class="stat-n <%= queue.length ? 'hl' : '' %>"><%= queue.length %></span></a>
-  <a class="stat" href="/episodios?view=lista&editor=eu"><span class="stat-label">Em edição</span><span class="stat-n"><%= inEdit %></span></a>
+  <a class="stat" href="/episodios?view=lista&editor=eu"><span class="stat-label">Em edição</span><span class="stat-n"><%= inEditCount %></span></a>
   <a class="stat" href="/episodios?view=lista&editor=eu"><span class="stat-label">Ajustes pedidos</span><span class="stat-n <%= adjustCount ? 'hl-bad' : '' %>"><%= adjustCount %></span></a>
   <a class="stat" href="/episodios?view=lista&editor=eu"><span class="stat-label">Em revisão</span><span class="stat-n"><%= inReview %></span></a>
 </section>
 
 <div class="grid-2 tight">
-  <section class="card">
-    <h2>Fila de edição</h2>
-    <% if (!queue.length) { %>
-      <div class="empty"><%- include('partials/pulse-line') %><strong>Fila vazia</strong><span>Quando um episódio for liberado para edição, ele aparece aqui e você recebe um aviso.</span></div>
+  <section class="card" aria-labelledby="ordem-h">
+    <h2 id="ordem-h">Ordem de edição</h2>
+    <% if (order.length > 1) { %><p class="small muted edit-order-hint">O 1º é o que vai ao ar antes.</p><% } %>
+    <% if (!order.length) { %>
+      <div class="empty"><%- include('partials/pulse-line') %><strong>Nada para editar agora</strong><span>Quando um episódio for liberado para edição, ele entra aqui na ordem em que vai ao ar e você recebe um aviso.</span></div>
     <% } else { %>
-    <ul class="plain today-list two-col">
-      <% queue.forEach(function (e) { %>
-      <li><span><a href="/episodios/<%= e.id %>"><strong><%= epNo(e) %> · <%= e.title %></strong></a><% if (e.recorded_on) { %><br><span class="mono small muted">GRAVADO <%= fmt.shortDate(e.recorded_on).toUpperCase() %></span><% } %></span><span class="badge b-st-disponivel_edicao">disponível</span></li>
+    <ol class="plain edit-order">
+      <% order.forEach(function (e) { var mineEp = e.editor_id === currentUser.id; %>
+      <li class="<%= e.rank === 1 ? 'is-first' : '' %>">
+        <span class="edit-pos" aria-label="<%= e.rank %>º na ordem"><%= e.rank %>º</span>
+        <span class="edit-main"><a href="/episodios/<%= e.id %>"><strong><%= epNo(e) %> · <%= e.title %></strong></a><span class="mono small air-<%= e.air.tone || 'ok' %>"><%= e.air.line %></span></span>
+        <% if (e.status === 'em_edicao' && mineEp && e.review_round > 0) { %><span class="badge b-red">ajustes pedidos</span>
+        <% } else if (e.status === 'em_edicao' && mineEp) { %><span class="badge b-st-em_edicao">com você</span>
+        <% } else if (e.status === 'em_edicao') { %><span class="badge b-gray">com <%= String(e.editor_name || 'outro editor').split(' ')[0] %></span>
+        <% } else { %><span class="badge b-st-disponivel_edicao">disponível</span><% } %>
+      </li>
       <% }) %>
-    </ul>
+    </ol>
     <% } %>
   </section>
 
   <section class="card">
     <h2>Meus episódios</h2>
     <% if (!mine.length) { %>
-      <div class="empty"><%- include('partials/pulse-line') %><strong>Nenhum episódio com você</strong><span>Abra um da fila e use "Assumir a edição".</span></div>
+      <div class="empty"><%- include('partials/pulse-line') %><strong>Nenhum episódio seu fora da edição</strong><span>Depois que você envia para revisão, o episódio aparece aqui até ser publicado.</span></div>
     <% } else { %>
     <ul class="plain today-list two-col">
       <% mine.forEach(function (e) { %>
       <li><span><a href="/episodios/<%= e.id %>"><strong><%= epNo(e) %> · <%= e.title %></strong></a><% if (e.review_round) { %><br><span class="mono small muted"><%= e.review_round %>ª REVISÃO</span><% } %></span>
-        <% if (e.status === 'em_edicao' && e.review_round > 0) { %><span class="badge b-red">ajustes pedidos</span><% } else { %><span class="badge b-st-<%= e.status %>"><%= EPISODE_STATUSES[e.status] %></span><% } %></li>
+        <span class="badge b-st-<%= e.status %>"><%= EPISODE_STATUSES[e.status] %></span></li>
       <% }) %>
     </ul>
     <% } %>

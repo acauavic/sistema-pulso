@@ -23,8 +23,8 @@
     <div class="cards">
       <% if (!col.items.length) { %><p class="col-empty small muted">Nenhum episódio nesta etapa.</p><% } %>
       <% col.items.forEach(function (e) { %>
-      <a class="kcard" href="/episodios/<%= e.id %>">
-        <span class="handle muted"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'EP.—' %> · <%= fmt.formatDayShort(e.aired_on) %></span>
+      <a class="kcard" href="/episodios/<%= e.id %>"><% var o = order[e.id]; %>
+        <span class="handle muted"><% if (o) { %><b class="order-n" title="<%= o.rank %>º na ordem de edição"><%= o.rank %>º</b> · <% } %><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'EP.—' %> · <% if (o) { %><span class="air-<%= o.air.tone || 'ok' %>" title="<%= o.air.line %>"><%= o.air.short %></span><% } else { %><%= fmt.formatDayShort(e.aired_on) %><% } %></span>
         <strong><%= e.title %></strong>
         <% if (e.guest_name) { %><span class="muted small"><%= e.guest_name %></span><% } %>
         <span class="meta small muted">
@@ -43,15 +43,16 @@
 <% } else { %>
 <div class="table-wrap">
 <table>
-  <thead><tr><th class="num">EP.</th><th>Título</th><th>Convidado</th><th>Veiculação</th><th>Etapa</th><th>Editor</th><th class="num">Patroc.</th><th></th></tr></thead>
+  <thead><tr><th class="num">EP.</th><th class="num" title="Ordem de edição: o que vai ao ar antes é editado primeiro">Ordem</th><th>Título</th><th>Convidado</th><th>Veiculação</th><th>Etapa</th><th>Editor</th><th class="num">Patroc.</th><th></th></tr></thead>
   <tbody>
-    <% if (!episodes.length) { %><tr><td colspan="8"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum episódio por aqui</strong><span>Quando um convidado ficar Agendado, o episódio aparece sozinho.</span></div></td></tr><% } %>
-    <% episodes.forEach(function (e) { %>
+    <% if (!episodes.length) { %><tr><td colspan="9"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum episódio por aqui</strong><span>Quando um convidado ficar Agendado, o episódio aparece sozinho.</span></div></td></tr><% } %>
+    <% episodes.forEach(function (e) { var o = order[e.id]; %>
     <tr>
       <td class="num mono"><%= e.number ? String(e.number).padStart(3, '0') : '—' %></td>
+      <td class="num mono"><% if (o) { %><b class="order-n"><%= o.rank %>º</b><% } else { %><span class="muted">—</span><% } %></td>
       <td><a href="/episodios/<%= e.id %>"><strong><%= e.title %></strong></a></td>
       <td><%= e.guest_name || '—' %></td>
-      <td class="mono nowrap"><%= fmt.formatDay(e.aired_on) %></td>
+      <td class="mono nowrap<%= o ? ' air-' + (o.air.tone || 'ok') : '' %>"<% if (o) { %> title="<%= o.air.line %>"<% } %>><%= fmt.formatDay(e.aired_on) %></td>
       <td><span class="badge b-st-<%= e.status %>"><%= statuses[e.status] %></span></td>
       <td><%- include('../partials/dot', { type: 'episode', id: e.id, user: e.editor_id ? { id: e.editor_id, name: e.editor_name } : null, editable: can('production.manage'), label: true }) %></td>
       <td class="num mono"><%= e.sponsors %></td>

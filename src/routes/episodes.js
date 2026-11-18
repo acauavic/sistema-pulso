@@ -128,8 +128,15 @@ router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => 
        FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.editor_id
       ${mine ? 'WHERE e.editor_id = $1' : ''}
       ORDER BY e.number DESC NULLS LAST, e.id DESC LIMIT 500`, mine ? [req.user.id] : []);
-  const columns = C.EPISODE_STAGES.map((s) => ({ ...s, items: rows.filter((e) => e.status === s.key) }));
-  res.render('episodes/index', { title: 'Episódios', view, mine, episodes: rows, columns, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES });
+  // Disponível para edição e Em edição seguem a ordem de edição (pela data de veiculação), com a posição em cada cartão
+  const editOrder = require('../services/editOrder');
+  const order = await editOrder.byId();
+  const columns = C.EPISODE_STAGES.map((s) => {
+    const items = rows.filter((e) => e.status === s.key);
+    if (editOrder.STAGES.includes(s.key)) items.sort((a, b) => (order[a.id]?.rank ?? 1e9) - (order[b.id]?.rank ?? 1e9));
+    return { ...s, items };
+  });
+  res.render('episodes/index', { title: 'Episódios', view, mine, episodes: rows, columns, order, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES });
 }));
 
 router.get('/episodios/novo', requirePerm('episodes.write'), wrap(async (req, res) => {
@@ -306,8 +313,10 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   const studioLinks = require('../services/studioLinks');
   const studio = can(req.user.role, 'production.upload') ? await studioLinks.panelState(ep.id) : null;
   const studioWa = studio && ['aguardando', 'enviando'].includes(studio.state) ? await require('../services/contacts').studioWaUrl(ep.guest_name || ep.title, studio.url) : null;
+  const editOrder = require('../services/editOrder');
+  const orderPos = editOrder.STAGES.includes(ep.status) ? await editOrder.positionOf(ep.id) : null; // "1º na ordem de edição"
   res.render('episodes/show', {
-    studio, studioWa, kindLabels: C.EPISODE_FILE_KINDS,
+    orderPos, studio, studioWa, kindLabels: C.EPISODE_FILE_KINDS,
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: reviewComments,
     sponsors, users: users.rows, moves, latestEdited, edited, C, L,
@@ -411,7 +420,14 @@ router.post('/episodios/:id/excluir', requirePerm('episodes.delete'), wrap(async
 router.post('/episodios/:id/etapa', requirePerm('episodes.read'), wrap(async (req, res) => {
   const ep = await findEpisode(req.params.id);
   if (!ep) return wantsJson(req) ? res.status(404).json({ ok: false }) : notFound(res);
+  // "Liberar para edição" de um episódio sem data de veiculação pergunta a data (opcional): ela decide a ordem de edição.
+  // Grava antes da mudança (o aviso ao editor já diz a posição) e desfaz se a mudança não acontecer.
+  const airedOn = String(req.body.aired_on || '');
+  const setAired = req.body.to === 'disponivel_edicao' && ep.status === 'gravado' && !ep.aired_on && require('../services/calendar').isISO(airedOn);
+  if (setAired) await db.query('UPDATE episodes SET aired_on = $2, updated_at = now() WHERE id = $1 AND aired_on IS NULL', [ep.id, airedOn]);
   const result = await prod.move(ep, String(req.body.to || ''), req.user);
+  if (result.error && setAired) await db.query('UPDATE episodes SET aired_on = NULL WHERE id = $1', [ep.id]);
+  if (!result.error && setAired) await prod.addEvent(ep.id, req.user.id, 'etapa', `Data de veiculação: ${fmt.formatDay(airedOn)} (ao liberar para edição)`);
   if (result.error) {
     if (wantsJson(req)) return res.status(422).json({ ok: false, error: result.error, missing: result.missing || [] });
     await req.flash('error', result.error);

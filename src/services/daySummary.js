@@ -95,6 +95,20 @@ async function posts(day) {
   return { posted: r.posted, networkPosts: r.network_posts, trials: r.trials };
 }
 
+// Posts agendados para o dia (cortes, imagens, carrosséis, stories), pela hora marcada: já no ar, ainda a sair (agendados, em
+// envio ou esperando aprovação) e com erro.
+async function scheduled(day) {
+  const { rows: [r] } = await db.query(`WITH ${BOUNDS}
+    SELECT count(*)::int AS total,
+           count(*) FILTER (WHERE p.clip_id IS NOT NULL)::int AS clips,
+           count(*) FILTER (WHERE p.status IN ('publicado', 'parcial'))::int AS out,
+           count(*) FILTER (WHERE p.status IN ('agendado', 'enviando', 'revisao'))::int AS pending,
+           count(*) FILTER (WHERE p.status = 'erro')::int AS failed
+      FROM episode_publications p, b
+     WHERE p.scheduled_at >= b.s AND p.scheduled_at < b.e AND p.status IN ('agendado', 'enviando', 'revisao', 'publicado', 'parcial', 'erro')`, [day]);
+  return { total: r.total, clips: r.clips, posts: r.total - r.clips, out: r.out, pending: r.pending, failed: r.failed };
+}
+
 // Tarefas atrasadas no fim do dia (hoje: agora), com a mesma regra da lista de tarefas: prazo vencido, ou o dia de hoje com a
 // hora já passada. Entram as que existiam e não estavam feitas naquele momento.
 async function tasks(day, cut) {
@@ -106,35 +120,36 @@ async function tasks(day, cut) {
   return { late: r.late, open: r.open };
 }
 
-// Seguidores: o saldo do dia é a última leitura do dia menos a do dia anterior (social_snapshots guarda a última de cada dia).
+// Seguidores: o saldo do dia é a última leitura do dia menos a do dia anterior (social_snapshots guarda a última de cada dia);
+// o da semana, menos a de 7 dias antes.
 // Dia sem leitura nossa usa a série diária do provedor, quando ela é de totais (a do YouTube pela Zernio). Sem as duas pontas,
 // o saldo fica vazio ("sem leitura"). Nenhuma leitura guardada: as redes não estão ligadas aqui e o bloco não aparece.
 async function followers(day) {
   const [{ rows: own }, { rows: series }, { rows: [any] }] = await Promise.all([
     db.query(`SELECT platform, to_char(taken_on, 'YYYY-MM-DD') AS d, (data->>'followers')::numeric AS n, updated_at
-                FROM social_snapshots WHERE platform = ANY($2::text[]) AND taken_on BETWEEN ($1::date - 1) AND $1::date`, [day, NETWORKS]),
+                FROM social_snapshots WHERE platform = ANY($2::text[]) AND taken_on IN ($1::date, $1::date - 1, $1::date - 7)`, [day, NETWORKS]),
     db.query(`SELECT DISTINCT ON (platform) platform, data->'series'->'points' AS points FROM social_snapshots
                WHERE platform = ANY($2::text[]) AND taken_on >= $1::date AND data->'series'->>'kind' = 'total' ORDER BY platform, taken_on`, [day, NETWORKS]),
     db.query('SELECT count(*)::int AS n FROM social_snapshots WHERE platform = ANY($1::text[])', [NETWORKS]),
   ]);
   if (!any.n) return null;
-  const prev = cal.addDays(day, -1);
+  const prev = cal.addDays(day, -1); const weekAgo = cal.addDays(day, -7);
   const out = {};
   for (const net of NETWORKS) {
     const mine = Object.fromEntries(own.filter((r) => r.platform === net && r.n !== null).map((r) => [r.d, r]));
     const points = series.find((r) => r.platform === net)?.points;
     const theirs = Object.fromEntries((Array.isArray(points) ? points : []).filter((p) => p && Number.isFinite(Number(p.v))).map((p) => [String(p.d).slice(0, 10), Number(p.v)]));
     const at = (d) => (mine[d] ? Number(mine[d].n) : d in theirs ? theirs[d] : null);
-    const total = at(day); const before = at(prev);
-    out[net] = { total, gain: total !== null && before !== null ? total - before : null, readAt: mine[day]?.updated_at || null };
+    const total = at(day); const before = at(prev); const week = at(weekAgo);
+    out[net] = { total, gain: total !== null && before !== null ? total - before : null, week: total !== null && week !== null ? total - week : null, readAt: mine[day]?.updated_at || null };
   }
   return out;
 }
 
 // Tudo do dia. Hoje, as tarefas atrasadas seguem a hora de agora; num dia que já passou, o fim do dia.
 async function summary(day, { isToday = day === cal.todayISO() } = {}) {
-  const [g, e, c, p, t, s] = await Promise.all([guests(day), episodes(day), clips(day), posts(day), tasks(day, isToday ? nowTime() : '24:00'), followers(day)]);
-  return { guests: g, episodes: e, clips: { ...c, ...p }, tasks: t, social: s };
+  const [g, e, c, p, sc, t, s] = await Promise.all([guests(day), episodes(day), clips(day), posts(day), scheduled(day), tasks(day, isToday ? nowTime() : '24:00'), followers(day)]);
+  return { guests: g, episodes: e, clips: { ...c, ...p }, scheduled: sc, tasks: t, social: s };
 }
 
 module.exports = { pick, summary, EDITOR_ROLES };

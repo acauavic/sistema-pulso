@@ -173,7 +173,8 @@ async function notifyStage(ep, to, user) {
   const from = ep.status; const name = user.name; const label = `${epLabel(ep)} · ${ep.title}`;
   const url = `/episodios/${ep.id}`; let users = []; let title; let body = null; let hash = '';
   if (to === 'disponivel_edicao' && from === 'gravado') {
-    title = `Liberado para edição: ${label}`; body = `${name} liberou o material. Abra o episódio para assumir a edição.`;
+    const pos = await require('./editOrder').positionOf(ep.id).catch(() => null); // o editor já sabe onde ele entra na ordem
+    title = `Liberado para edição: ${label}`; body = `${name} liberou o material.${pos ? ` É o ${pos.rank}º na ordem de edição (${pos.air.line}).` : ''} Abra o episódio para assumir a edição.`;
     users = (await db.query("SELECT id FROM users WHERE active AND role = 'editor_video'")).rows.map((r) => r.id); // a fila é dos editores
   } else if (to === 'disponivel_edicao') { users = await usersWithPerm('production.manage'); title = `Devolvido à fila: ${label}`; body = `${name} devolveu o episódio à fila de edição.`; }
   else if (to === 'em_edicao' && from === 'disponivel_edicao') { users = await usersWithPerm('production.manage'); title = `${name} assumiu a edição: ${label}`; }

@@ -1,16 +1,51 @@
 <%
   // Resumo do dia no Início. day: { day, today, min, isToday, weekday, prev, next }; ds: daySummary.summary().
-  // O número grande é o do dia; embaixo, como estava no fim daquele dia (hoje: até agora). Medir não é ação: nada de lime.
-  var g = ds.guests, e = ds.episodes, c = ds.clips, t = ds.tasks, s = ds.social;
+  // Um painel só, com dois caminhos desenhados como linha com pontos (do convite ao episódio, e o do conteúdo) e as redes e
+  // tarefas embaixo. O número grande é o do dia; embaixo, como estava no fim dele (hoje: até agora). Ponto aceso = algo aconteceu
+  // no dia; número zerado fica apagado. Medir não é ação: o único lime é o ponto "ao vivo" de hoje.
+  var g = ds.guests, e = ds.episodes, c = ds.clips, sc = ds.scheduled, t = ds.tasks, s = ds.social;
   var link = function (d) { return '/?dia=' + d + '#resumo'; };
-  var signed = function (n) { return n === null || n === undefined ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('pt-BR'); };
   var num = function (n) { return Number(n).toLocaleString('pt-BR'); };
-  var plural = function (n, one, many) { return num(n) + ' ' + (Number(n) === 1 ? one : many); };
-  var readAt = function (net) { return s[net] && s[net].readAt ? 'Última leitura ' + (day.isToday ? 'hoje' : 'do dia') + ' às ' + fmt.formatDateTime(s[net].readAt).slice(-5) : 'Sem leitura neste dia'; };
+  var signed = function (n) { return n === null || n === undefined ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('pt-BR'); };
+  var plural = function (n, one, many) { return Number(n) === 1 ? one : many; };
+  // cada linha de baixo é uma lista de partes { pre, n, t } separadas por " · ": o número fica mais claro que o texto
+  var flowGuests = [
+    { l: 'Convites enviados', n: g.sent, href: '/convidados?view=lista&status=convite_enviado', sub: [{ n: g.waiting, t: 'aguardando resposta' }] },
+    { l: 'Aceitos', n: g.accepted, href: '/convidados?view=lista&status=em_agendamento', sub: [{ n: g.scheduling, t: 'em agendamento' }] },
+    { l: 'Agendados', n: g.scheduledIn, href: '/convidados?view=lista&status=agendado', sub: [{ n: g.scheduled, t: 'com data marcada' }] },
+    { l: 'Gravados', n: e.recordedIn, href: '/episodios', sub: [{ n: e.toPublish, t: 'a publicar' }] },
+    { l: 'Publicados', n: e.publishedIn, href: '/episodios?view=lista', sub: [{ n: e.published, t: plural(e.published, 'episódio no ar', 'episódios no ar') }] },
+  ];
+  var schedSub = day.isToday
+    ? [{ n: sc.pending, t: 'a sair' }, { n: sc.out, t: 'no ar' }].concat(sc.failed ? [{ n: sc.failed, t: 'com erro', bad: true }] : [])
+    : [{ n: sc.out, t: 'no ar' }].concat(sc.pending + sc.failed ? [{ n: sc.pending + sc.failed, t: plural(sc.pending + sc.failed, 'não saiu', 'não saíram'), bad: true }] : []);
+  var flowContent = [
+    { l: 'Cortes subidos', n: c.uploaded, href: '/conteudo?vista=cortes', sub: c.uploadedByTeam ? [{ n: c.uploadedByTeam, t: 'subidos pela gestão' }] : [{ t: 'pelo editor' }] },
+    { l: 'Revisões', n: c.versions, href: '/conteudo?vista=cortes', sub: c.versions ? [{ pre: 'em', n: c.revised, t: plural(c.revised, 'corte', 'cortes') }] : [{ t: 'versões novas de cortes' }] },
+    { l: day.isToday ? 'Agendados para hoje' : 'Agendados para o dia', n: sc.total, href: '/social/publicacoes?status=agendado', sub: sc.total ? schedSub : [{ t: 'cortes e posts' }], title: sc.total ? num(sc.clips) + ' ' + plural(sc.clips, 'corte', 'cortes') + ' e ' + num(sc.posts) + ' ' + plural(sc.posts, 'post', 'posts') : '' },
+    { l: 'Cortes postados', n: c.posted, href: '/social/publicacoes', sub: c.networkPosts ? [{ n: c.networkPosts, t: plural(c.networkPosts, 'post nas redes', 'posts nas redes') }] : [{ t: 'foram ao ar no dia' }] },
+    { l: 'Reels de teste', n: c.trials, href: '/social/publicacoes', sub: [{ t: 'no Instagram' }] },
+  ];
+  var showSocial = s && can('social.read');
+  var nets = showSocial ? [['instagram', 'Instagram', 'seguidores'], ['youtube', 'YouTube', 'inscritos']].map(function (x) { return { l: x[1], v: s[x[0]], unit: x[2] }; }) : [];
+  var readAt = function (v) { return v.readAt ? 'Última leitura ' + (day.isToday ? 'hoje' : 'do dia') + ' às ' + fmt.formatDateTime(v.readAt).slice(-5) : 'Sem leitura neste dia'; };
 %>
+<% var subLine = function (parts) { %><span class="day-sub"><% parts.forEach(function (p, i) { %><%= i ? ' · ' : '' %><%= p.pre ? p.pre + ' ' : '' %><% if (p.n !== undefined && p.n !== null) { %><b class="<%= p.bad ? 'bad' : '' %>"><%= typeof p.n === 'number' ? num(p.n) : p.n %></b> <% } %><%= p.t %><% }) %></span><% }; %>
+<% var flow = function (nodes) { %>
+      <div class="day-flow">
+        <% nodes.forEach(function (x) { %>
+        <a class="day-node <%= x.n ? '' : 'is-zero' %>" href="<%= x.href %>"<% if (x.title) { %> title="<%= x.title %>"<% } %>>
+          <span class="day-dot" aria-hidden="true"></span>
+          <span class="day-l"><%= x.l %></span>
+          <span class="day-n"><%= num(x.n) %></span>
+          <% subLine(x.sub) %>
+        </a>
+        <% }) %>
+      </div>
+<% }; %>
 <section class="day-sum" id="resumo" aria-labelledby="resumo-h">
   <div class="day-sum-head">
-    <h2 id="resumo-h">Resumo do dia <span class="mono small muted"><%= day.isToday ? 'HOJE, ATÉ AGORA' : day.weekday.toUpperCase() %></span></h2>
+    <h2 id="resumo-h">Resumo do dia <span class="day-when"><% if (day.isToday) { %><span class="day-live" aria-hidden="true"></span>HOJE, ATÉ AGORA<% } else { %><%= day.weekday.toUpperCase() %><% } %></span></h2>
     <form class="day-nav" method="get" action="/#resumo">
       <% if (day.prev) { %><a class="btn sm" href="<%= link(day.prev) %>" aria-label="Dia anterior"><%- icon('chevron-left') %></a><% } else { %><span class="btn sm" aria-disabled="true"><%- icon('chevron-left') %></span><% } %>
       <label class="sr-only" for="dia-escolha">Escolher o dia</label>
@@ -20,77 +55,38 @@
     </form>
   </div>
 
-  <% if (can('guests.read')) { %>
-  <div class="day-group">
-    <h3 class="kicker">Convidados</h3>
-    <div class="stat-grid day-stats">
-      <a class="stat" href="/convidados?view=lista&amp;status=convite_enviado">
-        <span class="stat-label">Convites enviados</span><span class="stat-n"><%= num(g.sent) %></span>
-        <span class="delta"><%= num(g.waiting) %> aguardando resposta</span>
-      </a>
-      <a class="stat" href="/convidados?view=lista&amp;status=em_agendamento">
-        <span class="stat-label">Aceitos</span><span class="stat-n"><%= num(g.accepted) %></span><span class="delta">convites aceitos</span>
-      </a>
-      <a class="stat" href="/convidados?view=lista&amp;status=perdido">
-        <span class="stat-label">Perdidos</span><span class="stat-n"><%= num(g.lost) %></span><span class="delta">dados como perdido</span>
-      </a>
-      <a class="stat" href="/convidados?view=lista&amp;status=em_agendamento">
-        <span class="stat-label">Em agendamento</span><span class="stat-n"><%= num(g.scheduling) %></span><span class="delta"><%= signed(g.schedulingIn) %> no dia</span>
-      </a>
-      <a class="stat" href="/convidados?view=lista&amp;status=agendado">
-        <span class="stat-label">Agendados</span><span class="stat-n"><%= num(g.scheduled) %></span><span class="delta"><%= signed(g.scheduledIn) %> no dia</span>
-      </a>
-    </div>
-  </div>
-  <% } %>
+  <div class="day-panel">
+    <% if (can('guests.read')) { %>
+    <section class="day-band" aria-labelledby="day-b1">
+      <div class="day-band-head">
+        <h3 class="day-band-t" id="day-b1">Do convite ao episódio</h3>
+        <a class="day-aside <%= g.lost ? '' : 'is-zero' %>" href="/convidados?view=lista&amp;status=perdido"><% if (g.lost) { %><b><%= num(g.lost) %></b> <%= plural(g.lost, 'perdido', 'perdidos') %> no dia<% } else { %>nenhum perdido no dia<% } %></a>
+      </div>
+      <% flow(flowGuests) %>
+    </section>
+    <% } %>
 
-  <div class="day-group">
-    <h3 class="kicker">Episódios</h3>
-    <div class="stat-grid day-stats">
-      <a class="stat" href="/episodios">
-        <span class="stat-label">Gravados, a publicar</span><span class="stat-n"><%= num(e.toPublish) %></span><span class="delta"><%= signed(e.recordedIn) %> gravado<%= e.recordedIn === 1 ? '' : 's' %> no dia</span>
-      </a>
-      <a class="stat" href="/episodios">
-        <span class="stat-label">Publicados</span><span class="stat-n"><%= num(e.published) %></span><span class="delta"><%= signed(e.publishedIn) %> no dia</span>
-      </a>
-    </div>
-  </div>
+    <section class="day-band" aria-labelledby="day-b2">
+      <div class="day-band-head"><h3 class="day-band-t" id="day-b2">Conteúdo</h3></div>
+      <% flow(flowContent) %>
+    </section>
 
-  <div class="day-group">
-    <h3 class="kicker">Cortes</h3>
-    <div class="stat-grid day-stats">
-      <a class="stat" href="/conteudo?vista=cortes">
-        <span class="stat-label">Cortes subidos</span><span class="stat-n"><%= num(c.uploaded) %></span>
-        <span class="delta"><%= c.uploadedByTeam ? '+' + num(c.uploadedByTeam) + ' da gestão' : c.uploaded ? 'pelo editor, em ' + plural(c.uploadedEpisodes, 'episódio', 'episódios') : 'pelo editor' %></span>
-      </a>
-      <a class="stat" href="/conteudo?vista=cortes">
-        <span class="stat-label">Revisões</span><span class="stat-n"><%= num(c.versions) %></span>
-        <span class="delta"><%= c.versions ? 'versões novas, em ' + plural(c.revised, 'corte', 'cortes') : 'versões novas de cortes' %></span>
-      </a>
-      <% if (can('social.read')) { %>
-      <a class="stat" href="/social/publicacoes">
-        <span class="stat-label">Cortes postados</span><span class="stat-n"><%= num(c.posted) %></span>
-        <span class="delta"><%= c.networkPosts ? plural(c.networkPosts, 'post', 'posts') + ' nas redes' : 'foram ao ar no dia' %></span>
-      </a>
-      <a class="stat" href="/social/publicacoes">
-        <span class="stat-label">Reels de teste</span><span class="stat-n"><%= num(c.trials) %></span><span class="delta">no Instagram</span>
-      </a>
-      <% } %>
-    </div>
-  </div>
-
-  <div class="day-group">
-    <h3 class="kicker"><%= s && can('social.read') ? 'Redes e tarefas' : 'Tarefas' %></h3>
-    <div class="stat-grid day-stats">
-      <% if (s && can('social.read')) { [['instagram', 'Instagram', 'seguidores'], ['youtube', 'YouTube', 'inscritos']].forEach(function (n) { var x = s[n[0]]; %>
-      <a class="stat" href="/social/insights" title="<%= readAt(n[0]) %>">
-        <span class="stat-label"><%= n[1] %></span><span class="stat-n"><%= signed(x.gain) %></span>
-        <span class="delta"><%= x.total === null ? 'sem leitura' : num(x.total) + ' ' + n[2] %></span>
-      </a>
-      <% }) } %>
-      <a class="stat" href="/tarefas?escopo=todas">
-        <span class="stat-label">Tarefas atrasadas</span><span class="stat-n <%= t.late ? 'hl-bad' : '' %>"><%= num(t.late) %></span><span class="delta">de <%= num(t.open) %> em aberto</span>
-      </a>
-    </div>
+    <section class="day-band" aria-labelledby="day-b3">
+      <div class="day-band-head"><h3 class="day-band-t" id="day-b3"><%= showSocial ? 'Redes e tarefas' : 'Tarefas' %></h3></div>
+      <div class="day-cells">
+        <% nets.forEach(function (x) { var v = x.v; %>
+        <a class="day-cell <%= v.gain ? (v.gain < 0 ? 'is-down' : '') : 'is-zero' %>" href="/social/insights" title="<%= readAt(v) %>">
+          <span class="day-l"><%= x.l %></span>
+          <span class="day-n"><%= signed(v.gain) %></span>
+          <% subLine(v.total === null ? [{ t: 'sem leitura' }] : [{ n: v.total, t: x.unit }].concat(v.week !== null ? [{ n: signed(v.week), t: 'na semana' }] : [])) %>
+        </a>
+        <% }) %>
+        <a class="day-cell <%= t.late ? 'is-bad' : 'is-zero' %>" href="/tarefas?escopo=todas">
+          <span class="day-l">Tarefas atrasadas</span>
+          <span class="day-n"><%= num(t.late) %></span>
+          <% subLine([{ pre: 'de', n: t.open, t: 'em aberto' }]) %>
+        </a>
+      </div>
+    </section>
   </div>
 </section>

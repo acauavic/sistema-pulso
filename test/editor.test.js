@@ -74,7 +74,7 @@ describe('editor de vídeo: avisos de cada etapa e início só com produção', 
     const e2 = (await q("INSERT INTO episodes (number, title, status) VALUES (13, 'Conversa na fila', 'disponivel_edicao') RETURNING id")).rows[0];
     await q("INSERT INTO tasks (title, kind, status, assignee_id, due_on) VALUES ('Subir os cortes', 'geral', 'a_fazer', $1, CURRENT_DATE + 1)", [u.editor.id]);
     const page = (await as.editor.get('/')).text;
-    assert.match(page, /Fila de edição/); assert.match(page, /EP\.013 · Conversa na fila/); assert.match(page, /Meus episódios/); assert.match(page, /EP\.012 · Conversa com Dra\. Lia/); assert.match(page, /ajustes pedidos/);
+    assert.match(page, /Ordem de edição/); assert.match(page, /EP\.013 · Conversa na fila/); assert.match(page, /Meus episódios/); assert.match(page, /EP\.012 · Conversa com Dra\. Lia/); assert.match(page, /ajustes pedidos/);
     assert.match(page, /Minhas tarefas/); assert.match(page, /Subir os cortes/);
     for (const re of [/Dra\. Lia Segredo/, /Marca Confidencial/, /Próximas gravações/, /Atividade recente/, /Convite enviado/, /Financeiro/]) assert.doesNotMatch(page, re, String(re));
     assert.equal((await as.editor.get(`/episodios/${e2.id}`)).status, 200);

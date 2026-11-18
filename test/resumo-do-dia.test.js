@@ -93,8 +93,9 @@ describe('Resumo do dia no Início', () => {
     await q('INSERT INTO post_metrics (publication_id, platform, views, published_at) VALUES ($1, $2, 10, $3)', [late, 'instagram', at(D, '00:30')]); // a rede pôs no ar depois da meia-noite
     await pub(null, 'publicado', { created: at(D, '08:00'), results: ok(['instagram', true]) }); // post de imagem: não é corte
 
-    const c = (await ds.summary(D)).clips;
-    assert.deepEqual(c, { uploaded: 2, uploadedByTeam: 1, uploadedEpisodes: 1, versions: 2, revised: 1, posted: 3, networkPosts: 5, trials: 1 });
+    const day = await ds.summary(D);
+    assert.deepEqual(day.clips, { uploaded: 2, uploadedByTeam: 1, uploadedEpisodes: 1, versions: 2, revised: 1, posted: 3, networkPosts: 5, trials: 1 });
+    assert.deepEqual(day.scheduled, { total: 3, clips: 3, posts: 0, out: 2, pending: 1, failed: 0 }, 'agendados para o dia pela hora marcada: dois saíram e um ainda está agendado');
     const before = (await ds.summary(cal.addDays(D, -1))).clips;
     assert.deepEqual([before.uploaded, before.versions, before.posted], [1, 1, 0], 'na véspera: o corte de ontem, a versão nova do corte dois e nada no ar (o agendado das 23h saiu depois da meia-noite)');
   });
@@ -114,11 +115,13 @@ describe('Resumo do dia no Início', () => {
 
   it('seguidores: saldo pela leitura do dia menos a do anterior; sem a nossa leitura, a série de totais do provedor; sem nada, vazio', async () => {
     const snap = (d, net, data) => q('INSERT INTO social_snapshots (taken_on, platform, data, updated_at) VALUES ($1, $2, $3, $4)', [d, net, JSON.stringify(data), at(d, '23:50')]);
+    await snap(cal.addDays(D, -7), 'instagram', { provider: 'outstand', followers: 80 });
     await snap(cal.addDays(D, -1), 'instagram', { provider: 'outstand', followers: 100 });
     await snap(D, 'instagram', { provider: 'outstand', followers: 112, series: { kind: 'novos', points: [{ d: D, v: 40 }] } });
     await snap(D, 'youtube', { provider: 'zernio', followers: 50, series: { kind: 'total', points: [{ d: cal.addDays(D, -1), v: 47 }, { d: D, v: 50 }] } });
     const s = (await ds.summary(D)).social;
     assert.equal(s.instagram.gain, 12); assert.equal(s.instagram.total, 112); assert.ok(s.instagram.readAt);
+    assert.equal(s.instagram.week, 32, 'na semana: a leitura do dia menos a de 7 dias antes'); assert.equal(s.youtube.week, null);
     assert.equal(s.youtube.gain, 3, 'a véspera veio da série de totais da Zernio');
     const older = (await ds.summary(cal.addDays(D, -2))).social;
     assert.deepEqual([older.instagram.gain, older.instagram.total, older.youtube.gain], [null, null, null], 'sem leitura');
@@ -130,16 +133,20 @@ describe('Resumo do dia no Início', () => {
     assert.match(page, new RegExp(`name="dia" value="${D}"`));
     assert.match(page, new RegExp(`href="/\\?dia=${cal.addDays(D, -1)}#resumo" aria-label="Dia anterior"`));
     assert.match(page, new RegExp(`href="/\\?dia=${cal.addDays(D, 1)}#resumo" aria-label="Próximo dia"`));
-    assert.match(page, /Convites enviados<\/span><span class="stat-n">1</);
-    assert.match(page, /Cortes subidos<\/span><span class="stat-n">2</);
-    assert.match(page, /\+1 da gestão/);
-    assert.match(page, /Instagram<\/span><span class="stat-n">\+12</);
-    assert.match(page, /Tarefas atrasadas<\/span><span class="stat-n hl-bad">3</);
+    const tile = (label, n) => new RegExp(`day-l">${label}</span>\\s*<span class="day-n">${n}<`);
+    assert.match(page, tile('Convites enviados', 1));
+    assert.match(page, /<b>1<\/b> perdido no dia/);
+    assert.match(page, tile('Cortes subidos', 2)); assert.match(page, /<b class="">1<\/b> subidos pela gestão/);
+    assert.match(page, tile('Agendados para o dia', 3)); assert.match(page, /<b class="">2<\/b> no ar · <b class="bad">1<\/b> não saiu/);
+    assert.match(page, tile('Instagram', '\\+12')); assert.match(page, /<b class="">\+32<\/b> na semana/);
+    assert.match(page, /day-cell is-bad"[^>]*>\s*<span class="day-l">Tarefas atrasadas<\/span>\s*<span class="day-n">3</);
+    assert.doesNotMatch(page, /class="day-live"/, 'o ponto ao vivo é só de hoje');
     assert.match(page, />Hoje<\/a>/, 'fora de hoje, o atalho para voltar');
     assert.doesNotMatch(page, /stat-grid funnel/);
 
     page = (await as.gestao.get('/?dia=2999-01-01')).text; // depois de hoje: hoje
-    assert.match(page, new RegExp(`name="dia" value="${today}"`)); assert.match(page, /HOJE, ATÉ AGORA/);
+    assert.match(page, new RegExp(`name="dia" value="${today}"`)); assert.match(page, /class="day-live"[^>]*><\/span>HOJE, ATÉ AGORA/);
+    assert.match(page, tile('Agendados para hoje', '\\d+'));
     assert.match(page, /<span class="btn sm" aria-disabled="true">/, 'hoje: a seta do próximo dia fica apagada');
     assert.doesNotMatch(page, new RegExp(`href="/\\?dia=${cal.addDays(today, 1)}`));
     assert.match((await as.gestao.get('/?dia=abc')).text, new RegExp(`name="dia" value="${today}"`), 'data inválida: hoje');

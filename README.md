@@ -190,6 +190,7 @@ Pelo terminal (mesmas regras, prévia sem `--gravar`): `node src/scripts/importG
 - **Revisão do vídeo**: comentar, resolver e apagar acontecem na própria página (sem recarregar; o vídeo segue onde estava). O player tem voltar/avançar 5 e 10 s, play/pause, velocidade (0,5× a 2×) e tempo; clicar na linha dos marcadores leva até o ponto. Atalhos no computador: espaço pausa, ← → 5 s, J L 10 s, `,` `.` um quadro, C comenta neste ponto, Ctrl/⌘+Enter envia.
 - **Papéis** (matriz provisória em `src/permissions.js`): produtora sobe o material bruto e edita capas (inclusive na hora de agendar o post); editor de vídeo assume a edição, envia o vídeo editado e mexe em capas; gestão revisa, aprova, finaliza, publica. Superadmin faz tudo.
 - **Material bruto e vídeo editado** (Backblaze B2 privado): envio em **partes de 16 MB** pelo servidor (sem CORS), com retomada de parte e verificação; download e player por **link assinado**. O editor vê patrocinadores do episódio (moldura, QR Code, restrições) e as observações da gestão.
+- **Ordem de edição** (`src/services/editOrder.js`): o editor vê o que editar primeiro (1º, 2º, 3º…), pela **data de veiculação**: entram os episódios disponíveis para edição e em edição (inclusive os que voltaram com ajustes pedidos), quem vai ao ar antes vem primeiro, no mesmo dia vale o número e sem data vai para o fim (ajuste não fura a fila). Aparece no **Início do editor** ("Ordem de edição", uma lista só, com a situação de cada um), em **Episódios** (as colunas Disponível para edição e Em edição nessa ordem, com a posição no cartão; coluna "Ordem" na lista) e na **página do episódio** ("1º na ordem de edição · vai ao ar…"). A data fica vermelha se já passou e âmbar se é hoje ou nos próximos 2 dias. **Liberar para edição** de um episódio sem data abre uma janela com a data de veiculação (opcional), e o aviso ao editor diz a posição.
 - **Checklists padronizados**: modelos editáveis; itens obrigatórios travam "enviar para revisão" e "finalizar". Editor e gestão marcam.
 - **Tarefas automáticas** (cortes, bastidores, extra) e **revisão com player**: comentários presos ao segundo do vídeo, resolvidos um a um; "pedir ajustes" volta para edição (contador de revisões).
 - **Transcrição logo depois do envio**: quando o vídeo editado termina de subir, o trabalho `transcricao` (pista pesada do `worker`) faz o FFmpeg ler o vídeo pelo link do Backblaze e guardar só o áudio (o vídeo passa pela rede, mas não ocupa o disco do servidor); a Groq transcreve e o texto fica guardado com o arquivo de origem. O card "Vídeo editado" mostra "Transcrição da versão N: pronta / em andamento". Versão nova do vídeo = transcrição nova. A análise por IA da finalização reaproveita esse texto (se não houver, transcreve como antes).
@@ -379,15 +380,21 @@ O Início (de quem não é só editor de vídeo) abre com o **Resumo do dia**. O
 daquele dia (hoje: até agora). As setas e o calendário levam a qualquer dia desde o primeiro convidado cadastrado, e o dia vai no
 endereço (`/?dia=2026-11-17`). Cada número leva à lista dele.
 
+- **Visual**: um painel só. "Do convite ao episódio" e "Conteúdo" são caminhos desenhados como uma linha com pontos (o ponto aceso é
+  onde algo aconteceu no dia; número zerado fica apagado); "Redes e tarefas" fica embaixo, em células. Hoje aparece com o ponto "ao vivo".
 - **Convidados**: **Convites enviados** (entrou em Convite enviado no dia; embaixo, quantos aguardam resposta), **Aceitos** (saiu de
-  Prospecção, Convite enviado ou Perdido para Em agendamento ou Agendado), **Perdidos**, **Em agendamento** e **Agendados** (o total no
-  fim do dia, com quantos entraram no dia). Mudança desfeita no mesmo dia (arrastou errado e voltou) não conta.
-- **Episódios e cortes**: **Gravados, a publicar** (gravados e ainda sem publicar; embaixo, os gravados no dia, pela data da gravação),
-  **Publicados** (o total, com os do dia), **Cortes subidos** (pelo editor; o que a gestão subiu aparece à parte), **Revisões** (versão
-  nova de um corte que já existia), **Cortes postados** (cada corte uma vez no dia, na hora em que foi ao ar: a da rede, a agendada ou a
-  do envio) e **Reels de teste** (publicação marcada como Reel de teste que foi ao ar no Instagram).
+  Prospecção, Convite enviado ou Perdido para Em agendamento ou Agendado; embaixo, quantos estão em agendamento), **Agendados** (entraram
+  em Agendado no dia; embaixo, quantos têm data marcada) e **Perdidos** no dia (ao lado do título). Mudança desfeita no mesmo dia (arrastou
+  errado e voltou) não conta.
+- **Episódios** (no mesmo caminho dos convidados): **Gravados** no dia (pela data da gravação; embaixo, quantos estão gravados e ainda
+  sem publicar) e **Publicados** no dia (embaixo, o total no ar).
+- **Conteúdo**: **Cortes subidos** (pelo editor; o que a gestão subiu aparece à parte), **Revisões** (versão nova de um corte que já
+  existia), **Agendados para hoje** (cortes e posts marcados para o dia, pela hora marcada: quantos já saíram, quantos ainda vão sair e
+  se algum deu erro; num dia que passou, quantos não saíram), **Cortes postados** (cada corte uma vez no dia, na hora em que foi ao ar: a
+  da rede, a agendada ou a do envio) e **Reels de teste** (publicação marcada como Reel de teste que foi ao ar no Instagram).
 - **Redes e tarefas**: seguidores no **Instagram** e inscritos no **YouTube** (o saldo do dia: a última leitura do dia menos a do dia
-  anterior; sem a nossa leitura, a série de totais do provedor; senão, "sem leitura") e **Tarefas atrasadas** (no fim do dia; hoje, agora).
+  anterior; sem a nossa leitura, a série de totais do provedor; senão, "sem leitura"; embaixo, o total e o saldo da semana) e **Tarefas
+  atrasadas** (no fim do dia; hoje, agora).
 - **Registro das etapas**: a tabela `guest_stage_log` (migração `079_resumo_do_dia.sql`) guarda toda mudança de etapa por gatilho, venha
   de onde vier (quadro, cadastro, edição em massa, aceite ou recusa pelo link, convite por e-mail, importação). O passado foi refeito pela
   linha do tempo dos convidados (`guest_stage_backfill()`).

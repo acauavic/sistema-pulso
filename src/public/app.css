@@ -234,29 +234,71 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; grid-template
 .int-cards > .card { display: flex; flex-direction: column; } .int-cards > .card > form:last-of-type { margin-top: auto; padding-top: 8px; }
 .audit-meta { max-width: 420px; overflow-wrap: anywhere; }
 .link.err, button.link.err { color: var(--bad); } /* link destrutivo: vermelho, como .danger-link */
-/* Resumo do dia no Painel: cabeçalho com o dia (setas, calendário, Hoje) e um grupo por assunto (rótulo mono à esquerda, números
-   à direita). O rótulo pode quebrar em duas linhas e o número continua na mesma altura em todos os cartões. Sem lime: medir não é ação. */
+/* Resumo do dia no Início: um painel só (sem caixa dentro de caixa). Dois caminhos desenhados como uma linha com pontos (do convite
+   ao episódio; o conteúdo): o ponto aceso diz que algo aconteceu naquele passo no dia, o número zerado fica apagado. Embaixo, as
+   redes e as tarefas em células separadas por filete. Sem lime nos números (medir não é ação): o único lime é o ponto "ao vivo". */
 .day-sum { margin: 0 0 24px; scroll-margin-top: 16px; }
-.day-sum-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 16px; }
-.day-sum-head h2 { margin: 0; display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; }
-.day-sum-head h2 .mono.small { font-size: 11px; font-weight: 500; letter-spacing: .14em; } /* o momento (HOJE, ATÉ AGORA / dia da semana) é rótulo, não título */
+.day-sum-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.day-sum-head h2 { margin: 0; display: flex; align-items: baseline; gap: 4px 14px; flex-wrap: wrap; }
+.day-when { display: inline-flex; align-items: center; gap: 8px; font: 500 11px var(--f-mono); letter-spacing: .14em; color: var(--muted); }
+.day-live { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); animation: day-live 1.2s ease-in-out infinite; } /* o Ponto da marca: ao vivo */
+:root[data-theme="light"] .day-live { background: var(--text); }
+@keyframes day-live { 50% { opacity: .25; } }
 .day-nav { display: flex; align-items: center; gap: 8px; --control-h: 32px; } /* o calendário com a altura das setas (.btn.sm) */
 .day-nav .btn.sm { padding: 0 10px; } .day-nav [aria-disabled="true"] { opacity: .4; pointer-events: none; }
 .day-nav input[type=date] { width: auto; padding: 0 10px; font: 500 13px var(--f-mono); letter-spacing: .04em; border-radius: var(--r-full); }
-.day-group { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: start; margin-bottom: 12px; }
-.day-group > .kicker { margin: 18px 0 0; font-weight: 500; }
-.stat-grid.day-stats { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); margin: 0; }
-.day-stats .stat { grid-template-rows: 1fr auto 28px; align-content: stretch; padding: 14px 16px; } /* a linha de baixo tem sempre 2 linhas: os números ficam na mesma altura */
-.day-stats .stat-label { align-self: start; } .day-stats .stat-n { font-size: 32px; font-variant-numeric: tabular-nums; }
-.day-stats .delta { line-height: 14px; max-height: 28px; overflow: hidden; }
+.day-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); }
+.day-band { padding: 16px 12px 14px; } .day-band + .day-band { border-top: 1px solid var(--line); }
+.day-band-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 12px; margin-bottom: 6px; }
+.day-band-t { margin: 0; font: 500 11px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.day-aside { font: 500 11px var(--f-mono); letter-spacing: .06em; color: var(--muted); white-space: nowrap; }
+.day-aside b { color: var(--st-cancelado-fg); font-weight: 600; } .day-aside:hover { color: var(--text-2); text-decoration: none; }
+/* o caminho: 5 passos lado a lado; cada passo ocupa 4 linhas da grade (ponto, rótulo, número, linha de baixo), e a subgrade mantém
+   os números na mesma altura mesmo quando um rótulo quebra em duas linhas */
+.day-flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); }
+.day-node, .day-cell { position: relative; display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; align-content: start; padding: 10px 12px 12px; border-radius: var(--r-card); color: var(--text); transition: background var(--t) var(--ease); }
+.day-node:hover, .day-cell:hover { background: var(--raised); text-decoration: none; color: var(--text); }
+.day-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text); margin-bottom: 12px; position: relative; z-index: 1; }
+.day-node.is-zero .day-dot { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.day-node:not(:last-child)::after { content: ""; position: absolute; top: 13px; left: 25px; right: -6px; height: 1px; background: var(--line-strong); } /* liga este ponto ao próximo */
+.day-l { font: 500 11px/15px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); align-self: end; }
+.day-n { font: 700 36px/1 var(--f-display); letter-spacing: -.04em; margin: 8px 0 6px; }
+.is-zero .day-n { color: var(--muted); } .day-cell.is-bad .day-n, .day-cell.is-down .day-n { color: var(--st-cancelado-fg); }
+.day-sub { font: 400 11px/15px var(--f-mono); letter-spacing: .04em; color: var(--muted); }
+.day-sub b { font-weight: 500; color: var(--text-2); } .day-sub b.bad { color: var(--st-cancelado-fg); }
+.day-cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); }
+.day-cell { grid-row: span 4; } .day-cell::before { content: ""; } /* a 1ª linha da subgrade fica vazia: os números das células alinham com os do caminho */
+.day-cell + .day-cell { box-shadow: inset 1px 0 0 var(--line); border-radius: 0; } .day-cell + .day-cell:hover { border-radius: 0; }
+@media (prefers-reduced-motion: reduce) { .day-live { animation: none; } }
 @media (pointer: coarse) { .day-nav { --control-h: 40px; } }
 @media (max-width: 860px) { .day-sum { scroll-margin-top: 72px; } } /* ao trocar de dia, o título não fica sob a barra de cima */
+/* celular: o caminho fica em pé (a linha desce de ponto em ponto) e cada passo é uma linha: rótulo e linha de baixo à esquerda, número à direita */
 @media (max-width: 640px) {
   .day-nav { width: 100%; } .day-nav input[type=date] { flex: 1 1 auto; }
-  .day-group { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 16px; } .day-group > .kicker { margin: 0; }
-  .stat-grid.day-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .day-stats .stat { padding: 12px; } .day-stats .stat-n { font-size: 26px; }
+  .day-band { padding: 14px 4px 8px; } .day-band-head { padding: 0 12px; margin-bottom: 2px; flex-wrap: wrap; }
+  .day-flow, .day-cells { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .day-node, .day-cell { grid-row: auto; grid-template-rows: auto auto; grid-template-columns: 7px minmax(0, 1fr) auto; column-gap: 14px; align-items: center; padding: 10px 12px; }
+  .day-cell { grid-template-columns: minmax(0, 1fr) auto; } .day-cell::before { display: none; }
+  .day-dot { grid-column: 1; grid-row: 1 / span 2; margin: 0; align-self: center; }
+  .day-l { grid-column: 2; grid-row: 1; align-self: end; } .day-cell .day-l { grid-column: 1; }
+  .day-sub { grid-column: 2; grid-row: 2; } .day-cell .day-sub { grid-column: 1; }
+  .day-n { grid-column: 3; grid-row: 1 / span 2; margin: 0; font-size: 28px; text-align: right; } .day-cell .day-n { grid-column: 2; }
+  .day-node:not(:last-child)::after { top: calc(50% + 4px); bottom: calc(-50% + 4px); left: 15px; right: auto; width: 1px; height: auto; } /* a linha desce até o próximo ponto */
+  .day-cell + .day-cell { box-shadow: inset 0 1px 0 var(--line); }
 }
+/* Ordem de edição (Início do editor, Episódios, página do episódio): a posição (1º, 2º…) e quando o episódio vai ao ar, com a
+   cor do prazo: vermelho = a data passou, âmbar = hoje ou nos próximos 2 dias, apagado = sem data. Nada de lime: a ordem
+   informa; a ação é abrir o episódio. */
+.edit-order { display: grid; margin: 0; padding: 0; list-style: none; } .edit-order-hint { margin: -8px 0 4px; }
+.edit-order li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; }
+.edit-order li + li { border-top: 1px solid var(--line); }
+.edit-pos { font: 700 22px/1 var(--f-display); letter-spacing: -.04em; color: var(--muted); }
+.edit-order li.is-first .edit-pos { color: var(--text); }
+.edit-main { display: grid; gap: 3px; min-width: 0; } .edit-main a { overflow-wrap: anywhere; }
+.order-n { font-weight: 600; color: var(--text); }
+.order-note { margin: 8px 0 0; color: var(--muted); }
+.air-ok, .air-none { color: var(--muted); } .air-soon { color: var(--st-edicao-fg); } .air-late { color: var(--st-cancelado-fg); }
+@media (max-width: 640px) { .edit-order li { grid-template-columns: 32px minmax(0, 1fr); row-gap: 6px; } .edit-order li > .badge { grid-column: 2; justify-self: start; } }
 .kit-who > div { min-width: 0; overflow-wrap: anywhere; }
 /* busca da lista enquanto a nova resposta não chega: o resultado anterior fica apagado e o Enter espera */
 [data-palette-results].is-stale .palette-item { opacity: .45; }
