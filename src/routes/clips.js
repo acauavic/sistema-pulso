@@ -65,7 +65,19 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     R.list({ episodeId: only }), db.query("SELECT id, name, role FROM users WHERE active AND role IN ('editor_video','gestao','superadmin') ORDER BY (role = 'editor_video') DESC, name"),
     db.query('SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 80'),
   ]);
-  const list = clipRows.rows.map((c) => ({ ...c, covers: covers.rows.filter((x) => x.clip_id === c.id), pub: board.stateOf(idx.byClip.get(c.id)) }));
+  // aba Cortes: situação (só os prontos para postar) e ordem
+  const situacao = req.query.situacao === 'pronto' ? 'pronto' : '';
+  const ordem = ['antigos', 'episodio', 'duracao'].includes(req.query.ordem) ? req.query.ordem : 'recentes';
+  const natural = (a, b) => String(a.title).localeCompare(String(b.title), 'pt-BR', { numeric: true });
+  const sorters = {
+    recentes: (a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id,
+    antigos: (a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id,
+    episodio: (a, b) => (a.ep_number ?? 9999) - (b.ep_number ?? 9999) || natural(a, b),
+    duracao: (a, b) => (a.duration_ms || 0) - (b.duration_ms || 0) || natural(a, b),
+  };
+  const list = clipRows.rows.map((c) => ({ ...c, covers: covers.rows.filter((x) => x.clip_id === c.id), pub: board.stateOf(idx.byClip.get(c.id)) }))
+    .filter((c) => !situacao || (c.status === 'pronto' && !c.pub && (c.episode_id || c.request_id)))
+    .sort(sorters[ordem]);
   const byEpisode = {};
   for (const e of episodes.rows) byEpisode[e.id] = e;
   const hasFrames = new Set(withFrames.rows.map((r) => r.episode_id));
@@ -82,6 +94,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const columns = built.columns.map((col) => ({ ...col, cards: col.cards.filter(keep) }));
   const pedir = Object.prototype.hasOwnProperty.call(R.KINDS, req.query.pedir) ? req.query.pedir : (req.query.pedir === '1' ? 'trailer' : null);
   res.render('content/index', {
+    uploadPost: up, situacao, ordem, readyCount: clipRows.rows.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !board.stateOf(idx.byClip.get(c.id))).length,
     columns, hiddenOld: built.hiddenOld, tipo, vista: ['quadro', 'cortes', 'posts', 'pedidos'].includes(req.query.vista) ? req.query.vista : 'quadro',
     requests: reqs, openRequests: reqs.filter((r) => R.OPEN.includes(r.status)), people: people.rows, episodeList: episodeList.rows, K: R.KINDS, S: R.STATUSES, F: R.FORMATS,
     pedir, today: new Date().toISOString().slice(0, 10), isLate: R.isLate, stageLabel: board.STAGE_LABEL,

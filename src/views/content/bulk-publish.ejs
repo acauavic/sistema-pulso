@@ -1,0 +1,58 @@
+<%- include('../partials/head') %>
+<%
+  var ig = platforms.indexOf('instagram') >= 0;
+  var trials = rows.filter(function (r) { return r.trial; }).length;
+  var dayOf = function (r) { return fmt.formatDateTime(r.at).slice(0, 5); };
+  var backHref = '/conteudo?vista=cortes' + (episodio ? '&episodio=' + episodio : '');
+%>
+<div class="page-head">
+  <div><span class="kicker">Conteúdo · publicar em massa</span><h1>Agenda de <span class="mono"><%= rows.length %></span> <%= rows.length === 1 ? 'corte' : 'cortes' %></h1></div>
+  <div class="row"><a class="btn ghost" href="<%= backHref %>"><%- icon('arrow-left') %> Voltar aos cortes</a></div>
+</div>
+<p class="lead">
+  <%= platforms.map(labelOf).join(' · ') %>. <span class="mono"><%= opts.perDay %></span> por dia, das <span class="mono"><%= hhmm(opts.from) %></span> às <span class="mono"><%= hhmm(opts.to) %></span>, a partir de <span class="mono"><%= opts.start.split('-').reverse().join('/') %></span><%= days.length > 1 ? ', em ' + days.length + ' dias' : '' %>.
+  <% if (ig && trials) { %><span class="mono"><%= trials %></span> <%= trials === 1 ? 'vai' : 'vão' %> ao Instagram como Reel de teste (<%= opts.trialMode === 'manual' ? 'você libera no app' : 'libera sozinho se for bem' %>).<% } %>
+</p>
+
+<% if (skipped.length) { %>
+<div class="notice small">
+  <strong><%= skipped.length %> <%= skipped.length === 1 ? 'corte ficou' : 'cortes ficaram' %> de fora:</strong>
+  <%= skipped.slice(0, 6).map(function (s) { return (s.clip.post_title || s.clip.title) + ' (' + s.why + ')'; }).join('; ') %><%= skipped.length > 6 ? '…' : '' %>
+</div>
+<% } %>
+
+<% if (!rows.length) { %>
+<div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nada para agendar.</strong></p><p class="muted small">Os cortes marcados já saíram, estão na fila ou ainda não estão prontos.</p><p><a class="btn sm" href="<%= backHref %>">Voltar aos cortes</a></p></div>
+<% } else { %>
+<form method="post" action="/conteudo/em-massa/publicar" data-busy="Agendando…">
+  <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="episodio" value="<%= episodio %>"><input type="hidden" name="teste_modo" value="<%= opts.trialMode %>">
+  <% platforms.forEach(function (p) { %><input type="hidden" name="platforms" value="<%= p %>"><% }) %>
+  <% days.forEach(function (d) { var mine = rows.filter(function (r) { return dayOf(r) === d; }); %>
+  <section class="agenda-day">
+    <h2><span class="mono"><%= d %></span> <span class="small muted"><%= mine.length %> <%= mine.length === 1 ? 'post' : 'posts' %></span></h2>
+    <% mine.forEach(function (r) { var c = r.clip; %>
+    <div class="agenda-row">
+      <input type="hidden" name="ids" value="<%= c.id %>">
+      <label class="when"><span class="sr-only">Horário de <%= c.post_title || c.title %></span><input type="datetime-local" name="at_<%= c.id %>" value="<%= fmt.toInputValue(r.at) %>" step="300" required></label>
+      <% if (r.cover) { %><img src="/capas/<%= r.cover.id %>/imagem?v=<%= new Date(r.cover.updated_at).getTime() %>" alt="" loading="lazy"><% } else { %><span class="poster-empty"><%- icon('film', 16) %></span><% } %>
+      <div>
+        <a href="/cortes/<%= c.id %>" target="_blank" rel="noopener"><strong><%= c.post_title || c.title %></strong></a>
+        <p class="handle muted m-0"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.title %><%= c.duration_ms ? ' · ' + fmt.formatClock(c.duration_ms) : '' %><%= r.cover ? '' : ' · sem capa' %></p>
+      </div>
+      <% if (ig) { %><label class="check small trial-cell"><input type="checkbox" name="teste_<%= c.id %>" value="1" <%= r.trial ? 'checked' : '' %>> Reel de teste</label><% } %>
+    </div>
+    <% }) %>
+  </section>
+  <% }) %>
+  <div class="stack top-gap">
+    <% if (review) { %>
+    <p class="small muted">Vai para a revisão da gestão; cada post sai no horário marcado depois de aprovado.</p>
+    <div class="row"><button class="btn primary" type="submit">Enviar <%= rows.length %> para revisão</button><a class="btn ghost" href="<%= backHref %>">Cancelar</a></div>
+    <% } else { %>
+    <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto agenda as publicações nas redes escolhidas.</label>
+    <div class="row"><button class="btn primary" type="submit">Agendar <%= rows.length %> <%= rows.length === 1 ? 'publicação' : 'publicações' %></button><a class="btn ghost" href="<%= backHref %>">Cancelar</a></div>
+    <% } %>
+  </div>
+</form>
+<% } %>
+<%- include('../partials/foot') %>

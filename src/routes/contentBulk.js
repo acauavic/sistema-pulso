@@ -154,4 +154,123 @@ router.post('/conteudo/em-massa/pedidos', requirePerm('episodes.read'), wrap(asy
   return res.redirect(to);
 }));
 
+// ---------------------------------------------------------------- cortes: publicar em massa (agenda) e capas em lote
+const bulk = require('../services/bulkPublish');
+const up = require('../services/uploadPost');
+const canPublishNow = (role) => can(role, 'production.review');
+const canAskPublish = (role) => canPublishNow(role) || can(role, 'social.request');
+const canCover = (role) => can(role, 'covers.edit');
+const platformsOf = (body) => [...new Set([].concat(body.platforms || []).map(String).filter((p) => up.PLATFORMS[p]?.clip))];
+const coverList = (ids) => db.query('SELECT id, clip_id, label, spec, updated_at, approved FROM episode_covers WHERE clip_id = ANY($1) AND kind = \'reel_cover\' ORDER BY clip_id, position, id', [ids]).then((r) => r.rows);
+
+// 1) Agenda para conferir: horários distribuídos, quais vão como Reel de teste e o que ficou de fora (e por quê).
+router.post('/conteudo/em-massa/publicar/previa', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
+  const ids = idsOf(req.body); const to = back(req, 'cortes');
+  if (!ids.length) { await req.flash('error', 'Marque pelo menos um corte.'); return res.redirect(to); }
+  const platforms = platformsOf(req.body);
+  if (!platforms.length) { await req.flash('error', 'Escolha pelo menos uma rede.'); return res.redirect(to); }
+  const opts = bulk.readOptions(req.body);
+  if (opts.error) { await req.flash('error', opts.error); return res.redirect(to); }
+  const { ok, skipped } = await bulk.eligible(ids);
+  const slots = bulk.plan(ok.map((c) => c.id), opts);
+  const byId = new Map(ok.map((c) => [c.id, c]));
+  const covers = await coverList(ok.map((c) => c.id));
+  const rows = slots.map((s) => ({ ...s, clip: byId.get(s.clipId), cover: covers.find((v) => v.id === byId.get(s.clipId).cover_id) || covers.find((v) => v.clip_id === s.clipId) || null }));
+  const days = [...new Set(rows.map((r) => fmt.formatDateTime(r.at).slice(0, 5)))];
+  res.render('content/bulk-publish', {
+    title: 'Publicar em massa', rows, skipped, platforms, opts, days, labelOf: (p) => up.PLATFORMS[p]?.clipLabel || up.PLATFORMS[p]?.label || p,
+    review: !canPublishNow(req.user.role), episodio: isIntId(req.body.episodio) ? req.body.episodio : '', hhmm: bulk.hhmm,
+  });
+}));
+
+// 2) Confirmado: uma publicação agendada por corte (a produtora manda para a revisão da gestão).
+router.post('/conteudo/em-massa/publicar', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
+  const review = !canPublishNow(req.user.role);
+  const to = back(req, 'cortes');
+  if (!review && req.body.confirmar !== '1') { await req.flash('error', 'Confirme marcando "Entendi que isto agenda as publicações nas redes escolhidas".'); return res.redirect(to); }
+  const platforms = platformsOf(req.body);
+  const items = idsOf(req.body).map((id) => {
+    const d = fmt.parseInputDateTime(String(req.body[`at_${id}`] || ''));
+    return d ? { clipId: id, at: d.toISOString(), trial: req.body[`teste_${id}`] === '1' } : null;
+  }).filter(Boolean);
+  if (!items.length || !platforms.length) { await req.flash('error', 'Nada para agendar.'); return res.redirect(to); }
+  const { created, failed } = await bulk.schedule(items, { platforms, trialMode: req.body.teste_modo === 'manual' ? 'manual' : 'auto', userId: req.user.id, review });
+  await audit(req, review ? 'publicacao.pedida' : 'publicacao.criada', 'publication', null, { em_massa: true, ids: created.map((x) => x.pub.id), redes: platforms });
+  const trials = created.filter((x) => x.trial).length;
+  const msg = created.length
+    ? `${plural(created.length, review ? 'publicação foi para a revisão' : 'publicação agendada', review ? 'publicações foram para a revisão' : 'publicações agendadas')}${trials ? ` (${trials} como Reel de teste no Instagram)` : ''}.`
+    : 'Nenhuma publicação foi agendada.';
+  const why = failed.length ? ` ${plural(failed.length, 'ficou de fora', 'ficaram de fora')}: ${failed.slice(0, 3).map((f) => `${f.title || `corte ${f.clipId}`} (${f.why})`).join('; ')}${failed.length > 3 ? '…' : ''}` : '';
+  await req.flash(created.length ? 'ok' : 'error', msg + why);
+  return res.redirect(`/conteudo?vista=quadro${isIntId(req.body.episodio) ? `&episodio=${req.body.episodio}` : ''}`);
+}));
+
+// Capas em lote: escolher a capa de cada corte e reescrever o texto (a IA sugere). Uma linha por corte.
+router.get('/conteudo/capas-em-lote', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canCover(req.user.role)) return deny(res, 'Seu perfil não mexe nas capas.');
+  const ids = idsOf({ ids: req.query.ids });
+  if (!ids.length) return res.redirect('/conteudo?vista=cortes');
+  const { rows: list } = await db.query(
+    `SELECT c.id, c.title, c.post_title, c.cover_id, c.cover_texts, c.status, e.number AS ep_number, g.name AS guest_name,
+            EXISTS (SELECT 1 FROM episode_frames f WHERE f.clip_id = c.id) AS has_frames
+       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id WHERE c.id = ANY($1)`, [ids]);
+  const covers = await coverList(ids);
+  const order = new Map(ids.map((id, i) => [id, i]));
+  const rows = list.sort((a, b) => order.get(a.id) - order.get(b.id)).map((c) => {
+    const mine = covers.filter((v) => v.clip_id === c.id);
+    const chosen = mine.find((v) => v.id === c.cover_id) || mine[0] || null;
+    return { ...c, covers: mine, chosen, text: clips.coverTextOf(chosen) };
+  });
+  res.render('content/bulk-covers', { title: 'Capas em lote', rows, episodio: isIntId(req.query.episodio) ? req.query.episodio : '', aiOn: require('../config').geminiConfigured });
+}));
+
+// IA para todos de uma vez: 3 textos de capa por corte, 5 cortes em paralelo (um pedido só conta no limite de uso da IA).
+const coverAiLimiter = require('../auth/rateLimit').createLimiter({ name: 'ia-capas-lote', max: 10, windowMs: 10 * 60_000 });
+router.post('/conteudo/capas-em-lote/sugerir', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canCover(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não mexe nas capas.' });
+  if (!await coverAiLimiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitos pedidos seguidos. Espere alguns minutos.' });
+  const ids = idsOf(req.body).slice(0, 60);
+  const aiText = require('../services/aiText');
+  const out = {}; let i = 0;
+  await Promise.all(Array.from({ length: 5 }, async () => {
+    while (i < ids.length) {
+      const id = ids[i]; i += 1;
+      const r = await aiText.suggest({ field: 'capa', coverKind: 'reel_cover', current: String(req.body[`texto_${id}`] || ''), shortcut: 'impacto', clipId: id }).catch((err) => ({ error: err.message }));
+      out[id] = r.opcoes || { error: r.error || 'A IA não respondeu.' };
+    }
+  }));
+  res.json({ ok: true, sugestoes: out });
+}));
+
+router.post('/conteudo/capas-em-lote', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canCover(req.user.role)) return deny(res, 'Seu perfil não mexe nas capas.');
+  const ids = idsOf(req.body);
+  const covers = await coverList(ids);
+  let chosen = 0; let made = 0; const errors = [];
+  for (const id of ids) {
+    const mine = covers.filter((v) => v.clip_id === id);
+    const pick = mine.find((v) => String(v.id) === String(req.body[`capa_${id}`]));
+    const text = String(req.body[`texto_${id}`] || '').replace(/\s+/g, ' ').trim();
+    const before = String(req.body[`antes_${id}`] || '').replace(/\s+/g, ' ').trim();
+    if (text && text !== before) {
+      const out = await clips.coverWithText(id, { baseCoverId: pick?.id || null, text, userId: req.user.id });
+      if (out.error) errors.push(`corte ${id}: ${out.error}`); else made += 1;
+    } else if (pick) {
+      const { rows: [cur] } = await db.query('SELECT cover_id FROM episode_clips WHERE id = $1', [id]);
+      if (cur && cur.cover_id !== pick.id) {
+        await db.query('UPDATE episode_clips SET cover_id = $2, updated_at = now() WHERE id = $1', [id, pick.id]);
+        await db.query('UPDATE episode_covers SET approved = (id = $2) WHERE clip_id = $1', [id, pick.id]);
+        chosen += 1;
+      }
+    }
+  }
+  await audit(req, 'capas.em_lote', 'clip', null, { ids, novas: made, trocadas: chosen });
+  const parts = [made && plural(made, 'capa nova com o texto novo', 'capas novas com o texto novo'), chosen && plural(chosen, 'capa trocada', 'capas trocadas')].filter(Boolean);
+  await req.flash(errors.length && !parts.length ? 'error' : 'ok', `${parts.length ? `${parts.join(' e ')}.` : 'Nada mudou.'}${errors.length ? ` Não deu em ${errors.length}: ${errors.slice(0, 2).join('; ')}` : ''}`);
+  const q = new URLSearchParams(); ids.forEach((id) => q.append('ids', id)); if (isIntId(req.body.episodio)) q.set('episodio', req.body.episodio);
+  return res.redirect(`/conteudo/capas-em-lote?${q}`);
+}));
+
 module.exports = router;

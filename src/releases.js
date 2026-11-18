@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.73.0', date: '2026-11-17', title: 'Conteúdo: filtro por episódio, ordem, publicar em massa e capas em lote',
+    items: [
+      { kind: 'novo', text: 'Publicar em massa: em Conteúdo > Cortes, marque os cortes e toque em "Publicar". Escolha as redes, a partir de quando, a janela do dia (ex.: das 08:00 às 22:00), quantos por dia e quantos vão ao Instagram como Reel de teste. O sistema distribui os horários na ordem da lista e mostra a agenda para conferir (dá para mudar um horário ou marcar e desmarcar o Reel de teste) antes de agendar. Cada corte sai com o próprio título, legenda, capa e chamada de cada rede.' },
+      { kind: 'novo', text: 'Capas e textos em lote: com os cortes marcados, "Capas e textos" abre uma página com um corte por linha para escolher a capa e reescrever o texto. "Sugerir textos para todos" traz 3 opções da IA para cada um; ao salvar, o texto novo vira uma capa nova sobre o mesmo quadro do vídeo.' },
+      { kind: 'novo', text: 'Filtros: a aba Cortes ganhou "Prontos para postar", filtro por episódio e ordem (mais recentes, mais antigos, por episódio, mais curtos primeiro). O quadro também filtra por episódio, e a coluna "Pronto para postar" leva direto à seleção para publicar.' },
+    ],
+  },
+  {
     version: '1.72.1', date: '2026-11-17', title: 'Quadro de Conteúdo mostra o que já saiu há mais tempo',
     items: [
       { kind: 'correcao', text: 'No quadro de um episódio, a coluna Publicado mostra todos os cortes que já saíram, mesmo os de meses atrás. No quadro geral, o publicado há mais de 60 dias continua guardado, mas a própria coluna avisa quantos são e leva até eles.' },

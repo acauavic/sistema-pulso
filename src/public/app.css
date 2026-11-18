@@ -1700,3 +1700,23 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
 .cta-box .cta-list label { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 8px; margin: 0; }
 @media (max-width: 640px) { .cta-box .cta-list label { grid-template-columns: 1fr; gap: 4px; } }
 .column .col-more { display: block; padding: 8px 4px; }
+
+/* Conteúdo: filtros da aba Cortes e do quadro, publicar em massa e capas em lote */
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 640px) { .grid-3 { grid-template-columns: 1fr; } }
+.ep-filter { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ep-filter select { width: auto; max-width: 320px; }
+.agenda-day { margin-top: 24px; }
+.agenda-day h2 { font-size: 15px; }
+.agenda-row { display: grid; grid-template-columns: 64px 48px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.agenda-row img, .agenda-row .poster-empty { width: 48px; height: 85px; object-fit: cover; border-radius: 6px; background: var(--raised); display: flex; align-items: center; justify-content: center; }
+.agenda-row .when { font-size: 13px; }
+.agenda-row input[type="time"] { width: 100%; padding: 4px 6px; }
+.bulk-cover-row { display: grid; grid-template-columns: minmax(160px, 220px) 1fr minmax(240px, 360px); gap: 16px; align-items: start; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.bulk-cover-row .cover-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+.bulk-cover-row .cover-pick { position: relative; cursor: pointer; }
+.bulk-cover-row .cover-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.bulk-cover-row .cover-pick img { width: 72px; height: 128px; object-fit: cover; border-radius: 6px; border: 2px solid transparent; display: block; }
+.bulk-cover-row .cover-pick input:checked + img { border-color: var(--text); }
+.bulk-cover-row .cover-pick input:focus-visible + img { outline: 2px solid var(--text); outline-offset: 2px; }
+@media (max-width: 900px) { .bulk-cover-row { grid-template-columns: 1fr; } .agenda-row { grid-template-columns: 56px 40px 1fr; } .agenda-row .trial-cell { grid-column: 3; } }

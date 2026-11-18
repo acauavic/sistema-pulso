@@ -21,6 +21,7 @@
   var dayShort = function (d) { return d ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }).format(new Date(d)) : ''; };
   var dueShort = function (d) { if (!d) return ''; var iso = new Date(d).toISOString().slice(0, 10); return iso.slice(8, 10) + '/' + iso.slice(5, 7); };
   var boardHref = function (t) { return '/conteudo?vista=quadro' + (t ? '&tipo=' + t : '') + (only ? '&episodio=' + only : ''); };
+  var cutsHref = function (sit) { return '/conteudo?vista=cortes' + (sit ? '&situacao=' + sit : '') + (ordem !== 'recentes' ? '&ordem=' + ordem : '') + (only ? '&episodio=' + only : ''); };
 %>
 <div class="tabs-wrap" data-tabs data-default="<%= vista %>">
   <div class="tabbar" role="tablist" aria-label="Conteúdo">
@@ -35,6 +36,12 @@
       <div class="seg" role="group" aria-label="Filtrar o quadro">
         <% [['', 'Tudo'], ['video', 'Vídeos'], ['imagem', 'Imagens'], ['pedido', 'Pedidos']].forEach(function (f) { %><a class="<%= tipo === f[0] ? 'on' : '' %>" href="<%= boardHref(f[0]) %>"><%= f[1] %></a><% }) %>
       </div>
+      <form method="get" action="/conteudo" class="inline ep-filter"><input type="hidden" name="vista" value="quadro"><% if (tipo) { %><input type="hidden" name="tipo" value="<%= tipo %>"><% } %>
+        <select name="episodio" data-autosubmit aria-label="Filtrar por episódio">
+          <option value="">Todos os episódios</option>
+          <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= only === e.id ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
+        </select>
+      </form>
       <% if (hiddenOld) { %><a class="link small" href="<%= boardHref(tipo) %>&publicados=todos">Ver publicados há mais de 60 dias <span class="mono">(<%= hiddenOld %>)</span></a><% } %>
     </div>
     <div class="board board-wide pboard">
@@ -57,6 +64,7 @@
             </span>
           </a>
           <% }) %>
+          <% if (col.key === 'pronto' && perm.cut && readyCount > 1) { %><a class="link small col-more" href="<%= cutsHref('pronto') %>">Selecionar para publicar em massa</a><% } %>
           <% if (col.key === 'publicado' && hiddenOld) { %><a class="link small col-more" href="<%= boardHref(tipo) %>&publicados=todos">+ <span class="mono"><%= hiddenOld %></span> publicados há mais de 60 dias</a><% } %>
         </div>
       </section>
@@ -79,6 +87,21 @@
     <div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhum corte <%= only ? 'neste episódio' : 'ainda' %>.</strong></p><p class="muted small">Os vídeos editados aparecem aqui já com título, legenda e capas sugeridos.</p><% if (perm.cut && storageReady) { %><p><button class="btn sm" type="button" data-modal-open="modal-cortes"><%- icon('upload', 14) %> Enviar cortes</button></p><% } %></div>
     <% } %>
 
+    <div class="board-filter cuts-filter">
+      <div class="seg" role="group" aria-label="Situação dos cortes">
+        <a class="<%= situacao ? '' : 'on' %>" href="<%= cutsHref('') %>">Todos</a><a class="<%= situacao === 'pronto' ? 'on' : '' %>" href="<%= cutsHref('pronto') %>">Prontos para postar <span class="mono"><%= readyCount %></span></a>
+      </div>
+      <form method="get" action="/conteudo" class="inline ep-filter"><input type="hidden" name="vista" value="cortes"><% if (situacao) { %><input type="hidden" name="situacao" value="<%= situacao %>"><% } %>
+        <select name="episodio" data-autosubmit aria-label="Filtrar por episódio">
+          <option value="">Todos os episódios</option>
+          <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= only === e.id ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
+        </select>
+        <select name="ordem" data-autosubmit aria-label="Ordenar">
+          <% [['recentes', 'Mais recentes'], ['antigos', 'Mais antigos'], ['episodio', 'Por episódio'], ['duracao', 'Mais curtos primeiro']].forEach(function (o) { %><option value="<%= o[0] %>" <%= ordem === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %>
+        </select>
+      </form>
+    </div>
+
     <% var clipPick = perm.cut && clips.length > 1; %>
     <div<%- clipPick ? ' data-dl data-dl-zip="cortes"' : '' %>>
     <% if (clipPick) { %>
@@ -89,8 +112,10 @@
       <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
       <span class="row dl-actions">
         <button class="btn sm ghost" type="button" data-dl-all>Selecionar todos</button>
-        <button class="btn sm" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar</button>
-        <button class="btn sm primary" type="button" data-dl-open="modal-massa-cortes" disabled>Atribuir ao episódio</button>
+        <% if (perm.publish) { %><button class="btn sm primary" type="button" data-dl-open="modal-massa-publicar" disabled><%- icon('send', 14) %> Publicar</button><% } %>
+        <% if (perm.cover) { %><button class="btn sm" type="button" data-dl-open="modal-capas-lote" disabled><%- icon('image', 14) %> Capas e textos</button><% } %>
+        <button class="btn sm <%= perm.publish ? '' : 'primary' %>" type="button" data-dl-open="modal-massa-cortes" disabled>Atribuir ao episódio</button>
+        <button class="btn sm ghost" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar</button>
         <button class="link small danger-link" type="button" data-dl-do="excluir" data-confirm="Mandar {n} corte(s) para a lixeira? Ficam 15 dias lá e dá para restaurar." disabled>excluir</button>
         <button class="btn sm ghost" type="button" data-dl-cancel>Cancelar</button>
       </span>
@@ -246,6 +271,44 @@
     </label>
     <p class="small muted">Só aparecem episódios já gravados. Os cortes que já tinham episódio mudam para este, e as capas são refeitas.</p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Atribuir</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (perm.cut && clips.length > 1 && perm.publish) { %>
+<dialog class="modal modal-wide" id="modal-massa-publicar" aria-labelledby="mmpub-h">
+  <form method="post" action="/conteudo/em-massa/publicar/previa" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
+    <h2 id="mmpub-h">Publicar <span class="mono" data-dl-n>0</span> corte(s)</h2>
+    <p class="small muted">Cada corte sai com o próprio título, legenda, capa escolhida e a chamada de cada rede, na ordem da lista. Antes de agendar, você confere a agenda.</p>
+    <fieldset class="channels"><legend>Redes</legend>
+      <% Object.keys(uploadPost.PLATFORMS).filter(function (k) { return uploadPost.PLATFORMS[k].clip; }).forEach(function (k) { %>
+      <label class="check"><input type="checkbox" name="platforms" value="<%= k %>" <%= uploadPost.DEFAULTS.clip.indexOf(k) >= 0 ? 'checked' : '' %>> <%= uploadPost.PLATFORMS[k].clipLabel || uploadPost.PLATFORMS[k].label %></label>
+      <% }) %>
+    </fieldset>
+    <div class="grid-3">
+      <label>Começar em<input type="date" name="inicio" value="<%= today %>" required></label>
+      <label>Das<input type="time" name="de" value="08:00" step="300" required></label>
+      <label>Até<input type="time" name="ate" value="22:00" step="300" required></label>
+    </div>
+    <div class="grid-3">
+      <label>Por dia<input type="number" name="por_dia" min="1" max="24" value="3" class="num-input" required></label>
+      <label>Reel de teste por dia <small class="muted">(Instagram)</small><input type="number" name="teste_por_dia" min="0" max="24" value="0" class="num-input"></label>
+      <label>Reel de teste libera
+        <select name="teste_modo"><option value="auto">Sozinho, se for bem</option><option value="manual">Eu libero no app</option></select>
+      </label>
+    </div>
+    <p class="small muted m-0">Os horários do dia ficam espalhados entre o começo e o fim. O Reel de teste aparece primeiro só para quem não segue o Pulso; as outras redes recebem o post normal.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Ver a agenda</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% if (perm.cut && clips.length > 1 && perm.cover) { %>
+<dialog class="modal" id="modal-capas-lote" aria-labelledby="mcl-h">
+  <form method="get" action="/conteudo/capas-em-lote" class="stack">
+    <input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
+    <h2 id="mcl-h">Capas de <span class="mono" data-dl-n>0</span> corte(s)</h2>
+    <p class="small muted">Abre uma página com os cortes marcados, um por linha: escolha a capa de cada um e reescreva o texto, com a IA sugerindo para todos de uma vez.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Abrir as capas</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>
 <% } %>

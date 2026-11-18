@@ -253,6 +253,38 @@ async function buildCovers(clipId, userId = null) {
   return rows;
 }
 
+// Texto principal de uma capa de corte (capa gerada pelo sistema ou editada). Capa do Drive é imagem pronta: sem texto editável.
+function coverTextOf(cover) {
+  const layer = (cover?.spec?.layers || []).find((l) => l.type === 'text' && (l.role === 'main' || l.id === 'texto'));
+  return layer?.text ? String(layer.text) : '';
+}
+
+// Capa nova com outro texto (capas em lote): mesmo quadro da capa de base quando ela é do sistema; se a base é uma imagem pronta
+// (Drive, enviada), usa o melhor quadro do vídeo, para não escrever por cima de um texto que já está na imagem.
+// A capa nova fica escolhida e aprovada. Devolve a capa ou { error }.
+async function coverWithText(clipId, { baseCoverId = null, text, userId = null }) {
+  const t = cleanCoverText(text);
+  if (!goodCover(t)) return { error: 'Texto curto demais para a capa (use pelo menos 2 palavras).' };
+  const { rows: [clip] } = await db.query('SELECT * FROM episode_clips WHERE id = $1', [clipId]);
+  if (!clip) return { error: 'Corte não encontrado.' };
+  const frames = await store.loadFrames(null, { clipId });
+  if (!frames.length) return { error: 'Este corte ainda não tem quadros lidos: use "Ler de novo" no corte.' };
+  const { rows: [base] } = baseCoverId ? await db.query('SELECT spec FROM episode_covers WHERE id = $1 AND clip_id = $2', [baseCoverId, clipId]) : { rows: [] };
+  const ref = base?.spec?.bg?.ref;
+  const frame = frames.find((f) => f.ref === ref) || store.pickFrames(frames, 1, clip.duration_ms || 60_000)[0];
+  const { episode, guest } = await episodeContext(clip.episode_id);
+  const epLabel = episode?.number ? `EP.${String(episode.number).padStart(3, '0')}` : '';
+  const built = designs.buildReelCover({ frame, text: t, label: guest?.name || '', epLabel });
+  const buffers = await store.imageBuffers(frames, [frame.ref]);
+  const res = await store.render(built.spec, { [frame.ref]: buffers[frame.ref] }, built.ctxData);
+  const { rows: [{ n }] } = await db.query('SELECT coalesce(max(position), -1) + 1 AS n FROM episode_covers WHERE clip_id = $1', [clipId]);
+  const row = await store.insertCover(clip.episode_id, { kind: 'reel_cover', spec: built.spec, ctx: built.ctxData, lint: res.lint, label: `Capa: ${t}`, group: `clip-${clipId}`, position: n, clipId }, res, userId);
+  await db.query('UPDATE episode_covers SET auto = false WHERE id = $1', [row.id]);
+  await db.query('UPDATE episode_covers SET approved = (id = $2) WHERE clip_id = $1', [clipId, row.id]);
+  await db.query("UPDATE episode_clips SET cover_id = $2, cover_texts = jsonb_build_array($3::text) || coalesce(cover_texts, '[]'::jsonb), updated_at = now() WHERE id = $1", [clipId, row.id, t]);
+  return { ...row, approved: true };
+}
+
 // Atribui o corte a um episódio (só se ele já foi gravado). Refaz as capas para levar o nome do convidado e o número do episódio.
 async function assign(clipId, episodeId, userId = null) {
   const { rows: [clip] } = await db.query('SELECT * FROM episode_clips WHERE id = $1', [clipId]);
@@ -411,4 +443,4 @@ async function announceToReview(clip, covers) {
 }
 
 jobs.register('corte', runProcess);
-module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, replaceState, pendingReplacement, cancelReplacement, startReplacement, finishReplacement, versionsOf, writeTexts, textsPrompt, buildCovers, assign, runProcess, removeClip, momentsFor, cleanCoverText };
+module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, replaceState, pendingReplacement, cancelReplacement, startReplacement, finishReplacement, versionsOf, writeTexts, textsPrompt, buildCovers, coverTextOf, coverWithText, assign, runProcess, removeClip, momentsFor, cleanCoverText };
