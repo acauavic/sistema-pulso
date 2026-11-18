@@ -401,3 +401,196 @@ describe('Site: leitura pública', () => {
     assert.equal(fora.headers.get('access-control-allow-origin'), null);
   });
 });
+
+describe('Site: formulários', () => {
+  const { beforeEach } = require('node:test');
+  let app;
+  const SITE = 'https://podcastpulso.com';
+  const guestBody = (extra = {}) => ({
+    name: 'Dra. Fulana Site', instagram: '@Fulana', country: 'BR', phone: '(11) 91234-5678', email: 'Fulana@Site.com',
+    profile: 'medico', topic: 'Saúde mental de quem cuida', privacy: true, ...extra,
+  });
+  const sponsorBody = (extra = {}) => ({
+    name: 'Carlos Marca', company: 'Marca Boa', role: 'Diretor de marketing', country: 'BR', phone: '11 91234-5678',
+    email: 'carlos@marcaboa.com', website: 'marcaboa.com.br', goal: 'Falar com médicos', privacy: 'on', ...extra,
+  });
+  const postJson = async (path, body, origin = SITE) => {
+    const r = await fetch(`${app.base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) }, body: JSON.stringify(body) });
+    const text = await r.text();
+    let json = null; try { json = JSON.parse(text); } catch { /* resposta em texto */ }
+    return { status: r.status, json, text, headers: r.headers };
+  };
+  const postForm = async (path, fields, origin = SITE) => {
+    const r = await fetch(`${app.base}${path}`, { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded', origin }, body: new URLSearchParams(fields).toString() });
+    return { status: r.status, location: r.headers.get('location') };
+  };
+  const count = async (table) => (await h.db.query(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n;
+  before(async () => {
+    await h.resetDb();
+    app = await h.startServer();
+    await h.createUser({ name: 'Gil Gestão', email: 'gestao@t.com', role: 'gestao' });
+  });
+  beforeEach(async () => { await h.db.query("DELETE FROM rate_hits WHERE bucket = 'site_pedido'"); });
+  after(async () => { await app.close?.(); });
+
+  it('pedido de convidado vira prospect com origem site e avisa a gestão', async () => {
+    const r = await postJson('/api/site/v1/convidado', guestBody());
+    assert.equal(r.status, 200, r.text);
+    assert.deepEqual(r.json, { ok: true });
+    assert.equal(r.headers.get('access-control-allow-origin'), SITE);
+    const { rows: [g] } = await h.db.query("SELECT * FROM guests WHERE instagram = 'fulana'");
+    assert.equal(g.name, 'Dra. Fulana Site');
+    assert.equal(g.status, 'prospect');
+    assert.equal(g.origin, 'site');
+    assert.equal(g.profile, 'medico');
+    assert.equal(g.email, 'fulana@site.com');
+    assert.equal(g.phone, '+5511912345678');
+    assert.equal(g.invite_reason, 'Saúde mental de quem cuida');
+    assert.equal(g.topic, null); // o tema pedido não vai para a agenda pública sem a equipe decidir
+    const { rows: ev } = await h.db.query('SELECT type, message FROM guest_events WHERE guest_id = $1', [g.id]);
+    assert.ok(ev.some((e) => e.type === 'site' && /Pediu para ser convidado pelo site/.test(e.message)));
+    const { rows: n } = await h.db.query("SELECT title, url FROM notifications WHERE type = 'site'");
+    assert.equal(n.length, 1);
+    assert.equal(n[0].title, 'Novo pedido de convidado pelo site: Dra. Fulana Site (@fulana)');
+    assert.equal(n[0].url, `/convidados/${g.id}`);
+  });
+
+  it('mesmo Instagram não cria outro convidado, só registra o pedido', async () => {
+    const before = await count('guests');
+    const r = await postJson('/api/site/v1/convidado', guestBody({ instagram: 'fulana', name: 'Fulana de Novo' }));
+    assert.equal(r.status, 200, r.text);
+    assert.deepEqual(r.json, { ok: true });
+    assert.equal(await count('guests'), before);
+    const { rows } = await h.db.query("SELECT e.message FROM guest_events e JOIN guests g ON g.id = e.guest_id WHERE g.instagram = 'fulana' AND e.type = 'site' ORDER BY e.id");
+    assert.equal(rows.length, 2);
+    assert.match(rows[1].message, /^Pediu de novo pelo site: /);
+    assert.match(rows[1].message, /Fulana de Novo/);
+  });
+
+  it('pedido de patrocínio vira prospecção com contato e origem site', async () => {
+    const r = await postJson('/api/site/v1/patrocinador', sponsorBody({ utm: { utm_source: 'google', utm_campaign: 'marcas' } }));
+    assert.equal(r.status, 200, r.text);
+    const { rows: [s] } = await h.db.query("SELECT * FROM sponsors WHERE company = 'Marca Boa'");
+    assert.equal(s.stage, 'prospect');
+    assert.equal(s.origin, 'site');
+    assert.equal(s.contact_name, 'Carlos Marca');
+    assert.equal(s.contact_email, 'carlos@marcaboa.com');
+    assert.equal(s.contact_phone, '+5511912345678');
+    assert.equal(s.website, 'https://marcaboa.com.br');
+    assert.equal(s.notes, 'Cargo: Diretor de marketing\nO que a marca quer: Falar com médicos');
+    assert.deepEqual(s.utm, { source: 'google', campaign: 'marcas' });
+    const { rows: n } = await h.db.query("SELECT title, url FROM notifications WHERE type = 'site' AND title LIKE 'Nova marca%'");
+    assert.equal(n[0].title, 'Nova marca quer patrocinar: Marca Boa');
+    assert.equal(n[0].url, `/patrocinadores/${s.id}`);
+    const { rows: ev } = await h.db.query("SELECT 1 FROM sponsor_events WHERE sponsor_id = $1 AND type = 'site'", [s.id]);
+    assert.equal(ev.length, 1);
+  });
+
+  it('campo-isca responde ok e não grava nada', async () => {
+    const [g, s, n] = [await count('guests'), await count('sponsors'), await count('notifications')];
+    const a = await postJson('/api/site/v1/convidado', guestBody({ instagram: 'robo1', url_extra: 'http://spam' }));
+    const b = await postJson('/api/site/v1/patrocinador', sponsorBody({ company: 'Robô SA', url_extra: 'x' }));
+    assert.deepEqual([a.status, a.json, b.status, b.json], [200, { ok: true }, 200, { ok: true }]);
+    assert.deepEqual([await count('guests'), await count('sponsors'), await count('notifications')], [g, s, n]);
+  });
+
+  it('sem aceite da política responde 400 com field privacy', async () => {
+    const before = await count('guests');
+    const r = await postJson('/api/site/v1/convidado', guestBody({ instagram: 'semaceite', privacy: false }));
+    assert.equal(r.status, 400);
+    assert.equal(r.json.ok, false);
+    assert.equal(r.json.field, 'privacy');
+    assert.ok(r.json.error);
+    assert.equal(await count('guests'), before);
+  });
+
+  it('valida cada campo e devolve qual', async () => {
+    const cases = [
+      ['/api/site/v1/convidado', guestBody({ name: '' }), 'name'],
+      ['/api/site/v1/convidado', guestBody({ instagram: 'não é @ válido!' }), 'instagram'],
+      ['/api/site/v1/convidado', guestBody({ instagram: 'novo1', phone: '123' }), 'phone'],
+      ['/api/site/v1/convidado', guestBody({ instagram: 'novo2', country: 'XX' }), 'country'],
+      ['/api/site/v1/convidado', guestBody({ instagram: 'novo3', email: 'sem-arroba' }), 'email'],
+      ['/api/site/v1/convidado', guestBody({ instagram: 'novo4', profile: 'astronauta' }), 'profile'],
+      ['/api/site/v1/convidado', guestBody({ instagram: 'novo5', name: ['a', 'b'] }), 'name'],
+      ['/api/site/v1/patrocinador', sponsorBody({ company: '' }), 'company'],
+      ['/api/site/v1/patrocinador', sponsorBody({ email: '' }), 'email'],
+      ['/api/site/v1/patrocinador', sponsorBody({ website: 'javascript:alert(1)' }), 'website'],
+    ];
+    for (const [path, body, field] of cases) {
+      await h.db.query("DELETE FROM rate_hits WHERE bucket = 'site_pedido'");
+      const r = await postJson(path, body);
+      assert.equal(r.status, 400, `${field}: ${r.text}`);
+      assert.equal(r.json.field, field);
+    }
+    // texto longo é cortado, não recusado
+    const r = await postJson('/api/site/v1/convidado', guestBody({ instagram: 'longo', topic: 'x'.repeat(5000) }));
+    assert.equal(r.status, 200);
+    const { rows: [g] } = await h.db.query("SELECT length(invite_reason) AS n FROM guests WHERE instagram = 'longo'");
+    assert.ok(g.n <= 1000);
+  });
+
+  it('formulário sem JavaScript responde 303 para a página de obrigado do site', async () => {
+    const f = guestBody({ instagram: 'semjs', privacy: 'on' });
+    const r = await postForm('/api/site/v1/convidado', f);
+    assert.equal(r.status, 303);
+    assert.equal(r.location, `${h.config.siteBaseUrl}/obrigado/?tipo=convidado`);
+    assert.equal(h.config.siteBaseUrl, 'https://podcastpulso.com');
+    const s = await postForm('/api/site/v1/patrocinador', sponsorBody({ company: 'Sem JS SA' }));
+    assert.equal(s.status, 303);
+    assert.equal(s.location, `${h.config.siteBaseUrl}/obrigado/?tipo=patrocinador`);
+  });
+
+  it('formulário sem JavaScript com erro responde 303 para /ops/ com o campo', async () => {
+    const r = await postForm('/api/site/v1/convidado', { ...guestBody({ instagram: 'semjs2' }), privacy: '' });
+    assert.equal(r.status, 303);
+    assert.equal(r.location, `${h.config.siteBaseUrl}/ops/?tipo=convidado&erro=privacy`);
+    const s = await postForm('/api/site/v1/patrocinador', sponsorBody({ phone: '1' }));
+    assert.equal(s.location, `${h.config.siteBaseUrl}/ops/?tipo=patrocinador&erro=phone`);
+  });
+
+  it('origem de fora do site recebe 403', async () => {
+    const before = await count('guests');
+    const r = await postJson('/api/site/v1/convidado', guestBody({ instagram: 'forasteira' }), 'https://outro.com');
+    assert.equal(r.status, 403);
+    const nul = await postJson('/api/site/v1/convidado', guestBody({ instagram: 'forasteira' }), 'null');
+    assert.equal(nul.status, 403);
+    assert.equal(await count('guests'), before);
+    // a exceção vale só para os dois formulários: outra rota do painel continua recusando a origem do site
+    const other = await postJson('/login', { email: 'a@b.com', password: 'x' }, SITE);
+    assert.equal(other.status, 403);
+  });
+
+  it('preflight OPTIONS responde 204 com os cabeçalhos CORS', async () => {
+    const r = await fetch(`${app.base}/api/site/v1/convidado`, { method: 'OPTIONS', headers: { origin: SITE, 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type' } });
+    assert.equal(r.status, 204);
+    assert.equal(r.headers.get('access-control-allow-origin'), SITE);
+    assert.match(r.headers.get('access-control-allow-methods'), /POST/);
+    assert.match(r.headers.get('access-control-allow-headers'), /content-type/i);
+    const fora = await fetch(`${app.base}/api/site/v1/patrocinador`, { method: 'OPTIONS', headers: { origin: 'https://outro.com' } });
+    assert.equal(fora.headers.get('access-control-allow-origin'), null);
+  });
+
+  it('passa do limite e recebe 429', async () => {
+    let last;
+    for (let i = 0; i < 9; i += 1) last = await postJson('/api/site/v1/convidado', guestBody({ privacy: false }));
+    assert.equal(last.status, 429);
+    assert.equal(last.json.ok, false);
+    assert.ok(last.json.error);
+    const f = await postForm('/api/site/v1/patrocinador', sponsorBody());
+    assert.equal(f.location, `${h.config.siteBaseUrl}/ops/?tipo=patrocinador&erro=limite`);
+  });
+
+  it('guarda a UTM limpa', async () => {
+    const r = await postForm('/api/site/v1/convidado', { ...guestBody({ instagram: 'comutm', privacy: 'true' }), utm_source: 'instagram', utm_medium: ' bio ', utm_campaign: 'x'.repeat(400) });
+    assert.equal(r.status, 303);
+    const { rows: [g] } = await h.db.query("SELECT utm FROM guests WHERE instagram = 'comutm'");
+    assert.equal(g.utm.source, 'instagram');
+    assert.equal(g.utm.medium, 'bio');
+    assert.ok(g.utm.campaign.length <= 150);
+    assert.ok(!('term' in g.utm));
+    const sem = await postJson('/api/site/v1/convidado', guestBody({ instagram: 'semutm' }));
+    assert.equal(sem.status, 200);
+    assert.equal((await h.db.query("SELECT utm FROM guests WHERE instagram = 'semutm'")).rows[0].utm, null);
+  });
+});

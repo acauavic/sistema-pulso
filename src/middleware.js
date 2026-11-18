@@ -33,6 +33,8 @@ function originCheck(req, res, next) {
   // formulário. Essas rotas têm token CSRF próprio (sessão do patrocinador), então aceitam null (e só null ou o próprio host).
   const allowNull = /^\/patrocinador\/(cadastro|logo|audio|resposta|concluir)$/.test(req.path);
   const origin = req.get('origin');
+  // Formulários do site (podcastpulso.com): só estes dois caminhos aceitam as origens de SITE_ORIGIN (sem CSRF; isca e limite na rota).
+  if (/^\/api\/site\/v1\/(convidado|patrocinador)$/.test(req.path) && origin && config.siteOrigins.includes(origin)) return next();
   if (origin && origin !== 'null') {
     let host;
     try { host = new URL(origin).host; } catch { host = null; }
