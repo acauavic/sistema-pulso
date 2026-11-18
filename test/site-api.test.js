@@ -245,7 +245,7 @@ describe('Site: leitura pública', () => {
     const g = async (name, status, extra = {}) => (await h.db.query(
       `INSERT INTO guests (name, instagram, status, phone, email, notes, owner_id, invite_token${Object.keys(extra).map((k) => `, ${k}`).join('')})
        VALUES ($1, $2, $3, '11999990000', 'x@y.com', 'nota secreta', $4, $5${Object.values(extra).map((v) => `, ${v}`).join('')}) RETURNING id`,
-      [name, name.toLowerCase().replace(/\W/g, ''), status, owner.id, `tok${name.length}${status}`])).rows[0].id;
+      [name, name.toLowerCase().replace(/\W/g, ''), status, owner.id, `token-secreto-${name.length}${status}`])).rows[0].id;
     const gEstreia = await g('Dra Estreia', 'gravado');
     await g('Dr Previsto', 'agendado', { premiere_on: `'${day(10)}'` });
     await g('Dra Gravacao', 'agendado', { proposed_at: "now() + interval '5 days'" });
@@ -389,6 +389,70 @@ describe('Site: leitura pública', () => {
     assert.equal(json.posts[0].url, 'https://www.instagram.com/p/ABC/');
   });
 
+  it('oficial precisa ter fechado (ganho, ativo ou inativo)', async () => {
+    await h.db.query(`UPDATE sponsors SET stage = 'prospect' WHERE company = 'Oficial'`);
+    try {
+      const { json } = await get();
+      assert.equal(json.patrocinador_oficial, null);
+      assert.ok(!json.apoiadores.some((a) => a.company === 'Oficial'));
+    } finally { await h.db.query(`UPDATE sponsors SET stage = 'ativo' WHERE company = 'Oficial'`); }
+  });
+
+  it('handleOf entende instagram.com sem https', () => {
+    const { handleOf } = require('../src/services/siteData');
+    assert.equal(handleOf('instagram.com/Fulana/'), 'fulana');
+    assert.equal(handleOf('www.instagram.com/fulana?igsh=x'), 'fulana');
+    assert.equal(handleOf('https://instagram.com/fulana'), 'fulana');
+    assert.equal(handleOf('@fulana'), 'fulana');
+    assert.equal(handleOf('não é handle'), null);
+  });
+
+  it('episódios: link ruim não tira da lista um episódio bom (filtro antes do corte em 24)', async () => {
+    const ids = [];
+    for (let i = 0; i < 25; i += 1) ids.push((await h.db.query(`INSERT INTO episodes (title, status, aired_on, youtube_url) VALUES ($1, 'publicado', '2026-11-15', 'javascript:alert(1)') RETURNING id`, [`Quebrado ${i}`])).rows[0].id);
+    try {
+      const { json } = await get();
+      assert.ok(json.episodios.some((e) => e.title === 'Mais velho'));
+      assert.ok(!json.episodios.some((e) => e.title.startsWith('Quebrado')));
+    } finally { await h.db.query('DELETE FROM episodes WHERE id = ANY($1)', [ids]); }
+  });
+
+  it('vai_ao_ar: episódio de convidado cancelado não aparece', async () => {
+    await h.db.query(`UPDATE guests SET status = 'cancelado' WHERE name = 'Dra Estreia'`);
+    try {
+      const { json } = await get();
+      assert.ok(!json.agenda.vai_ao_ar.some((x) => x.name === 'Dra Estreia'));
+    } finally { await h.db.query(`UPDATE guests SET status = 'gravado' WHERE name = 'Dra Estreia'`); }
+  });
+
+  it('posts: Reel de teste fica de fora; capa do corte antes de uma capa da lista que não existe mais', async () => {
+    const ep = (await h.db.query(`SELECT id FROM episodes WHERE title = 'Mais novo'`)).rows[0].id;
+    const cover = (await h.db.query(`INSERT INTO episode_covers (episode_id, kind, spec, storage_key, mime, width, height, size_bytes) VALUES ($1, 'reel_cover', '{}', 'pp/c.png', 'image/png', 1, 1, 1) RETURNING id`, [ep])).rows[0].id;
+    const clip = (await h.db.query(`INSERT INTO episode_clips (episode_id, title, start_ms, end_ms, cover_id) VALUES ($1, 'Corte', 0, 1000, $2) RETURNING id`, [ep, cover])).rows[0].id;
+    const { rows: pubs } = await h.db.query(`INSERT INTO episode_publications (episode_id, clip_id, platforms, title, status, cover_ids, options, results, scheduled_at) VALUES
+      ($1, $2, '{instagram}', 'Corte com capa', 'publicado', '{999999}', '{}', '[{"platform":"instagram","ok":true,"url":"https://www.instagram.com/reel/CAPA/"}]', now() + interval '1 minute'),
+      ($1, $2, '{instagram}', 'Reel de teste', 'publicado', '{}', '{"instagram":{"trial":"auto"}}', '[{"platform":"instagram","ok":true,"url":"https://www.instagram.com/reel/TRIAL/"}]', now() + interval '2 minutes')
+      RETURNING id`, [ep, clip]);
+    try {
+      const { json } = await get();
+      assert.ok(!json.posts.some((p) => p.title === 'Reel de teste'));
+      const p = json.posts.find((x) => x.title === 'Corte com capa');
+      assert.ok(p.cover && p.cover.includes(`/imagem/capa/${cover}?`), p.cover);
+    } finally {
+      await h.db.query('DELETE FROM episode_publications WHERE id = ANY($1)', [pubs.map((r) => r.id)]);
+      await h.db.query('DELETE FROM episode_clips WHERE id = $1', [clip]);
+    }
+  });
+
+  it('imagens assinadas têm limite por IP', async () => {
+    await h.db.query(`INSERT INTO rate_hits (bucket, key) SELECT 'site_imagem', '127.0.0.1' FROM generate_series(1, 600)`);
+    try {
+      const r = await fetch(`${app.base}/api/site/v1/imagem/foto/1?e=1&s=x`);
+      assert.equal(r.status, 429);
+    } finally { await h.db.query(`DELETE FROM rate_hits WHERE bucket = 'site_imagem'`); }
+    assert.equal((await fetch(`${app.base}/api/site/v1/imagem/foto/1?e=1&s=x`)).status, 404);
+  });
+
   it('responde com Cache-Control público e CORS do site', async () => {
     const r = await get();
     assert.equal(r.headers.get('cache-control'), 'public, max-age=60');
@@ -530,10 +594,10 @@ describe('Site: formulários', () => {
     assert.ok(g.n <= 1000);
     // nome não carrega quebra de linha (vai para o título do aviso e do e-mail); o tema mantém
     await h.db.query("DELETE FROM rate_hits WHERE bucket = 'site_pedido'");
-    await postJson('/api/site/v1/convidado', guestBody({ instagram: 'quebra', name: 'Ana\r\nBcc: x@y.com', topic: 'linha 1\nlinha 2' }));
+    await postJson('/api/site/v1/convidado', guestBody({ instagram: 'quebra', name: 'Ana\r\nBcc: x@y.com\u202e', topic: 'linha 1\r\nlinha 2\u2028\u202egpj.exe\u2066' }));
     const { rows: [q] } = await h.db.query("SELECT name, invite_reason FROM guests WHERE instagram = 'quebra'");
     assert.equal(q.name, 'Ana Bcc: x@y.com');
-    assert.equal(q.invite_reason, 'linha 1\nlinha 2');
+    assert.equal(q.invite_reason, 'linha 1\nlinha 2gpj.exe'); // sem \r, U+2028 e controles de direção
   });
 
   it('formulário sem JavaScript responde 303 para a página de obrigado do site', async () => {
@@ -575,6 +639,64 @@ describe('Site: formulários', () => {
     assert.match(r.headers.get('access-control-allow-headers'), /content-type/i);
     const fora = await fetch(`${app.base}/api/site/v1/patrocinador`, { method: 'OPTIONS', headers: { origin: 'https://outro.com' } });
     assert.equal(fora.headers.get('access-control-allow-origin'), null);
+  });
+
+  it('convidado já gravado que pede de novo: nada no histórico; perdido ou cancelado: histórico e aviso (um por dia)', async () => {
+    const mk = async (ig, status, extra = '') => (await h.db.query(`INSERT INTO guests (name, instagram, profile, status${extra ? ', loss_reason' : ''}) VALUES ($1, $1, 'medico', $2${extra ? `, '${extra}'` : ''}) RETURNING id`, [ig, status])).rows[0].id;
+    const gravado = await mk('ja.gravado', 'gravado');
+    const perdido = await mk('ja.perdido', 'perdido', 'recusado');
+    const evs = async (id) => (await h.db.query("SELECT count(*)::int AS n FROM guest_events WHERE guest_id = $1 AND type = 'site'", [id])).rows[0].n;
+    const avisos = async (id) => (await h.db.query("SELECT count(*)::int AS n FROM notifications WHERE type = 'site' AND url = $1", [`/convidados/${id}`])).rows[0].n;
+    assert.equal((await postJson('/api/site/v1/convidado', guestBody({ instagram: '@Ja.Gravado' }))).status, 200);
+    assert.equal(await evs(gravado), 0);
+    assert.equal(await avisos(gravado), 0);
+    for (let i = 0; i < 2; i += 1) assert.equal((await postJson('/api/site/v1/convidado', guestBody({ instagram: 'ja.perdido' }))).status, 200);
+    assert.equal(await evs(perdido), 2);
+    assert.equal(await avisos(perdido), 1); // o segundo pedido do dia não repete o aviso
+    const { rows: [n] } = await h.db.query("SELECT title FROM notifications WHERE url = $1", [`/convidados/${perdido}`]);
+    assert.match(n.title, /^Pediu de novo pelo site: /);
+  });
+
+  it('teto de avisos: passou de 30 na hora, o cadastro entra e o sino recebe um resumo só', async () => {
+    await h.db.query(`INSERT INTO rate_hits (bucket, key) SELECT 'site_aviso', 'todos' FROM generate_series(1, 30)`);
+    try {
+      for (const ig of ['teto.um', 'teto.dois']) {
+        assert.equal((await postJson('/api/site/v1/convidado', guestBody({ instagram: ig }))).status, 200);
+        await h.db.query("DELETE FROM rate_hits WHERE bucket = 'site_pedido'");
+      }
+      assert.equal((await h.db.query("SELECT count(*)::int AS n FROM guests WHERE instagram IN ('teto.um', 'teto.dois') AND origin = 'site'")).rows[0].n, 2);
+      assert.equal((await h.db.query("SELECT count(*)::int AS n FROM notifications WHERE title LIKE '%(@teto.%'")).rows[0].n, 0);
+      assert.equal((await h.db.query("SELECT count(*)::int AS n FROM notifications WHERE title = 'Muitos pedidos pelo site nesta hora'")).rows[0].n, 1);
+    } finally { await h.db.query("DELETE FROM rate_hits WHERE bucket = 'site_aviso'"); }
+  });
+
+  it('erro (JSON quebrado, corpo grande, banco) responde ao site, não com a página do painel', async () => {
+    const raw = async (body, type = 'application/json') => {
+      const r = await fetch(`${app.base}/api/site/v1/convidado`, { method: 'POST', redirect: 'manual', headers: { 'content-type': type, origin: SITE }, body });
+      return { status: r.status, text: await r.text(), headers: r.headers };
+    };
+    const MSG = 'Não conseguimos registrar agora. Tente de novo em alguns minutos.';
+    const bad = await raw('{"name": ');
+    assert.equal(bad.status, 400);
+    assert.deepEqual(JSON.parse(bad.text), { ok: false, error: MSG });
+    assert.equal(bad.headers.get('access-control-allow-origin'), SITE);
+    const big = await raw(JSON.stringify({ name: 'x'.repeat(60_000) }));
+    assert.equal(big.status, 413);
+    assert.deepEqual(JSON.parse(big.text), { ok: false, error: MSG });
+    await h.db.query('ALTER TABLE sponsors RENAME COLUMN origin TO origin_x');
+    try {
+      const j = await postJson('/api/site/v1/patrocinador', sponsorBody({ company: 'Banco Fora' }));
+      assert.equal(j.status, 500);
+      assert.deepEqual(j.json, { ok: false, error: MSG });
+      assert.equal(j.headers.get('access-control-allow-origin'), SITE);
+      await h.db.query("DELETE FROM rate_hits WHERE bucket = 'site_pedido'");
+      const f = await postForm('/api/site/v1/patrocinador', sponsorBody({ company: 'Banco Fora' }));
+      assert.equal(f.status, 303);
+      assert.equal(f.location, `${h.config.siteBaseUrl}/ops/?tipo=patrocinador&erro=falha`);
+    } finally { await h.db.query('ALTER TABLE sponsors RENAME COLUMN origin_x TO origin'); }
+    // outra rota continua com a página de erro do painel (o tratamento vale só para os dois formulários)
+    const panel = await fetch(`${app.base}/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"x": ' });
+    assert.match(await panel.text(), /<!doctype/i);
   });
 
   it('passa do limite e recebe 429', async () => {

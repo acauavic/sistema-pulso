@@ -9,12 +9,14 @@ const notify = require('./notify');
 const rules = require('./guestRules');
 const { publicUrl } = require('./siteData');
 const { isEmail } = require('../utils/format');
+const { createLimiter } = require('../auth/rateLimit');
 const { PROFILE_BY_KEY } = require('../constants');
 
 // Só texto: listas, objetos e nulos viram "" (um campo repetido no formulário não vira "a,b").
 const str = (v) => (typeof v === 'string' ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : '');
 // Campo de uma linha (nome, empresa, @) perde quebras de linha; os textos longos (tema, o que a marca quer) mantêm.
-const text = (v, max, multiline = false) => str(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(multiline ? /[ \t]+/g : /\s+/g, ' ').trim().slice(0, max);
+// Some também: \r, separadores de linha Unicode (U+2028/2029) e controles de direção do texto (U+202A–202E, U+2066–2069).
+const text = (v, max, multiline = false) => str(v).replace(/[\u0000-\u0008\u000b-\u001f\u007f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '').replace(multiline ? /[ \t]+/g : /\s+/g, ' ').trim().slice(0, max);
 const accepted = (v) => v === true || ['true', 'on', '1'].includes(str(v).toLowerCase());
 const fail = (field, error) => ({ field, error });
 
@@ -69,9 +71,26 @@ function validateSponsor(body) {
   return { values: { name, company, role: text(body.role, 150) || null, phone: phone.e164, email, website, goal: text(body.goal, 1000, true) || null, utm: utmOf(body) } };
 }
 
+// Teto de avisos: no máximo 30 avisos 'site' por hora (janela móvel). Passou disso, os cadastros continuam entrando, mas o sino
+// recebe um resumo só (um por hora) em vez de um aviso por pedido.
+const AVISOS_POR_HORA = 30;
+const avisoLimiter = createLimiter({ name: 'site_aviso', max: AVISOS_POR_HORA, windowMs: 60 * 60_000 });
+const todayBR = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+
 // Aviso para a gestão; se falhar, o pedido já está salvo e não se perde.
-async function warn(title, body, url) {
-  try { await notify.notify({ type: 'site', broadcast: true, title, body, url }); } catch (e) { console.error('site: aviso não enviado:', e.message); }
+async function warn(title, body, url, dedupe = null) {
+  try {
+    if (await avisoLimiter.blocked('todos')) {
+      await notify.notify({
+        type: 'site', broadcast: true, url: '/convidados', dedupe: `site-teto:${new Date().toISOString().slice(0, 13)}`,
+        title: 'Muitos pedidos pelo site nesta hora',
+        body: `Mais de ${AVISOS_POR_HORA} pedidos em uma hora. Os cadastros continuam entrando com origem site; os avisos voltam quando a hora passar.`,
+      });
+      return;
+    }
+    const sent = await notify.notify({ type: 'site', broadcast: true, title, body, url, dedupe });
+    if (sent.length) await avisoLimiter.hit('todos');
+  } catch (e) { console.error('site: aviso não enviado:', e.message); }
 }
 
 // Mesmo Instagram (com ou sem @, maiúscula ou não) não cria outro convidado: registra o pedido no histórico de quem já existe.
@@ -83,8 +102,8 @@ async function createGuest(v) {
     await client.query('BEGIN');
     await client.query("SELECT pg_advisory_xact_lock(hashtext('site-convidado:' || $1))", [v.instagram]);
     const { rows: [found] } = await client.query(
-      "SELECT id FROM guests WHERE lower(regexp_replace(coalesce(instagram, ''), '^@+', '')) = $1 ORDER BY id LIMIT 1", [v.instagram]);
-    if (found) { id = found.id; existing = true; } else {
+      "SELECT id, status FROM guests WHERE lower(regexp_replace(coalesce(instagram, ''), '^@+', '')) = $1 ORDER BY id LIMIT 1", [v.instagram]);
+    if (found) { id = found.id; existing = found.status; } else {
       ({ rows: [{ id }] } = await client.query(
         `INSERT INTO guests (name, instagram, phone, email, profile, invite_reason, status, origin, utm)
          VALUES ($1, $2, $3, $4, $5, $6, 'prospect', 'site', $7::jsonb) RETURNING id`,
@@ -96,13 +115,19 @@ async function createGuest(v) {
     throw e;
   } finally { client.release(); }
   const details = [v.name, `WhatsApp ${v.phone}`, v.email, PROFILE_BY_KEY[v.profile].label, v.topic && `Tema: ${v.topic}`].filter(Boolean).join(' · ');
-  if (existing) {
+  if (existing === 'gravado') {
+    // já gravou (e talvez já está no ar): o pedido repetido não polui o histórico
+  } else if (existing) {
     await guestsSvc.addEvent(id, null, 'site', `Pediu de novo pelo site: ${details}`);
+    // quem foi perdido ou cancelado e pede de novo é um pedido de verdade: a gestão fica sabendo (um aviso por convidado por dia)
+    if (['perdido', 'cancelado'].includes(existing)) {
+      await warn(`Pediu de novo pelo site: ${v.name} (@${v.instagram})`, 'Estava como perdido ou cancelado no CRM.', `/convidados/${id}`, `site-convidado:${id}:${todayBR()}`);
+    }
   } else {
     await guestsSvc.addEvent(id, null, 'site', `Pediu para ser convidado pelo site${v.utm?.source ? ` (veio de ${v.utm.source})` : ''}`);
     await warn(`Novo pedido de convidado pelo site: ${v.name} (@${v.instagram})`, [PROFILE_BY_KEY[v.profile].label, v.topic].filter(Boolean).join(' · ') || null, `/convidados/${id}`);
   }
-  return { id, existing };
+  return { id, existing: Boolean(existing) };
 }
 
 async function createSponsor(v) {

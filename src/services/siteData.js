@@ -10,7 +10,13 @@ const TZ = 'America/Sao_Paulo';
 const todayISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
 
 // "@fulana", "instagram.com/fulana/" ou "fulana" → "fulana" (o mesmo do media kit).
-const handleOf = (ig) => (ig ? String(ig).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '') || null : null);
+function handleOf(ig) {
+  let s = String(ig ?? '').trim();
+  const url = s.match(/instagram\.com\/([^/?#\s]+)/i); // com ou sem https://, com ou sem www.
+  if (url) [, s] = url;
+  s = s.replace(/^@+/, '').replace(/\/.*$/, '');
+  return /^[A-Za-z0-9._]{1,30}$/.test(s) ? s.toLowerCase() : null;
+}
 
 // Link para o site: só http(s), sem espaço nem aspas. "marca.com.br" vira "https://marca.com.br".
 function publicUrl(value) {
@@ -69,8 +75,8 @@ async function episodios() {
        LEFT JOIN episode_covers c ON c.id = coalesce(m.thumb_cover_id,
             (SELECT t.id FROM episode_covers t WHERE t.episode_id = e.id AND t.kind = 'youtube_thumb' ORDER BY t.approved DESC, t.updated_at DESC, t.id DESC LIMIT 1))
       WHERE e.status = 'publicado' AND (coalesce(e.youtube_url, '') <> '' OR coalesce(e.spotify_url, '') <> '')
-      ORDER BY coalesce(e.aired_on, (e.published_at AT TIME ZONE '${TZ}')::date) DESC NULLS LAST, e.number DESC NULLS LAST, e.id DESC
-      LIMIT 24`);
+      ORDER BY coalesce(e.aired_on, (e.published_at AT TIME ZONE '${TZ}')::date) DESC NULLS LAST, e.number DESC NULLS LAST, e.id DESC`);
+  // o filtro do link (só http/https) vem antes do corte em 24: um link quebrado não tira um episódio bom da lista
   return rows.map((r) => {
     const youtube = publicUrl(r.youtube_url);
     const spotify = publicUrl(r.spotify_url);
@@ -81,19 +87,24 @@ async function episodios() {
       youtube_id: youtube ? youtubeId(youtube) : null, spotify_kind: sp.kind, spotify_id: sp.id,
       cover: coverOf(r.cover_id),
     };
-  }).filter((e) => e.youtube_url || e.spotify_url);
+  }).filter((e) => e.youtube_url || e.spotify_url).slice(0, 24);
 }
 
-// Posts do Instagram que estão no ar (o link que a rede devolveu), o mais recente primeiro.
+// Posts do Instagram que estão no ar (o link que a rede devolveu), o mais recente primeiro. Reel de teste fica de fora: o sistema
+// não sabe quando ele é liberado para os seguidores (isso acontece no app), então só entra o post normal.
+// Capa: a da publicação, senão a escolhida no corte, senão a primeira da lista; só a que ainda existe.
 async function posts() {
   const { rows } = await db.query(
     `SELECT * FROM (
-       SELECT DISTINCT ON (x->>'url') x->>'url' AS url, p.title, coalesce(p.scheduled_at, p.created_at) AS published_at, c.id AS cover_id
+       SELECT DISTINCT ON (x->>'url') x->>'url' AS url, p.title, coalesce(p.scheduled_at, p.created_at) AS published_at, coalesce(c1.id, c2.id, c3.id) AS cover_id
          FROM episode_publications p
         CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(p.results) = 'array' THEN p.results ELSE '[]'::jsonb END) x
          LEFT JOIN episode_clips cl ON cl.id = p.clip_id
-         LEFT JOIN episode_covers c ON c.id = coalesce(p.cover_id, p.cover_ids[1], cl.cover_id)
+         LEFT JOIN episode_covers c1 ON c1.id = p.cover_id
+         LEFT JOIN episode_covers c2 ON c2.id = cl.cover_id
+         LEFT JOIN episode_covers c3 ON c3.id = p.cover_ids[1]
         WHERE p.status IN ('publicado', 'parcial') AND x->>'platform' = 'instagram' AND x->>'ok' = 'true'
+          AND coalesce(p.options->'instagram'->>'trial', '') IN ('', 'false', '0')
           AND x->>'url' ~ '^https://(www\\.)?instagram\\.com/'
         ORDER BY x->>'url', coalesce(p.scheduled_at, p.created_at) DESC
      ) t ORDER BY published_at DESC LIMIT 12`);
@@ -109,7 +120,7 @@ async function agenda(plateiaActive) {
       `SELECT * FROM (
          SELECT to_char(e.aired_on, 'YYYY-MM-DD') AS date, g.id AS guest_id, g.name, g.instagram, g.topic, (g.photo_key IS NOT NULL) AS has_photo, 0 AS ord
            FROM episodes e JOIN guests g ON g.id = e.guest_id
-          WHERE e.status <> 'publicado' AND e.aired_on >= $1::date
+          WHERE e.status <> 'publicado' AND e.aired_on >= $1::date AND g.status NOT IN ('cancelado', 'perdido')
          UNION ALL
          SELECT to_char(g.premiere_on, 'YYYY-MM-DD'), g.id, g.name, g.instagram, g.topic, (g.photo_key IS NOT NULL), 1
            FROM guests g
@@ -132,13 +143,14 @@ async function agenda(plateiaActive) {
   };
 }
 
-// Patrocinador oficial (no máximo um) e apoiadores. "Esconder do site" vale para os dois: escondido não aparece em lugar nenhum.
+// Patrocinador oficial (no máximo um) e apoiadores, só de quem fechou (ganho, ativo ou inativo). "Esconder do site" vale para os dois:
+// escondido não aparece em lugar nenhum.
 async function patrocinio() {
   const { rows } = await db.query(
     `SELECT s.id, s.company, s.website, s.site_official,
             EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo') AS has_logo
        FROM sponsors s
-      WHERE NOT s.site_hidden AND (s.site_official OR s.stage IN ('ganho', 'ativo', 'inativo'))
+      WHERE NOT s.site_hidden AND s.stage IN ('ganho', 'ativo', 'inativo') -- vale também para o oficial
       ORDER BY s.starts_on NULLS LAST, lower(s.company), s.id`);
   const logo = (r) => (r.has_logo ? siteImages.signedUrl('logo', r.id) : null);
   const official = rows.find((r) => r.site_official);

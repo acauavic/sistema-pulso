@@ -15,6 +15,7 @@ const { wrap } = require('../utils/wrap');
 const router = express.Router();
 const dadosLimiter = createLimiter({ name: 'site_dados', max: 120, windowMs: 10 * 60_000 });
 const pedidoLimiter = createLimiter({ name: 'site_pedido', max: 8, windowMs: 10 * 60_000 });
+const imagemLimiter = createLimiter({ name: 'site_imagem', max: 600, windowMs: 10 * 60_000 });
 
 // CORS: só as origens do site (SITE_ORIGIN) recebem a permissão; a resposta varia pela origem.
 function cors(req, res) {
@@ -56,6 +57,7 @@ const SOURCES = {
 
 router.get('/api/site/v1/imagem/:kind/:id', wrap(async (req, res) => {
   const { kind, id } = req.params;
+  if (!await imagemLimiter.hit(req.ip)) return res.status(429).type('text').send('Muitas imagens seguidas. Tente de novo em alguns minutos.');
   if (!Object.hasOwn(SOURCES, kind) || !siteImages.verify(kind, id, req.query.e, req.query.s)) return notFound(res);
   if (!await SOURCES[kind](req, res, Number(id))) return notFound(res);
 }));
@@ -78,6 +80,8 @@ const FORMS = {
 };
 const FIELDS = new Set(['name', 'instagram', 'country', 'phone', 'email', 'profile', 'privacy', 'company', 'website', 'limite']);
 const FORM_PATH = '/api/site/v1/:tipo(convidado|patrocinador)';
+const FORM_RE = /^\/api\/site\/v1\/(convidado|patrocinador)$/;
+const FAIL_MSG = 'Não conseguimos registrar agora. Tente de novo em alguns minutos.';
 
 router.options(FORM_PATH, (req, res) => {
   if (cors(req, res)) res.set({ 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '600' });
@@ -103,4 +107,17 @@ router.post(FORM_PATH, wrap(async (req, res) => {
   return ok();
 }));
 
+// Erro nos dois formulários (JSON quebrado, corpo grande demais, banco fora): nunca a página de erro do painel.
+// Fica logo depois do router no app.js; os erros dos leitores de corpo (antes do router) também chegam aqui.
+function formErrors(err, req, res, next) {
+  const m = req.method === 'POST' && req.path.match(FORM_RE);
+  if (!m || res.headersSent) return next(err);
+  const clientError = err.type === 'entity.parse.failed' || err.type === 'entity.too.large' || err.type === 'request.aborted';
+  if (!clientError) console.error(`[erro] site ${req.path}:`, err);
+  cors(req, res);
+  if (req.is('application/json')) return res.status(clientError && err.status ? err.status : 500).json({ ok: false, error: FAIL_MSG });
+  return res.redirect(303, `${config.siteBaseUrl}/ops/?tipo=${m[1]}&erro=falha`);
+}
+
 module.exports = router;
+module.exports.formErrors = formErrors;
