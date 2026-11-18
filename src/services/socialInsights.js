@@ -139,11 +139,12 @@ async function fetchNetwork(net, { provider, account }, ctx) {
 }
 
 let running = null;
-// Atualiza as redes que estão velhas (ou todas, com force). Grava a foto do dia de cada uma. Devolve os erros por rede.
-async function refresh({ force = false } = {}) {
+// Atualiza as redes que estão velhas (ou todas, com force; only = só estas redes). Grava a foto do dia de cada uma. Devolve os erros por rede.
+async function refresh({ force = false, only = null } = {}) {
   if (running) return running;
   running = (async () => {
-    const { list, errors } = await accounts();
+    const { list: all, errors } = await accounts();
+    const list = only ? Object.fromEntries(Object.entries(all).filter(([net]) => only.includes(net))) : all;
     const { rows } = await db.query('SELECT platform, data, updated_at FROM social_snapshots WHERE taken_on = $1', [today()]);
     const fresh = Object.fromEntries(rows.map((r) => [r.platform, r]));
     const ctx = { upNets: Object.entries(list).filter(([, v]) => v.provider === 'uploadpost').map(([k]) => k) };
@@ -199,4 +200,17 @@ async function overview({ force = false } = {}) {
   return out;
 }
 
-module.exports = { NETWORKS, DAYS, overview, refresh, fromOutstand, fromZernio, accounts, outstandGet, zernioGet };
+// Leitura do fim do dia: entre 23:40 e a meia-noite, Instagram e YouTube são lidos de novo (uma vez), para o saldo de seguidores
+// do dia (Resumo do dia, no Início) fechar perto da meia-noite, e não na última leitura de 3 em 3 horas.
+const END_OF_DAY = '23:40';
+async function endOfDay(now = new Date()) {
+  const hm = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
+  if (hm < END_OF_DAY || !social.list().some((p) => p.configured())) return null;
+  const { rows: [r] } = await db.query(
+    `SELECT count(*)::int AS n, count(*) FILTER (WHERE updated_at < ($1::date + $2::time) AT TIME ZONE '${TZ}')::int AS old
+       FROM social_snapshots WHERE taken_on = $1 AND platform IN ('instagram', 'youtube')`, [dayOf(now), END_OF_DAY]);
+  if (r.n && !r.old) return null; // já lido depois das 23:40
+  return refresh({ force: true, only: ['instagram', 'youtube'] });
+}
+
+module.exports = { NETWORKS, DAYS, overview, refresh, endOfDay, fromOutstand, fromZernio, accounts, outstandGet, zernioGet };

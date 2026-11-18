@@ -41,16 +41,9 @@
 </section>
 <% } %>
 
+<%- include('partials/day-summary') %>
+
 <% if (can('guests.read')) { %>
-<section class="stat-grid funnel" aria-label="Convidados por etapa">
-  <% cards.forEach(function (c) { %>
-    <a class="stat" href="/convidados?view=lista&status=<%= c.key %>">
-      <span class="stat-label"><%= c.label %></span>
-      <span class="stat-n <%= c.key === 'em_agendamento' && c.n ? 'hl' : '' %>"><%= c.n %></span>
-      <% if (c.key === 'em_agendamento' && c.n) { %><span class="delta">esperando data</span><% } %>
-    </a>
-  <% }) %>
-</section>
 
 <% if (money) { %>
 <a class="card money-strip" href="/financeiro">

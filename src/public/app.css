@@ -234,8 +234,29 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; grid-template
 .int-cards > .card { display: flex; flex-direction: column; } .int-cards > .card > form:last-of-type { margin-top: auto; padding-top: 8px; }
 .audit-meta { max-width: 420px; overflow-wrap: anywhere; }
 .link.err, button.link.err { color: var(--bad); } /* link destrutivo: vermelho, como .danger-link */
-/* números do funil no Painel: o rótulo pode quebrar em duas linhas e o número continua na mesma altura em todos os cartões */
-.stat-grid.funnel { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); } .stat-grid.funnel .stat { grid-template-rows: 1fr auto 16px; align-content: stretch; } .stat-grid.funnel .stat-label { align-self: start; }
+/* Resumo do dia no Painel: cabeçalho com o dia (setas, calendário, Hoje) e um grupo por assunto (rótulo mono à esquerda, números
+   à direita). O rótulo pode quebrar em duas linhas e o número continua na mesma altura em todos os cartões. Sem lime: medir não é ação. */
+.day-sum { margin: 0 0 24px; scroll-margin-top: 16px; }
+.day-sum-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.day-sum-head h2 { margin: 0; display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; }
+.day-sum-head h2 .mono.small { font-size: 11px; font-weight: 500; letter-spacing: .14em; } /* o momento (HOJE, ATÉ AGORA / dia da semana) é rótulo, não título */
+.day-nav { display: flex; align-items: center; gap: 8px; --control-h: 32px; } /* o calendário com a altura das setas (.btn.sm) */
+.day-nav .btn.sm { padding: 0 10px; } .day-nav [aria-disabled="true"] { opacity: .4; pointer-events: none; }
+.day-nav input[type=date] { width: auto; padding: 0 10px; font: 500 13px var(--f-mono); letter-spacing: .04em; border-radius: var(--r-full); }
+.day-group { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: start; margin-bottom: 12px; }
+.day-group > .kicker { margin: 18px 0 0; font-weight: 500; }
+.stat-grid.day-stats { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); margin: 0; }
+.day-stats .stat { grid-template-rows: 1fr auto 28px; align-content: stretch; padding: 14px 16px; } /* a linha de baixo tem sempre 2 linhas: os números ficam na mesma altura */
+.day-stats .stat-label { align-self: start; } .day-stats .stat-n { font-size: 32px; font-variant-numeric: tabular-nums; }
+.day-stats .delta { line-height: 14px; max-height: 28px; overflow: hidden; }
+@media (pointer: coarse) { .day-nav { --control-h: 40px; } }
+@media (max-width: 860px) { .day-sum { scroll-margin-top: 72px; } } /* ao trocar de dia, o título não fica sob a barra de cima */
+@media (max-width: 640px) {
+  .day-nav { width: 100%; } .day-nav input[type=date] { flex: 1 1 auto; }
+  .day-group { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 16px; } .day-group > .kicker { margin: 0; }
+  .stat-grid.day-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .day-stats .stat { padding: 12px; } .day-stats .stat-n { font-size: 26px; }
+}
 .kit-who > div { min-width: 0; overflow-wrap: anywhere; }
 /* busca da lista enquanto a nova resposta não chega: o resultado anterior fica apagado e o Enter espera */
 [data-palette-results].is-stale .palette-item { opacity: .45; }

@@ -362,6 +362,14 @@
     if (target && target !== days.find(shown)) target.scrollIntoView({ block: 'start' });
   })();
   document.querySelectorAll('[data-autosubmit]').forEach((s) => s.addEventListener('change', () => s.form.submit()));
+  // Resumo do dia (Início): escolher no calendário leva direto ao dia; digitando, espera terminar (cada número já forma uma data
+  // válida e mandaria a página no meio da digitação). Enter vai na hora.
+  document.querySelectorAll('[data-day-pick]').forEach((inp) => {
+    let timer = null; let typed = 0;
+    const go = () => { clearTimeout(timer); if (inp.value && inp.value !== inp.defaultValue && inp.checkValidity()) inp.form.submit(); };
+    inp.addEventListener('keydown', (e) => { typed = Date.now(); if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    inp.addEventListener('change', () => { clearTimeout(timer); timer = setTimeout(go, Date.now() - typed < 1500 ? 900 : 0); });
+  });
 
   // ---------------------------------------------------------------- agenda da gravação: preencher a data pede a confirmação com estúdio, hosts e convidado
   // <div data-agenda> com input[data-agenda-date], checkboxes [data-agenda-check], dialog[data-agenda-dialog] e um resumo [data-agenda-summary]

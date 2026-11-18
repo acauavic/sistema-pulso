@@ -29,6 +29,7 @@ function registerRoutines() {
   scheduler.every('portal-convidado', 10 * 60_000, () => require('./services/guestPortal').tick(), { delayMs: 80_000 }); // posts novos em collab: avisa o convidado
   scheduler.every('cadencia', 30 * 60_000, () => require('./services/outreach').dailyNotice(), { delayMs: 70_000 });
   scheduler.every('insights', 3 * 3600_000, () => require('./services/socialInsights').refresh(), { delayMs: 120_000 });
+  scheduler.every('insights-fim-do-dia', 10 * 60_000, () => require('./services/socialInsights').endOfDay(), { delayMs: 125_000 }); // perto da meia-noite: seguidores do dia fecham certo
   scheduler.every('piloto-semana', 3600_000, () => require('./services/bulkPublish').weeklyNotice(), { delayMs: 160_000 }); // segunda de manhã: "a agenda da semana está pronta para conferir"
   scheduler.every('metricas-posts', 6 * 3600_000, () => require('./services/postMetrics').refresh(), { delayMs: 150_000 }); // números de cada post (views, curtidas) para o cartão do corte e a IA de copy // foto do dia das redes mesmo sem ninguém abrir Insights (TikTok e Facebook não têm histórico no provedor)
   scheduler.every('automacoes', 5 * 60_000, () => require('./services/social').runRules(), { delayMs: 60_000 });

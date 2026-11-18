@@ -1,0 +1,96 @@
+<%
+  // Resumo do dia no Início. day: { day, today, min, isToday, weekday, prev, next }; ds: daySummary.summary().
+  // O número grande é o do dia; embaixo, como estava no fim daquele dia (hoje: até agora). Medir não é ação: nada de lime.
+  var g = ds.guests, e = ds.episodes, c = ds.clips, t = ds.tasks, s = ds.social;
+  var link = function (d) { return '/?dia=' + d + '#resumo'; };
+  var signed = function (n) { return n === null || n === undefined ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('pt-BR'); };
+  var num = function (n) { return Number(n).toLocaleString('pt-BR'); };
+  var plural = function (n, one, many) { return num(n) + ' ' + (Number(n) === 1 ? one : many); };
+  var readAt = function (net) { return s[net] && s[net].readAt ? 'Última leitura ' + (day.isToday ? 'hoje' : 'do dia') + ' às ' + fmt.formatDateTime(s[net].readAt).slice(-5) : 'Sem leitura neste dia'; };
+%>
+<section class="day-sum" id="resumo" aria-labelledby="resumo-h">
+  <div class="day-sum-head">
+    <h2 id="resumo-h">Resumo do dia <span class="mono small muted"><%= day.isToday ? 'HOJE, ATÉ AGORA' : day.weekday.toUpperCase() %></span></h2>
+    <form class="day-nav" method="get" action="/#resumo">
+      <% if (day.prev) { %><a class="btn sm" href="<%= link(day.prev) %>" aria-label="Dia anterior"><%- icon('chevron-left') %></a><% } else { %><span class="btn sm" aria-disabled="true"><%- icon('chevron-left') %></span><% } %>
+      <label class="sr-only" for="dia-escolha">Escolher o dia</label>
+      <input type="date" id="dia-escolha" name="dia" value="<%= day.day %>" min="<%= day.min %>" max="<%= day.today %>" data-day-pick>
+      <% if (day.next) { %><a class="btn sm" href="<%= link(day.next) %>" aria-label="Próximo dia"><%- icon('chevron-right') %></a><% } else { %><span class="btn sm" aria-disabled="true"><%- icon('chevron-right') %></span><% } %>
+      <% if (!day.isToday) { %><a class="btn sm ghost" href="/#resumo">Hoje</a><% } %>
+    </form>
+  </div>
+
+  <% if (can('guests.read')) { %>
+  <div class="day-group">
+    <h3 class="kicker">Convidados</h3>
+    <div class="stat-grid day-stats">
+      <a class="stat" href="/convidados?view=lista&amp;status=convite_enviado">
+        <span class="stat-label">Convites enviados</span><span class="stat-n"><%= num(g.sent) %></span>
+        <span class="delta"><%= num(g.waiting) %> aguardando resposta</span>
+      </a>
+      <a class="stat" href="/convidados?view=lista&amp;status=em_agendamento">
+        <span class="stat-label">Aceitos</span><span class="stat-n"><%= num(g.accepted) %></span><span class="delta">convites aceitos</span>
+      </a>
+      <a class="stat" href="/convidados?view=lista&amp;status=perdido">
+        <span class="stat-label">Perdidos</span><span class="stat-n"><%= num(g.lost) %></span><span class="delta">dados como perdido</span>
+      </a>
+      <a class="stat" href="/convidados?view=lista&amp;status=em_agendamento">
+        <span class="stat-label">Em agendamento</span><span class="stat-n"><%= num(g.scheduling) %></span><span class="delta"><%= signed(g.schedulingIn) %> no dia</span>
+      </a>
+      <a class="stat" href="/convidados?view=lista&amp;status=agendado">
+        <span class="stat-label">Agendados</span><span class="stat-n"><%= num(g.scheduled) %></span><span class="delta"><%= signed(g.scheduledIn) %> no dia</span>
+      </a>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="day-group">
+    <h3 class="kicker">Episódios</h3>
+    <div class="stat-grid day-stats">
+      <a class="stat" href="/episodios">
+        <span class="stat-label">Gravados, a publicar</span><span class="stat-n"><%= num(e.toPublish) %></span><span class="delta"><%= signed(e.recordedIn) %> gravado<%= e.recordedIn === 1 ? '' : 's' %> no dia</span>
+      </a>
+      <a class="stat" href="/episodios">
+        <span class="stat-label">Publicados</span><span class="stat-n"><%= num(e.published) %></span><span class="delta"><%= signed(e.publishedIn) %> no dia</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="day-group">
+    <h3 class="kicker">Cortes</h3>
+    <div class="stat-grid day-stats">
+      <a class="stat" href="/conteudo?vista=cortes">
+        <span class="stat-label">Cortes subidos</span><span class="stat-n"><%= num(c.uploaded) %></span>
+        <span class="delta"><%= c.uploadedByTeam ? '+' + num(c.uploadedByTeam) + ' da gestão' : c.uploaded ? 'pelo editor, em ' + plural(c.uploadedEpisodes, 'episódio', 'episódios') : 'pelo editor' %></span>
+      </a>
+      <a class="stat" href="/conteudo?vista=cortes">
+        <span class="stat-label">Revisões</span><span class="stat-n"><%= num(c.versions) %></span>
+        <span class="delta"><%= c.versions ? 'versões novas, em ' + plural(c.revised, 'corte', 'cortes') : 'versões novas de cortes' %></span>
+      </a>
+      <% if (can('social.read')) { %>
+      <a class="stat" href="/social/publicacoes">
+        <span class="stat-label">Cortes postados</span><span class="stat-n"><%= num(c.posted) %></span>
+        <span class="delta"><%= c.networkPosts ? plural(c.networkPosts, 'post', 'posts') + ' nas redes' : 'foram ao ar no dia' %></span>
+      </a>
+      <a class="stat" href="/social/publicacoes">
+        <span class="stat-label">Reels de teste</span><span class="stat-n"><%= num(c.trials) %></span><span class="delta">no Instagram</span>
+      </a>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="day-group">
+    <h3 class="kicker"><%= s && can('social.read') ? 'Redes e tarefas' : 'Tarefas' %></h3>
+    <div class="stat-grid day-stats">
+      <% if (s && can('social.read')) { [['instagram', 'Instagram', 'seguidores'], ['youtube', 'YouTube', 'inscritos']].forEach(function (n) { var x = s[n[0]]; %>
+      <a class="stat" href="/social/insights" title="<%= readAt(n[0]) %>">
+        <span class="stat-label"><%= n[1] %></span><span class="stat-n"><%= signed(x.gain) %></span>
+        <span class="delta"><%= x.total === null ? 'sem leitura' : num(x.total) + ' ' + n[2] %></span>
+      </a>
+      <% }) } %>
+      <a class="stat" href="/tarefas?escopo=todas">
+        <span class="stat-label">Tarefas atrasadas</span><span class="stat-n <%= t.late ? 'hl-bad' : '' %>"><%= num(t.late) %></span><span class="delta">de <%= num(t.open) %> em aberto</span>
+      </a>
+    </div>
+  </div>
+</section>

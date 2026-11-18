@@ -5,7 +5,6 @@ const mailer = require('../services/mailer');
 const yourls = require('../services/yourls');
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
-const { GUEST_STATUSES } = require('../constants');
 const { wrap } = require('../utils/wrap');
 const { can } = require('../permissions');
 
@@ -40,8 +39,12 @@ router.get('/', wrap(async (req, res) => {
     "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'",
     [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())])]) : null;
   const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user) : null;
-  const [counts, upcoming, recent, mine] = await Promise.all([
-    db.query('SELECT status, count(*)::int AS n FROM guests GROUP BY status'),
+  // Resumo do dia: o dia vem do endereço (?dia=AAAA-MM-DD); sem ele, hoje
+  const daySummary = require('../services/daySummary');
+  const day = await daySummary.pick(req.query.dia);
+  const pDay = daySummary.summary(day.day, { isToday: day.isToday });
+  pDay.catch(() => {}); // se outra consulta falhar antes, esta não vira rejeição solta (o erro dela aparece no await abaixo)
+  const [upcoming, recent, mine] = await Promise.all([
     db.query(`SELECT id, name, topic, proposed_at FROM guests
                WHERE status = 'agendado' AND proposed_at >= now() ORDER BY proposed_at LIMIT 6`),
     db.query(`SELECT e.type, e.message, e.created_at, g.id AS guest_id, g.name AS guest_name, u.name AS user_name
@@ -49,7 +52,6 @@ router.get('/', wrap(async (req, res) => {
                ORDER BY e.created_at DESC, e.id DESC LIMIT 10`),
     db.query(`SELECT count(*)::int AS n FROM guests WHERE owner_id = $1 AND status IN ('prospect','convite_enviado')`, [req.user.id]),
   ]);
-  const byStatus = Object.fromEntries(counts.rows.map((r) => [r.status, r.n]));
   let money = null;
   if (pMoney) {
     const [c, stock, { rows: [week] }] = await pMoney;
@@ -59,7 +61,7 @@ router.get('/', wrap(async (req, res) => {
   if (outToday) outToday.items = outToday.items.map((x) => ({ ...x, d: outreach.describe(x) }));
   res.render('dashboard', {
     money, outToday, CHANNELS: outreach.CHANNELS, outBase: (k) => outreach.KINDS[k].base,
-    title: 'Início', cards: GUEST_STATUSES.map((s) => ({ ...s, n: byStatus[s.key] || 0 })),
+    title: 'Início', day, ds: await pDay,
     upcoming: upcoming.rows, recent: recent.rows, myOpen: mine.rows[0].n,
   });
 }));

@@ -76,6 +76,17 @@ const TOPICS = [
     ],
   },
   {
+    key: 'resumo-dia', title: 'Resumo do dia no Início', words: ['resumo do dia', 'resumo', 'painel', 'início', 'inicio', 'dashboard', 'números do dia', 'numeros do dia', 'convites enviados', 'convites aceitos', 'seguidores', 'inscritos', 'cortes postados', 'cortes subidos', 'revisões', 'revisoes', 'reels de teste', 'tarefas atrasadas'],
+    where: 'Início (a primeira tela), bloco "Resumo do dia"', perm: 'production.manage',
+    steps: [
+      'O Início abre com o Resumo do dia: convites enviados, aceitos e perdidos; em agendamento e agendados; episódios gravados a publicar e publicados; cortes subidos pelo editor, revisões (versão nova de um corte), cortes postados e Reels de teste; seguidores no Instagram, inscritos no YouTube e tarefas atrasadas.',
+      'O número grande é o do dia; embaixo, como estava no fim daquele dia (hoje: até agora). Mudança de etapa desfeita no mesmo dia não conta.',
+      'As setas mudam o dia, o calendário escolhe qualquer dia desde o primeiro convidado e "Hoje" volta. O dia fica no endereço, então dá para mandar o link de um dia.',
+      'Cada número leva à lista dele: convidados da etapa, cortes, publicações, Insights ou tarefas.',
+      'Seguidores e inscritos são o saldo do dia (entradas menos saídas): a última leitura do dia menos a do dia anterior. Dia sem leitura aparece como "sem leitura".',
+    ],
+  },
+  {
     key: 'patrocinadores', title: 'Patrocinadores, planos e media kit', words: ['patrocinador', 'patrocinadores', 'patrocínio', 'cota', 'ouro', 'diamond', 'media kit', 'mediakit', 'portal', 'reunião', 'reuniões', 'meet', 'google meet', 'formulário', 'entregável', 'entregaveis', 'plano', 'planos', 'galeria', 'quem já sentou'],
     where: '/patrocinadores', perm: 'sponsors.write',
     steps: [

@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.76.0', date: '2026-11-18', title: 'Resumo do dia no Início',
+    items: [
+      { kind: 'novo', text: 'Resumo do dia no Início: convites enviados, aceitos e perdidos; quantos estão em agendamento e agendados; episódios gravados a publicar e publicados; cortes subidos pelo editor, revisões (versão nova de um corte), cortes postados e Reels de teste; seguidores no Instagram, inscritos no YouTube e tarefas atrasadas. Abre em hoje; as setas e o calendário levam a qualquer dia desde 13/10, e cada número leva à lista dele.' },
+      { kind: 'novo', text: 'Toda mudança de etapa do convidado fica registrada, venha de onde vier (quadro, cadastro, edição em massa, aceite ou recusa pelo link, convite por e-mail). O passado foi refeito pela linha do tempo de cada convidado.' },
+      { kind: 'ajuste', text: 'O funil de etapas saiu do Início: os números dele estão no resumo (Prospecção e Cancelado continuam em Convidados). Os seguidores ganham uma leitura perto da meia-noite, para o saldo do dia fechar certo.' },
+    ],
+  },
+  {
     version: '1.75.1', date: '2026-11-18', title: 'Segunda revisão da interface: celular, buscas e detalhes',
     items: [
       { kind: 'correcao', text: 'No celular, um tema longo em "Próximas gravações" alargava o Painel e empurrava a barra de baixo para fora da tela.' },

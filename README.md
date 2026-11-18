@@ -26,6 +26,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - [Social: publicações, novo post, ideias, insights e automações](#social-publicações-novo-post-ideias-insights-e-automações)
 - [Post feito por fora do sistema](#post-feito-por-fora-do-sistema)
 - [Colaboração: tarefas, comentários, notificações e busca](#colaboração-tarefas-comentários-notificações-e-busca)
+- [Resumo do dia no Início](#resumo-do-dia-no-início)
 - [Arquitetura: processos, fila, rotinas e avisos](#arquitetura-processos-fila-rotinas-e-avisos)
 - [Assistente de IA](#assistente-de-ia)
 - [Segurança](#segurança)
@@ -47,6 +48,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - **Episódios (linha de produção)**: do convidado agendado até a publicação — material bruto no Backblaze, edição, revisão com comentários na minutagem, análise por IA, capas e posts com editor visual, cortes verticais e publicação nas redes. [Detalhes](#produção-de-episódios).
 - **Convite fixo**: gera link exclusivo + link curto no YOURLS, prévia, envio por e-mail (Brevo). Os botões do
   convite levam ao WhatsApp da produção **passando por um redirecionador próprio que conta os cliques**.
+- **Início com o Resumo do dia**: convites enviados, aceitos e perdidos, etapas, episódios, cortes, revisões, posts, Reels de teste, seguidores e tarefas atrasadas de qualquer dia. [Detalhes](#resumo-do-dia-no-início).
 - **Calendário**: tudo que tem data (tarefas, gravações, lembretes, publicações, contas, parcerias) com filtros e visualizações salvas. [Detalhes](#calendário).
 - **Auditoria** das ações sensíveis e tela de **Integrações** (status + testes seguros).
 
@@ -370,6 +372,28 @@ Código: `src/services/infinitePay.js`, `src/routes/infinitepay.js`, migração 
 ## WhatsApp dos convites
 
 **Gestão > Convites e parcerias > WhatsApp dos convites** (`contacts.manage`; `src/services/contacts.js`). Define para onde vai quem clica nos botões do convite do convidado ("Aceitar o convite", "Falar com a produção") e do media kit/portal do patrocinador ("Quero ser patrocinador", "Falar com a equipe"): o **número** e a **mensagem pronta** de cada botão (`{nome}` = convidado ou empresa, `{podcast}`). Em branco vale o padrão do servidor (`PRODUCAO_WHATSAPP`, `PATROCINIO_WHATSAPP`) e as mensagens de sempre. O WhatsApp da página pública da plateia continua em Plateia > Ajustes. O menu da gestão tem grupos com abas internas (Visão geral, Equipe, Operação, Convites e parcerias, Sistema).
+
+## Resumo do dia no Início
+
+O Início (de quem não é só editor de vídeo) abre com o **Resumo do dia**. O número grande é o do dia; embaixo, como estava no fim
+daquele dia (hoje: até agora). As setas e o calendário levam a qualquer dia desde o primeiro convidado cadastrado, e o dia vai no
+endereço (`/?dia=2026-11-17`). Cada número leva à lista dele.
+
+- **Convidados**: **Convites enviados** (entrou em Convite enviado no dia; embaixo, quantos aguardam resposta), **Aceitos** (saiu de
+  Prospecção, Convite enviado ou Perdido para Em agendamento ou Agendado), **Perdidos**, **Em agendamento** e **Agendados** (o total no
+  fim do dia, com quantos entraram no dia). Mudança desfeita no mesmo dia (arrastou errado e voltou) não conta.
+- **Episódios e cortes**: **Gravados, a publicar** (gravados e ainda sem publicar; embaixo, os gravados no dia, pela data da gravação),
+  **Publicados** (o total, com os do dia), **Cortes subidos** (pelo editor; o que a gestão subiu aparece à parte), **Revisões** (versão
+  nova de um corte que já existia), **Cortes postados** (cada corte uma vez no dia, na hora em que foi ao ar: a da rede, a agendada ou a
+  do envio) e **Reels de teste** (publicação marcada como Reel de teste que foi ao ar no Instagram).
+- **Redes e tarefas**: seguidores no **Instagram** e inscritos no **YouTube** (o saldo do dia: a última leitura do dia menos a do dia
+  anterior; sem a nossa leitura, a série de totais do provedor; senão, "sem leitura") e **Tarefas atrasadas** (no fim do dia; hoje, agora).
+- **Registro das etapas**: a tabela `guest_stage_log` (migração `079_resumo_do_dia.sql`) guarda toda mudança de etapa por gatilho, venha
+  de onde vier (quadro, cadastro, edição em massa, aceite ou recusa pelo link, convite por e-mail, importação). O passado foi refeito pela
+  linha do tempo dos convidados (`guest_stage_backfill()`).
+- **Leitura do fim do dia**: a rotina `insights-fim-do-dia` lê Instagram e YouTube de novo depois das 23:40, para o saldo fechar perto da
+  meia-noite (a rotina `insights` lê as redes de 3 em 3 horas).
+- Código: `src/services/daySummary.js`, `src/views/partials/day-summary.ejs`.
 
 ## Cadência de abordagem
 

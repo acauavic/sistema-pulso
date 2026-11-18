@@ -1,0 +1,140 @@
+// Resumo do dia no Painel: o que aconteceu num dia (convites enviados, aceitos e perdidos, gravações e publicações, cortes subidos
+// pelo editor, revisões, cortes postados, Reels de teste, seguidores) e como as coisas estavam no fim dele (etapas, episódios a
+// publicar, tarefas atrasadas). O dia vai de 00:00 a 24:00 em Brasília; hoje é "até agora".
+const db = require('../db/pool');
+const { ROLES, can } = require('../permissions');
+const { ACCEPT_FROM } = require('../constants');
+const cal = require('./calendar');
+const { nowTime } = require('./tasks');
+
+const TZ = 'America/Sao_Paulo';
+// "O editor": quem edita mas não gerencia a produção (o mesmo corte que decide a tela inicial do editor).
+const EDITOR_ROLES = Object.keys(ROLES).filter((r) => can(r, 'production.edit') && !can(r, 'production.manage'));
+// Começo e fim do dia $1 em Brasília.
+const BOUNDS = `b AS (SELECT ($1::date)::timestamp AT TIME ZONE '${TZ}' AS s, ($1::date + 1)::timestamp AT TIME ZONE '${TZ}' AS e)`;
+const NETWORKS = ['instagram', 'youtube'];
+
+// O dia pedido no endereço (?dia=AAAA-MM-DD), dentro do que o sistema tem: do primeiro convidado cadastrado até hoje.
+async function pick(raw) {
+  const today = cal.todayISO();
+  const { rows: [r] } = await db.query(`SELECT to_char(min(created_at) AT TIME ZONE '${TZ}', 'YYYY-MM-DD') AS d FROM guests`);
+  const min = r?.d && r.d < today ? r.d : today;
+  let day = cal.isISO(raw) ? raw : today;
+  if (day > today) day = today;
+  if (day < min) day = min;
+  return {
+    day, today, min, isToday: day === today, weekday: cal.dayLabel(day).split(',')[0],
+    prev: day > min ? cal.addDays(day, -1) : null, next: day < today ? cal.addDays(day, 1) : null,
+  };
+}
+
+// Convidados. A etapa de cada um no fim do dia é a última mudança até ali; uma mudança desfeita no mesmo dia (arrastou errado e
+// voltou) não conta, porque no fim do dia a pessoa não está mais onde a mudança a pôs.
+async function guests(day) {
+  const { rows: [r] } = await db.query(`WITH ${BOUNDS},
+    st AS (SELECT DISTINCT ON (l.guest_id) l.guest_id, l.to_status AS status FROM guest_stage_log l, b
+            WHERE l.changed_at < b.e ORDER BY l.guest_id, l.changed_at DESC, l.id DESC),
+    mv AS (SELECT l.guest_id, l.from_status, l.to_status, st.status AS end_status FROM guest_stage_log l JOIN st USING (guest_id), b
+            WHERE l.changed_at >= b.s AND l.changed_at < b.e AND l.from_status IS NOT NULL)
+    SELECT count(*) FILTER (WHERE st.status = 'convite_enviado')::int AS waiting,
+           count(*) FILTER (WHERE st.status = 'em_agendamento')::int AS scheduling,
+           count(*) FILTER (WHERE st.status = 'agendado')::int AS scheduled,
+           (SELECT count(DISTINCT guest_id) FROM mv WHERE to_status = 'convite_enviado' AND end_status <> 'prospect')::int AS sent,
+           (SELECT count(DISTINCT guest_id) FROM mv WHERE from_status = ANY($2::text[]) AND to_status IN ('em_agendamento', 'agendado')
+                AND NOT (end_status = ANY($2::text[])))::int AS accepted,
+           (SELECT count(DISTINCT guest_id) FROM mv WHERE to_status = 'perdido' AND end_status = 'perdido')::int AS lost,
+           (SELECT count(DISTINCT guest_id) FROM mv WHERE to_status = 'em_agendamento' AND end_status IN ('em_agendamento', 'agendado', 'gravado'))::int AS scheduling_in,
+           (SELECT count(DISTINCT guest_id) FROM mv WHERE to_status = 'agendado' AND end_status IN ('agendado', 'gravado'))::int AS scheduled_in
+      FROM st`, [day, ACCEPT_FROM]);
+  return { sent: r.sent, accepted: r.accepted, lost: r.lost, waiting: r.waiting, scheduling: r.scheduling, schedulingIn: r.scheduling_in, scheduled: r.scheduled, scheduledIn: r.scheduled_in };
+}
+
+// Episódios: gravados no dia (a data da gravação), os que estavam gravados e ainda sem publicar no fim do dia, e os publicados.
+async function episodes(day) {
+  const { rows: [r] } = await db.query(`WITH ${BOUNDS},
+    e AS (SELECT coalesce(recorded_on, (created_at AT TIME ZONE '${TZ}')::date) AS rec,
+                 (published_at IS NOT NULL OR status = 'publicado') AS pub, coalesce(published_at, '-infinity'::timestamptz) AS pub_at
+            FROM episodes)
+    SELECT count(*) FILTER (WHERE e.rec = $1::date)::int AS recorded_in,
+           count(*) FILTER (WHERE e.rec <= $1::date AND NOT (e.pub AND e.pub_at < b.e))::int AS to_publish,
+           count(*) FILTER (WHERE e.pub AND e.pub_at >= b.s AND e.pub_at < b.e)::int AS published_in,
+           count(*) FILTER (WHERE e.pub AND e.pub_at < b.e)::int AS published
+      FROM e, b`, [day]);
+  return { recordedIn: r.recorded_in, toPublish: r.to_publish, publishedIn: r.published_in, published: r.published };
+}
+
+// Cortes subidos no dia: os do editor; os que a gestão subiu (uma importação, por exemplo) ficam à parte.
+// Revisão = versão nova de um corte que já existia (a versão anterior vai para clip_versions na hora da troca).
+async function clips(day) {
+  const [{ rows: [up] }, { rows: [rv] }] = await Promise.all([
+    db.query(`WITH ${BOUNDS}
+      SELECT count(*) FILTER (WHERE u.role = ANY($2::text[]))::int AS by_editor,
+             count(*) FILTER (WHERE u.role IS NULL OR NOT (u.role = ANY($2::text[])))::int AS by_team,
+             count(DISTINCT c.episode_id) FILTER (WHERE u.role = ANY($2::text[]))::int AS episodes
+        FROM episode_clips c LEFT JOIN users u ON u.id = c.created_by, b
+       WHERE c.source = 'upload' AND c.created_at >= b.s AND c.created_at < b.e`, [day, EDITOR_ROLES]),
+    db.query(`WITH ${BOUNDS}
+      SELECT count(*)::int AS versions, count(DISTINCT v.clip_id)::int AS revised FROM clip_versions v, b
+       WHERE v.replaced_at >= b.s AND v.replaced_at < b.e`, [day]),
+  ]);
+  return { uploaded: up.by_editor, uploadedByTeam: up.by_team, uploadedEpisodes: up.episodes, versions: rv.versions, revised: rv.revised };
+}
+
+// Posts que foram ao ar no dia. A hora que vale é a da rede (lida com os números do post); sem ela, a hora agendada; sem
+// agendamento, a do envio (ou a do post marcado à mão). Cada corte conta uma vez no dia, mesmo indo para várias redes.
+async function posts(day) {
+  const { rows: [r] } = await db.query(`WITH ${BOUNDS},
+    p AS (SELECT p.id, p.clip_id, p.options, CASE WHEN jsonb_typeof(p.results) = 'array' THEN p.results ELSE '[]'::jsonb END AS results,
+                 coalesce((SELECT min(m.published_at) FROM post_metrics m WHERE m.publication_id = p.id), p.scheduled_at, p.created_at) AS live_at
+            FROM episode_publications p, b WHERE p.status IN ('publicado', 'parcial') AND p.created_at < b.e),
+    d AS (SELECT p.* FROM p, b WHERE p.live_at >= b.s AND p.live_at < b.e)
+    SELECT (SELECT count(DISTINCT clip_id) FROM d)::int AS posted,
+           (SELECT count(*) FROM d, jsonb_array_elements(d.results) x WHERE d.clip_id IS NOT NULL AND x->>'ok' = 'true')::int AS network_posts,
+           (SELECT count(*) FROM d WHERE coalesce(d.options->'instagram'->>'trial', '') NOT IN ('', 'false', '0')
+               AND EXISTS (SELECT 1 FROM jsonb_array_elements(d.results) x WHERE x->>'platform' = 'instagram' AND x->>'ok' = 'true'))::int AS trials`, [day]);
+  return { posted: r.posted, networkPosts: r.network_posts, trials: r.trials };
+}
+
+// Tarefas atrasadas no fim do dia (hoje: agora), com a mesma regra da lista de tarefas: prazo vencido, ou o dia de hoje com a
+// hora já passada. Entram as que existiam e não estavam feitas naquele momento.
+async function tasks(day, cut) {
+  const { rows: [r] } = await db.query(`WITH ${BOUNDS},
+    t AS (SELECT due_on, due_time FROM tasks, b WHERE created_at < b.e AND NOT (status = 'feito' AND coalesce(completed_at, created_at) < b.e))
+    SELECT count(*)::int AS open,
+           count(*) FILTER (WHERE due_on < $1::date OR (due_on = $1::date AND due_time IS NOT NULL AND due_time < $2::time))::int AS late
+      FROM t`, [day, cut]);
+  return { late: r.late, open: r.open };
+}
+
+// Seguidores: o saldo do dia é a última leitura do dia menos a do dia anterior (social_snapshots guarda a última de cada dia).
+// Dia sem leitura nossa usa a série diária do provedor, quando ela é de totais (a do YouTube pela Zernio). Sem as duas pontas,
+// o saldo fica vazio ("sem leitura"). Nenhuma leitura guardada: as redes não estão ligadas aqui e o bloco não aparece.
+async function followers(day) {
+  const [{ rows: own }, { rows: series }, { rows: [any] }] = await Promise.all([
+    db.query(`SELECT platform, to_char(taken_on, 'YYYY-MM-DD') AS d, (data->>'followers')::numeric AS n, updated_at
+                FROM social_snapshots WHERE platform = ANY($2::text[]) AND taken_on BETWEEN ($1::date - 1) AND $1::date`, [day, NETWORKS]),
+    db.query(`SELECT DISTINCT ON (platform) platform, data->'series'->'points' AS points FROM social_snapshots
+               WHERE platform = ANY($2::text[]) AND taken_on >= $1::date AND data->'series'->>'kind' = 'total' ORDER BY platform, taken_on`, [day, NETWORKS]),
+    db.query('SELECT count(*)::int AS n FROM social_snapshots WHERE platform = ANY($1::text[])', [NETWORKS]),
+  ]);
+  if (!any.n) return null;
+  const prev = cal.addDays(day, -1);
+  const out = {};
+  for (const net of NETWORKS) {
+    const mine = Object.fromEntries(own.filter((r) => r.platform === net && r.n !== null).map((r) => [r.d, r]));
+    const points = series.find((r) => r.platform === net)?.points;
+    const theirs = Object.fromEntries((Array.isArray(points) ? points : []).filter((p) => p && Number.isFinite(Number(p.v))).map((p) => [String(p.d).slice(0, 10), Number(p.v)]));
+    const at = (d) => (mine[d] ? Number(mine[d].n) : d in theirs ? theirs[d] : null);
+    const total = at(day); const before = at(prev);
+    out[net] = { total, gain: total !== null && before !== null ? total - before : null, readAt: mine[day]?.updated_at || null };
+  }
+  return out;
+}
+
+// Tudo do dia. Hoje, as tarefas atrasadas seguem a hora de agora; num dia que já passou, o fim do dia.
+async function summary(day, { isToday = day === cal.todayISO() } = {}) {
+  const [g, e, c, p, t, s] = await Promise.all([guests(day), episodes(day), clips(day), posts(day), tasks(day, isToday ? nowTime() : '24:00'), followers(day)]);
+  return { guests: g, episodes: e, clips: { ...c, ...p }, tasks: t, social: s };
+}
+
+module.exports = { pick, summary, EDITOR_ROLES };
