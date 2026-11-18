@@ -28,6 +28,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - [Colaboração: tarefas, comentários, notificações e busca](#colaboração-tarefas-comentários-notificações-e-busca)
 - [Resumo do dia no Início](#resumo-do-dia-no-início)
 - [Metas por pessoa](#metas-por-pessoa)
+- [Página pós-gravação](#página-pós-gravação)
 - [Arquitetura: processos, fila, rotinas e avisos](#arquitetura-processos-fila-rotinas-e-avisos)
 - [Assistente de IA](#assistente-de-ia)
 - [Segurança](#segurança)
@@ -427,6 +428,16 @@ métrica conta. A antiga meta diária de abordagens de patrocinadores da Cadênc
 
 **Seu ritmo** (Início do editor): cortes subidos e revisões de corte de hoje e da semana, episódios entregues na semana (e quantos foram
 reentregas depois de ajustes) e a próxima entrega (o 1º da ordem de edição), com as metas dele embaixo.
+
+## Página pós-gravação
+
+`/pos-gravacao` (endereço completo em Gestão > WhatsApp dos convites, com "Abrir" e "Copiar link") é a página do **QR Code do cartão
+de agradecimento**: a mesma para todos os convidados, sem login, sem link no resto do site e fora dos buscadores (`noindex` no cabeçalho e
+na página). Agradece, mostra o que acontece depois da gravação (triagem e edição; a data do episódio pelo WhatsApp da produção; o portal
+do convidado e a agenda dos cortes na sexta-feira antes do episódio; bastidores e aviso na semana; episódio e cortes no ar), o que tem
+no portal, os cortes em collab (distribuição em parceria, sem custo), as redes onde o Pulso posta e o WhatsApp da produção. O número e a
+mensagem do WhatsApp ("Na página pós-gravação") ficam em Gestão > WhatsApp dos convites; o texto da página está em
+`src/views/portal/pos-gravacao.ejs` (rota `src/routes/postRecording.js`). Para o cartão: aponte o link do QR Code para esse endereço.
 
 ## Cadência de abordagem
 

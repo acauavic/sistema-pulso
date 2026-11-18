@@ -8,7 +8,7 @@
 @font-face { font-family: "Instrument Serif"; font-style: italic; font-weight: 400; font-display: swap; src: url(/static/fonts/instrument-serif-latin-400-italic.woff2) format("woff2"); }
 
 /* Portal do convidado — tema claro do design system (o convidado vê). Botão principal preto com ponto lime; plum marca o externo. */
-:root { --bg: #F4F2EC; --surface: #FFFFFF; --raised: #E9E5DA; --line: #E2DED3; --line-strong: #D6D1C4; --text: #0A0A0A; --text-2: #4A4A4A; --muted: #6B6B6B; --lime: #C8FF42; --plum: #2D1B4E; --plum-soft: #E9E3F5; --bad: #9E2A1E; --bad-soft: #FBE3E0; --ease: cubic-bezier(.2, .8, .2, 1); }
+:root { --bg: #F4F2EC; --surface: #FFFFFF; --raised: #E9E5DA; --line: #E2DED3; --line-strong: #D6D1C4; --text: #0A0A0A; --text-2: #4A4A4A; --muted: #6B6B6B; --lime: #C8FF42; --plum: #2D1B4E; --plum-soft: #E9E3F5; --bone: #F0EDE3; --bad: #9E2A1E; --bad-soft: #FBE3E0; --ease: cubic-bezier(.2, .8, .2, 1); }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.6 "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 h1, h2, h3, h4 { font-family: "Space Grotesk", system-ui, sans-serif; letter-spacing: -.04em; line-height: 1.1; margin: 0; }
@@ -140,3 +140,48 @@ a { color: inherit; }
   .pt-nets .icon { width: 18px; height: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .pt-btn { transition: none; } }
+
+/* Página pós-gravação (/pos-gravacao): a mesma linguagem do portal (claro; plum = o que o convidado vê). Celular primeiro: o
+   agradecimento em serifa, três frases-resumo, o caminho até o episódio (linha com um ponto por passo; o feito, preenchido), o que
+   tem no portal, o bloco plum dos cortes em collab, as redes em pílulas e o WhatsApp (botão preto com ponto lime + flutuante neutro). */
+.pp { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pp-hero { padding: 36px 0 28px; }
+.pp-thanks { font: italic 400 clamp(42px, 12vw, 68px)/1.02 "Instrument Serif", serif; letter-spacing: -.01em; color: var(--plum); margin: 0 0 16px; text-wrap: balance; }
+.pp-glance { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 8px; }
+.pp-glance li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font-weight: 500; line-height: 1.35; }
+.pp-glance .icon { color: var(--plum); }
+.pp-path { list-style: none; margin: 22px 0 0; padding: 0; }
+.pp-path li { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 14px; padding-bottom: 22px; }
+.pp-path li:not(:last-child)::before { content: ""; position: absolute; left: 15.5px; top: 34px; bottom: 2px; width: 1px; background: var(--line-strong); } /* liga este passo ao próximo */
+.pp-dot { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line-strong); color: var(--text-2); }
+.pp-path li.is-done .pp-dot { background: var(--text); border-color: var(--text); color: var(--surface); }
+.pp-path .pt-mono { display: block; margin-top: 6px; }
+.pp-path h3 { margin: 4px 0 4px; } .pp-path p { color: var(--text-2); margin: 0; }
+.pp-items { list-style: none; margin: 18px 0 0; padding: 0; display: grid; border-top: 1px solid var(--line); }
+.pp-items li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.pp-items .icon { color: var(--plum); margin-top: 1px; } .pp-items p { color: var(--text-2); margin: 2px 0 0; font-size: 14px; }
+.pp-collab { margin: 8px 0 0; padding: 28px 22px 26px; background: var(--plum); color: var(--bone); border-radius: 6px; }
+.pp-collab .pt-mono { color: var(--lime); }
+.pp-collab h2 { color: var(--surface); margin: 10px 0 12px; font-size: clamp(24px, 6vw, 30px); text-wrap: balance; }
+.pp-collab p { margin: 0; max-width: 60ch; }
+.pp-after-collab { margin-top: 32px; }
+.pp-nets { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.pp-nets li { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px 8px 11px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); font-weight: 500; font-size: 14px; }
+.pp-help { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 18px; }
+.pp-phone { font-size: 13px; color: var(--text); letter-spacing: .06em; }
+.pp-foot { display: grid; justify-items: center; gap: 6px; padding: 32px 16px 104px; border-top: 1px solid var(--line); text-align: center; }
+.pp-tagline { font: italic 400 20px/1.3 "Instrument Serif", serif; color: var(--plum); margin: 0; }
+.pp-wa { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 10; display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px 0 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-strong); color: var(--text); font: 600 14px "Inter", sans-serif; text-decoration: none; box-shadow: 0 8px 24px rgba(10, 10, 10, .08); transition: transform 160ms var(--ease); }
+.pp-wa:hover { transform: translateY(-1px); }
+@media (max-width: 640px) {
+  .pp-wa { width: 56px; height: 56px; padding: 0; justify-content: center; }
+  .pp-wa span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+@media (min-width: 720px) {
+  .pp-hero { padding: 56px 0 36px; }
+  .pp-glance { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pp-glance li { align-items: flex-start; }
+  .pp-items { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+  .pp-collab { padding: 36px 40px 34px; }
+}
+@media (prefers-reduced-motion: reduce) { .pp-wa, .pp-wa:hover { transition: none; transform: none; } }

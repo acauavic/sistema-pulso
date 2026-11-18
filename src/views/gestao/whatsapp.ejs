@@ -18,6 +18,13 @@
   </section>
   <% }) %>
   <section class="card">
+    <div class="row spread">
+      <div><h2>Página pós-gravação</h2><p class="small muted">A página do QR Code do cartão de agradecimento: a mesma para todos os convidados e fora dos buscadores. O botão de WhatsApp dela usa o número da produção e a mensagem "Na página pós-gravação".</p></div>
+      <div class="row"><a class="btn sm ghost" href="<%= postUrl %>" target="_blank" rel="noopener">Abrir</a><button class="btn sm" type="button" data-copy="<%= postUrl %>">Copiar link</button></div>
+    </div>
+    <p class="mono raw"><%= postUrl %></p>
+  </section>
+  <section class="card">
     <h2>Página da plateia</h2>
     <p class="small muted">O WhatsApp de quem pede uma vaga na plateia fica em <a href="/plateia/painel">Plateia &gt; Ajustes da página</a>, junto com preço e local.</p>
     <p class="mono"><%= plateiaWa ? contacts.pretty(plateiaWa.replace(/\D/g, '')) : 'não definido' %></p>

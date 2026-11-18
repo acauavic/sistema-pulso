@@ -84,7 +84,8 @@ router.post('/gestao/lembretes', requirePerm('reminders.manage'), wrap(async (re
 // ---------------------------------------------------------------- WhatsApp dos convites
 router.get('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req, res) => {
   const contacts = require('../services/contacts');
-  res.render('gestao/whatsapp', { title: 'WhatsApp dos convites', contacts, cur: await contacts.current(), sample: { producao: 'Dra. Maria Souza', patrocinio: 'Clínica Exemplo' }, openGroup: contacts.GROUPS[req.query.editar] ? req.query.editar : null, plateiaWa: await require('../services/settings').get('plateia_whatsapp') });
+  const postUrl = `${require('../config').publicBaseUrl}${require('./postRecording').PATH}`; // página do QR Code do cartão de agradecimento
+  res.render('gestao/whatsapp', { title: 'WhatsApp dos convites', postUrl, contacts, cur: await contacts.current(), sample: { producao: 'Dra. Maria Souza', patrocinio: 'Clínica Exemplo' }, openGroup: contacts.GROUPS[req.query.editar] ? req.query.editar : null, plateiaWa: await require('../services/settings').get('plateia_whatsapp') });
 }));
 
 router.post('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req, res) => {

@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.79.0', date: '2026-11-18', title: 'Página pós-gravação para o convidado',
+    items: [
+      { kind: 'novo', text: 'Página pós-gravação (/pos-gravacao), a do QR Code do cartão de agradecimento: agradece, mostra o que acontece depois da gravação (triagem e edição, a data pelo WhatsApp, o portal na sexta antes do episódio, bastidores, episódio e cortes), o que tem no portal, os cortes em collab, as redes onde o Pulso posta e o WhatsApp da produção. É a mesma para todos os convidados, abre sem login e fica fora dos buscadores.' },
+      { kind: 'novo', text: 'Em Gestão > WhatsApp dos convites, o link da página (Abrir e Copiar link) e a mensagem que abre no WhatsApp quando o convidado toca em "Falar com a produção" por ela.' },
+    ],
+  },
+  {
     version: '1.78.0', date: '2026-11-18', title: 'Metas por pessoa e o ritmo do editor',
     items: [
       { kind: 'novo', text: 'Metas: em Gestão > Equipe > Metas, a gestão define até 3 metas para cada pessoa: o que contar (convites enviados e aceitos, gravações marcadas, taxa de aceite, abordagens de convidados e de patrocinadores, reuniões agendadas, patrocínios fechados, cortes subidos, revisões de corte, posts publicados, episódios entregues e publicados, tarefas concluídas e no prazo, seguidores, inscritos, cortes postados e Reels de teste), o período (por dia útil, semana ou mês), o alvo e se aparece em número ou em porcentagem. O sistema conta sozinho.' },

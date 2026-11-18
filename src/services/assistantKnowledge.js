@@ -76,6 +76,15 @@ const TOPICS = [
     ],
   },
   {
+    key: 'pos-gravacao', title: 'Página pós-gravação (QR Code do cartão)', words: ['pós-gravação', 'pos-gravacao', 'pós gravação', 'cartão de agradecimento', 'qr code', 'qrcode', 'depois da gravação', 'página do convidado'],
+    where: '/pos-gravacao; o link fica em Gestão > WhatsApp dos convites', perm: 'guests.read',
+    steps: [
+      'A página pós-gravação é a do QR Code do cartão de agradecimento: a mesma para todos os convidados, abre sem login e não aparece em buscadores.',
+      'Ela agradece, mostra o que acontece depois da gravação (triagem e edição, a data do episódio pelo WhatsApp, o portal na sexta antes do episódio, bastidores, episódio e cortes), o que tem no portal, os cortes em collab, as redes do Pulso e o WhatsApp da produção.',
+      'O endereço completo, com Abrir e Copiar link, fica em Gestão > WhatsApp dos convites. Ali também se muda o número e a mensagem que abre no WhatsApp ("Na página pós-gravação").',
+    ],
+  },
+  {
     key: 'metas', title: 'Metas por pessoa', words: ['meta', 'metas', 'objetivo', 'objetivos', 'minhas metas', 'definir meta', 'acompanhar meta', 'quanto falta', 'seu ritmo', 'ritmo'],
     where: 'Gestão > Equipe > Metas (gestão define); Início de cada pessoa (Minhas metas); Início do editor (Seu ritmo)', perm: 'tasks.read',
     steps: [

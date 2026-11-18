@@ -10,6 +10,7 @@ const GROUPS = {
     messages: {
       aceitar: { key: 'whatsapp_msg_aceitar', label: 'Ao aceitar o convite', hint: 'Abre depois que o convidado clica em "Aceitar o convite".', fallback: 'Olá! Sou {nome} e aceito o convite para o {podcast}. Podemos alinhar a data da gravação?' },
       producao: { key: 'whatsapp_msg_producao', label: 'Ao falar com a produção', hint: 'Abre quando o convidado clica em "Falar com a produção".', fallback: 'Olá! Sou {nome} e gostaria de falar com a produção do {podcast}.' },
+      posgravacao: { key: 'whatsapp_msg_posgravacao', label: 'Na página pós-gravação', hint: 'Abre quando alguém toca em "Falar com a produção" na página pós-gravação (a do QR Code do cartão de agradecimento). A página é a mesma para todos os convidados: aqui o {nome} fica vazio.', fallback: 'Olá! Gravei no {podcast} e tenho uma dúvida sobre os próximos passos.' },
       portal: { key: 'whatsapp_msg_portal', label: 'No portal do convidado', hint: 'Abre quando o convidado clica em "Falar com a produção" no portal (por exemplo, para combinar outra forma de collab).', fallback: 'Olá! Sou {nome}. Vi o meu portal do {podcast} e queria combinar com a produção a forma das collabs.' },
     },
   },
