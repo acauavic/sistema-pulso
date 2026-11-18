@@ -142,8 +142,19 @@ Uma ligação pública de leitura, só com dados que já são públicos ou feito
 ## Ainda com o dono (antes de lançar, não antes de começar)
 
 - Fotos (mesa, cenário, plateia, hosts, apoio) e logo da Healthscale em boa qualidade.
-- Lista das redes com os links; link da comunidade no WhatsApp; texto curto de cada host (ou eu proponho).
-- Razão social/CNPJ e e-mail de contato para a política de privacidade.
+- Texto curto de cada host (eu proponho, o dono revisa).
+- Confirmar o CNPJ: veio com 13 dígitos (`2854163400070`); CNPJ tem 14.
+
+## Dados que o dono já passou (2026-11-18)
+
+- Comunidade no WhatsApp: `https://link.podcastpulso.com/omunidade` (leva ao grupo do WhatsApp).
+- Política e termos: **Acauã Media Serviços e Produtos Digitais Ltda**, CNPJ a confirmar, `contato@podcastpulso.com`.
+- Redes: YouTube `https://www.youtube.com/@podcastpulsobr`, Spotify `https://open.spotify.com/show/033hmEjQj5nG6wKx1jfI3T`,
+  Instagram `https://www.instagram.com/podcastpulso`, Threads `https://www.threads.com/@podcastpulso`,
+  X `https://x.com/podcastpulso`, Facebook `https://www.facebook.com/Podcastpulso/`.
+- **Episódios tocam no próprio site** (decidido pelo dono): player do YouTube e do Spotify. Minha decisão: o player só
+  carrega quando a pessoa toca (antes é a capa com o botão de play), para o site abrir rápido e nada de terceiros rodar
+  sem a pessoa escolher; a política de privacidade explica os players.
 
 ## Deixado ao construtor
 

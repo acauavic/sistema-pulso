@@ -115,7 +115,7 @@ patrocinador `prospect` com `origin = 'site'` e avisam a gestão (`notify`, tipo
 { version: 1, generated_at: ISO,
   mesa:      [{ name, credential, handle|null, audience, ep|null, photo|null }],          // kitGallery: kit_featured, ordem do kit
   episodios: [{ number|null, title, guest|null, aired_on|null 'YYYY-MM-DD', youtube_url|null, spotify_url|null,
-                youtube_id|null, cover|null }],                                          // status 'publicado' com youtube_url ou spotify_url; mais recente primeiro; até 24
+                youtube_id|null, spotify_kind 'episode'|'show'|null, spotify_id|null, cover|null }],                                          // status 'publicado' com youtube_url ou spotify_url; mais recente primeiro; até 24
   posts:     [{ url, title, published_at ISO, cover|null }],                              // publications com results[].platform='instagram' e url; até 12
   agenda: { vai_ao_ar: [{ date 'YYYY-MM-DD', name, handle|null, topic|null, photo|null }], // episódios não publicados com aired_on >= hoje (Brasília) + convidados agendados com premiere_on >= hoje e sem episódio
             gravacoes: [{ at ISO|null, name, handle|null, topic|null, photo|null, plateia: bool }] }, // agendados sem episódio, proposed_at >= ontem; plateia = audience_enabled e status 'disponivel'
@@ -124,7 +124,7 @@ patrocinador `prospect` com `origin = 'site'` e avisam a gestão (`notify`, tipo
   plateia: { abertas: number } }                                                          // audience.agenda().length quando settings().active, senão 0
 ```
 
-`photo`, `logo` e `cover` são URLs de `siteImages.signedUrl`. `youtube_id` é extraído de `youtube_url` (`watch?v=`, `youtu.be/`, `/shorts/`, `/live/`). Datas só-dia saem como texto `YYYY-MM-DD` (`to_char(..., 'YYYY-MM-DD')`), "hoje" é calculado em `America/Sao_Paulo`.
+`photo`, `logo` e `cover` são URLs de `siteImages.signedUrl`. `youtube_id` é extraído de `youtube_url` (`watch?v=`, `youtu.be/`, `/shorts/`, `/live/`); `spotify_kind`/`spotify_id` de `spotify_url` (`open.spotify.com/(intl-xx/)?(episode|show)/<id>`), para o site montar o player. Datas só-dia saem como texto `YYYY-MM-DD` (`to_char(..., 'YYYY-MM-DD')`), "hoje" é calculado em `America/Sao_Paulo`.
 
 - [ ] **Step 1: Write the failing tests** (`describe('Site: leitura pública')`):
   - `it('responde o contrato com as chaves de primeiro nível')` → `Object.keys(json)` igual a `['version','generated_at','mesa','episodios','posts','agenda','patrocinador_oficial','apoiadores','plateia']`, `version === 1`.
@@ -132,7 +132,7 @@ patrocinador `prospect` com `origin = 'site'` e avisam a gestão (`notify`, tipo
   - `it('apoiadores: só ganho/ativo/inativo com logo, sem os escondidos e sem o oficial')` → 6 patrocinadores (ativo com logo; inativo com logo; prospect com logo; ativo sem logo; ativo com logo e `site_hidden`; ativo com logo e `site_official`) → `apoiadores` tem os 2 primeiros e `patrocinador_oficial.company` é o último.
   - `it('agenda: estreia e estreia prevista em vai_ao_ar, agendado sem episódio em gravacoes')` → episódio não publicado `aired_on = amanhã`, convidado agendado com `premiere_on` e convidado agendado com `proposed_at` futuro; confere os nomes em cada bloco; convidado `perdido` não aparece.
   - `it('datas só-dia não mudam de dia')` → `aired_on = '2026-12-20'` sai `'2026-12-20'`.
-  - `it('episódios: só publicados com link, mais recente primeiro, com youtube_id')` → `youtube_url = 'https://youtu.be/abc123XYZ_-'` → `youtube_id === 'abc123XYZ_-'`.
+  - `it('episódios: só publicados com link, mais recente primeiro, com youtube_id')` → `youtube_url = 'https://youtu.be/abc123XYZ_-'` → `youtube_id === 'abc123XYZ_-'`; `spotify_url = 'https://open.spotify.com/intl-pt/episode/4rOoJ6Egrf8K2IrywzwOMk?si=x'` → `spotify_kind === 'episode'`, `spotify_id === '4rOoJ6Egrf8K2IrywzwOMk'`.
   - `it('responde com Cache-Control público e CORS do site')` → `access-control-allow-origin` igual a `SITE_ORIGIN`.
 - [ ] **Step 2: Run** → FAIL.
 - [ ] **Step 3: Implement** `siteData.build()` e a rota (CORS: `Access-Control-Allow-Origin` = origem pedida quando ela é uma das duas de `SITE_ORIGIN`, `Vary: Origin`).
