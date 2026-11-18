@@ -16,7 +16,7 @@
       <select name="platform"><% commentPlatforms.forEach(function (p) { %><option value="<%= p %>" <%= sel(r.platform, p) %>><%= platforms[p].label %></option><% }) %></select>
     </label>
     <label>Quais posts
-      <select name="scope"><option value="recentes" <%= sel(r.scope, 'recentes') %>>Os 10 posts mais recentes</option><option value="post" <%= sel(r.scope, 'post') %>>Um post específico</option></select>
+      <select name="scope"><option value="recentes" <%= sel(r.scope, 'recentes') %>>Qualquer post da conta</option><option value="post" <%= sel(r.scope, 'post') %>>Um post específico</option></select>
     </label>
   </div>
   <div data-when="scope=post">

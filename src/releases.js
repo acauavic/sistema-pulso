@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.74.1', date: '2026-11-17', title: 'Automações do Instagram criadas à mão também pela Outstand',
+    items: [
+      { kind: 'correcao', text: 'A automação de comentário criada em Social > Automações (para qualquer post da conta ou um post específico) agora responde pela Outstand, como a da publicação. A leitura antiga dependia da Upload-Post, que não está mais conectada.' },
+    ],
+  },
+  {
     version: '1.74.0', date: '2026-11-17', title: 'Automação "comentou, recebe no direct" na hora de publicar, e listas mais rápidas',
     items: [
       { kind: 'novo', text: 'Ao publicar um corte, um post ou vários de uma vez, ligue "Automação no Instagram": quem comentar a palavra (por padrão, o primeiro nome do convidado, como TAMIRIS) recebe no direct o link do episódio, do canal do YouTube ou da comunidade no WhatsApp. A chamada do Instagram passa a pedir a palavra sozinha, e a publicação e o corte mostram quantas respostas já saíram.' },

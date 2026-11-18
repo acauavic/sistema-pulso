@@ -383,9 +383,11 @@ router.post('/social/automacoes', requirePerm('social.automate'), wrap(async (re
   const { values: v, error } = parseRule(req.body);
   if (error) { await req.flash('error', error); return res.redirect('/social/automacoes?nova=1'); }
   const { rows: [r] } = await db.query(
-    `INSERT INTO social_rules (name, trigger, platform, scope, post_url, keywords, action, message, reply_text, buttons, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-    [v.name, v.trigger, v.platform, v.scope, v.post_url, v.keywords, v.action, v.message, v.reply_text, JSON.stringify(v.buttons), req.user.id]);
+    `INSERT INTO social_rules (name, trigger, platform, scope, post_url, keywords, action, message, reply_text, buttons, created_by, provider)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+    // comentário no Instagram: chega pela Outstand (aviso na hora); o resto continua pela leitura da Upload-Post
+    [v.name, v.trigger, v.platform, v.scope, v.post_url, v.keywords, v.action, v.message, v.reply_text, JSON.stringify(v.buttons), req.user.id,
+      v.trigger === 'comentario' && v.platform === 'instagram' && config.outstandConfigured ? 'outstand' : 'uploadpost']);
   await audit(req, 'automacao.criada', 'social_rule', r.id, { name: v.name });
   await req.flash('ok', 'Automação criada, ainda pausada. Revise e ative quando quiser.');
   res.redirect(`/social/automacoes/${r.id}`);

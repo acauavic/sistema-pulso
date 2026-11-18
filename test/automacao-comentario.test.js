@@ -149,4 +149,16 @@ describe('Automação de comentário → direct ao publicar (Outstand)', () => {
     assert.match(list, /Comentou GUTO/); assert.match(list, /Comentou TAMIRIS/);
     assert.match((await as.gestao.get(`/social/automacoes/${r2.id}`)).text, /Responde na hora/);
   });
+
+  it('automação criada à mão no Instagram também vai pela Outstand e vale para qualquer post da conta', async () => {
+    await as.gestao.act('/social/automacoes', { name: 'Link geral', trigger: 'comentario', platform: 'instagram', scope: 'recentes', keywords: 'pulso', action: 'dm', message: 'Aqui está o canal: {canal}' }, { from: '/social/automacoes' });
+    const [rule] = await q("SELECT * FROM social_rules WHERE name = 'Link geral'");
+    assert.equal(rule.provider, 'outstand'); assert.equal(rule.active, false, 'nasce pausada');
+    await as.gestao.act(`/social/automacoes/${rule.id}/ativar`, { confirmar: '1' }, { from: `/social/automacoes/${rule.id}` });
+    const before = calls.filter((c) => c.path === '/v1/conversations').length;
+    await deliver(comment({ commentId: 'c9', postId: null, platformPostId: '5555', text: 'amo o pulso' }));
+    await runInbox();
+    const sent = calls.filter((c) => c.path === '/v1/conversations');
+    assert.equal(sent.length, before + 1); assert.equal(sent.at(-1).body.content, 'Aqui está o canal: https://youtube.com/@pulso');
+  });
 });

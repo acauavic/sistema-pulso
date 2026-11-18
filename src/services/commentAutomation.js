@@ -186,9 +186,13 @@ async function handle(job) {
   const { rows: rules } = await db.query(
     `SELECT r.* FROM social_rules r
       WHERE r.active AND r.provider = 'outstand' AND r.trigger = 'comentario' AND r.platform = $1 AND (r.expires_at IS NULL OR r.expires_at > now())
-        AND (r.scope = 'recentes' OR (r.scope = 'publicacao' AND EXISTS (
-          SELECT 1 FROM episode_publications p, jsonb_array_elements(coalesce(p.results, '[]'::jsonb)) x
-           WHERE p.id = r.publication_id AND x->>'platform' = $1 AND ((x->>'ref' = $2 AND $2 IS NOT NULL) OR (x->>'post_id' = $3 AND $3 IS NOT NULL)))))
+        AND (r.scope = 'recentes'
+          OR (r.scope = 'publicacao' AND EXISTS (
+            SELECT 1 FROM episode_publications p, jsonb_array_elements(coalesce(p.results, '[]'::jsonb)) x
+             WHERE p.id = r.publication_id AND x->>'platform' = $1 AND ((x->>'ref' = $2 AND $2 IS NOT NULL) OR (x->>'post_id' = $3 AND $3 IS NOT NULL))))
+          OR (r.scope = 'post' AND EXISTS ( -- "um post específico" (pelo link): casa com a publicação que saiu naquele link
+            SELECT 1 FROM episode_publications p, jsonb_array_elements(coalesce(p.results, '[]'::jsonb)) x
+             WHERE x->>'platform' = $1 AND x->>'url' = r.post_url AND ((x->>'ref' = $2 AND $2 IS NOT NULL) OR (x->>'post_id' = $3 AND $3 IS NOT NULL)))))
       ORDER BY (r.scope = 'publicacao') DESC, r.id`, [m.network, m.post_ref, m.platform_post_id]);
   if (!rules.length) return done('Nenhuma automação para este post.');
   const item = { id: m.comment_id, author: m.author_username, text: m.text };
