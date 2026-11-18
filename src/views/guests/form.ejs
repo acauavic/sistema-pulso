@@ -74,6 +74,12 @@
         <span data-agenda-state></span>
         <button class="link small" type="button" data-agenda-review>Revisar confirmações</button>
       </p>
+      <div class="stack" data-stages="agendado" <%= stageOf('agendado') %>>
+        <label>Estreia prevista
+          <input type="date" name="premiere_on" value="<%= typeof values.premiere_on === 'string' ? values.premiere_on : fmt.toInputDate(values.premiere_on) %>">
+        </label>
+        <p class="small muted">Data em que o episódio deve ir ao ar. Aparece na agenda do site.</p>
+      </div>
       <dialog class="modal" data-agenda-dialog aria-labelledby="m-confirm-h">
         <div class="stack">
           <h2 id="m-confirm-h">Confirmar a data</h2>

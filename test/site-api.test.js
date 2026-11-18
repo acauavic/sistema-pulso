@@ -90,3 +90,56 @@ describe('Site: patrocinador oficial e esconder do site', () => {
 });
 
 after(async () => { await h.db.close(); });
+
+describe('Site: estreia prevista do convidado', () => {
+  let app; let as; let gid;
+  const premiere = async (id) => (await h.db.query('SELECT premiere_on::text AS p FROM guests WHERE id = $1', [id])).rows[0].p;
+  const form = (extra = {}) => ({
+    name: 'Dra. Estreia', instagram: '@dra.estreia', profile: 'medico', status: 'agendado', email: 'e@t.com',
+    proposed_at: '2026-12-10T14:00', scheduled_studio: '1', scheduled_hosts: '1', scheduled_guest: '1', ...extra,
+  });
+  before(async () => {
+    await h.resetDb();
+    app = await h.startServer();
+    await h.createUser({ name: 'Gil Gestão', email: 'gestao@t.com', role: 'gestao' });
+    as = h.client(app.base);
+    assert.equal((await as.login('gestao@t.com')).status, 302);
+    gid = (await h.db.query(`INSERT INTO guests (name, instagram, profile, status) VALUES ('Dra. Estreia', 'dra.estreia', 'medico', 'prospect') RETURNING id`)).rows[0].id;
+  });
+  after(async () => { await app.close?.(); });
+
+  it('salva a estreia prevista do convidado agendado', async () => {
+    const r = await as.act(`/convidados/${gid}`, form({ premiere_on: '2026-12-20' }), { from: `/convidados/${gid}/editar` });
+    assert.equal(r.status, 302, r.text.slice(0, 300));
+    assert.equal(await premiere(gid), '2026-12-20');
+    // salvar de novo sem mexer na data mantém o valor (o formulário devolve o campo)
+    const page = await as.get(`/convidados/${gid}/editar`);
+    assert.match(page.text, /name="premiere_on"[^>]*value="2026-12-20"/);
+    assert.match(page.text, /Estreia prevista/);
+    assert.match(page.text, /Aparece na agenda do site/);
+    assert.match(page.text, /data-stages="agendado"/);
+    // data inválida é recusada; vazio limpa
+    const bad = await as.act(`/convidados/${gid}`, form({ premiere_on: '2026-13-45' }), { from: `/convidados/${gid}/editar` });
+    assert.equal(bad.status, 400);
+    assert.equal(await premiere(gid), '2026-12-20');
+    await as.act(`/convidados/${gid}`, form({ premiere_on: '' }), { from: `/convidados/${gid}/editar` });
+    assert.equal(await premiere(gid), null);
+  });
+
+  it('o episódio nasce com aired_on = premiere_on do convidado', async () => {
+    await as.act(`/convidados/${gid}`, form({ premiere_on: '2026-12-20' }), { from: `/convidados/${gid}/editar` });
+    const r = await as.act(`/convidados/${gid}`, form({ premiere_on: '2026-12-20', status: 'gravado', proposed_at: '2026-11-01T14:00' }), { from: `/convidados/${gid}/editar` });
+    assert.equal(r.status, 302, r.text.slice(0, 300));
+    const { rows } = await h.db.query('SELECT aired_on::text AS a FROM episodes WHERE guest_id = $1', [gid]);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].a, '2026-12-20');
+  });
+
+  it('sem estreia prevista o episódio nasce sem aired_on', async () => {
+    const production = require('../src/services/production');
+    const g2 = (await h.db.query(`INSERT INTO guests (name, instagram, profile, status, premiere_on) VALUES ('Sem Estreia', 'sem.estreia', 'medico', 'gravado', NULL) RETURNING id`)).rows[0].id;
+    const ep = await production.createEpisode({ title: 'X', guestId: g2 });
+    const { rows } = await h.db.query('SELECT aired_on FROM episodes WHERE id = $1', [ep.id]);
+    assert.equal(rows[0].aired_on, null);
+  });
+});
