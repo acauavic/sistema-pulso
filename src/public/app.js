@@ -369,15 +369,17 @@
       const cat = slot.querySelector('[data-goal-cat]'); const metric = slot.querySelector('[data-goal-metric]');
       const display = slot.querySelector('[data-goal-display]'); const target = slot.querySelector('[data-goal-target]');
       if (!cat || !metric) return;
-      const all = [...metric.options].map((o) => ({ value: o.value, text: o.textContent, cat: o.dataset.cat || '', rate: o.dataset.rate === '1' }));
+      const all = [...metric.options].map((o) => ({ value: o.value, text: o.textContent, cat: o.dataset.cat || '', rate: o.dataset.rate === '1', param: o.dataset.param === '1' }));
+      const param = slot.querySelector('[data-goal-param]'); // "Vídeos entregues": o tipo de vídeo só aparece para ela
       const sync = () => {
         const rate = Boolean(all.find((o) => o.value === metric.value && o.rate));
+        if (param) param.hidden = !all.find((o) => o.value === metric.value && o.param);
         if (display) { if (rate) display.value = 'porcentagem'; display.disabled = rate; }
         if (target) { target.max = rate ? '100' : ''; target.placeholder = rate ? 'ex.: 40 (%)' : 'ex.: 20'; }
       };
       const fill = () => {
         const keep = metric.value;
-        metric.replaceChildren(...all.filter((o) => !o.value || !cat.value || o.cat === cat.value).map((o) => { const el = new Option(o.text, o.value); el.dataset.cat = o.cat; if (o.rate) el.dataset.rate = '1'; return el; }));
+        metric.replaceChildren(...all.filter((o) => !o.value || !cat.value || o.cat === cat.value).map((o) => { const el = new Option(o.text, o.value); el.dataset.cat = o.cat; if (o.rate) el.dataset.rate = '1'; if (o.param) el.dataset.param = '1'; return el; }));
         metric.value = [...metric.options].some((o) => o.value === keep) ? keep : '';
         sync();
       };

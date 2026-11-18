@@ -10,10 +10,16 @@ const { ROLES } = require('../permissions');
 const router = express.Router();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// os tipos de vídeo da meta "Vídeos entregues" (Gestão > Categorias; cortes do episódio contam em "Cortes subidos")
+const videoTypes = () => {
+  const K = require('../services/contentRequests').KINDS;
+  return require('../services/catalog').videoOptions().filter((k) => K[k] && K[k].media === 'video' && !K[k].continuous).map((k) => ({ key: k, label: K[k].label }));
+};
+
 router.get('/gestao/metas', requirePerm('goals.manage'), wrap(async (req, res) => {
   res.render('gestao/metas', {
     title: 'Metas', people: await goals.overview(), METRICS: goals.METRICS, CATEGORIES: goals.CATEGORIES, PERIODS: goals.PERIODS, DISPLAYS: goals.DISPLAYS,
-    MAX: goals.MAX_PER_PERSON, ROLES, openFor: UUID.test(String(req.query.pessoa || '')) ? req.query.pessoa : '',
+    MAX: goals.MAX_PER_PERSON, ROLES, videoTypes: videoTypes(), openFor: UUID.test(String(req.query.pessoa || '')) ? req.query.pessoa : '',
   });
 }));
 

@@ -18,8 +18,16 @@
       <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>" <%= u.id === currentUser.id ? 'selected' : '' %>><%= u.name %></option><% }) %></select></label>
       <label>Vence em<input type="date" name="due_on"></label>
       <label>Hora<input type="time" name="due_time" title="Sem data, a hora vale para hoje"></label>
-      <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
+      <label>Categoria<select name="kind"><% Object.keys(C.TASK_KINDS).filter(function (k) { return !C.TASK_KINDS_OFF || !C.TASK_KINDS_OFF.has(k); }).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
     </div>
+    <label class="task-repeat">Repetir
+      <select name="repete" data-native>
+        <option value="">Não repete</option>
+        <option value="dia_util">Todo dia útil</option>
+        <option value="semana">Toda semana, no mesmo dia</option>
+        <option value="mes">Todo mês, no mesmo dia</option>
+      </select>
+    </label>
     <details <%= prefill.episode_id || prefill.guest_id || prefill.sponsor_id ? 'open' : '' %>>
       <summary>Ligar a um episódio, convidado ou patrocinador</summary>
       <div class="form-grid form-grid-3 top-gap">

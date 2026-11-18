@@ -2023,3 +2023,13 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
 .best-txt:hover strong { text-decoration: underline; }
 @media (max-width: 640px) { .best-list li { grid-template-columns: 24px minmax(0, 1fr); } .best-list .post-nums { grid-column: 2; } }
 .post-nums { display: inline-flex; flex-wrap: wrap; gap: 10px; color: var(--text-2); } .post-nums > span { display: inline-flex; align-items: center; gap: 4px; } .post-nums .icon { margin: 0; color: var(--muted); }
+
+/* Gestão > Categorias: uma linha por tipo de vídeo ou categoria de tarefa (nome, chips neutros "padrão" e "desativado", quanto já foi
+   usado em mono, Renomear e o interruptor de ativo à direita). Desativado fica apagado. */
+.cat-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; }
+.cat-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.cat-row.off .cat-name { opacity: .6; }
+.cat-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cat-actions { align-items: center; gap: 12px; }
+.task-repeat-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--text-2); margin: 6px 0 0; } .task-repeat-line .icon { color: var(--muted); }
+@media (max-width: 640px) { .cat-row { grid-template-columns: minmax(0, 1fr) auto; } .cat-actions { grid-column: 1 / -1; justify-content: flex-end; } }

@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.83.0', date: '2026-11-18', title: 'Categorias, tipos de vídeo e rotinas que se repetem',
+    items: [
+      { kind: 'novo', text: 'Gestão > Sistema > Categorias: os tipos de vídeo (os de sempre, como Corte, Bastidores, Q&A e Trailer, e os que você criar) e as categorias de tarefa. Dá para criar, renomear e desativar; o que já existe continua com o nome.' },
+      { kind: 'novo', text: 'Os tipos de vídeo novos aparecem em Pedir conteúdo, e a meta nova "Vídeos entregues" conta, por tipo, os vídeos que a pessoa enviou para revisão (cada vídeo uma vez). Exemplo: Bastidores, 3 por semana, para o editor.' },
+      { kind: 'novo', text: 'Rotinas que se repetem, em Gestão > Rotinas: todo dia útil, toda semana (nos dias escolhidos) ou todo mês (no dia escolhido), com hora e responsável. Elas criam uma tarefa ou um pedido de conteúdo do tipo de vídeo escolhido.' },
+      { kind: 'novo', text: '"Repetir" na tarefa nova: todo dia útil, toda semana ou todo mês. A tarefa mostra que se repete, e quem criou pode parar a repetição.' },
+      { kind: 'ajuste', text: 'Na tarefa, "Tipo" passou a se chamar "Categoria".' },
+    ],
+  },
+  {
     version: '1.82.0', date: '2026-11-18', title: 'Material do patrocinador em pastas',
     items: [
       { kind: 'novo', text: 'Aba Material na página do patrocinador, a partir de Ganho (também em Ativo e Inativo). As pastas são Logos, Moldura, QR Code e Material da marca, como no material do episódio: abrir a pasta, ver a miniatura, baixar um arquivo ou Selecionar e Baixar tudo num ZIP.' },

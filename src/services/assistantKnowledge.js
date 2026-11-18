@@ -4,6 +4,16 @@
 // Mantenha este arquivo junto das mudanças do sistema: assunto novo ou fluxo que mudou entra aqui.
 const TOPICS = [
   {
+    key: 'categorias', title: 'Categorias de tarefa e tipos de vídeo', words: ['categoria', 'categorias', 'tipo de vídeo', 'tipos de vídeo', 'tipo de video', 'novo tipo', 'bastidor', 'vídeos entregues', 'videos entregues', 'desativar categoria'],
+    where: 'Gestão > Sistema > Categorias', perm: 'catalog.manage',
+    steps: [
+      'Em Gestão > Sistema > Categorias ficam os tipos de vídeo e as categorias de tarefa. Os que já existiam vêm marcados "padrão".',
+      'Para criar: "Novo tipo de vídeo" ou "Nova categoria", com o nome. Já aparece nas listas: o tipo de vídeo em Pedir conteúdo, nas rotinas e nas metas; a categoria na tarefa nova e nas rotinas.',
+      'Renomear muda o nome em todo o sistema. Para tirar de uso, desative pelo interruptor: some das listas de escolha, mas o que já existe continua com o nome (nada se apaga).',
+      'A meta "Vídeos entregues" (Gestão > Metas) conta, por tipo de vídeo, os vídeos que a pessoa enviou para revisão; cada vídeo conta uma vez, mesmo se voltar com ajustes.',
+    ],
+  },
+  {
     key: 'tarefas', title: 'Tarefas', words: ['tarefa', 'tarefas', 'to-do', 'afazer', 'prazo', 'hora', 'vencimento', 'atrasada', 'quadro de tarefas', 'rotina de tarefa', 'rotinas'],
     where: '/tarefas', perm: 'tasks.write',
     steps: [
@@ -11,7 +21,8 @@ const TOPICS = [
       'Criar: botão "Nova tarefa". Campos: o que fazer, detalhes (texto formatado), responsável, "Vence em" e "Hora" (opcional; só a hora vale para hoje), tipo e, se quiser, o episódio, convidado ou patrocinador ligado.',
       'Com hora, a tarefa atrasa quando a hora passa; sem hora, só no dia seguinte. A pessoa recebe aviso ao receber a tarefa, quando o prazo muda, de manhã no dia, na última hora e quando atrasa.',
       'Os detalhes aceitam negrito, listas, tabelas, links (só a URL ou miniatura), imagens coladas com Ctrl+V e anexos PDF, HTML e ZIP.',
-      'Rotinas de tarefas (Gestão > Rotinas de tarefas) criam tarefas sozinhas em momentos da produção, como "episódio liberado para edição".',
+      'Rotinas de tarefas (Gestão > Rotinas de tarefas) criam tarefas sozinhas em momentos da produção, como "episódio liberado para edição", ou repetindo: todo dia útil, toda semana (nos dias marcados) ou todo mês, criando uma tarefa ou um pedido de conteúdo.',
+      'Na tarefa nova, "Repetir" (todo dia útil, toda semana ou todo mês, no mesmo dia) faz a tarefa voltar sozinha. Na tarefa, "parar de repetir" encerra (quem criou ou a gestão). A categoria da tarefa pode ser uma das criadas em Gestão > Categorias.',
       'Pelo assistente: "criar_tarefa" cria (pode escolher responsável, prazo e hora) e "atualizar_tarefa" muda status, prazo, hora e responsável.',
     ],
   },

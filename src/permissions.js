@@ -63,7 +63,8 @@ const PERMISSIONS = {
   'search.manage': ['superadmin', 'gestao'],            // atalhos e sugestões da busca global
   'contacts.manage': ['superadmin', 'gestao'],          // WhatsApp para onde vão os botões dos convites e do media kit, e as mensagens prontas
   'outreach.manage': ['superadmin', 'gestao'],          // cadência de abordagem: intervalos e o painel de follow-ups
-  'goals.manage': ['superadmin', 'gestao'],             // Gestão > Metas: definir as metas de cada pessoa e ver o andamento de todos
+  'goals.manage': ['superadmin', 'gestao'],
+  'catalog.manage': ['superadmin', 'gestao'],           // Gestão > Categorias: tipos de vídeo e categorias de tarefa             // Gestão > Metas: definir as metas de cada pessoa e ver o andamento de todos
   'duplicates.manage': ['superadmin', 'gestao'], // lista de duplicatas (convidados e patrocinadores); o aviso no cadastro e o juntar seguem guests/sponsors.write
   'audit.read': ['superadmin', 'gestao'],
   'trash.manage': ['superadmin', 'gestao'], // ver e restaurar tudo da lixeira e apagar de vez (cada pessoa vê e restaura o que ela apagou)

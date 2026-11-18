@@ -20,6 +20,7 @@ function registerRoutines() {
   scheduler.every('publicacoes', 30_000, () => require('./services/publishing').tick());
   scheduler.every('contas-redes', 15 * 60_000, () => require('./services/socialHealth').tick(), { delayMs: 60_000 }); // vigia contas desconectadas e avisa a gestão
   scheduler.every('fila-travada', 60_000, () => require('./services/jobs').recoverStuck());
+  scheduler.every('rotinas-recorrentes', 15 * 60_000, () => require('./services/recurring').tick(), { delayMs: 25_000 }); // rotinas que se repetem: a tarefa ou o pedido do dia
   scheduler.every('tarefas-vencendo', 15 * 60_000, () => require('./services/tasks').dueTick(), { delayMs: 20_000 });
   scheduler.every('lembretes', 5 * 60_000, () => require('./services/reminders').tick(), { delayMs: 30_000 });
   scheduler.every('google-agenda', 60_000, () => require('./services/googleCalendar').tick(), { delayMs: 40_000 });
