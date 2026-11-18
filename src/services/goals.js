@@ -1,7 +1,8 @@
 // Metas por pessoa (Gestão > Equipe > Metas): até 3 por pessoa, contadas sozinhas com o que o sistema já registra.
 // Cada meta: o que contar (METRICS), o período (dia útil, semana de segunda a domingo, mês), o alvo e como aparece no Início
 // ("12 de 20" ou a porcentagem da meta). Taxas (aceite, tarefas no prazo) são porcentagem e aparecem sempre assim.
-// Quem conta o quê: convites, aceites e gravações marcadas contam pelo responsável do convidado; abordagens, por quem registrou;
+// Quem conta o quê: convites, aceites e gravações marcadas contam pelo responsável do convidado; abordagens, por quem registrou (as de
+// patrocinador, só a primeira de cada um: follow-up não é abordagem nova);
 // reuniões, por quem marcou; patrocínios fechados, pelo responsável do patrocinador; cortes e versões novas, por quem subiu;
 // posts, por quem publicou; entregas de episódio, por quem enviou para revisão; tarefas, pela pessoa da tarefa. As "da equipe"
 // dão o mesmo número para quem tiver a meta.
@@ -49,14 +50,18 @@ const METRICS = {
     } },
   abordagens_convidados: { cat: 'convidados', label: 'Abordagens de convidados', unit: ['abordagem', 'abordagens'], kind: 'count', hint: 'abordagens registradas pela pessoa (Registrar abordagem)',
     value: (u, f, t) => count(outreach('guest'), [u, f, t]) },
-  abordagens_patrocinadores: { cat: 'patrocinadores', label: 'Abordagens de patrocinadores', unit: ['abordagem', 'abordagens'], kind: 'count', hint: 'abordagens registradas pela pessoa (Registrar abordagem)',
-    value: (u, f, t) => count(outreach('sponsor'), [u, f, t]) },
+  abordagens_patrocinadores: { cat: 'patrocinadores', label: 'Abordagens novas de patrocinadores', unit: ['abordagem nova', 'abordagens novas'], kind: 'count', hint: 'primeiras abordagens de patrocinadores registradas pela pessoa (Registrar abordagem); follow-up não conta',
+    value: (u, f, t) => count(`WITH ${B}, ${require('./outreach').SPONSOR_SENDS} SELECT count(*)::int AS n FROM firsts, b WHERE firsts.user_id = $1 AND firsts.at >= b.s`, [u, f, t]) },
   reunioes_agendadas: { cat: 'patrocinadores', label: 'Reuniões agendadas', unit: ['reunião', 'reuniões'], kind: 'count', hint: 'reuniões com patrocinador marcadas pela pessoa',
     value: (u, f, t) => count(`WITH ${B} SELECT count(*)::int AS n FROM sponsor_meetings m, b
       WHERE coalesce(m.created_by, m.owner_id) = $1 AND m.status = 'marcada' AND m.created_at >= b.s AND m.created_at < b.e`, [u, f, t]) },
   patrocinios_fechados: { cat: 'patrocinadores', label: 'Patrocínios fechados', unit: ['patrocínio', 'patrocínios'], kind: 'count', hint: 'patrocinadores da pessoa que entraram em Ganho',
     value: (u, f, t) => count(`WITH ${B} SELECT count(DISTINCT e.sponsor_id)::int AS n FROM sponsor_events e JOIN sponsors s ON s.id = e.sponsor_id, b
       WHERE e.type = 'etapa' AND e.message LIKE '%→ Ganho%' AND coalesce(s.owner_id, e.user_id) = $1 AND e.created_at >= b.s AND e.created_at < b.e`, [u, f, t]) },
+  // param = o tipo de vídeo (Gestão > Categorias). Conta a primeira vez que cada vídeo foi enviado para revisão, por quem enviou.
+  videos_entregues: { cat: 'conteudo', label: 'Vídeos entregues', unit: ['vídeo', 'vídeos'], kind: 'count', param: 'video_type', hint: 'pedidos de vídeo do tipo escolhido que a pessoa enviou para revisão (cada vídeo conta uma vez, na primeira entrega)',
+    value: (u, f, t, param) => count(`WITH ${B} SELECT count(*)::int AS n FROM content_requests r, b
+      WHERE r.delivered_by = $1 AND r.kind = $4 AND r.first_delivered_at >= b.s AND r.first_delivered_at < b.e`, [u, f, t, param || '']) },
   cortes_subidos: { cat: 'conteudo', label: 'Cortes subidos', unit: ['corte', 'cortes'], kind: 'count', hint: 'cortes que a pessoa subiu',
     value: (u, f, t) => count(`WITH ${B} SELECT count(*)::int AS n FROM episode_clips c, b
       WHERE c.created_by = $1 AND c.source = 'upload' AND c.created_at >= b.s AND c.created_at < b.e`, [u, f, t]) },
@@ -125,7 +130,7 @@ async function progress(goal, today = cal.todayISO()) {
   if (!m) return null;
   const p = periodOf(goal.period, today);
   const target = Number(goal.target);
-  const raw = await m.value(goal.user_id, p.from, p.to);
+  const raw = await m.value(goal.user_id, p.from, p.to, goal.param);
   let value; let detail = '';
   if (m.kind === 'rate') {
     value = raw.den ? Math.round((raw.num / raw.den) * 100) : null;
@@ -133,7 +138,8 @@ async function progress(goal, today = cal.todayISO()) {
   } else value = raw;
   const ratio = value === null || value === undefined ? 0 : Math.max(0, Math.min(1, value / target));
   const met = value !== null && value !== undefined && value >= target;
-  const out = { id: goal.id, metric: goal.metric, label: m.label, period: goal.period, periodLabel: p.label, target, value, met, bar: Math.round(ratio * 100), team: Boolean(m.team), kind: m.kind };
+  const typeLabel = m.param ? (require('./contentRequests').KINDS[goal.param]?.label || 'tipo removido') : null;
+  const out = { id: goal.id, metric: goal.metric, param: goal.param || null, label: typeLabel ? `${m.label} · ${typeLabel}` : m.label, period: goal.period, periodLabel: p.label, target, value, met, bar: Math.round(ratio * 100), team: Boolean(m.team), kind: m.kind };
   if (value === null || value === undefined) {
     out.main = '—'; out.rest = ''; out.note = m.kind === 'rate' ? detail : 'sem leitura no período';
   } else if (m.kind === 'rate') {
@@ -173,7 +179,13 @@ function parseSlots(body) {
     if (!Number.isFinite(target) || target <= 0 || target > 100000) return { error: `Meta ${i} (${m.label}): o alvo precisa ser um número maior que zero.` };
     if (m.kind === 'rate' && target > 100) return { error: `Meta ${i} (${m.label}): uma taxa vai até 100%.` };
     const display = m.kind === 'rate' ? 'porcentagem' : (DISPLAYS[body[`display_${i}`]] ? body[`display_${i}`] : 'numero');
-    goals.push({ metric, period, target: Math.round(target * 100) / 100, display, position: goals.length });
+    let param = null;
+    if (m.param === 'video_type') {
+      param = String(body[`param_${i}`] || '');
+      const K = require('./contentRequests').KINDS;
+      if (!K[param] || K[param].media !== 'video' || K[param].continuous) return { error: `Meta ${i} (${m.label}): escolha o tipo de vídeo.` };
+    }
+    goals.push({ metric, period, target: Math.round(target * 100) / 100, display, position: goals.length, ...(param ? { param } : {}) });
   }
   return { goals };
 }
@@ -184,8 +196,8 @@ async function saveFor(userId, goals, actorId) {
     await client.query('BEGIN');
     await client.query('DELETE FROM user_goals WHERE user_id = $1', [userId]);
     for (const g of goals.slice(0, MAX_PER_PERSON)) {
-      await client.query('INSERT INTO user_goals (user_id, metric, period, target, display, position, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-        [userId, g.metric, g.period, g.target, g.display, g.position, actorId]);
+      await client.query('INSERT INTO user_goals (user_id, metric, period, target, display, position, created_by, param) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [userId, g.metric, g.period, g.target, g.display, g.position, actorId, g.param || null]);
     }
     await client.query('COMMIT');
   } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }

@@ -1,0 +1,48 @@
+<%
+  // No Início da produtora: as próximas gravações (todas: a produção cuida de todas) e reuniões (as dela), e as tarefas dela que
+  // vencem até daqui a uma semana ou já venceram. Variáveis: mineNow (myDay.now).
+  var agenda = mineNow.agenda, tasks = mineNow.tasks;
+%>
+<div class="grid-2 tight">
+  <section class="card" aria-labelledby="agenda-h">
+    <h2 id="agenda-h">Próximas gravações e reuniões</h2>
+    <% if (!agenda.length) { %>
+      <div class="empty">
+        <%- include('pulse-line') %>
+        <strong>Nada marcado</strong>
+        <span>Gravações (convidado em Agendado) e reuniões com patrocinador aparecem aqui.</span>
+      </div>
+    <% } %>
+    <ul class="plain upcoming">
+      <% agenda.forEach(function (x) { var meet = x.kind === 'reuniao'; %>
+      <li>
+        <span class="date-block"><span class="m"><%= fmt.monthShort(x.at) %></span><span class="d"><%= fmt.dayNum(x.at) %></span></span>
+        <span>
+          <a href="<%= meet ? '/patrocinadores/' + x.id + '#reunioes' : '/convidados/' + x.id %>"><strong><%= meet ? 'Reunião com ' + x.title : x.title %></strong></a><br>
+          <span class="upcoming-meta"><span class="mono muted"><%= fmt.formatDateTime(x.at).slice(-5) %></span> <span class="badge <%= meet ? '' : 'b-st-agendado' %>"><%= meet ? 'reunião' : 'gravação' %></span><% if (!meet && x.detail) { %><span class="muted"> · <%= x.detail %></span><% } %></span>
+        </span>
+      </li>
+      <% }) %>
+    </ul>
+  </section>
+
+  <section class="card" aria-labelledby="tarefas-h">
+    <div class="today-head"><h2 id="tarefas-h">Suas tarefas</h2><a class="small" href="/tarefas">Ver todas</a></div>
+    <% if (!tasks.length) { %>
+      <div class="empty">
+        <%- include('pulse-line') %>
+        <strong>Nenhuma tarefa sua para os próximos dias</strong>
+        <span>As tarefas em que você é a responsável, com prazo até daqui a uma semana, aparecem aqui.</span>
+      </div>
+    <% } %>
+    <ul class="plain today-list">
+      <% tasks.forEach(function (x) { %>
+      <li>
+        <a href="/tarefas/<%= x.id %>"><strong><%= x.title %></strong></a>
+        <span class="mono small muted"><%= fmt.formatDayShort(x.due) %><%= fmt.formatTime(x.due_time) ? ' · ' + fmt.formatTime(x.due_time) : '' %></span>
+        <% if (x.late) { %><span class="outreach-chip bad small">atrasada</span><% } else if (x.today) { %><span class="outreach-chip warn small">hoje</span><% } %>
+      </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>

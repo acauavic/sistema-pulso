@@ -1,10 +1,10 @@
 <%
   // Resumo do dia no Início. day: { day, today, min, isToday, weekday, prev, next }; ds: daySummary.summary().
   // Um painel só, com três caminhos desenhados como linha com pontos (do convite ao episódio, da prospecção ao patrocínio, e o do
-  // conteúdo) e as redes e tarefas embaixo. O número grande é o do dia; embaixo, como estava no fim dele (hoje: até agora). Ponto
-  // aceso = algo aconteceu no dia; número zerado fica apagado. Medir não é ação: o único lime é o ponto "ao vivo" de hoje.
+  // conteúdo), os motivos de perda dos convidados (30 dias) e as redes e tarefas embaixo. O número grande é o do dia; embaixo, como
+  // estava no fim dele (hoje: até agora). Ponto aceso = algo aconteceu no dia; número zerado fica apagado. Medir não é ação: o único
+  // lime é o ponto "ao vivo" de hoje.
   var g = ds.guests, sp = ds.sponsors, e = ds.episodes, c = ds.clips, sc = ds.scheduled, t = ds.tasks, s = ds.social;
-  var link = function (d) { return '/?dia=' + d + '#resumo'; };
   var num = function (n) { return Number(n).toLocaleString('pt-BR'); };
   var signed = function (n) { return n === null || n === undefined ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('pt-BR'); };
   var plural = function (n, one, many) { return Number(n) === 1 ? one : many; };
@@ -59,13 +59,7 @@
 <section class="day-sum" id="resumo" aria-labelledby="resumo-h">
   <div class="day-sum-head">
     <h2 id="resumo-h">Resumo do dia <span class="day-when"><% if (day.isToday) { %><span class="day-live" aria-hidden="true"></span>HOJE, ATÉ AGORA<% } else { %><%= day.weekday.toUpperCase() %><% } %></span></h2>
-    <form class="day-nav" method="get" action="/#resumo">
-      <% if (day.prev) { %><a class="btn sm" href="<%= link(day.prev) %>" aria-label="Dia anterior"><%- icon('chevron-left') %></a><% } else { %><span class="btn sm" aria-disabled="true"><%- icon('chevron-left') %></span><% } %>
-      <label class="sr-only" for="dia-escolha">Escolher o dia</label>
-      <input type="date" id="dia-escolha" name="dia" value="<%= day.day %>" min="<%= day.min %>" max="<%= day.today %>" data-day-pick>
-      <% if (day.next) { %><a class="btn sm" href="<%= link(day.next) %>" aria-label="Próximo dia"><%- icon('chevron-right') %></a><% } else { %><span class="btn sm" aria-disabled="true"><%- icon('chevron-right') %></span><% } %>
-      <% if (!day.isToday) { %><a class="btn sm ghost" href="/#resumo">Hoje</a><% } %>
-    </form>
+    <%- include('day-nav') %>
   </div>
 
   <div class="day-panel">
@@ -77,6 +71,7 @@
       </div>
       <% flow(flowGuests) %>
     </section>
+    <%- include('loss-reasons', { losses: ds.losses, mineOnly: false, bandId: 'day-b-loss' }) %>
     <% } %>
 
     <% if (can('sponsors.read')) { %>

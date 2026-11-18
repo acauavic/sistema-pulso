@@ -1,6 +1,7 @@
 // Cadência de abordagem: cada contato com um convidado (etapa "Convite enviado") ou patrocinador (etapa "Prospecção") é registrado
 // por canal e endereço (Instagram, e-mail, WhatsApp, telefone), o sistema diz quando é o próximo follow-up e quando parece perdido
-// (sem resposta depois da última tentativa). A gestão configura os intervalos e a meta diária de patrocinadores.
+// (sem resposta depois da última tentativa). A gestão configura os intervalos; a meta diária de abordagens novas de patrocinadores fica
+// em Gestão > Metas.
 // O sistema só INDICA o possível perdido; quem decide é a pessoa.
 const db = require('../db/pool');
 const settingsSvc = require('./settings');
@@ -16,6 +17,20 @@ const KINDS = {
 };
 const DEFAULTS = { guest: [3, 4, 7, 7], sponsor: [3, 5, 7, 14] };
 const MAX_STEPS = 10;
+
+// Abordagens enviadas a patrocinadores, cada uma com o seu ciclo: o ciclo recomeça quando o patrocinador volta para Prospecção, e a
+// abordagem é do ciclo em que foi registrada (como a cadência conta). "firsts" é a primeira de cada ciclo, a abordagem nova (é ela
+// que a meta de abordagens conta); as outras são follow-up. Usa o CTE "b" (s, e) de quem chama e só olha o que aconteceu antes do
+// fim dele.
+const SPONSOR_SENDS = `sends AS (
+    SELECT a.id, a.subject_id AS sponsor_id, a.user_id, a.at,
+           coalesce((SELECT max(l.changed_at) FROM sponsor_stage_log l
+                      WHERE l.sponsor_id = a.subject_id AND l.to_stage = 'prospect' AND l.changed_at <= a.created_at), '-infinity') AS cycle
+      FROM outreach_attempts a JOIN sponsors s ON s.id = a.subject_id, b
+     WHERE a.subject_type = 'sponsor' AND a.result = 'enviado' AND a.at < b.e),
+  firsts AS (SELECT DISTINCT ON (sponsor_id, cycle) sponsor_id, cycle, user_id, at FROM sends ORDER BY sponsor_id, cycle, at, id)`;
+// De $1 a $2 (datas de Brasília, inclusive).
+const RANGE = `b AS (SELECT ($1::date)::timestamp AT TIME ZONE '${TZ}' AS s, ($2::date + 1)::timestamp AT TIME ZONE '${TZ}' AS e)`;
 
 const dayOf = (ts) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(ts));
 const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
@@ -37,7 +52,7 @@ async function config() {
   return { guest: parseSteps((saved.guest || []).join(','), DEFAULTS.guest), sponsor: parseSteps((saved.sponsor || []).join(','), DEFAULTS.sponsor) };
 }
 
-// body: { guest: "3, 4, 7", sponsor: "..." }. As metas (inclusive a de abordagens de patrocinadores) ficam em Gestão > Metas.
+// body: { guest: "3, 4, 7", sponsor: "..." }. As metas (inclusive a de abordagens novas de patrocinadores) ficam em Gestão > Metas.
 async function saveConfig(body) {
   const cur = await config();
   const next = { guest: parseSteps(body.guest, cur.guest), sponsor: parseSteps(body.sponsor, cur.sponsor) };
@@ -45,7 +60,7 @@ async function saveConfig(body) {
   return next;
 }
 
-// Meta diária de abordagens de patrocinadores de cada pessoa (0 = sem meta), definida em Gestão > Metas.
+// Meta diária de abordagens novas de patrocinadores de cada pessoa (0 = sem meta), definida em Gestão > Metas.
 async function goals(users) {
   const own = await require('./goals').dailySponsorTargets(users.map((u) => u.id));
   return new Map(users.map((u) => [u.id, own.get(u.id) || 0]));
@@ -146,8 +161,11 @@ async function remove(attemptId) {
 }
 
 // ---------------------------------------------------------------- meta diária e painel de hoje
-const sponsorSendsToday = async (userId) => Number((await db.query(
-  `SELECT count(*)::int AS n FROM outreach_attempts WHERE subject_type = 'sponsor' AND result = 'enviado' AND user_id = $1 AND (at AT TIME ZONE '${TZ}')::date = $2::date`, [userId, cal.todayISO()])).rows[0].n);
+// Abordagens novas (a primeira de cada patrocinador no ciclo) que a pessoa registrou hoje: é o que a meta diária conta.
+const sponsorFirstsToday = async (userId) => {
+  const today = cal.todayISO();
+  return Number((await db.query(`WITH ${RANGE}, ${SPONSOR_SENDS} SELECT count(*)::int AS n FROM firsts, b WHERE firsts.user_id = $3 AND firsts.at >= b.s`, [today, today, userId])).rows[0].n);
+};
 
 // O que a pessoa tem para fazer hoje: follow-ups dela (e o que está sem dono, que é de todos) + meta de patrocinadores.
 async function todayFor(user) {
@@ -157,7 +175,7 @@ async function todayFor(user) {
     .sort((a, b) => ({ possivel_perdido: 2, atrasado: 0, hoje: 1 }[a.state] - { possivel_perdido: 2, atrasado: 0, hoje: 1 }[b.state]) || a.name.localeCompare(b.name, 'pt-BR'));
   const toApproach = [...s.values()].filter((x) => x.state === 'a_abordar' && x.owner_id === user.id).length;
   const target = (await goals([{ id: user.id, role: user.role }])).get(user.id);
-  return { items, toApproach, goal: { target, done: await sponsorSendsToday(user.id) } };
+  return { items, toApproach, goal: { target, done: await sponsorFirstsToday(user.id) } };
 }
 
 // ---------------------------------------------------------------- painel da gestão
@@ -168,7 +186,8 @@ async function report(days) {
   const [{ rows: perChannel }, { rows: perUser }, { rows: perDay }, { rows: users }, g, s, cfg] = await Promise.all([
     db.query(`SELECT a.subject_type, a.channel, count(*) FILTER (WHERE a.result = 'enviado')::int AS sent, count(*) FILTER (WHERE a.result = 'respondeu')::int AS replies FROM outreach_attempts a WHERE ${win} GROUP BY 1, 2`, [from, to]),
     db.query(`SELECT a.user_id, a.subject_type, count(*) FILTER (WHERE a.result = 'enviado')::int AS sent, count(*) FILTER (WHERE a.result = 'respondeu')::int AS replies FROM outreach_attempts a WHERE ${win} GROUP BY 1, 2`, [from, to]),
-    db.query(`SELECT a.user_id, to_char((a.at AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS day, count(*)::int AS sent FROM outreach_attempts a WHERE a.subject_type = 'sponsor' AND a.result = 'enviado' AND ${win} GROUP BY 1, 2`, [from, to]),
+    // a meta conta abordagens novas (a primeira de cada patrocinador no ciclo); follow-up não entra
+    db.query(`WITH ${RANGE}, ${SPONSOR_SENDS} SELECT user_id, to_char((at AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS day, count(*)::int AS sent FROM firsts, b WHERE firsts.at >= b.s GROUP BY 1, 2`, [from, to]),
     db.query("SELECT id, name, role FROM users WHERE active AND role IN ('superadmin','gestao','produtora') ORDER BY lower(name)"),
     evaluateAll('guest'), evaluateAll('sponsor'), config(),
   ]);
@@ -183,9 +202,9 @@ async function report(days) {
     const target = goalOf.get(u.id) || 0;
     const sentByDay = new Map(perDay.filter((r) => r.user_id === u.id).map((r) => [r.day, r.sent]));
     const hit = target ? goalDays.filter((d) => (sentByDay.get(d) || 0) >= target).length : 0;
-    const sponsorSent = mine('sponsor').sent;
+    const newOnes = [...sentByDay.values()].reduce((n, v) => n + v, 0); // abordagens novas na janela (a média é das novas, como a meta)
     const overdue = [...g.values(), ...s.values()].filter((x) => x.owner_id === u.id && ['atrasado', 'possivel_perdido'].includes(x.state)).length;
-    return { id: u.id, name: u.name, role: u.role, guest: mine('guest'), sponsor: mine('sponsor'), target, hitDays: hit, goalDays: goalDays.length, avgPerDay: goalDays.length ? Math.round((sponsorSent / goalDays.length) * 10) / 10 : 0, overdue };
+    return { id: u.id, name: u.name, role: u.role, guest: mine('guest'), sponsor: mine('sponsor'), target, hitDays: hit, goalDays: goalDays.length, avgPerDay: goalDays.length ? Math.round((newOnes / goalDays.length) * 10) / 10 : 0, overdue };
   }).filter((p) => p.guest.sent || p.sponsor.sent || p.target || p.overdue || p.guest.replies || p.sponsor.replies);
   const all = [...g.values(), ...s.values()];
   const queue = all.filter((x) => ['atrasado', 'possivel_perdido'].includes(x.state)).sort((a, b) => (a.state === b.state ? a.daysTo - b.daysTo : a.state === 'possivel_perdido' ? 1 : -1)).slice(0, 12);
@@ -228,4 +247,4 @@ async function dailyNotice(now = new Date()) {
   return n;
 }
 
-module.exports = { clock, weekdayOnOrAfter, describe, dayOf, CHANNELS, RESULTS, KINDS, NEEDS, DEFAULTS, config, saveConfig, goals, evaluate, evaluateAll, knownAddresses, history, register, remove, todayFor, report, dailyNotice, sponsorSendsToday, parseSteps };
+module.exports = { clock, weekdayOnOrAfter, describe, dayOf, CHANNELS, RESULTS, KINDS, NEEDS, DEFAULTS, config, saveConfig, goals, evaluate, evaluateAll, knownAddresses, history, register, remove, todayFor, report, dailyNotice, sponsorFirstsToday, SPONSOR_SENDS, parseSteps };

@@ -13,12 +13,14 @@
     <fieldset class="kind-pick">
       <legend class="field-label">O que é</legend>
       <%# em grupos (antes, 11 chips soltos): vídeo, imagem e o que é do episódio %>
-      <% var GROUPS = [['Vídeo', ['trailer', 'video', 'corte', 'outro']], ['Imagem', ['post', 'carrossel', 'story']], ['Do episódio', ['cortes', 'qa', 'bastidores', 'extra']]];
+      <% var usable = function (k) { return K[k] && (K[k].active !== false || k === cur.kind); }; // desativado não aparece (a não ser no pedido que já é dele)
+         var custom = Object.keys(K).filter(function (k) { return K[k].custom; }); // tipos de vídeo criados em Gestão > Categorias
+         var GROUPS = [['Vídeo', ['trailer', 'video', 'corte'].concat(custom, ['outro'])], ['Imagem', ['post', 'carrossel', 'story']], ['Do episódio', ['cortes', 'qa', 'bastidores', 'extra']]];
          var placed = GROUPS.reduce(function (a, g) { return a.concat(g[1]); }, []);
          var rest = Object.keys(K).filter(function (k) { return placed.indexOf(k) < 0; });
          if (rest.length) GROUPS.push(['Outros', rest]); %>
       <div class="kind-groups">
-        <% GROUPS.forEach(function (g) { var keys = g[1].filter(function (k) { return K[k]; }); if (!keys.length) return; %>
+        <% GROUPS.forEach(function (g) { var keys = g[1].filter(usable); if (!keys.length) return; %>
         <div class="kind-group"><span class="mono small muted kind-group-l"><%= g[0] %></span>
           <div class="chips-radio"><% keys.forEach(function (k) { %><label class="chip-radio"><input type="radio" name="kind" value="<%= k %>" <%= k === kind ? 'checked' : '' %> required><span><%= K[k].label %></span></label><% }) %></div>
         </div>

@@ -137,7 +137,7 @@ function briefState(brief = {}, ctx = {}) {
 }
 
 async function hasLogoFile(sponsorId) {
-  return (await db.query("SELECT 1 FROM sponsor_files WHERE sponsor_id = $1 AND kind = 'logo' LIMIT 1", [sponsorId])).rows.length > 0;
+  return (await db.query("SELECT 1 FROM sponsor_files WHERE sponsor_id = $1 AND kind = 'logo' AND status = 'pronto' LIMIT 1", [sponsorId])).rows.length > 0;
 }
 
 // Estado atual do patrocinador (lê o briefing e a logo do banco).
@@ -211,7 +211,8 @@ const extOf = (contentType, filename) => {
   return { 'image/png': 'png', 'image/jpeg': 'jpg', 'audio/webm': 'webm', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/wav': 'wav' }[contentType] || 'bin';
 };
 
-// Guarda no bucket e registra. `replace`: apaga os anteriores do mesmo tipo (logo, moldura, qrcode).
+// Guarda no bucket e registra. `replace`: apaga os anteriores do mesmo tipo e da mesma origem (a logo que o patrocinador manda pelo
+// formulário troca só a que ele tinha mandado; as versões que a equipe subiu na pasta Logos ficam). Logo sem principal vira a principal.
 async function storeFile({ sponsorId, kind, field = null, buffer, filename, contentType, transcript = null, fromSponsor = false, replace = false }) {
   if (!FILE_KINDS.includes(kind)) throw new Error('Tipo de arquivo inválido.');
   const key = await b2.keyFor('patrocinadores', sponsorId, `${kind}-${crypto.randomBytes(8).toString('hex')}.${extOf(contentType, filename)}`);
@@ -221,8 +222,11 @@ async function storeFile({ sponsorId, kind, field = null, buffer, filename, cont
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
     [sponsorId, kind, field, key, String(filename || '').slice(0, 200) || null, contentType, buffer.length, transcript, fromSponsor]);
   if (replace) {
-    const { rows: old } = await db.query('DELETE FROM sponsor_files WHERE sponsor_id = $1 AND kind = $2 AND id <> $3 RETURNING storage_key', [sponsorId, kind, file.id]);
+    const { rows: old } = await db.query('DELETE FROM sponsor_files WHERE sponsor_id = $1 AND kind = $2 AND id <> $3 AND from_sponsor = $4 RETURNING storage_key', [sponsorId, kind, file.id, fromSponsor]);
     for (const o of old) await b2.deleteObject(o.storage_key).catch((err) => console.error('Falha ao apagar arquivo antigo:', err.message));
+  }
+  if (kind === 'logo') {
+    await db.query("UPDATE sponsor_files SET is_main = true WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM sponsor_files x WHERE x.sponsor_id = $2 AND x.kind = 'logo' AND x.is_main AND x.id <> $1)", [file.id, sponsorId]);
   }
   return file;
 }
@@ -234,10 +238,10 @@ async function deleteFile(file) {
 
 // Envia um arquivo do bucket como resposta HTTP (o bucket é privado: tudo passa por aqui).
 // req + inline: imagem (logo, moldura, QR) vai em WebP para ver; "Baixar" (inline = false) manda o original.
-async function sendFile(res, file, { inline = true, req = null } = {}) {
+async function sendFile(res, file, { inline = true, req = null, maxSide = 2000 } = {}) {
   if (inline && req) {
     return require('./webImage').send(req, res, {
-      key: file.storage_key, mime: file.content_type, maxSide: 2000, headers: { 'Cache-Control': 'private, max-age=300' },
+      key: file.storage_key, mime: file.content_type, maxSide, headers: { 'Cache-Control': 'private, max-age=300' },
       fallback: () => sendFile(res, file, { inline }),
     });
   }
@@ -337,7 +341,7 @@ async function kitSlotsHtml() {
 // Prova social do media kit: marcas marcadas "Mostrar no media kit" (logo quando houver; senão, o nome).
 async function kitBrandsHtml() {
   const { rows } = await db.query(
-    `SELECT s.id, s.company, s.starts_on, (SELECT f.storage_key FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo' ORDER BY f.id DESC LIMIT 1) AS logo_key
+    `SELECT s.id, s.company, s.starts_on, (SELECT f.storage_key FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo' AND f.status = 'pronto' ORDER BY f.is_main DESC, f.id DESC LIMIT 1) AS logo_key
        FROM sponsors s WHERE s.kit_show ORDER BY s.starts_on NULLS LAST, s.id`);
   if (!rows.length) return '';
   const { esc } = require('./inviteTemplate');
@@ -376,7 +380,7 @@ async function portalData(sponsor) {
            FROM sponsor_bookings b JOIN guests g ON g.id = b.guest_id
           WHERE b.sponsor_id = $1 AND g.status NOT IN ('perdido', 'cancelado')
        ) x ORDER BY aired_on NULLS LAST, number NULLS LAST`, [sponsor.id]),
-    db.query("SELECT id, kind, filename FROM sponsor_files WHERE sponsor_id = $1 AND kind IN ('moldura','qrcode','logo') ORDER BY id DESC", [sponsor.id]),
+    db.query("SELECT id, kind, filename FROM sponsor_files WHERE sponsor_id = $1 AND kind IN ('moldura','qrcode','logo') AND status = 'pronto' ORDER BY is_main DESC, id DESC", [sponsor.id]), // a logo principal primeiro
   ]);
   const latest = (kind) => files.rows.find((f) => f.kind === kind) || null;
   return {

@@ -104,9 +104,10 @@
             <div class="sponsor-box">
               <strong><%= s.company %></strong>
               <ul class="plain small asset-links">
-                <% if (s.logo) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.logo.id %>?baixar=1"><%- icon('arrow-right', 14) %> Logo (PNG)</a></li><% } %>
+                <% if (s.logo) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.logo.id %>?baixar=1"><%- icon('arrow-right', 14) %> Logo principal</a></li><% } %>
                 <% if (s.moldura) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.moldura.id %>?baixar=1"><%- icon('arrow-right', 14) %> Moldura</a></li><% } else { %><li class="muted">Moldura ainda não enviada</li><% } %>
                 <% if (s.qrcode) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.qrcode.id %>?baixar=1"><%- icon('arrow-right', 14) %> QR Code</a><%= s.qr_link ? ' → ' + s.qr_link : '' %></li><% } else { %><li class="muted">QR Code ainda não enviado</li><% } %>
+                <% if (can('sponsors.read')) { %><li><a href="/patrocinadores/<%= s.id %>#material"><%- icon('folder', 14) %> Todo o material (logos, moldura, QR Code e material da marca)</a></li><% } %>
               </ul>
               <% if (s.slogan) { %><p class="small"><span class="muted">Slogan:</span> <%= s.slogan %></p><% } %>
               <% if (s.offer) { %><p class="small pre"><span class="muted">Oferta:</span> <%= s.offer %></p><% } %>
@@ -593,7 +594,7 @@
     <h2 id="mt-new-h">Nova tarefa</h2>
     <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="Ex.: conteúdo extra: reação do convidado"></label>
     <div class="row">
-      <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
+      <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).filter(function (k) { return !C.TASK_KINDS_OFF || !C.TASK_KINDS_OFF.has(k); }).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
       <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></label>
       <label>Prazo<input type="date" name="due_on"></label>
       <label>Hora<input type="time" name="due_time"></label>

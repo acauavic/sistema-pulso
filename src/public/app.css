@@ -323,6 +323,36 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; grid-template
 .rhythm-goals { padding: 10px 12px 6px; } .rhythm-goals .goal-list { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 32px; }
 .day-n.day-n-text { font-size: 28px; } div.day-cell:hover { background: none; } /* célula sem link não acende */
 @media (max-width: 640px) { .day-cells.c4 { grid-template-columns: minmax(0, 1fr); } .rhythm-goals .goal-list { grid-template-columns: minmax(0, 1fr); } }
+/* Seu dia (Início da produtora): o plano do dia é feito de previsto (número grande = o feito, "de N" = o previsto ou a meta, barra de
+   6 px neutra; lime só na meta batida), o mesmo painel do Resumo do dia. Motivos de perda: uma linha por motivo com barra neutra
+   (a do mais comum na cor do texto), quantidade e porcentagem em mono. */
+.day-head-r { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.day-cells.c5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.plan-n { display: grid; gap: 10px; margin: 8px 0 8px; align-content: start; }
+.plan-v { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.plan-v .day-n { margin: 0; }
+.plan-of { font: 500 14px/1 var(--f-display); color: var(--text-2); white-space: nowrap; }
+.plan-n .goal-bar { max-width: 150px; }
+.loss-reasons { list-style: none; margin: 0; padding: 8px 12px 6px; display: grid; gap: 12px; }
+.loss-reason { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 32px 40px; gap: 16px; align-items: center; }
+.loss-reason-l { font-size: 13px; color: var(--text); }
+.loss-reason-n { font: 500 13px var(--f-mono); text-align: right; }
+.loss-reason-p { font: 400 11px var(--f-mono); letter-spacing: .04em; color: var(--muted); text-align: right; }
+.loss-reason .goal-bar .fg { fill: var(--text-2); } .loss-reason:first-child .goal-bar .fg { fill: var(--text); }
+.loss-empty { margin: 4px 12px 6px; }
+.today-hot .today-list li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.today-warn { margin: 14px 0 0; padding: 8px 0 0 12px; border-left: 2px solid var(--st-edicao-fg); color: var(--text-2); }
+.today-warn:first-child { margin-top: 0; } .today-warn b { color: var(--text); font-weight: 600; }
+@media (max-width: 640px) {
+  .day-head-r { width: 100%; } .day-head-r .seg { align-self: flex-start; }
+  .day-cells.c5 { grid-template-columns: minmax(0, 1fr); }
+  .plan-n { grid-column: 2; grid-row: 1 / span 2; margin: 0; justify-items: end; gap: 8px; }
+  .plan-v { justify-content: flex-end; }
+  .plan-v .day-n { font-size: 28px; }
+  .plan-n .goal-bar { width: 96px; }
+  .loss-reason { grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px 12px; }
+  .loss-reason .goal-bar { grid-column: 1 / -1; grid-row: 2; }
+}
 .kit-who > div { min-width: 0; overflow-wrap: anywhere; }
 /* busca da lista enquanto a nova resposta não chega: o resultado anterior fica apagado e o Enter espera */
 [data-palette-results].is-stale .palette-item { opacity: .45; }
@@ -1347,6 +1377,19 @@ body:has([data-dl].selecting) .assist-fab { display: none; } /* com a seleção 
 .mrow-tag { margin-right: 6px; vertical-align: 1px; font-size: 10px; }
 .stalled-note { display: grid; gap: 4px; margin-top: 14px; padding: 10px 12px; border-left: 2px solid var(--bad); background: var(--bad-bg); border-radius: 0 var(--r-field) var(--r-field) 0; }
 .stalled-note .m-0 { margin: 0; } .stalled-note form { justify-self: start; margin-top: 2px; }
+/* Material do patrocinador (aba Material): as mesmas pastas do material do episódio; pasta vazia aparece apagada (é onde se vê o que
+   falta). Cada arquivo: miniatura (imagem sobre xadrez neutro, para logo branca ou preta aparecer) ou o ícone da pasta, o nome em
+   mono, os chips (principal, patrocinador, enviando) e as ações à direita. */
+.folder.is-empty { opacity: .6; } .folder.is-empty:hover { opacity: .85; }
+.folder-hint { margin: 8px 0 2px; }
+.mfiles .mfile { justify-content: flex-start; } .folder-panel .mfiles .mfile > .mfile-thumb { flex: 0 0 auto; } /* não estica depois da caixa de marcar */
+.mfile-thumb { flex: 0 0 auto; width: 56px; height: 40px; object-fit: contain; border: 1px solid var(--line); border-radius: var(--r-tag);
+  background: repeating-conic-gradient(var(--raised) 0 25%, var(--surface) 0 50%) 50% / 10px 10px; }
+.mfile-ic { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); background: var(--raised); }
+.mfile-info { flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.mfile-info .mono { overflow-wrap: anywhere; } .mfile-info .badge { gap: 4px; }
+.mfile-actions { align-items: center; gap: 8px; }
+@media (max-width: 640px) { .mfile-actions { width: 100%; justify-content: flex-end; } }
 .upl-alert { margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line); border-left: 2px solid var(--bad); background: var(--bad-bg); color: var(--text); line-height: 1.45; }
 .upl-foot { display: flex; justify-content: flex-end; gap: 14px; }
 
@@ -1980,3 +2023,13 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
 .best-txt:hover strong { text-decoration: underline; }
 @media (max-width: 640px) { .best-list li { grid-template-columns: 24px minmax(0, 1fr); } .best-list .post-nums { grid-column: 2; } }
 .post-nums { display: inline-flex; flex-wrap: wrap; gap: 10px; color: var(--text-2); } .post-nums > span { display: inline-flex; align-items: center; gap: 4px; } .post-nums .icon { margin: 0; color: var(--muted); }
+
+/* Gestão > Categorias: uma linha por tipo de vídeo ou categoria de tarefa (nome, chips neutros "padrão" e "desativado", quanto já foi
+   usado em mono, Renomear e o interruptor de ativo à direita). Desativado fica apagado. */
+.cat-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; }
+.cat-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.cat-row.off .cat-name { opacity: .6; }
+.cat-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cat-actions { align-items: center; gap: 12px; }
+.task-repeat-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--text-2); margin: 6px 0 0; } .task-repeat-line .icon { color: var(--muted); }
+@media (max-width: 640px) { .cat-row { grid-template-columns: minmax(0, 1fr) auto; } .cat-actions { grid-column: 1 / -1; justify-content: flex-end; } }

@@ -44,17 +44,22 @@ router.get('/', wrap(async (req, res) => {
     "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'",
     [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())])]) : null;
   const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user) : null;
-  // Resumo do dia: o dia vem do endereço (?dia=AAAA-MM-DD); sem ele, hoje
+  // Resumo do dia: o dia vem do endereço (?dia=AAAA-MM-DD); sem ele, hoje. A produtora abre no "Seu dia" (os números dela) e vê o
+  // resumo da equipe em ?visao=equipe; as outras pessoas abrem no resumo da equipe.
   const daySummary = require('../services/daySummary');
+  const myDay = require('../services/myDay');
+  const isProducer = myDay.isProducer(req.user);
+  const visao = isProducer && req.query.visao !== 'equipe' ? 'meu' : 'equipe';
   const day = await daySummary.pick(req.query.dia);
-  const pDay = daySummary.summary(day.day, { isToday: day.isToday });
-  pDay.catch(() => {}); // se outra consulta falhar antes, esta não vira rejeição solta (o erro dela aparece no await abaixo)
-  const pGoals = require('../services/goals').progressFor(req.user.id); // Minhas metas (Gestão > Metas), no cartão Hoje
-  pGoals.catch(() => {});
+  const quiet = (p) => { if (p) p.catch(() => {}); return p; }; // se outra consulta falhar antes, esta não vira rejeição solta (o erro aparece no await)
+  const pDay = quiet(visao === 'equipe' ? daySummary.summary(day.day, { isToday: day.isToday }) : null);
+  const pMine = quiet(visao === 'meu' ? myDay.plan(req.user, day.day, day.isToday) : null);
+  const pNow = quiet(isProducer ? myDay.now(req.user, day.today) : null);
+  const pGoals = quiet(require('../services/goals').progressFor(req.user.id)); // Minhas metas (Gestão > Metas), no cartão Hoje
   const [upcoming, recent, mine] = await Promise.all([
-    db.query(`SELECT id, name, topic, proposed_at FROM guests
+    isProducer ? { rows: [] } : db.query(`SELECT id, name, topic, proposed_at FROM guests
                WHERE status = 'agendado' AND proposed_at >= now() ORDER BY proposed_at LIMIT 6`),
-    db.query(`SELECT e.type, e.message, e.created_at, g.id AS guest_id, g.name AS guest_name, u.name AS user_name
+    isProducer ? { rows: [] } : db.query(`SELECT e.type, e.message, e.created_at, g.id AS guest_id, g.name AS guest_name, u.name AS user_name
                 FROM guest_events e JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.user_id
                ORDER BY e.created_at DESC, e.id DESC LIMIT 10`),
     db.query(`SELECT count(*)::int AS n FROM guests WHERE owner_id = $1 AND status IN ('prospect','convite_enviado')`, [req.user.id]),
@@ -66,9 +71,11 @@ router.get('/', wrap(async (req, res) => {
   }
   const outToday = pOut ? await pOut : null;
   if (outToday) outToday.items = outToday.items.map((x) => ({ ...x, d: outreach.describe(x) }));
+  const myGoals = await pGoals;
   res.render('dashboard', {
     money, outToday, CHANNELS: outreach.CHANNELS, outBase: (k) => outreach.KINDS[k].base,
-    title: 'Início', day, ds: await pDay, myGoals: await pGoals,
+    title: 'Início', day, ds: await pDay, mineDay: await pMine, mineNow: await pNow, myGoals, isProducer, visao,
+    producerLine: isProducer ? myDay.line(outToday, myGoals) : '',
     upcoming: upcoming.rows, recent: recent.rows, myOpen: mine.rows[0].n,
   });
 }));

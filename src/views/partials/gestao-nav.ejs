@@ -1,6 +1,6 @@
 <%# Painel de gestão em dois níveis: grupos (linha de cima) e abas do grupo (linha de baixo). Variável: active (chave da aba). %>
 <%
-  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage', 'trash.manage', 'goals.manage'];
+  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage', 'trash.manage', 'goals.manage', 'catalog.manage'];
   var groups = [
     { label: 'Visão geral', tabs: [['geral', '/gestao', 'Visão geral', ANY]] },
     { label: 'Equipe', tabs: [
@@ -21,6 +21,7 @@
     ] },
     { label: 'Sistema', tabs: [
       ['integracoes', '/integracoes', 'Integrações', ['integrations.manage']],
+      ['categorias', '/gestao/categorias', 'Categorias', ['catalog.manage']],
       ['busca', '/gestao/busca', 'Busca global', ['search.manage']],
       ['sistema', '/gestao/sistema', 'Saúde do sistema', ['integrations.manage']],
       ['desempenho', '/gestao/desempenho', 'Desempenho', ['integrations.manage']],

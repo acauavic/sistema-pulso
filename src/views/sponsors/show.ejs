@@ -24,6 +24,7 @@
   var tabs = [{ key: 'resumo', label: 'Resumo' }];
   if (afterWon || hasBrief) tabs.push({ key: 'briefing', label: 'Briefing', badge: afterWon && formState.answered < formState.total ? formState.answered + '/' + formState.total : '' });
   if (afterWon) tabs.push({ key: 'entregas', label: 'Entregas', badge: deliverables.length || '' });
+  if (afterWon) tabs.push({ key: 'material', label: 'Material', badge: materialFolders.reduce(function (n, g) { return n + g.ready.length; }, 0) || '' });
   tabs.push({ key: 'reunioes', label: 'Reuniões', badge: meetings.upcoming.length || '' });
   tabs.push({ key: 'links', label: 'Links' });
   tabs.push({ key: 'historico', label: 'Histórico', badge: events.length });
@@ -286,24 +287,7 @@
           <% } %>
         </section>
 
-        <section class="card" id="arquivos">
-          <div class="row spread">
-            <h2>Arquivos <span class="mono muted"><%= otherFiles.length %></span></h2>
-            <% if (canWrite && storageReady) { %><button class="btn sm" type="button" data-modal-open="modal-arquivo"><%- icon('upload') %> Enviar arquivo</button><% } %>
-          </div>
-          <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
-          <% if (!otherFiles.length) { %><p class="muted small">Nenhum arquivo enviado. Moldura e QR Code enviados aparecem no portal do patrocinador.</p><% } %>
-          <ul class="plain file-list">
-            <% otherFiles.forEach(function (f) { %>
-            <li>
-              <span><span class="badge b-gray"><%= f.kind %></span> <a href="<%= fileBase + f.id %>?baixar=1"><%= f.filename || ('arquivo-' + f.id) %></a> <span class="handle muted">· <%= fmt.formatDateTime(f.created_at) %></span></span>
-              <% if (canWrite) { %>
-              <form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo?"><%- csrfField %><button class="link small" type="submit">remover</button></form>
-              <% } %>
-            </li>
-            <% }) %>
-          </ul>
-        </section>
+        <p class="small muted">Logos, moldura, QR Code e o material da marca ficam na aba <a href="#material">Material</a>.</p>
       </div>
 
       <section class="card" id="episodios">
@@ -320,6 +304,8 @@
       </section>
     </div>
   </div>
+
+  <%- include('_material', { canWrite: canWrite }) %>
 
   <% if (canWrite) { %>
   <dialog class="modal modal-wide" id="modal-deliv" aria-labelledby="md-h">
@@ -371,17 +357,6 @@
     </form>
   </dialog>
 
-  <% if (storageReady) { %>
-  <dialog class="modal" id="modal-arquivo" aria-labelledby="ma-h">
-    <div class="stack" data-upload data-url="/patrocinadores/<%= sponsor.id %>/arquivo">
-      <h2 id="ma-h">Enviar arquivo</h2>
-      <label>Tipo<select data-upload-kind><option value="moldura">Moldura</option><option value="qrcode">QR Code</option><option value="material">Outro material</option></select></label>
-      <label>Arquivo<input type="file" data-upload-file></label>
-      <span class="small" data-upload-status role="status"></span>
-      <div class="row modal-actions"><button class="btn primary" type="button" data-upload-send>Enviar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
-    </div>
-  </dialog>
-  <% } %>
   <% } %>
   <% } %>
 
@@ -529,4 +504,6 @@
 </dialog>
 <% } %>
 <% } %>
+<% if (afterWon) { %><script src="/static/baixar.js?v=<%= assetV %>" defer></script>
+<script src="/static/producao.js?v=<%= assetV %>" defer></script><% } %>
 <%- include('../partials/foot') %>

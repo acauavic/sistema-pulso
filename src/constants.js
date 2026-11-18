@@ -105,6 +105,7 @@ const ROUTINE_TRIGGERS = {
   'etapa:em_finalizacao': 'Quando entra Em finalização',
   'etapa:pronto_publicar': 'Quando fica Pronto para publicar',
   'etapa:publicado': 'Quando é Publicado',
+  recorrente: 'Repete (todo dia útil, toda semana ou todo mês)', // services/recurring.js
 };
 const ROUTINE_ANCHORS = { gatilho: 'a partir do dia do gatilho', gravacao: 'a partir da data da gravação', veiculacao: 'a partir da data de veiculação' };
 const ROUTINE_ASSIGNEES = { ninguem: 'Ninguém (fica para alguém pegar)', editor: 'O editor do episódio', responsavel_convidado: 'O responsável pelo convidado', usuario: 'Uma pessoa fixa' };

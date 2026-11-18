@@ -55,9 +55,10 @@ const list = ({ open = false, assigneeId = null, episodeId = null } = {}) => {
   return db.query(`${SELECT} WHERE ${where.join(' AND ')} ORDER BY (r.due_on IS NULL), r.due_on, r.created_at DESC`, p).then((x) => x.rows);
 };
 
-function parse(body) {
+// current: o tipo que o pedido já tinha (editar um pedido antigo de um tipo desativado continua valendo).
+function parse(body, { current = null } = {}) {
   const v = {}; const errors = [];
-  v.kind = Object.prototype.hasOwnProperty.call(KINDS, body.kind) ? body.kind : null;
+  v.kind = Object.prototype.hasOwnProperty.call(KINDS, body.kind) && (KINDS[body.kind].active !== false || body.kind === current) ? body.kind : null;
   if (!v.kind) errors.push('Escolha o que é o conteúdo.');
   v.title = clean(body.title, 160);
   if (!v.title) errors.push('Dê um nome para o pedido.');
@@ -143,8 +144,10 @@ async function deliver(r, user) {
   const ready = d.videos.filter((v) => v.status === 'pronto').length + d.images.length;
   if (!ready) return { error: 'Envie a entrega antes de mandar para a revisão.' };
   if (d.videos.some((v) => ['enviando', 'processando'].includes(v.status))) return { error: 'Espere os vídeos terminarem de subir e ser lidos.' };
-  const row = await move(r, 'producao', 'revisao', ', delivered_at = now()');
+  const row = await move(r, 'producao', 'revisao', ', delivered_at = now(), first_delivered_at = coalesce(first_delivered_at, now())');
   if (!row) return { error: 'Este pedido não está em produção.' };
+  // quem entregou a primeira vez (a meta "Vídeos entregues" conta a primeira entrega, de quem enviou)
+  await db.query('UPDATE content_requests SET delivered_by = coalesce(delivered_by, $2) WHERE id = $1', [r.id, user.id]);
   const who = [...new Set([r.created_by, ...(await reviewers())])].filter((u) => u && u !== user.id);
   await tell({ users: who, actorId: user.id, title: `Entrega para revisar: ${r.title}`, body: `${user.name} entregou ${kindLabel(r).toLowerCase()}.`, url: url(r.id), entity: { type: 'content_request', id: r.id }, dedupe: `pedido-entrega-${r.id}-${r.rounds}` });
   return { ok: true };

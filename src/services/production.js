@@ -412,7 +412,7 @@ async function sponsorAssets(episodeId) {
       WHERE se.episode_id = $1 ORDER BY se.role = 'exclusivo' DESC, s.company`, [episodeId]);
   if (!sponsors.length) return [];
   const { rows: files } = await db.query(
-    "SELECT id, sponsor_id, kind, filename FROM sponsor_files WHERE sponsor_id = ANY($1) AND kind IN ('logo','moldura','qrcode') ORDER BY id DESC", [sponsors.map((s) => s.id)]);
+    "SELECT id, sponsor_id, kind, filename FROM sponsor_files WHERE sponsor_id = ANY($1) AND kind IN ('logo','moldura','qrcode') AND status = 'pronto' ORDER BY is_main DESC, id DESC", [sponsors.map((s) => s.id)]);
   const { rows: qr } = await db.query("SELECT sponsor_id, link_url FROM sponsor_deliverables WHERE sponsor_id = ANY($1) AND kind = 'qr_code'", [sponsors.map((s) => s.id)]);
   return sponsors.map((s) => ({
     ...s,

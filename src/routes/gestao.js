@@ -141,12 +141,28 @@ function parseRoutine(body) {
     assignee_mode: C.ROUTINE_ASSIGNEES[body.assignee_mode] ? body.assignee_mode : 'ninguem',
     assignee_id: isUuid(body.assignee_id) ? body.assignee_id : null,
     active: body.active === '1',
-    // só no "episódio criado": vira pedido de conteúdo (entrega no sistema) em vez de tarefa, vem marcado no formulário, prioridade
-    target: body.trigger === 'episodio_criado' && body.target === 'pedido' ? 'pedido' : 'tarefa',
+    // "episódio criado" e as que se repetem podem virar pedido de conteúdo (a entrega sobe no sistema) em vez de tarefa
+    target: ['episodio_criado', 'recorrente'].includes(body.trigger) && body.target === 'pedido' ? 'pedido' : 'tarefa',
+    // as que se repetem: quando (todo dia útil, toda semana nos dias marcados, todo mês no dia), até que horas e o tipo de vídeo do pedido
+    repeat: body.trigger === 'recorrente' && ['dia_util', 'semana', 'mes'].includes(body.repeat) ? body.repeat : null,
+    weekdays: [].concat(body.weekdays || []).map(Number).filter((d) => Number.isInteger(d) && d >= 1 && d <= 7),
+    month_day: Number.parseInt(body.month_day, 10) || null,
+    due_time: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(body.due_time || '')) ? body.due_time : null,
+    request_kind: require('../services/catalog').isVideoType(body.request_kind) || (body.request_kind && body.request_kind === body.current_request_kind) ? body.request_kind : null,
     default_on: body.default_on === '1',
     priority: body.priority === '1',
   };
   if (!v.trigger) return { error: 'Escolha quando a tarefa é criada.' };
+  if (v.trigger === 'recorrente') {
+    if (!v.repeat) return { error: 'Escolha quando repete.' };
+    if (v.repeat === 'semana' && !v.weekdays.length) return { error: 'Marque em que dias da semana.' };
+    if (v.repeat === 'mes' && !(v.month_day >= 1 && v.month_day <= 31)) return { error: 'Diga o dia do mês (1 a 31).' };
+    if (!['usuario', 'ninguem'].includes(v.assignee_mode)) return { error: 'Numa rotina que se repete, o responsável é uma pessoa fixa ou ninguém.' };
+    if (v.target === 'pedido' && !v.request_kind) return { error: 'Escolha o tipo de vídeo do pedido.' };
+    v.anchor = 'gatilho'; v.offset_days = 0;
+    if (v.repeat !== 'semana') v.weekdays = [];
+    if (v.repeat !== 'mes') v.month_day = null;
+  } else { v.repeat = null; v.weekdays = []; v.month_day = null; v.due_time = null; v.request_kind = null; }
   if (!v.title) return { error: 'Dê um título para a tarefa.' };
   if (v.assignee_mode === 'usuario' && !v.assignee_id) return { error: 'Escolha a pessoa fixa.' };
   if (v.assignee_mode !== 'usuario') v.assignee_id = null;
@@ -159,18 +175,24 @@ router.get('/gestao/rotinas', requirePerm('routines.manage'), wrap(async (req, r
                LEFT JOIN users u ON u.id = r.assignee_id ORDER BY r.trigger, r.position, r.id`),
     require('../services/team').activeUsers(),
   ]);
-  res.render('gestao/routines', { title: 'Rotinas de tarefas', routines: routines.rows, users: users.rows, C, editing: isIntId(req.query.editar) ? Number(req.query.editar) : null });
+  const recurring = require('../services/recurring');
+  res.render('gestao/routines', {
+    title: 'Rotinas de tarefas', routines: routines.rows, users: users.rows, C, editing: isIntId(req.query.editar) ? Number(req.query.editar) : null,
+    videoKinds: require('../services/contentRequests').KINDS, videoOptions: (keep) => require('../services/catalog').videoOptions(keep), REPEATS: recurring.REPEATS, WEEKDAYS: recurring.WEEKDAYS, describeRepeat: recurring.describe,
+  });
 }));
 
 router.post('/gestao/rotinas', requirePerm('routines.manage'), wrap(async (req, res) => {
   const { values: v, error } = parseRoutine({ active: '1', ...req.body });
   if (error) { await req.flash('error', error); return res.redirect('/gestao/rotinas'); }
   const { rows: [r] } = await db.query(
-    `INSERT INTO task_routines (trigger, kind, title, description, anchor, offset_days, assignee_mode, assignee_id, active, target, default_on, priority, position)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, (SELECT coalesce(max(position),0)+1 FROM task_routines)) RETURNING id`,
-    [v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active, v.target, v.default_on, v.priority]);
+    `INSERT INTO task_routines (trigger, kind, title, description, anchor, offset_days, assignee_mode, assignee_id, active, target, default_on, priority, position,
+                                repeat, weekdays, month_day, due_time, request_kind, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, (SELECT coalesce(max(position),0)+1 FROM task_routines), $13, $14, $15, $16, $17, $18) RETURNING id`,
+    [v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active, v.target, v.default_on, v.priority,
+      v.repeat, v.weekdays.length ? v.weekdays : null, v.month_day, v.due_time, v.request_kind, req.user.id]);
   await audit(req, 'rotina.criada', 'routine', r.id, { titulo: v.title });
-  await req.flash('ok', 'Rotina criada. Vale para os próximos episódios que passarem por esse momento.');
+  await req.flash('ok', v.trigger === 'recorrente' ? `Rotina criada: ${require('../services/recurring').describe(v).toLowerCase()}.` : 'Rotina criada. Vale para os próximos episódios que passarem por esse momento.');
   res.redirect('/gestao/rotinas');
 }));
 
@@ -178,8 +200,10 @@ router.post('/gestao/rotinas/:id', requirePerm('routines.manage'), wrap(async (r
   if (!isIntId(req.params.id)) return res.redirect('/gestao/rotinas');
   const { values: v, error } = parseRoutine(req.body);
   if (error) { await req.flash('error', error); return res.redirect(`/gestao/rotinas?editar=${req.params.id}`); }
-  await db.query(`UPDATE task_routines SET trigger=$2, kind=$3, title=$4, description=$5, anchor=$6, offset_days=$7, assignee_mode=$8, assignee_id=$9, active=$10, target=$11, default_on=$12, priority=$13, updated_at=now() WHERE id=$1`,
-    [req.params.id, v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active, v.target, v.default_on, v.priority]);
+  await db.query(`UPDATE task_routines SET trigger=$2, kind=$3, title=$4, description=$5, anchor=$6, offset_days=$7, assignee_mode=$8, assignee_id=$9, active=$10, target=$11, default_on=$12, priority=$13,
+                    repeat=$14, weekdays=$15, month_day=$16, due_time=$17, request_kind=$18, updated_at=now() WHERE id=$1`,
+    [req.params.id, v.trigger, v.kind, v.title, v.description, v.anchor, v.offset_days, v.assignee_mode, v.assignee_id, v.active, v.target, v.default_on, v.priority,
+      v.repeat, v.weekdays.length ? v.weekdays : null, v.month_day, v.due_time, v.request_kind]);
   await audit(req, 'rotina.editada', 'routine', req.params.id, { titulo: v.title });
   await req.flash('ok', 'Rotina salva. Tarefas já criadas não mudam (o vencimento delas é editado na própria tarefa).');
   res.redirect('/gestao/rotinas');

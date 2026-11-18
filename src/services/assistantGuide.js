@@ -49,6 +49,7 @@ const ACTIONS = {
   'search.manage': { text: 'editar os atalhos da busca global', where: 'Gestão > Busca global' },
   'contacts.manage': { text: 'mudar o WhatsApp da produção (botões do convite do convidado) e o do comercial (media kit e portal do patrocinador), e as mensagens prontas que abrem nele', where: 'Gestão > WhatsApp dos convites' },
   'outreach.manage': { text: 'configurar a cadência de follow-up (intervalos entre abordagens) e acompanhar o painel de abordagens por canal e por pessoa', where: 'Gestão > Cadência' },
+  'catalog.manage': { text: 'criar, renomear e desativar os tipos de vídeo (Pedir conteúdo, rotinas e a meta Vídeos entregues) e as categorias de tarefa', where: 'Gestão > Sistema > Categorias' },
   'goals.manage': { text: 'definir as metas de cada pessoa (até 3: o que contar, período, alvo e se aparece em número ou porcentagem) e ver o andamento das metas de todos', where: 'Gestão > Equipe > Metas' },
   'duplicates.manage': { text: 'ver a lista de convidados e patrocinadores cadastrados em dobro, juntar ou marcar "não é duplicata"', where: 'Gestão > Sistema > Duplicatas' },
   'audit.read': { text: 'consultar os logs de auditoria', where: 'Gestão > Logs' },

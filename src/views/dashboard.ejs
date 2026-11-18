@@ -2,7 +2,9 @@
 <header class="hello">
   <span class="kicker"><%= fmt.todayLabel() %> · <%= podcastName %></span>
   <h1><%= fmt.greeting() %>, <%= currentUser.name.split(' ')[0] %>.</h1>
-  <% if (can('guests.read')) { %>
+  <% if (isProducer) { %>
+    <p class="voz"><%= producerLine %></p>
+  <% } else if (can('guests.read')) { %>
     <p class="voz"><%= myOpen ? 'Você tem ' + myOpen + (myOpen === 1 ? ' convidado seu aguardando' : ' convidados seus aguardando') + ' convite ou resposta.' : 'Nenhum convidado seu aguardando convite ou resposta.' %></p>
   <% } else { %>
     <p class="voz">Bem-vindo(a) à gestão do <%= podcastName %>.</p>
@@ -11,6 +13,11 @@
 <%- include('partials/conn-alerts') %>
 <%- include('partials/app-card') %>
 
+<% if (isProducer) { %>
+<%# a produtora: o Seu dia (ou o resumo da equipe, em "Equipe"), depois o Hoje dela %>
+<% if (visao === 'equipe') { %><%- include('partials/day-summary') %><% } else { %><%- include('partials/my-day') %><% } %>
+<%- include('partials/today-producer') %>
+<% } else { %>
 <% var hasFollow = outToday && (outToday.items.length || outToday.toApproach); if (hasFollow || myGoals.length) { %>
 <section class="card today" aria-labelledby="today-h">
   <div class="today-head"><h2 id="today-h">Hoje</h2><% if (outToday && outToday.items.length > 6) { %><a class="small" href="/convidados?view=lista&status=convite_enviado&followup=1">Ver os follow-ups de convidados</a><% } %></div>
@@ -42,6 +49,7 @@
 <% } %>
 
 <%- include('partials/day-summary') %>
+<% } %>
 
 <% if (can('guests.read')) { %>
 
@@ -54,6 +62,9 @@
 </a>
 <% } %>
 
+<% if (isProducer) { %>
+<%- include('partials/producer-agenda') %>
+<% } else { %>
 <div class="grid-2 tight">
   <section class="card">
     <h2>Próximas gravações</h2>
@@ -96,5 +107,6 @@
     </ul>
   </section>
 </div>
+<% } %>
 <% } %>
 <%- include('partials/foot') %>

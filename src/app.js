@@ -56,6 +56,7 @@ function createApp() {
   app.use(require('./routes/auth'));
 
   app.use(mw.requireAuth); // tudo abaixo exige login
+  app.use((req, res, next) => { require('./services/catalog').refresh().then(() => next(), next); }); // categorias e tipos de vídeo (Gestão > Categorias), a cada 30 s
   app.use(mw.navData);
   app.use(require('./routes/misc'));
   app.use(require('./routes/collab')); // comentários, responsável, notificações e busca global
@@ -64,6 +65,7 @@ function createApp() {
   app.use(require('./routes/attachments')); // anexos (imagem, PDF, HTML, ZIP, áudio) e miniatura de links
   app.use(require('./routes/tasks'));
   app.use(require('./routes/outreach')); // Cadência de abordagem: registro por canal, follow-ups e painel da gestão
+  app.use(require('./routes/catalog')); // Gestão > Sistema > Categorias
   app.use(require('./routes/goals')); // Gestão > Metas: até 3 metas por pessoa, contadas sozinhas
   app.use(require('./routes/releases')); // Novidades: versões do sistema e aviso de atualização
   app.use(require('./routes/calendar')); // Calendário: tudo que tem data, com filtros e visualizações salvas
@@ -77,6 +79,7 @@ function createApp() {
   app.use(require('./routes/guestPortal')); // portal do convidado: aba no cadastro e corte exclusivo
   app.use(require('./routes/guestImport')); // antes de guests: /convidados/importar não pode cair em /convidados/:id
   app.use(require('./routes/guests'));
+  app.use(require('./routes/sponsorMaterial')); // aba Material do patrocinador: envio em partes, logo principal, baixar
   app.use(require('./routes/sponsors'));
   app.use(require('./routes/bulkDownload')); // /baixar.zip: vários arquivos (episódio, cortes, posts) num ZIP só
   app.use(require('./routes/covers')); // /episodios/:id/capas/*: antes das rotas genéricas do episódio

@@ -114,8 +114,10 @@ router.post('/tarefas', requirePerm('tasks.write'), wrap(async (req, res) => {
   const task = await tasks.create({ values, user: req.user, assigneeId: assignee, links: await readLinks(req.body) });
   await attachments.link(attachmentIdsOf(values, req.body), 'task', task.id, req.user);
   await audit(req, 'tarefa.criada', 'task', task.id, { titulo: task.title });
+  // "Repetir": esta é a primeira; a rotina cria as próximas (fica em Gestão > Rotinas)
+  const repeat = await require('../services/recurring').fromTask(task, String(req.body.repete || ''), req.user);
   if (wantsJson(req)) return res.json({ ok: true, task });
-  await req.flash('ok', 'Tarefa criada.');
+  await req.flash('ok', repeat ? `Tarefa criada. ${require('../services/recurring').describe(repeat)}, ela aparece de novo.` : 'Tarefa criada.');
   res.redirect(backTo(req, `/tarefas/${task.id}`));
 }));
 
@@ -124,7 +126,27 @@ router.get('/tarefas/:id', requirePerm('tasks.read'), wrap(async (req, res) => {
   const task = await tasks.get(req.params.id);
   if (!task) return notFound(res);
   const [opts, thread, files] = await Promise.all([linkOptions(), comments.list('task', task.id), attachments.forEntity('task', task.id)]);
-  res.render('tasks/show', { title: task.title, task, ...opts, comments: thread, docs: files.filter((a) => a.kind === 'file'), C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t) });
+  res.render('tasks/show', { title: task.title, task, ...opts, comments: thread, docs: files.filter((a) => a.kind === 'file'), C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), repeat: await repeatOf(task, req.user) });
+}));
+
+// A tarefa nasceu de uma rotina que se repete (ativa): a frase e se quem vê pode parar (quem criou a repetição ou a gestão das rotinas).
+async function repeatOf(task, user) {
+  if (!task.routine_id) return null;
+  const { rows: [r] } = await db.query("SELECT * FROM task_routines WHERE id = $1 AND trigger = 'recorrente' AND active", [task.routine_id]);
+  if (!r) return null;
+  return { text: require('../services/recurring').describe(r), canStop: can(user.role, 'routines.manage') || String(r.created_by || '') === String(user.id) };
+}
+
+router.post('/tarefas/:id/parar-de-repetir', requirePerm('tasks.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const task = await tasks.get(req.params.id);
+  if (!task) return notFound(res);
+  const rep = await repeatOf(task, req.user);
+  if (!rep || !rep.canStop) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem criou a repetição ou a gestão das rotinas pode parar.' });
+  await db.query('UPDATE task_routines SET active = false, updated_at = now() WHERE id = $1', [task.routine_id]);
+  await audit(req, 'rotina.parada', 'routine', task.routine_id, { tarefa: task.id });
+  await req.flash('ok', 'Não repete mais. Esta tarefa continua.');
+  return res.redirect(`/tarefas/${task.id}`);
 }));
 
 router.post('/tarefas/:id', requirePerm('tasks.write'), wrap(async (req, res) => {

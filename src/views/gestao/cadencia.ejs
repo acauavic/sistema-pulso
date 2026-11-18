@@ -59,8 +59,8 @@
   <div class="pane" id="pane-pessoas" data-pane-id="pessoas">
     <section class="card">
       <h2>Por pessoa</h2>
-      <p class="small muted">A meta é de abordagens de patrocinadores por dia útil. Ajuste em "Configurar cadência e metas".</p>
-      <% if (!r.people.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Ninguém registrou abordagens ainda</strong><span>Defina a meta diária das produtoras em "Configurar" e peça para registrarem cada contato.</span></div><% } else { %>
+      <p class="small muted">A meta é de abordagens novas de patrocinadores por dia útil: só a primeira abordagem de cada um conta, follow-up não. As metas ficam em <a href="/gestao/metas">Gestão &gt; Metas</a>.</p>
+      <% if (!r.people.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Ninguém registrou abordagens ainda</strong><span>Defina a meta diária das produtoras em Gestão &gt; Metas e peça para registrarem cada contato.</span></div><% } else { %>
       <div class="table-wrap"><table>
         <thead><tr><th>Pessoa</th><th class="num">Convidados</th><th class="num">Patrocinadores</th><th class="num">Respostas</th><th class="num">Meta/dia</th><th class="num">Média/dia</th><th class="num">Dias com meta</th><th class="num">Atrasados</th></tr></thead>
         <tbody>
@@ -124,7 +124,7 @@
       <input type="text" name="sponsor" value="<%= r.cfg.sponsor.join(', ') %>" inputmode="numeric" placeholder="3, 5, 7, 14">
     </label>
     <p class="small muted">Cada número é a espera depois de uma abordagem, até o próximo follow-up. Se o follow-up cair num sábado ou domingo, ele passa para a segunda. O último número vale também como espera final: se ninguém responder depois dele, o card é indicado como possível perdido (a pessoa decide). Hoje: convidados <strong><%= r.cfg.guest.length %></strong> follow-ups, patrocinadores <strong><%= r.cfg.sponsor.length %></strong>.</p>
-    <p class="small muted">A meta diária de abordagens fica em <a href="/gestao/metas">Gestão &gt; Metas</a>, junto com as outras metas de cada pessoa.</p>
+    <p class="small muted">A meta diária de abordagens novas fica em <a href="/gestao/metas">Gestão &gt; Metas</a>, junto com as outras metas de cada pessoa.</p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>

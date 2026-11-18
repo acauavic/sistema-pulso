@@ -37,7 +37,13 @@
           <label>O que contar
             <select name="metric_<%= i %>" data-goal-metric data-native>
               <option value="">Escolha…</option>
-              <% Object.keys(METRICS).forEach(function (k) { var x = METRICS[k]; %><option value="<%= k %>" data-cat="<%= x.cat %>" data-rate="<%= x.kind === 'rate' ? '1' : '' %>" <%= g.metric === k ? 'selected' : '' %>><%= x.label %><%= x.kind === 'rate' ? ' (%)' : '' %></option><% }) %>
+              <% Object.keys(METRICS).forEach(function (k) { var x = METRICS[k]; %><option value="<%= k %>" data-cat="<%= x.cat %>" data-rate="<%= x.kind === 'rate' ? '1' : '' %>" data-param="<%= x.param ? '1' : '' %>" <%= g.metric === k ? 'selected' : '' %>><%= x.label %><%= x.kind === 'rate' ? ' (%)' : '' %></option><% }) %>
+            </select>
+          </label>
+          <label data-goal-param hidden>Tipo de vídeo
+            <select name="param_<%= i %>" data-native>
+              <option value="">Escolha…</option>
+              <% videoTypes.forEach(function (t) { %><option value="<%= t.key %>" <%= g.param === t.key ? 'selected' : '' %>><%= t.label %></option><% }) %>
             </select>
           </label>
         </div>

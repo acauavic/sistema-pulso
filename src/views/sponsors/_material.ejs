@@ -1,0 +1,133 @@
+<%
+  // Aba Material do patrocinador (só em Ganho, Ativo e Inativo): as pastas Logos, Moldura, QR Code e Material da marca, como no
+  // material do episódio. Quem vê patrocinadores (o editor também) vê e baixa; quem edita envia pela fila de envios (em partes,
+  // retomando de onde parou), escolhe a logo principal (a do media kit e do portal) e apaga (vai para a lixeira).
+  // Variáveis: sponsor, materialFolders, canWrite, storageReady, csrf.
+  var mBase = '/patrocinadores/' + sponsor.id + '/material/';
+  var fBase = '/patrocinadores/' + sponsor.id + '/arquivos/';
+  var mFiles = materialFolders.reduce(function (a, g) { return a.concat(g.items); }, []);
+  var mReady = mFiles.filter(function (f) { return f.status === 'pronto'; });
+  var mTotal = mReady.reduce(function (n, f) { return n + Number(f.size_bytes || 0); }, 0);
+  var mStalled = mFiles.filter(function (f) { return f.stalled; });
+  var canSend = canWrite && storageReady;
+  var isImg = function (f) { return /^image\/(png|jpe?g|webp|gif)$/.test(f.content_type || ''); };
+  var zipBase = fmt.slugify(sponsor.company) || 'patrocinador';
+  // a janela de envio (src/public/producao.js) com as pastas do patrocinador: a pasta inicial vem do tipo e da extensão
+  var mConfig = {
+    groups: {
+      logo: { label: 'Logo', labelled: false, one: 'logo', many: 'logos' },
+      moldura: { label: 'Moldura', labelled: false, one: 'moldura', many: 'molduras' },
+      qrcode: { label: 'QR Code', labelled: false, one: 'QR Code', many: 'QR Codes' },
+      material: { label: 'Material da marca', labelled: false, one: 'arquivo de material da marca', many: 'arquivos de material da marca' },
+    },
+    types: [
+      { key: 'image', title: 'Imagens', options: ['logo', 'moldura', 'qrcode', 'material'], listed: true },
+      { key: 'video', title: 'Vídeos', options: ['material'], listed: true },
+      { key: 'audio', title: 'Áudios', options: ['material'], listed: true },
+      { key: 'outro', title: 'Outros arquivos', options: ['logo', 'material'], listed: true },
+    ],
+    bulk: { image: ['logo', 'moldura', 'qrcode', 'material'], outro: ['logo', 'material'] },
+    order: ['logo', 'moldura', 'qrcode', 'material'],
+    guess: { pdf: 'material', zip: 'material', rar: 'material', doc: 'material', docx: 'material', ppt: 'material', pptx: 'material', key: 'material', txt: 'material' },
+    where: 'no patrocinador',
+    note: 'A primeira logo vira a principal, a do media kit e do portal. Dá para trocar depois.',
+  };
+%>
+<div class="pane" id="pane-material" data-pane-id="material">
+  <section class="card" id="material"<%- canSend ? ' data-material-drop' : '' %>>
+    <div class="row spread">
+      <div>
+        <h2>Material</h2>
+        <% if (mReady.length) { %><span class="handle muted"><%= mReady.length %> arquivo<%= mReady.length > 1 ? 's' : '' %> · <%= fmt.formatBytes(mTotal) %></span><% } %>
+      </div>
+      <% if (canSend) { %><button class="btn" type="button" data-material-pick><%- icon('upload') %> Enviar material</button><% } %>
+    </div>
+    <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
+    <% if (canSend) { %>
+    <div class="uploader quiet" data-material data-base="<%= mBase %>" data-csrf="<%= csrf %>" data-where="<%= sponsor.company %>" data-hash="material">
+      <input type="file" multiple hidden data-material-files aria-label="Escolher arquivos">
+      <p class="small muted"><%= mReady.length ? 'Arraste mais arquivos para cá ou use o botão.' : 'Logos, moldura, QR Code, manual da marca e vídeos de inserção: escolha tudo de uma vez ou arraste para cá.' %> Na próxima janela você diz a pasta de cada um.</p>
+      <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
+    </div>
+    <% } else if (!mFiles.length) { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
+    <% if (mStalled.length) { %>
+    <div class="stalled-note" role="status">
+      <p class="small m-0"><strong><%= mStalled.length %> arquivo<%= mStalled.length > 1 ? 's não terminaram' : ' não terminou' %> de subir</strong></p>
+      <p class="small muted m-0"><%= canSend ? 'Escolha os mesmos arquivos de novo em Enviar material: o envio continua de onde parou.' : 'Quem envia o material pode escolher os mesmos arquivos de novo: o envio continua de onde parou.' %></p>
+      <% if (canSend) { %><form method="post" action="<%= mBase %>descartar-parados" class="inline" data-confirm="Descartar os <%= mStalled.length %> envios que não terminaram?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">descartar</button></form><% } %>
+    </div>
+    <% } %>
+
+    <div class="folders" data-folders data-key="sponsor-<%= sponsor.id %>">
+      <div class="folder-grid" data-folder-grid>
+        <% materialFolders.forEach(function (g) { %>
+        <button type="button" class="folder <%= g.items.length ? '' : 'is-empty' %>" data-folder-open="<%= g.kind %>" aria-label="Abrir a pasta <%= g.title %>, <%= g.items.length %> arquivo<%= g.items.length === 1 ? '' : 's' %>">
+          <span class="folder-ic"><%- icon('folder', 30) %></span>
+          <span class="folder-name"><%- icon(g.ic, 14) %><strong><%= g.title %></strong></span>
+          <span class="mono small muted"><%= g.items.length ? g.items.length + ' · ' + fmt.formatBytes(g.size) : 'vazia' %></span>
+          <% if (g.items.some(function (f) { return f.stalled; })) { %><span class="badge b-red">não terminou</span><% } else if (g.items.some(function (f) { return f.status === 'enviando'; })) { %><span class="badge b-amber">enviando</span><% } %>
+        </button>
+        <% }) %>
+      </div>
+      <% materialFolders.forEach(function (g) { %>
+      <div class="folder-panel" data-folder-panel="<%= g.kind %>" data-dl data-dl-zip="<%= zipBase + '-' + fmt.slugify(g.title) %>" hidden>
+        <div class="folder-crumb">
+          <button class="icon-btn" type="button" data-folder-back aria-label="Voltar às pastas" title="Voltar às pastas"><%- icon('arrow-left', 16) %></button>
+          <span class="muted small">Material /</span>
+          <h3 class="folder-title"><%= g.title %> <span class="mono small muted"><%= g.items.length %> · <%= fmt.formatBytes(g.size) %></span></h3>
+          <% if (g.ready.length > 1) { %>
+          <span class="row dl-actions">
+            <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
+            <button class="btn sm" type="button" data-dl-everything title="Baixa os <%= g.ready.length %> arquivos desta pasta num ZIP só"><%- icon('download', 14) %> Baixar tudo</button>
+          </span>
+          <% } %>
+        </div>
+        <p class="small muted folder-hint"><%= g.hint %></p>
+        <% if (g.ready.length > 1) { %>
+        <div class="dl-bar" data-dl-bar role="group" aria-label="Baixar vários arquivos" hidden>
+          <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
+          <span class="row">
+            <button class="btn sm ghost" type="button" data-dl-all>Selecionar todos</button>
+            <button class="btn sm primary" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar selecionados</button>
+            <button class="btn sm ghost" type="button" data-dl-cancel>Cancelar</button>
+          </span>
+        </div>
+        <p class="small muted dl-note" data-dl-note role="status" aria-live="polite" hidden></p>
+        <% } %>
+        <% if (!g.items.length) { %><p class="muted small">Nenhum arquivo nesta pasta ainda.<%= canSend ? ' Use Enviar material.' : '' %></p><% } %>
+        <ul class="plain file-list file-compact mfiles">
+          <% g.items.forEach(function (f) { var ok = f.status === 'pronto'; %>
+          <li class="mfile"<% if (ok) { %> data-dl-item data-zip="s<%= f.id %>" data-href="<%= fBase + f.id %>/baixar" data-name="<%= f.filename %>" data-bytes="<%= Number(f.size_bytes || 0) %>"<% } %>>
+            <% if (ok && g.ready.length > 1) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= f.filename %>"><% } %>
+            <% if (ok && isImg(f)) { %><img class="mfile-thumb" src="<%= fBase + f.id %>?w=320" alt="" loading="lazy" decoding="async"><% } else { %><span class="mfile-thumb mfile-ic" aria-hidden="true"><%- icon(g.ic, 16) %></span><% } %>
+            <span class="mfile-info">
+              <span class="mono small"><%= f.filename || ('arquivo-' + f.id) %></span>
+              <% if (f.main) { %><span class="badge b-gray"><%- icon('star', 12) %> principal</span><% } %>
+              <% if (f.from_sponsor) { %><span class="file-tag" title="Enviado pelo patrocinador no formulário">patrocinador</span><% } %>
+              <% if (f.stalled) { %><span class="badge b-red" title="O envio parou no meio. Envie o mesmo arquivo de novo: continua de onde parou.">não terminou</span><% } else if (!ok) { %><span class="badge b-amber">enviando</span><% } %>
+              <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDay(f.created_at) %><%= f.uploader_name ? ' · ' + f.uploader_name.split(' ')[0] : '' %></span>
+            </span>
+            <span class="row mfile-actions">
+              <% if (ok) { %><a class="btn sm" href="<%= fBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
+              <% if (canWrite && ok && g.kind === 'logo' && !f.main) { %><form method="post" action="<%= fBase + f.id %>/principal" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">usar como principal</button></form><% } %>
+              <% if (canWrite) { %><form method="post" action="<%= fBase + f.id %>/excluir" class="inline" data-confirm="Mandar <%= f.filename || 'este arquivo' %> para a lixeira? Fica 15 dias lá e dá para restaurar."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn row-del" type="submit" aria-label="Mandar <%= f.filename || 'o arquivo' %> para a lixeira" title="Mandar para a lixeira"><%- icon('trash-2', 14) %></button></form><% } %>
+            </span>
+          </li>
+          <% }) %>
+        </ul>
+      </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <% if (canSend) { %>
+  <dialog class="modal modal-wide" data-material-dialog data-m-config="<%= JSON.stringify(mConfig) %>" aria-labelledby="material-dlg-h">
+    <div class="stack">
+      <h2 id="material-dlg-h">Enviar material</h2>
+      <p class="small muted" data-m-summary></p>
+      <div class="stack" data-m-sections></div>
+      <div class="row modal-actions"><button class="btn primary" type="button" data-m-send>Enviar</button><button class="btn" type="button" data-m-more>Adicionar mais</button><button class="btn ghost" type="button" data-m-cancel>Cancelar</button></div>
+    </div>
+  </dialog>
+  <% } %>
+</div>

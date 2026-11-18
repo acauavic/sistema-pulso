@@ -1,0 +1,59 @@
+<%- include('../partials/head') %>
+<%
+  // Gestão > Sistema > Categorias: tipos de vídeo (pedidos de conteúdo, rotinas e a meta "Vídeos entregues") e categorias de tarefa.
+  // Os que já existiam vêm marcados "padrão"; tudo se renomeia e se desativa (não se apaga: o histórico continua com o nome).
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var section = function (type, list, use, cfg) { %>
+  <div class="pane" id="pane-<%= type %>" data-pane-id="<%= type %>">
+    <section class="card">
+      <div class="row spread">
+        <div><h2><%= cfg.title %></h2><p class="small muted m-0"><%= cfg.lead %></p></div>
+        <button class="btn primary" type="button" data-modal-open="cat-novo-<%= type %>"><%- icon('plus') %> <%= cfg.add %></button>
+      </div>
+      <ul class="plain cat-list">
+        <% list.forEach(function (c) { var n = use[c.key] || 0; %>
+        <li class="cat-row <%= c.active ? '' : 'off' %>">
+          <span class="cat-name"><strong><%= c.label %></strong><% if (c.builtin) { %> <span class="badge b-gray">padrão</span><% } %><% if (!c.active) { %> <span class="badge b-gray">desativado</span><% } %></span>
+          <span class="mono small muted"><%= n %> <%= n === 1 ? cfg.one : cfg.many %></span>
+          <span class="row cat-actions">
+            <button class="btn sm ghost" type="button" data-fill-modal="cat-renomear" data-fill-action="/gestao/categorias/<%= cfg.slug %>/<%= c.key %>" data-fill="<%= JSON.stringify({ label: c.label }) %>"><%- icon('pencil', 14) %> Renomear</button>
+            <form method="post" action="/gestao/categorias/<%= cfg.slug %>/<%= c.key %>" class="inline"><%- csrfField %><input type="hidden" name="ativo" value="<%= c.active ? '0' : '1' %>">
+              <label class="switch" title="<%= c.active ? 'Desativar: some das listas de escolha; o que já existe continua com o nome' : 'Ativar de novo' %>"><input type="checkbox" role="switch" <%= c.active ? 'checked' : '' %> data-autosubmit aria-label="<%= c.label %> ativo"><span class="switch-track" aria-hidden="true"></span><span class="mono small switch-state"><%= c.active ? 'ATIVO' : 'DESATIVADO' %></span></label>
+            </form>
+          </span>
+        </li>
+        <% }) %>
+      </ul>
+    </section>
+    <dialog class="modal" id="cat-novo-<%= type %>" aria-labelledby="cat-novo-<%= type %>-h">
+      <form method="post" action="/gestao/categorias/<%= cfg.slug %>" class="stack"><%- csrfField %>
+        <h2 id="cat-novo-<%= type %>-h"><%= cfg.add %></h2>
+        <label>Nome<input type="text" name="label" maxlength="60" required placeholder="<%= cfg.ph %>"></label>
+        <p class="small muted"><%= cfg.after %></p>
+        <div class="row modal-actions"><button class="btn primary" type="submit">Criar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+      </form>
+    </dialog>
+  </div>
+<% }; %>
+<div class="page-head"><div><span class="kicker">Gestão · Sistema</span><h1>Categorias</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'categorias' }) %>
+<p class="lead">Os tipos de vídeo que o editor faz e as categorias das tarefas. Crie os seus, renomeie e desative o que não usa mais: o que já existe continua com o nome.</p>
+
+<div class="tabs-wrap" data-tabs data-default="video">
+  <div class="seg seg-tabs" role="tablist" aria-label="O que configurar">
+    <button type="button" role="tab" data-tab-btn="video">Tipos de vídeo <span class="mono"><%= videos.filter(function (v) { return v.active; }).length %></span></button>
+    <button type="button" role="tab" data-tab-btn="tarefa">Categorias de tarefa <span class="mono"><%= tasks.filter(function (t) { return t.active; }).length %></span></button>
+  </div>
+  <% section('video', videos, vUse, { slug: 'video', title: 'Tipos de vídeo', lead: 'Aparecem em Pedir conteúdo, nas rotinas que se repetem e na meta "Vídeos entregues".', add: 'Novo tipo de vídeo', ph: 'ex.: Vídeo de bastidor', one: 'pedido', many: 'pedidos', after: 'O tipo novo já aparece em Pedir conteúdo, nas rotinas e nas metas.' }) %>
+  <% section('tarefa', tasks, tUse, { slug: 'tarefa', title: 'Categorias de tarefa', lead: 'Aparecem ao criar uma tarefa e nas rotinas.', add: 'Nova categoria', ph: 'ex.: Financeiro', one: 'tarefa', many: 'tarefas', after: 'A categoria nova já aparece ao criar uma tarefa e nas rotinas.' }) %>
+</div>
+
+<dialog class="modal" id="cat-renomear" aria-labelledby="cat-renomear-h">
+  <form method="post" action="" class="stack" data-fill-form><%- csrfField %>
+    <h2 id="cat-renomear-h">Renomear</h2>
+    <label>Nome<input type="text" name="label" maxlength="60" required></label>
+    <p class="small muted">O nome novo vale em todo o sistema, inclusive no que já existe.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<%- include('../partials/foot') %>

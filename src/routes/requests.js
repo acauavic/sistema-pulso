@@ -55,7 +55,7 @@ router.get('/conteudo/pedidos/:id', requirePerm('episodes.read'), wrap(async (re
 router.post('/conteudo/pedidos/:id', requirePerm('episodes.read'), wrap(async (req, res) => {
   const r = await load(req); if (!r) return notFound(res);
   if (!canEdit(req.user, r)) return deny(req, res, 'Só quem pediu e a gestão mudam o pedido.');
-  const { values, error } = R.parse({ ...r, due_on: r.due_on ? new Date(r.due_on).toISOString().slice(0, 10) : '', briefing_html: r.briefing_html || richText.fromPlain(r.briefing || ''), ...req.body });
+  const { values, error } = R.parse({ ...r, due_on: r.due_on ? new Date(r.due_on).toISOString().slice(0, 10) : '', briefing_html: r.briefing_html || richText.fromPlain(r.briefing || ''), ...req.body }, { current: r.kind });
   if (error) { await req.flash('error', error); return res.redirect(R.url(r.id)); }
   await R.update(r, values, req.user);
   await attachments.link([...(values.attachmentIds || []), ...[].concat(req.body.attachment_ids || [])], 'content_request', r.id, req.user);
