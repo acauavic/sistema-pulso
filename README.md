@@ -27,6 +27,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - [Post feito por fora do sistema](#post-feito-por-fora-do-sistema)
 - [Colaboração: tarefas, comentários, notificações e busca](#colaboração-tarefas-comentários-notificações-e-busca)
 - [Resumo do dia no Início](#resumo-do-dia-no-início)
+- [Início da produtora (Seu dia)](#início-da-produtora-seu-dia)
 - [Metas por pessoa](#metas-por-pessoa)
 - [Página pós-gravação](#página-pós-gravação)
 - [Arquitetura: processos, fila, rotinas e avisos](#arquitetura-processos-fila-rotinas-e-avisos)
@@ -50,6 +51,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - **Episódios (linha de produção)**: do convidado agendado até a publicação — material bruto no Backblaze, edição, revisão com comentários na minutagem, análise por IA, capas e posts com editor visual, cortes verticais e publicação nas redes. [Detalhes](#produção-de-episódios).
 - **Convite fixo**: gera link exclusivo + link curto no YOURLS, prévia, envio por e-mail (Brevo). Os botões do
   convite levam ao WhatsApp da produção **passando por um redirecionador próprio que conta os cliques**.
+- **Início da produtora (Seu dia)**: o plano do dia (feito de previsto, contra as metas), o que o dia rendeu, os motivos de perda dos convidados, o que está quente agora, os aceitos sem data, a agenda e as tarefas dela. [Detalhes](#início-da-produtora-seu-dia).
 - **Metas por pessoa**: até 3 metas para cada pessoa (o que contar, período, alvo, número ou porcentagem), contadas sozinhas e mostradas no Início de cada um. [Detalhes](#metas-por-pessoa).
 - **Início com o Resumo do dia**: convites enviados, aceitos e perdidos, patrocinadores (entraram em prospecção, abordados, follow-ups, interessados, fechados), etapas, episódios, cortes, revisões, posts, Reels de teste, seguidores e tarefas atrasadas de qualquer dia. [Detalhes](#resumo-do-dia-no-início).
 - **Calendário**: tudo que tem data (tarefas, gravações, lembretes, publicações, contas, parcerias) com filtros e visualizações salvas. [Detalhes](#calendário).
@@ -407,12 +409,44 @@ endereço (`/?dia=2026-11-17`). Cada número leva à lista dele.
 - **Redes e tarefas**: seguidores no **Instagram** e inscritos no **YouTube** (o saldo do dia: a última leitura do dia menos a do dia
   anterior; sem a nossa leitura, a série de totais do provedor; senão, "sem leitura"; embaixo, o total e o saldo da semana) e **Tarefas
   atrasadas** (no fim do dia; hoje, agora).
+- **Por que os convidados foram perdidos** (logo abaixo do caminho dos convidados): os motivos marcados nos convidados que entraram em
+  Perdido nos últimos 30 dias até o dia escolhido (e continuavam perdidos no fim dele), do mais comum para o menos, com a quantidade, a
+  porcentagem e uma barra.
 - **Registro das etapas**: a tabela `guest_stage_log` (migração `079_resumo_do_dia.sql`) guarda toda mudança de etapa por gatilho, venha
   de onde vier (quadro, cadastro, edição em massa, aceite ou recusa pelo link, convite por e-mail, importação). O passado foi refeito pela
   linha do tempo dos convidados (`guest_stage_backfill()`).
 - **Leitura do fim do dia**: a rotina `insights-fim-do-dia` lê Instagram e YouTube de novo depois das 23:40, para o saldo fechar perto da
   meia-noite (a rotina `insights` lê as redes de 3 em 3 horas).
 - Código: `src/services/daySummary.js`, `src/views/partials/day-summary.ejs`.
+
+## Início da produtora (Seu dia)
+
+A produtora abre o Início no **Seu dia**, os números dela no mesmo desenho do Resumo do dia, com as mesmas setas e calendário. O botão
+**Seu dia | Equipe** troca para o resumo da equipe (`/?visao=equipe`), e a escolha segue junto ao trocar de dia. As outras pessoas abrem
+direto no resumo da equipe. O que é dela: convidados e patrocinadores de que ela é responsável (nos follow-ups e no que está quente,
+também os sem responsável); abordagens, por quem registrou; reuniões, por quem marcou; tarefas, pela pessoa da tarefa.
+
+- **Plano do dia (feito de previsto)**: o número grande é o feito; ao lado, o previsto ou a meta; embaixo, uma barra (lime só quando a
+  meta é batida).
+  - **Abordagens novas de patrocinadores**: a primeira abordagem de cada patrocinador no ciclo (follow-up não conta), contra a meta
+    diária dela; embaixo, quantos patrocinadores dela estão a abordar.
+  - **Follow-ups de patrocinadores** e **de convidados**: os marcados para o dia (a cadência como estava quando o dia começou) e quantos
+    ela fez. Feito = recebeu contato no dia ou saiu da etapa nele (respondeu, avançou ou foi perdido). Embaixo, quantos faltam (num dia
+    que passou, quantos ficaram sem fazer) e os atrasados de antes que seguem sem contato.
+  - **Convites enviados**: contra a meta diária de convites; embaixo, quantos aguardam resposta.
+  - **Tarefas**: as com prazo no dia e quantas ela fez; embaixo, quantas faltam e as atrasadas.
+  - Meta por dia útil não vale no fim de semana. As metas que não estão no plano (por semana, por mês ou de outra coisa) aparecem em
+    **Minhas metas**, no fim do painel.
+- **O que o dia rendeu**: convites aceitos (embaixo, quantos estão em agendamento), convidados perdidos (com o motivo), patrocinadores
+  interessados (foram para Em negociação), reuniões que ela marcou (e a próxima) e patrocínios fechados (embaixo, os ativos).
+- **Por que seus convidados foram perdidos**: os motivos dos últimos 30 dias, como no resumo da equipe, só com os convidados dela.
+- **Hoje**: os follow-ups que faltam e **Quentes agora**: patrocinador que abriu o media kit ou pediu uma conversa e convidado que abriu
+  o convite e não respondeu, nas últimas 48 horas e sem abordagem registrada depois (os 5 mais recentes). Embaixo, os **aceitos sem
+  data** (convidados em Em agendamento) com há quantos dias, em média.
+- **Próximas gravações e reuniões** (todas as gravações e as reuniões dela) e **Suas tarefas** (abertas, com prazo até daqui a uma
+  semana ou já vencido), no lugar de "Próximas gravações" e "Atividade recente".
+- Código: `src/services/myDay.js`, `src/views/partials/my-day.ejs`, `today-producer.ejs`, `producer-agenda.ejs`, `day-nav.ejs` e
+  `loss-reasons.ejs`.
 
 ## Metas por pessoa
 
@@ -423,14 +457,15 @@ O sistema conta sozinho (`src/services/goals.js`, tabela `user_goals`, migraçã
 
 - **Convidados** (dos convidados de que a pessoa é responsável): convites enviados, convites aceitos, gravações marcadas, taxa de aceite
   (aceites ÷ convites enviados) e abordagens de convidados (as que a pessoa registrou).
-- **Patrocinadores**: abordagens de patrocinadores, reuniões agendadas (marcadas pela pessoa, sem as canceladas) e patrocínios fechados
-  (patrocinadores dela que entraram em Ganho).
+- **Patrocinadores**: abordagens novas de patrocinadores (a primeira abordagem de cada patrocinador no ciclo, registrada pela pessoa;
+  follow-up não conta), reuniões agendadas (marcadas pela pessoa, sem as canceladas) e patrocínios fechados (patrocinadores dela que
+  entraram em Ganho).
 - **Conteúdo**: cortes subidos e revisões de corte (versões novas que a pessoa subiu) e posts publicados (os dela que foram ao ar).
 - **Produção**: episódios entregues para revisão (contam as reentregas depois de ajustes) e episódios publicados (da equipe).
 - **Tarefas**: tarefas concluídas e tarefas no prazo (feitas até o prazo ÷ feitas com prazo).
 - **Da equipe** (o mesmo número para quem tiver a meta): seguidores no Instagram, inscritos no YouTube, cortes postados e Reels de teste.
 
-Cada pessoa vê as dela no **Início** (no cartão "Hoje"; o editor, embaixo do "Seu ritmo"), com quanto já fez, a barra de andamento (lime
+Cada pessoa vê as dela no **Início** (no cartão "Hoje"; o editor, embaixo do "Seu ritmo"; a produtora, no plano do Seu dia e em Minhas metas), com quanto já fez, a barra de andamento (lime
 quando bate) e quanto falta até o fim do período. A página da gestão mostra todas as pessoas com o andamento e, embaixo, o que cada
 métrica conta. A antiga meta diária de abordagens de patrocinadores da Cadência virou uma meta (`abordagens_patrocinadores`, por dia
 útil), com o mesmo número para quem tinha; produtora nova não ganha meta sozinha.
@@ -450,7 +485,7 @@ mensagem do WhatsApp ("Na página pós-gravação") ficam em Gestão > WhatsApp 
 
 ## Cadência de abordagem
 
-Código: `src/services/outreach.js`, `src/routes/outreach.js`, migração `035_cadencia.sql` (`outreach_attempts`, `outreach_goals` (sem uso desde a 1.78.0: as metas ficam em `user_goals`), `stage_entered_at` com gatilho em `guests`/`sponsors`). A cadência vale para convidados em **Convite enviado** e patrocinadores em **Prospecção**. Cada contato é um registro (canal: Instagram, e-mail, WhatsApp, telefone ou outro; o **endereço** usado, que pode ser vários por pessoa; resultado "enviei" ou "respondeu"; data; observação) feito pelo botão **Registrar abordagem** da página do convidado/patrocinador (permissão `guests.write`/`sponsors.write`; dá para apagar um registro errado). **Regras** (Gestão > Cadência > Configurar): dias de espera entre as abordagens, por tipo (padrão convidados 3, 4, 7, 7; patrocinadores 3, 5, 7, 14). O relógio do convidado começa quando ele entra na etapa (o convite é a abordagem 0); o do patrocinador, na primeira abordagem registrada (sem nenhuma = "a abordar"). Estados: em dia, hoje, atrasado, **possível perdido** (acabaram os intervalos e a última espera passou sem resposta; só indica, a pessoa decide e o motivo sugerido é "Nunca respondeu") e respondeu (para a cadência). Reentrar na etapa abre um ciclo novo (o histórico fica). **Meta diária** de abordagens de patrocinadores: desde a 1.78.0 é uma das metas de cada pessoa, em [Gestão > Metas](#metas-por-pessoa) (dias úteis). Onde aparece: **Início** (card "Hoje": follow-ups e progresso da meta), **quadro e lista de convidados** (estado do card e filtro "Só follow-ups pendentes"), páginas do convidado/patrocinador (próximo passo e card "Abordagens" com histórico por canal) e **Gestão > Cadência** (permissão `outreach.manage`, gestão e superadmin): abordagens por canal, por pessoa, respostas, atrasados, cumprimento da meta, fila de quem precisa de ação e qualidade do preenchimento (sem abordagem, sem endereço, sem responsável). A rotina `cadencia` manda, nos dias úteis depois das 8h, um aviso para a **produção** (tipo de notificação "Follow-ups"): cada produtora recebe os dela, e o que está com a gestão, com o editor ou sem responsável vai para todas as produtoras. Gestão e superadmin não recebem.
+Código: `src/services/outreach.js`, `src/routes/outreach.js`, migração `035_cadencia.sql` (`outreach_attempts`, `outreach_goals` (sem uso desde a 1.78.0: as metas ficam em `user_goals`), `stage_entered_at` com gatilho em `guests`/`sponsors`). A cadência vale para convidados em **Convite enviado** e patrocinadores em **Prospecção**. Cada contato é um registro (canal: Instagram, e-mail, WhatsApp, telefone ou outro; o **endereço** usado, que pode ser vários por pessoa; resultado "enviei" ou "respondeu"; data; observação) feito pelo botão **Registrar abordagem** da página do convidado/patrocinador (permissão `guests.write`/`sponsors.write`; dá para apagar um registro errado). **Regras** (Gestão > Cadência > Configurar): dias de espera entre as abordagens, por tipo (padrão convidados 3, 4, 7, 7; patrocinadores 3, 5, 7, 14). O relógio do convidado começa quando ele entra na etapa (o convite é a abordagem 0); o do patrocinador, na primeira abordagem registrada (sem nenhuma = "a abordar"). Estados: em dia, hoje, atrasado, **possível perdido** (acabaram os intervalos e a última espera passou sem resposta; só indica, a pessoa decide e o motivo sugerido é "Nunca respondeu") e respondeu (para a cadência). Reentrar na etapa abre um ciclo novo (o histórico fica). **Meta diária** de abordagens de patrocinadores: desde a 1.78.0 é uma das metas de cada pessoa, em [Gestão > Metas](#metas-por-pessoa) (dias úteis); desde a 1.81.0 conta só abordagens novas (a primeira de cada patrocinador no ciclo). Onde aparece: **Início** (card "Hoje": follow-ups e progresso da meta), **quadro e lista de convidados** (estado do card e filtro "Só follow-ups pendentes"), páginas do convidado/patrocinador (próximo passo e card "Abordagens" com histórico por canal) e **Gestão > Cadência** (permissão `outreach.manage`, gestão e superadmin): abordagens por canal, por pessoa, respostas, atrasados, cumprimento da meta, fila de quem precisa de ação e qualidade do preenchimento (sem abordagem, sem endereço, sem responsável). A rotina `cadencia` manda, nos dias úteis depois das 8h, um aviso para a **produção** (tipo de notificação "Follow-ups"): cada produtora recebe os dela, e o que está com a gestão, com o editor ou sem responsável vai para todas as produtoras. Gestão e superadmin não recebem.
 
 ## Google Agenda
 

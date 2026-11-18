@@ -323,6 +323,36 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; grid-template
 .rhythm-goals { padding: 10px 12px 6px; } .rhythm-goals .goal-list { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 32px; }
 .day-n.day-n-text { font-size: 28px; } div.day-cell:hover { background: none; } /* célula sem link não acende */
 @media (max-width: 640px) { .day-cells.c4 { grid-template-columns: minmax(0, 1fr); } .rhythm-goals .goal-list { grid-template-columns: minmax(0, 1fr); } }
+/* Seu dia (Início da produtora): o plano do dia é feito de previsto (número grande = o feito, "de N" = o previsto ou a meta, barra de
+   6 px neutra; lime só na meta batida), o mesmo painel do Resumo do dia. Motivos de perda: uma linha por motivo com barra neutra
+   (a do mais comum na cor do texto), quantidade e porcentagem em mono. */
+.day-head-r { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.day-cells.c5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.plan-n { display: grid; gap: 10px; margin: 8px 0 8px; align-content: start; }
+.plan-v { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.plan-v .day-n { margin: 0; }
+.plan-of { font: 500 14px/1 var(--f-display); color: var(--text-2); white-space: nowrap; }
+.plan-n .goal-bar { max-width: 150px; }
+.loss-reasons { list-style: none; margin: 0; padding: 8px 12px 6px; display: grid; gap: 12px; }
+.loss-reason { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 32px 40px; gap: 16px; align-items: center; }
+.loss-reason-l { font-size: 13px; color: var(--text); }
+.loss-reason-n { font: 500 13px var(--f-mono); text-align: right; }
+.loss-reason-p { font: 400 11px var(--f-mono); letter-spacing: .04em; color: var(--muted); text-align: right; }
+.loss-reason .goal-bar .fg { fill: var(--text-2); } .loss-reason:first-child .goal-bar .fg { fill: var(--text); }
+.loss-empty { margin: 4px 12px 6px; }
+.today-hot .today-list li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.today-warn { margin: 14px 0 0; padding: 8px 0 0 12px; border-left: 2px solid var(--st-edicao-fg); color: var(--text-2); }
+.today-warn:first-child { margin-top: 0; } .today-warn b { color: var(--text); font-weight: 600; }
+@media (max-width: 640px) {
+  .day-head-r { width: 100%; } .day-head-r .seg { align-self: flex-start; }
+  .day-cells.c5 { grid-template-columns: minmax(0, 1fr); }
+  .plan-n { grid-column: 2; grid-row: 1 / span 2; margin: 0; justify-items: end; gap: 8px; }
+  .plan-v { justify-content: flex-end; }
+  .plan-v .day-n { font-size: 28px; }
+  .plan-n .goal-bar { width: 96px; }
+  .loss-reason { grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px 12px; }
+  .loss-reason .goal-bar { grid-column: 1 / -1; grid-row: 2; }
+}
 .kit-who > div { min-width: 0; overflow-wrap: anywhere; }
 /* busca da lista enquanto a nova resposta não chega: o resultado anterior fica apagado e o Enter espera */
 [data-palette-results].is-stale .palette-item { opacity: .45; }

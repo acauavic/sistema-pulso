@@ -130,12 +130,15 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
   it('o Início mostra os follow-ups de hoje e a meta diária de patrocinadores', async () => {
     const { rows: [s] } = await q("INSERT INTO sponsors (company, stage, owner_id) VALUES ('Marca Hoje', 'prospect', $1) RETURNING id", [u.prod.id]);
     await q("INSERT INTO user_goals (user_id, metric, period, target) VALUES ($1, 'abordagens_patrocinadores', 'dia', 5)", [u.prod.id]); // a meta vem de Gestão > Metas
+    // a produtora abre no Seu dia: a meta diária de abordagens novas é o "de 5" do plano (no fim de semana não há meta diária)
+    const weekend = [0, 6].includes(new Date(`${cal.todayISO()}T12:00:00Z`).getUTCDay());
+    const approaches = (n) => new RegExp(`Abordagens novas de patrocinadores</span>\\s*<span class="plan-n">\\s*<span class="plan-v"><span class="day-n">${n}</span>${weekend ? '' : '<span class="plan-of">de 5 · meta</span>'}`);
     let page = (await as.prod.get('/')).text;
     assert.match(page, /id="today-h"/); assert.match(page, /Duda Atrasada/);
-    assert.match(page, /Abordagens de patrocinadores · hoje/); assert.match(page, /goal-item-n">0<\/span> <span class="goal-item-of">de 5</);
-    assert.match(page, /1 patrocinador seu ainda sem abordagem/);
+    assert.match(page, approaches(0));
+    assert.match(page, /<b class="">1<\/b> a abordar/);
     await as.prod.act(`/patrocinadores/${s.id}/abordagens`, { canal: 'whatsapp', addr_whatsapp: '__novo', novo_whatsapp: '+5511911112222' }, { from: '/' });
-    page = (await as.prod.get('/')).text; assert.match(page, /goal-item-n">1<\/span> <span class="goal-item-of">de 5</);
+    page = (await as.prod.get('/')).text; assert.match(page, approaches(1));
     assert.doesNotMatch((await as.editor.get('/')).text, /id="today-h"/, 'editor de vídeo não vê a meta');
   });
 

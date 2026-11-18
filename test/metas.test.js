@@ -29,10 +29,15 @@ describe('Metas', () => {
     // revisões: versão nova do c1 subida pelo editor; versão nova do corte da gestão subida pela gestão
     await q("INSERT INTO clip_versions (clip_id, version, storage_key, uploaded_by, replaced_at) VALUES ($1, 1, 'pp/v1', $2, $3), ($4, 1, 'pp/v1b', $5, $6)", [c1, u.editor.id, at(W, '12:00'), cg, u.gestao.id, at(W, '13:00')]);
     await q("UPDATE episode_clips SET version = 2 WHERE id = ANY($1)", [[c1, cg]]);
-    // abordagens da produtora: 2 enviadas a patrocinador (1 resposta não conta), 1 a convidado
-    for (const [kind, result] of [['sponsor', 'enviado'], ['sponsor', 'enviado'], ['sponsor', 'respondeu'], ['guest', 'enviado']]) {
-      await q("INSERT INTO outreach_attempts (subject_type, subject_id, channel, result, at, user_id) VALUES ($1, 1, 'whatsapp', $2, $3, $4)", [kind, result, at(W, '09:30'), u.prod.id]);
-    }
+    // abordagens da produtora: patrocinadores A e B abordados pela 1ª vez no dia (A também por outro canal, ainda a mesma abordagem),
+    // C já abordado na véspera (o contato do dia é follow-up, não abordagem nova) e uma resposta (não conta); e 1 a convidado
+    const spIds = [];
+    for (const name of ['Marca A', 'Marca B', 'Marca C']) spIds.push((await q("INSERT INTO sponsors (company, stage, owner_id, created_at, stage_entered_at) VALUES ($1, 'prospect', $2, $3, $3) RETURNING id", [name, u.prod.id, at(cal.addDays(W, -20))])).rows[0].id);
+    const att = (kind, id, result, when) => q("INSERT INTO outreach_attempts (subject_type, subject_id, channel, result, at, created_at, user_id) VALUES ($1, $2, 'whatsapp', $3, $4, $4, $5)", [kind, id, result, when, u.prod.id]);
+    await att('sponsor', spIds[0], 'enviado', at(W, '09:30')); await att('sponsor', spIds[0], 'enviado', at(W, '09:40'));
+    await att('sponsor', spIds[1], 'enviado', at(W, '10:00')); await att('sponsor', spIds[1], 'respondeu', at(W, '12:00'));
+    await att('sponsor', spIds[2], 'enviado', at(cal.addDays(W, -1), '10:00')); await att('sponsor', spIds[2], 'enviado', at(W, '11:00'));
+    await att('guest', 1, 'enviado', at(W, '09:30'));
     // convidados: da produtora, 2 convites enviados, 1 aceite, 1 gravação marcada; da gestão, 1 convite (não conta para a produtora)
     const guest = async (owner, status) => (await q("INSERT INTO guests (name, instagram, profile, status, owner_id, created_at) VALUES ('G', 'g', 'medico', $1, $2, $3) RETURNING id", [status, owner, at(cal.addDays(W, -20))])).rows[0].id;
     await q('TRUNCATE guest_stage_log');
@@ -62,7 +67,7 @@ describe('Metas', () => {
     assert.equal(await v('editor', 'cortes_subidos', 'dia', 5), 3);
     assert.equal(await v('editor', 'cortes_subidos', 'semana', 5), 4, 'a segunda da mesma semana entra');
     assert.equal(await v('editor', 'revisoes_corte', 'dia', 5), 1); assert.equal(await v('gestao', 'revisoes_corte', 'dia', 5), 1);
-    assert.equal(await v('prod', 'abordagens_patrocinadores', 'dia', 5), 2, 'resposta não conta');
+    assert.equal(await v('prod', 'abordagens_patrocinadores', 'dia', 5), 2, 'só a abordagem nova: A e B (o follow-up de C, o segundo canal de A e a resposta não contam)');
     assert.equal(await v('prod', 'abordagens_convidados', 'dia', 5), 1);
     assert.equal(await v('prod', 'convites_enviados', 'dia', 5), 2, 'o convite do convidado da gestão não conta');
     assert.equal(await v('prod', 'convites_aceitos', 'dia', 5), 1);
@@ -113,9 +118,12 @@ describe('Metas', () => {
     assert.equal(r.status, 302);
     assert.deepEqual((await goals.listFor(u.prod.id)).map((g) => [g.metric, g.period, Number(g.target), g.display]), [['abordagens_patrocinadores', 'dia', 5, 'numero'], ['convites_enviados', 'semana', 10, 'porcentagem']]);
     page = (await as.gestao.get('/gestao/metas')).text;
-    assert.match(page, /Abordagens de patrocinadores · hoje/); assert.match(page, /Convites enviados · esta semana/);
+    assert.match(page, /Abordagens novas de patrocinadores · hoje/); assert.match(page, /Convites enviados · esta semana/);
+    // no Início da produtora (Seu dia), a meta diária de abordagens novas vira o "de 5 · meta" do plano; a semanal fica em Minhas metas
     const home = (await as.prod.get('/')).text;
-    assert.match(home, /Minhas metas/); assert.match(home, /Abordagens de patrocinadores · hoje/); assert.match(home, /Convites enviados · esta semana/);
+    assert.match(home, /Minhas metas/); assert.match(home, /Convites enviados · esta semana/);
+    if ([0, 6].includes(new Date(`${cal.todayISO()}T12:00:00Z`).getUTCDay())) assert.match(home, /Abordagens novas de patrocinadores · hoje/, 'fim de semana: sem meta diária no plano');
+    else assert.match(home, /plan-of">de 5 · meta</);
     assert.doesNotMatch((await as.gestao.get('/')).text, /Minhas metas/, 'quem não tem meta não vê o bloco');
     // erro: volta com a janela da pessoa aberta e nada muda
     const bad = await as.gestao.act(`/gestao/metas/${u.prod.id}`, { metric_1: 'taxa_aceite', period_1: 'mes', target_1: '150' }, { from: '/gestao/metas' });

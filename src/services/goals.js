@@ -1,7 +1,8 @@
 // Metas por pessoa (Gestão > Equipe > Metas): até 3 por pessoa, contadas sozinhas com o que o sistema já registra.
 // Cada meta: o que contar (METRICS), o período (dia útil, semana de segunda a domingo, mês), o alvo e como aparece no Início
 // ("12 de 20" ou a porcentagem da meta). Taxas (aceite, tarefas no prazo) são porcentagem e aparecem sempre assim.
-// Quem conta o quê: convites, aceites e gravações marcadas contam pelo responsável do convidado; abordagens, por quem registrou;
+// Quem conta o quê: convites, aceites e gravações marcadas contam pelo responsável do convidado; abordagens, por quem registrou (as de
+// patrocinador, só a primeira de cada um: follow-up não é abordagem nova);
 // reuniões, por quem marcou; patrocínios fechados, pelo responsável do patrocinador; cortes e versões novas, por quem subiu;
 // posts, por quem publicou; entregas de episódio, por quem enviou para revisão; tarefas, pela pessoa da tarefa. As "da equipe"
 // dão o mesmo número para quem tiver a meta.
@@ -49,8 +50,8 @@ const METRICS = {
     } },
   abordagens_convidados: { cat: 'convidados', label: 'Abordagens de convidados', unit: ['abordagem', 'abordagens'], kind: 'count', hint: 'abordagens registradas pela pessoa (Registrar abordagem)',
     value: (u, f, t) => count(outreach('guest'), [u, f, t]) },
-  abordagens_patrocinadores: { cat: 'patrocinadores', label: 'Abordagens de patrocinadores', unit: ['abordagem', 'abordagens'], kind: 'count', hint: 'abordagens registradas pela pessoa (Registrar abordagem)',
-    value: (u, f, t) => count(outreach('sponsor'), [u, f, t]) },
+  abordagens_patrocinadores: { cat: 'patrocinadores', label: 'Abordagens novas de patrocinadores', unit: ['abordagem nova', 'abordagens novas'], kind: 'count', hint: 'primeiras abordagens de patrocinadores registradas pela pessoa (Registrar abordagem); follow-up não conta',
+    value: (u, f, t) => count(`WITH ${B}, ${require('./outreach').SPONSOR_SENDS} SELECT count(*)::int AS n FROM firsts, b WHERE firsts.user_id = $1 AND firsts.at >= b.s`, [u, f, t]) },
   reunioes_agendadas: { cat: 'patrocinadores', label: 'Reuniões agendadas', unit: ['reunião', 'reuniões'], kind: 'count', hint: 'reuniões com patrocinador marcadas pela pessoa',
     value: (u, f, t) => count(`WITH ${B} SELECT count(*)::int AS n FROM sponsor_meetings m, b
       WHERE coalesce(m.created_by, m.owner_id) = $1 AND m.status = 'marcada' AND m.created_at >= b.s AND m.created_at < b.e`, [u, f, t]) },

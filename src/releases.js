@@ -4,6 +4,17 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.81.0', date: '2026-11-18', title: 'Início da produtora: o Seu dia',
+    items: [
+      { kind: 'novo', text: 'A produtora abre o Início no "Seu dia", com os números dela. O plano do dia mostra o que estava previsto e o que ela já fez: abordagens novas de patrocinadores e convites contra a meta diária, follow-ups de patrocinadores e de convidados marcados para o dia (e os atrasados de antes) e as tarefas do dia. O botão "Equipe" mostra o resumo da equipe.' },
+      { kind: 'novo', text: 'No Seu dia, "O que o dia rendeu" traz convites aceitos, convidados perdidos (com o motivo), patrocinadores interessados, reuniões marcadas (e a próxima) e patrocínios fechados. As outras metas dela ficam em "Minhas metas".' },
+      { kind: 'novo', text: 'Quentes agora, no cartão Hoje da produtora: patrocinador que abriu o media kit ou pediu uma conversa e convidado que abriu o convite e não respondeu, nas últimas 48 horas e sem abordagem depois. Logo abaixo, os aceitos ainda sem data de gravação.' },
+      { kind: 'novo', text: 'Por que os convidados foram perdidos: os motivos dos últimos 30 dias, com quantidade e porcentagem, no Resumo do dia (logo abaixo do caminho dos convidados) e, só com os convidados dela, no Seu dia.' },
+      { kind: 'novo', text: 'No Início da produtora, "Próximas gravações e reuniões" e "Suas tarefas" ficam no lugar de "Próximas gravações" e "Atividade recente".' },
+      { kind: 'ajuste', text: 'A meta de abordagens de patrocinadores passa a contar só abordagens novas, a primeira de cada patrocinador. Follow-up não conta. Vale nas Metas, na Cadência e no Início.' },
+    ],
+  },
+  {
     version: '1.80.0', date: '2026-11-18', title: 'Patrocínio no Resumo do dia',
     items: [
       { kind: 'novo', text: 'Resumo do dia: o caminho "Da prospecção ao patrocínio", logo abaixo do caminho dos convidados. Mostra os patrocinadores que entraram em prospecção (embaixo, quantos estão em prospecção), os abordados pela primeira vez (quantos ainda estão a abordar), os follow-ups do dia (quantos estão para hoje e os atrasados; num dia que passou, quantos ficaram atrasados), os interessados (foram para Em negociação) e os fechados (entraram em Ganho; embaixo, os patrocínios ativos). Os perdidos no dia ficam ao lado do título.' },

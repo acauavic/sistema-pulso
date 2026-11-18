@@ -4,7 +4,7 @@
 // atrasadas). O dia vai de 00:00 a 24:00 em Brasília; hoje é "até agora".
 const db = require('../db/pool');
 const { ROLES, can } = require('../permissions');
-const { ACCEPT_FROM } = require('../constants');
+const { ACCEPT_FROM, LOSS_REASONS } = require('../constants');
 const cal = require('./calendar');
 const outreach = require('./outreach');
 const { nowTime } = require('./tasks');
@@ -31,11 +31,11 @@ async function pick(raw) {
 }
 
 // Convidados. A etapa de cada um no fim do dia é a última mudança até ali; uma mudança desfeita no mesmo dia (arrastou errado e
-// voltou) não conta, porque no fim do dia a pessoa não está mais onde a mudança a pôs.
-async function guests(day) {
+// voltou) não conta, porque no fim do dia a pessoa não está mais onde a mudança a pôs. ownerId: só os convidados da pessoa.
+async function guests(day, ownerId = null) {
   const { rows: [r] } = await db.query(`WITH ${BOUNDS},
-    st AS (SELECT DISTINCT ON (l.guest_id) l.guest_id, l.to_status AS status FROM guest_stage_log l, b
-            WHERE l.changed_at < b.e ORDER BY l.guest_id, l.changed_at DESC, l.id DESC),
+    st AS (SELECT DISTINCT ON (l.guest_id) l.guest_id, l.to_status AS status FROM guest_stage_log l JOIN guests gg ON gg.id = l.guest_id, b
+            WHERE l.changed_at < b.e AND ($3::uuid IS NULL OR gg.owner_id = $3) ORDER BY l.guest_id, l.changed_at DESC, l.id DESC),
     mv AS (SELECT l.guest_id, l.from_status, l.to_status, st.status AS end_status FROM guest_stage_log l JOIN st USING (guest_id), b
             WHERE l.changed_at >= b.s AND l.changed_at < b.e AND l.from_status IS NOT NULL)
     SELECT count(*) FILTER (WHERE st.status = 'convite_enviado')::int AS waiting,
@@ -47,17 +47,18 @@ async function guests(day) {
            (SELECT count(DISTINCT guest_id) FROM mv WHERE to_status = 'perdido' AND end_status = 'perdido')::int AS lost,
            (SELECT count(DISTINCT guest_id) FROM mv WHERE to_status = 'em_agendamento' AND end_status IN ('em_agendamento', 'agendado', 'gravado'))::int AS scheduling_in,
            (SELECT count(DISTINCT guest_id) FROM mv WHERE to_status = 'agendado' AND end_status IN ('agendado', 'gravado'))::int AS scheduled_in
-      FROM st`, [day, ACCEPT_FROM]);
+      FROM st`, [day, ACCEPT_FROM, ownerId]);
   return { sent: r.sent, accepted: r.accepted, lost: r.lost, waiting: r.waiting, scheduling: r.scheduling, schedulingIn: r.scheduling_in, scheduled: r.scheduled, scheduledIn: r.scheduled_in };
 }
 
 // Patrocinadores. A etapa de cada um no fim do dia é a última mudança até ali (sponsor_stage_log). Entrou numa etapa no dia quem
 // chegou nela pelo cadastro (só no dia em que nasceu: voltar da lixeira não é entrada nova) ou por uma mudança que não foi desfeita
 // no mesmo dia, sem já estar nela quando o dia começou. Fechado = entrou em Ganho, ou em Ativo sem passar por Ganho.
-async function sponsorStages(day) {
+// ownerId: só os patrocinadores da pessoa.
+async function sponsorStages(day, ownerId = null) {
   const { rows: [r] } = await db.query(`WITH ${BOUNDS},
-    st AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage AS stage FROM sponsor_stage_log l, b
-            WHERE l.changed_at < b.e ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC),
+    st AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage AS stage FROM sponsor_stage_log l JOIN sponsors ss ON ss.id = l.sponsor_id, b
+            WHERE l.changed_at < b.e AND ($2::uuid IS NULL OR ss.owner_id = $2) ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC),
     st0 AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage AS stage FROM sponsor_stage_log l, b
              WHERE l.changed_at < b.s ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC),
     mv AS (SELECT l.sponsor_id, l.from_stage, l.to_stage, st.stage AS end_stage
@@ -72,39 +73,33 @@ async function sponsorStages(day) {
            (SELECT count(DISTINCT sponsor_id) FROM mv WHERE to_stage = 'negociacao')::int AS interested,
            (SELECT count(DISTINCT sponsor_id) FROM mv WHERE to_stage = 'ganho' OR (to_stage = 'ativo' AND from_stage IS DISTINCT FROM 'ganho'))::int AS closed,
            (SELECT count(DISTINCT sponsor_id) FROM mv WHERE to_stage = 'perdido' AND end_stage = 'perdido')::int AS lost
-      FROM st`, [day]);
+      FROM st`, [day, ownerId]);
   return r;
 }
 
-// Abordagens de patrocinadores, a mesma base da cadência (Registrar abordagem). Cada ciclo começa quando o patrocinador entra em
-// Prospecção, e a abordagem é do ciclo em que foi registrada (como a cadência conta). A 1ª abordagem do ciclo faz dele "abordado"
-// no dia em que aconteceu (outro canal no mesmo dia ainda é essa abordagem); falar de novo num dia seguinte é follow-up, e cada
-// patrocinador conta um por dia, mesmo por mais de um canal.
+// Abordagens de patrocinadores, a mesma base da cadência (Registrar abordagem) e da meta de abordagens (outreach.SPONSOR_SENDS).
+// A 1ª abordagem do ciclo faz dele "abordado" no dia em que aconteceu (outro canal no mesmo dia ainda é essa abordagem); falar de
+// novo num dia seguinte é follow-up, e cada patrocinador conta um por dia, mesmo por mais de um canal.
 async function sponsorContacts(day) {
-  const { rows: [r] } = await db.query(`WITH ${BOUNDS},
-    sends AS (SELECT a.subject_id AS id, a.at,
-                     coalesce((SELECT max(l.changed_at) FROM sponsor_stage_log l
-                                WHERE l.sponsor_id = a.subject_id AND l.to_stage = 'prospect' AND l.changed_at <= a.created_at), '-infinity') AS cycle
-                FROM outreach_attempts a JOIN sponsors s ON s.id = a.subject_id, b
-               WHERE a.subject_type = 'sponsor' AND a.result = 'enviado' AND a.at < b.e),
-    f AS (SELECT id, cycle, min((at AT TIME ZONE '${TZ}')::date) AS first_day FROM sends GROUP BY id, cycle)
-    SELECT (SELECT count(DISTINCT id) FROM f WHERE first_day = $1::date)::int AS approached,
-           (SELECT count(DISTINCT x.id) FROM sends x JOIN f USING (id, cycle), b
-             WHERE x.at >= b.s AND f.first_day < $1::date)::int AS followed`, [day]);
+  const { rows: [r] } = await db.query(`WITH ${BOUNDS}, ${outreach.SPONSOR_SENDS}
+    SELECT (SELECT count(DISTINCT sponsor_id) FROM firsts, b WHERE firsts.at >= b.s)::int AS approached,
+           (SELECT count(DISTINCT x.sponsor_id) FROM sends x JOIN firsts f USING (sponsor_id, cycle), b
+             WHERE x.at >= b.s AND f.at < b.s)::int AS followed`, [day]);
   return r;
 }
 
 // Como a cadência estava no fim do dia: quantos em Prospecção ainda sem abordagem, com follow-up para o dia e atrasados. Hoje é a
 // própria cadência (a mesma conta do cartão Hoje e de Gestão > Cadência); num dia que passou, ela é refeita com a etapa daquele
-// dia e as abordagens até o fim dele.
-async function sponsorCadence(day, isToday) {
+// dia e as abordagens até o fim dele. ownerId: só os patrocinadores da pessoa.
+async function sponsorCadence(day, isToday, ownerId = null) {
   let list;
-  if (isToday) list = [...(await outreach.evaluateAll('sponsor')).values()];
+  if (isToday) list = [...(await outreach.evaluateAll('sponsor', { ownerId })).values()];
   else {
     const { rows: subjects } = await db.query(`WITH ${BOUNDS},
       st AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage, l.changed_at FROM sponsor_stage_log l, b
               WHERE l.changed_at < b.e ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC)
-      SELECT sponsor_id AS id, changed_at AS entered FROM st WHERE to_stage = 'prospect'`, [day]);
+      SELECT st.sponsor_id AS id, st.changed_at AS entered FROM st JOIN sponsors s ON s.id = st.sponsor_id
+       WHERE st.to_stage = 'prospect' AND ($2::uuid IS NULL OR s.owner_id = $2)`, [day, ownerId]);
     const { rows: attempts } = subjects.length ? await db.query(`WITH ${BOUNDS}
       SELECT a.subject_id, a.channel, a.result, a.at, a.created_at FROM outreach_attempts a, b
        WHERE a.subject_type = 'sponsor' AND a.subject_id = ANY($2::int[]) AND a.at < b.e`, [day, subjects.map((x) => x.id)]) : { rows: [] };
@@ -115,6 +110,25 @@ async function sponsorCadence(day, isToday) {
   }
   const count = (state) => list.filter((x) => x.state === state).length;
   return { toApproach: count('a_abordar'), due: count('hoje'), late: count('atrasado') };
+}
+
+// Por que os convidados foram perdidos: quem entrou em Perdido nos últimos `days` dias até o dia (inclusive) e ainda estava lá no fim
+// dele, pelo motivo marcado no cadastro. ownerId: só os convidados da pessoa. { total, list: [{ key, label, n, pct, bar }] }, do
+// motivo mais comum para o menos; a barra é proporcional ao mais comum.
+async function lossReasons(day, { ownerId = null, days = 30 } = {}) {
+  const { rows } = await db.query(`WITH b AS (SELECT ($1::date - ($3::int - 1))::timestamp AT TIME ZONE '${TZ}' AS s, ($1::date + 1)::timestamp AT TIME ZONE '${TZ}' AS e),
+    st AS (SELECT DISTINCT ON (l.guest_id) l.guest_id, l.to_status AS status FROM guest_stage_log l, b
+            WHERE l.changed_at < b.e ORDER BY l.guest_id, l.changed_at DESC, l.id DESC)
+    SELECT g.loss_reason AS reason, count(DISTINCT g.id)::int AS n
+      FROM guest_stage_log l JOIN st USING (guest_id) JOIN guests g ON g.id = l.guest_id, b
+     WHERE l.to_status = 'perdido' AND l.from_status IS NOT NULL AND st.status = 'perdido' AND l.changed_at >= b.s AND l.changed_at < b.e
+       AND ($2::uuid IS NULL OR g.owner_id = $2)
+     GROUP BY g.loss_reason`, [day, ownerId, days]);
+  const total = rows.reduce((n, r) => n + r.n, 0);
+  const max = rows.reduce((m, r) => Math.max(m, r.n), 0);
+  const list = rows.map((r) => ({ key: r.reason || '', label: LOSS_REASONS[r.reason] || 'Sem motivo', n: r.n, pct: total ? Math.round((r.n / total) * 100) : 0, bar: max ? Math.max(2, Math.round((r.n / max) * 100)) : 0 }))
+    .sort((x, y) => y.n - x.n || x.label.localeCompare(y.label, 'pt-BR'));
+  return { total, list };
 }
 
 // Episódios: gravados no dia (a data da gravação), os que estavam gravados e ainda sem publicar no fim do dia, e os publicados.
@@ -216,9 +230,9 @@ async function followers(day) {
 
 // Tudo do dia. Hoje, as tarefas atrasadas seguem a hora de agora; num dia que já passou, o fim do dia.
 async function summary(day, { isToday = day === cal.todayISO() } = {}) {
-  const [g, sp, spc, spk, e, c, p, sc, t, s] = await Promise.all([guests(day), sponsorStages(day), sponsorContacts(day), sponsorCadence(day, isToday), episodes(day), clips(day), posts(day), scheduled(day),
-    tasks(day, isToday ? nowTime() : '24:00'), followers(day)]);
-  return { guests: g, sponsors: { ...sp, ...spc, ...spk }, episodes: e, clips: { ...c, ...p }, scheduled: sc, tasks: t, social: s };
+  const [g, losses, sp, spc, spk, e, c, p, sc, t, s] = await Promise.all([guests(day), lossReasons(day), sponsorStages(day), sponsorContacts(day), sponsorCadence(day, isToday),
+    episodes(day), clips(day), posts(day), scheduled(day), tasks(day, isToday ? nowTime() : '24:00'), followers(day)]);
+  return { guests: g, losses, sponsors: { ...sp, ...spc, ...spk }, episodes: e, clips: { ...c, ...p }, scheduled: sc, tasks: t, social: s };
 }
 
-module.exports = { pick, summary, EDITOR_ROLES };
+module.exports = { pick, summary, guests, sponsorStages, sponsorCadence, lossReasons, BOUNDS, EDITOR_ROLES };

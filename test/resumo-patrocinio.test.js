@@ -180,8 +180,8 @@ describe('Resumo do dia: patrocínio', () => {
     page = (await as.gestao.get('/')).text; // hoje: o que falta fazer agora
     assert.match(page, /<b class="">\d+<\/b> para hoje/);
 
-    page = (await as.prod.get(`/?dia=${D}`)).text;
-    assert.match(page, /Da prospecção ao patrocínio/, 'a produtora também vê');
+    page = (await as.prod.get(`/?dia=${D}&visao=equipe`)).text;
+    assert.match(page, /Da prospecção ao patrocínio/, 'a produtora também vê, no resumo da equipe');
     assert.match(page, /href="\/patrocinadores\?view=lista&amp;stage=prospect"[^>]*>\s*<span class="day-dot"[^>]*><\/span>\s*<span class="day-l">Follow-ups/, 'sem a cadência, a lista da Prospecção');
     assert.doesNotMatch((await as.editor.get('/')).text, /Da prospecção ao patrocínio/, 'o editor continua com o Início dele');
   });

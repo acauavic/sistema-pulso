@@ -70,7 +70,7 @@ const TOPICS = [
     steps: [
       'Quem está sendo abordado (convidado em "Convite enviado", patrocinador em "Prospecção") tem um estado de follow-up: em dia, hoje, atrasado ou possível perdido (muitas tentativas sem resposta).',
       '"Registrar abordagem" abre uma janela curta: canal (Instagram, e-mail, WhatsApp, telefone, outro), qual endereço, se enviou ou se respondeu, quando e uma observação. Cada canal tem seu intervalo até o próximo follow-up. Follow-up nunca vence no fim de semana: se cair no sábado ou no domingo, passa para a segunda.',
-      'A meta diária de abordagens (de patrocinadores ou de convidados) é uma das metas de cada pessoa, em Gestão > Metas. O Início mostra os follow-ups e as metas no cartão Hoje; de manhã, quem tem pendências recebe um aviso.',
+      'A meta diária de abordagens (de patrocinadores ou de convidados) é uma das metas de cada pessoa, em Gestão > Metas. A de patrocinadores conta só abordagens novas: a primeira de cada patrocinador (follow-up não conta). O Início mostra os follow-ups e as metas; de manhã, quem tem pendências recebe um aviso.',
       'Gestão > Cadência (gestão) mostra o painel por canal e por pessoa e configura os intervalos dos follow-ups.',
       'Pelo assistente: "follow_ups" mostra quem precisa de abordagem e "registrar_abordagem" registra uma abordagem feita.',
     ],
@@ -89,7 +89,7 @@ const TOPICS = [
     where: 'Gestão > Equipe > Metas (gestão define); Início de cada pessoa (Minhas metas); Início do editor (Seu ritmo)', perm: 'tasks.read',
     steps: [
       'A gestão define até 3 metas para cada pessoa em Gestão > Equipe > Metas: a categoria e o que contar, o período (por dia útil, por semana de segunda a domingo ou por mês), o alvo e se aparece em número ("12 de 20") ou em porcentagem.',
-      'O sistema conta sozinho: convites enviados e aceitos, gravações marcadas e taxa de aceite (dos convidados de que a pessoa é responsável); abordagens de convidados e de patrocinadores (as que ela registrou); reuniões agendadas; patrocínios fechados; cortes subidos e revisões de corte; posts publicados; episódios entregues para revisão; tarefas concluídas e no prazo; e, da equipe, seguidores, inscritos, cortes postados, Reels de teste e episódios publicados.',
+      'O sistema conta sozinho: convites enviados e aceitos, gravações marcadas e taxa de aceite (dos convidados de que a pessoa é responsável); abordagens de convidados e abordagens novas de patrocinadores (as que ela registrou; de patrocinador, só a primeira de cada um); reuniões agendadas; patrocínios fechados; cortes subidos e revisões de corte; posts publicados; episódios entregues para revisão; tarefas concluídas e no prazo; e, da equipe, seguidores, inscritos, cortes postados, Reels de teste e episódios publicados.',
       'Cada pessoa vê as dela no Início, no cartão Hoje, com quanto já fez, a barra de andamento e quanto falta até o fim do período. A barra fica lime quando a meta é batida. Meta por dia útil não cobra sábado e domingo.',
       'O editor vê no Início o "Seu ritmo": cortes subidos e revisões de corte de hoje e da semana, episódios entregues na semana e a próxima entrega, com as metas dele embaixo.',
     ],
@@ -106,12 +106,25 @@ const TOPICS = [
     ],
   },
   {
+    key: 'seu-dia', title: 'Seu dia (Início da produtora)', words: ['seu dia', 'meu dia', 'início da produtora', 'inicio da produtora', 'plano do dia', 'previsto', 'previstos', 'feito de previsto', 'quentes agora', 'quente', 'aceitos sem data', 'motivos de perda', 'por que perdeu', 'o que o dia rendeu', 'minhas tarefas'],
+    where: 'Início da produtora (bloco "Seu dia"); "Equipe" mostra o Resumo do dia da equipe', perm: 'guests.write',
+    steps: [
+      'A produtora abre o Início no "Seu dia", com os números dela e as mesmas setas e calendário do Resumo do dia. O botão "Equipe" mostra o resumo da equipe, e a escolha segue junto ao trocar de dia.',
+      'Plano do dia (feito de previsto): abordagens novas de patrocinadores (só a primeira de cada um, contra a meta diária, e quantos ainda estão a abordar), follow-ups de patrocinadores e de convidados (os marcados para o dia pela cadência e quantos ela já fez; os atrasados de antes aparecem à parte), convites enviados (contra a meta diária, e quantos aguardam resposta) e as tarefas com prazo no dia.',
+      'Follow-up feito = o patrocinador ou convidado recebeu contato no dia (Registrar abordagem) ou saiu da etapa (respondeu, avançou ou foi perdido). Contam os dela e os sem responsável.',
+      'O que o dia rendeu: convites aceitos (e quantos estão em agendamento), convidados perdidos (com o motivo), patrocinadores interessados (foram para Em negociação), reuniões que ela marcou (e a próxima) e patrocínios fechados.',
+      'Por que seus convidados foram perdidos: os motivos dos últimos 30 dias, com quantidade e porcentagem. As outras metas dela (as que não estão no plano) ficam em "Minhas metas".',
+      'Embaixo: o cartão Hoje com os follow-ups que faltam e "Quentes agora" (patrocinador que abriu o media kit ou pediu uma conversa, convidado que abriu o convite e não respondeu, nas últimas 48 horas e sem abordagem depois), os aceitos ainda sem data de gravação, as próximas gravações e reuniões e as tarefas dela.',
+    ],
+  },
+  {
     key: 'resumo-dia', title: 'Resumo do dia no Início', words: ['resumo do dia', 'resumo', 'painel', 'início', 'inicio', 'dashboard', 'números do dia', 'numeros do dia', 'convites enviados', 'convites aceitos', 'seguidores', 'inscritos', 'cortes postados', 'cortes subidos', 'revisões', 'revisoes', 'reels de teste', 'tarefas atrasadas', 'patrocínio', 'patrocinio', 'patrocinadores', 'prospecção', 'prospeccao', 'abordados', 'follow-ups', 'follow-up', 'interessados', 'fechados'],
     where: 'Início (a primeira tela), bloco "Resumo do dia"', perm: 'production.manage',
     steps: [
       'O Início abre com o Resumo do dia: convites enviados, aceitos (e quantos estão em agendamento), agendados e perdidos; episódios gravados e publicados; cortes subidos pelo editor, revisões (versão nova de um corte), agendados para hoje (cortes e posts: quantos já saíram e quantos ainda vão sair), cortes postados e Reels de teste; seguidores no Instagram, inscritos no YouTube (com o saldo da semana) e tarefas atrasadas.',
       'O caminho "Da prospecção ao patrocínio" mostra os patrocinadores que entraram em prospecção, os abordados pela primeira vez (e quantos ainda estão a abordar), os follow-ups do dia (e quantos estão para hoje ou atrasados na cadência; num dia que passou, quantos ficaram atrasados), os interessados (foram para Em negociação), os fechados (entraram em Ganho; embaixo, os patrocínios ativos) e os perdidos no dia.',
       'Abordagem e follow-up vêm do Registrar abordagem: a primeira abordagem do ciclo (desde que o patrocinador entrou em Prospecção) é "abordado"; contato de novo num dia seguinte é follow-up, um por patrocinador no dia, mesmo por mais de um canal.',
+      'Logo abaixo do caminho dos convidados, "Por que os convidados foram perdidos": os motivos marcados nos convidados perdidos nos últimos 30 dias até o dia escolhido, do mais comum para o menos, com a quantidade e a porcentagem.',
       'Os três caminhos (do convite ao episódio, da prospecção ao patrocínio e o do conteúdo) têm um ponto em cada passo: aceso quando algo aconteceu naquele passo no dia.',
       'O número grande é o do dia; embaixo, como estava no fim daquele dia (hoje: até agora). Mudança de etapa desfeita no mesmo dia não conta.',
       'As setas mudam o dia, o calendário escolhe qualquer dia desde o primeiro convidado e "Hoje" volta. O dia fica no endereço, então dá para mandar o link de um dia.',
