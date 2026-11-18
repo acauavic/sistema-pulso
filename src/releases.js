@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.84.0', date: '2026-11-18', title: 'Site do Pulso: dados públicos para o podcastpulso.com e pedidos pelo site',
+    items: [
+      { kind: 'novo', text: 'Os pedidos para ser convidado e para patrocinar feitos no site entram direto no CRM de convidados e em Patrocinadores, com a origem "site" (e a campanha, quando vem) e um aviso para a gestão.' },
+      { kind: 'novo', text: 'Na página do patrocinador, "Patrocinador oficial no site" (só um por vez) e "Esconder do site": o site mostra o oficial em destaque e a logo das marcas que fecharam ou patrocinam.' },
+      { kind: 'novo', text: '"Estreia prevista" no convidado agendado: o site mostra quando ele vai ao ar, e a data passa para o episódio quando ele é criado.' },
+    ],
+  },
+  {
     version: '1.83.0', date: '2026-11-18', title: 'Categorias, tipos de vídeo e rotinas que se repetem',
     items: [
       { kind: 'novo', text: 'Gestão > Sistema > Categorias: os tipos de vídeo (os de sempre, como Corte, Bastidores, Q&A e Trailer, e os que você criar) e as categorias de tarefa. Dá para criar, renomear e desativar; o que já existe continua com o nome.' },

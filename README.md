@@ -30,6 +30,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - [Início da produtora (Seu dia)](#início-da-produtora-seu-dia)
 - [Metas por pessoa](#metas-por-pessoa)
 - [Página pós-gravação](#página-pós-gravação)
+- [Site do Pulso (podcastpulso.com)](#site-do-pulso-podcastpulsocom)
 - [Arquitetura: processos, fila, rotinas e avisos](#arquitetura-processos-fila-rotinas-e-avisos)
 - [Assistente de IA](#assistente-de-ia)
 - [Segurança](#segurança)
@@ -347,6 +348,7 @@ Veja `.env.example` (comentado). Resumo:
 - **Patrocinadores**: `BB_KEY_ID`, `BB_APPLICATION_KEY`, `BUCKET_NAME` (Backblaze B2; `BB_ENDPOINT` e `BB_PREFIX` são descobertos pela chave, só informe para forçar), `GROQ_APIKEY` (transcrição de voz; `GROQ_WHISPER_MODEL` opcional) e `PATROCINIO_WHATSAPP`.
 - **Episódios**: `GEMINI_KEY` (`GEMINI_MODEL` opcional), `UPLOAD_POST_KEY`, `UPLOAD_POST_USER` (padrão `default`), `UPLOAD_POST_LIVE` (**padrão `false`: só simula**), `ROLE` (`web`, `worker` ou `all`, padrão `all`; ver Arquitetura), `VIDEO_FORMAT_CHECK` (padrão `true`; `false` só em teste), `UPLOAD_PART_BYTES` (só em teste).
 - **Opcionais**: `PUBLIC_BASE_URL` (domínio dos convites), `PRODUCAO_WHATSAPP` (destino dos botões do convite), `PODCAST_NAME`, `AUTO_MIGRATE`, `PORT`.
+- **Site do Pulso**: `SITE_ORIGIN` (origens do podcastpulso.com, separadas por vírgula; padrão `https://podcastpulso.com,https://www.podcastpulso.com`). Só elas recebem CORS e mandam os formulários; a primeira é o endereço para onde os formulários sem JavaScript voltam (`/obrigado/` ou `/ops/`). Ver [Site do Pulso](#site-do-pulso-podcastpulsocom).
 
 ## Testes
 
@@ -503,6 +505,15 @@ data do episódio; bastidores e aviso na semana; episódio e cortes no ar), o qu
 e do Spotify, posts em collab em tempo real, a agenda dos cortes e os cortes inéditos), os cortes em collab (distribuição em parceria, sem custo), as redes onde o Pulso posta e o WhatsApp da produção. O número e a
 mensagem do WhatsApp ("Na página pós-gravação") ficam em Gestão > WhatsApp dos convites; o texto da página está em
 `src/views/portal/pos-gravacao.ejs` (rota `src/routes/postRecording.js`). Para o cartão: aponte o link do QR Code para esse endereço.
+
+## Site do Pulso (podcastpulso.com)
+
+O sistema é a fonte dos dados do site e recebe os formulários dele (`src/routes/siteApi.js`, sem login nem CSRF; migração 084).
+
+- **`GET /api/site/v1/dados`** (`src/services/siteData.js`): um JSON só, contrato versionado (`version: 1`), com `mesa`, `episodios`, `posts`, `agenda` (`vai_ao_ar` e `gravacoes`), `patrocinador_oficial`, `apoiadores` e `plateia`. Só o que já é público: nada de telefone, e-mail, valores, responsável, notas ou tokens. Cache de 60 s, CORS só para `SITE_ORIGIN`, limite por IP.
+- **Imagens** (`src/services/siteImages.js`): foto do convidado, logo do patrocinador (a principal, já pronta) e capa de post vão em endereço absoluto assinado (`/api/site/v1/imagem/:tipo/:id?e=…&s=…`), válido por 24 h e preso ao tipo e ao id; assinatura ruim, vencida ou sem imagem dá o mesmo 404.
+- **Formulários** `POST /api/site/v1/convidado` e `POST /api/site/v1/patrocinador` (`src/services/siteLeads.js`): JSON (resposta `{ ok }`) ou formulário comum (303 para o site). O pedido vira convidado ou patrocinador em Prospecção, com origem `site` e a UTM da visita, e a gestão recebe o aviso "Pedidos pelo site". Isca para robôs, validação campo a campo e limite por IP.
+- **No painel**: o patrocinador tem "Patrocinador oficial no site" (no máximo um; ao juntar duplicatas o selo passa para o que fica, e restaurar da lixeira com outro oficial volta sem o selo) e "Esconder do site". Apoiadores = Ganho, Ativo ou Inativo com logo. O convidado agendado tem "Estreia prevista", que vira a data de veiculação do episódio quando ele é criado.
 
 ## Cadência de abordagem
 
