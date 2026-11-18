@@ -176,7 +176,7 @@ const goodCover = (t) => t && t.split(/\s+/).length >= 2;
 const hashtagLine = (tags, n = 4) => [...new Set((tags || []).map((h) => `#${String(h).replace(/^#/, '').replace(/[^\p{L}\p{N}_]/gu, '')}`).filter((h) => h.length > 2))].slice(0, n).join(' ');
 
 // O pedido de textos do corte (exportado para o teste conferir as regras de copy).
-function textsPrompt({ episode = null, guest = null, transcript, avoid = [] }) {
+function textsPrompt({ episode = null, guest = null, transcript, avoid = [], examples = '' }) {
   const context = episode ? fin.buildContext({ episode, guest, sponsors: [] }) : 'Podcast: Pulso (corte ainda sem episódio definido).';
   return [
     fin.MARCA, '', context, '',
@@ -185,6 +185,7 @@ function textsPrompt({ episode = null, guest = null, transcript, avoid = [] }) {
     `- textos_capa: EXATAMENTE 3 textos para a capa do vídeo, de 2 a 5 palavras e no máximo ${L.LIMITS.thumbnailText.maxChars - 4} caracteres, cada um por um caminho diferente. ${SC.COPY.capa}`,
     `- legenda: de 2 a 4 frases curtas (até 320 caracteres), sem hashtags e sem exclamações. ${SC.COPY.legenda}`,
     `- chamadas: uma chamada por rede, em 1 frase de até ${SC.CTA_MAX} caracteres, que diz o que fazer e dá um motivo ligado ao tema deste corte (não um motivo genérico). ${SC.NETWORKS.map((n) => SC.CTA_RULE[n]).join('; ')}. Sem "link na bio", sem exclamações em sequência.`,
+    examples ? `\n${examples}` : '',
     avoid.length ? `\nA versão anterior usou frases genéricas proibidas (${avoid.join(', ')}). Reescreva sem elas.` : '',
     '', `Fala: ${L.fitWords(transcript, 3000)}`,
   ].filter((x) => x !== '').join('\n');
@@ -197,8 +198,9 @@ async function writeTexts({ episode = null, guest = null, transcript, hashtags =
   if (!config.geminiConfigured || !transcript || transcript.length < 20) return empty;
   try {
     let data; let avoid = [];
+    const examples = await require('./postMetrics').examples(); // os cortes mais vistos viram referência (quando há números)
     for (let round = 0; round < 2; round += 1) {
-      ({ data } = await gemini.generateJson({ parts: [{ text: textsPrompt({ episode, guest, transcript, avoid }) }], schema: TEXTS_SCHEMA, temperature: 0.7 }));
+      ({ data } = await gemini.generateJson({ parts: [{ text: textsPrompt({ episode, guest, transcript, avoid, examples }) }], schema: TEXTS_SCHEMA, temperature: 0.7 }));
       avoid = SC.bannedIn(`${data.titulo || ''} ${data.legenda || ''} ${(data.textos_capa || []).join(' ')}`);
       if (!avoid.length) break;
     }

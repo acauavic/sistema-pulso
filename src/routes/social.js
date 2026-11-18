@@ -27,15 +27,16 @@ router.get('/social', requirePerm('social.read'), (req, res) => res.redirect('/s
 router.get('/social/publicacoes', requirePerm('social.read'), wrap(async (req, res) => {
   const status = social.STATUS_LABEL[req.query.status] ? req.query.status : '';
   const media = MEDIA[req.query.tipo] ? req.query.tipo : '';
+  const q = String(req.query.q || '').trim().slice(0, 80);
   const { pageOf, paginate } = require('../utils/pager');
   const pg = pageOf(req, 50);
   const [rawPubs, counts] = await Promise.all([
-    social.listPublications({ status, media, limit: pg.limit, offset: pg.offset }),
+    social.listPublications({ status, media, q, limit: pg.limit, offset: pg.offset }),
     db.query('SELECT status, count(*)::int AS n FROM episode_publications GROUP BY status'),
   ]);
   const { rows: pubs, pager } = paginate(req, rawPubs, pg);
   res.render('social/publications', {
-    title: 'Social', tab: 'publicacoes', pubs, pager, status, media, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, ...(await pubLive()),
+    title: 'Social', tab: 'publicacoes', pubs, pager, status, media, q, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, ...(await pubLive()),
     counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])),
   });
 }));
@@ -98,7 +99,7 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   const canResend = can(req.user.role, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
   const resend = canResend ? await resendChoices(pub) : null;
   res.render('social/publication', {
-    resend, videoTags: await socialApi.videoTags(), auto: await automation.ofPublication(pub.id),
+    resend, videoTags: await socialApi.videoTags(), auto: await automation.ofPublication(pub.id), nums: await require('../services/postMetrics').forPublication(pub.id),
     title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: providers.every((p) => p.live()), provider: providers[0], providers,
     providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
     testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
@@ -291,7 +292,7 @@ router.post('/social/ideias/gerar', requirePerm('social.ideas'), wrap(async (req
   if (ids.length === 1) { // um episódio: na hora
     const r = await social.generateIdeas(ids[0], kinds, req.user.id);
     if (r.error) await req.flash('error', r.error);
-    else await req.flash('ok', r.created ? `${r.created} ideia(s) nova(s).${r.skipped ? ` ${r.skipped} parecida(s) com o que já existe ficaram de fora.` : ''}` : 'Nenhuma ideia nova: o que a IA sugeriu já tinha sido feito ou sugerido.');
+    else await req.flash('ok', r.created ? `${fmt.plural(r.created, 'ideia nova', 'ideias novas')}.${r.skipped ? ` ${r.skipped === 1 ? '1 parecida com o que já existe ficou de fora' : `${r.skipped} parecidas com o que já existe ficaram de fora`}.` : ''}` : 'Nenhuma ideia nova: o que a IA sugeriu já tinha sido feito ou sugerido.');
   } else {
     await jobs.enqueue('social_ideias', { refId: Date.now() % 2147483647, payload: { episodeIds: ids, kinds, userId: req.user.id } });
     await req.flash('ok', `Pedido de ideias para ${ids.length} episódios na fila. Você recebe uma notificação quando terminar.`);
@@ -322,8 +323,8 @@ router.post('/social/ideias/:id/:acao(aprovar|feita|descartar|reabrir)', require
 
 // ---------------------------------------------------------------- insights
 router.get('/social/insights', requirePerm('social.read'), wrap(async (req, res) => {
-  const [data, ours] = await Promise.all([require('../services/socialInsights').overview({ force: req.query.atualizar === '1' }), social.ourActivity()]);
-  res.render('social/insights', { title: 'Insights', tab: 'insights', data, ours, platforms: up.PLATFORMS, MEDIA });
+  const [data, ours, best] = await Promise.all([require('../services/socialInsights').overview({ force: req.query.atualizar === '1' }), social.ourActivity(), require('../services/postMetrics').top({ limit: 10 })]);
+  res.render('social/insights', { title: 'Insights', tab: 'insights', data, ours, best, platforms: up.PLATFORMS, MEDIA });
 }));
 
 // ---------------------------------------------------------------- automações
@@ -385,9 +386,9 @@ router.post('/social/automacoes', requirePerm('social.automate'), wrap(async (re
   const { rows: [r] } = await db.query(
     `INSERT INTO social_rules (name, trigger, platform, scope, post_url, keywords, action, message, reply_text, buttons, created_by, provider)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
-    // comentário no Instagram: chega pela Outstand (aviso na hora); o resto continua pela leitura da Upload-Post
+    // comentário e direct no Instagram: chegam pela Outstand (aviso na hora); o resto continua pela leitura da Upload-Post
     [v.name, v.trigger, v.platform, v.scope, v.post_url, v.keywords, v.action, v.message, v.reply_text, JSON.stringify(v.buttons), req.user.id,
-      v.trigger === 'comentario' && v.platform === 'instagram' && config.outstandConfigured ? 'outstand' : 'uploadpost']);
+      ((v.trigger === 'comentario' && v.platform === 'instagram') || v.trigger === 'direct') && config.outstandConfigured ? 'outstand' : 'uploadpost']);
   await audit(req, 'automacao.criada', 'social_rule', r.id, { name: v.name });
   await req.flash('ok', 'Automação criada, ainda pausada. Revise e ative quando quiser.');
   res.redirect(`/social/automacoes/${r.id}`);
@@ -444,7 +445,7 @@ router.post('/social/automacoes/:id/:acao(ativar|pausar|excluir|rodar)', require
     if (!rule.active) { await req.flash('error', 'Ative a automação antes de rodar.'); return res.redirect(`/social/automacoes/${rule.id}`); }
     const n = await social.runRules();
     const { rows: [fresh] } = await db.query('SELECT last_error FROM social_rules WHERE id = $1', [rule.id]);
-    await req.flash(fresh.last_error ? 'error' : 'ok', fresh.last_error ? `Não rodou: ${fresh.last_error}` : `Rodou agora: ${n} resposta(s).`);
+    await req.flash(fresh.last_error ? 'error' : 'ok', fresh.last_error ? `Não rodou: ${fresh.last_error}` : `Rodou agora: ${fmt.plural(n, 'resposta', 'respostas')}.`);
   }
   await audit(req, `automacao.${acao}`, 'social_rule', rule.id);
   res.redirect(`/social/automacoes/${rule.id}`);

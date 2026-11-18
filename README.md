@@ -252,6 +252,15 @@ Cada convidado com episódio tem a aba **Portal** no cadastro. **Ativar portal**
 
 ## Social: publicações, novo post, ideias, insights e automações
 
+**Números dos posts** (`src/services/postMetrics.js`, migração 078, rotina `metricas-posts` a cada 6 h): views, curtidas, comentários,
+compartilhamentos e alcance de cada publicação que saiu pelo painel nos últimos 90 dias, por rede (Outstand: `GET /v1/posts/{id}/analytics`,
+uma consulta por post; Zernio: lista de posts da conta, casada pelo link). Aparecem na publicação (por rede), no corte (total), no cartão do
+quadro e em Insights > "O que publicamos" ("Cortes que mais funcionaram"); os 5 mais vistos entram como referência no prompt de copy.
+**Agenda da semana** (`/conteudo/semana`, `bulkPublish.weekPicks`): a semana montada com os cortes prontos, um episódio de cada vez, para
+conferir e agendar; "Ajustar" guarda as escolhas (`app_settings.piloto_semana`) e a rotina `piloto-semana` avisa a equipe na segunda de manhã.
+**Palavra no direct**: o webhook da Outstand também aceita `message.received`; a mensagem vira `social_inbox` e o trabalho `direct_recebido`
+responde na conversa (`POST /v1/conversations/{id}/messages`) quando há automação de Direct ativa com a palavra.
+
 **Menu Social** (`src/routes/social.js`, `src/services/social.js`). Tudo passa pelo Upload-Post e, **sem `UPLOAD_POST_LIVE=true`,
 nada sai para as redes** (posts, edições, respostas e directs ficam como "simulado"; leituras — números, comentários, directs — são reais).
 

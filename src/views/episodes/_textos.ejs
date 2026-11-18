@@ -68,7 +68,7 @@
               <input type="radio" name="thumb_frame_id" value="<%= f.id %>" <%= meta && meta.thumb_frame_id === f.id ? 'checked' : '' %> <%= canWriteMeta ? '' : 'disabled' %>>
               <img src="/episodios/<%= ep.id %>/quadros/<%= f.id %>" alt="Quadro em <%= fmt.formatClock(f.at_ms) %>" loading="lazy">
               <span class="handle"><%= fmt.formatClock(f.at_ms) %> · nota <%= f.score != null ? Number(f.score).toFixed(1) : '—' %></span>
-              <span class="small muted"><%= (a.rostos || []).length %> rosto(s)<%= a.texto_queimado ? ' · legenda no quadro' : '' %><%= a.olhos_abertos === false ? ' · olhos fechados' : '' %></span>
+              <span class="small muted"><%= fmt.plural((a.rostos || []).length, 'rosto', 'rostos') %><%= a.texto_queimado ? ' · legenda no quadro' : '' %><%= a.olhos_abertos === false ? ' · olhos fechados' : '' %></span>
             </label>
             <% }) %>
           </div>

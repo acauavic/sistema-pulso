@@ -7,14 +7,14 @@
   var empty = { minhas: 'Nenhuma tarefa sua em aberto.', hoje: 'Nada vence hoje para você.', todas: 'Nenhuma tarefa ainda.' };
 %>
 <div class="page-head">
-  <div><span class="kicker">Gestão de tarefas</span><h1><%= scopes[scope] %></h1></div>
+  <div><span class="kicker">Gestão de tarefas</span><h1><%= { minhas: 'Minhas tarefas', hoje: 'Para hoje', todas: 'Todas as tarefas' }[scope] || scopes[scope] %></h1></div>
   <div class="row">
     <div class="seg" role="tablist" aria-label="Visualização">
       <a class="<%= view === 'lista' ? 'on' : '' %>" href="<%= url({ visao: 'lista', mes: '' }) %>"><%- icon('list') %> Lista</a>
       <a class="<%= view === 'quadro' ? 'on' : '' %>" href="<%= url({ visao: 'quadro', mes: '' }) %>"><%- icon('columns-3') %> Quadro</a>
       <a class="<%= view === 'calendario' ? 'on' : '' %>" href="<%= url({ visao: 'calendario' }) %>"><%- icon('calendar') %> Calendário</a>
     </div>
-    <% if (can('tasks.write') && voiceReady) { %><button class="btn" type="button" data-voice-open title="Falar a tarefa: a IA organiza" aria-label="Falar a tarefa"><%- icon('mic') %> Falar tarefa</button><% } %>
+    <% if (can('tasks.write') && voiceReady) { %><button class="btn" type="button" data-voice-open title="Falar a tarefa: a IA organiza" aria-label="Falar a tarefa"><%- icon('mic') %> Falar a tarefa</button><% } %>
     <% if (can('tasks.write')) { %><button class="btn primary" type="button" data-modal-open="modal-task-new"><%- icon('plus') %> Nova tarefa</button><% } %>
   </div>
 </div>
@@ -53,7 +53,7 @@
           </span>
         </div>
         <span class="handle tt-due <%= lateOf(t) ? 'err' : '' %>"><%= due ? fmt.formatDueShort(t.due_on, t.due_time) : '—' %></span>
-        <span class="handle muted"><%= t.comments ? t.comments + ' coment.' : '' %></span>
+        <span class="handle muted tt-com"<%- t.comments ? ' title="' + t.comments + (t.comments === 1 ? ' comentário' : ' comentários') + '"' : '' %>><% if (t.comments) { %><%- icon('message-circle', 12) %> <%= t.comments %><% } %></span>
         <%- include('../partials/dot', { type: 'task', id: t.id, user: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null, editable: edit }) %>
       </li>
       <% }) %>

@@ -45,9 +45,12 @@
     <a class="btn ghost" href="/patrocinadores"><%- icon('arrow-left') %> Voltar</a>
     <% if (canWrite) { %><a class="btn" href="/patrocinadores/<%= sponsor.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
     <% if (can('sponsors.delete')) { %>
-    <form method="post" action="/patrocinadores/<%= sponsor.id %>/excluir" class="inline" data-confirm="Excluir <%= sponsor.company %>, os arquivos e todo o histórico? Esta ação não pode ser desfeita.">
-      <%- csrfField %><button class="btn danger" type="submit"><%- icon('trash-2') %> Excluir</button>
-    </form>
+    <details class="row-menu">
+      <summary class="btn icon-only" aria-label="Mais ações" title="Mais ações"><%- icon('ellipsis') %></summary>
+      <div class="row-menu-list">
+        <form method="post" action="/patrocinadores/<%= sponsor.id %>/excluir" data-confirm="Mandar <%= sponsor.company %> para a lixeira? Fica 15 dias lá, com os arquivos e o histórico, e dá para restaurar."><%- csrfField %><button class="link danger-link" type="submit"><%- icon('trash-2', 14) %> Mandar para a lixeira</button></form>
+      </div>
+    </details>
     <% } %>
   </div>
 </div>
@@ -150,9 +153,9 @@
           <h2>Dados</h2>
           <dl class="kv">
             <dt>Quem cuida</dt><dd><%- include('../partials/dot', { type: 'sponsor', id: sponsor.id, user: sponsor.owner_id ? { id: sponsor.owner_id, name: sponsor.owner_name } : null, editable: canWrite, label: true }) %></dd>
-            <% if (sponsor.website) { %><dt>Site</dt><dd><a href="<%= sponsor.website %>" target="_blank" rel="noopener noreferrer"><%= sponsor.website %></a></dd><% } %>
+            <% if (sponsor.website) { var site = /^https?:\/\//i.test(sponsor.website) ? sponsor.website : 'https://' + sponsor.website; %><dt>Site</dt><dd><a href="<%= site %>" target="_blank" rel="noopener noreferrer"><%= sponsor.website.replace(/^https?:\/\//i, '').replace(/\/$/, '') %></a></dd><% } %>
             <% if (sponsor.contact_name) { %><dt>Responsável</dt><dd><%= sponsor.contact_name %></dd><% } %>
-            <% if (sponsor.contact_phone) { %><dt>WhatsApp</dt><dd class="handle"><%= sponsor.contact_phone %></dd><% } %>
+            <% if (sponsor.contact_phone) { %><dt>WhatsApp</dt><dd class="handle"><% if (fmt.waLink(sponsor.contact_phone)) { %><a href="<%= fmt.waLink(sponsor.contact_phone) %>" target="_blank" rel="noopener noreferrer"><%= fmt.phone(sponsor.contact_phone) %></a><% } else { %><%= sponsor.contact_phone %><% } %></dd><% } %>
             <% if (sponsor.contact_email) { %><dt>E-mail</dt><dd><%= sponsor.contact_email %></dd><% } %>
             <% if (sponsor.tier) { %><dt>Cota</dt><dd><%= C.SPONSOR_TIERS[sponsor.tier] %></dd><% } %>
             <% if (sponsor.value_cents != null) { %><dt>Valor</dt><dd class="handle"><%= fmt.formatBRL(sponsor.value_cents) %></dd><% } %>

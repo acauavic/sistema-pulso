@@ -34,7 +34,7 @@
         <span><strong><%= CHANNELS[a.channel] %></strong><% if (a.address) { %> <span class="mono small raw"><%= a.address %></span><% } %> <span class="badge <%= a.result === 'respondeu' ? 'b-green' : 'b-gray' %>"><%= RESULTS[a.result] %></span>
           <% if (a.note) { %><span class="small muted"> · <%= a.note %></span><% } %>
           <span class="small muted"> · <%= a.user_name || 'sistema' %></span></span>
-        <% if (canWrite) { %><form method="post" action="/abordagens/<%= a.id %>/excluir" class="inline" data-confirm="Apagar este registro?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit" aria-label="Apagar o registro de <%= fmt.formatDateTime(a.at) %>">Apagar</button></form><% } %>
+        <% if (canWrite) { %><form method="post" action="/abordagens/<%= a.id %>/excluir" class="inline" data-confirm="Apagar este registro?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn row-del" type="submit" title="Apagar este registro" aria-label="Apagar o registro de <%= fmt.formatDateTime(a.at) %>"><%- icon('trash-2', 14) %></button></form><% } %>
       </li>
       <% }) %>
     </ul>

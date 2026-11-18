@@ -312,7 +312,7 @@ describe('trabalho de finalização (FFmpeg real, IA simulada)', { skip: hasFfmp
     assert.match(page, /data-counter-for="yt_title"/);
     assert.match(page, /Sem ego, \/ sem vaidade/);
     assert.match(page, new RegExp(`/episodios/${ep.id}/quadros/\\d+`));
-    assert.match(page, /1 rosto\(s\)/);
+    assert.match(page, /1 rosto(?!s)/);
     assert.match(page, /Transcrição: 2 trechos/);
     const frame = (await h.db.query('SELECT id FROM episode_frames WHERE episode_id=$1 LIMIT 1', [ep.id])).rows[0];
     const redirect = await as.editor.get(`/episodios/${ep.id}/quadros/${frame.id}`);

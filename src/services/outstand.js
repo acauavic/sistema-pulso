@@ -372,6 +372,12 @@ async function replyToComment({ postRef, commentId, content }) {
   return { replyId: json.reply_id || null };
 }
 
+// Resposta dentro de uma conversa do direct (vale até 24 h depois da última mensagem da pessoa).
+async function sendMessage({ conversationId, content }) {
+  const { json } = await call('POST', `/v1/conversations/${encodeURIComponent(conversationId)}/messages`, { body: { content }, timeout: 30_000 });
+  return { messageId: json.message?.id || null, status: json.message?.status || null };
+}
+
 // Endereço para reconectar o Instagram com acesso às mensagens (a reconexão pelo painel da Outstand tira esse acesso).
 const MESSAGING_SCOPES = 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights,instagram_business_manage_messages';
 async function instagramAuthUrl(redirectUri) {
@@ -381,4 +387,4 @@ async function instagramAuthUrl(redirectUri) {
   return url;
 }
 
-module.exports = { NETWORKS, HEAVY_BYTES, heavy, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator, privateReply, replyToComment, instagramAuthUrl, MESSAGING_SCOPES };
+module.exports = { NETWORKS, HEAVY_BYTES, heavy, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator, privateReply, replyToComment, instagramAuthUrl, MESSAGING_SCOPES, sendMessage };

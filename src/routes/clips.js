@@ -45,57 +45,92 @@ const eligibleEpisodes = () => db.query(
 // ---------------------------------------------------------------- tela de conteúdo
 router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const only = isIntId(req.query.episodio) ? Number(req.query.episodio) : null;
-  const [clipRows, covers, episodes, posts, withFrames] = await Promise.all([
+  // cada aba é uma página: só monta o que a aba aberta mostra (o quadro, os cortes, os posts ou os pedidos)
+  const vista = ['quadro', 'cortes', 'posts', 'pedidos'].includes(req.query.vista) ? req.query.vista : 'quadro';
+  const board = require('../services/contentBoard');
+  const R = require('../services/contentRequests');
+  const clipFilter = `(c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes') ${only ? 'AND c.episode_id = $1' : ''}`;
+  const [clipRows, episodes, postCountRow, idx, reqs, people, episodeList] = await Promise.all([
     db.query(
       `SELECT c.*, e.number AS ep_number, e.title AS ep_title, g.name AS guest_name, r.title AS request_title FROM episode_clips c
          LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN content_requests r ON r.id = c.request_id
-        WHERE (c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes') ${only ? 'AND c.episode_id = $1' : ''} ORDER BY (c.episode_id IS NULL) DESC, c.created_at DESC, c.id DESC`, only ? [only] : []),
-    db.query('SELECT id, clip_id, updated_at FROM episode_covers WHERE clip_id IS NOT NULL ORDER BY position'),
+        WHERE ${clipFilter} ORDER BY (c.episode_id IS NULL) DESC, c.created_at DESC, c.id DESC`, only ? [only] : []),
     eligibleEpisodes(),
-    db.query(
-      `SELECT c.id, c.episode_id, c.kind, c.group_key, c.position, c.label, c.lint, c.approved, c.auto, c.width, c.height, c.size_bytes, c.updated_at
-         FROM episode_covers c WHERE c.clip_id IS NULL AND c.kind = ANY($1) ${only ? 'AND c.episode_id = $2' : ''} ORDER BY c.episode_id DESC, c.kind, c.group_key, c.position, c.id`, only ? [POST_KINDS, only] : [POST_KINDS]),
-    db.query('SELECT DISTINCT episode_id FROM episode_frames WHERE clip_id IS NULL AND episode_id IS NOT NULL'),
-  ]);
-  const board = require('../services/contentBoard');
-  const R = require('../services/contentRequests');
-  // quadro de um episódio: mostra tudo o que já saiu; o geral esconde o publicado há mais de 60 dias (com aviso na coluna)
-  const [built, idx, reqs, people, episodeList] = await Promise.all([
-    board.build({ episodeId: only, recentDays: req.query.publicados === 'todos' || only ? null : 60 }), board.publicationIndex(),
+    db.query(`SELECT count(*)::int AS n FROM episode_covers c WHERE c.clip_id IS NULL AND c.kind = ANY($1) ${only ? 'AND c.episode_id = $2' : ''}`, only ? [POST_KINDS, only] : [POST_KINDS]),
+    board.publicationIndex(),
     R.list({ episodeId: only }), db.query("SELECT id, name, role FROM users WHERE active AND role IN ('editor_video','gestao','superadmin') ORDER BY (role = 'editor_video') DESC, name"),
     db.query('SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 80'),
   ]);
-  // aba Cortes: situação (só os prontos para postar) e ordem
-  const situacao = req.query.situacao === 'pronto' ? 'pronto' : '';
-  const ordem = ['antigos', 'episodio', 'duracao'].includes(req.query.ordem) ? req.query.ordem : 'recentes';
-  const natural = (a, b) => String(a.title).localeCompare(String(b.title), 'pt-BR', { numeric: true });
-  const sorters = {
-    recentes: (a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id,
-    antigos: (a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id,
-    episodio: (a, b) => (a.ep_number ?? 9999) - (b.ep_number ?? 9999) || natural(a, b),
-    duracao: (a, b) => (a.duration_ms || 0) - (b.duration_ms || 0) || natural(a, b),
-  };
-  const list = clipRows.rows.map((c) => ({ ...c, covers: covers.rows.filter((x) => x.clip_id === c.id), pub: board.stateOf(idx.byClip.get(c.id)) }))
-    .filter((c) => !situacao || (c.status === 'pronto' && !c.pub && (c.episode_id || c.request_id)))
-    .sort(sorters[ordem]);
   const byEpisode = {};
   for (const e of episodes.rows) byEpisode[e.id] = e;
-  const hasFrames = new Set(withFrames.rows.map((r) => r.episode_id));
-  const postGroups = [];
-  for (const e of episodes.rows) {
-    const mine = posts.rows.filter((p) => p.episode_id === e.id);
-    if ((only && e.id !== only) || (!mine.length && !hasFrames.has(e.id))) continue;
-    postGroups.push({ episode: e, covers: mine, canGenerate: hasFrames.has(e.id) });
-  }
-  const moments = only ? await clips.momentsFor(only) : [];
-  const running = list.some((c) => ['enviando', 'processando'].includes(c.status));
+
+  // Quadro
+  let columns = []; let hiddenOld = 0;
   const tipo = ['video', 'imagem', 'pedido'].includes(req.query.tipo) ? req.query.tipo : '';
-  const keep = (c) => !tipo || (tipo === 'pedido' ? c.type === 'pedido' : tipo === 'video' ? c.media === 'video' && c.type !== 'pedido' : c.type !== 'pedido' && c.media !== 'video');
-  const columns = built.columns.map((col) => ({ ...col, cards: col.cards.filter(keep) }));
+  if (vista === 'quadro') {
+    const built = await board.build({ episodeId: only, recentDays: req.query.publicados === 'todos' || only ? null : 60 }); // de um episódio: tudo o que já saiu
+    hiddenOld = built.hiddenOld;
+    const keep = (c) => !tipo || (tipo === 'pedido' ? c.type === 'pedido' : tipo === 'video' ? c.media === 'video' && c.type !== 'pedido' : c.type !== 'pedido' && c.media !== 'video');
+    const views = await require('../services/postMetrics').forClips(built.cards.filter((k) => k.type === 'corte').map((k) => Number(String(k.key).slice(1))));
+    // coluna com muitos cartões (ex.: 150 prontos para postar): mostra os 30 primeiros e leva à lista com filtro e seleção
+    columns = built.columns.map((col) => {
+      const cards = col.cards.filter(keep).map((k) => (k.type === 'corte' ? { ...k, views: views[Number(String(k.key).slice(1))]?.views || 0 } : k));
+      const cap = col.key === 'pronto' ? 30 : cards.length;
+      return { ...col, total: cards.length, cards: cards.slice(0, cap) };
+    });
+  }
+
+  // Cortes: situação (só os prontos para postar), ordem e páginas de 60
+  const situacao = req.query.situacao === 'pronto' ? 'pronto' : '';
+  const ordem = ['antigos', 'episodio', 'duracao'].includes(req.query.ordem) ? req.query.ordem : 'recentes';
+  const allClips = clipRows.rows.map((c) => ({ ...c, pub: board.stateOf(idx.byClip.get(c.id)) }));
+  const readyCount = allClips.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !c.pub).length;
+  let list = []; let clipPager = null; let running = false;
+  if (vista === 'cortes') {
+    const natural = (a, b) => String(a.title).localeCompare(String(b.title), 'pt-BR', { numeric: true });
+    const sorters = {
+      recentes: (a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id,
+      antigos: (a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id,
+      episodio: (a, b) => (a.ep_number ?? 9999) - (b.ep_number ?? 9999) || natural(a, b),
+      duracao: (a, b) => (a.duration_ms || 0) - (b.duration_ms || 0) || natural(a, b),
+    };
+    const filtered = allClips.filter((c) => !situacao || (c.status === 'pronto' && !c.pub && (c.episode_id || c.request_id))).sort(sorters[ordem]);
+    const { pageOf, paginate } = require('../utils/pager');
+    const pg = pageOf(req, req.query.todos === '1' ? 1000 : 60);
+    const out = paginate(req, filtered.slice(pg.offset, pg.offset + pg.limit), pg);
+    clipPager = out.pager;
+    const ids = out.rows.map((c) => c.id);
+    const [{ rows: covers }, views] = await Promise.all([
+      ids.length ? db.query('SELECT id, clip_id, updated_at FROM episode_covers WHERE clip_id = ANY($1) ORDER BY position', [ids]) : { rows: [] },
+      require('../services/postMetrics').forClips(ids),
+    ]);
+    list = out.rows.map((c) => ({ ...c, covers: covers.filter((x) => x.clip_id === c.id), views: views[c.id] || null }));
+    running = list.some((c) => ['enviando', 'processando'].includes(c.status));
+  }
+
+  // Posts e carrosséis
+  const postGroups = [];
+  if (vista === 'posts') {
+    const [posts, withFrames] = await Promise.all([
+      db.query(
+        `SELECT c.id, c.episode_id, c.kind, c.group_key, c.position, c.label, c.lint, c.approved, c.auto, c.width, c.height, c.size_bytes, c.updated_at
+           FROM episode_covers c WHERE c.clip_id IS NULL AND c.kind = ANY($1) ${only ? 'AND c.episode_id = $2' : ''} ORDER BY c.episode_id DESC, c.kind, c.group_key, c.position, c.id`, only ? [POST_KINDS, only] : [POST_KINDS]),
+      db.query('SELECT DISTINCT episode_id FROM episode_frames WHERE clip_id IS NULL AND episode_id IS NOT NULL'),
+    ]);
+    const hasFrames = new Set(withFrames.rows.map((r) => r.episode_id));
+    for (const e of episodes.rows) {
+      const mine = posts.rows.filter((p) => p.episode_id === e.id);
+      if ((only && e.id !== only) || (!mine.length && !hasFrames.has(e.id))) continue;
+      postGroups.push({ episode: e, covers: mine, canGenerate: hasFrames.has(e.id) });
+    }
+  }
+
+  const moments = only && vista === 'cortes' ? await clips.momentsFor(only) : [];
   const pedir = Object.prototype.hasOwnProperty.call(R.KINDS, req.query.pedir) ? req.query.pedir : (req.query.pedir === '1' ? 'trailer' : null);
   res.render('content/index', {
-    uploadPost: up, autoDefaults: await require('../services/commentAutomation').formDefaults({}), situacao, ordem, readyCount: clipRows.rows.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !board.stateOf(idx.byClip.get(c.id))).length,
-    columns, hiddenOld: built.hiddenOld, tipo, vista: ['quadro', 'cortes', 'posts', 'pedidos'].includes(req.query.vista) ? req.query.vista : 'quadro',
+    uploadPost: up, autoDefaults: vista === 'cortes' ? await require('../services/commentAutomation').formDefaults({}) : null, situacao, ordem, readyCount, clipPager,
+    tabCounts: { cortes: allClips.length, posts: postCountRow.rows[0].n },
+    columns, hiddenOld, tipo, vista,
     requests: reqs, openRequests: reqs.filter((r) => R.OPEN.includes(r.status)), people: people.rows, episodeList: episodeList.rows, K: R.KINDS, S: R.STATUSES, F: R.FORMATS,
     pedir, today: new Date().toISOString().slice(0, 10), isLate: R.isLate, stageLabel: board.STAGE_LABEL,
     title: 'Conteúdo', clips: list, episodes: episodes.rows, postGroups, only, onlyEpisode: only ? byEpisode[only] || null : null,
@@ -269,12 +304,13 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
   ]);
   const light = Boolean(await require('../services/videoViews').viewKeyFor(c.storage_key));
   const automation = require('../services/commentAutomation');
-  const [autoDefaults, autoOf] = await Promise.all([
+  const [autoDefaults, autoOf, nums] = await Promise.all([
     automation.formDefaults({ guest: ep.rows[0]?.guest_name ? { name: ep.rows[0].guest_name } : null }),
     Promise.all(pubs.rows.map(async (p) => [p.id, await automation.ofPublication(p.id)])).then((l) => Object.fromEntries(l.filter(([, r]) => r))),
+    pubs.rows.length ? require('../services/postMetrics').forClips([c.id]).then((m) => m[c.id] || null) : null,
   ]);
   res.render('content/clip', {
-    ctas: require('../services/socialCopy').forClip(c), autoDefaults, autoOf,
+    ctas: require('../services/socialCopy').forClip(c), autoDefaults, autoOf, nums,
     comments: thread, request, versions, replace, light,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C, videoTags: await socialApi.videoTags(),

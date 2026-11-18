@@ -18,7 +18,7 @@
 <% if (data.error) { %><p class="flash flash-error"><%= data.error %></p><% } %>
 
 <div class="tabs-wrap" data-tabs data-default="resumo">
-  <div class="tabbar" role="tablist" aria-label="Redes">
+  <div class="seg ins-seg" role="tablist" aria-label="Redes">
     <button type="button" role="tab" data-tab-btn="resumo">Resumo</button>
     <% nets.forEach(function (d) { %><button type="button" role="tab" data-tab-btn="<%= d.net %>"><%= label(d.net) %></button><% }) %>
     <button type="button" role="tab" data-tab-btn="equipe">O que publicamos</button>
@@ -115,6 +115,22 @@
   <% }) %>
 
   <div class="pane" data-pane-id="equipe" hidden>
+    <section class="card">
+      <div class="row spread"><h2>Cortes que mais funcionaram</h2><span class="mono small muted">90 DIAS · TODAS AS REDES</span></div>
+      <% if (!best.length) { %><p class="muted small">Os números aparecem aqui quando os cortes publicados pelo painel tiverem visualizações (o sistema lê a cada 6 horas). Post feito por fora não tem como ser lido.</p>
+      <% } else { %>
+      <p class="small muted">Somados os números de todas as redes em que o corte saiu pelo painel. A IA usa os cinco primeiros como referência ao sugerir capa, título e legenda.</p>
+      <ol class="plain best-list">
+        <% best.forEach(function (c, i) { %>
+        <li>
+          <span class="mono muted best-rank"><%= String(i + 1).padStart(2, '0') %></span>
+          <a class="best-txt" href="/cortes/<%= c.id %>"><strong><%= c.pub_title || c.post_title || c.title %></strong><span class="mono small muted"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') : 'AVULSO' %><%= c.guest_name ? ' · ' + c.guest_name : '' %></span></a>
+          <span class="post-nums mono small"><span><%- icon('eye', 12) %> <%= fmt.compact(c.views) %></span><span><%- icon('heart', 12) %> <%= fmt.compact(c.likes) %></span><span><%- icon('message-circle', 12) %> <%= fmt.compact(c.comments) %></span></span>
+        </li>
+        <% }) %>
+      </ol>
+      <% } %>
+    </section>
     <section class="card">
       <h2>O que a equipe publicou</h2>
       <p class="small muted">Últimos 30 dias, pelos registros do painel.</p>

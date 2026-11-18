@@ -52,9 +52,11 @@ describe('Conteúdo: filtro por episódio, ordem, publicar em massa com agenda e
     assert.ok(t.indexOf(`data-clip="${ids.b}"`) < t.indexOf(`data-clip="${ids.a}"`), 'mais curto primeiro');
     t = (await as.gestao.get(`/conteudo?vista=cortes&episodio=${ep2.id}`)).text;
     assert.match(t, new RegExp(`data-clip="${ids.c}"`)); assert.doesNotMatch(t, new RegExp(`data-clip="${ids.a}"`));
-    t = (await as.gestao.get('/conteudo')).text;
+    t = (await as.gestao.get('/conteudo?vista=cortes')).text;
     assert.match(t, /data-dl-open="modal-massa-publicar"/); assert.match(t, /data-dl-open="modal-capas-lote"/);
-    assert.match(t, /Selecionar para publicar em massa/);
+    assert.match(t, /href="\/conteudo\/semana"/, 'atalho para a agenda da semana');
+    t = (await as.gestao.get('/conteudo')).text; // o quadro
+    assert.match(t, /Selecionar para publicar em massa/); assert.match(t, /Montar a agenda da semana/);
     assert.match(t, /name="episodio" data-autosubmit aria-label="Filtrar por episódio"/);
   });
 

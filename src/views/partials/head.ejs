@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="/static/app.css?v=<%= assetV %>">
 </head>
 <body>
+<% if (currentUser) { %><a class="skip-link" href="#conteudo">Pular para o conteúdo</a><% } %>
 <% if (currentUser) {
      const initials = currentUser.name.split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0]; }).join('').toUpperCase();
      const navItem = function (href, iconName, label, active) {
@@ -61,10 +62,10 @@
       <span class="who-txt"><strong><%= currentUser.name %></strong><span class="kicker m-0"><%= ROLES[currentUser.role].label %></span></span>
     </a>
     <div class="foot-actions">
-      <button class="icon-btn" type="button" data-pwa-install hidden><%- icon('smartphone') %><span>Instalar o app</span></button>
-      <a class="icon-btn<%= currentPath.startsWith('/lixeira') ? ' on' : '' %>" href="/lixeira"><%- icon('trash-2') %><span>Lixeira</span></a>
-      <button class="icon-btn" type="button" data-theme-toggle aria-label="Alternar tema claro/escuro"><span class="theme-moon"><%- icon('moon') %></span><span class="theme-sun"><%- icon('sun') %></span><span>Tema</span></button>
-      <form method="post" action="/logout" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn" type="submit"><%- icon('log-out') %><span>Sair</span></button></form>
+      <button class="icon-btn" type="button" data-pwa-install hidden title="Instalar o app"><%- icon('smartphone') %><span class="foot-label">Instalar o app</span></button>
+      <a class="icon-btn<%= currentPath.startsWith('/lixeira') ? ' on' : '' %>" href="/lixeira" title="Lixeira"><%- icon('trash-2') %><span class="foot-label">Lixeira</span></a>
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="Alternar tema claro/escuro" title="Tema claro ou escuro"><span class="theme-moon"><%- icon('moon') %></span><span class="theme-sun"><%- icon('sun') %></span><span class="foot-label">Tema</span></button>
+      <form method="post" action="/logout" class="inline push-right"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn keep-label" type="submit"><%- icon('log-out') %><span class="foot-label">Sair</span></button></form>
     </div>
   </div>
 </aside>
@@ -82,7 +83,7 @@
   <a href="/notificacoes" class="<%= currentPath.startsWith('/notificacoes') ? 'on' : '' %>"><span class="tabnav-ico"><%- icon('bell', 20) %><span class="tabnav-count" data-unread <%= navCounts && navCounts.unread ? '' : 'hidden' %>><%= navCounts ? navCounts.unread : 0 %></span></span><span>Avisos</span></a>
   <button type="button" data-nav-toggle aria-expanded="false"><%- icon('menu', 20) %><span>Menu</span></button>
 </nav>
-<main class="main"><div class="container">
+<main class="main" id="conteudo" tabindex="-1"><div class="container">
 <% } else { %>
 <div class="auth"><div class="auth-box">
   <div>

@@ -1,23 +1,26 @@
 <%- include('../partials/head') %>
 <%
-  var ST = { enviando: ['b-amber', 'enviando'], processando: ['b-amber', 'lendo o vídeo'], pronto: ['b-green', 'pronto'], erro: ['b-red', 'erro'] }[clip.status];
-  var PUB = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-amber', 'agendado'], publicado: ['b-green', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] };
+  var ST = { enviando: ['b-amber', 'enviando'], processando: ['b-amber', 'lendo o vídeo'], pronto: ['b-gray', 'pronto'], erro: ['b-red', 'erro'] }[clip.status];
+  var PUB = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-st-agendado', 'agendado'], publicado: ['b-st-publicado', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] };
   var UP = uploadPost.PLATFORMS;
   var ready = clip.status === 'pronto';
   var chosen = covers.find(function (x) { return x.id === clip.cover_id; });
   var epLabel = function (e) { return (e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '') + e.title; };
   var boxes = [];
+  // redes onde o corte já está no ar: não entram de novo (sairia duplicado)
+  var liveNets = {};
+  publications.forEach(function (p) { (p.results || []).forEach(function (r) { if (r.ok && !r.simulated) liveNets[r.platform] = true; }); });
   Object.keys(UP).forEach(function (key) {
     if (!UP[key].clip) return;
     var acc = social && social.platforms[key];
     var linked = !social || (acc ? !acc.reauth : !social.ok); // reconectar também bloqueia: o envio falharia
-    boxes.push({ key: key, label: UP[key].clipLabel || UP[key].label, linked: linked, reauth: Boolean(acc && acc.reauth), checked: uploadPost.DEFAULTS.clip.indexOf(key) >= 0 && linked, handle: acc ? acc.handle : '' });
+    boxes.push({ key: key, label: UP[key].clipLabel || UP[key].label, linked: linked, live: Boolean(liveNets[key]), reauth: Boolean(acc && acc.reauth), checked: uploadPost.DEFAULTS.clip.indexOf(key) >= 0 && linked && !liveNets[key], handle: acc ? acc.handle : '' });
   });
 %>
 <div class="page-head" data-cortes data-single="<%= clip.id %>" data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
   <div>
-    <span class="kicker">Corte · <%= episode ? epLabel(episode) : 'sem episódio ainda' %></span>
-    <h1><%= clip.title %> <span class="badge <%= ST[0] %>" data-clip-badge><%= ST[1] %></span></h1>
+    <span class="kicker"><%= clip.title %> · <%= episode ? epLabel(episode) : 'sem episódio ainda' %></span>
+    <h1><%= clip.post_title || clip.title %> <span class="badge <%= ST[0] %>" data-clip-badge><%= ST[1] %></span></h1>
     <p class="handle muted"><%= clip.duration_ms ? fmt.formatClock(clip.duration_ms) : '—' %><%= clip.width ? ' · ' + clip.width + '×' + clip.height : '' %><%= clip.size_bytes ? ' · ' + fmt.formatBytes(clip.size_bytes) : '' %><%= clip.filename ? ' · ' + clip.filename : '' %></p>
   </div>
   <div class="row">
@@ -42,7 +45,7 @@
         <% if (perm.cut && replace.allowed) { %><button class="btn sm" type="button" data-modal-open="modal-trocar"><%- icon('upload', 14) %> Trocar vídeo</button><% } %>
       </div>
       <div class="clip-media">
-        <div class="clip-player"><video controls preload="metadata" playsinline src="/cortes/<%= clip.id %>/video<%= clip.version > 1 ? '?v=' + clip.version : '' %>#t=0.1" id="clip-video"></video>
+        <div class="clip-player"><%- include('../partials/video-poster', { src: '/cortes/' + clip.id + '/video' + (clip.version > 1 ? '?v=' + clip.version : ''), id: 'clip-video', poster: chosen ? '/capas/' + chosen.id + '/imagem?v=' + new Date(chosen.updated_at).getTime() + '&w=640' : null, duration: clip.duration_ms, label: clip.post_title || clip.title }) %>
         <% if (light) { %><p class="video-quality small muted"><span class="mono" data-video-label>Versão leve · 720p</span> <button type="button" class="link small" data-video-swap="clip-video">Ver no original</button></p><% } %></div>
         <div>
           <p class="kicker">Capa<%= covers.length ? '' : ' (ainda sem sugestões)' %></p>
@@ -141,23 +144,23 @@
       <dialog class="modal modal-wide" id="modal-publicar" aria-labelledby="mpub-h">
       <h2 id="mpub-h">Publicar nas redes</h2>
       <% if (!uploadLive) { %><p class="notice small">Modo de teste <%= locals.testAt || '' %>: o que sair por aí é montado e conferido, mas nada é enviado. Para publicar de verdade, a gestão liga em Integrações &gt; Redes sociais.</p><% } %>
-      <% if (social && !social.ok) { %><p class="notice small">Não consegui consultar as redes conectadas: <%= social.error %></p><% } %>
-      <form method="post" action="/cortes/<%= clip.id %>/publicar" class="stack" data-busy="Enviando…">
+      <% if (social && !social.ok) { %><p class="notice small"><%- icon('info', 14) %> <span>Não deu para conferir agora quais contas estão conectadas<%= social.errors && social.errors.length ? ' na ' + social.errors.map(function (e) { return e.label; }).join(' e ') : '' %>. Dá para publicar mesmo assim: se alguma conta estiver desconectada, a rede volta com o motivo e você reenvia. <span class="muted">Resposta: <%= social.error %></span></span></p><% } %>
+      <form method="post" action="/cortes/<%= clip.id %>/publicar" class="stack" data-busy="Enviando…" data-publish="<%= uploadLive ? 'live' : 'test' %>">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <fieldset class="channels"><legend>Redes</legend>
           <% boxes.forEach(function (p) { %>
-          <label class="check <%= p.linked ? '' : 'off' %>"><input type="checkbox" name="platforms" value="<%= p.key %>" <%= p.checked ? 'checked' : '' %> <%= p.linked ? '' : 'disabled' %>> <%= p.label %><% if (p.handle) { %> <span class="handle muted"><%= p.handle %></span><% } %><% if (!p.linked) { %> <span class="handle <%= p.reauth ? 'bad-text' : 'muted' %>"><%= p.reauth ? 'reconectar' : 'não conectado' %></span><% } %></label>
+          <label class="check <%= p.linked && !p.live ? '' : 'off' %>"><input type="checkbox" name="platforms" value="<%= p.key %>" <%= p.checked ? 'checked' : '' %> <%= p.linked && !p.live ? '' : 'disabled' %>> <%= p.label %><% if (p.live) { %> <span class="badge b-st-publicado">no ar</span><% } else if (p.handle) { %> <span class="handle muted"><%= p.handle %></span><% } %><% if (!p.linked && !p.live) { %> <span class="handle <%= p.reauth ? 'bad-text' : 'muted' %>"><%= p.reauth ? 'reconectar' : 'não conectado' %></span><% } %></label>
           <% }) %>
         </fieldset>
         <%- include('../partials/ig-people', { episodeId: clip.episode_id, photo: false, videoTags }) %>
-        <label>Título <small class="counter" data-counter-for="pub_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" id="pub_title" name="title" data-ai="titulo" data-ai-clip="<%= clip.id %>" value="<%= clip.post_title || clip.title %>" maxlength="100"></label>
+        <label>Título <small class="counter" data-counter-for="pub_title" data-max="<%= L.LIMITS.shorts.title.max %>" data-ideal="<%= L.LIMITS.shorts.title.ideal %>"></small><input type="text" id="pub_title" name="title" data-ai="titulo" data-ai-clip="<%= clip.id %>" value="<%= clip.post_title || '' %>" maxlength="100" required placeholder="O gancho do corte (use Sugerir com IA)"></label>
         <label>Legenda <small class="counter" data-counter-for="pub_desc" data-max="<%= L.LIMITS.instagram.caption %>"></small><textarea id="pub_desc" name="description" data-ai="descricao" data-ai-clip="<%= clip.id %>" rows="5"><%= clip.caption || '' %></textarea></label>
         <%- include('../partials/cta-fields', { ctas: ctas, nets: boxes.map(function (b) { return { key: b.key, label: UP[b.key].label }; }) }) %>
         <%- include('../partials/auto-fields', { auto: autoDefaults }) %>
         <label>Agendar (opcional, horário de Brasília)<input type="datetime-local" name="agendar"></label>
         <% if (perm.direct) { %>
         <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas.</label>
-        <div class="row modal-actions"><button class="btn primary" type="submit"><%= uploadLive ? 'Publicar' : 'Montar pedido (modo de teste)' %></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+        <div class="row modal-actions"><button class="btn primary" type="submit" data-publish-submit><%= uploadLive ? 'Publicar' : 'Montar pedido (modo de teste)' %></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
         <% } else { %>
         <p class="small muted">Vai para a revisão da gestão antes de sair.</p>
         <div class="row modal-actions"><button class="btn primary" type="submit">Enviar para revisão</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
@@ -166,6 +169,7 @@
       </dialog>
       <% } %>
       <% if (publications.length) { %>
+      <% if (nums && nums.views) { %><p class="post-nums mono small top-gap" title="Soma de todas as redes · atualizado <%= fmt.formatDateTime(nums.fetched_at) %>"><span class="muted">NO TOTAL</span><span><%- icon('eye', 12) %> <%= fmt.compact(nums.views) %> views</span><span><%- icon('heart', 12) %> <%= fmt.compact(nums.likes) %></span><span><%- icon('message-circle', 12) %> <%= fmt.compact(nums.comments) %></span><% if (nums.shares) { %><span><%- icon('send', 12) %> <%= fmt.compact(nums.shares) %></span><% } %></p><% } %>
       <ul class="pubs">
         <% publications.forEach(function (p) { var b = p.retry_at && PUB[p.status] ? ['b-amber', 'nova tentativa às ' + fmt.formatSoon(p.retry_at)] : (PUB[p.status] || ['b-gray', p.status]); %>
         <li>
@@ -192,11 +196,11 @@
       <h2>Ações</h2>
       <div class="row">
         <% if (clip.status === 'pronto' || clip.status === 'erro') { %>
-        <form method="post" action="/cortes/<%= clip.id %>/reprocessar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit">Ler de novo</button></form>
+        <form method="post" action="/cortes/<%= clip.id %>/reprocessar" class="inline" data-confirm="Refazer a leitura? A IA lê o vídeo de novo e sugere título, legenda e capas novos."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('refresh-cw', 14) %> Refazer a leitura</button></form>
         <% } %>
-        <form method="post" action="/cortes/<%= clip.id %>/excluir" class="inline" data-confirm="Excluir este corte, as capas e o vídeo?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger" type="submit">excluir corte</button></form>
+        <form method="post" action="/cortes/<%= clip.id %>/excluir" class="inline push-right" data-confirm="Mandar este corte para a lixeira? Fica 15 dias lá, com as capas e o vídeo, e dá para restaurar."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">mandar para a lixeira</button></form>
       </div>
-      <p class="small muted">"Ler de novo" refaz fala, quadros, título e capas (usa a IA).</p>
+      <p class="small muted">Refazer a leitura: a IA ouve a fala, olha os quadros e sugere título, legenda e capas de novo.</p>
     </section>
     <% } %>
   </div>
@@ -222,7 +226,7 @@
     <% if (replace.waiting) { %><p class="notice small">Este corte tem publicação agendada ou em revisão: ela vai sair com o vídeo novo. Confira a capa.</p><% } %>
     <div class="uploader" data-uploader data-close-on-start="1" data-base="/cortes/<%= clip.id %>/trocar/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="<%= clip.title %>" data-hash="">
       <input type="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files aria-label="Novo vídeo do corte">
-      <button class="btn primary" type="button" data-start><%- icon('upload') %> Enviar nova versão</button>
+      <button class="btn primary" type="button" data-start><%- icon('upload') %> Escolher o vídeo novo</button>
       <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
       <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
     </div>
@@ -232,5 +236,6 @@
 <% } %>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
 <script src="/static/autocta.js?v=<%= assetV %>" defer></script>
+<script src="/static/publicar.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>

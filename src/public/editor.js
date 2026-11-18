@@ -442,7 +442,7 @@
       if (!res.ok || !json.ok) throw new Error(json.error || `erro ${res.status}`);
       dirty = false;
       const issues = (json.lint?.issues || []).length; const warns = (json.lint?.warnings || []).length;
-      setStatus(issues ? `Salvo, mas o servidor encontrou ${issues} problema(s): ${json.lint.issues[0]}` : (warns ? `Salvo (${warns} aviso(s): ${json.lint.warnings[0]})` : 'Salvo. Imagem atualizada.'));
+      setStatus(issues ? `Salvo, mas o servidor encontrou ${issues} ${issues === 1 ? 'problema' : 'problemas'}: ${json.lint.issues[0]}` : (warns ? `Salvo (${warns} ${warns === 1 ? 'aviso' : 'avisos'}: ${json.lint.warnings[0]})` : 'Salvo. Imagem atualizada.'));
     } catch (err) { setStatus(`Não foi possível salvar: ${err.message}`); } finally { btn.disabled = false; }
   });
   window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });

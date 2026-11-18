@@ -210,6 +210,38 @@ router.post('/conteudo/em-massa/publicar', requirePerm('episodes.read'), wrap(as
   return res.redirect(`/conteudo?vista=quadro${isIntId(req.body.episodio) ? `&episodio=${req.body.episodio}` : ''}`);
 }));
 
+// Piloto automático da semana: a agenda montada com os prontos para postar (mistura os episódios), para conferir e agendar.
+// Mesma página e mesma confirmação de "Publicar em massa". ?ajustar=1 abre as escolhas (redes, por dia, horários, Reel de teste).
+router.get('/conteudo/semana', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
+  const st = await bulk.pilotSettings();
+  const opts = bulk.readOptions({ inicio: bulk.nextMonday(), de: st.from, ate: st.to, por_dia: String(st.perDay), teste_por_dia: String(st.trialPerDay), teste_modo: st.trialMode });
+  const picks = await bulk.weekPicks(opts.perDay * 7);
+  const { ok, skipped } = await bulk.eligible(picks);
+  const slots = bulk.plan(ok.map((c) => c.id), opts);
+  const byId = new Map(ok.map((c) => [c.id, c]));
+  const covers = await coverList(ok.map((c) => c.id));
+  const rows = slots.map((s) => ({ ...s, clip: byId.get(s.clipId), cover: covers.find((v) => v.id === byId.get(s.clipId).cover_id) || covers.find((v) => v.clip_id === s.clipId) || null }));
+  const days = [...new Set(rows.map((r) => fmt.formatDateTime(r.at).slice(0, 5)))];
+  const automation = require('../services/commentAutomation');
+  const defaults = await automation.formDefaults({});
+  const auto = st.auto && st.platforms.includes('instagram') ? automation.readForm({ auto_on: '1', auto_palavra: st.autoWord || '', auto_mensagem: st.autoMessage || defaults.message, auto_dias: String(st.autoDays) }) : null;
+  res.render('content/bulk-publish', {
+    title: 'Agenda da semana', week: true, pilot: st, weekEnd: bulk.addDays(opts.start, 6), uploadPost: up,
+    autoDefaults: { ...defaults, on: st.auto, keyword: st.autoWord || '', message: st.autoMessage || defaults.message, days: st.autoDays }, rows, skipped, platforms: st.platforms, opts, days, auto,
+    keywordOf: (c) => (auto ? auto.keyword || automation.keywordFor(c.guest_name || 'Episódio') : null),
+    labelOf: (p) => up.PLATFORMS[p]?.clipLabel || up.PLATFORMS[p]?.label || p, review: !canPublishNow(req.user.role), episodio: '', hhmm: bulk.hhmm, openSettings: req.query.ajustar === '1',
+  });
+}));
+router.post('/conteudo/semana/ajustes', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
+  const r = await bulk.savePilot(req.body);
+  if (r.error) { await req.flash('error', r.error); return res.redirect('/conteudo/semana?ajustar=1'); }
+  await audit(req, 'piloto_semana.ajustado', 'settings', null, r.settings);
+  await req.flash('ok', 'Escolhas da semana salvas. A agenda abaixo já segue elas.');
+  return res.redirect('/conteudo/semana');
+}));
+
 // Capas em lote: escolher a capa de cada corte e reescrever o texto (a IA sugere). Uma linha por corte.
 router.get('/conteudo/capas-em-lote', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!canCover(req.user.role)) return deny(res, 'Seu perfil não mexe nas capas.');

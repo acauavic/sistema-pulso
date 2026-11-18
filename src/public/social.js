@@ -64,3 +64,44 @@ document.querySelectorAll('[data-check-all]').forEach((all) => {
   all.addEventListener('change', () => items().forEach((i) => { i.checked = all.checked; }));
   scope.addEventListener('change', (e) => { if (e.target.matches('[data-check-item]')) all.checked = items().every((i) => i.checked); });
 });
+
+// Novo post: escolher o item sem rolar por centenas de cartões. Busca (título, convidado, EP), filtro por episódio e 24 por vez
+// ("Mostrar mais"). Escolhido o item, a grade recolhe num resumo com "Trocar" e o formulário fica logo abaixo.
+(function () {
+  const form = document.querySelector('[data-compose]');
+  const grid = form && form.querySelector('[data-pick-grid]');
+  if (!grid) return;
+  const PAGE = 24;
+  const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  const cards = [...grid.querySelectorAll('[data-pick]')];
+  const search = form.querySelector('[data-pick-search]'); const ep = form.querySelector('[data-pick-ep]');
+  const count = form.querySelector('[data-pick-count]'); const moreWrap = form.querySelector('[data-pick-more-wrap]');
+  const moreN = form.querySelector('[data-pick-more-n]'); const empty = form.querySelector('[data-pick-empty]');
+  const tools = form.querySelector('[data-pick-tools]'); const chosen = form.querySelector('[data-pick-chosen]');
+  let limit = PAGE;
+  const apply = () => {
+    const q = fold(search?.value); const e = ep?.value || '';
+    const hits = cards.filter((c) => (!q || c.dataset.find.includes(q)) && (!e || c.dataset.ep === e));
+    cards.forEach((c) => { c.hidden = true; });
+    hits.slice(0, limit).forEach((c) => { c.hidden = false; });
+    if (count) count.textContent = `${hits.length} ${hits.length === 1 ? 'item' : 'itens'}`;
+    if (moreWrap) { moreWrap.hidden = hits.length <= limit; if (moreN) moreN.textContent = `(${hits.length - limit})`; }
+    if (empty) empty.hidden = hits.length > 0;
+  };
+  const collapse = (input) => {
+    const card = input.closest('[data-pick]'); if (!card || !chosen) return;
+    const img = card.querySelector('img'); const pic = chosen.querySelector('[data-pick-chosen-img]');
+    if (img && pic) { pic.src = img.currentSrc || img.src; pic.hidden = false; } else if (pic) pic.hidden = true;
+    chosen.querySelector('[data-pick-chosen-title]').textContent = card.querySelector('strong')?.textContent || '';
+    chosen.querySelector('[data-pick-chosen-ep]').textContent = card.dataset.short || card.querySelector('.small.muted')?.textContent || '';
+    chosen.hidden = false; grid.hidden = true; if (tools) tools.hidden = true; if (moreWrap) moreWrap.hidden = true; if (empty) empty.hidden = true;
+  };
+  const expand = () => { chosen.hidden = true; grid.hidden = false; if (tools) tools.hidden = false; apply(); search?.focus(); };
+  search?.addEventListener('input', () => { limit = PAGE; apply(); });
+  ep?.addEventListener('change', () => { limit = PAGE; apply(); });
+  form.querySelector('[data-pick-more]')?.addEventListener('click', () => { limit += PAGE; apply(); });
+  form.querySelector('[data-pick-change]')?.addEventListener('click', expand);
+  grid.addEventListener('change', (e) => { if (e.target.matches('input[type="radio"]')) collapse(e.target); });
+  apply();
+  const pre = grid.querySelector('input[type="radio"]:checked'); if (pre) collapse(pre);
+})();

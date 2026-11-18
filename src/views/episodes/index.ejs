@@ -21,16 +21,17 @@
   <section class="column" data-status="<%= col.key %>">
     <header><span class="badge b-st-<%= col.key %>"><%= col.label %></span><span class="count"><%= col.items.length %></span></header>
     <div class="cards">
+      <% if (!col.items.length) { %><p class="col-empty small muted">Nenhum episódio nesta etapa.</p><% } %>
       <% col.items.forEach(function (e) { %>
       <a class="kcard" href="/episodios/<%= e.id %>">
         <span class="handle muted"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'EP.—' %> · <%= fmt.formatDayShort(e.aired_on) %></span>
         <strong><%= e.title %></strong>
         <% if (e.guest_name) { %><span class="muted small"><%= e.guest_name %></span><% } %>
         <span class="meta small muted">
-          <% if (e.sponsors) { %><span><%- icon('shield-check', 12) %><%= e.sponsors %></span><% } %>
-          <% if (e.files) { %><span><%- icon('file-text', 12) %><%= e.files %></span><% } %>
-          <% if (e.tasks) { %><span><%- icon('check', 12) %><%= e.tasks_done %>/<%= e.tasks %></span><% } %>
-          <% if (e.open_comments) { %><span class="warn"><%- icon('message-square', 12) %><%= e.open_comments %></span><% } %>
+          <% if (e.sponsors) { %><span title="<%= fmt.plural(e.sponsors, 'patrocinador', 'patrocinadores') %>"><%- icon('shield-check', 12) %><%= e.sponsors %></span><% } %>
+          <% if (e.files) { %><span title="<%= fmt.plural(e.files, 'arquivo de material', 'arquivos de material') %>"><%- icon('file-text', 12) %><%= e.files %> arq.</span><% } %>
+          <% if (e.tasks) { %><span title="Tarefas feitas de <%= e.tasks %>"><%- icon('check', 12) %><%= e.tasks_done %>/<%= e.tasks %></span><% } %>
+          <% if (e.open_comments) { %><span class="warn" title="<%= fmt.plural(e.open_comments, 'ajuste em aberto', 'ajustes em aberto') %>"><%- icon('message-square', 12) %><%= e.open_comments %></span><% } %>
         </span>
         <span class="card-foot"><%- include('../partials/dot', { type: 'episode', id: e.id, user: e.editor_id ? { id: e.editor_id, name: e.editor_name } : null, editable: can('production.manage'), inLink: true }) %></span>
       </a>
@@ -57,7 +58,12 @@
       <td class="actions">
         <a class="btn sm" href="/episodios/<%= e.id %>">Abrir</a>
         <% if (can('episodes.delete')) { %>
-        <form method="post" action="/episodios/<%= e.id %>/excluir" class="inline" data-confirm="Excluir o episódio “<%= e.title %>” e todos os arquivos dele? Esta ação não pode ser desfeita."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm danger" type="submit">Excluir</button></form>
+        <details class="row-menu">
+          <summary class="btn sm icon-only ghost" aria-label="Mais ações para <%= e.title %>" title="Mais ações"><%- icon('ellipsis', 14) %></summary>
+          <div class="row-menu-list">
+            <form method="post" action="/episodios/<%= e.id %>/excluir" data-confirm="Mandar o episódio “<%= e.title %>” para a lixeira? Fica 15 dias lá, com os arquivos, e dá para restaurar."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link danger-link" type="submit"><%- icon('trash-2', 14) %> Mandar para a lixeira</button></form>
+          </div>
+        </details>
         <% } %>
       </td>
     </tr>

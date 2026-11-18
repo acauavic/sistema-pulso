@@ -137,6 +137,15 @@ async function receive(raw, signature) {
   const d = body.data || {};
   const now = new Date().toISOString();
   await note({ last_event_at: now, last_event: String(body.event || ''), ...(body.event === 'test' ? { last_test_at: now } : {}) });
+  if (body.event === 'message.received' && d.messageId && d.conversationId) { // mensagem no direct (automação "mandou a palavra")
+    const { rows: [msg] } = await db.query(
+      `INSERT INTO social_inbox (provider, event, network, conversation_id, message_id, author_id, author_username, text, payload)
+       VALUES ('outstand', $1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (provider, message_id) WHERE message_id IS NOT NULL DO NOTHING RETURNING id`,
+      [body.event, d.network || 'instagram', String(d.conversationId), String(d.messageId), d.senderId != null ? String(d.senderId) : null,
+        d.sender?.username || d.sender?.name || null, String(d.content || '').slice(0, 2000), JSON.stringify(body)]);
+    if (msg) await jobs.enqueue('direct_recebido', { refId: Number(msg.id), maxAttempts: 3 });
+    return { status: 200, body: { ok: true } };
+  }
   if (body.event !== 'comment.received' || !d.commentId) return { status: 200, body: { ok: true } };
   const { rows: [row] } = await db.query(
     `INSERT INTO social_inbox (provider, event, network, account_id, post_ref, platform_post_id, comment_id, parent_comment_id, author_id, author_username, text, payload)
@@ -223,6 +232,38 @@ async function handle(job) {
 }
 jobs.register('comentario_recebido', handle);
 
+// Trabalho: uma mensagem recebida no direct. Responde na própria conversa (a janela de 24 h acabou de abrir) quando a palavra bate.
+async function handleDirect(job) {
+  const social = require('./social');
+  const ost = require('./outstand');
+  await require('./socialApi').syncLive();
+  const { rows: [m] } = await db.query('SELECT * FROM social_inbox WHERE id = $1', [job.ref_id]);
+  if (!m || m.processed_at) return { skipped: true };
+  const done = async (result) => { await db.query('UPDATE social_inbox SET processed_at = now(), result = $2 WHERE id = $1', [m.id, result]); return { result }; };
+  const { rows: rules } = await db.query(
+    `SELECT * FROM social_rules WHERE active AND provider = 'outstand' AND trigger = 'direct' AND platform = $1 AND (expires_at IS NULL OR expires_at > now()) ORDER BY id`,
+    [m.network || 'instagram']);
+  if (!rules.length) return done('Nenhuma automação de direct ativa.');
+  const item = { id: m.message_id, author: m.author_username, text: m.text };
+  for (const rule of rules) {
+    if (!social.has(m.text, rule.keywords || [])) { await social.record(rule, item, 'ignorado', null); continue; }
+    if (!(await social.claimItem(rule, item))) return done('Já tratado.');
+    try {
+      const simulated = !config.outstand.live;
+      const message = render(rule.message, { linkSet: await links() });
+      if (!simulated) await ost.sendMessage({ conversationId: m.conversation_id, content: message });
+      await social.record(rule, item, simulated ? 'simulado' : 'enviado', `DM: ${message}`);
+      if (!simulated) await note({ messaging_ok_at: new Date().toISOString() });
+      return done(simulated ? 'Simulado (modo de teste).' : 'Respondido no direct.');
+    } catch (err) {
+      await social.record(rule, item, 'erro', null, friendly(err));
+      return done(`Erro: ${friendly(err)}`);
+    }
+  }
+  return done('A palavra não bateu.');
+}
+jobs.register('direct_recebido', handleDirect);
+
 // Resumo da automação de uma publicação (página da publicação e do corte).
 async function ofPublication(pubId) {
   const { rows: [r] } = await db.query(
@@ -234,5 +275,5 @@ async function ofPublication(pubId) {
 
 module.exports = {
   LINKS_KEY, SECRET_KEY, STATUS_KEY, DAYS, DEFAULT_MESSAGE, PLACEHOLDERS, links, setLinks, cleanKeyword, keywordFor, ctaFor, withKeyword,
-  readForm, render, formDefaults, keywordForTarget, prepare, attach, state, note, newSecret, signatureOk, receive, handle, friendly, ofPublication,
+  readForm, render, formDefaults, keywordForTarget, prepare, attach, state, note, newSecret, signatureOk, receive, handle, handleDirect, friendly, ofPublication,
 };

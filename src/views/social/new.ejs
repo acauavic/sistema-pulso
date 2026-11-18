@@ -5,11 +5,12 @@
   var allowed = tipo === 'video' ? Object.keys(platforms).filter(function (k) { return platforms[k].clip; }) : (tipo === 'story' ? ['instagram'] : photoPlatforms);
   var preset = tipo === 'video' ? defaults.clip : ['instagram'];
   var hasConn = Object.keys(connected).length > 0;
+  var shortLabel = function (x, extra) { var ep = x.episode_number ? 'EP.' + String(x.episode_number).padStart(3, '0') : (x.episode_id ? 'Episódio' : 'Avulso'); return [ep, x.guest_name, extra].filter(Boolean).join(' · '); };
   var epLabel = function (x) { return x.episode_id ? (x.episode_number ? 'EP.' + String(x.episode_number).padStart(3, '0') + ' · ' : '') + (x.episode_title || '') : 'Avulso'; };
   var dur = function (ms) { return ms ? Math.round(ms / 1000) + 's' : ''; };
   var fresh = function (list) { return list.filter(function (x) { return !x.pub; }).length; };
   var day = function (d) { return d ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }).format(new Date(d)) : ''; };
-  var usedChip = function (x) { if (!x.pub) return x.sugerido ? '<span class="badge b-gray">sugerido</span>' : ''; return '<span class="badge ' + (x.pub.stage === 'publicado' ? 'b-green' : 'b-st-agendado') + '">' + x.pub.label + '</span><span class="handle muted">' + x.pub.platforms.join(' · ') + (x.pub.at ? ' · ' + day(x.pub.at) : '') + '</span>'; };
+  var usedChip = function (x) { if (!x.pub) return x.sugerido ? '<span class="badge b-gray">sugerido</span>' : ''; return '<span class="badge ' + (x.pub.stage === 'publicado' ? 'b-st-publicado' : 'b-st-agendado') + '">' + x.pub.label + '</span><span class="handle muted">' + x.pub.platforms.join(' · ') + (x.pub.at ? ' · ' + day(x.pub.at) : '') + '</span>'; };
   var withUsed = function (t) { return '/social/novo?tipo=' + t + (showUsed ? '&publicados=1' : ''); };
   var emptyText = { video: 'Todos os cortes prontos já foram publicados ou agendados. Envie novos em Conteúdo.', imagem: 'Nenhum post de imagem para postar. Os posts de frase saem da finalização do episódio; um post sob medida é um pedido em Conteúdo.', carrossel: 'Nenhum carrossel para postar. Gere na finalização do episódio ou peça em Conteúdo.', story: 'Nenhum story pronto. Story é pedido em Conteúdo (capas de corte e thumbnails não entram aqui).' };
 %>
@@ -26,21 +27,35 @@
 <% if (!items.length && !storyPosts.length) { %>
 <div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nada para postar aqui.</strong></p><p class="muted small"><%= emptyText[tipo] %></p><% if (tipo !== 'video') { %><p><a class="btn sm" href="/conteudo?pedir=<%= tipo === 'imagem' ? 'post' : tipo %>"><%- icon('plus', 14) %> Pedir ao editor</a></p><% } %></div>
 <% } else { %>
-<form method="post" action="/social/publicar" class="stack-lg" data-compose data-busy="Enviando…">
+<form method="post" action="/social/publicar" class="stack-lg" data-compose data-busy="Enviando…" data-publish="<%= live ? 'live' : 'test' %>">
   <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>">
   <section>
     <p class="small muted"><%= showUsed ? 'Mostrando também o que já saiu (marcado). Postar de novo é possível, mas confira se faz sentido.' : 'Só aparece o que ainda não foi publicado nem agendado. Os sugeridos vêm primeiro: do episódio que foi ao ar mais recentemente.' %> Escolha <%= tipo === 'carrossel' ? 'um carrossel' : 'um item' %>.</p>
-    <div class="pick-grid">
+    <%
+      var pickList = tipo === 'video' ? clips : tipo === 'carrossel' ? images.carousels : items;
+      var eps = []; pickList.forEach(function (x) { var id = x.episode_id || (x.slides && x.slides[0] && x.slides[0].episode_id) || ''; if (id && !eps.some(function (e) { return e.id === id; })) eps.push({ id: id, label: epLabel(x) }); });
+      var foldTxt = function (t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); };
+    %>
+    <div class="pick-chosen" data-pick-chosen hidden>
+      <img alt="" data-pick-chosen-img hidden><span class="pick-chosen-txt"><span class="kicker m-0" data-pick-chosen-ep></span><strong data-pick-chosen-title></strong></span>
+      <button class="btn sm" type="button" data-pick-change><%- icon('refresh-cw', 14) %> Trocar</button>
+    </div>
+    <div class="pick-tools" data-pick-tools>
+      <input type="search" placeholder="Buscar pelo título, convidado ou EP" aria-label="Buscar <%= tipo === 'video' ? 'corte' : 'item' %>" data-pick-search autocomplete="off">
+      <% if (eps.length > 1) { %><select aria-label="Filtrar por episódio" data-pick-ep data-search><option value="">Todos os episódios</option><% eps.forEach(function (e) { %><option value="<%= e.id %>"><%= e.label %></option><% }) %></select><% } %>
+      <span class="mono small muted" data-pick-count><%= pickList.length %></span>
+    </div>
+    <div class="pick-grid" data-pick-grid>
       <% if (tipo === 'video') { clips.forEach(function (c) { %>
-      <label class="pick <%= c.pub ? 'used' : '' %>">
+      <label class="pick <%= c.pub ? 'used' : '' %>" data-pick data-ep="<%= c.episode_id || '' %>" data-short="<%= shortLabel(c, c.duration_ms ? dur(c.duration_ms) : '') %>" data-find="<%= foldTxt([c.post_title, c.title, epLabel(c), c.guest_name].join(' ')) %>">
         <input type="radio" name="clip_id" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.post_title || c.title %>" data-caption="<%= c.caption || '' %>" data-ctas="<%= JSON.stringify(c.ctas || {}) %>" data-cover="<%= c.cover_id || '' %>" data-clip="<%= c.id %>">
-        <% if (c.cover_id) { %><img src="/capas/<%= c.cover_id %>/imagem" alt="" loading="lazy"><% } else { %><span class="ph"><%- icon('film', 20) %></span><% } %>
+        <% if (c.cover_id) { %><img src="/capas/<%= c.cover_id %>/imagem?w=640" alt="" loading="lazy"><% } else { %><span class="ph"><%- icon('film', 20) %></span><% } %>
         <strong><%= c.post_title || c.title %></strong>
         <span class="small muted"><%= c.request_id && !c.episode_id ? 'Avulso · ' + (requestKinds[c.request_kind] ? requestKinds[c.request_kind].label : 'pedido') : epLabel(c) %><%= c.duration_ms ? ' · ' + dur(c.duration_ms) : '' %></span>
         <span class="row small"><%- usedChip(c) %><% if (c.tested && !c.pub) { %><span class="badge b-gray">só testado</span><% } %></span>
       </label>
       <% }); } else if (tipo === 'carrossel') { images.carousels.forEach(function (g) { %>
-      <label class="pick <%= g.pub ? 'used' : '' %>">
+      <label class="pick <%= g.pub ? 'used' : '' %>" data-pick data-ep="<%= g.episode_id || (g.slides[0] && g.slides[0].episode_id) || '' %>" data-find="<%= foldTxt([g.label, epLabel(g)].join(' ')) %>">
         <input type="radio" name="cover_ids" value="<%= g.slides.map(function (s) { return s.id; }).join(',') %>" data-episode="<%= g.episode_id || (g.slides[0] && g.slides[0].episode_id) || '' %>" required <%= String(pick) === g.slides.map(function (s) { return s.id; }).join(',') ? 'checked' : '' %> data-title="<%= g.label || 'Carrossel' %>" data-cover="<%= g.slides[0] && g.slides[0].kind !== 'entrega' ? g.slides[0].id : '' %>">
         <span class="slides"><% g.slides.slice(0, 3).forEach(function (s) { %><img src="/capas/<%= s.id %>/imagem?w=640" alt="" loading="lazy"><% }) %></span>
         <strong><%= g.label || 'Carrossel' %></strong>
@@ -48,7 +63,7 @@
         <span class="row small"><%- usedChip(g) %></span>
       </label>
       <% }); } else { items.forEach(function (c) { %>
-      <label class="pick <%= c.pub ? 'used' : '' %>">
+      <label class="pick <%= c.pub ? 'used' : '' %>" data-pick data-ep="<%= c.episode_id || '' %>" data-find="<%= foldTxt([c.label, epLabel(c)].join(' ')) %>">
         <input type="radio" name="cover_ids" value="<%= c.id %>" data-episode="<%= c.episode_id || '' %>" required <%= String(pick) === String(c.id) ? 'checked' : '' %> data-title="<%= c.label || (tipo === 'story' ? 'Story' : 'Post') %>" data-cover="<%= c.kind !== 'entrega' ? c.id : '' %>">
         <img class="<%= tipo === 'imagem' ? 'sq' : '' %>" src="/capas/<%= c.id %>/imagem?w=640" alt="" loading="lazy">
         <strong><%= c.label || (c.kind === 'post_quote' ? 'Frase' : c.kind === 'post_split' ? 'Tela dividida' : tipo === 'story' ? 'Story' : 'Post') %></strong>
@@ -57,6 +72,8 @@
       </label>
       <% }); } %>
     </div>
+    <p class="center top-gap" data-pick-more-wrap hidden><button class="btn" type="button" data-pick-more>Mostrar mais <span class="mono" data-pick-more-n></span></button></p>
+    <p class="small muted center" data-pick-empty hidden>Nada encontrado com essa busca.</p>
     <% if (storyPosts.length) { %>
     <details class="top-gap"<%= items.length ? '' : ' open' %>>
       <summary>Usar um post 4:5 como story <span class="mono muted"><%= storyPosts.length %></span></summary>
@@ -98,8 +115,8 @@
     <% if (tipo !== 'story') { %><%- include('../partials/cta-fields', { ctas: defaultCtas, nets: allowed.map(function (k) { return { key: k, label: platforms[k].label }; }) }) %><%- include('../partials/auto-fields', { auto: autoDefaults, bulk: true }) %><% } %>
     <label>Agendar <small class="muted">(vazio = <%= direct ? 'publicar agora' : 'publicar assim que a gestão aprovar' %>)</small><input type="datetime-local" name="agendar"></label>
     <% if (direct) { %>
-    <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas</label>
-    <div><button class="btn primary" type="submit"><%- icon('send') %> Publicar</button></div>
+    <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto publica nas redes escolhidas.</label>
+    <div class="row"><button class="btn primary" type="submit" data-publish-submit>Publicar</button><a class="btn ghost" href="/social/publicacoes">Cancelar</a></div>
     <% } else { %>
     <p class="small muted">O post vai para a revisão da gestão antes de sair. Você recebe um aviso quando ele for aprovado ou devolvido.</p>
     <div><button class="btn primary" type="submit"><%- icon('send') %> Enviar para revisão</button></div>
@@ -112,5 +129,6 @@
 <% } %>
 <script src="/static/social.js?v=<%= assetV %>" defer></script>
 <script src="/static/autocta.js?v=<%= assetV %>" defer></script>
+<script src="/static/publicar.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>

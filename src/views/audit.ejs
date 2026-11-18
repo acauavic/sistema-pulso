@@ -1,23 +1,41 @@
 <%- include('partials/head') %>
-<div class="page-head"><div><span class="kicker">Gestão · Registro</span><h1>Logs</h1></div></div>
+<%# Jornada: alguém da gestão abre a Auditoria para entender quem mexeu em quê (um cadastro que mudou, um corte que sumiu).
+    Filtra por área e por pessoa; cada linha diz a ação em português e leva ao que foi mexido quando dá. %>
+<div class="page-head"><div><span class="kicker">Gestão · Registro</span><h1>Auditoria</h1></div></div>
 <%- include('partials/gestao-nav', { active: 'logs' }) %>
-<p class="lead">Auditoria: as últimas 300 ações registradas no sistema (quem, o quê, quando e de onde).</p>
+<form method="get" action="/auditoria" class="filters">
+  <select name="area" aria-label="Área" data-autosubmit>
+    <option value="">Todas as áreas</option>
+    <% Object.keys(areas).sort(function (a, b) { return areas[a].localeCompare(areas[b], 'pt-BR'); }).forEach(function (k) { %><option value="<%= k %>" <%= area === k ? 'selected' : '' %>><%= areas[k] %></option><% }) %>
+  </select>
+  <% if (people.length > 1) { %>
+  <select name="quem" aria-label="Pessoa" data-autosubmit>
+    <option value="">Todas as pessoas</option>
+    <% people.forEach(function (p) { %><option value="<%= p %>" <%= quem === p ? 'selected' : '' %>><%= p %></option><% }) %>
+  </select>
+  <% } %>
+  <% if (area || quem) { %><a class="link small" href="/auditoria">Limpar filtros</a><% } %>
+</form>
+<% var targetHref = function (r) { var m = { clip: '/cortes/', guest: '/convidados/', sponsor: '/patrocinadores/', episode: '/episodios/', task: '/tarefas/', publication: '/social/publicacoes/', request: '/conteudo/pedidos/' }; return r.entity && r.entity_id && m[r.entity] && /^\d+$/.test(String(r.entity_id)) ? m[r.entity] + r.entity_id : null; }; %>
+<% if (!rows.length) { %>
+<div class="empty card"><%- include('partials/pulse-line') %><p><strong><%= area || quem ? 'Nada com esse filtro.' : 'Nada registrado ainda.' %></strong></p><p class="muted small">Cada ação importante (cadastros, etapas, publicações, exclusões, acessos) fica registrada aqui com quem fez e quando.</p></div>
+<% } else { %>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Alvo</th><th>Detalhes</th><th>IP</th></tr></thead>
+  <thead><tr><th>Quando</th><th>Quem</th><th>O que aconteceu</th><th>Em</th><th>Detalhes</th></tr></thead>
   <tbody>
-    <% rows.forEach(function (r) { %>
+    <% rows.forEach(function (r) { var href = targetHref(r); %>
     <tr>
       <td class="nowrap mono"><%= fmt.formatDateTime(r.created_at) %></td>
-      <td><%= r.user_email || '—' %></td>
-      <td><code><%= r.action %></code></td>
-      <td><%= r.entity ? r.entity + (r.entity_id ? ' #' + String(r.entity_id).slice(0, 8) : '') : '—' %></td>
-      <td class="small"><%= r.meta ? JSON.stringify(r.meta) : '' %></td>
-      <td class="small"><%= r.ip || '' %></td>
+      <td class="small"><%= r.user_email || 'sistema' %></td>
+      <td title="<%= r.action %>"><%= auditLabel(r.action) %></td>
+      <td class="small nowrap"><% if (r.entity) { %><% if (href) { %><a href="<%= href %>"><%= entityLabel(r.entity) %> <span class="mono">#<%= r.entity_id %></span></a><% } else { %><%= entityLabel(r.entity) %><% } %><% } else { %>—<% } %></td>
+      <td class="small muted audit-meta"><%= r.meta ? Object.keys(r.meta).map(function (k) { var v = r.meta[k]; return k.replace(/_/g, ' ') + ': ' + (typeof v === 'object' ? JSON.stringify(v) : v); }).join(' · ') : '' %><% if (r.ip && r.ip !== '::1' && r.ip !== '127.0.0.1') { %><span class="mono"> · <%= r.ip %></span><% } %></td>
     </tr>
     <% }) %>
   </tbody>
 </table>
 <%- include('partials/pager', { pager }) %>
 </div>
+<% } %>
 <%- include('partials/foot') %>

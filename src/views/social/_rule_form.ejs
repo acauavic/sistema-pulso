@@ -11,6 +11,7 @@
     <label class="choice"><input type="radio" name="trigger" value="comentario" <%= chk(r.trigger, 'comentario') %>><span><strong>Comentário</strong><small class="muted">alguém comenta num post</small></span></label>
     <label class="choice"><input type="radio" name="trigger" value="direct" <%= chk(r.trigger, 'direct') %>><span><strong>Direct</strong><small class="muted">alguém manda mensagem no Instagram</small></span></label>
   </div>
+  <p class="small muted m-0" data-when="trigger=direct">Responde na própria conversa, pela Outstand. Precisa do aviso <span class="mono">message.received</span> ligado em Integrações &gt; Comentários e directs; o Instagram só deixa responder até 24 horas depois da mensagem.</p>
   <div class="grid-2 tight" data-when="trigger=comentario">
     <label>Rede
       <select name="platform"><% commentPlatforms.forEach(function (p) { %><option value="<%= p %>" <%= sel(r.platform, p) %>><%= platforms[p].label %></option><% }) %></select>

@@ -8,8 +8,8 @@
 
 <section class="card">
   <div class="row spread"><h2>Links que vão no direct</h2><% if (canAutomate) { %><button class="btn sm" type="button" data-modal-open="modal-links"><%- icon('pencil', 14) %> Editar</button><% } %></div>
-  <dl class="kv">
-    <dt>Episódio</dt><dd class="small">o do próprio episódio no YouTube (antes da estreia, o do canal)</dd>
+  <dl class="kv kv-wide">
+    <dt>Episódio</dt><dd class="small muted">o do próprio episódio no YouTube (antes da estreia, o do canal)</dd>
     <dt>Canal do YouTube</dt><dd class="mono small"><%= links.youtube_channel || 'não cadastrado' %></dd>
     <dt>Comunidade no WhatsApp</dt><dd class="mono small"><%= links.whatsapp_community || 'não cadastrado' %></dd>
     <dt>Spotify</dt><dd class="mono small"><%= links.spotify_show || 'não cadastrado' %></dd>

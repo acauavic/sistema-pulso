@@ -1,25 +1,35 @@
 <%- include('partials/head') %>
+<%# Jornada: a pessoa abre o perfil para conferir os dados ou trocar o nome ou a senha (raro). Primeiro o valor atual, legível;
+    trocar o nome e a senha são botões que abrem janelas (antes, os dois formulários ficavam abertos, com dois botões lime). %>
 <div class="page-head"><div><span class="kicker">Conta</span><h1>Meu perfil</h1></div></div>
-<div class="grid-2 tight">
-  <section class="card">
-    <h2>Dados</h2>
-    <form method="post" action="/perfil" class="stack">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <label>Nome<input type="text" name="name" value="<%= currentUser.name %>" maxlength="120" required></label>
-      <label>E-mail<input type="email" value="<%= currentUser.email %>" disabled></label>
-      <label>Perfil<input type="text" value="<%= ROLES[currentUser.role].label %>" disabled></label>
-      <button class="btn primary" type="submit">Salvar</button>
-    </form>
-  </section>
-  <section class="card">
-    <h2>Alterar senha</h2>
-    <form method="post" action="/perfil/senha" class="stack">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <label>Senha atual<input type="password" name="current" autocomplete="current-password" required></label>
-      <label>Nova senha<input type="password" name="password" minlength="10" autocomplete="new-password" required></label>
-      <label>Confirmar nova senha<input type="password" name="confirm" minlength="10" autocomplete="new-password" required></label>
-      <button class="btn primary" type="submit">Alterar senha</button>
-    </form>
-  </section>
-</div>
+<section class="card profile-card">
+  <div class="row spread"><h2>Dados</h2><button class="btn sm" type="button" data-modal-open="modal-nome"><%- icon('pencil', 14) %> Editar nome</button></div>
+  <dl class="kv">
+    <dt>Nome</dt><dd><strong><%= currentUser.name %></strong></dd>
+    <dt>E-mail</dt><dd class="mono small"><%= currentUser.email %></dd>
+    <dt>Perfil</dt><dd><span class="badge b-role-<%= currentUser.role %>"><%= ROLES[currentUser.role].label %></span> <span class="small muted">quem muda é a gestão</span></dd>
+  </dl>
+  <div class="row spread top-gap profile-pass"><span class="small muted">Senha: a troca encerra as outras sessões abertas.</span><button class="btn sm" type="button" data-modal-open="modal-senha"><%- icon('key-round', 14) %> Trocar a senha</button></div>
+</section>
+
+<dialog class="modal" id="modal-nome" aria-labelledby="mnome-h">
+  <form method="post" action="/perfil" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mnome-h">Seu nome</h2>
+    <label>Nome<input type="text" name="name" value="<%= currentUser.name %>" maxlength="120" required autocomplete="name"></label>
+    <p class="small muted m-0">É como você aparece para a equipe: nas tarefas, nos comentários e nas mensagens.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="modal-senha" aria-labelledby="msenha-h">
+  <form method="post" action="/perfil/senha" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="msenha-h">Trocar a senha</h2>
+    <label>Senha atual<input type="password" name="current" autocomplete="current-password" required></label>
+    <label>Nova senha <small class="muted">(pelo menos 10 caracteres)</small><input type="password" name="password" minlength="10" autocomplete="new-password" required></label>
+    <label>Confirmar a nova senha<input type="password" name="confirm" minlength="10" autocomplete="new-password" required></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Trocar a senha</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
 <%- include('partials/foot') %>

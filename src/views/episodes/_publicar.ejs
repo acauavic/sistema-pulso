@@ -4,7 +4,7 @@
    var ytAcc = social && social.platforms.youtube;
    var ytLinked = !social || (ytAcc ? !ytAcc.reauth : !social.ok);
    var thumb = meta && meta.thumb_cover_id ? covers.find(function (c) { return c.id === meta.thumb_cover_id; }) : null;
-   var PUB2 = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-amber', 'agendado'], publicado: ['b-green', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] }; %>
+   var PUB2 = { revisao: ['b-amber', 'em revisão'], recusado: ['b-red', 'devolvido'], simulado: ['b-gray', 'simulado'], enviando: ['b-amber', 'enviando'], agendado: ['b-st-agendado', 'agendado'], publicado: ['b-st-publicado', 'publicado'], parcial: ['b-amber', 'parcial'], erro: ['b-red', 'erro'] }; %>
 <% if (perm.review && ready) { %>
 <dialog class="modal modal-wide" id="modal-publicar" aria-labelledby="mpb-h">
   <form method="post" action="/episodios/<%= ep.id %>/publicar" class="stack" data-busy="Enviando…">

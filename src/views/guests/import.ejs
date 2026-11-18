@@ -62,7 +62,7 @@
   <form method="post" action="/convidados/importar" class="row top-gap">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <input type="hidden" name="csv" value="<%= csvText %>">
-    <button class="btn primary" type="submit">Importar <%= result.ok %> convidado(s)</button>
+    <button class="btn primary" type="submit">Importar <%= fmt.plural(result.ok, 'convidado', 'convidados') %></button>
     <span class="small muted">Linhas com erro ou duplicadas ficam de fora.</span>
   </form>
   <% } else { %><p class="muted top-gap">Nenhuma linha pronta. Corrija o arquivo e gere a prévia de novo.</p><% } %>

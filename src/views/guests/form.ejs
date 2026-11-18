@@ -6,6 +6,9 @@
   var hasAbout = values.gender === 'f' || values.is_plural || values.invite_reason || values.company || values.job_title || values.positioning || values.topic || values.bio || values.notes;
   var stageOpen = Boolean(error || (typeof notice !== 'undefined' && notice) || (guest && values.status !== guest.status));
   var curStatus = (statuses.find(function (s) { return s.key === values.status; }) || {}).label;
+  // "Sobre" fecha por padrão (abre com erro ou pelo link #sobre); o resumo diz o que já está preenchido
+  var aboutFields = [values.company, values.job_title, values.invite_reason, values.positioning, values.topic, values.bio, values.notes];
+  var aboutFilled = aboutFields.filter(function (v) { return v && String(v).trim(); }).length;
 %>
 <div class="page-head"><div><span class="kicker">Convidados · CRM</span><h1><%= guest ? 'Editar ' + guest.name : 'Novo convidado' %></h1></div></div>
 <div class="card form-card wide">
@@ -15,7 +18,7 @@
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <%- include('../partials/duplicate-notice') %>
 
-    <h2 class="form-section">Cadastro</h2>
+    <div class="row spread"><h2 class="form-section">Cadastro</h2><span class="small muted">* obrigatório</span></div>
     <label>Nome * <small class="muted">(como aparece no convite; para dupla: "Dr. João e Dra. Maria")</small>
       <input type="text" name="name" value="<%= values.name || '' %>" maxlength="150" required autofocus>
     </label>
@@ -23,15 +26,15 @@
       <label>Instagram *
         <input type="text" name="instagram" value="<%= values.instagram || '' %>" maxlength="120" placeholder="@usuario" required>
       </label>
-      <label>Alcance<input type="text" name="reach" value="<%= values.reach || '' %>" maxlength="20" placeholder="+1,2M"></label>
+      <label>Alcance<input type="text" name="reach" value="<%= values.reach || '' %>" maxlength="20" placeholder="ex.: 1,2 mi"></label>
       <label>Perfil *
         <select name="profile" required>
           <option value="">Escolha…</option>
           <% profiles.forEach(function (p) { %><option value="<%= p.key %>" <%= values.profile === p.key ? 'selected' : '' %>><%= p.label %></option><% }) %>
         </select>
       </label>
-      <label>WhatsApp <small class="muted">(opcional)</small><input type="text" name="phone" value="<%= values.phone || '' %>" maxlength="40"></label>
-      <label>E-mail <small class="muted">(opcional)</small><input type="email" name="email" value="<%= values.email || '' %>" maxlength="254"></label>
+      <label>WhatsApp<input type="tel" name="phone" value="<%= values.phone || '' %>" maxlength="40" placeholder="(48) 99999-0000" autocomplete="off"></label>
+      <label>E-mail<input type="email" name="email" value="<%= values.email || '' %>" maxlength="254"></label>
       <label>Responsável
         <select name="owner_id">
           <option value="">— ninguém —</option>
@@ -40,8 +43,8 @@
       </label>
     </div>
 
-    <details <%= hasAbout ? 'open' : '' %>>
-      <summary>Sobre <%= guest ? 'o convidado' : 'o convidado (opcional)' %></summary>
+    <details id="sobre" <%= error && hasAbout ? 'open' : '' %>>
+      <summary>Sobre o convidado <span class="small muted"><%= aboutFilled ? '· ' + aboutFilled + ' de ' + aboutFields.length + ' preenchidos' : '· empresa, cargo, motivo do convite, temas e biografia' %></span></summary>
       <div class="stack">
         <div class="grid-2 tight">
           <label>Empresa / projeto<input type="text" name="company" value="<%= values.company || '' %>" maxlength="150"></label>
@@ -90,8 +93,8 @@
       </dialog>
     </div>
 
-    <details <%= values.sponsor_id ? 'open' : '' %>>
-      <summary>Ligado a um patrocinador<%= values.sponsor_id ? '' : ' (opcional)' %></summary>
+    <details id="patrocinador" <%= values.sponsor_id && !guest ? 'open' : '' %>>
+      <summary>Ligado a um patrocinador <span class="small muted"><%= values.sponsor_id ? '· ' + ((sponsors.find(function (sp) { return String(sp.id) === String(values.sponsor_id); }) || {}).company || 'sim') : '· não' %></span></summary>
       <div class="stack">
         <p class="small muted">Para episódio patrocinado com alguém do patrocinador ou indicado por ele. A gravação já fica reservada para o patrocinador e entra no portal dele.</p>
         <div class="grid-2 tight">
@@ -111,8 +114,8 @@
       </div>
     </details>
 
-    <details <%= stageOpen ? 'open' : '' %>>
-      <summary>Etapa: <span data-stage-label><%= curStatus %></span><%= guest ? '' : ' (mude só se o convidado já estiver mais adiante)' %></summary>
+    <details id="etapa" <%= stageOpen ? 'open' : '' %>>
+      <summary>Etapa: <span data-stage-label><%= curStatus %></span> <span class="small muted"><%= guest ? '' : '· mude só se o convidado já estiver mais adiante' %></span></summary>
       <div class="stack">
         <label>Etapa
           <select name="status" data-stage-select>

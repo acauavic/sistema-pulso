@@ -188,19 +188,19 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
   });
 
   it('a tela de conteúdo lista os cortes sem episódio e só oferece episódios já gravados', async () => {
-    const page = await as.editor.get('/conteudo');
+    const page = await as.editor.get('/conteudo?vista=cortes'); // cada aba é uma página
     assert.equal(page.status, 200);
     assert.match(page.text, /Sem episódio \(2\)/);
     assert.match(page.text, /Atribuir a um episódio/);
     assert.match(page.text, /EP\.012 · Conversa com Jonata Rocha/);
     assert.match(page.text, /EP\.013 · Outro episódio/, 'todo episódio já nasce gravado');
     assert.match(page.text, /Enviar cortes/);
-    const asProd = (await as.prod.get('/conteudo')).text;
+    const asProd = (await as.prod.get('/conteudo?vista=cortes')).text;
     assert.match(asProd, /Sem episódio/, 'a produtora enxerga');
     assert.doesNotMatch(asProd, /Enviar cortes/, 'mas não envia');
     const detail = await as.editor.get(`/cortes/${(await h.db.query('SELECT id FROM episode_clips ORDER BY id LIMIT 1')).rows[0].id}`);
     assert.equal(detail.status, 200);
-    assert.match(detail.text, /\/cortes\/\d+\/video#t=0\.1/);
+    assert.match(detail.text, /data-video-load data-src="\/cortes\/\d+\/video"/, 'o vídeo só carrega no clique');
     assert.equal((detail.text.match(/class="cover-pick/g) || []).length, 3);
   });
 
@@ -222,7 +222,7 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
     assert.ok(after.every((c) => c.spec.layers.some((l) => /EP\.012/.test(l.text || ''))), 'o número do episódio entra nas capas');
     assert.ok((await h.db.query("SELECT 1 FROM episode_events WHERE episode_id=$1 AND type='corte'", [ep.id])).rows.length);
     assert.notEqual((await clipRow(v.id)).cover_id, null);
-    assert.match((await as.gestao.get(`/conteudo?episodio=${ep.id}`)).text, /Momentos que a IA sugere cortar/, 'com o filtro do episódio, aparecem os momentos da análise como dica');
+    assert.match((await as.gestao.get(`/conteudo?vista=cortes&episodio=${ep.id}`)).text, /Momentos que a IA sugere cortar/, 'com o filtro do episódio, aparecem os momentos da análise como dica');
     const epPage = (await as.gestao.get(`/episodios/${ep.id}`)).text;
     assert.match(epPage, /Conteúdo <span class="mono small">0\/1<\/span>/, 'o episódio só mostra o resumo (publicados/total) e o link');
     assert.doesNotMatch(epPage, /cover-pick/, 'cortes não ficam dentro do card do episódio');
@@ -453,7 +453,7 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
       assert.equal(v.version, 1); assert.equal(v.storage_key, before.storage_key); assert.ok(h.b2Store.has(v.storage_key), 'a versão antiga continua no armazenamento');
       const page = (await as.editor.get(`/cortes/${id}`)).text;
       assert.match(page, /Versões anteriores/); assert.match(page, new RegExp(`/cortes/${id}/versoes/${v.id}/baixar`));
-      assert.match(page, new RegExp(`/cortes/${id}/video\\?v=2#t=0\\.1`), 'o navegador não reaproveita o vídeo antigo');
+      assert.match(page, new RegExp(`data-src="/cortes/${id}/video\\?v=2"`), 'o navegador não reaproveita o vídeo antigo');
       assert.equal((await as.editor.get(`/cortes/${id}/versoes/${v.id}/baixar`)).status, 302);
       const { rows: notes } = await h.db.query("SELECT n.title, n.user_id FROM notifications n WHERE n.dedupe_key = $1", [`corte-versao-${id}-2`]);
       assert.ok(notes.length >= 1); assert.match(notes[0].title, /Nova versão do corte: Corte revisado/);

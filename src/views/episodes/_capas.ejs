@@ -22,7 +22,7 @@
         <span class="row small">
           <% if (c.approved) { %><span class="badge b-green">aprovada</span><% } %>
           <% if (!c.auto) { %><span class="badge b-gray">editada</span><% } %>
-          <% if (issues) { %><span class="badge b-red" title="<%= (l.issues || []).join(' ') %>"><%= issues %> problema(s)</span><% } else if (warns) { %><span class="badge b-amber" title="<%= (l.warnings || []).join(' ') %>"><%= warns %> aviso(s)</span><% } else { %><span class="badge b-gray">conferida</span><% } %>
+          <% if (issues) { %><span class="badge b-red" title="<%= (l.issues || []).join(' ') %>"><%= fmt.plural(issues, 'problema', 'problemas') %></span><% } else if (warns) { %><span class="badge b-amber" title="<%= (l.warnings || []).join(' ') %>"><%= fmt.plural(warns, 'aviso', 'avisos') %></span><% } else { %><span class="badge b-gray">conferida</span><% } %>
           <span class="handle muted"><%= c.width %>×<%= c.height %> · <%= fmt.formatBytes(c.size_bytes) %></span>
         </span>
         <span class="row">

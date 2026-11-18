@@ -81,8 +81,8 @@ const PROVIDERS = [
     return rows.map((r) => ({ title: r.company, sub: r.contact_name || 'patrocinador', url: `/patrocinadores/${r.id}` }));
   } },
   { key: 'episodes', label: 'Episódios', tables: ['episodes'], perm: 'episodes.read', async search(q) {
-    const num = (String(q).trim().match(/^(?:ep\.?\s*)?(\d{1,4})$/i) || [])[1];
-    const m = match(['e.title', 'g.name', "'ep ' || coalesce(e.number::text, '')", 'e.number::text'], q);
+    const num = (norm(q).trim().match(/^(?:ep(?:isodio)?\.?\s*)?(\d{1,4})$/) || [])[1]; // "12", "ep 12", "ep.12", "episódio 12"
+    const m = match(['e.title', 'g.name', "'ep episodio ' || coalesce(e.number::text, '')", 'e.number::text'], q);
     const { rows } = await db.query(`SELECT e.id, e.number, e.title, g.name AS guest FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
       WHERE (${m.sql}) ${num ? `OR e.number = $${m.params.length + 1}` : ''} ORDER BY e.number DESC NULLS LAST LIMIT 6`, num ? [...m.params, Number(num)] : m.params);
     return rows.map((r) => ({ title: `${pad3(r.number) ? `${pad3(r.number)} · ` : ''}${r.title}`, sub: r.guest || 'episódio', url: `/episodios/${r.id}` }));
@@ -95,7 +95,7 @@ const PROVIDERS = [
   } },
   { key: 'clips', label: 'Cortes', tables: ['episode_clips'], perm: 'episodes.read', async search(q) {
     const rows = await find('episode_clips c', ['c.title', 'c.post_title', 'c.caption'], q, 'c.id, c.title, c.post_title', 'c.id DESC', 5);
-    return rows.map((r) => ({ title: r.title, sub: r.post_title || 'corte', url: `/cortes/${r.id}` }));
+    return rows.map((r) => ({ title: r.post_title || r.title, sub: r.post_title ? r.title : 'corte', url: `/cortes/${r.id}` })); // o gancho é o que todos reconhecem
   } },
   { key: 'publications', label: 'Publicações nas redes', tables: ['episode_publications'], perm: 'social.read', async search(q) {
     const rows = await find('episode_publications p', ['p.title', 'p.description'], q, 'p.id, p.title, p.status, p.media', 'p.created_at DESC', 5);

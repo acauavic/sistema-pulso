@@ -22,7 +22,7 @@
 <div class="page-head">
   <div>
     <span class="kicker">Pedido de conteúdo · <%= k.label %></span>
-    <h1><%= r.title %> <span class="badge <%= badge %>"><%= cont && r.status === 'aprovado' ? 'Concluído' : S[r.status] %></span><% if (r.priority && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %> <span class="badge b-amber">Prioridade</span><% } %></h1>
+    <h1><%= r.title %> <span class="badge <%= allPublished ? 'b-st-publicado' : badge %>"><%= allPublished ? 'Publicado' : cont && r.status === 'aprovado' ? 'Concluído' : S[r.status] %></span><% if (r.priority && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %> <span class="badge b-amber">Prioridade</span><% } %></h1>
     <p class="handle muted top-gap">
       <%= r.assignee_name ? 'Para ' + r.assignee_name : 'Para qualquer editor' %>
       <% if (r.due_on) { %> · <span class="<%= late ? 'err' : '' %>">entregar até <%= br(r.due_on) %><%= late ? ' (atrasado)' : '' %></span><% } %>
@@ -100,7 +100,7 @@
       <ul class="plain stack top-gap">
         <% videos.forEach(function (v) { %>
         <li class="<%= v.status === 'pronto' ? 'req-video' : 'clip-card' %>" data-clip="<%= v.id %>">
-          <% if (v.status === 'pronto') { %><video controls preload="metadata" playsinline src="/cortes/<%= v.id %>/video"<%- v.cover_id ? ' poster="/capas/' + v.cover_id + '/imagem"' : '' %> class="<%= v.height > v.width ? 'tall' : '' %>"></video><% } else { %>
+          <% if (v.status === 'pronto') { %><%- include('../partials/video-poster', { src: '/cortes/' + v.id + '/video', id: 'req-video-' + v.id, poster: v.cover_id ? '/capas/' + v.cover_id + '/imagem?w=640' : null, duration: v.duration_ms, tall: v.height > v.width, label: v.title }) %><% } else { %>
           <a class="clip-poster" href="/cortes/<%= v.id %>"><span class="poster-empty"><%- icon('film', 28) %></span></a><% } %>
           <div class="clip-body">
             <div class="row spread"><a href="/cortes/<%= v.id %>"><strong><%= v.title %></strong></a>
@@ -143,7 +143,7 @@
 
   <section class="card">
     <h2>Briefing</h2>
-    <% if (r.briefing_html || r.briefing) { %><div class="rich-content"><%- fmt.richHtml(r.briefing_html, r.briefing) %></div><% } else { %><p class="muted">Sem briefing. <%= perm.edit ? 'Use “Editar” para explicar o que precisa.' : '' %></p><% } %>
+    <% if (r.briefing_html || r.briefing) { %><div class="rich-content"><%- fmt.richHtml(r.briefing_html, r.briefing) %></div><% } else { %><p class="muted">Sem briefing.<% if (perm.edit && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %> <button class="link" type="button" data-modal-open="modal-pedido-editar">Escrever o briefing</button><% } %></p><% } %>
     <% if (docs.length) { %><div class="field top-gap"><span class="field-label">Anexos</span>
       <ul class="plain task-docs"><% docs.forEach(function (d) { %><li><span class="rte-ic"><%- icon('file-text', 16) %></span><a class="doc-name" href="/anexos/<%= d.id %>/baixar"><%= d.filename %></a><span class="mono small muted"><%= fmt.formatBytes(d.size_bytes) %></span></li><% }) %></ul></div><% } %>
   </section>

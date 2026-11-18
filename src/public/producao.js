@@ -63,9 +63,11 @@
     const edited = box.dataset.edited === '1';
     const say = (text) => { const li = document.createElement('li'); li.className = 'upload-item err'; li.innerHTML = '<span class="u-state small"></span>'; li.firstChild.textContent = text; queue.appendChild(li); };
     refreshWhenDone(box);
+    // um botão só: sem arquivo escolhido, ele abre o seletor; escolheu, o envio começa (nada de "Nenhum arquivo escolhido" nativo)
+    if (input && startBtn) { input.hidden = true; input.addEventListener('change', () => { if (input.files.length) startBtn.click(); }); }
     startBtn?.addEventListener('click', async () => {
       const files = [...input.files];
-      if (!files.length) { input.focus(); return; }
+      if (!files.length) { input.click(); return; }
       queue.replaceChildren();
       const ok = [];
       for (const f of files) {

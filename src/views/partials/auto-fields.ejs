@@ -1,13 +1,13 @@
 <%#
   Automação no Instagram na hora de publicar: quem comentar a palavra recebe o link no direct.
-  locals: auto = { keyword, message, days, linkSet, ready, heard } (commentAutomation.formDefaults), bulk = true quando são vários cortes.
+  locals: auto = { keyword, message, days, linkSet, ready, heard, on? } (commentAutomation.formDefaults; on = já vem marcada), bulk = true quando são vários cortes.
   Fica fechado; o resumo diz o que é. A chamada do Instagram passa a pedir a palavra (no envio).
 %>
 <% var bulkMode = typeof bulk !== 'undefined' && bulk; %>
-<details class="cta-box auto-box" data-auto-box>
+<details class="cta-box auto-box" data-auto-box<%= auto.on ? ' open' : '' %>>
   <summary><span class="cta-box-title">Automação no Instagram</span> <span class="small muted">quem comentar a palavra recebe o link no direct</span></summary>
   <% if (!auto.heard) { %><p class="notice small">Falta ligar o aviso de comentários da Outstand (Integrações &gt; Comentários e directs). Sem ele, a automação fica criada, mas não responde.</p><% } %>
-  <label class="check"><input type="checkbox" name="auto_on" value="1" data-auto-on> Responder no direct quem comentar a palavra</label>
+  <label class="check"><input type="checkbox" name="auto_on" value="1" data-auto-on<%= auto.on ? ' checked' : '' %>> Responder no direct quem comentar a palavra</label>
   <div class="grid-2 tight">
     <label>Palavra<input type="text" name="auto_palavra" value="<%= auto.keyword %>" maxlength="30" placeholder="<%= bulkMode ? 'Nome do convidado de cada corte' : 'Ex.: EPISODIO' %>" autocomplete="off" data-auto-word></label>
     <label>Fica ativa por

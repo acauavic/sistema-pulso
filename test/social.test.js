@@ -120,8 +120,9 @@ describe('Social', () => {
   describe('publicações: ver e editar', () => {
     it('a lista filtra por status e tipo; o detalhe mostra onde saiu', async () => {
       const t = (await as.prod.get('/social/publicacoes')).text;
-      assert.match(t, /\[ CARROSSEL \]/); assert.match(t, /\[ VÍDEO \]/);
-      assert.doesNotMatch((await as.prod.get('/social/publicacoes?tipo=story')).text, /\[ CARROSSEL \]/);
+      assert.match(t, /<span class="badge b-gray">Carrossel<\/span>/); assert.match(t, /<span class="badge b-gray">Vídeo<\/span>/);
+      assert.doesNotMatch((await as.prod.get('/social/publicacoes?tipo=story')).text, /<span class="badge b-gray">Carrossel<\/span>/);
+      assert.match((await as.prod.get('/social/publicacoes?q=nada-com-isso')).text, /Nada com esse filtro/, 'busca na lista');
       assert.match((await as.prod.get('/social/publicacoes?status=agendado')).text, /Agendado/);
       const { rows: [p] } = await h.db.query("SELECT id FROM episode_publications WHERE media='carrossel'");
       const d = await as.prod.get(`/social/publicacoes/${p.id}`);
@@ -175,7 +176,7 @@ describe('Social', () => {
       ({ rows } = await h.db.query('SELECT kind, title FROM social_ideas ORDER BY id'));
       assert.equal(rows.length, 3, 'só o story é novo');
       const page = (await as.prod.get('/social/ideias')).text;
-      assert.match(page, /\[ CARROSSEL \]/);
+      assert.match(page, /<span class="badge b-gray">CARROSSEL<\/span>/);
       assert.match(page, /TRECHO 2:00 – 2:55/);
       assert.match(page, /Gestão é cuidado\./);
     });

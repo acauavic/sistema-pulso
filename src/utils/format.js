@@ -55,6 +55,33 @@ function slugify(text) {
     .slice(0, 30);
 }
 
+// Número curto para views e alcance: 950, 12,3 mil, 1,2 mi.
+function compact(n) {
+  const v = Number(n) || 0;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace('.', ',').replace(/,0$/, '')} mi`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(v >= 1e4 ? 0 : 1).replace('.', ',').replace(/,0$/, '')} mil`;
+  return String(Math.round(v));
+}
+
+// "1 aviso" / "3 avisos": plural de verdade em vez de "aviso(s)".
+function plural(n, one, many) { return `${n} ${Number(n) === 1 ? one : many}`; }
+
+// Telefone legível: "48999720273" -> "(48) 99972-0273"; com 55 na frente, "+55 (48) 99972-0273". Fora desse formato, volta como veio.
+function phone(p) {
+  const raw = String(p || '').trim(); const d = raw.replace(/\D/g, '');
+  const local = (x) => (x.length === 11 ? `(${x.slice(0, 2)}) ${x.slice(2, 7)}-${x.slice(7)}` : x.length === 10 ? `(${x.slice(0, 2)}) ${x.slice(2, 6)}-${x.slice(6)}` : null);
+  if (raw.startsWith('+') && !d.startsWith('55')) return raw; // outro país: como foi digitado
+  if (d.length === 10 || d.length === 11) return local(d);
+  if ((d.length === 12 || d.length === 13) && d.startsWith('55')) return `+55 ${local(d.slice(2))}`;
+  return raw;
+}
+// Link do WhatsApp (wa.me) para o número; número brasileiro sem DDI ganha o 55. Sem dígitos suficientes, null.
+function waLink(p) {
+  const raw = String(p || '').trim(); const d = raw.replace(/\D/g, '');
+  if (d.length < 10) return null;
+  return `https://wa.me/${d.length <= 11 && !raw.startsWith('+') ? `55${d}` : d}`;
+}
+
 function firstName(name) {
   return String(name || '').trim().split(/\s+/)[0] || '';
 }
@@ -173,7 +200,7 @@ function relativeDays(v, now = new Date()) {
 }
 const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
-module.exports = { formatRange, escHtml, richHtml, commentHtml, initials, relativeDays,
+module.exports = { compact, plural, phone, waLink, formatRange, escHtml, richHtml, commentHtml, initials, relativeDays,
   formatBRL, parseBRL, parseInputDate, toInputDate, formatDay, formatDayShort, formatDayLong, timeParts, formatTime, toInputTime, formatDue, formatDueShort, formatBytes, formatClock,
   TZ, formatDateTime, formatDate, formatSoon, formatLong, toInputValue, parseInputDateTime,
   shortDate, monthShort, dayNum, todayLabel, greeting,

@@ -5,7 +5,7 @@
   <aside class="chat-side">
     <header class="chat-side-head"><h1>Mensagens</h1><button class="btn primary sm" type="button" data-chat-new><%- icon('plus', 14) %> Nova conversa</button></header>
     <nav class="chat-convs" data-chat-convs aria-label="Conversas"></nav>
-    <div class="empty" data-chat-noconv hidden><%- include('../partials/pulse-line') %><strong>Nenhuma conversa ainda</strong><span class="small">Toque em Nova conversa para falar com alguém da equipe ou criar um grupo.</span></div>
+    <div class="empty" data-chat-noconv hidden><%- include('../partials/pulse-line') %><strong>Nenhuma conversa ainda</strong><span class="small">Use “Nova conversa” para falar com alguém da equipe ou criar um grupo.</span></div>
   </aside>
 
   <div class="chat-main">
@@ -46,7 +46,7 @@
 <dialog class="modal" id="chat-new" aria-labelledby="chat-new-h">
   <h2 id="chat-new-h">Nova conversa</h2>
   <div class="seg" role="group" aria-label="Tipo de conversa"><button type="button" class="on" data-chat-new-tab="pessoa">Pessoa</button><button type="button" data-chat-new-tab="grupo">Grupo</button></div>
-  <div class="stack" data-chat-new-pane="pessoa"><ul class="plain chat-people" data-chat-people></ul></div>
+  <div class="stack" data-chat-new-pane="pessoa"><input type="search" placeholder="Buscar pessoa" aria-label="Buscar pessoa" data-chat-people-find autocomplete="off"><ul class="plain chat-people" data-chat-people></ul></div>
   <form class="stack" data-chat-new-pane="grupo" data-chat-group-form hidden>
     <label>Nome do grupo<input type="text" name="nome" maxlength="80" placeholder="Ex.: Edição do EP.020"></label>
     <fieldset><legend>Quem participa</legend><ul class="plain chat-checks" data-chat-group-people></ul></fieldset>

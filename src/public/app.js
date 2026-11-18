@@ -34,9 +34,11 @@
   });
 
   // celular: abas e etapas que não cabem rolam de lado; a ativa já aparece (sem mexer na rolagem da página)
+  // (nas etapas, a anterior também fica inteira: sem "m agendamento" cortado na borda)
   document.querySelectorAll('.stepper li.now, .tabbar .on, .seg .on').forEach((el) => {
     const box = el.parentElement;
-    if (box && box.scrollWidth > box.clientWidth) box.scrollLeft += el.getBoundingClientRect().left - box.getBoundingClientRect().left - 16;
+    const from = el.matches('.stepper li') && el.previousElementSibling ? el.previousElementSibling : el;
+    if (box && box.scrollWidth > box.clientWidth) box.scrollLeft += from.getBoundingClientRect().left - box.getBoundingClientRect().left;
   });
 
   // confirmação antes de ações destrutivas: <form data-confirm="...">
@@ -104,6 +106,7 @@
       box.querySelector('[data-bulk-bar]').hidden = !n;
       box.querySelector('[data-bulk-hint]').hidden = n > 0;
       document.querySelectorAll('[data-bulk-count]').forEach((el) => { el.textContent = n; });
+      document.querySelectorAll('[data-bulk-word]').forEach((el) => { const [one, many] = el.dataset.bulkWord.split('|'); el.textContent = n === 1 ? one : many; });
       if (all) { all.checked = n > 0 && n === picks().length; all.indeterminate = n > 0 && n < picks().length; }
     };
     picks().forEach((b) => b.addEventListener('change', sync));
@@ -308,6 +311,32 @@
     dlg.querySelectorAll('[data-modal-close]').forEach((b) => b.addEventListener('click', () => dlg.close()));
     dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // clicar fora fecha
   });
+  document.querySelector('dialog.modal[data-open-on-load]')?.showModal(); // voltou com erro de uma janela: ela reabre
+  // filtro rápido de uma lista, sem recarregar: <div class="seg" data-row-filter="id-da-lista"> com botões data-value; linhas com data-filter-value
+  document.querySelectorAll('[data-row-filter]').forEach((seg) => {
+    const list = document.getElementById(seg.dataset.rowFilter);
+    if (!list) return;
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-value]');
+      if (!b) return;
+      seg.querySelectorAll('button[data-value]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+      list.querySelectorAll('[data-filter-value]').forEach((row) => { row.hidden = Boolean(b.dataset.value) && !row.dataset.filterValue.split(' ').includes(b.dataset.value); });
+    });
+  });
+  // link para uma seção que abre (#sobre): ela já vem aberta
+  try { const sec = location.hash.length > 1 && document.getElementById(decodeURIComponent(location.hash.slice(1))); if (sec && sec.tagName === 'DETAILS') sec.open = true; } catch { /* hash inválido */ }
+
+  // Calendário no celular: a grade vira lista dos dias com evento; ela começa em hoje (ou no próximo dia com algo), não no primeiro quadrado do mês
+  (() => {
+    const grid = document.querySelector('.cal-month, .cal-week');
+    if (!grid || !window.matchMedia('(max-width: 760px)').matches) return;
+    const days = [...grid.querySelectorAll('.cal-day')];
+    const i = days.findIndex((d) => d.classList.contains('today'));
+    if (i < 0) return;
+    const shown = (d) => d.offsetParent !== null;
+    const target = days.slice(i).find(shown);
+    if (target && target !== days.find(shown)) target.scrollIntoView({ block: 'start' });
+  })();
   document.querySelectorAll('[data-autosubmit]').forEach((s) => s.addEventListener('change', () => s.form.submit()));
 
   // ---------------------------------------------------------------- agenda da gravação: preencher a data pede a confirmação com estúdio, hosts e convidado
@@ -393,6 +422,10 @@
     const sync = () => { const on = form.querySelector('input[name="status"]:checked'); btn.disabled = !on || on.dataset.current === '1'; };
     form.addEventListener('change', sync); sync();
   });
+  // menu "Mais" (details.row-menu): fecha ao clicar fora ou com Esc
+  document.addEventListener('click', (e) => { document.querySelectorAll('details.row-menu[open]').forEach((d) => { if (!d.contains(e.target)) d.open = false; }); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('details.row-menu[open]').forEach((d) => { d.open = false; d.querySelector('summary')?.focus(); }); });
+
   // ---------------------------------------------------------------- janela de edição reaproveitada: <button data-fill-modal="id" data-fill='{"campo":"valor"}' data-fill-action="/rota" data-fill-mode="edit|new" data-fill-remove="/rota/excluir">
   // Um formulário só (form[data-fill-form]) serve a todos os itens da lista: o clique preenche, aponta a rota e abre.
   document.addEventListener('click', (e) => {
@@ -418,6 +451,7 @@
       rm.textContent = btn.dataset.fillRemoveLabel || rm.dataset.label;
     }
     form.dispatchEvent(new Event('change', { bubbles: true })); // refaz campos condicionais (data-when) com os valores preenchidos
+    form.querySelectorAll('select').forEach((el) => el.dispatchEvent(new Event('pulso:combo-sync'))); // lista com busca mostra o valor novo
     dlg.showModal();
   });
   document.addEventListener('click', (e) => {
@@ -457,8 +491,19 @@
 })();
 
 // Vídeo: o player toca a versão leve (720p). "Ver no original" troca para o arquivo enviado sem perder o ponto em que estava.
+// Vídeo que só carrega no clique: a capa vira o player e já começa a tocar.
+document.addEventListener('click', (e) => {
+  const p = e.target.closest('[data-video-load]'); if (!p) return;
+  const v = document.createElement('video');
+  v.id = p.dataset.id; v.controls = true; v.playsInline = true; v.autoplay = true; v.preload = 'auto'; v.src = p.dataset.src;
+  if (p.dataset.poster) v.poster = p.dataset.poster;
+  v.className = p.classList.contains('tall') ? 'tall' : '';
+  p.replaceWith(v); v.focus(); v.play().catch(() => {});
+});
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-video-swap]'); if (!btn) return;
+  const waiting = document.querySelector(`[data-video-load][data-id="${CSS.escape(btn.dataset.videoSwap)}"]`);
+  if (waiting) { const u = new URL(waiting.dataset.src, location.href); u.searchParams.set('original', '1'); waiting.dataset.src = u.toString(); btn.dataset.on = '1'; btn.textContent = 'Ver na versão leve'; const l = btn.parentElement.querySelector('[data-video-label]'); if (l) l.textContent = 'Original'; waiting.click(); return; }
   const video = document.getElementById(btn.dataset.videoSwap); if (!video) return;
   const original = btn.dataset.on !== '1';
   const at = video.currentTime; const playing = !video.paused;

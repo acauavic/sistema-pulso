@@ -12,19 +12,19 @@
 
 <form method="get" action="/patrocinadores" class="filters">
   <input type="hidden" name="view" value="<%= view %>">
-  <input type="search" name="q" value="<%= q %>" placeholder="Buscar empresa, responsável ou e-mail">
-  <select name="owner">
+  <input type="search" name="q" value="<%= q %>" placeholder="Buscar empresa, responsável ou e-mail" aria-label="Buscar patrocinador" enterkeyhint="search">
+  <select name="owner" aria-label="Responsável" data-autosubmit>
     <option value="">Todos da equipe</option>
     <option value="eu" <%= ownerFilter === 'eu' ? 'selected' : '' %>>Só os meus</option>
     <% owners.forEach(function (o) { %><option value="<%= o.id %>" <%= ownerFilter === o.id ? 'selected' : '' %>><%= o.name %></option><% }) %>
   </select>
   <% if (view === 'lista') { %>
-  <select name="stage">
+  <select name="stage" aria-label="Etapa" data-autosubmit>
     <option value="">Todas as etapas</option>
     <% stages.forEach(function (s) { %><option value="<%= s.key %>" <%= stage === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
   </select>
   <% } %>
-  <button class="btn" type="submit">Filtrar</button>
+  <% if (q || ownerFilter || stage) { %><a class="link small" href="/patrocinadores?view=<%= view %>">Limpar filtros</a><% } %>
 </form>
 
 <% if (view === 'quadro') { %>
@@ -34,13 +34,14 @@
     <header><span class="badge b-st-<%= col.key %>"><%= col.label %></span><span class="count"><%= col.items.length %></span></header>
     <% if (col.total) { %><p class="column-total handle muted"><%= fmt.formatBRL(col.total) %></p><% } %>
     <div class="cards" data-dropzone>
+      <p class="col-empty small muted">Nenhum nesta etapa.<%= can('sponsors.write') ? ' Arraste um cartão para cá.' : '' %></p>
       <% col.items.forEach(function (s) { %>
       <a class="kcard" href="/patrocinadores/<%= s.id %>" data-item-id="<%= s.id %>" draggable="<%= can('sponsors.write') ? 'true' : 'false' %>">
         <strong><%= s.company %></strong>
         <% if (s.contact_name) { %><span class="muted small"><%= s.contact_name %></span><% } %>
         <span class="meta small muted">
           <% if (s.tier) { %><span><%= tiers[s.tier] %></span><% } %>
-          <% if (s.kind) { %><span><%= kinds[s.kind] %></span><% } %>
+          <% if (s.kind && s.kind !== 'negocio') { %><span><%= kinds[s.kind] %></span><% } %>
           <% if (s.value_cents != null) { %><span><%= fmt.formatBRL(s.value_cents) %></span><% } %>
           <% if (s.form && s.form.complete) { %><span><%- icon('circle-check', 12) %>briefing</span>
           <% } else if (s.form && s.form.pending) { %><span class="warn" title="Perguntas que o patrocinador deixou para responder depois: <%= s.form.pendingTitles.join(', ') %>"><%- icon('clock', 12) %><%= s.form.pending %> pendência<%= s.form.pending > 1 ? 's' : '' %></span>

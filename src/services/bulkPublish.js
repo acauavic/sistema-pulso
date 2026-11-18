@@ -107,4 +107,67 @@ async function schedule(items, { platforms, trialMode = 'auto', userId, review =
   return { created, failed };
 }
 
-module.exports = { MAX_PER_DAY, todayBR, daySlots, trialMask, readOptions, plan, eligible, schedule, hhmm, toMin };
+// ---------------------------------------------------------------- piloto automático da semana
+// Toda semana o sistema monta a agenda com os prontos para postar: mistura os episódios (um de cada por vez, para o feed não virar
+// uma semana de um convidado só), os mais recentes primeiro e, dentro de cada episódio, os cortes com capa antes. A pessoa confere
+// e agenda com um clique (a mesma página de "Publicar em massa"). As escolhas ficam guardadas em app_settings 'piloto_semana'.
+const PILOT_KEY = 'piloto_semana';
+const PILOT_DEFAULTS = { platforms: ['instagram', 'tiktok', 'youtube'], perDay: 3, from: '08:00', to: '22:00', trialPerDay: 0, trialMode: 'auto', auto: false, autoWord: '', autoMessage: '', autoDays: 30 };
+async function pilotSettings() {
+  let v = {};
+  try { v = JSON.parse((await require('./settings').get(PILOT_KEY)) || '{}'); } catch { v = {}; }
+  return { ...PILOT_DEFAULTS, ...v };
+}
+async function savePilot(body) {
+  const up = require('./uploadPost');
+  const platforms = [...new Set([].concat(body.platforms || []).map(String).filter((p) => up.PLATFORMS[p]?.clip))];
+  const opts = readOptions({ ...body, inicio: undefined });
+  if (opts.error) return { error: opts.error };
+  if (!platforms.length) return { error: 'Escolha pelo menos uma rede.' };
+  const v = { platforms, perDay: opts.perDay, from: hhmm(opts.from), to: hhmm(opts.to), trialPerDay: opts.trialPerDay, trialMode: opts.trialMode,
+    auto: String(body.auto_on || '') === '1', autoWord: require('./commentAutomation').cleanKeyword(body.auto_palavra), autoMessage: String(body.auto_mensagem || '').replace(/\r/g, '').trim().slice(0, 1000), autoDays: [7, 30, 90].includes(Number(body.auto_dias)) ? Number(body.auto_dias) : 30 };
+  await require('./settings').set(PILOT_KEY, JSON.stringify(v));
+  return { settings: v };
+}
+
+// Ordem de publicação da semana: round-robin entre episódios. Devolve ids de corte (até `limit`).
+async function weekPicks(limit) {
+  const { rows } = await db.query(
+    `SELECT c.id, c.episode_id, (c.cover_id IS NOT NULL) AS has_cover, c.created_at, e.number, e.aired_on
+       FROM episode_clips c JOIN episodes e ON e.id = c.episode_id
+      WHERE c.status = 'pronto' AND NOT EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status = ANY($1))
+      ORDER BY e.aired_on DESC NULLS LAST, e.number DESC NULLS LAST, (c.cover_id IS NOT NULL) DESC, c.created_at, c.id`, [QUEUED]);
+  const byEp = new Map();
+  for (const r of rows) { if (!byEp.has(r.episode_id)) byEp.set(r.episode_id, []); byEp.get(r.episode_id).push(r.id); }
+  const queues = [...byEp.values()]; const out = [];
+  while (out.length < limit && queues.some((q) => q.length)) for (const q of queues) { if (q.length && out.length < limit) out.push(q.shift()); }
+  return out;
+}
+
+// Próxima segunda-feira (ou hoje, se hoje é segunda) no fuso de Brasília, em YYYY-MM-DD.
+function nextMonday(today = todayBR()) {
+  const d = new Date(`${today}T12:00:00Z`); const dow = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() + ((8 - dow) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+// Segunda de manhã (Brasília): avisa a gestão que a agenda da semana está pronta para conferir (uma vez por semana).
+async function weeklyNotice(now = new Date()) {
+  const br = new Date(now.getTime() - 3 * 3600_000);
+  if (br.getUTCDay() !== 1 || br.getUTCHours() < 8 || br.getUTCHours() > 11) return null;
+  const st = await pilotSettings();
+  const picks = await weekPicks(st.perDay * 7);
+  if (picks.length < st.perDay) return null;
+  const { can, ROLES } = require('../permissions');
+  const roles = Object.keys(ROLES).filter((r) => can(r, 'production.review'));
+  const { rows: users } = await db.query('SELECT id FROM users WHERE active AND role = ANY($1)', [roles]);
+  const week = br.toISOString().slice(0, 10);
+  await require('./notify').notify({
+    type: 'rotina', users: users.map((u) => u.id), title: 'A agenda da semana está pronta para conferir',
+    body: `${picks.length} cortes prontos para postar, ${st.perDay} por dia, misturando os episódios. Confira e agende com um clique.`,
+    url: '/conteudo/semana', dedupe: `piloto-semana-${week}`,
+  });
+  return { picks: picks.length };
+}
+
+module.exports = { addDays, PILOT_KEY, PILOT_DEFAULTS, pilotSettings, savePilot, weekPicks, nextMonday, weeklyNotice, MAX_PER_DAY, todayBR, daySlots, trialMask, readOptions, plan, eligible, schedule, hhmm, toMin };

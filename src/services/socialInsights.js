@@ -199,4 +199,4 @@ async function overview({ force = false } = {}) {
   return out;
 }
 
-module.exports = { NETWORKS, DAYS, overview, refresh, fromOutstand, fromZernio, accounts };
+module.exports = { NETWORKS, DAYS, overview, refresh, fromOutstand, fromZernio, accounts, outstandGet, zernioGet };

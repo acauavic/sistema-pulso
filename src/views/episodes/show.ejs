@@ -14,13 +14,14 @@
 %>
 <div class="page-head">
   <div>
-    <span class="kicker"><%= epNo %> · gravado <%= fmt.formatDay(ep.recorded_on) %><%= ep.aired_on ? ' · vai ao ar ' + fmt.formatDay(ep.aired_on) : '' %></span>
+    <% var airedPast = ep.aired_on && (ep.status === 'publicado' || fmt.toInputDate(ep.aired_on) <= new Intl.DateTimeFormat('en-CA', { timeZone: fmt.TZ }).format(new Date())); %>
+    <span class="kicker"><%= epNo %> · gravado <%= fmt.formatDay(ep.recorded_on) %><%= ep.aired_on ? (airedPast ? ' · foi ao ar ' : ' · vai ao ar ') + fmt.formatDay(ep.aired_on) : '' %></span>
     <h1><%= ep.title %> <span class="badge b-st-<%= ep.status %>"><%= C.EPISODE_STATUSES[ep.status] %></span></h1>
     <p class="muted top-gap"><%= ep.guest_name ? ep.guest_name : (sponsors.length ? 'Só os hosts · ' + sponsors.map(function (s) { return s.company; }).join(', ') : 'Só os hosts') %><%= ep.editor_name ? ' · editor: ' + ep.editor_name : '' %></p>
   </div>
   <div class="row">
     <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
-    <a class="btn" href="/conteudo?episodio=<%= ep.id %>" title="<%= content.total ? content.total + ' peças, ' + content.published + ' publicadas' + (content.requests ? ', ' + content.requests + ' pedido(s) em aberto' : '') : 'Cortes, posts e pedidos deste episódio' %>"><%- icon('layers') %> Conteúdo<% if (content.total || content.requests) { %> <span class="mono small"><%= content.published %>/<%= content.total %></span><% } %></a>
+    <a class="btn" href="/conteudo?episodio=<%= ep.id %>" title="<%= content.total ? content.total + ' peças, ' + content.published + ' publicadas' + (content.requests ? ', ' + fmt.plural(content.requests, 'pedido', 'pedidos') + ' em aberto' : '') : 'Cortes, posts e pedidos deste episódio' %>"><%- icon('layers') %> Conteúdo<% if (content.total || content.requests) { %> <span class="mono small"><%= content.published %>/<%= content.total %></span><% } %></a>
     <% if (ep.guest_id && can('guests.read')) { %><a class="btn" href="/convidados/<%= ep.guest_id %>"><%- icon('mic') %> Convidado</a><% } %>
     <% if (perm.write) { %><a class="btn" href="/episodios/<%= ep.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
   </div>
@@ -32,10 +33,10 @@
   <% }) %>
 </ol>
 
+<% if (moves.length) { %>
 <section class="card moves" id="etapa">
   <span class="kicker">Próximo passo</span>
   <div class="move-list">
-    <% if (!moves.length) { %><p class="muted">Este episódio está no fim da linha de produção.</p><% } %>
     <% moves.filter(function (m) { return m.allowed; }).forEach(function (m) { %>
     <div class="move">
       <form method="post" action="/episodios/<%= ep.id %>/etapa" class="inline">
@@ -50,6 +51,7 @@
     <% } %>
   </div>
 </section>
+<% } %>
 
 <div class="tabs-wrap top-gap" data-tabs data-default="<%= defaultTab %>">
   <div class="tabbar" role="tablist" aria-label="Seções do episódio">
@@ -333,7 +335,7 @@
           <% var editedUploader = function (label) { %>
           <div class="uploader" data-uploader data-base="<%= fileBase %>" data-csrf="<%= csrf %>" data-edited="1" data-where="<%= epNo + ' · ' + ep.title %>" data-hash="edicao">
             <input type="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
-            <button class="btn" type="button" data-start><%- icon('arrow-right') %> <%= label %></button>
+            <button class="btn" type="button" data-start><%- icon('upload') %> <%= label %></button>
             <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
             <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
           </div>

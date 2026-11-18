@@ -20,6 +20,8 @@
       '<button class="btn ' + (tone || '') + '" type="submit">' + label + '</button></form>';
   };
   var openOnLoad = function (name) { return openModal === name ? 'data-open-on-load' : ''; };
+  // a página da plateia é para divulgar a gravação: depois de gravado, só aparece se já estiver ligada
+  var showPagina = pagePlateia && (guest.audience_page_enabled || idx >= 0 && idx <= 3);
 %>
 <div class="page-head">
   <div>
@@ -31,12 +33,15 @@
   </div>
   <div class="row">
     <a class="btn ghost" href="/convidados"><%- icon('arrow-left') %> Voltar</a>
-    <% if (episode) { %><a class="btn" href="/episodios/<%= episode.id %>"><%- icon('film') %> <%= epNo %></a><% } %>
+    <% if (episode && guest.status !== 'gravado') { %><a class="btn" href="/episodios/<%= episode.id %>"><%- icon('film') %> <%= epNo %></a><% } %>
     <% if (canW) { %><a class="btn" href="/convidados/<%= guest.id %>/editar"><%- icon('pencil') %> Editar</a><% } %>
     <% if (can('guests.delete')) { %>
-    <form method="post" action="/convidados/<%= guest.id %>/excluir" class="inline" data-confirm="Excluir <%= guest.name %> e todo o histórico? Esta ação não pode ser desfeita.">
-      <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn danger" type="submit"><%- icon('trash-2') %> Excluir</button>
-    </form>
+    <details class="row-menu">
+      <summary class="btn icon-only" aria-label="Mais ações" title="Mais ações"><%- icon('ellipsis') %></summary>
+      <div class="row-menu-list">
+        <form method="post" action="/convidados/<%= guest.id %>/excluir" data-confirm="Mandar <%= guest.name %> para a lixeira? Fica 15 dias lá, com o histórico, e dá para restaurar."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link danger-link" type="submit"><%- icon('trash-2', 14) %> Mandar para a lixeira</button></form>
+      </div>
+    </details>
     <% } %>
   </div>
 </div>
@@ -154,7 +159,7 @@
   <div class="tabbar" role="tablist" aria-label="Seções do convidado">
     <button type="button" role="tab" data-tab-btn="resumo" aria-controls="pane-resumo">Resumo</button>
     <% if (showInvite) { %><button type="button" role="tab" data-tab-btn="convite" aria-controls="pane-convite">Convite</button><% } %>
-    <% if (pagePlateia) { %><button type="button" role="tab" data-tab-btn="pagina" aria-controls="pane-pagina">Página da plateia<% if (guest.audience_page_enabled) { %> <span class="count"><%= pagePlateia.partners.filter(function (p) { return p.active; }).length || '' %></span><% } %></button><% } %>
+    <% if (showPagina) { %><button type="button" role="tab" data-tab-btn="pagina" aria-controls="pane-pagina">Página da plateia<% if (guest.audience_page_enabled) { %> <span class="count"><%= pagePlateia.partners.filter(function (p) { return p.active; }).length || '' %></span><% } %></button><% } %>
     <% if (portalTab) { %><button type="button" role="tab" data-tab-btn="portal" aria-controls="pane-portal">Portal<% if (portalTab.pending.length) { %> <span class="count"><%= portalTab.pending.length %></span><% } %></button><% } %>
     <button type="button" role="tab" data-tab-btn="historico" aria-controls="pane-historico">Histórico <span class="count"><%= events.length %></span></button>
   </div>
@@ -166,7 +171,7 @@
           <h2>Sobre</h2>
           <dl class="kv">
             <dt>Responsável</dt><dd><%- include('../partials/dot', { type: 'guest', id: guest.id, user: guest.owner_id ? { id: guest.owner_id, name: guest.owner_name } : null, editable: canW, label: true }) %></dd>
-            <% if (guest.phone) { %><dt>WhatsApp</dt><dd class="handle"><%= guest.phone %></dd><% } %>
+            <% if (guest.phone) { %><dt>WhatsApp</dt><dd class="handle"><% if (fmt.waLink(guest.phone)) { %><a href="<%= fmt.waLink(guest.phone) %>" target="_blank" rel="noopener noreferrer"><%= fmt.phone(guest.phone) %></a><% } else { %><%= guest.phone %><% } %></dd><% } %>
             <% if (guest.email) { %><dt>E-mail</dt><dd><%= guest.email %></dd><% } %>
             <% if (guest.reach) { %><dt>Alcance</dt><dd class="mono"><%= guest.reach %> seguidores</dd><% } %>
             <% if (guest.invite_reason) { %><dt>Motivo do convite</dt><dd class="pre"><%= guest.invite_reason %></dd><% } %>
@@ -179,7 +184,7 @@
             <% if (guest.rsvp_message && !closed) { %><dt>Recado</dt><dd class="quote pre"><%= guest.rsvp_message %></dd><% } %>
           </dl>
           <% var gaps = [!guest.phone && !guest.email && 'contato', !guest.positioning && 'posicionamento', !guest.topic && 'temas', !guest.bio && 'biografia'].filter(Boolean); %>
-          <% if (canW && gaps.length) { %><p class="small muted top-gap">Sem <%= gaps.join(', ') %>. <a href="/convidados/<%= guest.id %>/editar">Completar cadastro</a></p><% } %>
+          <% if (canW && gaps.length) { %><p class="small muted top-gap">Sem <%= gaps.join(', ') %>. <a href="/convidados/<%= guest.id %>/editar#sobre">Completar cadastro</a></p><% } %>
         </section>
         <%- include('../partials/comments', { type: 'guest', id: guest.id, items: comments, back: '/convidados/' + guest.id }) %>
       </div>
@@ -320,7 +325,7 @@
   </div>
   <% } %>
 
-  <% if (pagePlateia) { var P = pagePlateia; var csrfF = '<input type="hidden" name="_csrf" value="' + csrf + '">'; %>
+  <% if (showPagina) { var P = pagePlateia; var csrfF = '<input type="hidden" name="_csrf" value="' + csrf + '">'; %>
   <div class="pane" id="pane-pagina" data-pane-id="pagina">
     <% if (!guest.audience_page_enabled) { %>
     <section class="card empty page-off">
@@ -493,7 +498,7 @@
           <% if (canW) { %><p><button class="btn sm" type="button" data-modal-open="modal-portal-calendario"><%- icon('calendar', 14) %> Montar calendário</button></p><% } %>
           <% } else { %>
           <p class="mono small muted"><%= pc.plan.length %> previsto<%= pc.plan.length === 1 ? '' : 's' %></p>
-          <ul class="plain plan-list">
+          <ul class="plain post-plan">
             <% pc.plan.forEach(function (it) { %>
             <li class="<%= it.state === 'feito' ? 'is-off' : '' %>"><span class="mono small"><%= it.day %><%= it.time ? ' · ' + it.time : '' %></span> <span><%= it.label || 'Post em collab' %></span></li>
             <% }) %>
@@ -593,7 +598,7 @@
         <h2 id="mpe-h">Enviar o link do portal</h2>
         <p class="small muted">A mensagem apresenta o portal e explica que ele se atualiza durante a semana.</p>
         <% if (PT.hasEmail) { %><form method="post" action="/convidados/<%= guest.id %>/portal/enviar" data-busy="Enviando…"><%- csrfP %><input type="hidden" name="canal" value="email"><button class="btn primary" type="submit"><%- icon('mail') %> Enviar por e-mail</button> <span class="mono small muted"><%= guest.email %></span></form><% } %>
-        <% if (PT.hasPhone) { %><form method="post" action="/convidados/<%= guest.id %>/portal/enviar" target="_blank"><%- csrfP %><input type="hidden" name="canal" value="whatsapp"><button class="btn <%= PT.hasEmail ? '' : 'primary' %>" type="submit"><%- icon('message-circle') %> Abrir no WhatsApp</button> <span class="mono small muted"><%= guest.phone %></span></form><% } %>
+        <% if (PT.hasPhone) { %><form method="post" action="/convidados/<%= guest.id %>/portal/enviar" target="_blank"><%- csrfP %><input type="hidden" name="canal" value="whatsapp"><button class="btn <%= PT.hasEmail ? '' : 'primary' %>" type="submit"><%- icon('message-circle') %> Abrir no WhatsApp</button> <span class="mono small muted"><%= fmt.phone(guest.phone) %></span></form><% } %>
         <% if (!PT.hasEmail && !PT.hasPhone) { %><p class="notice small">Sem e-mail nem WhatsApp no cadastro. Copie o link e mande por onde vocês conversam.</p><% } %>
         <div class="row modal-actions"><button class="btn ghost" type="button" data-modal-close>Fechar</button></div>
       </div>

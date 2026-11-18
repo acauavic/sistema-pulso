@@ -30,8 +30,8 @@ async function availableClips({ includeUsed = false } = {}) {
   const [{ rows }, idx] = await Promise.all([db.query(
     `SELECT c.id, c.title, c.post_title, c.caption, c.ctas, c.duration_ms, c.cover_id, c.episode_id, c.request_id, c.created_at, c.width, c.height,
             e.number AS episode_number, e.title AS episode_title, e.status AS episode_status, e.published_at, e.aired_on, r.title AS request_title, r.kind AS request_kind, r.approved_at,
-            EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status = 'simulado') AS tested
-       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id
+            g.name AS guest_name, EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status = 'simulado') AS tested
+       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN content_requests r ON r.id = c.request_id
       WHERE c.status = 'pronto' AND c.storage_key IS NOT NULL
         AND ((c.request_id IS NULL AND c.episode_id IS NOT NULL) OR r.status = 'aprovado' OR (r.kind = 'cortes' AND c.episode_id IS NOT NULL))
       ORDER BY c.created_at DESC LIMIT 300`), board.publicationIndex()]);
@@ -70,10 +70,16 @@ const unusedClips = () => availableClips();
 const unusedImages = () => availableImages();
 
 const STATUS_LABEL = { revisao: 'Em revisão', recusado: 'Devolvido', simulado: 'Simulado', enviando: 'Enviando', agendado: 'Agendado', publicado: 'Publicado', parcial: 'Parcial', erro: 'Erro' };
-async function listPublications({ status = '', media = '', limit = 200, offset = 0 } = {}) {
+async function listPublications({ status = '', media = '', q = '', limit = 200, offset = 0 } = {}) {
   const where = []; const params = [];
   if (STATUS_LABEL[status]) { params.push(status); where.push(`p.status = $${params.length}`); }
   if (['video', 'imagem', 'carrossel', 'story'].includes(media)) { params.push(media); where.push(`p.media = $${params.length}`); }
+  const term = String(q || '').trim().slice(0, 80);
+  if (term) { // título, legenda, nome do corte, episódio ou número ("12", "ep 12")
+    params.push(`%${term.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`);
+    const n = params.length; const num = (term.match(/^(?:ep\.?\s*)?(\d{1,4})$/i) || [])[1];
+    where.push(`(p.title ILIKE $${n} OR p.description ILIKE $${n} OR c.title ILIKE $${n} OR c.post_title ILIKE $${n} OR e.title ILIKE $${n}${num ? ` OR e.number = ${Number(num)}` : ''})`);
+  }
   params.push(limit);
   const { rows } = await db.query(
     `SELECT p.*, e.number AS episode_number, e.title AS episode_title, c.title AS clip_title, u.name AS created_by_name
@@ -224,7 +230,7 @@ jobs.register('social_ideias', async (job, ctx) => {
     if (r.error) errors.push(r.error);
   }
   await require('./notify').notify({
-    type: 'rotina', users: [userId], title: created ? `${created} ideia(s) nova(s) para as redes` : 'Nenhuma ideia nova para as redes',
+    type: 'rotina', users: [userId], title: created ? `${created} ${created === 1 ? 'ideia nova' : 'ideias novas'} para as redes` : 'Nenhuma ideia nova para as redes',
     body: errors.length ? [...new Set(errors)].join(' ') : 'Veja em Social > Ideias.', url: '/social/ideias', dedupe: `ideias-${job.id}`,
   }).catch(() => {});
   return { created, errors };

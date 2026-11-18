@@ -7,28 +7,31 @@
       <a class="<%= view === 'lista' ? 'on' : '' %>" href="/convidados?view=lista&q=<%= encodeURIComponent(q) %>&owner=<%= encodeURIComponent(ownerFilter) %>"><%- icon('list') %> Lista</a>
     </div>
     <% if (can('guests.write')) { %>
-    <a class="btn" href="/convidados/importar"><%- icon('file-text') %> Importar CSV</a>
     <a class="btn primary" href="/convidados/novo"><%- icon('plus') %> Novo convidado</a>
+    <details class="row-menu">
+      <summary class="btn icon-only" aria-label="Mais ações" title="Mais ações"><%- icon('ellipsis') %></summary>
+      <div class="row-menu-list"><a class="link" href="/convidados/importar"><%- icon('file-text', 14) %> Importar uma planilha (CSV)</a></div>
+    </details>
     <% } %>
   </div>
 </div>
 
 <form method="get" action="/convidados" class="filters">
   <input type="hidden" name="view" value="<%= view %>">
-  <input type="search" name="q" value="<%= q %>" placeholder="Buscar nome, Instagram, e-mail ou tema">
-  <select name="owner">
+  <input type="search" name="q" value="<%= q %>" placeholder="Buscar nome, Instagram, e-mail ou tema" aria-label="Buscar convidado" enterkeyhint="search">
+  <select name="owner" aria-label="Responsável" data-autosubmit>
     <option value="">Todos os responsáveis</option>
     <option value="eu" <%= ownerFilter === 'eu' ? 'selected' : '' %>>Só os meus</option>
     <% owners.forEach(function (o) { %><option value="<%= o.id %>" <%= ownerFilter === o.id ? 'selected' : '' %>><%= o.name %></option><% }) %>
   </select>
   <% if (view === 'lista') { %>
-  <select name="status">
+  <select name="status" aria-label="Etapa" data-autosubmit>
     <option value="">Todas as etapas</option>
     <% statuses.forEach(function (s) { %><option value="<%= s.key %>" <%= status === s.key ? 'selected' : '' %>><%= s.label %></option><% }) %>
   </select>
   <% } %>
   <% if (followupCount || followupOnly) { %><label class="check"><input type="checkbox" name="followup" value="1" <%= followupOnly ? 'checked' : '' %> data-autosubmit> Só follow-ups pendentes (<%= followupCount %>)</label><% } %>
-  <button class="btn" type="submit">Filtrar</button>
+  <% if (q || ownerFilter || status || followupOnly) { %><a class="link small" href="/convidados?view=<%= view %>">Limpar filtros</a><% } %>
 </form>
 
 <% if (view === 'quadro') { %>
@@ -61,7 +64,7 @@
 <div data-bulk>
   <p class="small muted" data-bulk-hint>Marque os convidados para mudar etapa, responsável, perfil, gênero ou patrocinador de vários de uma vez.</p>
   <div class="bulk-bar" data-bulk-bar hidden>
-    <strong><span data-bulk-count class="mono">0</span> selecionado(s)</strong>
+    <strong><span data-bulk-count class="mono">0</span> <span data-bulk-word="selecionado|selecionados">selecionados</span></strong>
     <div class="row">
       <button class="btn primary sm" type="button" data-modal-open="modal-massa">Editar em massa</button>
       <button class="link small" type="button" data-bulk-clear>Limpar seleção</button>
@@ -92,7 +95,7 @@
 <dialog class="modal" id="modal-massa" aria-labelledby="m-massa-h">
   <form method="post" action="/convidados/em-massa" id="form-massa" class="stack" data-bulk-form>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <h2 id="m-massa-h">Editar <span data-bulk-count class="mono">0</span> convidado(s)</h2>
+    <h2 id="m-massa-h">Editar <span data-bulk-count class="mono">0</span> <span data-bulk-word="convidado|convidados">convidados</span></h2>
     <p class="small muted">Só muda o que você escolher. Em branco, fica como está.</p>
     <label>Etapa
       <select name="status" data-bulk-status>

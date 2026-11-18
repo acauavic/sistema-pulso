@@ -836,7 +836,7 @@ describe('fluxos ponta a ponta', () => {
       const page = await as.prod.get('/convidados/importar');
       assert.equal(page.status, 200);
       assert.match(page.text, /Importar por CSV/);
-      assert.match((await as.prod.get('/convidados')).text, /Importar CSV/);
+      assert.match((await as.prod.get('/convidados')).text, /href="\/convidados\/importar"/);
       const model = await as.prod.get('/convidados/importar/modelo.csv');
       assert.equal(model.status, 200);
       assert.match(model.headers.get('content-type'), /text\/csv/);
@@ -868,7 +868,7 @@ describe('fluxos ponta a ponta', () => {
       assert.match(t, /e-mail inválido/);
       assert.match(t, /@jaexiste já cadastrado \(Já Existe\)/);
       assert.match(t, /@ana\.lima repetido no arquivo/);
-      assert.match(t, /Importar 2 convidado\(s\)/);
+      assert.match(t, /Importar 2 convidados/);
     });
 
     it('confirmar grava só as linhas válidas, em Prospecção, com responsável, histórico e auditoria', async () => {

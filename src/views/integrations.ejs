@@ -2,7 +2,7 @@
 <div class="page-head"><div><span class="kicker">Gestão · Conexões</span><h1>Integrações</h1></div></div>
 <%- include('partials/gestao-nav', { active: 'integracoes' }) %>
 <p class="lead">Status das integrações. Por segurança, chaves e senhas nunca aparecem aqui — elas ficam nas variáveis de ambiente do servidor.</p>
-<div class="grid-2 tight">
+<div class="grid-2 tight int-cards">
   <section class="card" id="mensagens">
     <h2>Mensagens (RabbitMQ)</h2>
     <p class="small muted">Leva as mensagens do chat até quem está conectado. Se ele sair do ar, o chat continua pelo banco de dados.</p>
@@ -141,7 +141,7 @@
       <button class="btn <%= ib.reconnected_at || ib.messaging_ok_at ? '' : 'primary' %>" type="submit" <%= comments.configured ? '' : 'disabled' %>>Reconectar o Instagram</button>
     </form>
     <h3 class="top-gap">2. Ligar o aviso de comentários na Outstand</h3>
-    <p class="small muted">No painel da Outstand: Settings &gt; Webhooks &gt; Add Webhook. Cole o endereço e o segredo abaixo e marque o evento <span class="mono">comment.received</span>. Use "Test" lá para conferir: o aviso aparece aqui em "Último aviso recebido".</p>
+    <p class="small muted">No painel da Outstand: Settings &gt; Webhooks &gt; Add Webhook. Cole o endereço e o segredo abaixo e marque os eventos <span class="mono">comment.received</span> (palavra no comentário) e <span class="mono">message.received</span> (palavra no direct). Use "Test" lá para conferir: o aviso aparece aqui em "Último aviso recebido".</p>
     <dl class="kv">
       <dt>Endereço</dt><dd><span class="mono small"><%= comments.webhookUrl %></span> <button class="link small" type="button" data-copy="<%= comments.webhookUrl %>">copiar</button></dd>
       <dt>Segredo</dt><dd>
@@ -175,7 +175,7 @@
   <% } %>
   <section class="card">
     <h2>E-mail transacional (Brevo SMTP)</h2>
-    <p><span class="badge <%= smtp.ok ? 'b-green' : 'b-red' %>"><%= smtp.ok ? (smtp.dry ? 'Modo teste (não envia)' : 'Configurado') : 'Não configurado' %></span></p>
+    <p><span class="badge <%= smtp.ok ? (smtp.dry ? 'b-amber' : 'b-green') : 'b-red' %>"><%= smtp.ok ? (smtp.dry ? 'Modo teste (não envia)' : 'Configurado') : 'Não configurado' %></span></p>
     <ul class="plain small">
       <li>Servidor: <code><%= smtp.host %>:<%= smtp.port %></code></li>
       <li>Remetente: <code><%= smtp.from || '—' %></code></li>

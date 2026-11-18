@@ -105,10 +105,11 @@
         const dlg = document.getElementById(btn.dataset.dlOpen); const form = dlg?.querySelector('form'); if (!form) return;
         fill(form, form.querySelector('[data-dl-ids]'));
         dlg.querySelectorAll('[data-dl-n]').forEach((el) => { el.textContent = String(n); });
+        dlg.querySelectorAll('[data-dl-word]').forEach((el) => { const [one, many] = el.dataset.dlWord.split('|'); el.textContent = n === 1 ? one : many; });
         dlg.showModal(); return;
       }
       const form = box.querySelector('[data-dl-form]'); if (!form) return;
-      if (btn.dataset.confirm && !window.confirm(btn.dataset.confirm.replace('{n}', n))) return;
+      if (btn.dataset.confirm && !window.confirm(btn.dataset.confirm.replace('{n}', n).replace(/(\p{L}+)\(s\)/gu, (m, w) => (n === 1 ? w : `${w}s`)))) return; // "corte(s)" vira "corte" ou "cortes"
       form.querySelector('input[name="acao"]').value = btn.dataset.dlDo;
       fill(form);
       btn.disabled = true; if (btn.dataset.busy) btn.textContent = btn.dataset.busy;

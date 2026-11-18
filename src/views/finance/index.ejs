@@ -10,10 +10,10 @@
 <%- include('_nav', { active: 'resumo', counts: counts }) %>
 
 <section class="stat-grid" aria-label="Números do mês">
-  <a class="stat" href="/financeiro/regras"><span class="stat-label">Caixa hoje</span><span class="stat-n money"><%= money(ov.cash) %></span></a>
+  <a class="stat" href="/financeiro/regras"><span class="stat-label">Caixa hoje</span><span class="stat-n money <%= ov.cash < 0 ? 'err' : '' %>"><%= money(ov.cash) %></span></a>
   <a class="stat" href="/financeiro/lancamentos"><span class="stat-label">A pagar em 7 dias</span><span class="stat-n money"><%= money(ov.out7) %></span></a>
   <a class="stat" href="/financeiro/lancamentos"><span class="stat-label">Atrasado</span><span class="stat-n money <%= late ? 'err' : '' %>"><%= money(late) %></span></a>
-  <a class="stat" href="/financeiro/lancamentos?escopo=historico"><span class="stat-label">Resultado do mês</span><span class="stat-n money"><%= money(ov.month.result) %></span></a>
+  <a class="stat" href="/financeiro/lancamentos?escopo=historico"><span class="stat-label">Resultado do mês</span><span class="stat-n money <%= ov.month.result < 0 ? 'err' : '' %>"><%= money(ov.month.result) %></span></a>
 </section>
 
 <% if (firstRun) { %>

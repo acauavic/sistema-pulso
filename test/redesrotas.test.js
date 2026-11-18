@@ -121,7 +121,7 @@ describe('Uma rede por provedor (X pela Zernio, o resto pela Outstand) e vigia d
       assert.deepEqual(done.results.map((r) => [r.platform, r.provider]).sort(), [['instagram', 'outstand'], ['x', 'zernio'], ['youtube', 'outstand']]);
       assert.equal(done.results.find((r) => r.platform === 'x').url, 'https://x.com/pulso_x/status/1');
       const page = (await as.gestao.get(`/social/publicacoes/${pub.id}`)).text;
-      assert.match(page, /Saiu por[\s\S]*Zernio e Outstand/);
+      assert.match(page, /Provedor[\s\S]*Zernio e Outstand/);
     } finally { h.config.outstand.live = false; h.config.zernio.live = false; }
   });
 

@@ -4,16 +4,51 @@
   var trials = rows.filter(function (r) { return r.trial; }).length;
   var dayOf = function (r) { return fmt.formatDateTime(r.at).slice(0, 5); };
   var backHref = '/conteudo?vista=cortes' + (episodio ? '&episodio=' + episodio : '');
+  var isWeek = typeof week !== 'undefined' && week;
+  var br = function (ymd) { return String(ymd || '').split('-').reverse().slice(0, 2).join('/'); };
 %>
 <div class="page-head">
+  <% if (isWeek) { %>
+  <div><span class="kicker">Conteúdo · agenda da semana</span><h1>Semana de <span class="mono"><%= br(opts.start) %></span> a <span class="mono"><%= br(weekEnd) %></span></h1></div>
+  <div class="row"><button class="btn" type="button" data-modal-open="modal-semana"><%- icon('sliders-horizontal') %> Ajustar</button><a class="btn ghost" href="<%= backHref %>"><%- icon('arrow-left') %> Voltar aos cortes</a></div>
+  <% } else { %>
   <div><span class="kicker">Conteúdo · publicar em massa</span><h1>Agenda de <span class="mono"><%= rows.length %></span> <%= rows.length === 1 ? 'corte' : 'cortes' %></h1></div>
   <div class="row"><a class="btn ghost" href="<%= backHref %>"><%- icon('arrow-left') %> Voltar aos cortes</a></div>
+  <% } %>
 </div>
+<% if (isWeek) { %>
+<dialog class="modal modal-wide" id="modal-semana" aria-labelledby="msem-h"<%= openSettings ? ' data-open-on-load' : '' %>>
+  <form method="post" action="/conteudo/semana/ajustes" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="msem-h">Como a semana é montada</h2>
+    <p class="small muted">Fica guardado: toda segunda de manhã chega o aviso com a agenda pronta, já com estas escolhas.</p>
+    <fieldset class="channels"><legend>Redes</legend>
+      <% Object.keys(uploadPost.PLATFORMS).filter(function (k) { return uploadPost.PLATFORMS[k].clip; }).forEach(function (k) { %>
+      <label class="check"><input type="checkbox" name="platforms" value="<%= k %>" <%= pilot.platforms.indexOf(k) >= 0 ? 'checked' : '' %>> <%= uploadPost.PLATFORMS[k].clipLabel || uploadPost.PLATFORMS[k].label %></label>
+      <% }) %>
+    </fieldset>
+    <div class="grid-3">
+      <label>Por dia<input type="number" name="por_dia" min="1" max="24" value="<%= pilot.perDay %>" class="num-input" required></label>
+      <label>Das<input type="time" name="de" value="<%= pilot.from %>" step="300" required></label>
+      <label>Até<input type="time" name="ate" value="<%= pilot.to %>" step="300" required></label>
+    </div>
+    <div class="grid-2">
+      <label>Reel de teste por dia <small class="muted">(Instagram)</small><input type="number" name="teste_por_dia" min="0" max="24" value="<%= pilot.trialPerDay %>" class="num-input"></label>
+      <label>Reel de teste libera
+        <select name="teste_modo"><option value="auto" <%= pilot.trialMode === 'auto' ? 'selected' : '' %>>Sozinho, se for bem</option><option value="manual" <%= pilot.trialMode === 'manual' ? 'selected' : '' %>>Eu libero no app</option></select>
+      </label>
+    </div>
+    <%- include('../partials/auto-fields', { auto: autoDefaults, bulk: true }) %>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar e remontar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <p class="lead">
   <%= platforms.map(labelOf).join(' · ') %>. <span class="mono"><%= opts.perDay %></span> por dia, das <span class="mono"><%= hhmm(opts.from) %></span> às <span class="mono"><%= hhmm(opts.to) %></span>, a partir de <span class="mono"><%= opts.start.split('-').reverse().join('/') %></span><%= days.length > 1 ? ', em ' + days.length + ' dias' : '' %>.
   <% if (auto) { %>Automação no Instagram: quem comentar a palavra recebe o link no direct por <span class="mono"><%= auto.days %></span> dias.<% } %>
     <% if (ig && trials) { %><span class="mono"><%= trials %></span> <%= trials === 1 ? 'vai' : 'vão' %> ao Instagram como Reel de teste (<%= opts.trialMode === 'manual' ? 'você libera no app' : 'libera sozinho se for bem' %>).<% } %>
 </p>
+<% if (isWeek) { %><p class="small muted">Montada com os cortes prontos que ainda não saíram, um episódio de cada vez (o que foi ao ar mais recentemente primeiro). Confira, troque horários ou desmarque o Reel de teste e agende: nada sai sem você agendar.</p><% } %>
 
 <% if (skipped.length) { %>
 <div class="notice small">

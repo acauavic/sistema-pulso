@@ -92,6 +92,7 @@ async function suggest({ field, coverKind = null, current = '', shortcut = null,
     key === 'convite_motivo' ? `Missão do Pulso: ajudar o profissional da saúde a ser um profissional melhor e levar ao público mais saúde e qualidade de vida. Eixos: saúde e inovação, mentalidade, estilo de vida e histórias inspiradoras.\n${guestBrief(ctx.guest)}`
       : ctx.episode ? fin.buildContext({ episode: ctx.episode, guest: ctx.guest, sponsors: [] }) : 'Podcast: Pulso (corte ainda sem episódio definido).',
     ctx.clip ? `Corte: ${ctx.clip.post_title || ctx.clip.title}` : '',
+    ['capa', 'titulo', 'descricao'].includes(key) ? await require('./postMetrics').examples() : '',
     '', `Campo: ${FIELDS[key].label}. Regras: ${FIELDS[key].rule}.`,
     now ? `Texto atual: ${now}` : 'O campo está vazio.',
     '', `Pedido: ${[ask, own].filter(Boolean).join(' ')}`,

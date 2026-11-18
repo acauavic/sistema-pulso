@@ -4,6 +4,22 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.75.0', date: '2026-11-18', title: 'Revisão da interface inteira, números dos posts e agenda da semana',
+    items: [
+      { kind: 'novo', text: 'Listas longas com busca: todo seletor com muitas opções (episódio, convidado, patrocinador, pessoa) ganhou uma caixa de busca dentro dele. Digite parte do nome, sem se preocupar com acento.' },
+      { kind: 'novo', text: 'Números de cada post: a publicação mostra views, curtidas, comentários e compartilhamentos por rede; o corte mostra o total; e Social > Insights ganhou "Cortes que mais funcionaram". O sistema lê os números a cada 6 horas, e a IA usa os cortes mais vistos como referência ao sugerir capa, título e legenda.' },
+      { kind: 'novo', text: 'Agenda da semana: em Conteúdo > Cortes, "Agenda da semana" monta a semana com os cortes prontos, um episódio de cada vez, para conferir e agendar. "Ajustar" guarda as redes, quantos por dia, horários, Reels de teste e automação; toda segunda de manhã chega o aviso com a agenda pronta.' },
+      { kind: 'novo', text: 'Palavra no direct: uma automação de Direct (Social > Automações) responde na própria conversa quando alguém manda a palavra. Precisa do aviso de mensagens da Outstand ligado em Integrações.' },
+      { kind: 'novo', text: 'Novo post: a escolha do corte tem busca e filtro por episódio e mostra 24 por vez; escolhido, vira um resumo com "Trocar" e o formulário aparece logo abaixo.' },
+      { kind: 'ajuste', text: 'Conteúdo mais leve: cada aba (Quadro, Cortes, Posts, Pedidos) abre só o que é dela, os cortes vêm em páginas de 60 e o vídeo do corte só carrega quando você toca no play.' },
+      { kind: 'ajuste', text: 'Publicar ficou mais seguro: rede onde o corte já está no ar aparece como "no ar" e não pode ser marcada de novo, o título começa vazio (nada de "Corte 10" nas redes), o botão diz o destino ("Publicar em 2 redes") e só libera depois do "Entendi".' },
+      { kind: 'ajuste', text: 'Alinhamento e leitura: botões e campos com a mesma altura, textos de apoio mais claros e maiores, rótulos que não quebram, barra de seleção que flutua no pé sem empurrar a lista, menu lateral mais compacto e link "Pular para o conteúdo" para quem usa teclado.' },
+      { kind: 'ajuste', text: 'Lime só para ação e para o que foi publicado: "pronto para postar", "ativo" e "aprovado" viraram chips neutros, e os posts não têm mais um "Aprovar" lime em cada cartão.' },
+      { kind: 'ajuste', text: 'Telas revistas uma a uma: tarefas com o status como chip e a data visível no celular; calendário que abre em hoje no celular; filtros de Convidados, Patrocinadores e Usuários que se aplicam sozinhos; editar convidado com seções que abrem; WhatsApp e site como links; cortes chamados pelo gancho, e não por "Corte 322"; Posts numa grade só; pedidos com filtro por situação; Ideias e Perfil em janelas; publicações com busca; Auditoria em português e com filtros; Lixeira juntando o que foi apagado de uma vez.' },
+      { kind: 'correcao', text: 'O painel somava os atrasados em "a pagar nos próximos 7 dias" e mostrava um valor diferente do Financeiro; agora a conta é a mesma. "Excluir" que vai para a lixeira não diz mais que "não pode ser desfeito", e os plurais deixaram de aparecer como "(s)".' },
+    ],
+  },
+  {
     version: '1.74.1', date: '2026-11-17', title: 'Automações do Instagram criadas à mão também pela Outstand',
     items: [
       { kind: 'correcao', text: 'A automação de comentário criada em Social > Automações (para qualquer post da conta ou um post específico) agora responde pela Outstand, como a da publicação. A leitura antiga dependia da Upload-Post, que não está mais conectada.' },

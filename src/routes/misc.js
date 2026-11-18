@@ -36,7 +36,9 @@ router.get('/', wrap(async (req, res) => {
   const fin = require('../services/finance');
   const outreach = require('../services/outreach');
   const pMoney = can(req.user.role, 'finance.read') ? Promise.all([fin.counts(), fin.stockItems(), db.query(
-    "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on <= CURRENT_DATE + 7), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'")]) : null;
+    // mesma conta do Financeiro ("A pagar em 7 dias"): de hoje até daqui a 7 dias; o atrasado aparece à parte
+    "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'",
+    [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())])]) : null;
   const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user) : null;
   const [counts, upcoming, recent, mine] = await Promise.all([
     db.query('SELECT status, count(*)::int AS n FROM guests GROUP BY status'),
@@ -65,9 +67,16 @@ router.get('/', wrap(async (req, res) => {
 router.get('/auditoria', requirePerm('audit.read'), wrap(async (req, res) => {
   const { pageOf, paginate } = require('../utils/pager');
   const pg = pageOf(req, 100); // 100 por página (antes: só os 300 mais recentes, o resto não aparecia)
-  const { rows: raw } = await db.query('SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2', [pg.limit, pg.offset]);
+  const labels = require('../utils/auditLabels');
+  const area = labels.AREAS[req.query.area] ? req.query.area : '';
+  const quem = String(req.query.quem || '').trim().slice(0, 254);
+  const [{ rows: raw }, { rows: people }] = await Promise.all([
+    db.query(`SELECT * FROM audit_log WHERE ($1 = '' OR split_part(action, '.', 1) = $1) AND ($2 = '' OR user_email = $2)
+               ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4`, [area, quem, pg.limit, pg.offset]),
+    db.query("SELECT DISTINCT user_email FROM audit_log WHERE user_email IS NOT NULL AND created_at > now() - interval '180 days' ORDER BY 1 LIMIT 100"),
+  ]);
   const { rows, pager } = paginate(req, raw, pg);
-  res.render('audit', { title: 'Auditoria', rows, pager });
+  res.render('audit', { title: 'Auditoria', rows, pager, area, quem, people: people.map((p) => p.user_email), areas: labels.AREAS, auditLabel: labels.auditLabel, entityLabel: labels.entityLabel });
 }));
 
 // ---- integrações: status + testes seguros (sem expor segredos) ----

@@ -544,7 +544,7 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
   describe('painel de gestão e menu', () => {
     it('gestão reúne usuários, logs, notificações, rotinas, busca e integrações; editor não entra', async () => {
       const page = (await as.gestao.get('/gestao')).text;
-      for (const t of ['Usuários', 'Logs', 'Notificações', 'Rotinas de tarefas', 'Busca global', 'Integrações']) assert.match(page, new RegExp(t), t);
+      for (const t of ['Usuários', 'Auditoria', 'Notificações', 'Rotinas de tarefas', 'Busca global', 'Integrações']) assert.match(page, new RegExp(t), t);
       assert.equal((await as.editor.get('/gestao')).status, 403);
       for (const p of ['/usuarios', '/auditoria', '/integracoes']) assert.match((await as.gestao.get(p)).text, /class="subnav subnav-groups"/, `${p} com as abas da gestão`);
     });

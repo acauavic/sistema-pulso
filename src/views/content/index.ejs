@@ -14,7 +14,6 @@
     <% if (perm.request) { %><button class="btn primary" type="button" data-modal-open="modal-pedido"><%- icon('plus') %> Pedir conteúdo</button><% } %>
   </div>
 </div>
-<p class="lead">Tudo o que sai do podcast passa por aqui: pedidos para o editor, cortes, posts e carrosséis. Cada peça mostra em que ponto está, até ser publicada no Social.</p>
 
 <%
   var colBadge = { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao', pronto: 'b-st-pronto_publicar', fila: 'b-st-agendado', publicado: 'b-st-publicado' };
@@ -23,15 +22,18 @@
   var boardHref = function (t) { return '/conteudo?vista=quadro' + (t ? '&tipo=' + t : '') + (only ? '&episodio=' + only : ''); };
   var cutsHref = function (sit) { return '/conteudo?vista=cortes' + (sit ? '&situacao=' + sit : '') + (ordem !== 'recentes' ? '&ordem=' + ordem : '') + (only ? '&episodio=' + only : ''); };
 %>
-<div class="tabs-wrap" data-tabs data-default="<%= vista %>">
-  <div class="tabbar" role="tablist" aria-label="Conteúdo">
-    <button type="button" role="tab" data-tab-btn="quadro" aria-controls="pane-quadro"><%- icon('columns-3', 14) %> Quadro</button>
-    <button type="button" role="tab" data-tab-btn="cortes" aria-controls="pane-cortes">Cortes <span class="count"><%= clips.length %></span></button>
-    <button type="button" role="tab" data-tab-btn="posts" aria-controls="pane-posts">Posts e carrosséis <span class="count"><%= postCount %></span></button>
-    <button type="button" role="tab" data-tab-btn="pedidos" aria-controls="pane-pedidos">Pedidos <span class="count"><%= openRequests.length %></span></button>
-  </div>
+<%# Cada aba é uma página: só a aba aberta é montada no servidor (antes, as quatro vinham juntas). %>
+<% var tabHref = function (v) { return '/conteudo?vista=' + v + (only ? '&episodio=' + only : ''); }; %>
+<div class="tabs-wrap">
+  <nav class="tabbar" aria-label="Conteúdo">
+    <a href="<%= tabHref('quadro') %>" class="<%= vista === 'quadro' ? 'on' : '' %>"<%- vista === 'quadro' ? ' aria-current="page"' : '' %>><%- icon('columns-3', 14) %> Quadro</a>
+    <a href="<%= tabHref('cortes') %>" class="<%= vista === 'cortes' ? 'on' : '' %>"<%- vista === 'cortes' ? ' aria-current="page"' : '' %>>Cortes <span class="count"><%= tabCounts.cortes %></span></a>
+    <a href="<%= tabHref('posts') %>" class="<%= vista === 'posts' ? 'on' : '' %>"<%- vista === 'posts' ? ' aria-current="page"' : '' %>>Posts e carrosséis <span class="count"><%= tabCounts.posts %></span></a>
+    <a href="<%= tabHref('pedidos') %>" class="<%= vista === 'pedidos' ? 'on' : '' %>"<%- vista === 'pedidos' ? ' aria-current="page"' : '' %>>Pedidos <span class="count"><%= openRequests.length %></span></a>
+  </nav>
 
-  <div class="pane" id="pane-quadro" data-pane-id="quadro">
+  <% if (vista === 'quadro') { %>
+  <div class="pane" id="pane-quadro">
     <div class="board-filter">
       <div class="seg" role="group" aria-label="Filtrar o quadro">
         <% [['', 'Tudo'], ['video', 'Vídeos'], ['imagem', 'Imagens'], ['pedido', 'Pedidos']].forEach(function (f) { %><a class="<%= tipo === f[0] ? 'on' : '' %>" href="<%= boardHref(f[0]) %>"><%= f[1] %></a><% }) %>
@@ -47,32 +49,37 @@
     <div class="board board-wide pboard">
       <% columns.forEach(function (col) { %>
       <section class="column" data-stage="<%= col.key %>">
-        <header><span class="badge <%= colBadge[col.key] %>" title="<%= col.hint %>"><%= col.label %></span><span class="count"><%= col.cards.length %></span></header>
+        <header><span class="badge <%= colBadge[col.key] %>" title="<%= col.hint %>"><%= col.label %></span><span class="count"><%= col.total != null ? col.total : col.cards.length %></span></header>
         <div class="cards">
           <% if (!col.cards.length) { %><p class="small muted col-hint"><%= col.key === 'pedido' && perm.request ? 'Peça um trailer, um vídeo avulso ou um post no botão “Pedir conteúdo”.' : col.hint %></p><% } %>
-          <% col.cards.forEach(function (k) { %>
+          <% col.cards.forEach(function (k) { var kTitle = k.episode && String(k.title).toLowerCase() === String(k.kind).toLowerCase() ? (k.episode.split(' · ').slice(1).join(' · ') || k.title) : k.title; %>
           <a class="kcard has-thumb" href="<%= k.href %>">
             <% if (k.thumb) { %><img class="kthumb <%= k.media === 'video' && k.vertical === false ? '' : (k.media !== 'video' && k.type !== 'story' ? 'wide' : '') %>" src="<%= k.thumb %>" alt="" loading="lazy"><% } else { %><span class="kthumb ph"><%- icon(k.media === 'video' ? 'film' : 'image', 16) %></span><% } %>
             <span class="ktype"><%= k.kind %><%= k.episode ? ' · ' + k.episode.split(' · ')[0] : (k.type !== 'pedido' && k.media === 'video' && !k.warn ? ' · avulso' : '') %></span>
-            <strong><%= k.title %></strong>
+            <strong><%= kTitle %></strong>
             <span class="meta">
               <% if (k.type === 'pedido') { %><% if (k.priority) { %><span class="warn">prioridade</span><% } %><span><%- icon('user', 12) %><%= k.who %></span><% if (k.due) { %><span class="<%= k.late ? 'late' : '' %>"><%- icon('calendar', 12) %><%= dueShort(k.due) %><%= k.late ? ' · atrasado' : '' %></span><% } %><% if (k.rounds) { %><span><%= k.rounds %>ª volta</span><% } %><% } %>
               <% if (k.chip) { %><span class="<%= k.chip === 'erro' ? 'late' : '' %>"><%= k.chip %></span><% } %>
               <% if (k.warn) { %><span class="warn"><%= k.warn %></span><% } %>
               <% if (k.slides) { %><span><%= k.slides %> slides</span><% } %>
+              <% if (k.views) { %><span class="views"><%- icon('eye', 12) %><%= fmt.compact(k.views) %></span><% } %>
               <% if (k.pub) { %><span class="nets"><%= k.pub.stage === 'fila' ? k.pub.label + ' · ' : '' %><%= k.pub.platforms.join(' · ') %><%= k.pub.at ? ' · ' + dayShort(k.pub.at) : '' %></span><% if (k.pub.trial) { %> <span class="badge b-trial" title="Reel de teste no Instagram: aparece primeiro só para quem não segue">Reel de teste</span><% } %><% } %>
             </span>
           </a>
           <% }) %>
+          <% if (col.total > col.cards.length) { %><a class="link small col-more" href="<%= cutsHref(col.key === 'pronto' ? 'pronto' : '') %>">+ <span class="mono"><%= col.total - col.cards.length %></span> na lista de cortes</a><% } %>
           <% if (col.key === 'pronto' && perm.cut && readyCount > 1) { %><a class="link small col-more" href="<%= cutsHref('pronto') %>">Selecionar para publicar em massa</a><% } %>
+          <% if (col.key === 'pronto' && perm.publish && readyCount > 1) { %><a class="link small col-more" href="/conteudo/semana">Montar a agenda da semana</a><% } %>
           <% if (col.key === 'publicado' && hiddenOld) { %><a class="link small col-more" href="<%= boardHref(tipo) %>&publicados=todos">+ <span class="mono"><%= hiddenOld %></span> publicados há mais de 60 dias</a><% } %>
         </div>
       </section>
       <% }) %>
     </div>
   </div>
+  <% } %>
 
-  <div class="pane" id="pane-cortes" data-pane-id="cortes" data-cortes data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
+  <% if (vista === 'cortes') { %>
+  <div class="pane" id="pane-cortes" data-cortes data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
     <% if (moments && moments.length) { %>
     <section class="card top-gap">
       <h2>Momentos que a IA sugere cortar</h2>
@@ -107,6 +114,7 @@
     <% if (clipPick) { %>
     <div class="row dl-toolbar">
       <button class="btn sm ghost" type="button" data-dl-select><%- icon('check-square', 14) %> Selecionar</button>
+      <% if (perm.publish && readyCount > 1) { %><a class="btn sm" href="/conteudo/semana" title="A semana montada com os prontos para postar, um episódio de cada vez"><%- icon('calendar', 14) %> Agenda da semana</a><% } %>
     </div>
     <div class="dl-bar" data-dl-bar role="group" aria-label="Ações nos cortes marcados" hidden>
       <span class="mono small" data-dl-count aria-live="polite">Nenhum item marcado</span>
@@ -138,9 +146,12 @@
     </div>
     <% } %>
     </div>
+    <%- include('../partials/pager', { pager: clipPager }) %>
   </div>
+  <% } %>
 
-  <div class="pane" id="pane-posts" data-pane-id="posts" hidden>
+  <% if (vista === 'posts') { %>
+  <div class="pane" id="pane-posts">
     <% if (!postGroups.length) { %>
     <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum post ainda.</strong></p><p class="muted small">Quando o episódio for analisado pela IA (ao entrar em finalização), o sistema monta posts de frase, tela dividida e carrossel.</p></div>
     <% } %>
@@ -176,39 +187,43 @@
       <p class="small muted dl-note" data-dl-note role="status" aria-live="polite" hidden></p>
       <form method="post" action="/conteudo/em-massa/posts" data-dl-form hidden><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value=""><input type="hidden" name="episodio" value="<%= only || '' %>"></form>
       <% } %>
-      <% ['post_quote', 'post_split', 'carousel'].forEach(function (kind) { var list = g.covers.filter(function (c) { return c.kind === kind; }); if (!list.length) return; %>
-      <h3 class="capas-kind"><%= KINDS[kind] %></h3>
+      <%# uma grade só por episódio (antes, um bloco por tipo deixava grupos de um cartão e muito vazio); o tipo vai no cartão %>
+      <% var ordered = ['post_quote', 'post_split', 'carousel'].reduce(function (acc, kind) { return acc.concat(g.covers.filter(function (c) { return c.kind === kind; })); }, []); %>
+      <% if (ordered.length) { %>
       <div class="cover-grid">
-        <% list.forEach(function (c) { var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
+        <% ordered.forEach(function (c) { var kind = c.kind; var l = c.lint || {}; var issues = (l.issues || []).length; var warns = (l.warnings || []).length; %>
         <figure class="cover-card <%= c.approved ? 'approved' : '' %>"<% if (postCount > 1) { %> data-dl-item data-id="<%= c.id %>" data-zip="k<%= c.id %>" data-href="/capas/<%= c.id %>/imagem?baixar=1" data-name="<%= epTag + '-' + c.kind.replace(/_/g, '-') + '-' + (c.position + 1) + '.jpg' %>" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %>>
           <% if (postCount > 1) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.label || KINDS[kind] %>"><% } %>
           <a href="/capas/<%= c.id %>/imagem" target="_blank" rel="noopener" data-dl-pick><img src="/capas/<%= c.id %>/imagem?v=<%= new Date(c.updated_at).getTime() %>&w=640" alt="<%= c.label || KINDS[kind] %>" loading="lazy" width="<%= c.width %>" height="<%= c.height %>"></a>
           <figcaption>
-            <span class="small"><%= c.label || '' %></span>
+            <span class="mono small muted cover-kind"><%= KINDS[kind] %></span>
+            <% if (c.label) { %><span class="small"><%= c.label %></span><% } %>
             <span class="row small">
               <% if (c.approved) { %><span class="badge b-green">aprovada</span><% } %>
               <% if (!c.auto) { %><span class="badge b-gray">editada</span><% } %>
-              <% if (issues) { %><span class="badge b-red" title="<%= (l.issues || []).join(' ') %>"><%= issues %> problema(s)</span><% } else if (warns) { %><span class="badge b-amber" title="<%= (l.warnings || []).join(' ') %>"><%= warns %> aviso(s)</span><% } else { %><span class="badge b-gray">conferida</span><% } %>
+              <% if (issues) { %><span class="badge b-red" title="<%= (l.issues || []).join(' ') %>"><%= fmt.plural(issues, 'problema', 'problemas') %></span><% } else if (warns) { %><span class="badge b-amber" title="<%= (l.warnings || []).join(' ') %>"><%= fmt.plural(warns, 'aviso', 'avisos') %></span><% } else { %><span class="badge b-gray">conferida</span><% } %>
               <span class="handle muted"><%= c.width %>×<%= c.height %> · <%= fmt.formatBytes(c.size_bytes) %></span>
             </span>
-            <span class="row">
-              <a class="btn sm" href="/capas/<%= c.id %>/imagem?baixar=1"><%- icon('download', 14) %> Baixar</a>
-              <% if (perm.cover) { %><a class="btn sm" href="/capas/<%= c.id %>/editar">Editar</a><% } %>
+            <span class="row cover-actions">
               <% if (perm.publish) { %>
-              <form method="post" action="/capas/<%= c.id %>/aprovar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="aprovar" value="<%= c.approved ? '0' : '1' %>"><button class="btn sm <%= c.approved ? '' : 'primary' %>" type="submit"><%= c.approved ? 'Tirar aprovação' : 'Aprovar' %></button></form>
+              <form method="post" action="/capas/<%= c.id %>/aprovar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="aprovar" value="<%= c.approved ? '0' : '1' %>"><button class="btn sm <%= c.approved ? 'ghost' : '' %>" type="submit"><%= c.approved ? 'Tirar aprovação' : 'Aprovar' %></button></form>
               <% } %>
-              <% if (perm.cover) { %><form method="post" action="/capas/<%= c.id %>/excluir" class="inline" data-confirm="Excluir esta imagem?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">excluir</button></form><% } %>
+              <% if (perm.cover) { %><a class="btn sm ghost" href="/capas/<%= c.id %>/editar">Editar</a><% } %>
+              <a class="icon-btn" href="/capas/<%= c.id %>/imagem?baixar=1" title="Baixar" aria-label="Baixar <%= c.label || KINDS[kind] %>" data-no-skeleton><%- icon('download', 14) %></a>
+              <% if (perm.cover) { %><form method="post" action="/capas/<%= c.id %>/excluir" class="inline push-right" data-confirm="Mandar esta imagem para a lixeira? Fica 15 dias lá e dá para restaurar."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn row-del" type="submit" title="Mandar para a lixeira" aria-label="Mandar para a lixeira"><%- icon('trash-2', 14) %></button></form><% } %>
             </span>
           </figcaption>
         </figure>
         <% }) %>
       </div>
-      <% }) %>
+      <% } %>
     </section>
     <% }) %>
   </div>
+  <% } %>
 
-  <div class="pane" id="pane-pedidos" data-pane-id="pedidos" hidden>
+  <% if (vista === 'pedidos') { %>
+  <div class="pane" id="pane-pedidos">
     <% var closed = requests.filter(function (r) { return openRequests.indexOf(r) < 0; }); %>
     <% if (!openRequests.length) { %>
     <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido em aberto.</strong></p><p class="muted small">Trailer do canal, vídeo avulso, um corte específico, post ou story: peça ao editor por aqui, com briefing e prazo. A entrega volta para você aprovar e já fica pronta no Social.</p><% if (perm.request) { %><p><button class="btn sm" type="button" data-modal-open="modal-pedido"><%- icon('plus', 14) %> Pedir conteúdo</button></p><% } %></div>
@@ -231,12 +246,20 @@
     </div>
     <form method="post" action="/conteudo/em-massa/pedidos" data-dl-form hidden><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value=""><input type="hidden" name="episodio" value="<%= only || '' %>"></form>
     <% } %>
-    <div class="req-list<%= reqPick ? ' top-gap' : '' %>">
+    <% var mineOf = function (r) { return String(r.assignee_id || '') === String(currentUser.id) || String(r.created_by) === String(currentUser.id); };
+       var reqCount = function (st) { return openRequests.filter(function (r) { return st === 'meus' ? mineOf(r) : r.status === st; }).length; }; %>
+    <% if (openRequests.length > 4) { %>
+    <div class="seg req-filter" role="group" aria-label="Filtrar pedidos" data-row-filter="req-open">
+      <button type="button" class="on" aria-pressed="true" data-value="">Todos <span class="mono"><%= openRequests.length %></span></button>
+      <% [['pedido', 'Na fila'], ['producao', 'Em produção'], ['revisao', 'Em revisão'], ['meus', 'Meus']].forEach(function (f) { var n = reqCount(f[0]); if (!n) return; %><button type="button" aria-pressed="false" data-value="<%= f[0] %>"><%= f[1] %> <span class="mono"><%= n %></span></button><% }) %>
+    </div>
+    <% } %>
+    <div class="req-list<%= reqPick ? ' top-gap' : '' %>" id="req-open">
       <% openRequests.forEach(function (r) { var late = isLate(r, today); var mayPick = reqPick && (perm.review || String(r.created_by) === String(currentUser.id)); %>
-      <div class="req-pick"<% if (mayPick) { %> data-dl-item data-id="<%= r.id %>"<% } %>>
+      <div class="req-pick" data-filter-value="<%= r.status %><%= mineOf(r) ? ' meus' : '' %>"<% if (mayPick) { %> data-dl-item data-id="<%= r.id %>"<% } %>>
       <% if (mayPick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= r.title %>"><% } %>
       <a class="req-row" href="/conteudo/pedidos/<%= r.id %>"<%- mayPick ? ' data-dl-pick' : '' %>>
-        <span><span class="ktype mono small muted"><%= K[r.kind].label %><%= r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '' %></span><br><strong><%= r.title %></strong>
+        <span><span class="ktype mono small muted"><%= K[r.kind].label %><%= r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '' %></span><br><strong><%= String(r.title).toLowerCase() === String(K[r.kind].label).toLowerCase() && r.episode_title ? r.episode_title : r.title %></strong>
           <span class="meta"><span><%- icon('user', 12) %><%= r.assignee_name || 'qualquer editor' %></span><% if (r.due_on) { %><span class="<%= late ? 'err' : '' %>"><%- icon('calendar', 12) %><%= dueShort(r.due_on) %><%= late ? ' · atrasado' : '' %></span><% } %><% if (r.rounds) { %><span><%= r.rounds %>ª volta</span><% } %></span></span>
         <span class="badge <%= { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao' }[r.status] %>"><%= S[r.status] %></span>
       </a>
@@ -255,6 +278,7 @@
     </details>
     <% } %>
   </div>
+  <% } %>
 </div>
 
 <% if (perm.request) { %><%- include('_request_form', { id: 'modal-pedido', r: null, preset: { kind: pedir, episode: only }, openOnLoad: Boolean(pedir) }) %><% } %>
@@ -262,7 +286,7 @@
 <dialog class="modal" id="modal-massa-cortes" aria-labelledby="mmc-h">
   <form method="post" action="/conteudo/em-massa/cortes" class="stack" data-busy="Atribuindo…">
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value="atribuir"><input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
-    <h2 id="mmc-h">Atribuir <span class="mono" data-dl-n>0</span> corte(s)</h2>
+    <h2 id="mmc-h">Atribuir <span class="mono" data-dl-n>0</span> <span data-dl-word="corte|cortes">cortes</span></h2>
     <label>Episódio
       <select name="episode_id" required>
         <option value="">Escolha…</option>
@@ -278,7 +302,7 @@
 <dialog class="modal modal-wide" id="modal-massa-publicar" aria-labelledby="mmpub-h">
   <form method="post" action="/conteudo/em-massa/publicar/previa" class="stack" data-remember="publicar-em-massa" data-remember-skip="_csrf,ids,inicio,episodio">
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
-    <h2 id="mmpub-h">Publicar <span class="mono" data-dl-n>0</span> corte(s)</h2>
+    <h2 id="mmpub-h">Publicar <span class="mono" data-dl-n>0</span> <span data-dl-word="corte|cortes">cortes</span></h2>
     <p class="small muted">Cada corte sai com o próprio título, legenda, capa escolhida e a chamada de cada rede, na ordem da lista. Antes de agendar, você confere a agenda.</p>
     <fieldset class="channels"><legend>Redes</legend>
       <% Object.keys(uploadPost.PLATFORMS).filter(function (k) { return uploadPost.PLATFORMS[k].clip; }).forEach(function (k) { %>
@@ -307,7 +331,7 @@
 <dialog class="modal" id="modal-capas-lote" aria-labelledby="mcl-h">
   <form method="get" action="/conteudo/capas-em-lote" class="stack">
     <input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
-    <h2 id="mcl-h">Capas de <span class="mono" data-dl-n>0</span> corte(s)</h2>
+    <h2 id="mcl-h">Capas de <span class="mono" data-dl-n>0</span> <span data-dl-word="corte|cortes">cortes</span></h2>
     <p class="small muted">Abre uma página com os cortes marcados, um por linha: escolha a capa de cada um e reescreva o texto, com a IA sugerindo para todos de uma vez.</p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Abrir as capas</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
@@ -317,7 +341,7 @@
 <dialog class="modal" id="modal-massa-pedidos" aria-labelledby="mmp-h">
   <form method="post" action="/conteudo/em-massa/pedidos" class="stack">
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="acao" value="alterar"><input type="hidden" name="episodio" value="<%= only || '' %>"><span data-dl-ids></span>
-    <h2 id="mmp-h">Mudar <span class="mono" data-dl-n>0</span> pedido(s)</h2>
+    <h2 id="mmp-h">Mudar <span class="mono" data-dl-n>0</span> <span data-dl-word="pedido|pedidos">pedidos</span></h2>
     <p class="small muted">Só muda o que você escolher; o resto fica como está em cada pedido.</p>
     <label>Responsável
       <select name="assignee_id">
@@ -344,7 +368,7 @@
     <p class="small muted">Selecione vários vídeos de uma vez (MP4, MOV, M4V, WebM ou MKV). Cada um recebe um nome interno (Corte 1, Corte 2…) que você pode trocar.<%= aiReady ? ' O sistema lê cada vídeo e sugere título, legenda e capas.' : ' A leitura por IA (fala, rostos, título e capas) não está completa neste servidor.' %> Para um pedido (trailer, vídeo avulso), envie pela página do pedido.</p>
     <div class="uploader" data-uploader data-base="/cortes/" data-csrf="<%= csrf %>" data-edited="0" data-mode="clip" data-where="Cortes" data-hash="cortes">
       <input type="file" multiple accept="video/*,.mp4,.mov,.m4v,.mkv,.webm" data-files>
-      <button class="btn primary" type="button" data-start><%- icon('upload') %> Enviar</button>
+      <button class="btn primary" type="button" data-start><%- icon('upload') %> Escolher os vídeos</button>
       <ul class="plain upload-queue" data-queue aria-live="polite"></ul>
       <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
     </div>

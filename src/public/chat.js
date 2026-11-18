@@ -44,6 +44,7 @@
   // ---------------------------------------------------------------- lista de conversas
   function paintConvs() {
     el.noconv.hidden = S.convs.length > 0;
+    if (el.pick) el.pick.classList.toggle('chat-pick-none', !S.convs.length); // sem conversa nenhuma: um estado vazio só (o da lista)
     el.convs.innerHTML = S.convs.map((c) => `<a class="chat-item${S.cur?.id === c.id ? ' on' : ''}${c.unread ? ' unread' : ''}" href="/mensagens/${c.id}" data-conv="${c.id}" data-no-skeleton>`
       + `<span class="avatar sm">${c.kind === 'group' ? ic('users') : esc(c.initials)}</span>`
       + `<span class="chat-item-main"><span class="chat-item-top"><strong>${esc(c.name)}</strong><time class="mono small muted">${c.last_at ? esc(when(c.last_at)) : ''}</time></span>`
@@ -410,7 +411,14 @@
     $('[data-chat-people]').innerHTML = team.length ? team.map((u) => `<li><button type="button" class="chat-person" data-person="${esc(u.id)}"><span class="avatar sm">${esc(u.ini)}</span> ${esc(u.name)}</button></li>`).join('') : '<li class="small muted">Ainda não há outras pessoas na equipe.</li>';
     $('[data-chat-group-people]').innerHTML = checks(team);
     $('[data-chat-group-form]').reset(); $('[data-chat-group-err]').hidden = true;
+    const find = $('[data-chat-people-find]'); if (find) { find.value = ''; find.hidden = team.length < 6; }
     setNewTab('pessoa'); dNew.showModal();
+  });
+  // busca na lista de pessoas (sem acento, sem maiúscula)
+  $('[data-chat-people-find]')?.addEventListener('input', (e) => {
+    const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const q = fold(e.target.value.trim());
+    $$('[data-chat-people] li', dNew).forEach((li) => { li.hidden = Boolean(q) && !fold(li.textContent).includes(q); });
   });
   function setNewTab(t) {
     $$('[data-chat-new-tab]', dNew).forEach((b) => b.classList.toggle('on', b.dataset.chatNewTab === t));
