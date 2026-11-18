@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.82.0', date: '2026-11-18', title: 'Material do patrocinador em pastas',
+    items: [
+      { kind: 'novo', text: 'Aba Material na página do patrocinador, a partir de Ganho (também em Ativo e Inativo). As pastas são Logos, Moldura, QR Code e Material da marca, como no material do episódio: abrir a pasta, ver a miniatura, baixar um arquivo ou Selecionar e Baixar tudo num ZIP.' },
+      { kind: 'novo', text: 'Enviar material: escolha ou arraste vários arquivos e diga a pasta de cada um. Eles sobem pela mesma fila dos episódios, em segundo plano e retomando de onde pararam; vídeo de inserção grande não trava a tela.' },
+      { kind: 'novo', text: 'Logos: cabem várias versões, e uma é a principal, a que aparece no media kit, no portal do patrocinador e no episódio patrocinado. A primeira logo vira a principal, e "usar como principal" troca.' },
+      { kind: 'novo', text: 'No episódio patrocinado, o link "Todo o material" leva o editor às pastas do patrocinador. O editor vê e baixa; quem edita patrocinadores envia, troca a logo principal e manda para a lixeira.' },
+      { kind: 'ajuste', text: 'Moldura e QR Code agora são enviados pela aba Material e continuam indo para o entregável e o portal. A logo que o patrocinador manda pelo formulário entra na pasta Logos e não apaga as versões da equipe.' },
+    ],
+  },
+  {
     version: '1.81.0', date: '2026-11-18', title: 'Início da produtora: o Seu dia',
     items: [
       { kind: 'novo', text: 'A produtora abre o Início no "Seu dia", com os números dela. O plano do dia mostra o que estava previsto e o que ela já fez: abordagens novas de patrocinadores e convites contra a meta diária, follow-ups de patrocinadores e de convidados marcados para o dia (e os atrasados de antes) e as tarefas do dia. O botão "Equipe" mostra o resumo da equipe.' },

@@ -144,7 +144,7 @@ async function renderBrief(res, sp, extra = {}) {
   const sponsor = sp.sponsor;
   const [brief, files] = await Promise.all([
     sponsorsSvc.loadBrief(sponsor.id),
-    db.query("SELECT id, kind, field, transcript FROM sponsor_files WHERE sponsor_id = $1 AND kind IN ('logo','audio') ORDER BY id DESC", [sponsor.id]),
+    db.query("SELECT id, kind, field, transcript FROM sponsor_files WHERE sponsor_id = $1 AND kind IN ('logo','audio') AND status = 'pronto' ORDER BY is_main DESC, id DESC", [sponsor.id]),
   ]);
   const logo = files.rows.find((f) => f.kind === 'logo') || null;
   const status = sponsorsSvc.briefState(brief, { hasLogo: Boolean(logo) });
@@ -270,7 +270,7 @@ router.get('/agenda/foto/:id', wrap(async (req, res) => {
 // ---- arquivos que o próprio patrocinador pode ver (logo, moldura, QR Code) ----
 router.get('/patrocinador/arquivo/:fid', withSession(), wrap(async (req, res) => {
   if (!/^\d{1,9}$/.test(req.params.fid)) return gone(res);
-  const { rows: [file] } = await db.query("SELECT * FROM sponsor_files WHERE id = $1 AND sponsor_id = $2 AND kind IN ('logo','moldura','qrcode')", [req.params.fid, req.sp.sponsor.id]);
+  const { rows: [file] } = await db.query("SELECT * FROM sponsor_files WHERE id = $1 AND sponsor_id = $2 AND kind IN ('logo','moldura','qrcode') AND status = 'pronto'", [req.params.fid, req.sp.sponsor.id]);
   if (!file) return gone(res);
   return sponsorsSvc.sendFile(res, file, { req });
 }));

@@ -75,6 +75,7 @@ function createApp() {
   app.use(require('./routes/guestPortal')); // portal do convidado: aba no cadastro e corte exclusivo
   app.use(require('./routes/guestImport')); // antes de guests: /convidados/importar não pode cair em /convidados/:id
   app.use(require('./routes/guests'));
+  app.use(require('./routes/sponsorMaterial')); // aba Material do patrocinador: envio em partes, logo principal, baixar
   app.use(require('./routes/sponsors'));
   app.use(require('./routes/bulkDownload')); // /baixar.zip: vários arquivos (episódio, cortes, posts) num ZIP só
   app.use(require('./routes/covers')); // /episodios/:id/capas/*: antes das rotas genéricas do episódio

@@ -133,6 +133,18 @@ const TOPICS = [
     ],
   },
   {
+    key: 'material-patrocinador', title: 'Material do patrocinador (logos, moldura, QR Code)', words: ['logo', 'logos', 'logomarca', 'marca', 'moldura', 'qr code', 'qrcode', 'material do patrocinador', 'material da marca', 'manual da marca', 'vídeo de inserção', 'video de insercao', 'logo principal', 'pasta do patrocinador'],
+    where: 'Página do patrocinador, aba Material (a partir de Ganho)', perm: 'sponsors.read',
+    steps: [
+      'A aba Material aparece quando o patrocinador está em Ganho, Ativo ou Inativo, com as pastas Logos, Moldura, QR Code e Material da marca.',
+      'Para enviar: Enviar material (ou arraste os arquivos para a aba), diga a pasta de cada um e confirme. Os arquivos sobem em segundo plano, como o material do episódio; dá para continuar usando o sistema.',
+      'Logos: a principal é a que aparece no media kit, no portal do patrocinador e no episódio patrocinado. A primeira enviada vira a principal; para trocar, use "usar como principal" na logo que quiser.',
+      'Moldura e QR Code enviados vão para o entregável e para o portal do patrocinador.',
+      'Para baixar: o botão Baixar de cada arquivo, ou Selecionar e Baixar tudo para um ZIP com vários.',
+      'O editor vê e baixa (no episódio patrocinado há o link "Todo o material"); enviar, trocar a principal e apagar é de quem edita patrocinadores.',
+    ],
+  },
+  {
     key: 'patrocinadores', title: 'Patrocinadores, planos e media kit', words: ['patrocinador', 'patrocinadores', 'patrocínio', 'cota', 'ouro', 'diamond', 'media kit', 'mediakit', 'portal', 'reunião', 'reuniões', 'meet', 'google meet', 'formulário', 'entregável', 'entregaveis', 'plano', 'planos', 'galeria', 'quem já sentou'],
     where: '/patrocinadores', perm: 'sponsors.write',
     steps: [

@@ -6,6 +6,7 @@ const config = require('../config');
 const sponsorsSvc = require('../services/sponsors');
 const guestRules = require('../services/guestRules');
 const { audit } = require('../services/audit');
+const material = require('../services/sponsorMaterial');
 const recordChanges = require('../services/recordChanges');
 const { requirePerm } = require('../middleware');
 const C = require('../constants');
@@ -98,7 +99,7 @@ router.get('/patrocinadores', requirePerm('sponsors.read'), wrap(async (req, res
     db.query(
       `SELECT s.id, s.company, s.kind, s.tier, s.value_cents, s.contact_name, s.stage, s.public_token, s.brief_completed_at, s.updated_at, s.owner_id, u.name AS owner_name,
               b.skipped AS b_skipped, b.na AS b_na, b.landing_url, b.landing_perk, b.offer, b.presentation, b.key_points, b.restrictions, b.slogan, b.goal, b.goal_other,
-              EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo') AS has_logo
+              EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo' AND f.status = 'pronto') AS has_logo
          FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id LEFT JOIN sponsor_briefs b ON b.sponsor_id = s.id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY s.updated_at DESC LIMIT 500`, params),
@@ -179,6 +180,7 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
     comments: thread, linkedTasks: linkedTasks.rows,
     meetings, meetingCtx: { team: team.rows, DURATIONS: meetingsSvc.DURATIONS, MODES: meetingsSvc.MODES, RESPONSES: meetingsSvc.RESPONSES, ready: config.googleMeetConfigured, inputValue: require('../utils/format').toInputValue },
     title: sponsor.company, sponsor, events: events.rows, brief, files: files.rows,
+    materialFolders: material.isOpen(sponsor) ? material.folders(await material.list(sponsor.id)) : [],
     hasLogo: files.rows.some((f) => f.kind === 'logo'),
     formState: sponsorsSvc.briefState(brief, { hasLogo: files.rows.some((f) => f.kind === 'logo') }), formQuestions: sponsorsSvc.BRIEF_QUESTIONS, deliverables, planInfo: await require('../services/plans').plans(),
     roleByEpisode: Object.fromEntries(linked.rows.map((r) => [r.episode_id, r.role])), episodes: episodes.rows, clicks,
@@ -429,7 +431,7 @@ router.post('/patrocinadores/:id/entregaveis', requirePerm('sponsors.write'), wr
     return res.redirect(back(sponsor.id, '#entregas'));
   }
   const { rows: [file] } = ['moldura', 'qr_code'].includes(d.kind)
-    ? await db.query("SELECT id FROM sponsor_files WHERE sponsor_id = $1 AND kind = $2 ORDER BY id DESC LIMIT 1", [sponsor.id, d.kind === 'qr_code' ? 'qrcode' : 'moldura'])
+    ? await db.query("SELECT id FROM sponsor_files WHERE sponsor_id = $1 AND kind = $2 AND status = 'pronto' ORDER BY id DESC LIMIT 1", [sponsor.id, d.kind === 'qr_code' ? 'qrcode' : 'moldura'])
     : { rows: [] };
   await db.query('INSERT INTO sponsor_deliverables (sponsor_id, kind, title, description, quantity, status, link_url, notes, file_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
     [sponsor.id, d.kind, d.title, d.description, d.quantity, d.status, d.link_url, d.notes, file?.id || null]);
@@ -512,7 +514,7 @@ router.get('/patrocinadores/:id/arquivos/:fid', requirePerm('sponsors.read'), wr
   if (!isIntId(req.params.id) || !isIntId(req.params.fid)) return notFound(res);
   const { rows: [file] } = await db.query('SELECT * FROM sponsor_files WHERE id = $1 AND sponsor_id = $2', [req.params.fid, req.params.id]);
   if (!file) return notFound(res);
-  return sponsorsSvc.sendFile(res, file, { inline: req.query.baixar !== '1', req });
+  return sponsorsSvc.sendFile(res, file, { inline: req.query.baixar !== '1', req, maxSide: req.query.w === '320' ? 320 : 2000 }); // ?w=320: a miniatura da pasta
 }));
 
 router.post('/patrocinadores/:id/arquivos/:fid/excluir', requirePerm('sponsors.write'), wrap(async (req, res) => {
@@ -522,7 +524,7 @@ router.post('/patrocinadores/:id/arquivos/:fid/excluir', requirePerm('sponsors.w
   const t = await require('../services/trash').remove('sponsor_file', file.id, { user: req.user });
   await req.flash('ok', 'Arquivo na lixeira.', t && { undo: t.batch });
   await sponsorsSvc.addEvent(file.sponsor_id, req.user.id, 'arquivo', `Arquivo removido: ${file.kind}${file.filename ? ` (${file.filename})` : ''}`);
-  res.redirect(back(file.sponsor_id, '#arquivos'));
+  res.redirect(back(file.sponsor_id, file.kind === 'audio' ? '#briefing' : '#material'));
 }));
 
 // ---- excluir ----

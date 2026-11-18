@@ -87,30 +87,46 @@
     audio: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'aif', 'aiff', 'ogg', 'opus', 'wma'],
     image: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'tif', 'tiff', 'dng', 'cr2', 'cr3', 'arw', 'nef', 'gif'],
   };
-  const GROUPS = {
-    bruto_video: { label: 'Vídeo do episódio', labelled: true, ph: 'Rótulo (ex.: Câmera 1)' },
-    bruto_audio: { label: 'Áudio', labelled: true, ph: 'Rótulo (ex.: Lapela do convidado)' },
-    bastidor: { label: 'Bastidores', labelled: false },
-    foto: { label: 'Fotografias', labelled: false },
-    outro: { label: 'Outro', labelled: true, ph: 'Rótulo (opcional)' },
+  // O material do episódio é o padrão. Outra tela (o material do patrocinador) passa as pastas dela no data-m-config da janela:
+  // { groups, types, bulk, order, guess (pasta inicial por extensão), where ("no patrocinador"), note }.
+  const EPISODE_MATERIAL = {
+    groups: {
+      bruto_video: { label: 'Vídeo do episódio', labelled: true, ph: 'Rótulo (ex.: Câmera 1)', one: 'vídeo do episódio', many: 'vídeos do episódio' },
+      bruto_audio: { label: 'Áudio', labelled: true, ph: 'Rótulo (ex.: Lapela do convidado)', one: 'áudio', many: 'áudios' },
+      bastidor: { label: 'Bastidores', labelled: false, one: 'arquivo de bastidores', many: 'arquivos de bastidores' },
+      foto: { label: 'Fotografias', labelled: false, one: 'fotografia', many: 'fotografias' },
+      outro: { label: 'Outro', labelled: true, ph: 'Rótulo (opcional)', one: 'outro', many: 'outros' },
+    },
+    types: [
+      { key: 'video', title: 'Vídeos', options: ['bruto_video', 'bastidor', 'outro'], listed: true },
+      { key: 'audio', title: 'Áudios', options: ['bruto_audio', 'outro'], listed: true },
+      { key: 'image', title: 'Imagens', options: ['foto', 'bastidor', 'outro'], listed: false },
+      { key: 'outro', title: 'Outros arquivos', options: ['outro'], listed: true },
+    ],
+    bulk: { video: ['bruto_video', 'bastidor'], image: ['foto', 'bastidor'] },
+    order: ['bruto_video', 'bruto_audio', 'foto', 'bastidor', 'outro'],
+    guess: {},
+    where: 'no episódio',
+    note: 'Rótulos são opcionais e só valem para vídeos e áudios do episódio; fotografias e bastidores entram em quantidade.',
   };
-  const TYPES = [
-    { key: 'video', title: 'Vídeos', options: ['bruto_video', 'bastidor', 'outro'], listed: true },
-    { key: 'audio', title: 'Áudios', options: ['bruto_audio', 'outro'], listed: true },
-    { key: 'image', title: 'Imagens', options: ['foto', 'bastidor', 'outro'], listed: false },
-    { key: 'outro', title: 'Outros arquivos', options: ['outro'], listed: true },
-  ];
-  const typeOf = (name) => {
-    const ext = (String(name).match(/\.([A-Za-z0-9]{1,6})$/) || [])[1]?.toLowerCase() || '';
-    return Object.keys(EXT).find((k) => EXT[k].includes(ext)) || 'outro';
+  const materialConfig = (dlg) => {
+    try {
+      const c = dlg.dataset.mConfig ? JSON.parse(dlg.dataset.mConfig) : null;
+      if (c && c.groups && Array.isArray(c.types)) return { ...EPISODE_MATERIAL, bulk: {}, guess: {}, note: '', ...c };
+    } catch { /* configuração ilegível: fica a do episódio */ }
+    return EPISODE_MATERIAL;
   };
-  const firstOption = (t) => TYPES.find((x) => x.key === t).options[0];
+  const extOf = (name) => (String(name).match(/\.([A-Za-z0-9]{1,6})$/) || [])[1]?.toLowerCase() || '';
+  const typeOf = (name) => Object.keys(EXT).find((k) => EXT[k].includes(extOf(name))) || 'outro';
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
   document.querySelectorAll('[data-material]').forEach((box) => {
     const picker = box.querySelector('[data-material-files]');
     const dlg = document.querySelector('[data-material-dialog]');
     if (!picker || !dlg) return;
+    const M = materialConfig(dlg);
+    const GROUPS = M.groups; const TYPES = M.types;
+    const firstOption = (t, name) => { const opts = TYPES.find((x) => x.key === t).options; const g = M.guess[extOf(name)]; return g && opts.includes(g) ? g : opts[0]; };
     const sections = dlg.querySelector('[data-m-sections]');
     const summary = dlg.querySelector('[data-m-summary]');
     const sendBtn = dlg.querySelector('[data-m-send]');
@@ -148,10 +164,10 @@
     async function addFiles(list) {
       const seen = new Set(rows.map((r) => key(r.file)));
       const fresh = [];
-      [...list].forEach((f) => { if (f.size > 0 && !seen.has(key(f))) { seen.add(key(f)); const type = typeOf(f.name); fresh.push({ file: f, type, group: firstOption(type), label: '' }); } });
+      [...list].forEach((f) => { if (f.size > 0 && !seen.has(key(f))) { seen.add(key(f)); const type = typeOf(f.name); fresh.push({ file: f, type, group: firstOption(type, f.name), label: '' }); } });
       if (!fresh.length && !rows.length) return;
       rows.push(...fresh);
-      if (!dlg.open) { summary.textContent = 'Conferindo o que já está no episódio…'; sections.replaceChildren(); sendBtn.disabled = true; dlg.showModal(); }
+      if (!dlg.open) { summary.textContent = `Conferindo o que já está ${M.where}…`; sections.replaceChildren(); sendBtn.disabled = true; dlg.showModal(); }
       await loadExisting();
       classify();
       // quem já existe completo herda o tipo e o rótulo de lá (substituir mantém o arquivo no mesmo lugar)
@@ -207,7 +223,7 @@
       const sec = document.createElement('section'); sec.className = 'msec mdup';
       if (dups.length) {
         const head = document.createElement('div'); head.className = 'msec-head';
-        const h = document.createElement('strong'); h.textContent = dups.length === 1 ? 'Já existe no episódio' : 'Já existem no episódio';
+        const h = document.createElement('strong'); h.textContent = dups.length === 1 ? `Já existe ${M.where}` : `Já existem ${M.where}`;
         const meta = document.createElement('span'); meta.className = 'mono small muted'; meta.textContent = `${dups.length} · ${fmtBytes(dups.reduce((n, r) => n + r.file.size, 0))}`;
         head.append(h, meta); sec.appendChild(head);
         const p = document.createElement('p'); p.className = 'small muted m-0';
@@ -261,7 +277,7 @@
         const h = document.createElement('strong'); h.textContent = t.title;
         const meta = document.createElement('span'); meta.className = 'mono small muted'; meta.textContent = `${mine.length} · ${fmtBytes(mine.reduce((n, r) => n + r.file.size, 0))}`;
         head.append(h, meta);
-        const bulkOpts = t.key === 'video' ? ['bruto_video', 'bastidor'] : (t.key === 'image' ? ['foto', 'bastidor'] : null);
+        const bulkOpts = M.bulk[t.key] || null;
         if (bulkOpts && (mine.length > 1 || !t.listed)) { const w = document.createElement('label'); w.className = 'msec-bulk small muted'; w.append(mine.length > 1 ? 'Todos como ' : 'Enviar como ', bulkSelect(t, bulkOpts)); head.appendChild(w); }
         sec.appendChild(head);
         const list = document.createElement('ul'); list.className = 'plain mlist';
@@ -276,13 +292,8 @@
       const by = {};
       const sending = rows.filter(goes);
       sending.forEach((r) => { by[r.group] = (by[r.group] || 0) + 1; });
-      const parts = [];
-      if (by.bruto_video) parts.push(plural(by.bruto_video, 'vídeo do episódio', 'vídeos do episódio'));
-      if (by.bruto_audio) parts.push(plural(by.bruto_audio, 'áudio', 'áudios'));
-      if (by.foto) parts.push(plural(by.foto, 'fotografia', 'fotografias'));
-      if (by.bastidor) parts.push(plural(by.bastidor, 'arquivo de bastidores', 'arquivos de bastidores'));
-      if (by.outro) parts.push(plural(by.outro, 'outro', 'outros'));
-      summary.textContent = sending.length ? `${parts.join(' · ')} · ${fmtBytes(total())}. Rótulos são opcionais e só valem para vídeos e áudios do episódio; fotografias e bastidores entram em quantidade.` : 'Nada novo para enviar: tudo o que você escolheu já está no episódio.';
+      const parts = M.order.filter((k) => by[k]).map((k) => plural(by[k], GROUPS[k].one, GROUPS[k].many));
+      summary.textContent = sending.length ? `${parts.join(' · ')} · ${fmtBytes(total())}.${M.note ? ` ${M.note}` : ''}` : `Nada novo para enviar: tudo o que você escolheu já está ${M.where}.`;
       sendBtn.disabled = !sending.length;
       sendBtn.textContent = sending.length ? `Enviar ${plural(sending.length, 'arquivo', 'arquivos')}` : 'Nada para enviar';
     }

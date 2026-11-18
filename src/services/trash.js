@@ -32,7 +32,7 @@ const KINDS = {
   cover: { table: 'episode_covers', label: 'Imagem', title: (r) => r.label || COVER_KINDS[r.kind] || 'Imagem', url: (r) => (r.request_id ? `/conteudo/pedidos/${r.request_id}` : r.clip_id ? `/cortes/${r.clip_id}` : '/conteudo?vista=posts') },
   request: { table: 'content_requests', label: 'Pedido de conteúdo', title: (r) => r.title, url: (r) => `/conteudo/pedidos/${r.id}` },
   episode_file: { table: 'episode_files', label: 'Arquivo do episódio', title: (r) => r.filename, url: (r) => `/episodios/${r.episode_id}#material` },
-  sponsor_file: { table: 'sponsor_files', label: 'Arquivo do patrocinador', title: (r) => r.filename || r.kind, url: (r) => `/patrocinadores/${r.sponsor_id}#arquivos` },
+  sponsor_file: { table: 'sponsor_files', label: 'Arquivo do patrocinador', title: (r) => r.filename || r.kind, url: (r) => `/patrocinadores/${r.sponsor_id}#material` },
   fin_entry: { table: 'fin_entries', label: 'Lançamento', title: (r) => r.description, url: () => '/financeiro/lancamentos' },
 };
 // Para a mensagem de quando algo de que o item depende não existe mais.

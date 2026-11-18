@@ -1,5 +1,6 @@
 // Baixar vários de uma vez num ZIP só (baixar.js): material e galeria do episódio, posts e cortes do Conteúdo.
-// /baixar.zip?itens=f12,f13,c5,k9&nome=ep012-bastidores — f = arquivo do episódio, c = corte, k = capa/post.
+// /baixar.zip?itens=f12,f13,c5,k9,s4&nome=ep012-bastidores — f = arquivo do episódio, c = corte, k = capa/post, s = material do
+// patrocinador (só para quem vê patrocinadores).
 // O ZIP é montado enquanto baixa: cada arquivo sai do Backblaze aos pedaços e vai direto para a resposta (nada fica no disco nem
 // inteiro na memória), sem compressão (vídeo e foto já vêm comprimidos). Antes de começar, um HEAD em cada arquivo dá o tamanho
 // exato, e o ZIP sai com Content-Length: o navegador mostra o andamento e o tempo que falta.
@@ -9,6 +10,7 @@ const b2 = require('../services/b2');
 const fmt = require('../utils/format');
 const { zipStream, zipLength, uniqueNames } = require('../utils/zipStream');
 const { requirePerm } = require('../middleware');
+const { can } = require('../permissions');
 const { wrap } = require('../utils/wrap');
 
 const router = express.Router();
@@ -20,7 +22,7 @@ const coverName = (c) => `${c.number ? `ep${String(c.number).padStart(3, '0')}` 
 function parseItems(raw) {
   const seen = new Set(); const out = [];
   for (const t of String(raw || '').split(',')) {
-    const m = t.trim().match(/^([fck])([1-9]\d{0,9})$/);
+    const m = t.trim().match(/^([fcks])([1-9]\d{0,9})$/);
     if (m && !seen.has(m[0])) { seen.add(m[0]); out.push({ type: m[1], id: Number(m[2]) }); }
   }
   return out.slice(0, MAX_ITEMS);
@@ -29,15 +31,17 @@ function parseItems(raw) {
 // Itens pedidos que existem e estão prontos, na ordem do pedido: { name, key, when }.
 async function resolve(items) {
   const ids = (type) => items.filter((i) => i.type === type).map((i) => i.id);
-  const [files, clips, covers] = await Promise.all([
+  const [files, clips, covers, sponsorFiles] = await Promise.all([
     db.query("SELECT id, filename, storage_key, created_at FROM episode_files WHERE id = ANY($1::int[]) AND status = 'pronto'", [ids('f')]),
     db.query("SELECT id, title, storage_key, created_at FROM episode_clips WHERE id = ANY($1::int[]) AND storage_key IS NOT NULL AND status <> 'enviando'", [ids('c')]),
     db.query('SELECT c.id, c.kind, c.position, c.clip_id, c.storage_key, c.updated_at, e.number FROM episode_covers c LEFT JOIN episodes e ON e.id = c.episode_id WHERE c.id = ANY($1::int[]) AND c.storage_key IS NOT NULL', [ids('k')]),
+    db.query("SELECT id, filename, storage_key, created_at FROM sponsor_files WHERE id = ANY($1::int[]) AND status = 'pronto' AND kind <> 'audio'", [ids('s')]),
   ]);
   const by = {
     f: new Map(files.rows.map((r) => [r.id, { name: r.filename, key: r.storage_key, when: r.created_at }])),
     c: new Map(clips.rows.map((r) => [r.id, { name: `${fmt.slugify(r.title) || `corte-${r.id}`}.mp4`, key: r.storage_key, when: r.created_at }])),
     k: new Map(covers.rows.map((r) => [r.id, { name: coverName(r), key: r.storage_key, when: r.updated_at }])),
+    s: new Map(sponsorFiles.rows.map((r) => [r.id, { name: r.filename || `arquivo-${r.id}`, key: r.storage_key, when: r.created_at }])),
   };
   return items.map((i) => by[i.type].get(i.id)).filter(Boolean);
 }
@@ -56,7 +60,7 @@ async function withSizes(list) {
 }
 
 router.get('/baixar.zip', requirePerm('episodes.read'), wrap(async (req, res) => {
-  const items = parseItems(req.query.itens);
+  const items = parseItems(req.query.itens).filter((i) => i.type !== 's' || can(req.user.role, 'sponsors.read'));
   const list = items.length ? await withSizes(await resolve(items)) : [];
   if (!list.length) return res.status(404).render('error', { title: 'Nada para baixar', message: 'Os arquivos marcados não estão mais disponíveis.' });
   const names = uniqueNames(list.map((f) => f.name));

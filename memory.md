@@ -89,6 +89,13 @@
   `today-producer.ejs`, `producer-agenda.ejs`, `day-nav.ejs` (setas + `.seg` Seu dia | Equipe, `?visao=equipe`), `loss-reasons.ejs`
   (também no Resumo do dia da equipe). `misc.js`: `isProducer` (role `produtora`) decide. Meta `abordagens_patrocinadores` = só a
   primeira abordagem do ciclo (`SPONSOR_SENDS`, também no relatório da Cadência).
+- **Material do patrocinador (1.82.0, 2026-11-18)**: aba Material (Ganho/Ativo/Inativo) com pastas Logos, Moldura, QR Code e
+  Material da marca (`services/sponsorMaterial.js`, `routes/sponsorMaterial.js`, `views/sponsors/_material.ejs`). Envio pela fila
+  `uploads.js` com o mesmo contrato dos episódios (`/patrocinadores/:id/material/iniciar|:fid/urls|parte|partes|concluir|cancelar`,
+  `existentes`), partes em `sponsor_file_parts` (migração 082: `sponsor_files.status`, `part_size`, `upload_id`, `uploaded_by`,
+  `is_main`…); a janela de triagem (`producao.js`) lê as pastas de `data-m-config` (o episódio é o padrão). Logo principal =
+  `is_main` (sem marcada, a mais nova), usada no media kit, portal e episódio. Baixar = link assinado (`/arquivos/:fid/baixar`);
+  ZIP = `/baixar.zip` item `s`. A rota antiga `POST /patrocinadores/:id/arquivo` (corpo cru, até 12 MB) continua para os testes/API.
 - **Página pós-gravação (1.79.0)**: `/pos-gravacao` (`routes/postRecording.js`, `views/portal/pos-gravacao.ejs`, `pp-*` em
   `portal.css`), pública, a mesma para todos, noindex, CSP só `'self'`, sem script. WhatsApp = produção (`contacts.waUrl('producao',
   'posgravacao', '')`, mensagem nova `whatsapp_msg_posgravacao`, sem {nome}). Link em Gestão > WhatsApp dos convites. O QR Code do
@@ -180,6 +187,8 @@
 - **Busca global** (`services/search.js`): módulo novo declara ação e provedor (`ACTIONS`/`PROVIDERS`, com `tables`) e busca com `find()`/`match()` (sem acento, sem caixa, por palavras em qualquer ordem). Tabela sem provedor aparece sozinha como sugestão em Gestão > Busca global.
 
 ## Últimas Decisões
+
+- **Material do patrocinador (v1.82.0, 2026-11-18)**: o dono pediu subir as logos (antes só havia moldura e QR Code, e a logo só vinha do formulário do patrocinador) num "sisteminha de pasta" como o dos episódios, visível só em Ganho, Ativo ou encerrado. Aprovado: pastas Logos, Moldura, QR Code e Material da marca ("bastam"); o editor vê e baixa. Decisões: reaproveitar a fila de envios e a janela de triagem dos episódios (configurável), em vez de subir pelo corpo cru de 12 MB (vídeo de inserção não caberia); logo principal com `is_main` (a primeira vira principal; o formulário do patrocinador troca só a logo que ele mesmo mandou, por `from_sponsor`); moldura e QR Code continuam ligados ao entregável (o mais novo); pastas vazias aparecem apagadas; o cartão "Arquivos" e a janela antiga de envio saíram de Entregas (fica uma linha apontando para a aba). Publicado junto com a autorização dele ("assim que terminar, já pode publicar").
 
 - **Início da produtora / Seu dia (v1.81.0, 2026-11-18)**: o dono pediu uma versão do painel para a produtora (meta, abordagens de patrocinadores x meta, follow-ups marcados para hoje x feitos, tarefas, reuniões; convidados: follow-ups, convites x meta, aceitos e perdidos por dia, principais motivos de perda; os motivos também no Início do superadmin) e aprovou a prévia (imagens em `docs/previas/inicio-produtora/`, fora do git) com as regras: **follow-up previsto = só o marcado para o dia** (os atrasados de antes aparecem à parte, sem entrar no "de N"); **abordagem de patrocinador = só a primeira** (abordagem nova; follow-up não conta) — por isso a métrica `abordagens_patrocinadores` mudou para `firsts` (Metas, Cadência "Por pessoa" e o Início), rótulo "Abordagens novas de patrocinadores". Decisões minhas: feito = contato no dia OU saiu da etapa (respondeu/avançou/perdido não fica como pendência); conta os dela e os sem responsável (como o cartão Hoje); metas diárias de abordagens e convites viram o "de N · meta" do plano, as outras vão para "Minhas metas"; meta diária não vale no fim de semana; Quentes = kit_visto/clique 'quero' (patrocinador em prospecção, negociação ou perdido, sem abordagem nem reunião criada depois) e convite_visto (convidado em convite enviado, sem abordagem depois), 48 h; aceitos sem data = Em agendamento (média de dias desde `stage_entered_at`); motivos de perda = entrou em Perdido na janela e ainda estava lá no fim dela, pelo `loss_reason` atual. Em produção o dono criou as metas dela (abordagens 10/dia; reuniões 4/semana); a de convites não estava lá quando conferi.
 

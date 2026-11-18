@@ -1377,6 +1377,19 @@ body:has([data-dl].selecting) .assist-fab { display: none; } /* com a seleção 
 .mrow-tag { margin-right: 6px; vertical-align: 1px; font-size: 10px; }
 .stalled-note { display: grid; gap: 4px; margin-top: 14px; padding: 10px 12px; border-left: 2px solid var(--bad); background: var(--bad-bg); border-radius: 0 var(--r-field) var(--r-field) 0; }
 .stalled-note .m-0 { margin: 0; } .stalled-note form { justify-self: start; margin-top: 2px; }
+/* Material do patrocinador (aba Material): as mesmas pastas do material do episódio; pasta vazia aparece apagada (é onde se vê o que
+   falta). Cada arquivo: miniatura (imagem sobre xadrez neutro, para logo branca ou preta aparecer) ou o ícone da pasta, o nome em
+   mono, os chips (principal, patrocinador, enviando) e as ações à direita. */
+.folder.is-empty { opacity: .6; } .folder.is-empty:hover { opacity: .85; }
+.folder-hint { margin: 8px 0 2px; }
+.mfiles .mfile { justify-content: flex-start; } .folder-panel .mfiles .mfile > .mfile-thumb { flex: 0 0 auto; } /* não estica depois da caixa de marcar */
+.mfile-thumb { flex: 0 0 auto; width: 56px; height: 40px; object-fit: contain; border: 1px solid var(--line); border-radius: var(--r-tag);
+  background: repeating-conic-gradient(var(--raised) 0 25%, var(--surface) 0 50%) 50% / 10px 10px; }
+.mfile-ic { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); background: var(--raised); }
+.mfile-info { flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.mfile-info .mono { overflow-wrap: anywhere; } .mfile-info .badge { gap: 4px; }
+.mfile-actions { align-items: center; gap: 8px; }
+@media (max-width: 640px) { .mfile-actions { width: 100%; justify-content: flex-end; } }
 .upl-alert { margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line); border-left: 2px solid var(--bad); background: var(--bad-bg); color: var(--text); line-height: 1.45; }
 .upl-foot { display: flex; justify-content: flex-end; gap: 14px; }
 

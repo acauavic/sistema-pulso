@@ -104,9 +104,10 @@
             <div class="sponsor-box">
               <strong><%= s.company %></strong>
               <ul class="plain small asset-links">
-                <% if (s.logo) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.logo.id %>?baixar=1"><%- icon('arrow-right', 14) %> Logo (PNG)</a></li><% } %>
+                <% if (s.logo) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.logo.id %>?baixar=1"><%- icon('arrow-right', 14) %> Logo principal</a></li><% } %>
                 <% if (s.moldura) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.moldura.id %>?baixar=1"><%- icon('arrow-right', 14) %> Moldura</a></li><% } else { %><li class="muted">Moldura ainda não enviada</li><% } %>
                 <% if (s.qrcode) { %><li><a href="/patrocinadores/<%= s.id %>/arquivos/<%= s.qrcode.id %>?baixar=1"><%- icon('arrow-right', 14) %> QR Code</a><%= s.qr_link ? ' → ' + s.qr_link : '' %></li><% } else { %><li class="muted">QR Code ainda não enviado</li><% } %>
+                <% if (can('sponsors.read')) { %><li><a href="/patrocinadores/<%= s.id %>#material"><%- icon('folder', 14) %> Todo o material (logos, moldura, QR Code e material da marca)</a></li><% } %>
               </ul>
               <% if (s.slogan) { %><p class="small"><span class="muted">Slogan:</span> <%= s.slogan %></p><% } %>
               <% if (s.offer) { %><p class="small pre"><span class="muted">Oferta:</span> <%= s.offer %></p><% } %>
