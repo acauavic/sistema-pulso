@@ -14,11 +14,14 @@ const router = express.Router();
 // veiculação), os episódios dele que já saíram da edição e as tarefas dele. Nada de convidados, patrocinadores ou financeiro.
 async function editorHome(req, res) {
   const me = req.user.id;
-  const [order, { rows: mine }, { rows: tasks }] = await Promise.all([
+  const goalsSvc = require('../services/goals');
+  const [order, { rows: mine }, { rows: tasks }, rhythm, myGoals] = await Promise.all([
     require('../services/editOrder').list(),
     db.query(`SELECT id, number, title, status, review_round FROM episodes WHERE editor_id = $1 AND status IN ('em_revisao', 'em_finalizacao', 'pronto_publicar')
                ORDER BY CASE status WHEN 'em_revisao' THEN 0 ELSE 1 END, number DESC NULLS LAST`, [me]),
     db.query("SELECT id, title, status, due_on, to_char(due_time, 'HH24:MI') AS due_time FROM tasks WHERE assignee_id = $1 AND status <> 'feito' ORDER BY due_on NULLS LAST, due_time NULLS LAST, id LIMIT 8", [me]),
+    goalsSvc.rhythmFor(me), // Seu ritmo: cortes e revisões de hoje e da semana, entregas da semana, próxima entrega
+    goalsSvc.progressFor(me), // Minhas metas (Gestão > Metas)
   ]);
   const queue = order.filter((e) => e.status === 'disponivel_edicao');
   const inEdit = order.filter((e) => e.status === 'em_edicao' && e.editor_id === me);
@@ -28,7 +31,7 @@ async function editorHome(req, res) {
     `SELECT id, kind, title, status, due_on, rounds, assignee_id FROM content_requests
       WHERE status IN ('pedido','producao','revisao') AND (assignee_id = $1 OR (assignee_id IS NULL AND status = 'pedido'))
       ORDER BY CASE WHEN status = 'producao' AND rounds > 0 THEN 0 WHEN status = 'producao' THEN 1 WHEN status = 'pedido' THEN 2 ELSE 3 END, due_on NULLS LAST, id`, [me]);
-  res.render('dashboard-editor', { requests, requestKinds: require('../services/contentRequests').KINDS, title: 'Início', order, queue, inEditCount: inEdit.length, mine, tasks: tasks.map((t) => ({ ...t, late: require('../services/tasks').isLate(t) })), adjustCount: adjust.length, today: require('../services/calendar').todayISO(), EPISODE_STATUSES: require('../constants').EPISODE_STATUSES });
+  res.render('dashboard-editor', { requests, requestKinds: require('../services/contentRequests').KINDS, title: 'Início', order, queue, inEditCount: inEdit.length, mine, rhythm, myGoals, tasks: tasks.map((t) => ({ ...t, late: require('../services/tasks').isLate(t) })), adjustCount: adjust.length, today: require('../services/calendar').todayISO(), EPISODE_STATUSES: require('../constants').EPISODE_STATUSES });
 }
 
 router.get('/', wrap(async (req, res) => {
@@ -46,6 +49,8 @@ router.get('/', wrap(async (req, res) => {
   const day = await daySummary.pick(req.query.dia);
   const pDay = daySummary.summary(day.day, { isToday: day.isToday });
   pDay.catch(() => {}); // se outra consulta falhar antes, esta não vira rejeição solta (o erro dela aparece no await abaixo)
+  const pGoals = require('../services/goals').progressFor(req.user.id); // Minhas metas (Gestão > Metas), no cartão Hoje
+  pGoals.catch(() => {});
   const [upcoming, recent, mine] = await Promise.all([
     db.query(`SELECT id, name, topic, proposed_at FROM guests
                WHERE status = 'agendado' AND proposed_at >= now() ORDER BY proposed_at LIMIT 6`),
@@ -63,7 +68,7 @@ router.get('/', wrap(async (req, res) => {
   if (outToday) outToday.items = outToday.items.map((x) => ({ ...x, d: outreach.describe(x) }));
   res.render('dashboard', {
     money, outToday, CHANNELS: outreach.CHANNELS, outBase: (k) => outreach.KINDS[k].base,
-    title: 'Início', day, ds: await pDay,
+    title: 'Início', day, ds: await pDay, myGoals: await pGoals,
     upcoming: upcoming.rows, recent: recent.rows, myOpen: mine.rows[0].n,
   });
 }));

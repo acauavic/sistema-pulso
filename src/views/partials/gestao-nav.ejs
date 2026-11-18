@@ -1,10 +1,11 @@
 <%# Painel de gestão em dois níveis: grupos (linha de cima) e abas do grupo (linha de baixo). Variável: active (chave da aba). %>
 <%
-  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage', 'trash.manage'];
+  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage', 'trash.manage', 'goals.manage'];
   var groups = [
     { label: 'Visão geral', tabs: [['geral', '/gestao', 'Visão geral', ANY]] },
     { label: 'Equipe', tabs: [
       ['usuarios', '/usuarios', 'Usuários', ['users.read']],
+      ['metas', '/gestao/metas', 'Metas', ['goals.manage']],
       ['logs', '/auditoria', 'Logs', ['audit.read']],
     ] },
     { label: 'Operação', tabs: [

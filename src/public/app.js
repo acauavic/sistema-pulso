@@ -362,6 +362,36 @@
     if (target && target !== days.find(shown)) target.scrollIntoView({ block: 'start' });
   })();
   document.querySelectorAll('[data-autosubmit]').forEach((s) => s.addEventListener('change', () => s.form.submit()));
+  // Gestão > Metas (janela de cada pessoa): a categoria filtra "o que contar"; taxa (%) aparece sempre em porcentagem (o campo
+  // trava e o servidor também garante); "Adicionar meta" mostra a próxima linha; "tirar" esvazia a linha (salvar apaga a meta).
+  document.querySelectorAll('[data-goal-form]').forEach((form) => {
+    form.querySelectorAll('[data-goal-slot]').forEach((slot) => {
+      const cat = slot.querySelector('[data-goal-cat]'); const metric = slot.querySelector('[data-goal-metric]');
+      const display = slot.querySelector('[data-goal-display]'); const target = slot.querySelector('[data-goal-target]');
+      if (!cat || !metric) return;
+      const all = [...metric.options].map((o) => ({ value: o.value, text: o.textContent, cat: o.dataset.cat || '', rate: o.dataset.rate === '1' }));
+      const sync = () => {
+        const rate = Boolean(all.find((o) => o.value === metric.value && o.rate));
+        if (display) { if (rate) display.value = 'porcentagem'; display.disabled = rate; }
+        if (target) { target.max = rate ? '100' : ''; target.placeholder = rate ? 'ex.: 40 (%)' : 'ex.: 20'; }
+      };
+      const fill = () => {
+        const keep = metric.value;
+        metric.replaceChildren(...all.filter((o) => !o.value || !cat.value || o.cat === cat.value).map((o) => { const el = new Option(o.text, o.value); el.dataset.cat = o.cat; if (o.rate) el.dataset.rate = '1'; return el; }));
+        metric.value = [...metric.options].some((o) => o.value === keep) ? keep : '';
+        sync();
+      };
+      cat.addEventListener('change', fill); metric.addEventListener('change', sync);
+      fill();
+      slot.querySelector('[data-goal-clear]')?.addEventListener('click', () => { cat.value = ''; fill(); metric.value = ''; if (target) target.value = ''; sync(); });
+    });
+    const add = form.querySelector('[data-goal-add]');
+    add?.addEventListener('click', () => {
+      const next = form.querySelector('[data-goal-slot][hidden]');
+      if (next) { next.hidden = false; next.querySelector('select')?.focus(); }
+      add.hidden = !form.querySelector('[data-goal-slot][hidden]');
+    });
+  });
   // Resumo do dia (Início): escolher no calendário leva direto ao dia; digitando, espera terminar (cada número já forma uma data
   // válida e mandaria a página no meio da digitação). Enter vai na hora.
   document.querySelectorAll('[data-day-pick]').forEach((inp) => {

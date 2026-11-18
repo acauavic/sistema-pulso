@@ -1,7 +1,6 @@
 <%- include('partials/head') %>
 <%
   var epNo = function (e) { return e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'Episódio'; };
-  var inReview = mine.filter(function (e) { return e.status === 'em_revisao'; }).length;
 %>
 <header class="hello">
   <span class="kicker"><%= fmt.todayLabel() %> · <%= podcastName %></span>
@@ -10,11 +9,44 @@
 </header>
 <%- include('partials/app-card') %>
 
-<section class="stat-grid" aria-label="Produção">
-  <a class="stat" href="/episodios?view=lista"><span class="stat-label">Na fila</span><span class="stat-n <%= queue.length ? 'hl' : '' %>"><%= queue.length %></span></a>
-  <a class="stat" href="/episodios?view=lista&editor=eu"><span class="stat-label">Em edição</span><span class="stat-n"><%= inEditCount %></span></a>
-  <a class="stat" href="/episodios?view=lista&editor=eu"><span class="stat-label">Ajustes pedidos</span><span class="stat-n <%= adjustCount ? 'hl-bad' : '' %>"><%= adjustCount %></span></a>
-  <a class="stat" href="/episodios?view=lista&editor=eu"><span class="stat-label">Em revisão</span><span class="stat-n"><%= inReview %></span></a>
+<% var r = rhythm, epNoShort = function (e) { return e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'Episódio'; }; var again = r.deliveries.filter(function (d) { return d.again; }).length; %>
+<section class="day-sum rhythm" aria-labelledby="ritmo-h">
+  <div class="day-sum-head"><h2 id="ritmo-h">Seu ritmo <span class="day-when">HOJE E ESTA SEMANA</span></h2></div>
+  <div class="day-panel">
+    <section class="day-band" aria-label="Números de hoje e da semana">
+      <div class="day-cells c4">
+        <a class="day-cell <%= r.clipsToday ? '' : 'is-zero' %>" href="/conteudo?vista=cortes">
+          <span class="day-l">Cortes subidos hoje</span><span class="day-n"><%= r.clipsToday %></span>
+          <span class="day-sub"><b><%= r.clipsWeek %></b> na semana</span>
+        </a>
+        <a class="day-cell <%= r.revToday ? '' : 'is-zero' %>" href="/conteudo?vista=cortes">
+          <span class="day-l">Revisões de corte hoje</span><span class="day-n"><%= r.revToday %></span>
+          <span class="day-sub"><b><%= r.revWeek %></b> na semana</span>
+        </a>
+        <a class="day-cell <%= r.deliveries.length ? '' : 'is-zero' %>" href="/episodios?view=lista&editor=eu">
+          <span class="day-l">Episódios entregues na semana</span><span class="day-n"><%= r.deliveries.length %></span>
+          <span class="day-sub"><% if (r.deliveries.length) { %><%= r.deliveries.map(function (d) { return epNoShort(d); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(' · ') %><%= again ? ' · ' + again + ' com ajustes feitos' : '' %><% } else { %>enviados para revisão<% } %></span>
+        </a>
+        <% if (r.next) { %>
+        <a class="day-cell" href="/episodios/<%= r.next.id %>">
+          <span class="day-l">Próxima entrega</span><span class="day-n day-n-text"><%= epNoShort(r.next) %></span>
+          <span class="day-sub air-<%= r.next.air.tone || 'ok' %>"><%= r.next.air.line %></span>
+        </a>
+        <% } else { %>
+        <div class="day-cell is-zero">
+          <span class="day-l">Próxima entrega</span><span class="day-n day-n-text">—</span>
+          <span class="day-sub">nada na ordem de edição</span>
+        </div>
+        <% } %>
+      </div>
+    </section>
+    <% if (myGoals.length) { %>
+    <section class="day-band" aria-labelledby="metas-h">
+      <div class="day-band-head"><h3 class="day-band-t" id="metas-h">Minhas metas</h3></div>
+      <div class="rhythm-goals"><%- include('partials/goals-list', { list: myGoals }) %></div>
+    </section>
+    <% } %>
+  </div>
 </section>
 
 <div class="grid-2 tight">

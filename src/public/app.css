@@ -299,6 +299,30 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; grid-template
 .order-note { margin: 8px 0 0; color: var(--muted); }
 .air-ok, .air-none { color: var(--muted); } .air-soon { color: var(--st-edicao-fg); } .air-late { color: var(--st-cancelado-fg); }
 @media (max-width: 640px) { .edit-order li { grid-template-columns: 32px minmax(0, 1fr); row-gap: 6px; } .edit-order li > .badge { grid-column: 2; justify-self: start; } }
+/* Metas (Início, Seu ritmo e Gestão > Metas): cada meta numa linha: o que conta e o período em mono, o número em display com o alvo,
+   a barra (o lime só aparece na meta batida) e quanto falta. Na gestão, um cartão por pessoa; a janela tem uma moldura por meta. */
+.goal-list { gap: 16px; }
+.goal-item { display: grid; gap: 6px; }
+.goal-item-l { font: 500 11px/15px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.goal-item-v { display: flex; align-items: baseline; gap: 4px 8px; flex-wrap: wrap; }
+.goal-item-n { font: 700 28px/1 var(--f-display); letter-spacing: -.04em; }
+.goal-item-of { font: 500 15px/1 var(--f-display); color: var(--text-2); }
+.goal-item-note { font: 400 11px/15px var(--f-mono); letter-spacing: .04em; color: var(--muted); }
+.goal-item-p { font: 400 12px/16px var(--f-body); color: var(--muted); } .goal-item.is-met .goal-item-p { color: var(--text-2); }
+.goal-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.goal-person { display: grid; gap: 16px; }
+.goal-person-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.goal-person-head h2 { margin: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.goal-slot { border: 1px solid var(--line); border-radius: var(--r-card); padding: 10px 14px 14px; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.goal-slot legend { padding: 0 6px; font: 500 11px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.goal-slot legend .link { margin-left: 6px; text-transform: none; letter-spacing: 0; font-family: var(--f-body); }
+.goal-add { justify-self: start; }
+.today-goals { display: grid; gap: 12px; align-content: start; } .today-grid.one { grid-template-columns: minmax(0, 1fr); }
+/* Seu ritmo (Início do editor): as células do Resumo do dia, quatro lado a lado; as metas dele na faixa de baixo */
+.day-cells.c4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rhythm-goals { padding: 10px 12px 6px; } .rhythm-goals .goal-list { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 32px; }
+.day-n.day-n-text { font-size: 28px; } div.day-cell:hover { background: none; } /* célula sem link não acende */
+@media (max-width: 640px) { .day-cells.c4 { grid-template-columns: minmax(0, 1fr); } .rhythm-goals .goal-list { grid-template-columns: minmax(0, 1fr); } }
 .kit-who > div { min-width: 0; overflow-wrap: anywhere; }
 /* busca da lista enquanto a nova resposta não chega: o resultado anterior fica apagado e o Enter espera */
 [data-palette-results].is-stale .palette-item { opacity: .45; }

@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.78.0', date: '2026-11-18', title: 'Metas por pessoa e o ritmo do editor',
+    items: [
+      { kind: 'novo', text: 'Metas: em Gestão > Equipe > Metas, a gestão define até 3 metas para cada pessoa: o que contar (convites enviados e aceitos, gravações marcadas, taxa de aceite, abordagens de convidados e de patrocinadores, reuniões agendadas, patrocínios fechados, cortes subidos, revisões de corte, posts publicados, episódios entregues e publicados, tarefas concluídas e no prazo, seguidores, inscritos, cortes postados e Reels de teste), o período (por dia útil, semana ou mês), o alvo e se aparece em número ou em porcentagem. O sistema conta sozinho.' },
+      { kind: 'novo', text: 'Minhas metas: cada pessoa vê as dela no Início (no cartão Hoje), com quanto já fez, a barra de andamento e quanto falta até o fim do período. A barra fica lime quando a meta é batida.' },
+      { kind: 'novo', text: 'Seu ritmo, no Início do editor: cortes subidos e revisões de corte de hoje e da semana, os episódios entregues na semana (e quantos voltaram com ajustes já feitos) e a próxima entrega, com as metas dele logo abaixo.' },
+      { kind: 'ajuste', text: 'A meta diária de abordagens de patrocinadores saiu da Cadência e virou uma das metas, com o mesmo número para quem já tinha. A Cadência fica só com os intervalos de follow-up.' },
+    ],
+  },
+  {
     version: '1.77.0', date: '2026-11-18', title: 'Ordem de edição e Resumo do dia redesenhado',
     items: [
       { kind: 'novo', text: 'Ordem de edição: o editor vê o que editar primeiro (1º, 2º, 3º…), pela data em que cada episódio vai ao ar, no Início dele, em Episódios (quadro e lista) e na página do episódio. A data fica vermelha se já passou e âmbar se é hoje ou nos próximos 2 dias; sem data, o episódio vai para o fim.' },

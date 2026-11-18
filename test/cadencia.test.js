@@ -129,11 +129,13 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
 
   it('o Início mostra os follow-ups de hoje e a meta diária de patrocinadores', async () => {
     const { rows: [s] } = await q("INSERT INTO sponsors (company, stage, owner_id) VALUES ('Marca Hoje', 'prospect', $1) RETURNING id", [u.prod.id]);
+    await q("INSERT INTO user_goals (user_id, metric, period, target) VALUES ($1, 'abordagens_patrocinadores', 'dia', 5)", [u.prod.id]); // a meta vem de Gestão > Metas
     let page = (await as.prod.get('/')).text;
-    assert.match(page, /id="today-h"/); assert.match(page, /Duda Atrasada/); assert.match(page, /0<\/span><span class="muted"> \/ 5<\/span>/, 'meta padrão da produtora: 5');
+    assert.match(page, /id="today-h"/); assert.match(page, /Duda Atrasada/);
+    assert.match(page, /Abordagens de patrocinadores · hoje/); assert.match(page, /goal-item-n">0<\/span> <span class="goal-item-of">de 5</);
     assert.match(page, /1 patrocinador seu ainda sem abordagem/);
     await as.prod.act(`/patrocinadores/${s.id}/abordagens`, { canal: 'whatsapp', addr_whatsapp: '__novo', novo_whatsapp: '+5511911112222' }, { from: '/' });
-    page = (await as.prod.get('/')).text; assert.match(page, /1<\/span><span class="muted"> \/ 5<\/span>/);
+    page = (await as.prod.get('/')).text; assert.match(page, /goal-item-n">1<\/span> <span class="goal-item-of">de 5</);
     assert.doesNotMatch((await as.editor.get('/')).text, /id="today-h"/, 'editor de vídeo não vê a meta');
   });
 
@@ -150,17 +152,17 @@ describe('cadência de abordagem: follow-ups por canal, possível perdido, meta 
     assert.ok((await as.admin.get('/gestao/cadencia')).status === 200);
   });
 
-  it('configurar: intervalos, meta padrão e meta por pessoa', async () => {
-    const r = await as.gestao.act('/gestao/cadencia/config', { guest: '2, 3', sponsor: '4,6,8', goal_default: '3', [`goal_${u.prod.id}`]: '8', [`goal_${u.gestao.id}`]: '2' }, { from: '/gestao/cadencia' });
+  it('configurar: intervalos (a meta diária de abordagens fica em Gestão > Metas)', async () => {
+    const r = await as.gestao.act('/gestao/cadencia/config', { guest: '2, 3', sponsor: '4,6,8' }, { from: '/gestao/cadencia' });
     assert.equal(r.status, 302);
-    const cfg = await outreach.config(); assert.deepEqual([cfg.guest, cfg.sponsor, cfg.sponsorGoal], [[2, 3], [4, 6, 8], 3]);
-    const g = await outreach.goals([{ id: u.prod.id, role: 'produtora' }, { id: u.gestao.id, role: 'gestao' }, { id: u.admin.id, role: 'superadmin' }]);
-    assert.deepEqual([g.get(u.prod.id), g.get(u.gestao.id), g.get(u.admin.id)], [8, 2, 0]);
-    await as.gestao.act('/gestao/cadencia/config', { guest: 'abc', sponsor: '', goal_default: '', [`goal_${u.prod.id}`]: '' }, { from: '/gestao/cadencia' });
-    const back = await outreach.config(); assert.deepEqual([back.guest, back.sponsor, back.sponsorGoal], [[2, 3], [4, 6, 8], 3], 'valor inválido mantém o que estava');
-    assert.equal((await outreach.goals([{ id: u.prod.id, role: 'produtora' }])).get(u.prod.id), 3, 'sem meta própria: vale o padrão');
+    const cfg = await outreach.config(); assert.deepEqual([cfg.guest, cfg.sponsor], [[2, 3], [4, 6, 8]]);
+    await as.gestao.act('/gestao/cadencia/config', { guest: 'abc', sponsor: '' }, { from: '/gestao/cadencia' });
+    const back = await outreach.config(); assert.deepEqual([back.guest, back.sponsor], [[2, 3], [4, 6, 8]], 'valor inválido mantém o que estava');
+    const g = await outreach.goals([{ id: u.prod.id }, { id: u.gestao.id }, { id: u.admin.id }]);
+    assert.deepEqual([g.get(u.prod.id), g.get(u.gestao.id), g.get(u.admin.id)], [5, 0, 0], 'a meta diária vem de Gestão > Metas');
+    assert.match((await as.gestao.get('/gestao/cadencia')).text, /href="\/gestao\/metas"/);
     assert.equal((await as.prod.act('/gestao/cadencia/config', { guest: '1' }, { from: '/' })).status, 403);
-    await as.gestao.act('/gestao/cadencia/config', { guest: '3,4,7,7', sponsor: '3,5,7,14', goal_default: '5' }, { from: '/gestao/cadencia' });
+    await as.gestao.act('/gestao/cadencia/config', { guest: '3,4,7,7', sponsor: '3,5,7,14' }, { from: '/gestao/cadencia' });
   });
 
   it('aviso diário: um resumo por pessoa, sem repetir no mesmo dia', async () => {

@@ -53,15 +53,13 @@ router.get('/gestao/cadencia', requirePerm('outreach.manage'), wrap(async (req, 
   const days = [7, 30, 90].includes(Number(req.query.dias)) ? Number(req.query.dias) : 30;
   const r = await outreach.report(days);
   const goalOf = r.goalOf; // o relatório já leu as metas: não relê
-  const { rows: own } = await db.query('SELECT user_id, daily_target FROM outreach_goals');
-  res.render('gestao/cadencia', { title: 'Cadência', r, days, CHANNELS: outreach.CHANNELS, goalOf, ownGoal: new Map(own.map((o) => [o.user_id, o.daily_target])), shortDay, base: (k) => outreach.KINDS[k].base });
+  res.render('gestao/cadencia', { title: 'Cadência', r, days, CHANNELS: outreach.CHANNELS, goalOf, shortDay, base: (k) => outreach.KINDS[k].base });
 }));
 
 router.post('/gestao/cadencia/config', requirePerm('outreach.manage'), wrap(async (req, res) => {
-  const { rows: users } = await db.query("SELECT id, name, role FROM users WHERE active AND role IN ('superadmin','gestao','produtora')");
-  const next = await outreach.saveConfig(req.body, users);
-  await audit(req, 'cadencia.configurada', 'system', null, { convidados: next.guest, patrocinadores: next.sponsor, meta_padrao: next.sponsorGoal });
-  await req.flash('ok', 'Cadência e metas salvas.');
+  const next = await outreach.saveConfig(req.body);
+  await audit(req, 'cadencia.configurada', 'system', null, { convidados: next.guest, patrocinadores: next.sponsor });
+  await req.flash('ok', 'Cadência salva.');
   res.redirect('/gestao/cadencia');
 }));
 

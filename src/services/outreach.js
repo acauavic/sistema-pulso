@@ -14,7 +14,7 @@ const KINDS = {
   guest: { table: 'guests', col: 'status', stage: 'convite_enviado', base: '/convidados', name: 'convidado' },
   sponsor: { table: 'sponsors', col: 'stage', stage: 'prospect', base: '/patrocinadores', name: 'patrocinador' },
 };
-const DEFAULTS = { guest: [3, 4, 7, 7], sponsor: [3, 5, 7, 14], sponsorGoal: 5 };
+const DEFAULTS = { guest: [3, 4, 7, 7], sponsor: [3, 5, 7, 14] };
 const MAX_STEPS = 10;
 
 const dayOf = (ts) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(ts));
@@ -34,35 +34,21 @@ const parseSteps = (text, fallback) => {
 async function config() {
   let saved = {};
   try { saved = JSON.parse(await settingsSvc.get('outreach_config') || '{}'); } catch { /* usa o padrão */ }
-  const goal = Number(saved.sponsorGoal);
-  return {
-    guest: parseSteps((saved.guest || []).join(','), DEFAULTS.guest), sponsor: parseSteps((saved.sponsor || []).join(','), DEFAULTS.sponsor),
-    sponsorGoal: Number.isInteger(goal) && goal >= 0 && goal <= 200 ? goal : DEFAULTS.sponsorGoal,
-  };
+  return { guest: parseSteps((saved.guest || []).join(','), DEFAULTS.guest), sponsor: parseSteps((saved.sponsor || []).join(','), DEFAULTS.sponsor) };
 }
 
-// body: { guest: "3, 4, 7", sponsor: "...", goal_default: "5", goal_<userId>: "8" (vazio = padrão) }
-async function saveConfig(body, users) {
+// body: { guest: "3, 4, 7", sponsor: "..." }. As metas (inclusive a de abordagens de patrocinadores) ficam em Gestão > Metas.
+async function saveConfig(body) {
   const cur = await config();
-  const next = { guest: parseSteps(body.guest, cur.guest), sponsor: parseSteps(body.sponsor, cur.sponsor), sponsorGoal: cur.sponsorGoal };
-  const g = Number(body.goal_default);
-  if (String(body.goal_default ?? '').trim() !== '' && Number.isInteger(g) && g >= 0 && g <= 200) next.sponsorGoal = g;
+  const next = { guest: parseSteps(body.guest, cur.guest), sponsor: parseSteps(body.sponsor, cur.sponsor) };
   await settingsSvc.set('outreach_config', JSON.stringify(next));
-  for (const u of users) {
-    const raw = String(body[`goal_${u.id}`] ?? '').trim();
-    if (raw === '') { await db.query('DELETE FROM outreach_goals WHERE user_id = $1', [u.id]); continue; }
-    const n = Number(raw);
-    if (Number.isInteger(n) && n >= 0 && n <= 200) await db.query('INSERT INTO outreach_goals (user_id, daily_target) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET daily_target = EXCLUDED.daily_target, updated_at = now()', [u.id, n]);
-  }
   return next;
 }
 
-// Meta diária de abordagens de patrocinadores: a de cada pessoa, ou o padrão para as produtoras.
+// Meta diária de abordagens de patrocinadores de cada pessoa (0 = sem meta), definida em Gestão > Metas.
 async function goals(users) {
-  const cfg = await config();
-  const { rows } = await db.query('SELECT user_id, daily_target FROM outreach_goals');
-  const own = new Map(rows.map((r) => [r.user_id, r.daily_target]));
-  return new Map(users.map((u) => [u.id, own.has(u.id) ? own.get(u.id) : (u.role === 'produtora' ? cfg.sponsorGoal : 0)]));
+  const own = await require('./goals').dailySponsorTargets(users.map((u) => u.id));
+  return new Map(users.map((u) => [u.id, own.get(u.id) || 0]));
 }
 
 // ---------------------------------------------------------------- avaliação de um assunto

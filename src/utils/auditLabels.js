@@ -3,7 +3,7 @@
 const AREAS = {
   abordagem: 'Abordagem', automacao: 'Automação', busca: 'Busca', cadencia: 'Cadência', calendario: 'Calendário', capas: 'Capas',
   checklist: 'Checklist', convidado: 'Convidado', convidados: 'Convidados', convite: 'Convite', corte: 'Corte', episodio: 'Episódio',
-  estoque: 'Estoque', estudio: 'Estúdio', financeiro: 'Financeiro', integracao: 'Integração', kit: 'Media kit', lembretes: 'Lembretes',
+  estoque: 'Estoque', estudio: 'Estúdio', metas: 'Metas', financeiro: 'Financeiro', integracao: 'Integração', kit: 'Media kit', lembretes: 'Lembretes',
   lixeira: 'Lixeira', login: 'Acesso', notificacoes: 'Notificações', patrocinador: 'Patrocinador', patrocinio: 'Patrocínio', pedido: 'Pedido',
   perfil: 'Perfil', piloto_semana: 'Agenda da semana', plano: 'Plano', plateia: 'Plateia', portal: 'Portal do convidado', publicacao: 'Publicação',
   rotina: 'Rotina', senha: 'Senha', tarefa: 'Tarefa', trabalho: 'Trabalho em segundo plano', usuario: 'Usuário', whatsapp: 'WhatsApp',

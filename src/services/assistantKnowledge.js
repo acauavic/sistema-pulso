@@ -70,9 +70,19 @@ const TOPICS = [
     steps: [
       'Quem está sendo abordado (convidado em "Convite enviado", patrocinador em "Prospecção") tem um estado de follow-up: em dia, hoje, atrasado ou possível perdido (muitas tentativas sem resposta).',
       '"Registrar abordagem" abre uma janela curta: canal (Instagram, e-mail, WhatsApp, telefone, outro), qual endereço, se enviou ou se respondeu, quando e uma observação. Cada canal tem seu intervalo até o próximo follow-up. Follow-up nunca vence no fim de semana: se cair no sábado ou no domingo, passa para a segunda.',
-      'Para patrocinadores há uma meta diária de abordagens por pessoa. O Início mostra os follow-ups e a meta do dia; de manhã, quem tem pendências recebe um aviso.',
-      'Gestão > Cadência (gestão) mostra o painel por canal e por pessoa e configura intervalos e metas.',
+      'A meta diária de abordagens (de patrocinadores ou de convidados) é uma das metas de cada pessoa, em Gestão > Metas. O Início mostra os follow-ups e as metas no cartão Hoje; de manhã, quem tem pendências recebe um aviso.',
+      'Gestão > Cadência (gestão) mostra o painel por canal e por pessoa e configura os intervalos dos follow-ups.',
       'Pelo assistente: "follow_ups" mostra quem precisa de abordagem e "registrar_abordagem" registra uma abordagem feita.',
+    ],
+  },
+  {
+    key: 'metas', title: 'Metas por pessoa', words: ['meta', 'metas', 'objetivo', 'objetivos', 'minhas metas', 'definir meta', 'acompanhar meta', 'quanto falta', 'seu ritmo', 'ritmo'],
+    where: 'Gestão > Equipe > Metas (gestão define); Início de cada pessoa (Minhas metas); Início do editor (Seu ritmo)', perm: 'tasks.read',
+    steps: [
+      'A gestão define até 3 metas para cada pessoa em Gestão > Equipe > Metas: a categoria e o que contar, o período (por dia útil, por semana de segunda a domingo ou por mês), o alvo e se aparece em número ("12 de 20") ou em porcentagem.',
+      'O sistema conta sozinho: convites enviados e aceitos, gravações marcadas e taxa de aceite (dos convidados de que a pessoa é responsável); abordagens de convidados e de patrocinadores (as que ela registrou); reuniões agendadas; patrocínios fechados; cortes subidos e revisões de corte; posts publicados; episódios entregues para revisão; tarefas concluídas e no prazo; e, da equipe, seguidores, inscritos, cortes postados, Reels de teste e episódios publicados.',
+      'Cada pessoa vê as dela no Início, no cartão Hoje, com quanto já fez, a barra de andamento e quanto falta até o fim do período. A barra fica lime quando a meta é batida. Meta por dia útil não cobra sábado e domingo.',
+      'O editor vê no Início o "Seu ritmo": cortes subidos e revisões de corte de hoje e da semana, episódios entregues na semana e a próxima entrega, com as metas dele embaixo.',
     ],
   },
   {
