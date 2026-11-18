@@ -13,7 +13,8 @@ const { PROFILE_BY_KEY } = require('../constants');
 
 // Só texto: listas, objetos e nulos viram "" (um campo repetido no formulário não vira "a,b").
 const str = (v) => (typeof v === 'string' ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : '');
-const text = (v, max) => str(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().replace(/[ \t]+/g, ' ').slice(0, max);
+// Campo de uma linha (nome, empresa, @) perde quebras de linha; os textos longos (tema, o que a marca quer) mantêm.
+const text = (v, max, multiline = false) => str(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(multiline ? /[ \t]+/g : /\s+/g, ' ').trim().slice(0, max);
 const accepted = (v) => v === true || ['true', 'on', '1'].includes(str(v).toLowerCase());
 const fail = (field, error) => ({ field, error });
 
@@ -49,7 +50,7 @@ function validateGuest(body) {
   const profile = text(body.profile, 40);
   if (!Object.hasOwn(PROFILE_BY_KEY, profile)) return fail('profile', 'Escolha o seu perfil.');
   if (!accepted(body.privacy)) return fail('privacy', 'Para enviar, aceite a política de privacidade.');
-  return { values: { name, instagram, phone: phone.e164, email: email || null, profile, topic: text(body.topic, 1000) || null, utm: utmOf(body) } };
+  return { values: { name, instagram, phone: phone.e164, email: email || null, profile, topic: text(body.topic, 1000, true) || null, utm: utmOf(body) } };
 }
 
 function validateSponsor(body) {
@@ -65,7 +66,7 @@ function validateSponsor(body) {
   const website = rawSite ? publicUrl(rawSite) : null;
   if (rawSite && !website) return fail('website', 'Confira o endereço do site.');
   if (!accepted(body.privacy)) return fail('privacy', 'Para enviar, aceite a política de privacidade.');
-  return { values: { name, company, role: text(body.role, 150) || null, phone: phone.e164, email, website, goal: text(body.goal, 1000) || null, utm: utmOf(body) } };
+  return { values: { name, company, role: text(body.role, 150) || null, phone: phone.e164, email, website, goal: text(body.goal, 1000, true) || null, utm: utmOf(body) } };
 }
 
 // Aviso para a gestão; se falhar, o pedido já está salvo e não se perde.

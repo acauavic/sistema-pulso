@@ -528,6 +528,12 @@ describe('Site: formulários', () => {
     assert.equal(r.status, 200);
     const { rows: [g] } = await h.db.query("SELECT length(invite_reason) AS n FROM guests WHERE instagram = 'longo'");
     assert.ok(g.n <= 1000);
+    // nome não carrega quebra de linha (vai para o título do aviso e do e-mail); o tema mantém
+    await h.db.query("DELETE FROM rate_hits WHERE bucket = 'site_pedido'");
+    await postJson('/api/site/v1/convidado', guestBody({ instagram: 'quebra', name: 'Ana\r\nBcc: x@y.com', topic: 'linha 1\nlinha 2' }));
+    const { rows: [q] } = await h.db.query("SELECT name, invite_reason FROM guests WHERE instagram = 'quebra'");
+    assert.equal(q.name, 'Ana Bcc: x@y.com');
+    assert.equal(q.invite_reason, 'linha 1\nlinha 2');
   });
 
   it('formulário sem JavaScript responde 303 para a página de obrigado do site', async () => {
