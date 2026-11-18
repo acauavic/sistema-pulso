@@ -761,3 +761,67 @@ describe('Site: origem no painel', () => {
     assert.equal(((await as.get(`/patrocinadores/${sOther}`)).text.match(CHIP) || []).length, 0);
   });
 });
+
+describe('Site: logo pronta, juntar duplicatas e lixeira com o patrocinador oficial', () => {
+  const siteImages = require('../src/services/siteImages');
+  const siteData = require('../src/services/siteData');
+  const dup = require('../src/services/duplicates');
+  const trash = require('../src/services/trash');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
+  const q = async (sql, p) => (await h.db.query(sql, p)).rows;
+  const logo = (sid, key, { status = 'pronto', main = false } = {}) => h.db.query(
+    `INSERT INTO sponsor_files (sponsor_id, kind, storage_key, content_type, status, is_main) VALUES ($1, 'logo', $2, 'image/png', $3, $4)`, [sid, key, status, main]);
+  let app;
+  before(async () => { await h.resetDb(); app = await h.startServer(); });
+  after(async () => { await app.close?.(); });
+
+  it('logo: serve a principal pronta (nem a que ainda está subindo nem a mais nova que não é a principal)', async () => {
+    const [{ id: sid }] = await q(`INSERT INTO sponsors (company, stage) VALUES ('Marca Pronta', 'ativo') RETURNING id`);
+    await logo(sid, 'pp/site/principal.png', { main: true });
+    await logo(sid, 'pp/site/outra.png');
+    await logo(sid, 'pp/site/subindo.png', { status: 'enviando', main: true });
+    h.b2Store.set('pp/site/principal.png', { body: png, contentType: 'image/png' }); // só a principal existe no bucket
+    const r = await h.client(app.base).get(siteImages.signedUrl('logo', sid).replace(h.config.appBaseUrl, ''));
+    assert.equal(r.status, 200);
+    // patrocinador com uma logo só subindo não conta como "com logo" (fica fora dos apoiadores)
+    const [{ id: s2 }] = await q(`INSERT INTO sponsors (company, stage) VALUES ('Marca Subindo', 'ativo') RETURNING id`);
+    await logo(s2, 'pp/site/so-subindo.png', { status: 'enviando' });
+    const { apoiadores } = await siteData.build();
+    assert.deepEqual(apoiadores.map((a) => a.company), ['Marca Pronta']);
+  });
+
+  it('juntar convidados leva estreia prevista, origem e UTM', async () => {
+    const [keep] = await q(`INSERT INTO guests (name, status) VALUES ('Dra Fica', 'agendado') RETURNING id`);
+    const [drop] = await q(`INSERT INTO guests (name, status, premiere_on, origin, utm) VALUES ('Dra Sai', 'prospect', '2026-12-01', 'site', '{"utm_source":"ig"}') RETURNING id`);
+    assert.ok((await dup.merge('guest', keep.id, drop.id, {}, null)).keep);
+    const [g] = await q(`SELECT to_char(premiere_on, 'YYYY-MM-DD') AS premiere_on, origin, utm FROM guests WHERE id = $1`, [keep.id]);
+    assert.deepEqual(g, { premiere_on: '2026-12-01', origin: 'site', utm: { utm_source: 'ig' } });
+  });
+
+  it('juntar patrocinadores leva origem, UTM e o selo de oficial do que sai', async () => {
+    const [keep] = await q(`INSERT INTO sponsors (company, stage) VALUES ('Fica SA', 'ativo') RETURNING id`);
+    const [drop] = await q(`INSERT INTO sponsors (company, stage, origin, utm, site_official) VALUES ('Sai SA', 'prospect', 'site', '{"utm_campaign":"x"}', true) RETURNING id`);
+    const out = await dup.merge('sponsor', keep.id, drop.id, {}, null);
+    assert.ok(out.keep && out.trash);
+    const [s] = await q('SELECT origin, utm, site_official FROM sponsors WHERE id = $1', [keep.id]);
+    assert.deepEqual(s, { origin: 'site', utm: { utm_campaign: 'x' }, site_official: true });
+    const [t] = await q('SELECT payload FROM trash_items WHERE id = $1', [out.trash.id]);
+    assert.equal(t.payload.rows[0].row.site_official, false); // o que foi para a lixeira já não é oficial
+    // limpa para o próximo teste
+    await h.db.query('UPDATE sponsors SET site_official = false WHERE id = $1', [keep.id]);
+  });
+
+  it('restaurar o oficial quando outro já é oficial: volta sem o selo; sem conflito, volta oficial', async () => {
+    const [a] = await q(`INSERT INTO sponsors (company, stage, site_official) VALUES ('Oficial Antigo', 'ativo', true) RETURNING id`);
+    const ta = await trash.remove('sponsor', a.id, {});
+    const [b] = await q(`INSERT INTO sponsors (company, stage, site_official) VALUES ('Oficial Novo', 'ativo', true) RETURNING id`);
+    const out = await trash.restore(ta.id);
+    assert.ok(out.ok, out.error);
+    assert.equal((await q('SELECT site_official FROM sponsors WHERE id = $1', [a.id]))[0].site_official, false);
+    assert.equal((await q('SELECT site_official FROM sponsors WHERE id = $1', [b.id]))[0].site_official, true);
+    // "Desfazer" logo depois de apagar o oficial (ninguém mais é oficial): continua oficial
+    const tb = await trash.remove('sponsor', b.id, {});
+    assert.ok((await trash.restore(tb.id)).ok);
+    assert.equal((await q('SELECT site_official FROM sponsors WHERE id = $1', [b.id]))[0].site_official, true);
+  });
+});

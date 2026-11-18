@@ -244,6 +244,7 @@ router.post('/patrocinadores/:id/site', requirePerm('sponsors.write'), wrap(asyn
   let before; let s;
   try {
     await client.query('BEGIN');
+    await sponsorsSvc.lockSiteOfficial((text, params) => client.query(text, params));
     ({ rows: [before] } = await client.query('SELECT id, company, site_official, site_hidden FROM sponsors WHERE id = $1 FOR UPDATE', [id]));
     if (!before) { await client.query('ROLLBACK'); return notFound(res); }
     if (official) await client.query('UPDATE sponsors SET site_official = false, updated_at = now() WHERE site_official AND id <> $1', [id]);

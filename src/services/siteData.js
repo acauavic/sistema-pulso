@@ -148,7 +148,7 @@ async function agenda(plateiaActive) {
 async function patrocinio() {
   const { rows } = await db.query(
     `SELECT s.id, s.company, s.website, s.site_official,
-            EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo') AS has_logo
+            EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo' AND f.status = 'pronto') AS has_logo
        FROM sponsors s
       WHERE NOT s.site_hidden AND s.stage IN ('ganho', 'ativo', 'inativo') -- vale também para o oficial
       ORDER BY s.starts_on NULLS LAST, lower(s.company), s.id`);

@@ -168,6 +168,13 @@ async function restore(trashId) {
     if (!t) { await q('ROLLBACK'); return { error: 'Este item não está mais na lixeira.' }; }
     const m = await schema(q);
     let pending = t.payload.rows.map((r) => ({ ...r, row: { ...r.row } }));
+    // patrocinador oficial no site (no máximo um): se outro virou oficial enquanto este estava na lixeira, volta sem o selo
+    for (const it of pending) {
+      if (it.table !== 'sponsors' || !it.row.site_official) continue;
+      await require('./sponsors').lockSiteOfficial(q);
+      const { rows: other } = await q('SELECT 1 FROM sponsors WHERE site_official AND id::text <> $1', [String(it.row.id)]);
+      if (other.length) it.row.site_official = false;
+    }
     const relinks = [...(t.payload.relinks || [])];
     // ordem de inserção: pais antes dos filhos; o que depende de algo ainda não inserido tenta de novo na volta seguinte
     for (let round = 0; pending.length && round < 30; round += 1) {

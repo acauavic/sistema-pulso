@@ -46,7 +46,7 @@ async function sendKey(req, res, { key, mime, version, maxSide }) {
 const SOURCES = {
   foto: async (req, res, id) => guestPhotos.send(res, id, req, CACHE),
   logo: async (req, res, id) => {
-    const { rows: [f] } = await db.query("SELECT id, storage_key, content_type FROM sponsor_files WHERE sponsor_id = $1 AND kind = 'logo' ORDER BY created_at DESC, id DESC LIMIT 1", [id]);
+    const { rows: [f] } = await db.query("SELECT id, storage_key, content_type FROM sponsor_files WHERE sponsor_id = $1 AND kind = 'logo' AND status = 'pronto' ORDER BY is_main DESC, id DESC LIMIT 1", [id]);
     return f ? sendKey(req, res, { key: f.storage_key, mime: f.content_type, version: String(f.id), maxSide: 800 }) : false;
   },
   capa: async (req, res, id) => {

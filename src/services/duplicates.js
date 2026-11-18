@@ -175,8 +175,8 @@ const FIELDS = {
 };
 // Preenchidos só quando o que fica não tem (sem escolha): responsável, ligações e datas.
 const FILL = {
-  guest: ['owner_id', 'sponsor_id', 'sponsor_relation', 'proposed_at', 'photo_key'],
-  sponsor: ['owner_id', 'tier', 'value_cents', 'paid_at', 'starts_on', 'ends_on'],
+  guest: ['owner_id', 'sponsor_id', 'sponsor_relation', 'proposed_at', 'photo_key', 'premiere_on', 'origin', 'utm'],
+  sponsor: ['owner_id', 'tier', 'value_cents', 'paid_at', 'starts_on', 'ends_on', 'origin', 'utm'],
 };
 // Link público que acompanha o cadastro quando o que fica não tem um (o convite já mandado continua funcionando).
 const LINKS = {
@@ -282,6 +282,7 @@ async function merge(kind, keepId, dropId, choices, user) {
   let keep; let drop;
   try {
     await q('BEGIN');
+    if (kind === 'sponsor') await require('./sponsors').lockSiteOfficial(q); // o oficial pode passar de um para o outro (abaixo)
     const { rows } = await q(`SELECT * FROM ${table} WHERE id = ANY($1::int[]) ORDER BY id FOR UPDATE`, [[Number(keepId), Number(dropId)]]);
     keep = rows.find((r) => Number(r.id) === Number(keepId)); drop = rows.find((r) => Number(r.id) === Number(dropId));
     if (!keep || !drop) { await q('ROLLBACK'); return { error: 'Um dos cadastros não existe mais.' }; }
@@ -297,6 +298,11 @@ async function merge(kind, keepId, dropId, choices, user) {
     }
     for (const f of FILL[kind]) if (empty(keep[f]) && !empty(drop[f])) { set[f] = drop[f]; if (f === 'photo_key') clearDrop.photo_key = null; }
     if (kind === 'guest' && set.sponsor_id && empty(keep.sponsor_relation)) set.sponsor_relation = drop.sponsor_relation;
+    // patrocinador oficial no site (no máximo um): sai do que vai para a lixeira e passa para o que fica
+    if (kind === 'sponsor' && drop.site_official) {
+      clearDrop.site_official = false;
+      if (!keep.site_official) set.site_official = true;
+    }
     const L = LINKS[kind];
     if (empty(keep[L.has]) && !empty(drop[L.has])) for (const c of L.cols) { set[c] = drop[c]; clearDrop[c] = null; }
     const who = `${drop[nameCol]}, #${drop.id}`;
