@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.80.0', date: '2026-11-18', title: 'Patrocínio no Resumo do dia',
+    items: [
+      { kind: 'novo', text: 'Resumo do dia: o caminho "Da prospecção ao patrocínio", logo abaixo do caminho dos convidados. Mostra os patrocinadores que entraram em prospecção (embaixo, quantos estão em prospecção), os abordados pela primeira vez (quantos ainda estão a abordar), os follow-ups do dia (quantos estão para hoje e os atrasados; num dia que passou, quantos ficaram atrasados), os interessados (foram para Em negociação) e os fechados (entraram em Ganho; embaixo, os patrocínios ativos). Os perdidos no dia ficam ao lado do título.' },
+      { kind: 'novo', text: 'Abordagens e follow-ups vêm da cadência (Registrar abordagem). A primeira abordagem do ciclo conta como "abordado" no dia; falar de novo num dia seguinte é follow-up, e cada patrocinador conta uma vez por dia, mesmo quando o contato vai por mais de um canal.' },
+      { kind: 'ajuste', text: 'Toda mudança de etapa do patrocinador passa a ser registrada, venha do quadro, do cadastro, do painel do patrocínio, do media kit ou de juntar duplicatas. O passado foi refeito pela linha do tempo de cada patrocinador, para qualquer dia aparecer certo.' },
+    ],
+  },
+  {
     version: '1.79.0', date: '2026-11-18', title: 'Página pós-gravação para o convidado',
     items: [
       { kind: 'novo', text: 'Página pós-gravação (/pos-gravacao), a do QR Code do cartão de agradecimento: agradece, mostra o que acontece depois da gravação (triagem e edição; na sexta-feira antes do episódio, o portal do convidado com a data do episódio; bastidores; episódio e cortes), o que tem no portal (fotos, o episódio com os links do YouTube e do Spotify, posts em collab em tempo real, a agenda dos cortes e os cortes inéditos), os cortes em collab, as redes onde o Pulso posta e o WhatsApp da produção. É a mesma para todos os convidados, abre sem login e fica fora dos buscadores.' },

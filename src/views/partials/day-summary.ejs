@@ -1,9 +1,9 @@
 <%
   // Resumo do dia no Início. day: { day, today, min, isToday, weekday, prev, next }; ds: daySummary.summary().
-  // Um painel só, com dois caminhos desenhados como linha com pontos (do convite ao episódio, e o do conteúdo) e as redes e
-  // tarefas embaixo. O número grande é o do dia; embaixo, como estava no fim dele (hoje: até agora). Ponto aceso = algo aconteceu
-  // no dia; número zerado fica apagado. Medir não é ação: o único lime é o ponto "ao vivo" de hoje.
-  var g = ds.guests, e = ds.episodes, c = ds.clips, sc = ds.scheduled, t = ds.tasks, s = ds.social;
+  // Um painel só, com três caminhos desenhados como linha com pontos (do convite ao episódio, da prospecção ao patrocínio, e o do
+  // conteúdo) e as redes e tarefas embaixo. O número grande é o do dia; embaixo, como estava no fim dele (hoje: até agora). Ponto
+  // aceso = algo aconteceu no dia; número zerado fica apagado. Medir não é ação: o único lime é o ponto "ao vivo" de hoje.
+  var g = ds.guests, sp = ds.sponsors, e = ds.episodes, c = ds.clips, sc = ds.scheduled, t = ds.tasks, s = ds.social;
   var link = function (d) { return '/?dia=' + d + '#resumo'; };
   var num = function (n) { return Number(n).toLocaleString('pt-BR'); };
   var signed = function (n) { return n === null || n === undefined ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('pt-BR'); };
@@ -15,6 +15,19 @@
     { l: 'Agendados', n: g.scheduledIn, href: '/convidados?view=lista&status=agendado', sub: [{ n: g.scheduled, t: 'com data marcada' }] },
     { l: 'Gravados', n: e.recordedIn, href: '/episodios', sub: [{ n: e.toPublish, t: 'a publicar' }] },
     { l: 'Publicados', n: e.publishedIn, href: '/episodios?view=lista', sub: [{ n: e.published, t: plural(e.published, 'episódio no ar', 'episódios no ar') }] },
+  ];
+  // patrocínio: a etapa (Prospecção → Em negociação → Ganho) e, no meio, a cadência (abordagem e follow-ups, Registrar abordagem)
+  var cadence = can('outreach.manage') ? '/gestao/cadencia' : '/patrocinadores?view=lista&stage=prospect';
+  var lateN = sp.due + sp.late;
+  var followSub = day.isToday
+    ? [{ n: sp.due, t: 'para hoje' }].concat(sp.late ? [{ n: sp.late, t: plural(sp.late, 'atrasado', 'atrasados'), bad: true }] : [])
+    : (lateN ? [{ n: lateN, t: plural(lateN, 'ficou atrasado', 'ficaram atrasados'), bad: true }] : [{ t: 'nenhum ficou atrasado' }]);
+  var flowSponsors = [
+    { l: 'Entraram em prospecção', n: sp.entered, href: '/patrocinadores?view=lista&stage=prospect', sub: [{ n: sp.prospecting, t: 'em prospecção' }] },
+    { l: 'Abordados', n: sp.approached, href: cadence, sub: [{ n: sp.toApproach, t: 'a abordar' }], title: 'Primeira abordagem registrada no dia' },
+    { l: 'Follow-ups', n: sp.followed, href: cadence, sub: followSub, title: 'Patrocinadores já abordados que receberam contato de novo no dia (um por patrocinador)' },
+    { l: 'Interessados', n: sp.interested, href: '/patrocinadores?view=lista&stage=negociacao', sub: [{ n: sp.negotiating, t: 'em negociação' }] },
+    { l: 'Fechados', n: sp.closed, href: '/patrocinadores', sub: [{ n: sp.active, t: plural(sp.active, 'patrocínio ativo', 'patrocínios ativos') }] },
   ];
   var schedSub = day.isToday
     ? [{ n: sc.pending, t: 'a sair' }, { n: sc.out, t: 'no ar' }].concat(sc.failed ? [{ n: sc.failed, t: 'com erro', bad: true }] : [])
@@ -63,6 +76,16 @@
         <a class="day-aside <%= g.lost ? '' : 'is-zero' %>" href="/convidados?view=lista&amp;status=perdido"><% if (g.lost) { %><b><%= num(g.lost) %></b> <%= plural(g.lost, 'perdido', 'perdidos') %> no dia<% } else { %>nenhum perdido no dia<% } %></a>
       </div>
       <% flow(flowGuests) %>
+    </section>
+    <% } %>
+
+    <% if (can('sponsors.read')) { %>
+    <section class="day-band" aria-labelledby="day-b-sp">
+      <div class="day-band-head">
+        <h3 class="day-band-t" id="day-b-sp">Da prospecção ao patrocínio</h3>
+        <a class="day-aside <%= sp.lost ? '' : 'is-zero' %>" href="/patrocinadores?view=lista&amp;stage=perdido"><% if (sp.lost) { %><b><%= num(sp.lost) %></b> <%= plural(sp.lost, 'perdido', 'perdidos') %> no dia<% } else { %>nenhum perdido no dia<% } %></a>
+      </div>
+      <% flow(flowSponsors) %>
     </section>
     <% } %>
 

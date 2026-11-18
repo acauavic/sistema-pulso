@@ -106,11 +106,13 @@ const TOPICS = [
     ],
   },
   {
-    key: 'resumo-dia', title: 'Resumo do dia no Início', words: ['resumo do dia', 'resumo', 'painel', 'início', 'inicio', 'dashboard', 'números do dia', 'numeros do dia', 'convites enviados', 'convites aceitos', 'seguidores', 'inscritos', 'cortes postados', 'cortes subidos', 'revisões', 'revisoes', 'reels de teste', 'tarefas atrasadas'],
+    key: 'resumo-dia', title: 'Resumo do dia no Início', words: ['resumo do dia', 'resumo', 'painel', 'início', 'inicio', 'dashboard', 'números do dia', 'numeros do dia', 'convites enviados', 'convites aceitos', 'seguidores', 'inscritos', 'cortes postados', 'cortes subidos', 'revisões', 'revisoes', 'reels de teste', 'tarefas atrasadas', 'patrocínio', 'patrocinio', 'patrocinadores', 'prospecção', 'prospeccao', 'abordados', 'follow-ups', 'follow-up', 'interessados', 'fechados'],
     where: 'Início (a primeira tela), bloco "Resumo do dia"', perm: 'production.manage',
     steps: [
       'O Início abre com o Resumo do dia: convites enviados, aceitos (e quantos estão em agendamento), agendados e perdidos; episódios gravados e publicados; cortes subidos pelo editor, revisões (versão nova de um corte), agendados para hoje (cortes e posts: quantos já saíram e quantos ainda vão sair), cortes postados e Reels de teste; seguidores no Instagram, inscritos no YouTube (com o saldo da semana) e tarefas atrasadas.',
-      'Os dois caminhos (do convite ao episódio e o do conteúdo) têm um ponto em cada passo: aceso quando algo aconteceu naquele passo no dia.',
+      'O caminho "Da prospecção ao patrocínio" mostra os patrocinadores que entraram em prospecção, os abordados pela primeira vez (e quantos ainda estão a abordar), os follow-ups do dia (e quantos estão para hoje ou atrasados na cadência; num dia que passou, quantos ficaram atrasados), os interessados (foram para Em negociação), os fechados (entraram em Ganho; embaixo, os patrocínios ativos) e os perdidos no dia.',
+      'Abordagem e follow-up vêm do Registrar abordagem: a primeira abordagem do ciclo (desde que o patrocinador entrou em Prospecção) é "abordado"; contato de novo num dia seguinte é follow-up, um por patrocinador no dia, mesmo por mais de um canal.',
+      'Os três caminhos (do convite ao episódio, da prospecção ao patrocínio e o do conteúdo) têm um ponto em cada passo: aceso quando algo aconteceu naquele passo no dia.',
       'O número grande é o do dia; embaixo, como estava no fim daquele dia (hoje: até agora). Mudança de etapa desfeita no mesmo dia não conta.',
       'As setas mudam o dia, o calendário escolhe qualquer dia desde o primeiro convidado e "Hoje" volta. O dia fica no endereço, então dá para mandar o link de um dia.',
       'Cada número leva à lista dele: convidados da etapa, cortes, publicações, Insights ou tarefas.',

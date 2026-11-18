@@ -51,7 +51,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - **Convite fixo**: gera link exclusivo + link curto no YOURLS, prévia, envio por e-mail (Brevo). Os botões do
   convite levam ao WhatsApp da produção **passando por um redirecionador próprio que conta os cliques**.
 - **Metas por pessoa**: até 3 metas para cada pessoa (o que contar, período, alvo, número ou porcentagem), contadas sozinhas e mostradas no Início de cada um. [Detalhes](#metas-por-pessoa).
-- **Início com o Resumo do dia**: convites enviados, aceitos e perdidos, etapas, episódios, cortes, revisões, posts, Reels de teste, seguidores e tarefas atrasadas de qualquer dia. [Detalhes](#resumo-do-dia-no-início).
+- **Início com o Resumo do dia**: convites enviados, aceitos e perdidos, patrocinadores (entraram em prospecção, abordados, follow-ups, interessados, fechados), etapas, episódios, cortes, revisões, posts, Reels de teste, seguidores e tarefas atrasadas de qualquer dia. [Detalhes](#resumo-do-dia-no-início).
 - **Calendário**: tudo que tem data (tarefas, gravações, lembretes, publicações, contas, parcerias) com filtros e visualizações salvas. [Detalhes](#calendário).
 - **Auditoria** das ações sensíveis e tela de **Integrações** (status + testes seguros).
 
@@ -383,12 +383,21 @@ O Início (de quem não é só editor de vídeo) abre com o **Resumo do dia**. O
 daquele dia (hoje: até agora). As setas e o calendário levam a qualquer dia desde o primeiro convidado cadastrado, e o dia vai no
 endereço (`/?dia=2026-11-17`). Cada número leva à lista dele.
 
-- **Visual**: um painel só. "Do convite ao episódio" e "Conteúdo" são caminhos desenhados como uma linha com pontos (o ponto aceso é
-  onde algo aconteceu no dia; número zerado fica apagado); "Redes e tarefas" fica embaixo, em células. Hoje aparece com o ponto "ao vivo".
+- **Visual**: um painel só. "Do convite ao episódio", "Da prospecção ao patrocínio" e "Conteúdo" são caminhos desenhados como uma linha
+  com pontos (o ponto aceso é onde algo aconteceu no dia; número zerado fica apagado); "Redes e tarefas" fica embaixo, em células. Hoje
+  aparece com o ponto "ao vivo".
 - **Convidados**: **Convites enviados** (entrou em Convite enviado no dia; embaixo, quantos aguardam resposta), **Aceitos** (saiu de
   Prospecção, Convite enviado ou Perdido para Em agendamento ou Agendado; embaixo, quantos estão em agendamento), **Agendados** (entraram
   em Agendado no dia; embaixo, quantos têm data marcada) e **Perdidos** no dia (ao lado do título). Mudança desfeita no mesmo dia (arrastou
   errado e voltou) não conta.
+- **Patrocínio** (logo abaixo dos convidados; quem vê patrocinadores): **Entraram em prospecção** (pelo cadastro ou voltando para
+  Prospecção; embaixo, quantos estão em prospecção), **Abordados** (a primeira abordagem do ciclo registrada no dia, em Registrar
+  abordagem; embaixo, quantos estão em Prospecção sem nenhuma abordagem), **Follow-ups** (patrocinadores já abordados que receberam contato
+  de novo no dia, um por patrocinador mesmo por mais de um canal; embaixo, hoje, os follow-ups para hoje e os atrasados da cadência; num dia
+  que passou, quantos ficaram atrasados), **Interessados** (entraram em Em negociação; embaixo, quantos estão em negociação), **Fechados**
+  (entraram em Ganho, ou em Ativo sem passar por Ganho; embaixo, os patrocínios ativos) e **Perdidos** no dia (ao lado do título). O ciclo
+  da cadência começa quando o patrocinador entra em Prospecção, e cada abordagem pertence ao ciclo em que foi registrada. As etapas vêm do
+  `sponsor_stage_log` (toda mudança de etapa, de qualquer caminho, por gatilho).
 - **Episódios** (no mesmo caminho dos convidados): **Gravados** no dia (pela data da gravação; embaixo, quantos estão gravados e ainda
   sem publicar) e **Publicados** no dia (embaixo, o total no ar).
 - **Conteúdo**: **Cortes subidos** (pelo editor; o que a gestão subiu aparece à parte), **Revisões** (versão nova de um corte que já

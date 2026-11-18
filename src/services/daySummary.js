@@ -1,10 +1,12 @@
-// Resumo do dia no Painel: o que aconteceu num dia (convites enviados, aceitos e perdidos, gravações e publicações, cortes subidos
-// pelo editor, revisões, cortes postados, Reels de teste, seguidores) e como as coisas estavam no fim dele (etapas, episódios a
-// publicar, tarefas atrasadas). O dia vai de 00:00 a 24:00 em Brasília; hoje é "até agora".
+// Resumo do dia no Painel: o que aconteceu num dia (convites enviados, aceitos e perdidos, patrocinadores que entraram em
+// prospecção, foram abordados e receberam follow-up, gravações e publicações, cortes subidos pelo editor, revisões, cortes
+// postados, Reels de teste, seguidores) e como as coisas estavam no fim dele (etapas, cadência, episódios a publicar, tarefas
+// atrasadas). O dia vai de 00:00 a 24:00 em Brasília; hoje é "até agora".
 const db = require('../db/pool');
 const { ROLES, can } = require('../permissions');
 const { ACCEPT_FROM } = require('../constants');
 const cal = require('./calendar');
+const outreach = require('./outreach');
 const { nowTime } = require('./tasks');
 
 const TZ = 'America/Sao_Paulo';
@@ -47,6 +49,72 @@ async function guests(day) {
            (SELECT count(DISTINCT guest_id) FROM mv WHERE to_status = 'agendado' AND end_status IN ('agendado', 'gravado'))::int AS scheduled_in
       FROM st`, [day, ACCEPT_FROM]);
   return { sent: r.sent, accepted: r.accepted, lost: r.lost, waiting: r.waiting, scheduling: r.scheduling, schedulingIn: r.scheduling_in, scheduled: r.scheduled, scheduledIn: r.scheduled_in };
+}
+
+// Patrocinadores. A etapa de cada um no fim do dia é a última mudança até ali (sponsor_stage_log). Entrou numa etapa no dia quem
+// chegou nela pelo cadastro (só no dia em que nasceu: voltar da lixeira não é entrada nova) ou por uma mudança que não foi desfeita
+// no mesmo dia, sem já estar nela quando o dia começou. Fechado = entrou em Ganho, ou em Ativo sem passar por Ganho.
+async function sponsorStages(day) {
+  const { rows: [r] } = await db.query(`WITH ${BOUNDS},
+    st AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage AS stage FROM sponsor_stage_log l, b
+            WHERE l.changed_at < b.e ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC),
+    st0 AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage AS stage FROM sponsor_stage_log l, b
+             WHERE l.changed_at < b.s ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC),
+    mv AS (SELECT l.sponsor_id, l.from_stage, l.to_stage, st.stage AS end_stage
+             FROM sponsor_stage_log l JOIN st USING (sponsor_id) LEFT JOIN st0 USING (sponsor_id) JOIN sponsors s ON s.id = l.sponsor_id, b
+            WHERE l.changed_at >= b.s AND l.changed_at < b.e
+              AND (l.from_stage IS NOT NULL OR (s.created_at >= b.s AND s.created_at < b.e))
+              AND l.from_stage IS DISTINCT FROM st.stage AND st0.stage IS DISTINCT FROM l.to_stage)
+    SELECT count(*) FILTER (WHERE st.stage = 'prospect')::int AS prospecting,
+           count(*) FILTER (WHERE st.stage = 'negociacao')::int AS negotiating,
+           count(*) FILTER (WHERE st.stage = 'ativo')::int AS active,
+           (SELECT count(DISTINCT sponsor_id) FROM mv WHERE to_stage = 'prospect')::int AS entered,
+           (SELECT count(DISTINCT sponsor_id) FROM mv WHERE to_stage = 'negociacao')::int AS interested,
+           (SELECT count(DISTINCT sponsor_id) FROM mv WHERE to_stage = 'ganho' OR (to_stage = 'ativo' AND from_stage IS DISTINCT FROM 'ganho'))::int AS closed,
+           (SELECT count(DISTINCT sponsor_id) FROM mv WHERE to_stage = 'perdido' AND end_stage = 'perdido')::int AS lost
+      FROM st`, [day]);
+  return r;
+}
+
+// Abordagens de patrocinadores, a mesma base da cadência (Registrar abordagem). Cada ciclo começa quando o patrocinador entra em
+// Prospecção, e a abordagem é do ciclo em que foi registrada (como a cadência conta). A 1ª abordagem do ciclo faz dele "abordado"
+// no dia em que aconteceu (outro canal no mesmo dia ainda é essa abordagem); falar de novo num dia seguinte é follow-up, e cada
+// patrocinador conta um por dia, mesmo por mais de um canal.
+async function sponsorContacts(day) {
+  const { rows: [r] } = await db.query(`WITH ${BOUNDS},
+    sends AS (SELECT a.subject_id AS id, a.at,
+                     coalesce((SELECT max(l.changed_at) FROM sponsor_stage_log l
+                                WHERE l.sponsor_id = a.subject_id AND l.to_stage = 'prospect' AND l.changed_at <= a.created_at), '-infinity') AS cycle
+                FROM outreach_attempts a JOIN sponsors s ON s.id = a.subject_id, b
+               WHERE a.subject_type = 'sponsor' AND a.result = 'enviado' AND a.at < b.e),
+    f AS (SELECT id, cycle, min((at AT TIME ZONE '${TZ}')::date) AS first_day FROM sends GROUP BY id, cycle)
+    SELECT (SELECT count(DISTINCT id) FROM f WHERE first_day = $1::date)::int AS approached,
+           (SELECT count(DISTINCT x.id) FROM sends x JOIN f USING (id, cycle), b
+             WHERE x.at >= b.s AND f.first_day < $1::date)::int AS followed`, [day]);
+  return r;
+}
+
+// Como a cadência estava no fim do dia: quantos em Prospecção ainda sem abordagem, com follow-up para o dia e atrasados. Hoje é a
+// própria cadência (a mesma conta do cartão Hoje e de Gestão > Cadência); num dia que passou, ela é refeita com a etapa daquele
+// dia e as abordagens até o fim dele.
+async function sponsorCadence(day, isToday) {
+  let list;
+  if (isToday) list = [...(await outreach.evaluateAll('sponsor')).values()];
+  else {
+    const { rows: subjects } = await db.query(`WITH ${BOUNDS},
+      st AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage, l.changed_at FROM sponsor_stage_log l, b
+              WHERE l.changed_at < b.e ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC)
+      SELECT sponsor_id AS id, changed_at AS entered FROM st WHERE to_stage = 'prospect'`, [day]);
+    const { rows: attempts } = subjects.length ? await db.query(`WITH ${BOUNDS}
+      SELECT a.subject_id, a.channel, a.result, a.at, a.created_at FROM outreach_attempts a, b
+       WHERE a.subject_type = 'sponsor' AND a.subject_id = ANY($2::int[]) AND a.at < b.e`, [day, subjects.map((x) => x.id)]) : { rows: [] };
+    const cfg = await outreach.config();
+    const by = new Map();
+    for (const a of attempts) { if (!by.has(a.subject_id)) by.set(a.subject_id, []); by.get(a.subject_id).push(a); }
+    list = subjects.map((x) => outreach.evaluate('sponsor', x.entered, (by.get(x.id) || []).filter((a) => new Date(a.created_at) >= new Date(x.entered)), cfg, day));
+  }
+  const count = (state) => list.filter((x) => x.state === state).length;
+  return { toApproach: count('a_abordar'), due: count('hoje'), late: count('atrasado') };
 }
 
 // Episódios: gravados no dia (a data da gravação), os que estavam gravados e ainda sem publicar no fim do dia, e os publicados.
@@ -148,8 +216,9 @@ async function followers(day) {
 
 // Tudo do dia. Hoje, as tarefas atrasadas seguem a hora de agora; num dia que já passou, o fim do dia.
 async function summary(day, { isToday = day === cal.todayISO() } = {}) {
-  const [g, e, c, p, sc, t, s] = await Promise.all([guests(day), episodes(day), clips(day), posts(day), scheduled(day), tasks(day, isToday ? nowTime() : '24:00'), followers(day)]);
-  return { guests: g, episodes: e, clips: { ...c, ...p }, scheduled: sc, tasks: t, social: s };
+  const [g, sp, spc, spk, e, c, p, sc, t, s] = await Promise.all([guests(day), sponsorStages(day), sponsorContacts(day), sponsorCadence(day, isToday), episodes(day), clips(day), posts(day), scheduled(day),
+    tasks(day, isToday ? nowTime() : '24:00'), followers(day)]);
+  return { guests: g, sponsors: { ...sp, ...spc, ...spk }, episodes: e, clips: { ...c, ...p }, scheduled: sc, tasks: t, social: s };
 }
 
 module.exports = { pick, summary, EDITOR_ROLES };
