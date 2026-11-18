@@ -6,8 +6,9 @@ module.exports = [
   {
     version: '1.79.0', date: '2026-11-18', title: 'Página pós-gravação para o convidado',
     items: [
-      { kind: 'novo', text: 'Página pós-gravação (/pos-gravacao), a do QR Code do cartão de agradecimento: agradece, mostra o que acontece depois da gravação (triagem e edição, a data pelo WhatsApp, o portal na sexta antes do episódio, bastidores, episódio e cortes), o que tem no portal, os cortes em collab, as redes onde o Pulso posta e o WhatsApp da produção. É a mesma para todos os convidados, abre sem login e fica fora dos buscadores.' },
+      { kind: 'novo', text: 'Página pós-gravação (/pos-gravacao), a do QR Code do cartão de agradecimento: agradece, mostra o que acontece depois da gravação (triagem e edição; na sexta-feira antes do episódio, o portal do convidado com a data do episódio; bastidores; episódio e cortes), o que tem no portal (fotos, o episódio com os links do YouTube e do Spotify, posts em collab em tempo real, a agenda dos cortes e os cortes inéditos), os cortes em collab, as redes onde o Pulso posta e o WhatsApp da produção. É a mesma para todos os convidados, abre sem login e fica fora dos buscadores.' },
       { kind: 'novo', text: 'Em Gestão > WhatsApp dos convites, o link da página (Abrir e Copiar link) e a mensagem que abre no WhatsApp quando o convidado toca em "Falar com a produção" por ela.' },
+      { kind: 'ajuste', text: 'Novo WhatsApp da produção: (11) 99978-8953, nos convites, no portal do convidado, na página pós-gravação e na página da plateia.' },
     ],
   },
   {

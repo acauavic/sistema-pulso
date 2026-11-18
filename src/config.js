@@ -29,7 +29,7 @@ const config = {
   // WhatsApp da produção (só dígitos, com DDI): destino dos botões do convite.
   // WhatsApp comercial (media kit): destino dos botões "Quero ser patrocinador" e "Falar com a equipe".
   whatsappPatrocinio: String(env.PATROCINIO_WHATSAPP || '5511971739061').replace(/\D/g, ''),
-  whatsappProducao: String(env.PRODUCAO_WHATSAPP || '5512991053852').replace(/\D/g, ''),
+  whatsappProducao: String(env.PRODUCAO_WHATSAPP || '5511999788953').replace(/\D/g, ''),
   whatsappEstudio: String(env.ESTUDIO_WHATSAPP || '').replace(/\D/g, ''), // link do estúdio (material da gravação); vazio = só "Copiar link"
 
   brevo: {

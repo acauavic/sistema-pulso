@@ -18,7 +18,7 @@ const HEADERS = {
 };
 // As redes do Pulso, na ordem em que o convidado mais reconhece.
 const NETWORKS = [['instagram', 'Instagram e Reels'], ['youtube', 'YouTube e Shorts'], ['tiktok', 'TikTok'], ['linkedin', 'LinkedIn'], ['x', 'X (Twitter)'], ['threads', 'Threads'], ['facebook', 'Facebook']];
-// número com o código do Brasil vira "(12) 99105-3852"; de fora, fica com o "+"
+// número com o código do Brasil vira "(11) 99978-8953"; de fora, fica com o "+"
 const prettyPhone = (n) => fmt.phone(/^55\d{10,11}$/.test(n) ? n.slice(2) : n);
 
 router.get(PATH, wrap(async (req, res) => {

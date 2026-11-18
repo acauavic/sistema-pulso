@@ -80,7 +80,7 @@ const TOPICS = [
     where: '/pos-gravacao; o link fica em Gestão > WhatsApp dos convites', perm: 'guests.read',
     steps: [
       'A página pós-gravação é a do QR Code do cartão de agradecimento: a mesma para todos os convidados, abre sem login e não aparece em buscadores.',
-      'Ela agradece, mostra o que acontece depois da gravação (triagem e edição, a data do episódio pelo WhatsApp, o portal na sexta antes do episódio, bastidores, episódio e cortes), o que tem no portal, os cortes em collab, as redes do Pulso e o WhatsApp da produção.',
+      'Ela agradece, mostra o que acontece depois da gravação (triagem e edição; na sexta antes do episódio, o portal com a data do episódio; bastidores; episódio e cortes), o que tem no portal (fotos, o episódio com os links do YouTube e do Spotify, posts em collab em tempo real, agenda dos cortes e cortes inéditos), os cortes em collab, as redes do Pulso e o WhatsApp da produção.',
       'O endereço completo, com Abrir e Copiar link, fica em Gestão > WhatsApp dos convites. Ali também se muda o número e a mensagem que abre no WhatsApp ("Na página pós-gravação").',
     ],
   },

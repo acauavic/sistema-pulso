@@ -28,9 +28,11 @@ describe('Página pós-gravação', () => {
   it('agradece e mostra o que acontece agora, o portal, os cortes em collab e as redes', async () => {
     const t = (await h.client(app.base).get('/pos-gravacao')).text;
     assert.match(t, /Obrigado por sentar à mesa\./);
-    for (const step of ['Gravação', 'Triagem e edição', 'A data do seu episódio', 'Seu portal do convidado', 'Bastidores e aviso', 'Episódio e cortes']) assert.match(t, new RegExp(`<h3>${step}</h3>`));
-    assert.match(t, /Sexta-feira antes do episódio/);
-    for (const item of ['Fotos da gravação', 'Posts em collab', 'Cortes inéditos', 'Posts inéditos', 'Agenda dos cortes']) assert.match(t, new RegExp(item));
+    for (const step of ['Gravação', 'Triagem e edição', 'Seu portal, com a data do episódio', 'Bastidores e aviso', 'Episódio e cortes']) assert.match(t, new RegExp(`<h3>${step}</h3>`));
+    assert.match(t, /Sexta-feira antes do episódio/); assert.match(t, /A data do episódio chega junto com o seu portal/);
+    for (const item of ['Fotos da gravação', 'O episódio', 'Posts em collab', 'Agenda dos cortes', 'Cortes inéditos']) assert.match(t, new RegExp(`<h3>${item}</h3>`));
+    assert.match(t, /links do YouTube e do Spotify/); assert.match(t, /Em tempo real/);
+    assert.doesNotMatch(t, /Posts inéditos/);
     assert.match(t, /Cortes em collab/); assert.match(t, /sem custo para você/);
     for (const net of ['Instagram e Reels', 'YouTube e Shorts', 'TikTok', 'LinkedIn', 'X \\(Twitter\\)', 'Threads', 'Facebook']) assert.match(t, new RegExp(`<span>${net}</span>`));
   });

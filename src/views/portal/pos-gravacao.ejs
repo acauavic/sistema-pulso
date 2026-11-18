@@ -25,7 +25,7 @@
     <h1 class="pp-thanks" id="pp-obrigado">Obrigado por sentar à mesa.</h1>
     <p class="pt-lede">A conversa está gravada. Aqui está, em poucos passos, o que acontece agora e como você acompanha cada um.</p>
     <ul class="pp-glance">
-      <li><%- icon('calendar-days', 18) %><span>A data do episódio chega pelo WhatsApp da produção</span></li>
+      <li><%- icon('calendar-days', 18) %><span>A data do episódio chega junto com o seu portal do convidado</span></li>
       <li><%- icon('scissors', 18) %><span>Você recebe cortes para postar em collab com o Pulso</span></li>
       <li><%- icon('share-2', 18) %><span>O episódio sai em todas as redes do Pulso</span></li>
     </ul>
@@ -43,12 +43,8 @@
         <div><span class="pt-mono pt-muted">Agora</span><h3>Triagem e edição</h3><p>Selecionamos as fotografias e as imagens e editamos o episódio e os cortes.</p></div>
       </li>
       <li>
-        <span class="pp-dot"><%- icon('calendar-days', 15) %></span>
-        <div><span class="pt-mono pt-muted">Em breve</span><h3>A data do seu episódio</h3><p>O episódio sai de forma programada. A produção do Pulso manda a data pelo WhatsApp.</p></div>
-      </li>
-      <li>
         <span class="pp-dot"><%- icon('send', 15) %></span>
-        <div><span class="pt-mono pt-muted">Sexta-feira antes do episódio</span><h3>Seu portal do convidado</h3><p>Você recebe o portal, com tudo o que é seu, e a agenda de postagem dos cortes, para programar o collab.</p></div>
+        <div><span class="pt-mono pt-muted">Sexta-feira antes do episódio</span><h3>Seu portal, com a data do episódio</h3><p>A produção manda pelo WhatsApp o seu portal do convidado: é ali que você vê a data do episódio e tudo o que é seu.</p></div>
       </li>
       <li>
         <span class="pp-dot"><%- icon('clapperboard', 15) %></span>
@@ -56,21 +52,20 @@
       </li>
       <li>
         <span class="pp-dot"><%- icon('play', 15) %></span>
-        <div><span class="pt-mono pt-muted">Episódio no ar</span><h3>Episódio e cortes</h3><p>O episódio sai, e os cortes vão saindo nas redes do Pulso, em collab com você.</p></div>
+        <div><span class="pt-mono pt-muted">Episódio no ar</span><h3>Episódio e cortes</h3><p>O episódio sai no YouTube e no Spotify, e os cortes vão saindo nas redes do Pulso, em collab com você.</p></div>
       </li>
     </ol>
   </section>
 
   <section class="pt-sec" aria-labelledby="pp-portal">
     <h2 id="pp-portal">O que tem no seu portal</h2>
-    <p class="pt-sub">Um link só seu, que chega na sexta-feira antes do episódio. Fica tudo num lugar, para baixar e postar quando quiser.</p>
+    <p class="pt-sub">Um link só seu, que chega na sexta-feira antes do episódio. Fica tudo num lugar, para acompanhar, baixar e postar quando quiser.</p>
     <ul class="pp-items">
       <li><%- icon('camera', 20) %><div><h3>Fotos da gravação</h3><p>Para baixar e postar.</p></div></li>
-      <li><%- icon('users', 20) %><div><h3>Posts em collab</h3><p>Com a data prevista de cada um.</p></div></li>
-      <li><%- icon('play', 20) %><div><h3>O episódio</h3><p>Quando sai e onde assistir e ouvir.</p></div></li>
+      <li><%- icon('play', 20) %><div><h3>O episódio</h3><p>A data e, quando ele sai, os links do YouTube e do Spotify.</p></div></li>
+      <li><%- icon('users', 20) %><div><h3>Posts em collab</h3><p>Em tempo real, conforme vão saindo.</p></div></li>
+      <li><%- icon('calendar-days', 20) %><div><h3>Agenda dos cortes</h3><p>Quando sai cada corte, para você programar o collab.</p></div></li>
       <li><%- icon('scissors', 20) %><div><h3>Cortes inéditos</h3><p>Exclusivos, para você postar no seu perfil.</p></div></li>
-      <li><%- icon('image', 20) %><div><h3>Posts inéditos</h3><p>Prontos para o seu perfil.</p></div></li>
-      <li><%- icon('calendar-days', 20) %><div><h3>Agenda dos cortes</h3><p>Para programar os posts em collab.</p></div></li>
     </ul>
   </section>
 
@@ -90,7 +85,7 @@
 
   <section class="pt-sec" aria-labelledby="pp-duvidas">
     <h2 id="pp-duvidas">Ficou alguma dúvida?</h2>
-    <p class="pt-sub">Fale com a produção do Pulso pelo WhatsApp. É por lá também que chega a data do seu episódio.</p>
+    <p class="pt-sub">Fale com a produção do Pulso pelo WhatsApp. É por lá também que chega o seu portal, com a data do episódio.</p>
     <% if (wa) { %>
     <div class="pp-help"><a class="pt-btn" href="<%= wa %>" target="_blank" rel="noopener">Falar com a produção</a><span class="pt-mono pp-phone"><%= phone %></span></div>
     <% } %>
