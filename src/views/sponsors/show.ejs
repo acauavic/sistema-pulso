@@ -40,6 +40,14 @@
       <% if (sponsor.kit_show) { %><span class="badge b-gray">no media kit</span> <button class="link small" type="submit">tirar do media kit</button><% } else { %><button class="btn sm" type="submit"><%- icon('eye', 14) %> Mostrar no media kit</button> <span class="small muted">entra em "Marcas que escolheram estar nessas conversas"<%= hasLogo ? '' : ' (sem logo: aparece o nome)' %></span><% } %>
     </form>
     <% } %>
+    <% if (canWrite && (sponsor.kit_show || sponsor.site_official || sponsor.site_hidden || ['ganho', 'ativo', 'inativo'].includes(sponsor.stage))) { %>
+    <form method="post" action="/patrocinadores/<%= sponsor.id %>/site" class="row top-gap" data-autosubmit-form><%- csrfField %>
+      <label class="switch"><input type="checkbox" role="switch" name="official" value="on" <%= sponsor.site_official ? 'checked' : '' %> data-autosubmit aria-label="Patrocinador oficial no site"><span class="switch-track" aria-hidden="true"></span><span class="small">Patrocinador oficial no site</span> <span class="mono small switch-state"><%= sponsor.site_official ? 'LIGADO' : 'DESLIGADO' %></span></label>
+      <label class="switch"><input type="checkbox" role="switch" name="hidden" value="on" <%= sponsor.site_hidden ? 'checked' : '' %> data-autosubmit aria-label="Esconder do site"><span class="switch-track" aria-hidden="true"></span><span class="small">Esconder do site</span> <span class="mono small switch-state"><%= sponsor.site_hidden ? 'LIGADO' : 'DESLIGADO' %></span></label>
+      <noscript><button class="btn sm" type="submit">Salvar</button></noscript>
+    </form>
+    <p class="small muted">O site mostra a logo das marcas que fecharam ou patrocinam.</p>
+    <% } %>
   </div>
   <div class="row">
     <a class="btn ghost" href="/patrocinadores"><%- icon('arrow-left') %> Voltar</a>

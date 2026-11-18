@@ -7,7 +7,6 @@ const notify = require('../src/services/notify');
 
 describe('Site: campos novos', () => {
   before(async () => { await h.resetDb(); });
-  after(async () => { await h.db.close(); });
 
   it('as colunas existem', async () => {
     await h.db.query('SELECT premiere_on, origin, utm FROM guests');
@@ -34,3 +33,60 @@ describe('Site: campos novos', () => {
     assert.equal(n.length, 1); assert.equal(String(n[0].user_id), String(g.id));
   });
 });
+
+describe('Site: patrocinador oficial e esconder do site', () => {
+  let app; const as = {}; let a; let b;
+  const flags = async (id) => (await h.db.query('SELECT site_official, site_hidden FROM sponsors WHERE id = $1', [id])).rows[0];
+  before(async () => {
+    await h.resetDb();
+    app = await h.startServer();
+    await h.createUser({ name: 'Gil Gestão', email: 'gestao@t.com', role: 'gestao' });
+    await h.createUser({ name: 'Edu Editor', email: 'edit@t.com', role: 'editor_video' });
+    for (const [k, email] of [['gestao', 'gestao@t.com'], ['editor', 'edit@t.com']]) {
+      as[k] = h.client(app.base);
+      assert.equal((await as[k].login(email)).status, 302, `login ${k}`);
+    }
+    a = (await h.db.query(`INSERT INTO sponsors (company, stage) VALUES ('Marca A', 'ativo') RETURNING id`)).rows[0].id;
+    b = (await h.db.query(`INSERT INTO sponsors (company, stage) VALUES ('Marca B', 'ativo') RETURNING id`)).rows[0].id;
+  });
+  after(async () => { await app.close?.(); });
+
+  it('marcar um oficial desmarca o anterior', async () => {
+    let r = await as.gestao.act(`/patrocinadores/${a}/site`, { official: 'on' });
+    assert.equal(r.status, 302); assert.equal(r.location, `/patrocinadores/${a}`);
+    assert.equal((await flags(a)).site_official, true);
+    r = await as.gestao.act(`/patrocinadores/${b}/site`, { official: 'on' });
+    assert.equal(r.status, 302);
+    assert.equal((await flags(a)).site_official, false);
+    assert.equal((await flags(b)).site_official, true);
+    r = await as.gestao.act(`/patrocinadores/${b}/site`, {});
+    assert.equal((await flags(b)).site_official, false);
+  });
+
+  it('esconder do site grava site_hidden', async () => {
+    await as.gestao.act(`/patrocinadores/${a}/site`, { hidden: 'on' });
+    assert.deepEqual(await flags(a), { site_official: false, site_hidden: true });
+    await as.gestao.act(`/patrocinadores/${a}/site`, {});
+    assert.equal((await flags(a)).site_hidden, false);
+    const { rows } = await h.db.query(`SELECT 1 FROM sponsor_events WHERE sponsor_id = $1 AND type = 'site'`, [a]);
+    assert.ok(rows.length >= 2);
+  });
+
+  it('quem só lê patrocinadores recebe 403', async () => {
+    const r = await as.editor.act(`/patrocinadores/${a}/site`, { official: 'on' });
+    assert.equal(r.status, 403);
+    assert.equal((await flags(a)).site_official, false);
+  });
+
+  it('a página mostra os dois interruptores e a frase', async () => {
+    const r = await as.gestao.get(`/patrocinadores/${a}`);
+    assert.equal(r.status, 200);
+    assert.match(r.text, /Patrocinador oficial no site/);
+    assert.match(r.text, /Esconder do site/);
+    assert.match(r.text, /O site mostra a logo das marcas que fecharam ou patrocinam\./);
+    assert.equal((r.text.match(/role="switch"/g) || []).length >= 2, true);
+    assert.match(r.text, /action="\/patrocinadores\/\d+\/site"/);
+  });
+});
+
+after(async () => { await h.db.close(); });

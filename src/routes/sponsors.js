@@ -232,6 +232,33 @@ router.post('/patrocinadores/:id/media-kit', requirePerm('sponsors.write'), wrap
   res.redirect(`/patrocinadores/${s.id}`);
 }));
 
+// Site (podcastpulso.com): um patrocinador oficial (no máximo) e "esconder do site". O formulário manda os dois interruptores juntos.
+router.post('/patrocinadores/:id/site', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const id = Number(req.params.id);
+  const official = req.body.official === 'on';
+  const hidden = req.body.hidden === 'on';
+  const client = await db.getPool().connect();
+  let before; let s;
+  try {
+    await client.query('BEGIN');
+    ({ rows: [before] } = await client.query('SELECT id, company, site_official, site_hidden FROM sponsors WHERE id = $1 FOR UPDATE', [id]));
+    if (!before) { await client.query('ROLLBACK'); return notFound(res); }
+    if (official) await client.query('UPDATE sponsors SET site_official = false, updated_at = now() WHERE site_official AND id <> $1', [id]);
+    ({ rows: [s] } = await client.query('UPDATE sponsors SET site_official = $2, site_hidden = $3, updated_at = now() WHERE id = $1 RETURNING id, company', [id, official, hidden]));
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; } finally { client.release(); }
+  const notes = [];
+  if (before.site_official !== official) notes.push(official ? 'virou o patrocinador oficial no site' : 'deixou de ser o patrocinador oficial no site');
+  if (before.site_hidden !== hidden) notes.push(hidden ? 'foi escondido do site' : 'voltou a aparecer no site');
+  if (notes.length) {
+    await sponsorsSvc.addEvent(s.id, req.user.id, 'site', notes.join('; ').replace(/^./, (c) => c.toUpperCase()));
+    await audit(req, 'patrocinador.site', 'sponsor', s.id, { official, hidden });
+    await req.flash('ok', `${s.company}: ${notes.join('; ')}.`);
+  }
+  res.redirect(`/patrocinadores/${s.id}`);
+}));
+
 router.post('/patrocinadores/:id/etapa', requirePerm('sponsors.write'), wrap(async (req, res) => {
   const sponsor = await findSponsor(req.params.id);
   if (!sponsor) return wantsJson(req) ? res.status(404).json({ ok: false }) : notFound(res);
