@@ -1,13 +1,26 @@
-// API pública do site (podcastpulso.com). Sem login nem CSRF: o que protege é a assinatura (imagens) e o segredo do site (dados e formulários).
+// API pública do site (podcastpulso.com). Sem login nem CSRF: imagens por assinatura; dados só com o que já é público;
+// formulários com origem conferida (originCheck aceita só as origens do site), isca, validação campo a campo e limite por IP.
 const express = require('express');
+const config = require('../config');
 const db = require('../db/pool');
 const b2 = require('../services/b2');
 const guestPhotos = require('../services/guestPhotos');
 const siteImages = require('../services/siteImages');
+const siteData = require('../services/siteData');
 const webImage = require('../services/webImage');
+const { createLimiter } = require('../auth/rateLimit');
 const { wrap } = require('../utils/wrap');
 
 const router = express.Router();
+const dadosLimiter = createLimiter({ name: 'site_dados', max: 120, windowMs: 10 * 60_000 });
+
+// CORS: só as origens do site (SITE_ORIGIN) recebem a permissão; a resposta varia pela origem.
+function cors(req, res) {
+  res.vary('Origin');
+  const origin = req.get('origin');
+  if (origin && config.siteOrigins.includes(origin)) { res.set('Access-Control-Allow-Origin', origin); return true; }
+  return false;
+}
 const CACHE = 'public, max-age=3600';
 const notFound = (res) => res.status(404).type('text').send('Imagem não encontrada.'); // a mesma resposta para assinatura ruim, vencida ou sem imagem
 
@@ -43,6 +56,14 @@ router.get('/api/site/v1/imagem/:kind/:id', wrap(async (req, res) => {
   const { kind, id } = req.params;
   if (!Object.hasOwn(SOURCES, kind) || !siteImages.verify(kind, id, req.query.e, req.query.s)) return notFound(res);
   if (!await SOURCES[kind](req, res, Number(id))) return notFound(res);
+}));
+
+// Tudo o que o site mostra, em um JSON só (contrato versionado: version 1).
+router.get('/api/site/v1/dados', wrap(async (req, res) => {
+  cors(req, res);
+  if (!await dadosLimiter.hit(req.ip)) return res.status(429).json({ ok: false, error: 'Muitas leituras seguidas. Tente de novo em alguns minutos.' });
+  const data = await siteData.build();
+  res.set({ 'Cache-Control': 'public, max-age=60', 'Cross-Origin-Resource-Policy': 'cross-origin' }).json(data);
 }));
 
 module.exports = router;

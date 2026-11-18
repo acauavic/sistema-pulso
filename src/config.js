@@ -20,6 +20,9 @@ const config = {
   // pode ser outro domínio (ex.: https://kit.podcastpulso.com) apontando pro mesmo serviço.
   publicBaseUrl: (env.PUBLIC_BASE_URL || env.APP_BASE_URL || `http://localhost:${port}`).replace(/\/+$/, ''),
   sessionSecret: env.SESSION_SECRET,
+  // Site do Pulso (podcastpulso.com): origens que podem ler os dados e mandar os formulários (lista separada por vírgula).
+  // A primeira é o endereço do site (para onde os formulários sem JavaScript voltam).
+  siteOrigins: String(env.SITE_ORIGIN || 'https://podcastpulso.com,https://www.podcastpulso.com').split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean),
   sessionDays: 7,
   autoMigrate: env.AUTO_MIGRATE !== 'false',
   // Miniaturas da galeria do material: ficam no disco do servidor (volume no Docker), não no Backblaze.
@@ -96,6 +99,7 @@ const config = {
   },
 };
 
+config.siteBaseUrl = config.siteOrigins[0] || 'https://podcastpulso.com';
 config.mailConfigured = config.mailDryRun || Boolean(config.brevo.user && config.brevo.pass && config.brevo.from);
 config.storageConfigured = Boolean(config.b2.keyId && config.b2.appKey && config.b2.bucket);
 config.geminiConfigured = Boolean(config.gemini.key);

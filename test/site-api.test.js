@@ -221,3 +221,183 @@ describe('Site: imagens assinadas', () => {
     assert.throws(() => siteImages.signedUrl('video', 1));
   });
 });
+
+describe('Site: leitura pública', () => {
+  let app;
+  const SITE = 'https://podcastpulso.com';
+  const get = async (headers = { origin: SITE }) => {
+    const r = await fetch(`${app.base}/api/site/v1/dados`, { headers });
+    return { status: r.status, headers: r.headers, json: r.status === 200 ? await r.json() : null };
+  };
+  const day = (offset) => new Date(Date.now() + offset * 86400_000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const sponsor = async (company, stage, { logo = true, hidden = false, official = false, starts = null } = {}) => {
+    const { rows: [s] } = await h.db.query(
+      `INSERT INTO sponsors (company, stage, site_hidden, site_official, starts_on, website, contact_phone, contact_email, value_cents)
+       VALUES ($1, $2, $3, $4, $5, 'marca.com.br', '11999990000', 'x@y.com', 500000) RETURNING id`, [company, stage, hidden, official, starts]);
+    if (logo) await h.db.query(`INSERT INTO sponsor_files (sponsor_id, kind, storage_key, content_type) VALUES ($1, 'logo', 'pp/logo-${s.id}.png', 'image/png')`, [s.id]);
+    return s.id;
+  };
+  before(async () => {
+    await h.resetDb();
+    app = await h.startServer();
+    const owner = await h.createUser({ name: 'Dona Owner', email: 'dona@t.com', role: 'gestao' });
+    // convidados
+    const g = async (name, status, extra = {}) => (await h.db.query(
+      `INSERT INTO guests (name, instagram, status, phone, email, notes, owner_id, invite_token${Object.keys(extra).map((k) => `, ${k}`).join('')})
+       VALUES ($1, $2, $3, '11999990000', 'x@y.com', 'nota secreta', $4, $5${Object.values(extra).map((v) => `, ${v}`).join('')}) RETURNING id`,
+      [name, name.toLowerCase().replace(/\W/g, ''), status, owner.id, `tok${name.length}${status}`])).rows[0].id;
+    const gEstreia = await g('Dra Estreia', 'gravado');
+    await g('Dr Previsto', 'agendado', { premiere_on: `'${day(10)}'` });
+    await g('Dra Gravacao', 'agendado', { proposed_at: "now() + interval '5 days'" });
+    await g('Dr Perdido', 'perdido', { proposed_at: "now() + interval '5 days'", loss_reason: "'recusado'" });
+    const gPub = await g('Dra Publicada', 'gravado');
+    const gData = await g('Dr Data', 'gravado');
+    // episódios
+    await h.db.query(`INSERT INTO episodes (title, guest_id, status, aired_on) VALUES ('Estreia amanhã', $1, 'em_edicao', $2)`, [gEstreia, day(1)]);
+    await h.db.query(`INSERT INTO episodes (title, guest_id, status, aired_on) VALUES ('Na data', $1, 'pronto_publicar', '2026-12-20')`, [gData]);
+    await h.db.query(`INSERT INTO episodes (number, title, guest_id, status, aired_on, youtube_url, spotify_url, kit_featured)
+                      VALUES (2, 'Mais novo', $1, 'publicado', '2026-11-10', 'https://youtu.be/abc123XYZ_-', 'https://open.spotify.com/intl-pt/episode/4rOoJ6Egrf8K2IrywzwOMk?si=x', true)`, [gPub]);
+    await h.db.query(`INSERT INTO episodes (number, title, status, aired_on, youtube_url) VALUES (1, 'Mais velho', 'publicado', '2026-10-01', 'https://www.youtube.com/watch?v=OLD_id-1234&t=3')`);
+    await h.db.query(`INSERT INTO episodes (number, title, status, aired_on) VALUES (3, 'Sem link', 'publicado', '2026-11-12')`);
+    // patrocinadores
+    await sponsor('Ativa Logo', 'ativo', { starts: '2026-01-01' });
+    await sponsor('Inativa Logo', 'inativo', { starts: '2026-02-01' });
+    await sponsor('Prospect Logo', 'prospect');
+    await sponsor('Ativa Sem Logo', 'ativo', { logo: false });
+    await sponsor('Ativa Escondida', 'ativo', { hidden: true });
+    await sponsor('Oficial', 'ativo', { official: true });
+  });
+  after(async () => { await app.close?.(); });
+
+  it('responde o contrato com as chaves de primeiro nível', async () => {
+    const { status, json } = await get();
+    assert.equal(status, 200);
+    assert.deepEqual(Object.keys(json), ['version', 'generated_at', 'mesa', 'episodios', 'posts', 'agenda', 'patrocinador_oficial', 'apoiadores', 'plateia']);
+    assert.equal(json.version, 1);
+    assert.deepEqual(Object.keys(json.agenda), ['vai_ao_ar', 'gravacoes']);
+    assert.deepEqual(json.plateia, { abertas: 1 }); // a plateia nasce aberta; Dra Gravacao está na agenda dela
+    assert.ok(!Number.isNaN(Date.parse(json.generated_at)));
+  });
+
+  it('plateia fechada: abertas 0 e nenhuma gravação com plateia', async () => {
+    const settings = require('../src/services/settings');
+    assert.equal((await get()).json.agenda.gravacoes.find((x) => x.name === 'Dra Gravacao').plateia, true);
+    await settings.set('plateia_active', 'false');
+    try {
+      const { json } = await get();
+      assert.deepEqual(json.plateia, { abertas: 0 });
+      assert.ok(json.agenda.gravacoes.every((x) => x.plateia === false));
+    } finally { await settings.set('plateia_active', 'true'); }
+  });
+
+  it('não expõe dado privado', async () => {
+    const text = JSON.stringify((await get()).json);
+    for (const bad of ['11999990000', 'x@y.com', '500000', 'owner', 'storage_key', 'token', 'nota secreta', 'Dona Owner']) assert.ok(!text.includes(bad), bad);
+  });
+
+  it('apoiadores: só ganho/ativo/inativo com logo, sem os escondidos e sem o oficial', async () => {
+    const { json } = await get();
+    assert.deepEqual(json.apoiadores.map((a) => a.company), ['Ativa Logo', 'Inativa Logo']);
+    assert.equal(json.apoiadores[0].website, 'https://marca.com.br');
+    assert.ok(json.apoiadores[0].logo.startsWith(`${h.config.appBaseUrl}/api/site/v1/imagem/logo/`));
+    assert.equal(json.patrocinador_oficial.company, 'Oficial');
+    assert.deepEqual(Object.keys(json.patrocinador_oficial), ['company', 'website', 'logo']);
+  });
+
+  it('oficial e escondido ao mesmo tempo não aparece em lugar nenhum', async () => {
+    await h.db.query(`UPDATE sponsors SET site_hidden = true WHERE company = 'Oficial'`);
+    try {
+      const { json } = await get();
+      assert.equal(json.patrocinador_oficial, null);
+      assert.ok(!json.apoiadores.some((a) => a.company === 'Oficial'));
+    } finally {
+      await h.db.query(`UPDATE sponsors SET site_hidden = false WHERE company = 'Oficial'`);
+    }
+  });
+
+  it('agenda: estreia e estreia prevista em vai_ao_ar, agendado sem episódio em gravacoes', async () => {
+    const { json } = await get();
+    const ar = json.agenda.vai_ao_ar.map((x) => x.name);
+    const grav = json.agenda.gravacoes.map((x) => x.name);
+    assert.ok(ar.includes('Dra Estreia'), ar.join());
+    assert.ok(ar.includes('Dr Previsto'), ar.join());
+    assert.ok(!ar.includes('Dra Gravacao'));
+    assert.ok(grav.includes('Dra Gravacao'), grav.join());
+    assert.ok(!grav.includes('Dra Estreia')); // já tem episódio
+    assert.ok(![...ar, ...grav].includes('Dr Perdido'));
+    const estreia = json.agenda.vai_ao_ar.find((x) => x.name === 'Dra Estreia');
+    assert.deepEqual(Object.keys(estreia), ['date', 'name', 'handle', 'topic', 'photo']);
+    assert.equal(estreia.date, day(1));
+    assert.equal(json.agenda.vai_ao_ar.find((x) => x.name === 'Dr Previsto').date, day(10));
+    const gr = json.agenda.gravacoes.find((x) => x.name === 'Dra Gravacao');
+    assert.deepEqual(Object.keys(gr), ['at', 'name', 'handle', 'topic', 'photo', 'plateia']);
+    assert.equal(gr.handle, 'dragravacao');
+    assert.equal(typeof gr.plateia, 'boolean');
+    assert.ok(gr.photo.startsWith(`${h.config.appBaseUrl}/api/site/v1/imagem/foto/`));
+  });
+
+  it('datas só-dia não mudam de dia', async () => {
+    const { json } = await get();
+    assert.equal(json.agenda.vai_ao_ar.find((x) => x.name === 'Dr Data').date, '2026-12-20');
+    assert.equal(json.episodios.find((e) => e.title === 'Mais novo').aired_on, '2026-11-10');
+  });
+
+  it('episódios: só publicados com link, mais recente primeiro, com youtube_id', async () => {
+    const { json } = await get();
+    assert.deepEqual(json.episodios.map((e) => e.title), ['Mais novo', 'Mais velho']);
+    const [novo, velho] = json.episodios;
+    assert.deepEqual(Object.keys(novo), ['number', 'title', 'guest', 'aired_on', 'youtube_url', 'spotify_url', 'youtube_id', 'spotify_kind', 'spotify_id', 'cover']);
+    assert.equal(novo.youtube_id, 'abc123XYZ_-');
+    assert.equal(novo.spotify_kind, 'episode');
+    assert.equal(novo.spotify_id, '4rOoJ6Egrf8K2IrywzwOMk');
+    assert.equal(novo.guest, 'Dra Publicada');
+    assert.equal(novo.number, 2);
+    assert.equal(velho.youtube_id, 'OLD_id-1234');
+    assert.equal(velho.spotify_kind, null);
+    assert.equal(velho.guest, null);
+  });
+
+  it('extrai o id do YouTube (watch, youtu.be, shorts, live) e do Spotify (episode, show)', () => {
+    const { youtubeId, spotifyRef, publicUrl } = require('../src/services/siteData');
+    assert.equal(youtubeId('https://www.youtube.com/shorts/abc123XYZ_-'), 'abc123XYZ_-');
+    assert.equal(youtubeId('https://youtube.com/live/abc123XYZ_-?feature=share'), 'abc123XYZ_-');
+    assert.equal(youtubeId('https://m.youtube.com/watch?v=abc123XYZ_-'), 'abc123XYZ_-');
+    assert.equal(youtubeId('https://evil.com/watch?v=abc123XYZ_-'), null);
+    assert.deepEqual(spotifyRef('https://open.spotify.com/show/4rOoJ6Egrf8K2IrywzwOMk'), { kind: 'show', id: '4rOoJ6Egrf8K2IrywzwOMk' });
+    assert.deepEqual(spotifyRef('https://open.spotify.com/track/4rOoJ6Egrf8K2IrywzwOMk'), { kind: null, id: null });
+    assert.equal(publicUrl('javascript:alert(1)'), null);
+    assert.equal(publicUrl('marca.com.br'), 'https://marca.com.br');
+  });
+
+  it('mesa: os escolhidos para o kit, com nome, credencial e episódio', async () => {
+    const { json } = await get();
+    assert.equal(json.mesa.length, 1);
+    assert.deepEqual(Object.keys(json.mesa[0]), ['name', 'credential', 'handle', 'audience', 'ep', 'photo']);
+    assert.equal(json.mesa[0].name, 'Dra Publicada');
+    assert.equal(json.mesa[0].ep, 2);
+  });
+
+  it('posts: os do Instagram que estão no ar, com link', async () => {
+    const ep = (await h.db.query(`SELECT id FROM episodes WHERE title = 'Mais novo'`)).rows[0].id;
+    await h.db.query(`INSERT INTO episode_publications (episode_id, platforms, title, status, results) VALUES
+      ($1, '{instagram}', 'Post no ar', 'publicado', '[{"platform":"instagram","ok":true,"url":"https://www.instagram.com/p/ABC/"}]'),
+      ($1, '{instagram}', 'Post com erro', 'erro', '[{"platform":"instagram","ok":false,"url":"https://www.instagram.com/p/ERR/"}]'),
+      ($1, '{youtube}', 'Só YouTube', 'publicado', '[{"platform":"youtube","ok":true,"url":"https://youtu.be/x"}]')`, [ep]);
+    const { json } = await get();
+    assert.deepEqual(json.posts.map((p) => p.title), ['Post no ar']);
+    assert.deepEqual(Object.keys(json.posts[0]), ['url', 'title', 'published_at', 'cover']);
+    assert.equal(json.posts[0].url, 'https://www.instagram.com/p/ABC/');
+  });
+
+  it('responde com Cache-Control público e CORS do site', async () => {
+    const r = await get();
+    assert.equal(r.headers.get('cache-control'), 'public, max-age=60');
+    assert.equal(r.headers.get('access-control-allow-origin'), SITE);
+    assert.match(r.headers.get('vary') || '', /Origin/);
+    const www = await get({ origin: 'https://www.podcastpulso.com' });
+    assert.equal(www.headers.get('access-control-allow-origin'), 'https://www.podcastpulso.com');
+    const fora = await get({ origin: 'https://outro.com' });
+    assert.equal(fora.status, 200);
+    assert.equal(fora.headers.get('access-control-allow-origin'), null);
+  });
+});
