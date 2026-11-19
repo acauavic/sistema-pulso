@@ -17,3 +17,38 @@
 		max_size 300MB
 	}
 }
+
+# Site do Pulso (estático, gerado pelo container "builder" do repositório site-pulso em /opt/site-pulso/www/dist).
+{$SITE_DOMINIO} {
+	root * /srv/www/dist
+	encode zstd gzip
+	header {
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; frame-src https://www.youtube-nocookie.com https://open.spotify.com; connect-src 'self' https://sistema.podcastpulso.com; form-action 'self' https://podcastpulso.com https://sistema.podcastpulso.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+		# nunca no-referrer: com ele o formulário sem JavaScript chega ao sistema com Origin: null e leva 403
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Content-Type-Options "nosniff"
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	# imagens têm o hash no nome e as fontes não mudam: cache longo. O resto (HTML, CSS, JS) muda a cada build.
+	@longo path /img/* /fonts/*
+	header @longo Cache-Control "public, max-age=31536000, immutable"
+	@curto not path /img/* /fonts/*
+	header @curto Cache-Control "public, max-age=300"
+	try_files {path} {path}/index.html
+	file_server
+	handle_errors {
+		@naoexiste expression `{err.status_code} == 404`
+		handle @naoexiste {
+			rewrite * /404.html
+			file_server {
+				status 404
+			}
+		}
+		respond "{err.status_code}" {err.status_code}
+	}
+}
+
+www.{$SITE_DOMINIO} {
+	redir https://{$SITE_DOMINIO}{uri} permanent
+}

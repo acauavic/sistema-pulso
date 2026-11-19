@@ -64,8 +64,11 @@ services:
       - "443:443"
     environment:
       DOMINIO: ${DOMINIO}
+      SITE_DOMINIO: ${SITE_DOMINIO:-podcastpulso.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # site do Pulso (podcastpulso.com): gerado pelo container "builder" do repositório site-pulso; a pasta de CIMA
+      - /opt/site-pulso/www:/srv/www:ro
       - caddy_data:/data
       - caddy_config:/config
 
