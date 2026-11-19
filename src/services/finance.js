@@ -185,8 +185,9 @@ async function onEpisodeDates(episodeId) {
     if (base) await db.query('UPDATE fin_entries SET due_on = $2, updated_at = now() WHERE id = $1', [r.entry_id, addDays(base, r.offset_days)]);
   }
   if (ep.recorded_on) await db.query("UPDATE fin_entries SET due_on = $2, updated_at = now() WHERE auto_key = $1 AND status = 'previsto'", [`estudio-saldo-e${ep.id}`, iso(ep.recorded_on)]);
-  // A data pode ter levado o episódio para dentro ou para fora do banco de horas: refaz o estúdio (idempotente). Só para quem já
-  // tem conta de estúdio; episódio importado do histórico (sem custos automáticos) continua sem nenhuma.
+  // Banco de horas ligado: a data pode ter levado o episódio para dentro ou para fora do banco, então refaz o estúdio (idempotente).
+  // Só para quem já tem conta de estúdio (episódio importado do histórico continua sem nenhuma); no modo por hora nada muda.
+  if ((await settings()).studio_mode !== 'banco') return;
   const { rows: [hasStudio] } = await db.query("SELECT 1 FROM fin_entries WHERE episode_id = $1 AND auto_key LIKE 'estudio-%' LIMIT 1", [ep.id]);
   if (hasStudio) await recomputeStudio(ep.id);
 }

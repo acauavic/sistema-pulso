@@ -65,6 +65,16 @@ describe('banco de horas do estúdio', () => {
     assert.equal((await byKey(`estudio-saldo-e${ids.T}`)).status, 'previsto');
   });
 
+  it('modo por hora: editar a data de episódio com saldo pago em parte não lança hora extra (como antes do banco)', async () => {
+    const gH = await mkGuest('Dr. Hora'); await prod.syncFromGuest(gH);
+    const ep = await record(gH, '2026-11-03');
+    const saldo = await byKey(`estudio-saldo-e${ep.id}`);
+    await h.db.query("UPDATE fin_entries SET status = 'pago', paid_on = '2026-11-03', amount_cents = 10000 WHERE id = $1", [saldo.id]);
+    assert.equal((await editDate(ep.id, '2026-11-04')).status, 302);
+    assert.equal(await byKey(`estudio-extra-e${ep.id}`), undefined);
+    assert.equal(fin.iso((await one('SELECT recorded_on FROM episodes WHERE id = $1', [ep.id])).recorded_on), '2026-11-04');
+  });
+
   it('permissões: só quem escreve no Financeiro liga o banco e registra compra; a produtora não vê', async () => {
     const before = await fin.settings();
     assert.equal((await as.prod.act('/financeiro/banco/ligar', { start_episode_id: String(ids.S), bought_on: '2026-11-14', hours: '20', amount: '5.000,00' }, { from: '/' })).status, 403);
