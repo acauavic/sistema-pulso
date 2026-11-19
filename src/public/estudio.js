@@ -39,9 +39,33 @@
   }
   const fromInput = (input) => [...input.files].map((file) => ({ file, path: file.webkitRelativePath || file.name }));
 
+  // ---------------------------------------------------------------- "não sou robô" (Turnstile)
+  // O servidor só aceita começar envios depois da confirmação, que vale 12 h para este link. Começa já ao abrir a página.
+  const tsBox = document.querySelector('[data-turnstile]');
+  let passed = !tsBox; let passing = null;
+  function pass() {
+    if (passed) return Promise.resolve(true);
+    if (passing) return passing;
+    passing = (async () => {
+      for (let i = 0; i < 3; i++) {
+        const tok = await window.PulsoTurnstile.token(tsBox);
+        if (!tok) break;
+        const r = await fetch(base.replace(/arquivos\/$/, 'verificar'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ turnstile: tok }) }).catch(() => null);
+        if (r && r.ok) { passed = true; return true; }
+        window.PulsoTurnstile.reset(tsBox);
+      }
+      say('Não conseguimos confirmar que você não é um robô. Recarregue a página e tente de novo.');
+      passing = null;
+      return false;
+    })();
+    return passing;
+  }
+  if (tsBox && window.PulsoTurnstile) pass();
+
   // ---------------------------------------------------------------- fila
-  function enqueue(list) {
+  async function enqueue(list) {
     if (!U) { say('O envio não abriu neste navegador. Tente o Chrome ou o Edge atualizados.'); return; }
+    if (!passed) { say('Confirmando que você não é um robô…'); if (!(await pass())) return; }
     const clean = list.filter((x) => x.file.size > 0 && !JUNK.test(x.path));
     let skipped = 0; let resumed = 0;
     const entries = [];

@@ -43,6 +43,7 @@
     </form>
   </section>
 <template data-upl-icons><span data-i="x"><%- icon('x', 14) %></span><span data-i="rotate-cw"><%- icon('rotate-cw', 14) %></span><span data-i="chevron-up"><%- icon('chevron-up', 16) %></span></template>
+<%- include('../partials/turnstile', { tsManual: true, tsAction: 'estudio' }) %>
 <script src="/static/uploads.js?v=<%= assetV %>" defer></script>
 <script src="/static/estudio.js?v=<%= assetV %>" defer></script>
 <%- include('_bottom') %>

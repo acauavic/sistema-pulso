@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.87.0', date: '2026-11-19', title: '"Não sou robô" nas telas públicas',
+    items: [
+      { kind: 'novo', text: 'O login, o "Esqueci minha senha", o link do estúdio, o pedido de participação na plateia e os formulários do site passam a ter a confirmação "não sou robô" do Cloudflare. Quase sempre ela é invisível; a caixa só aparece quando a visita parece suspeita.' },
+      { kind: 'ajuste', text: 'No link do estúdio, a confirmação é feita uma vez ao abrir a página e vale por 12 horas: envios longos não pedem de novo.' },
+    ],
+  },
+  {
     version: '1.86.1', date: '2026-11-19', title: 'Mais correções de segurança',
     items: [
       { kind: 'correcao', text: 'O e-mail de quem já tem senha só pode ser trocado por um superadmin, e trocar o e-mail ou a senha invalida os links de acesso que já tinham saído.' },

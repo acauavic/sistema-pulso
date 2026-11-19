@@ -99,6 +99,8 @@
     form.elements.terms.checked = false;
     show('form');
     dlg.showModal();
+    const tsBox = form.querySelector('[data-turnstile]'); // "não sou robô": nasce quando a janela abre (escondida, não renderiza)
+    if (tsBox && window.PulsoTurnstile) window.PulsoTurnstile.render(tsBox);
     form.elements.name.focus();
   });
   dlg.querySelector('[data-close]').addEventListener('click', () => dlg.close());
@@ -116,11 +118,14 @@
     if (bad || !current) return;
     const btn = form.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Enviando…';
     try {
+      const tsBox = form.querySelector('[data-turnstile]');
+      const turnstile = tsBox && window.PulsoTurnstile ? await window.PulsoTurnstile.token(tsBox) : undefined;
       const res = await fetch('/plateia/inscricao', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guest_id: current.id, partner: body.dataset.partner || undefined, name, country: form.elements.country.value, phone: form.elements.phone.value, terms: form.elements.terms.checked, site: form.elements.site.value, visitor_id: visitor, utm, referrer, landing }),
+        body: JSON.stringify({ guest_id: current.id, partner: body.dataset.partner || undefined, name, country: form.elements.country.value, phone: form.elements.phone.value, terms: form.elements.terms.checked, site: form.elements.site.value, turnstile: turnstile || undefined, visitor_id: visitor, utm, referrer, landing }),
       });
       const json = await res.json().catch(() => ({}));
+      if (tsBox && window.PulsoTurnstile) window.PulsoTurnstile.reset(tsBox); // o token vale uma vez
       if (!res.ok || !json.ok) { err(json.field || 'form', json.error || 'Não foi possível enviar agora. Tente novamente.'); return; }
       ref = json.ref;
       fire('Lead', 'generate_lead', { content_name: current.name });

@@ -159,3 +159,7 @@ a { color: inherit; }
 .pl-foot { padding-bottom: 96px; }
 @media (max-width: 600px) { .pl-wa { width: 56px; height: 56px; padding: 0; justify-content: center; } .pl-wa span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
 @media (prefers-reduced-motion: reduce) { .pl-wa { transition: none; } .pl-wa:hover { transform: none; } }
+
+/* Cloudflare Turnstile ("não sou robô"): some enquanto confirma sozinho; quando pede a caixa, ela aparece centralizada */
+.ts-box { display: flex; justify-content: center; margin: 4px 0; }
+.ts-box:empty { display: none; }

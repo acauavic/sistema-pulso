@@ -34,7 +34,7 @@
 	root * /srv/www/dist
 	encode zstd gzip
 	header {
-		Content-Security-Policy "default-src 'self'; img-src 'self' data:; frame-src https://www.youtube-nocookie.com https://open.spotify.com; connect-src 'self' https://sistema.podcastpulso.com; form-action 'self' https://podcastpulso.com https://sistema.podcastpulso.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; img-src 'self' data:; frame-src https://www.youtube-nocookie.com https://open.spotify.com https://challenges.cloudflare.com; connect-src 'self' https://sistema.podcastpulso.com; form-action 'self' https://podcastpulso.com https://sistema.podcastpulso.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 		# nunca no-referrer: com ele o formulário sem JavaScript chega ao sistema com Origin: null e leva 403
 		Referrer-Policy "strict-origin-when-cross-origin"
 		X-Content-Type-Options "nosniff"

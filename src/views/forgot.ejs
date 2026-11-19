@@ -7,8 +7,10 @@
     <p class="center small"><a href="/login">Voltar para o login</a></p>
   <% } else { %>
     <p class="muted">Informe o e-mail da sua conta e enviaremos um link para redefinir a senha.</p>
+    <% if (typeof error !== 'undefined' && error) { %><div class="flash flash-error"><%= error %></div><% } %>
     <form method="post" action="/esqueci-senha" class="stack">
-      <label>E-mail<input type="email" name="email" autocomplete="username" required autofocus></label>
+      <label>E-mail<input type="email" name="email" value="<%= email %>" autocomplete="username" required autofocus></label>
+      <%- include('partials/turnstile', { tsAction: 'esqueci' }) %>
       <button class="btn primary lg" type="submit">Enviar link</button>
     </form>
     <p class="center small"><a href="/login">Voltar</a></p>

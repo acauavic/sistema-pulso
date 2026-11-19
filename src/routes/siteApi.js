@@ -12,6 +12,7 @@ const webImage = require('../services/webImage');
 const { createLimiter } = require('../auth/rateLimit');
 const { wrap } = require('../utils/wrap');
 
+const turnstile = require('../services/turnstile');
 const router = express.Router();
 const dadosLimiter = createLimiter({ name: 'site_dados', max: 120, windowMs: 10 * 60_000 });
 const pedidoLimiter = createLimiter({ name: 'site_pedido', max: 8, windowMs: 10 * 60_000 });
@@ -95,11 +96,12 @@ router.post(FORM_PATH, wrap(async (req, res) => {
   const ok = () => (asJson ? res.json({ ok: true }) : res.redirect(303, `${config.siteBaseUrl}/obrigado/?tipo=${tipo}`));
   const no = (status, field, error) => {
     if (asJson) return res.status(status).json(field ? { ok: false, field, error } : { ok: false, error });
-    return res.redirect(303, `${config.siteBaseUrl}/ops/?tipo=${tipo}&erro=${FIELDS.has(field) ? field : 'limite'}`);
+    return res.redirect(303, `${config.siteBaseUrl}/ops/?tipo=${tipo}&erro=${FIELDS.has(field) || field === 'robo' ? field : 'limite'}`);
   };
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   if (typeof body.url_extra === 'string' ? body.url_extra.trim() : body.url_extra) return ok(); // isca para robôs: parece aceitar, não grava
   if (!await pedidoLimiter.hit(req.ip)) return no(429, null, 'Muitos envios seguidos. Aguarde alguns minutos e tente de novo.');
+  if (!(await turnstile.verify(turnstile.tokenOf(body), req.ip)).ok) return no(400, 'robo', turnstile.MESSAGE);
   const form = FORMS[tipo];
   const v = form.validate(body);
   if (v.error) return no(400, v.field, v.error);

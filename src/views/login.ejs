@@ -8,6 +8,7 @@
     <form method="post" action="/login" class="stack">
       <label>E-mail<input type="email" name="email" value="<%= email %>" autocomplete="username" required autofocus></label>
       <label>Senha<input type="password" name="password" autocomplete="current-password" required></label>
+      <%- include('partials/turnstile', { tsAction: 'login' }) %>
       <button class="btn primary lg" type="submit">Entrar</button>
     </form>
     <p class="center small mt-20 mb-0"><a href="/esqueci-senha">Esqueci minha senha</a></p>

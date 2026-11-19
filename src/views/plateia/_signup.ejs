@@ -26,6 +26,7 @@
         <small class="pl-err" data-err="terms"></small>
       </div>
       <input type="text" name="site" class="pl-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <%- include('../partials/turnstile', { tsManual: true, tsLazy: true, tsAction: 'plateia' }) %>
       <p class="pl-err pl-err-main" data-err="form" role="alert"></p>
       <button class="pl-btn" type="submit">Revisar pedido</button>
     </form>

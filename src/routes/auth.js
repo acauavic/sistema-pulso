@@ -6,6 +6,7 @@ const { hashPassword, verifyPassword, passwordPolicyError, burnPasswordCheck } =
 const { createAuthToken, peekAuthToken, consumeAuthToken, revokeAuthTokens } = require('../auth/tokens');
 const { createLimiter } = require('../auth/rateLimit');
 const mailer = require('../services/mailer');
+const turnstile = require('../services/turnstile');
 const { audit } = require('../services/audit');
 const { requireAuth } = require('../middleware');
 const { wrap } = require('../utils/wrap');
@@ -26,12 +27,12 @@ const NOTICES = {
   saiu: 'Você saiu da sua conta.',
 };
 
-router.get('/login', (req, res) => {
+router.get('/login', turnstile.page, (req, res) => {
   if (req.user) return res.redirect('/');
   return res.render('login', { title: 'Entrar', error: null, email: '', notice: NOTICES[req.query.ok] || null });
 });
 
-router.post('/login', wrap(async (req, res) => {
+router.post('/login', turnstile.page, wrap(async (req, res) => {
   const email = clean(req.body.email, 254).toLowerCase();
   const password = typeof req.body.password === 'string' ? req.body.password : '';
   const fail = (status, error) => res.status(status).render('login', { title: 'Entrar', error, email, notice: null });
@@ -39,6 +40,7 @@ router.post('/login', wrap(async (req, res) => {
   if (await loginLimiterIp.blocked(req.ip) || await loginLimiterEmail.blocked(emailIpKey(email, req.ip)) || await loginLimiterEmailAll.blocked(email)) {
     return fail(429, 'Muitas tentativas. Aguarde alguns minutos e tente de novo.');
   }
+  if (!(await turnstile.verify(turnstile.tokenOf(req.body), req.ip)).ok) return fail(400, turnstile.MESSAGE);
   const { rows } = await db.query('SELECT * FROM users WHERE lower(email) = $1', [email]);
   const user = rows[0];
   const checks = Boolean(user && user.active && user.password_hash);
@@ -69,11 +71,14 @@ router.post('/logout', wrap(async (req, res) => {
 }));
 
 // ---- esqueci a senha ----
-router.get('/esqueci-senha', (req, res) => res.render('forgot', { title: 'Esqueci minha senha', sent: false, email: '' }));
+router.get('/esqueci-senha', turnstile.page, (req, res) => res.render('forgot', { title: 'Esqueci minha senha', sent: false, email: '' }));
 
-router.post('/esqueci-senha', wrap(async (req, res) => {
+router.post('/esqueci-senha', turnstile.page, wrap(async (req, res) => {
   const email = clean(req.body.email, 254).toLowerCase();
   const render = () => res.render('forgot', { title: 'Esqueci minha senha', sent: true, email });
+  if (!(await turnstile.verify(turnstile.tokenOf(req.body), req.ip)).ok) {
+    return res.status(400).render('forgot', { title: 'Esqueci minha senha', sent: false, email, error: turnstile.MESSAGE });
+  }
   if (!isEmail(email) || !await forgotLimiter.hit(req.ip) || !await forgotLimiter.hit(email)) return render(); // resposta idêntica sempre
   const { rows } = await db.query('SELECT id, name, email, active FROM users WHERE lower(email) = $1', [email]);
   const user = rows[0];

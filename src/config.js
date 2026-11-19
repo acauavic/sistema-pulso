@@ -22,6 +22,8 @@ const config = {
   sessionSecret: env.SESSION_SECRET,
   // Site do Pulso (podcastpulso.com): origens que podem ler os dados e mandar os formulários (lista separada por vírgula).
   // A primeira é o endereço do site (para onde os formulários sem JavaScript voltam).
+  // Cloudflare Turnstile ("não sou robô") no login, recuperar senha, link do estúdio, plateia e formulários do site; sem as duas chaves, desligado
+  turnstile: { siteKey: String(env.TURNSTILE_SITE_KEY || '').trim(), secret: String(env.TURNSTILE_SECRET_KEY || '').trim() },
   siteOrigins: String(env.SITE_ORIGIN || 'https://podcastpulso.com,https://www.podcastpulso.com').split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean),
   sessionDays: 7,
   autoMigrate: env.AUTO_MIGRATE !== 'false',

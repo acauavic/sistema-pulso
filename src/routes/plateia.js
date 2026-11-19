@@ -7,6 +7,7 @@ const page = require('../services/audiencePage');
 const b2 = require('../services/b2');
 const db = require('../db/pool');
 const { createLimiter } = require('../auth/rateLimit');
+const turnstile = require('../services/turnstile');
 const { wrap, isIntId } = require('../utils/wrap');
 const { icon } = require('../utils/icons');
 
@@ -53,7 +54,7 @@ const FAQ = (s, { varies = false, min = s.priceCents } = {}) => [
   ['Posso escolher o episódio?', 'Sim. Você escolhe a gravação que quer pedir; a produção decide o encaixe conforme o convidado e as vagas de cada episódio.'],
 ];
 
-router.get('/plateia', wrap(async (req, res) => {
+router.get('/plateia', turnstile.page, wrap(async (req, res) => {
   const s = await audience.settings();
   const agenda = s.active ? await audience.agenda() : [];
   const varies = agenda.some((g) => g.priceCents !== s.priceCents);
@@ -70,7 +71,7 @@ router.get('/plateia', wrap(async (req, res) => {
 
 // Página de um convidado (/plateia/com/:slug) e o link de parceiro (/plateia/com/:slug/:token, participação isenta até o limite).
 // A página existe enquanto a gestão a deixa ativa; fora da agenda (gravação passou, lotou ou encerrou) ela mostra que encerrou.
-router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], wrap(async (req, res, next) => {
+router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], turnstile.page, wrap(async (req, res, next) => {
   if (req.params.token === 'foto' || req.params.token === 'fotos') return next();
   const g = await page.bySlug(req.params.slug);
   if (!g) return res.status(404).set(require('../services/inviteTemplate').publicHeaders()).type('html').send(require('../services/publicPages').messageHtml('Página não encontrada', 'Esta página de plateia não existe ou foi desligada. Veja as próximas gravações em podcastpulso.com/plateia.'));
@@ -175,6 +176,7 @@ router.post('/plateia/inscricao', wrap(async (req, res) => {
   const b = req.body || {};
   if (b.site) return res.json({ ok: true, ref: 'x', url: null }); // isca para robôs: parece aceitar, não grava
   if (!await leadLimiter.hit(req.ip)) return res.status(429).json({ ok: false, error: 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.' });
+  if (!(await turnstile.verify(turnstile.tokenOf(b), req.ip)).ok) return res.status(400).json({ ok: false, error: turnstile.MESSAGE });
   const s = await audience.settings();
   if (!s.active) return res.status(403).json({ ok: false, error: 'As inscrições estão pausadas no momento.' });
   const guest = isIntId(String(b.guest_id ?? '')) ? await audience.agendaGuest(Number(b.guest_id)) : null;

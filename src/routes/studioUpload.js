@@ -14,6 +14,8 @@ const MAX_PART = 70 * prod.MB;
 const MAX_FILE = 200 * 1024 * prod.MB; // 200 GB
 const missLimiter = createLimiter({ name: 'estudio_token_invalido', max: 30, windowMs: 10 * 60_000 }); // tentar adivinhar o link
 const startLimiter = createLimiter({ name: 'estudio_iniciar', max: 1200, windowMs: 60 * 60_000 }); // arquivos iniciados por link
+const verifyLimiter = createLimiter({ name: 'estudio_verificar', max: 30, windowMs: 10 * 60_000 });
+const turnstile = require('../services/turnstile');
 
 const HEADERS = { 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'same-origin', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY' };
 const jsonError = (res, status, error, code) => res.status(status).set(HEADERS).json({ ok: false, error, ...(code ? { code } : {}) });
@@ -44,9 +46,10 @@ async function storageGuard(res, fn) {
   }
 }
 
-router.get('/estudio/:token', wrap(async (req, res) => {
+router.get('/estudio/:token', turnstile.page, wrap(async (req, res) => {
   const link = await load(req, res, { page: true });
   if (!link) return;
+  if (turnstile.passOk(req, link.id)) res.locals.turnstileKey = null; // já confirmou nas últimas 12 h: nada a mostrar
   const files = await links.files(link.id);
   res.set(HEADERS).render('studio/upload', {
     icon: require('../utils/icons').icon, fmt: require('../utils/format'), title: 'Material da gravação', link, tag: links.epTag(link.episode_number), base: `/estudio/${link.token}/arquivos/`,
@@ -55,8 +58,17 @@ router.get('/estudio/:token', wrap(async (req, res) => {
   });
 }));
 
+// "Não sou robô" do link: confere o token uma vez e deixa um passe de 12 h para este link (os envios não pedem de novo).
+router.post('/estudio/:token/verificar', wrap(async (req, res) => {
+  const link = await load(req, res); if (!link) return;
+  if (!await verifyLimiter.hit(req.ip)) return jsonError(res, 429, 'Muitas tentativas. Espere alguns minutos e recarregue a página.');
+  if (!(await turnstile.verify(turnstile.tokenOf(req.body), req.ip)).ok) return jsonError(res, 400, turnstile.MESSAGE, 'verificar');
+  res.set(HEADERS).append('Set-Cookie', turnstile.passCookie(link.id, link.token)).json({ ok: true });
+}));
+
 router.post('/estudio/:token/arquivos/iniciar', wrap(async (req, res) => {
   const link = await load(req, res); if (!link) return;
+  if (!turnstile.passOk(req, link.id)) return jsonError(res, 403, 'Recarregue a página para confirmar que você não é um robô e envie de novo.', 'verificar');
   if (!config.storageConfigured) return jsonError(res, 503, 'O armazenamento não está disponível agora. Fale com a produção.');
   if (!await startLimiter.hit(link.id)) return jsonError(res, 429, 'Muitos arquivos iniciados em pouco tempo. Espere alguns minutos.');
   const split = links.splitPath(req.body.caminho || req.body.nome);

@@ -119,6 +119,9 @@ html { scrollbar-gutter: stable; } /* trocar de aba não muda a largura da pági
 .auth-box .wordmark { font-size: 64px; }
 .auth-tag { font-family: var(--f-voice); font-style: italic; font-size: 24px; line-height: 1.15; color: var(--text); margin: 0; }
 .auth-card { padding: 28px; }
+/* Cloudflare Turnstile: sem altura enquanto confirma sozinho; quando o Cloudflare pede a caixa (300×65), ela aparece centralizada */
+.ts-box { display: flex; justify-content: center; }
+.ts-box:empty { display: none; }
 
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 24px; } /* sombra só em menus e janelas (design system): cartão é borda + superfície */
 .nocaps { text-transform: none; letter-spacing: .02em; }

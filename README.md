@@ -350,6 +350,7 @@ Veja `.env.example` (comentado). Resumo:
 - **Patrocinadores**: `BB_KEY_ID`, `BB_APPLICATION_KEY`, `BUCKET_NAME` (Backblaze B2; `BB_ENDPOINT` e `BB_PREFIX` são descobertos pela chave, só informe para forçar), `GROQ_APIKEY` (transcrição de voz; `GROQ_WHISPER_MODEL` opcional) e `PATROCINIO_WHATSAPP`.
 - **Episódios**: `GEMINI_KEY` (`GEMINI_MODEL` opcional), `UPLOAD_POST_KEY`, `UPLOAD_POST_USER` (padrão `default`), `UPLOAD_POST_LIVE` (**padrão `false`: só simula**), `ROLE` (`web`, `worker` ou `all`, padrão `all`; ver Arquitetura), `VIDEO_FORMAT_CHECK` (padrão `true`; `false` só em teste), `UPLOAD_PART_BYTES` (só em teste).
 - **Opcionais**: `PUBLIC_BASE_URL` (domínio dos convites), `PRODUCAO_WHATSAPP` (destino dos botões do convite), `PODCAST_NAME`, `AUTO_MIGRATE`, `PORT`.
+- **"Não sou robô" (Cloudflare Turnstile)**: `TURNSTILE_SITE_KEY` (pública) e `TURNSTILE_SECRET_KEY`. Com as duas, o login, o "Esqueci minha senha", o link do estúdio (uma vez, vale 12 h), o pedido da plateia e os formulários do site pedem a confirmação; sem elas, desligado. Se o Cloudflare não responder, deixa passar e os limites de tentativa continuam valendo.
 - **Site do Pulso**: `SITE_ORIGIN` (origens do podcastpulso.com, separadas por vírgula; padrão `https://podcastpulso.com,https://www.podcastpulso.com`). Só elas recebem CORS e mandam os formulários; a primeira é o endereço para onde os formulários sem JavaScript voltam (`/obrigado/` ou `/ops/`). Ver [Site do Pulso](#site-do-pulso-podcastpulsocom).
 
 ## Testes
