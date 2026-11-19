@@ -164,16 +164,16 @@ async function sweep({ days = 14, pubId = null, force = false } = {}) {
   if (!config.outstandConfigured) return { posts: 0, skipped: 'sem Outstand' };
   const posts = await watchedPosts({ days, pubId });
   const mine = await ourHandles();
-  let errors = 0;
+  let errors = 0; const failed = [];
   for (const post of posts) {
     const r = await fetchPost(post, mine);
-    if (r.error) errors += 1;
+    if (r.error) { errors += 1; if (failed.length < 10) failed.push({ publication_id: post.publication_id, network: post.network, error: String(r.error).slice(0, 200) }); }
     await new Promise((res) => setTimeout(res, process.env.NODE_ENV === 'test' ? 0 : 300));
   }
   const pubs = [...new Set(posts.map((p) => p.publication_id))];
   const { rows: pending } = pubs.length ? await db.query("SELECT DISTINCT publication_id FROM social_comments WHERE status = 'nova' AND publication_id = ANY($1)", [pubs]) : { rows: [] };
   for (const r of pending) await jobs.enqueue('comentarios_ia', { refId: r.publication_id, maxAttempts: 4 });
-  await settings.set(`${KEY}_varredura`, JSON.stringify({ at: new Date().toISOString(), posts: posts.length, errors }));
+  await settings.set(`${KEY}_varredura`, JSON.stringify({ at: new Date().toISOString(), posts: posts.length, errors, failed }));
   return { posts: posts.length, errors, queued: pending.length };
 }
 

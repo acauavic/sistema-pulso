@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.93.2', date: '2026-11-19', title: 'Reconectar o Instagram volta a abrir',
+    items: [
+      { kind: 'correcao', text: 'Integrações > Comentários e directs: o botão "Reconectar o Instagram" não fazia nada (o navegador barrava a ida para o Instagram). Agora ele abre uma página curta que leva ao Instagram na hora, com um botão de reserva.' },
+      { kind: 'ajuste', text: 'Comentários > Números: quando a leitura não consegue ler um post, "Saúde da automação" diz qual é (com o link) e o motivo, em vez de só "1 com erro".' },
+    ],
+  },
+  {
     version: '1.93.1', date: '2026-11-19', title: 'Respostas por IA logo depois de uma atualização',
     items: [
       { kind: 'correcao', text: 'Um comentário que chegasse no primeiro minuto depois de uma atualização do sistema não era lido pela IA (ficava parado até a leitura seguinte, ou de vez num post antigo). Agora é lido na hora, como os outros.' },

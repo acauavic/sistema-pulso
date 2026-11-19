@@ -99,6 +99,15 @@ describe('Comentários > Números e a faixa do Resumo do dia', () => {
     assert.deepEqual(await S.clicksOn(y), { day: 11, total: 41 });
   });
 
+  it('o post que a leitura não consegue ler aparece pelo nome, com o motivo', async () => {
+    await settings.set(`${R.KEY}_varredura`, JSON.stringify({ at: new Date().toISOString(), posts: 2, errors: 1,
+      failed: [{ publication_id: pub2.id, network: 'instagram', error: 'Outstand recusou (500): Internal server error' }] }));
+    const page = (await as.prod.get('/social/comentarios/numeros')).text;
+    assert.match(page, /1 com erro/);
+    assert.match(page, new RegExp(`href="/social/publicacoes/${pub2.id}">O peso do relacionamento</a>`));
+    assert.match(page, /costuma ser post apagado ou arquivado no Instagram/);
+  });
+
   it('a hora real do comentário entra na leitura seguinte (o que chegou sem hora)', async () => {
     await q("UPDATE social_comments SET commented_at = NULL WHERE comment_id = 'c4'");
     const when = '2026-11-18T12:00:00.000Z';

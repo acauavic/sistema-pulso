@@ -74,7 +74,10 @@ describe('Automação de comentário → direct ao publicar (Outstand)', () => {
     assert.equal((await as.prod.act('/integracoes/outstand/segredo', {}, { from: '/' })).status, 403);
     // reconectar o Instagram com acesso às mensagens
     r = await as.gestao.act('/integracoes/outstand/mensagens', {}, { from: '/integracoes' });
-    assert.equal(r.status, 303); assert.equal(r.location, 'https://www.instagram.com/oauth/authorize?x=1');
+    // a CSP do painel (form-action 'self') barra formulário que termina fora: a resposta é uma página do painel que leva ao Instagram
+    assert.equal(r.status, 200, 'sem redirecionamento para fora'); assert.ok(!r.location);
+    assert.match(r.text, /href="https:\/\/www\.instagram\.com\/oauth\/authorize\?x=1" data-auto-open/); assert.match(r.text, /Abrindo o Instagram/);
+    assert.match(r.headers.get('content-security-policy'), /form-action 'self'/, 'a regra de segurança continua a mesma');
     const auth = calls.find((c) => c.path === '/v1/social-networks/instagram/auth-url');
     assert.match(auth.body.scopes, /instagram_business_manage_messages/); assert.match(auth.body.redirect_uri, /\/integracoes\/outstand\/voltou$/);
     await as.gestao.get('/integracoes/outstand/voltou?success=true&account_id=IG1&username=podcastpulso');

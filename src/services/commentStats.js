@@ -112,6 +112,16 @@ async function snapshotClicks({ today = cal.todayISO() } = {}) {
   return { total };
 }
 
+// O motivo de um post não ter sido lido, em português.
+function readReason(err) {
+  const m = String(err || '');
+  if (/\(500\)/.test(m)) return 'a Outstand não consegue ler os comentários deste post (costuma ser post apagado ou arquivado no Instagram)';
+  if (/\(404\)/.test(m)) return 'a Outstand não acha este post';
+  if (/\(40[13]\)/.test(m)) return 'a Outstand recusou o acesso (confira a conexão em Integrações)';
+  if (/\(429\)/.test(m)) return 'a Outstand pediu para ir mais devagar';
+  return m.slice(0, 140);
+}
+
 // Erros e o que está parado. now: para dizer se o direct está pausado e se a Outstand está muda.
 async function health(day, { isToday, now = new Date() } = {}) {
   const replies = require('./commentReplies');
@@ -134,6 +144,12 @@ async function health(day, { isToday, now = new Date() } = {}) {
     replies.getConfig(), settings.get(`${replies.KEY}_varredura`), settings.get('outstand_inbox'), settings.get(replies.DM_KEY),
   ]);
   const sweep = parseJson(sweepS, {}); const inbox = parseJson(inboxS, {}); const dm = parseJson(dmS, {});
+  // posts que a última leitura não conseguiu ler, com o título (para saber qual é e por quê)
+  const failedIds = (sweep.failed || []).map((f) => f.publication_id).filter(Boolean);
+  const titles = failedIds.length ? Object.fromEntries((await db.query(
+    `SELECT p.id, coalesce(cl.post_title, cl.title, p.title) AS title FROM episode_publications p LEFT JOIN episode_clips cl ON cl.id = p.clip_id WHERE p.id = ANY($1::int[])`,
+    [failedIds])).rows.map((r) => [r.id, r.title])) : {};
+  sweep.failed = (sweep.failed || []).map((f) => ({ ...f, title: titles[f.publication_id] || 'Publicação', reason: readReason(f.error) }));
   const communityOk = Boolean((await require('./commentAutomation').links()).whatsapp_community);
   const dmPausedUntil = dm.next_at && new Date(dm.next_at) - now > 2 * 3600_000 ? dm.next_at : null; // intervalo normal é de minutos
   const alerts = [];

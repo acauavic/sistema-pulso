@@ -362,6 +362,9 @@
     if (target && target !== days.find(shown)) target.scrollIntoView({ block: 'start' });
   })();
   document.querySelectorAll('[data-autosubmit]').forEach((s) => s.addEventListener('change', () => s.form.submit()));
+  // Página-ponte para um site de fora (ex.: reconectar o Instagram): segue o link sozinha; o botão fica de reserva.
+  const autoOpen = document.querySelector('a[data-auto-open][href^="https://"]');
+  if (autoOpen) setTimeout(() => window.location.assign(autoOpen.href), 300);
   // Gestão > Metas (janela de cada pessoa): a categoria filtra "o que contar"; taxa (%) aparece sempre em porcentagem (o campo
   // trava e o servidor também garante); "Adicionar meta" mostra a próxima linha; "tirar" esvazia a linha (salvar apaga a meta).
   document.querySelectorAll('[data-goal-form]').forEach((form) => {

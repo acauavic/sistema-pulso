@@ -139,7 +139,9 @@ router.post('/integracoes/outstand/mensagens', requirePerm('integrations.manage'
   try {
     const url = await require('../services/outstand').instagramAuthUrl(`${config.appBaseUrl.replace(/\/$/, '')}/integracoes/outstand/voltou`);
     await audit(req, 'integracao.outstand_reconectar', 'settings', null);
-    return res.redirect(303, url);
+    // Não dá para responder com redirecionamento para fora: a CSP do painel (form-action 'self') faz o navegador barrar em silêncio
+    // um formulário que termina em outro site. Uma página do painel leva ao Instagram.
+    return res.render('integrations-go', { title: 'Reconectar o Instagram', url });
   } catch (err) {
     await req.flash('error', `Não consegui abrir a reconexão: ${err.message}`);
     return res.redirect('/integracoes#comentarios');

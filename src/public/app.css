@@ -2158,6 +2158,7 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
 .cmt-ignorada .cmt-text, .cmt-respondida .cmt-text { color: var(--text-2); }
 .cmt-quote { display: block; padding: 8px 10px; border-left: 2px solid var(--line-strong); background: var(--raised); color: var(--text-2); font-size: 13px; overflow-wrap: anywhere; white-space: pre-line; max-height: 140px; overflow: auto; }
 .cmt-quote:empty { display: none; }
+.go-card { max-width: 560px; margin: 32px auto; }
 .pub-ai-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 /* Comentários > Números: o mesmo painel do Resumo do dia. Medir não é ação: barras e números neutros, vermelho só no erro. */
 .cmt-tabs { display: flex; width: max-content; }
@@ -2174,6 +2175,7 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
 .cmt-top-net { text-align: right; white-space: nowrap; }
 .cmt-health { padding: 4px 12px 6px; }
 .cmt-reasons { margin: 0; display: grid; gap: 4px; font-size: 13px; } .cmt-reasons .mono { margin-right: 6px; }
+.cmt-failed { margin-top: 6px; font-family: var(--f-body); letter-spacing: 0; }
 .cmt-slots { padding: 4px 12px 0; } .cmt-slots svg { display: block; width: 100%; height: auto; }
 .cmt-axis { stroke: var(--line-strong); stroke-width: 1; }
 .cmt-bar-in { fill: var(--text-2); } .cmt-bar-out { fill: var(--muted); opacity: .55; }
