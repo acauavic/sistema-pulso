@@ -25,7 +25,7 @@ Doc pra humano: `README.md`. Memória pra IA (estado + decisões): `memory.md`.
 ## Comandos
 
 - `npm run dev` (porta 3100) · `npm run migrate` · `npm run create-superadmin -- email "Nome"`.
-- **Deploy (produção, https://sistema.podcastpulso.com)**: o acesso SSH à VPS fica em `.env.vps.local` na raiz (`VPS_HOST`, `VPS_USER`, `SSHPASS`; arquivo local, fora do git). Nunca copie a senha para o repositório, para o chat ou para o log. Para publicar: `set -a; . ./.env.vps.local; set +a; sshpass -e ssh -o StrictHostKeyChecking=accept-new "$VPS_USER@$VPS_HOST" 'cd /opt/pulso && git pull -q && cd deploy && docker compose up -d --build'` (o código precisa estar no GitHub antes).
+- **Deploy (produção, https://sistema.podcastpulso.com)**: o SSH da VPS **só aceita chave** (senha desligada desde 2026-11-18, fail2ban ligado). Host e usuário ficam em `.env.vps.local` na raiz (arquivo local, fora do git); a chave é `~/.ssh/pulso_vps_root` neste Mac (emergência: console web da Contabo). Nunca copie segredos para o repositório, para o chat ou para o log. Para publicar: `set -a; . ./.env.vps.local; set +a; ssh -i ~/.ssh/pulso_vps_root -o IdentitiesOnly=yes "$VPS_USER@$VPS_HOST" 'cd /opt/pulso && git pull -q && cd deploy && docker compose up -d --build'` (o código precisa estar no GitHub antes).
 - `npm test` precisa de Postgres e de `TEST_DATABASE_URL` apontando para um banco que **termine em `_test`** (a suíte recria o schema).
 - Rodar localmente para ver a UI: `MAIL_DRY_RUN=true`, `YOURLS_*` vazios, `PODCAST_DATABASE_URL` de um banco de dev (ver README).
 

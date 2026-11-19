@@ -236,6 +236,8 @@ async function deleteFile(file) {
   await b2.deleteObject(file.storage_key).catch((err) => console.error('Falha ao apagar arquivo:', err.message));
 }
 
+const SAFE_INLINE = /^(image\/(png|jpe?g|gif|webp|avif|svg\+xml)|video\/[a-z0-9.+-]+|audio\/[a-z0-9.+-]+|application\/pdf)$/;
+
 // Envia um arquivo do bucket como resposta HTTP (o bucket é privado: tudo passa por aqui).
 // req + inline: imagem (logo, moldura, QR) vai em WebP para ver; "Baixar" (inline = false) manda o original.
 async function sendFile(res, file, { inline = true, req = null, maxSide = 2000 } = {}) {
@@ -248,9 +250,13 @@ async function sendFile(res, file, { inline = true, req = null, maxSide = 2000 }
   const obj = await b2.getObject(file.storage_key);
   if (!obj) return res.status(404).send('Arquivo não encontrado.');
   const safeName = encodeURIComponent(file.filename || `arquivo-${file.id}`);
+  // o tipo vem de quem enviou: só imagem, áudio, vídeo e PDF saem com o próprio tipo; o resto (JS, HTML…) baixa como binário,
+  // para nunca virar um <script src> do próprio domínio (a CSP do painel aceita 'self')
+  const type = String(file.content_type || '').split(';')[0].trim().toLowerCase();
+  const safeType = SAFE_INLINE.test(type);
   res.set({
-    'Content-Type': file.content_type || 'application/octet-stream',
-    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${safeName}`,
+    'Content-Type': safeType ? type : 'application/octet-stream',
+    'Content-Disposition': `${inline && safeType ? 'inline' : 'attachment'}; filename*=UTF-8''${safeName}`,
     'Cache-Control': 'private, max-age=300',
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox",

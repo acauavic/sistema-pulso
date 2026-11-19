@@ -177,6 +177,30 @@ describe('Reuniões com patrocinador: Meet e convite pelo Google, em nome da con
     assert.match(page, /Resumo recebido/); assert.match(page, /Fechamos o <strong>plano Ouro<\/strong>/);
     const auto = await meetings.saveSummary(m.id, '<p>Resumo do sistema externo</p>', { source: 'webhook' });
     assert.equal(auto.meeting.summary_source, 'webhook');
+    assert.equal(auto.meeting.summary, '<p>Resumo do sistema externo</p>', 'grava só o HTML limpo, nunca o objeto em JSON');
+  });
+
+  it('segurança: texto que parece tag no resumo continua escapado na página (o texto cru não vai para o HTML)', async () => {
+    const [m] = await q("SELECT * FROM sponsor_meetings WHERE summary IS NOT NULL ORDER BY id LIMIT 1");
+    await as.prod.act(`/patrocinadores/${sponsor.id}/reunioes/${m.id}/resumo`, { resumo_html: '<p>Ver &lt;script src=/patrocinadores/1/arquivos/9&gt;&lt;/script&gt; depois</p>' }, { from: `/patrocinadores/${sponsor.id}` });
+    const [s] = await q('SELECT summary FROM sponsor_meetings WHERE id = $1', [m.id]);
+    assert.doesNotMatch(s.summary, /^\{/); assert.doesNotMatch(s.summary, /<script/);
+    const page = (await as.prod.get(`/patrocinadores/${sponsor.id}`)).text;
+    assert.doesNotMatch(page, /<script src=\/patrocinadores\/1\/arquivos\/9>/);
+  });
+
+  it('segurança: arquivo do patrocinador com tipo de script baixa como binário; imagem segue aberta', async () => {
+    const b2 = require('../src/services/b2'); const sponsorsSvc = require('../src/services/sponsors');
+    const orig = b2.getObject; b2.getObject = async () => new Response('alert(1)');
+    const fake = () => { const r = { headers: {}, set(h) { Object.assign(r.headers, h); return r; }, send(b) { r.body = b; return r; } }; return r; };
+    try {
+      const js = fake(); await sponsorsSvc.sendFile(js, { id: 9, storage_key: 'pp/x.js', filename: 'x.js', content_type: 'text/javascript' }, { inline: true });
+      assert.equal(js.headers['Content-Type'], 'application/octet-stream'); assert.match(js.headers['Content-Disposition'], /^attachment/);
+      const html = fake(); await sponsorsSvc.sendFile(html, { id: 10, storage_key: 'pp/x.html', filename: 'x.html', content_type: 'text/html; charset=utf-8' }, { inline: true });
+      assert.equal(html.headers['Content-Type'], 'application/octet-stream');
+      const png = fake(); await sponsorsSvc.sendFile(png, { id: 11, storage_key: 'pp/x.png', filename: 'x.png', content_type: 'image/png' }, { inline: true });
+      assert.equal(png.headers['Content-Type'], 'image/png'); assert.match(png.headers['Content-Disposition'], /^inline/);
+    } finally { b2.getObject = orig; }
   });
 
   it('Calendário do painel mostra as reuniões; o espelho do Google não manda de novo; gravações seguem sem agir em nome de ninguém', async () => {

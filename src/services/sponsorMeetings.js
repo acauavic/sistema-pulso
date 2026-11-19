@@ -189,7 +189,7 @@ async function retry(id) {
 async function saveSummary(id, html, { source = 'manual', user = null } = {}) {
   const cur = await get(id);
   if (!cur) return { error: 'Reunião não encontrada.' };
-  const clean = html && !richText.isEmpty(html) ? richText.sanitize(html) : null;
+  const clean = html && !richText.isEmpty(html) ? richText.sanitize(html).html || null : null; // só o HTML limpo (o objeto inteiro virava JSON com o texto cru)
   const m = await setGoogle(id, { summary: clean, summary_source: clean ? source : null, summary_at: clean ? new Date() : null, summary_by: clean ? user?.id || null : null });
   if (clean && !cur.summary) await addEvent(m.sponsor_id, user?.id, `Resumo da reunião de ${when(m.starts_at)} registrado${source === 'webhook' ? ' automaticamente' : ''}.`);
   return { meeting: m };
