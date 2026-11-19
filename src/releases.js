@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.90.0', date: '2026-11-19', title: 'Avisos que se limpam, respostas não lidas e tarefa a partir da mensagem',
+    items: [
+      { kind: 'ajuste', text: 'Quando uma tarefa passa para Fazendo ou Feito, os avisos dela que ainda estavam em Notificações (vence hoje, falta pouco, atrasada, bloqueada e "criou uma tarefa para você") ficam como lidos, para todo mundo que recebeu. O contador cai na hora.' },
+      { kind: 'novo', text: 'Mensagens: dentro de cada conversa, a faixa "Respostas não lidas" junta as respostas novas nas threads que você segue (as suas mensagens, as threads em que respondeu e as em que foi marcado). Toque numa linha para abrir a thread.' },
+      { kind: 'novo', text: 'Criar tarefa a partir de uma mensagem: no ícone de tarefa, ao lado de reagir e responder, a IA lê a mensagem (ou a thread inteira, se você escolher) e abre a janela Nova tarefa já preenchida. Confira e crie. A mensagem mostra "Tarefa · …" e a tarefa leva de volta à conversa.' },
+      { kind: 'correcao', text: 'Ao abrir uma conversa, algumas mensagens podiam aparecer duas vezes.' },
+    ],
+  },
+  {
     version: '1.89.0', date: '2026-11-19', title: 'Filtros em todas as listas e campos do cartão',
     items: [
       { kind: 'novo', text: 'Botão Filtros também em Episódios, Patrocinadores e nas abas Quadro, Posts e Pedidos de Conteúdo: combine etapa, responsável, datas (inclusive criado e atualizado em), campos vazios ou preenchidos e conexões, com E ou OU, e salve como visualização.' },
