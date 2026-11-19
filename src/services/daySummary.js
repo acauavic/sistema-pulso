@@ -235,4 +235,4 @@ async function summary(day, { isToday = day === cal.todayISO() } = {}) {
   return { guests: g, losses, sponsors: { ...sp, ...spc, ...spk }, episodes: e, clips: { ...c, ...p }, scheduled: sc, tasks: t, social: s };
 }
 
-module.exports = { pick, summary, guests, sponsorStages, sponsorCadence, lossReasons, BOUNDS, EDITOR_ROLES };
+module.exports = { pick, summary, guests, sponsorStages, sponsorCadence, lossReasons, followers, BOUNDS, EDITOR_ROLES };

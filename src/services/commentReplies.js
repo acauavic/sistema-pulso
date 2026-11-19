@@ -115,7 +115,7 @@ async function ingest(post, comments, mine) {
         `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, author_username, text, commented_at, likes, thread, status, reason, author_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'respondida','O Pulso já respondeu este comentário.',$11)
          ON CONFLICT (provider, network, comment_id) DO UPDATE SET thread = EXCLUDED.thread, likes = EXCLUDED.likes, updated_at = now(),
-           author_id = coalesce(social_comments.author_id, EXCLUDED.author_id),
+           author_id = coalesce(social_comments.author_id, EXCLUDED.author_id), commented_at = coalesce(EXCLUDED.commented_at, social_comments.commented_at),
            status = CASE WHEN social_comments.status IN ('nova','proposta','equipe','aprovada','erro') THEN 'respondida' ELSE social_comments.status END,
            reason = CASE WHEN social_comments.status IN ('nova','proposta','equipe','aprovada','erro') THEN EXCLUDED.reason ELSE social_comments.reason END`,
         [...base, k.id, k.username, String(k.text || '').slice(0, 2000), k.timestamp, k.likes || 0, JSON.stringify(thread), k.authorId || null]);
@@ -127,7 +127,8 @@ async function ingest(post, comments, mine) {
         const x = back[back.length - 1];
         const { rows } = await db.query(
           `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, parent_comment_id, author_username, text, commented_at, thread, author_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (provider, network, comment_id) DO UPDATE SET author_id = coalesce(social_comments.author_id, EXCLUDED.author_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (provider, network, comment_id) DO UPDATE SET author_id = coalesce(social_comments.author_id, EXCLUDED.author_id),
+             commented_at = coalesce(EXCLUDED.commented_at, social_comments.commented_at)
            RETURNING (xmax = 0) AS inserted`,
           [...base, x.id, k.id, x.username || k.username, String(x.text || '').slice(0, 2000), x.timestamp || null,
             JSON.stringify([{ id: k.id, usuario: k.username, texto: String(k.text || '').slice(0, 400), pulso: false }, ...thread]), x.authorId || k.authorId || null]);
@@ -139,7 +140,7 @@ async function ingest(post, comments, mine) {
       `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, author_username, text, commented_at, likes, thread, author_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        ON CONFLICT (provider, network, comment_id) DO UPDATE SET thread = EXCLUDED.thread, likes = EXCLUDED.likes, updated_at = now(),
-         author_id = coalesce(social_comments.author_id, EXCLUDED.author_id)
+         author_id = coalesce(social_comments.author_id, EXCLUDED.author_id), commented_at = coalesce(EXCLUDED.commented_at, social_comments.commented_at)
        RETURNING (xmax = 0) AS inserted`,
       [...base, k.id, k.username, String(k.text || '').slice(0, 2000), k.timestamp, k.likes || 0, JSON.stringify(thread), k.authorId || null]);
     if (ins?.inserted) fresh += 1;
@@ -423,15 +424,21 @@ async function sendTick({ now = new Date() } = {}) {
 }
 
 // ---------------------------------------------------------------- direct com a comunidade (Instagram)
-// O link da comunidade sai encurtado uma vez (dá para ver os cliques no encurtador); sem encurtador, vai o link direto.
+// O direct leva um link curto só dele (os cliques dele não se misturam com os da bio): se o link cadastrado já é do encurtador,
+// vale o destino dele, com uma marca no fim para o encurtador criar um link novo. Sem encurtador, vai o link cadastrado.
+const DM_LINK_KEYWORDS = ['comunidade-direct', 'direct-comunidade'];
 async function communityLink() {
   const long = (await require('./commentAutomation').links()).whatsapp_community;
   if (!long) return null;
   const cache = parseJson(await settings.get(`${DM_KEY}_link`), {});
   if (cache.long === long && cache.short) return cache.short;
   if (!config.yourlsConfigured) return long;
+  const y = require('./yourls');
   try {
-    const { shortUrl } = await require('./yourls').shorten(long, { title: 'Comunidade · direct dos comentários' });
+    let target = y.isOwnLink(long) ? await y.expand(long) : long;
+    if (!target) return long;
+    const u = new URL(target); u.searchParams.set('origem', 'direct-pulso'); target = u.toString();
+    const { shortUrl } = await y.shorten(target, { title: 'Comunidade · direct dos comentários', keywords: DM_LINK_KEYWORDS });
     await settings.set(`${DM_KEY}_link`, JSON.stringify({ long, short: shortUrl }));
     return shortUrl;
   } catch { return long; }

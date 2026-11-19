@@ -89,6 +89,8 @@
       <% flow(flowContent) %>
     </section>
 
+    <% if (locals.cmtDay) { %><%- include('comments-band', { bandId: 'day-b-cmt' }) %><% } %>
+
     <section class="day-band" aria-labelledby="day-b3">
       <div class="day-band-head"><h3 class="day-band-t" id="day-b3"><%= showSocial ? 'Redes e tarefas' : 'Tarefas' %></h3></div>
       <div class="day-cells">

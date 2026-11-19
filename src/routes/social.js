@@ -482,6 +482,22 @@ router.get('/social/comentarios', requirePerm('social.comments'), wrap(async (re
   });
 }));
 
+// Números dos comentários e das automações, por dia (?dia=AAAA-MM-DD; sem ele, hoje).
+router.get('/social/comentarios/numeros', requirePerm('social.comments'), wrap(async (req, res) => {
+  const cal = require('../services/calendar');
+  const today = cal.todayISO();
+  const { rows: [first] } = await db.query("SELECT to_char(min(created_at) AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS d FROM social_comments");
+  const min = first?.d && first.d < today ? first.d : today;
+  let d = cal.isISO(req.query.dia) ? req.query.dia : today;
+  if (d > today) d = today; if (d < min) d = min;
+  const day = { day: d, today, min, isToday: d === today, weekday: cal.dayLabel(d).split(',')[0], prev: d > min ? cal.addDays(d, -1) : null, next: d < today ? cal.addDays(d, 1) : null };
+  const stats = await require('../services/commentStats').forDay(d, { isToday: day.isToday });
+  res.render('social/comments-numbers', {
+    title: 'Números dos comentários', tab: 'comentarios', cmtTab: 'numeros', day, k: stats, dayBase: '/social/comentarios/numeros', dayHash: '',
+    MODES: replies.MODES, outstandLive: config.outstand.live,
+  });
+}));
+
 router.post('/social/comentarios/config', requirePerm('social.automate'), wrap(async (req, res) => {
   const r = await replies.setConfig(req.body);
   if (r.error) { await req.flash('error', r.error); return res.redirect('/social/comentarios'); }

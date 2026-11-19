@@ -1,0 +1,142 @@
+<%- include('../partials/head') %>
+<%- include('../partials/social-nav') %>
+<%- include('_comments-tabs', { cmtTab: 'numeros' }) %>
+<%
+  // Números dos comentários e das automações num dia (commentStats.forDay). Jornada: no fim do dia (ou quando bate a dúvida
+  // "está rodando?"), ver em segundos se funcionou, o que rendeu e o que quebrou; o próximo passo é abrir o erro, o que espera a
+  // equipe ou o post que mais conversou. Medir não é ação: nenhum número em lime; vermelho só para erro e queda.
+  var h = k.health;
+  var n = function (v) { return Number(v || 0).toLocaleString('pt-BR'); };
+  var pl = function (v, one, many) { return Number(v) === 1 ? one : many; };
+  var signed = function (v) { return v === null || v === undefined ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString('pt-BR'); };
+  var pad = function (v) { return v ? 'EP.' + String(v).padStart(3, '0') : ''; };
+  var sub = function (parts) { %><span class="day-sub"><% parts.forEach(function (p, i) { %><%= i ? ' · ' : '' %><% if (p.n !== undefined) { %><b class="<%= p.bad ? 'bad' : '' %>"><%= typeof p.n === 'number' ? n(p.n) : p.n %></b> <% } %><%= p.t %><% }) %></span><% };
+  var avg = k.avg;
+  var dmErrN = h.dmErrors.reduce(function (s, e) { return s + e.n; }, 0);
+  var replyErrN = h.replyErrors.reduce(function (s, e) { return s + e.n; }, 0);
+  var flow = [
+    { l: 'Comentários recebidos', v: k.received, href: '/social/comentarios', s: avg ? [{ t: 'média de ' + n(avg.received) + ' nos ' + (avg.days === 7 ? '7 dias' : avg.days + ' ' + pl(avg.days, 'dia', 'dias')) + ' antes' }] : [{ t: 'lidos pelo sistema' }] },
+    { l: 'Respondidos', v: k.replied, href: '/social/comentarios?vista=enviadas', s: k.replied ? [{ n: k.text, t: 'em texto' }, { n: k.reactions, t: pl(k.reactions, 'reação', 'reações') }] : [{ t: avg ? 'média de ' + n(avg.replied) : 'pela IA' }] },
+    { l: 'Com convite para seguir', v: k.invited, href: '/social/comentarios?vista=enviadas', s: [{ t: 'de ' + n(k.text) + ' em texto' }] },
+    { l: 'Directs enviados', v: k.dms, href: '/social/comentarios?vista=enviadas', s: [].concat(day.isToday && h.dmQueue ? [{ n: h.dmQueue, t: 'na fila' }] : []).concat(dmErrN ? [{ n: dmErrN, t: 'não ' + pl(dmErrN, 'saiu', 'saíram'), bad: true }] : []).concat(!h.dmQueue && !dmErrN ? [{ t: 'com o link da comunidade' }] : []) },
+    { l: 'Cliques no link', v: k.clicks.day || 0, href: '/social/automacoes', s: k.clicks.day === null ? [{ t: 'contando desde o 1º direct' }] : [{ n: k.clicks.total, t: 'no total' }], title: 'Cliques no link da comunidade que vai no direct (um link só do direct, separado do da bio)' },
+  ];
+  var ig = k.instagram;
+  var cov = k.coverage;
+  var maxSlot = Math.max(1, Math.max.apply(null, k.slots.map(function (s) { return Math.max(s.in, s.out); })));
+  var slotTotal = k.slots.reduce(function (s, x) { return s + x.in + x.out; }, 0);
+%>
+
+<section class="day-sum cmt-nums" aria-labelledby="nums-h">
+  <div class="day-sum-head">
+    <h2 id="nums-h">Números do dia <span class="day-when"><% if (day.isToday) { %><span class="day-live" aria-hidden="true"></span>HOJE, ATÉ AGORA<% } else { %><%= day.weekday.toUpperCase() %><% } %></span></h2>
+    <%- include('../partials/day-nav') %>
+  </div>
+
+  <% h.alerts.forEach(function (a) { %><div class="notice <%= a.bad ? 'notice-bad' : '' %> cmt-alert"><%- icon(a.icon, 16) %> <span><%= a.text %></span></div><% }) %>
+  <% if (!outstandLive) { %><p class="test-mode small"><%- icon('info', 14) %> <span>A Outstand está em modo de teste: respostas e directs são simulados e contam aqui como se tivessem saído.</span></p><% } %>
+
+  <div class="day-panel">
+    <section class="day-band" aria-labelledby="nums-b1">
+      <div class="day-band-head"><h3 class="day-band-t" id="nums-b1">Do comentário à comunidade</h3></div>
+      <div class="day-flow">
+        <% flow.forEach(function (x) { %>
+        <a class="day-node <%= x.v ? '' : 'is-zero' %>" href="<%= x.href %>"<% if (x.title) { %> title="<%= x.title %>"<% } %>>
+          <span class="day-dot" aria-hidden="true"></span>
+          <span class="day-l"><%= x.l %></span>
+          <span class="day-n"><%= n(x.v) %></span>
+          <% sub(x.s) %>
+        </a>
+        <% }) %>
+      </div>
+    </section>
+
+    <section class="day-band" aria-labelledby="nums-b2">
+      <div class="day-band-head"><h3 class="day-band-t" id="nums-b2">A conversa continuou?</h3></div>
+      <div class="day-cells">
+        <a class="day-cell <%= k.back.back ? '' : 'is-zero' %>" href="/social/comentarios" title="Das respostas em texto que saíram neste dia, quantas pessoas comentaram de novo depois (o sistema vê na leitura seguinte)">
+          <span class="day-l">Voltaram a comentar</span>
+          <span class="day-n"><%= n(k.back.back) %></span>
+          <% sub(k.back.replied ? [{ t: 'de ' + n(k.back.replied) + ' respondidos em texto' + (k.back.rate !== null ? ' · ' + k.back.rate + '%' : '') }] : [{ t: 'depois da resposta do Pulso' }]) %>
+        </a>
+        <a class="day-cell <%= ig && ig.gain ? (ig.gain < 0 ? 'is-down' : '') : 'is-zero' %>" href="/social/insights">
+          <span class="day-l">Seguidores no Instagram</span>
+          <span class="day-n"><%= ig ? signed(ig.gain) : '—' %></span>
+          <% sub(ig && ig.total !== null ? [{ n: ig.total, t: 'seguidores' }] : [{ t: 'sem leitura neste dia' }]) %>
+        </a>
+        <div class="day-cell <%= cov.read ? '' : 'is-zero' %>" title="A Outstand mostra só os 25 comentários mais recentes de cada post: num post com muito comentário, a leitura não alcança todos">
+          <span class="day-l">Comentários lidos</span>
+          <span class="day-n"><%= n(cov.read) %></span>
+          <% sub(cov.network ? [{ t: 'de ' + n(cov.network) + ' na rede nesses posts' + (cov.network > cov.read ? ' · ' + Math.round(cov.read / cov.network * 100) + '%' : '') }] : [{ t: 'a rede ainda não informou o total' }]) %>
+        </div>
+      </div>
+    </section>
+
+    <section class="day-band" aria-labelledby="nums-b3">
+      <div class="day-band-head"><h3 class="day-band-t" id="nums-b3">Posts que mais conversaram</h3><span class="day-aside">no dia · lidos e na rede</span></div>
+      <% if (!k.top.length) { %>
+      <p class="small muted cmt-nums-empty">Nenhum comentário lido neste dia.</p>
+      <% } else { %>
+      <ol class="plain cmt-top">
+        <% k.top.forEach(function (p, i) { %>
+        <li class="cmt-top-row">
+          <span class="cmt-top-pos <%= i ? '' : 'first' %>"><%= i + 1 %>º</span>
+          <a class="cmt-thumb" href="/social/comentarios?pub=<%= p.id %>" tabindex="-1" aria-hidden="true"><% if (p.thumb_cover) { %><img src="/capas/<%= p.thumb_cover %>/imagem?v=<%= p.thumb_at ? new Date(p.thumb_at).getTime() : 0 %>&w=640" alt="" loading="lazy" decoding="async"><% } else { %><%- icon('image', 18) %><% } %></a>
+          <div class="cmt-top-body">
+            <p class="mono small muted m-0"><%= [pad(p.ep_number), p.guest].filter(Boolean).join(' · ') || 'Publicação' %></p>
+            <a class="cmt-top-title" href="/social/comentarios?pub=<%= p.id %>"><%= p.title || 'Publicação' %></a>
+            <p class="cmt-top-nums mono small m-0"><b><%= n(p.n) %></b> <%= pl(p.n, 'comentário', 'comentários') %> · <b><%= n(p.answered) %></b> <%= pl(p.answered, 'respondido', 'respondidos') %> · <b><%= n(p.dms) %></b> <%= pl(p.dms, 'direct', 'directs') %></p>
+          </div>
+          <p class="cmt-top-net mono small muted m-0"><% if (p.network_total !== null) { %><%= n(p.network_total) %> na rede · <% } %><%= n(p.read_total) %> lidos</p>
+        </li>
+        <% }) %>
+      </ol>
+      <% } %>
+    </section>
+
+    <section class="day-band" aria-labelledby="nums-b4">
+      <div class="day-band-head"><h3 class="day-band-t" id="nums-b4">Saúde da automação</h3></div>
+      <dl class="kv kv-wide cmt-health">
+        <dt>Estado</dt><dd><%= h.on ? 'Ligada · ' + MODES[h.mode].toLowerCase() : 'Desligada' %><%= h.on && h.dmOn ? ' · direct ligado' : '' %></dd>
+        <dt>Última leitura</dt><dd class="mono small"><% if (h.lastSweep) { %><%= fmt.formatSoon(h.lastSweep.at) %> · <%= n(h.lastSweep.posts) %> <%= pl(h.lastSweep.posts, 'post', 'posts') %><% if (h.lastSweep.errors) { %> · <span class="bad-text"><%= n(h.lastSweep.errors) %> com erro</span><% } %><% } else { %>nenhuma ainda<% } %></dd>
+        <dt>Aviso da Outstand</dt><dd class="mono small"><%= h.lastEvent ? 'último às ' + fmt.formatSoon(h.lastEvent) : 'nenhum recebido' %></dd>
+        <dt>Leituras da IA</dt><dd class="mono small"><%= n(h.ai.runs) %> no dia<% if (h.ai.retried) { %> · <%= n(h.ai.retried) %> <%= pl(h.ai.retried, 'precisou', 'precisaram') %> de nova tentativa<% } %><% if (h.ai.failed) { %> · <span class="bad-text"><%= n(h.ai.failed) %> <%= pl(h.ai.failed, 'falhou', 'falharam') %></span><% } %></dd>
+        <dt>Esperando a equipe</dt><dd><% if (h.team) { %><a class="bad-text" href="/social/comentarios?vista=equipe"><span class="mono"><%= n(h.team) %></span> <%= pl(h.team, 'comentário', 'comentários') %></a><% } else { %><span class="muted">nada</span><% } %></dd>
+        <% if (day.isToday) { %>
+        <dt>Na fila agora</dt><dd class="mono small"><%= n(h.queue) %> <%= pl(h.queue, 'resposta', 'respostas') %> · <%= n(h.dmQueue) %> <%= pl(h.dmQueue, 'direct', 'directs') %><% if (h.toApprove || h.dmToApprove) { %> · <a href="/social/comentarios?vista=aprovar"><%= n(h.toApprove + h.dmToApprove) %> para aprovar</a><% } %></dd>
+        <% } %>
+        <dt>Respostas com erro</dt><dd><% if (!h.replyErrors.length) { %><span class="muted">nenhuma</span><% } else { %><ul class="plain cmt-reasons"><% h.replyErrors.forEach(function (e) { %><li><span class="mono bad-text"><%= n(e.n) %></span> <%= e.reason %></li><% }) %></ul><% } %></dd>
+        <dt>Directs que não saíram</dt><dd><% if (!h.dmErrors.length) { %><span class="muted">nenhum</span><% } else { %><ul class="plain cmt-reasons"><% h.dmErrors.forEach(function (e) { %><li><span class="mono bad-text"><%= n(e.n) %></span> <%= e.reason %></li><% }) %></ul><% } %></dd>
+        <% if (h.dmSkipped.length) { %>
+        <dt>Directs que não vão</dt><dd><ul class="plain cmt-reasons"><% h.dmSkipped.forEach(function (e) { %><li><span class="mono"><%= n(e.n) %></span> <span class="muted"><%= e.reason %></span></li><% }) %></ul></dd>
+        <% } %>
+        <dt>Barradas por código</dt><dd><% if (h.blocked) { %><a class="bad-text" href="/social/comentarios?vista=equipe"><span class="mono"><%= n(h.blocked) %></span> <%= pl(h.blocked, 'resposta da IA veio', 'respostas da IA vieram') %> com código e não <%= pl(h.blocked, 'saiu', 'saíram') %></a><% } else { %><span class="muted">nenhuma</span><% } %></dd>
+      </dl>
+    </section>
+
+    <section class="day-band" aria-labelledby="nums-b5">
+      <div class="day-band-head"><h3 class="day-band-t" id="nums-b5">Automação por palavra</h3><a class="day-aside" href="/social/automacoes"><%= n(k.keyword.rules) %> <%= pl(k.keyword.rules, 'regra ativa', 'regras ativas') %></a></div>
+      <p class="small cmt-nums-line"><% if (!k.keyword.sent && !k.keyword.errors && !k.keyword.ignored) { %><span class="muted">Ninguém comentou a palavra de uma automação neste dia.</span><% } else { %><span class="mono"><%= n(k.keyword.sent) %></span> <%= pl(k.keyword.sent, 'pessoa recebeu', 'pessoas receberam') %> o link no direct<% if (k.keyword.errors) { %> · <span class="mono bad-text"><%= n(k.keyword.errors) %></span> com erro<% } %><% if (k.keyword.ignored) { %> · <span class="mono"><%= n(k.keyword.ignored) %></span> <span class="muted">já tinham recebido</span><% } %><% } %></p>
+    </section>
+
+    <section class="day-band" aria-labelledby="nums-b6">
+      <div class="day-band-head"><h3 class="day-band-t" id="nums-b6">De 30 em 30 minutos</h3>
+        <span class="day-aside cmt-legend"><span class="cmt-key cmt-key-in" aria-hidden="true"></span>comentários <span class="cmt-key cmt-key-out" aria-hidden="true"></span>respostas</span></div>
+      <% if (!slotTotal) { %>
+      <p class="small muted cmt-nums-empty">Nada chegou nem saiu neste dia.</p>
+      <% } else { %>
+      <figure class="cmt-slots m-0">
+        <svg viewBox="0 0 480 132" role="img" aria-label="Comentários que chegaram e respostas que saíram, de 30 em 30 minutos">
+          <line class="cmt-axis" x1="0" y1="112.5" x2="480" y2="112.5"></line>
+          <% k.slots.forEach(function (s) { var x = s.i * 10, hi = Math.round(s.in / maxSlot * 104), ho = Math.round(s.out / maxSlot * 104); %>
+          <% if (s.in) { %><rect class="cmt-bar-in" x="<%= x + 1 %>" y="<%= 112 - hi %>" width="4" height="<%= hi %>"><title><%= s.label %> · <%= s.in %> <%= pl(s.in, 'comentário', 'comentários') %></title></rect><% } %>
+          <% if (s.out) { %><rect class="cmt-bar-out" x="<%= x + 5 %>" y="<%= 112 - ho %>" width="4" height="<%= ho %>"><title><%= s.label %> · <%= s.out %> <%= pl(s.out, 'resposta', 'respostas') %></title></rect><% } %>
+          <% if (s.i % 6 === 0) { %><text class="cmt-tick" x="<%= x %>" y="128"><%= s.label.slice(0, 2) %>h</text><% } %>
+          <% }) %>
+        </svg>
+      </figure>
+      <% } %>
+    </section>
+  </div>
+</section>
+<%- include('../partials/foot') %>

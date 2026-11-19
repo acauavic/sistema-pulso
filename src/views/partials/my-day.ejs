@@ -80,6 +80,8 @@
 
     <%- include('loss-reasons', { losses: m.losses, mineOnly: true, bandId: 'mine-b3' }) %>
 
+    <% if (locals.cmtDay) { %><%- include('comments-band', { bandId: 'mine-b-cmt' }) %><% } %>
+
     <% if (m.otherGoals.length) { %>
     <section class="day-band" aria-labelledby="mine-b4">
       <div class="day-band-head"><h3 class="day-band-t" id="mine-b4">Minhas metas</h3></div>

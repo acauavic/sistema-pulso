@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.93.0', date: '2026-11-19', title: 'Números dos comentários e das automações',
+    items: [
+      { kind: 'novo', text: 'Social > Comentários > Números: o dia inteiro das respostas por IA num painel só. O caminho do comentário à comunidade (recebidos, respondidos em texto e com reação, com convite para seguir, directs e cliques no link), quem voltou a comentar depois da resposta, o saldo de seguidores, os posts que mais conversaram (com o total da rede ao lado do que o sistema leu), a automação por palavra e as barras de 30 em 30 minutos. Dá para voltar aos dias anteriores, com a média dos 7 dias antes.' },
+      { kind: 'novo', text: '"Saúde da automação" mostra a última leitura, o último aviso da Outstand, as leituras da IA que falharam, as respostas e os directs que não saíram com o motivo, o que espera a equipe e o que foi barrado. Quando algo para (direct pausado, aviso da Outstand mudo há horas), um aviso aparece no topo.' },
+      { kind: 'novo', text: 'O Resumo do dia e o Seu dia ganharam a faixa "Comentários nas redes": comentários, respondidos, directs, quem voltou a comentar e erros, com o link para os números.' },
+      { kind: 'ajuste', text: 'O direct leva um link curto só dele para a comunidade (leva ao mesmo grupo), para os cliques do direct não se misturarem com os da bio. Os comentários são lidos de 30 em 30 minutos (antes, de hora em hora) e guardam a hora real em que foram feitos.' },
+    ],
+  },
+  {
     version: '1.92.1', date: '2026-11-19', title: 'Direct também para quem foi respondido à mão',
     items: [
       { kind: 'correcao', text: 'O direct com a comunidade só saía depois de uma resposta da IA. Agora sai também para quem o Pulso respondeu de outro jeito (à mão, no app ou pela fila de respostas), dentro dos 7 dias do Instagram e no mesmo ritmo do dia.' },

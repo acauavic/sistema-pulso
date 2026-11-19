@@ -37,8 +37,9 @@ function keywordCandidates(guestName, random = () => crypto.randomBytes(2).toStr
 }
 
 // Gera um link curto para `longUrl`.
-async function shorten(longUrl, { title, guestName } = {}) {
-  for (const keyword of keywordCandidates(guestName)) {
+// keywords: nomes a tentar antes dos do convidado (ex.: o link do direct da comunidade).
+async function shorten(longUrl, { title, guestName, keywords = [] } = {}) {
+  for (const keyword of [...new Set([...keywords, ...keywordCandidates(guestName)])]) {
     const json = await call({ action: 'shorturl', url: longUrl, keyword, title: title || '' });
     if (json.shorturl) return { shortUrl: json.shorturl, keyword: json.url?.keyword || keyword };
     if (!isKeywordTaken(json)) throw new Error(`YOURLS: ${json.message || json.code || 'falha ao encurtar'}`);
@@ -56,4 +57,21 @@ async function ping() {
   return json['db-stats'] || json;
 }
 
-module.exports = { shorten, ping, keywordCandidates };
+// Total de cliques de um link curto (só leitura). null se o encurtador não souber dele.
+async function clicks(shortUrl) {
+  const json = await call({ action: 'url-stats', shorturl: String(shortUrl).replace(/\/+$/, '').split('/').pop() });
+  const n = Number(json?.link?.clicks);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Para onde um link curto leva (só leitura). null se não for um link do encurtador.
+async function expand(shortUrl) {
+  const json = await call({ action: 'expand', shorturl: String(shortUrl).replace(/\/+$/, '').split('/').pop() });
+  return json?.longurl || null;
+}
+
+const isOwnLink = (url) => {
+  try { return new URL(url).host === new URL(config.yourls.base).host; } catch { return false; }
+};
+
+module.exports = { shorten, ping, keywordCandidates, clicks, expand, isOwnLink };

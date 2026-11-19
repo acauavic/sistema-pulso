@@ -1,5 +1,6 @@
 <%- include('../partials/head') %>
 <%- include('../partials/social-nav') %>
+<%- include('_comments-tabs', { cmtTab: 'respostas' }) %>
 <%
   var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
   var here = '/social/comentarios?vista=' + vista + (pubId ? '&pub=' + pubId : '');
@@ -11,7 +12,7 @@
   var actionLabel = { responder: 'Responder', reagir: 'Reagir' };
   var empty = {
     equipe: ['Nada esperando você.', 'Quando um comentário for pesado ou delicado demais para a IA (ameaça, pedido de orientação de saúde, reclamação séria), ele aparece aqui e você recebe um aviso.'],
-    aprovar: ['Nenhuma resposta para aprovar.', cfg.on ? 'Os comentários novos chegam pela Outstand e pela leitura de cada hora. A IA escreve a resposta e ela espera aqui o seu ok.' : 'Ligue as respostas por IA para a lista começar a encher.'],
+    aprovar: ['Nenhuma resposta para aprovar.', cfg.on ? 'Os comentários novos chegam pela Outstand e pela leitura de 30 em 30 minutos. A IA escreve a resposta e ela espera aqui o seu ok.' : 'Ligue as respostas por IA para a lista começar a encher.'],
     fila: ['A fila está vazia.', 'O que você aprova entra aqui e sai uma por vez, no ritmo configurado.'],
     enviadas: ['Nenhuma resposta enviada ainda.', 'As respostas que saírem para as redes ficam aqui, com o botão de apagar se precisar.'],
     ignoradas: ['Nada ignorado.', 'Comentários que são conversa com o convidado, marcação de amigos, vazios ou de robô ficam aqui, sem resposta.'],

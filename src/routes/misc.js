@@ -58,6 +58,9 @@ router.get('/', wrap(async (req, res) => {
   const pMine = quiet(visao === 'meu' ? myDay.plan(req.user, day.day, day.isToday) : null);
   const pNow = quiet(isProducer ? myDay.now(req.user, day.today) : null);
   const pGoals = quiet(require('../services/goals').progressFor(req.user.id)); // Minhas metas (Gestão > Metas), no cartão Hoje
+  // faixa "Comentários nas redes" (respostas por IA) para quem cuida dos comentários; se falhar, a faixa só não aparece
+  const pCmt = can(req.user.role, 'social.comments') ? require('../services/commentStats').brief(day.day, { isToday: day.isToday })
+    .catch((err) => { console.error('Comentários (Início):', err.message); return null; }) : null;
   const [upcoming, recent, mine] = await Promise.all([
     isProducer ? { rows: [] } : db.query(`SELECT id, name, topic, proposed_at FROM guests
                WHERE status = 'agendado' AND proposed_at >= now() ORDER BY proposed_at LIMIT 6`),
@@ -78,7 +81,7 @@ router.get('/', wrap(async (req, res) => {
   const myGoals = await pGoals;
   res.render('dashboard', {
     money, outToday, CHANNELS: outreach.CHANNELS, outBase: (k) => outreach.KINDS[k].base,
-    title: 'Início', day, ds: await pDay, mineDay: await pMine, mineNow: await pNow, myGoals, isProducer, visao,
+    title: 'Início', day, ds: await pDay, mineDay: await pMine, mineNow: await pNow, myGoals, isProducer, visao, cmtDay: await pCmt,
     producerLine: isProducer ? myDay.line(outToday, myGoals) : '',
     upcoming: upcoming.rows, recent: recent.rows, myOpen: mine.rows[0].n,
   });
