@@ -34,6 +34,7 @@ function registerRoutines() {
   scheduler.every('piloto-semana', 3600_000, () => require('./services/bulkPublish').weeklyNotice(), { delayMs: 160_000 }); // segunda de manhã: "a agenda da semana está pronta para conferir"
   scheduler.every('metricas-posts', 6 * 3600_000, () => require('./services/postMetrics').refresh(), { delayMs: 150_000 }); // números de cada post (views, curtidas) para o cartão do corte e a IA de copy // foto do dia das redes mesmo sem ninguém abrir Insights (TikTok e Facebook não têm histórico no provedor)
   scheduler.every('comentarios-envio', 60_000, () => require('./services/commentReplies').sendTick(), { delayMs: 35_000 }); // respostas por IA: uma por vez, no ritmo escolhido
+  scheduler.every('comentarios-direct', 60_000, () => require('./services/commentReplies').dmTick(), { delayMs: 45_000 }); // direct com o link da comunidade, no ritmo do dia
   scheduler.every('comentarios-varredura', 3600_000, () => require('./services/commentReplies').sweep({ days: 3 }), { delayMs: 140_000 }); // comentários que o aviso da Outstand não trouxe: posts de até 3 dias
   scheduler.every('comentarios-varredura-longa', 6 * 3600_000, () => require('./services/commentReplies').sweep({ days: 14 }), { delayMs: 170_000 }); // e os de até 14 dias, de 6 em 6 horas
   scheduler.every('automacoes', 5 * 60_000, () => require('./services/social').runRules(), { delayMs: 60_000 });

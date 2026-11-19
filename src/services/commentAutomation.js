@@ -155,7 +155,7 @@ async function receive(raw, signature) {
       d.parentCommentId || null, d.authorId != null ? String(d.authorId) : null, d.authorUsername || null, String(d.text || '').slice(0, 2000), JSON.stringify(body)]);
   if (row) await jobs.enqueue('comentario_recebido', { refId: Number(row.id), maxAttempts: 3 });
   // respostas por IA: lê o post daqui a pouco e faz a triagem (services/commentReplies.js)
-  if (row) await require('./commentReplies').fromWebhook({ network: d.network || null, post_ref: d.postId || null, platform_post_id: d.platformPostId || null, comment_id: d.commentId, parent_comment_id: d.parentCommentId || null, author_username: d.authorUsername || null, text: d.text || '' }).catch((err) => console.error('[respostas-ia] aviso:', err.message));
+  if (row) await require('./commentReplies').fromWebhook({ network: d.network || null, post_ref: d.postId || null, platform_post_id: d.platformPostId || null, comment_id: d.commentId, parent_comment_id: d.parentCommentId || null, author_username: d.authorUsername || null, author_id: d.authorId != null ? String(d.authorId) : null, text: d.text || '' }).catch((err) => console.error('[respostas-ia] aviso:', err.message));
   return { status: 200, body: { ok: true } };
 }
 

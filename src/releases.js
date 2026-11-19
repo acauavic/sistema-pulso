@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.92.0', date: '2026-11-19', title: 'Direct com a comunidade e convite para seguir nas respostas',
+    items: [
+      { kind: 'novo', text: 'Respostas por IA no Instagram: quem comentou com conteúdo (opinião, relato, pergunta) recebe, depois da resposta pública, um direct curto que cita o que a pessoa disse e chama para a comunidade do Pulso no WhatsApp. Até 150 por dia (ajustável), no máximo um por pessoa a cada 30 dias e só até 7 dias depois do comentário.' },
+      { kind: 'novo', text: 'Em parte das respostas (no máximo 1 a cada 4, nunca duas vezes para a mesma pessoa), a IA convida a acompanhar o Pulso, principalmente nos Reels de teste, que chegam a quem ainda não segue.' },
+      { kind: 'novo', text: 'Na aba Comentários, o direct aparece junto da resposta, com o estado (para aprovar, na fila, enviado). Dá para editar na mesma janela ou tirar só o direct. A configuração ganhou o limite de directs por dia e as opções de convite e direct.' },
+    ],
+  },
+  {
     version: '1.91.0', date: '2026-11-19', title: 'Respostas por IA nos comentários dos posts',
     items: [
       { kind: 'novo', text: 'Social > Comentários: a IA lê os comentários dos posts que saíram pela Outstand (Instagram, Facebook e Threads), escreve uma resposta curta no tom do Pulso ou reage com um emoji e, sempre que dá, termina com uma pergunta para a pessoa comentar de novo. Conversa com o convidado, marcações, robôs e comentários vazios ficam de fora.' },

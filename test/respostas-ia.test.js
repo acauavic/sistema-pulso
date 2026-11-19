@@ -238,7 +238,7 @@ describe('Respostas por IA nos comentários (Social > Comentários)', () => {
     await ost.replyToComment({ postRef: 'op1', commentId: 'x1', content: 'Oi', platformPostId: '1789' });
     assert.equal(calls.filter((c) => c.method === 'POST').pop().body.platform_post_id, '1789');
     const list = await ost.listComments({ postRef: 'op3', network: 'instagram' });
-    assert.deepEqual(list[0], { id: 'n1', text: 'Oi', username: 'kika', timestamp: '2026-11-19T10:00:00+0000', likes: 2, replies: [{ id: 'n2', text: 'Olá!', username: null, timestamp: null }] }, 'formato novo (data) da Outstand');
+    assert.deepEqual(list[0], { id: 'n1', text: 'Oi', username: 'kika', timestamp: '2026-11-19T10:00:00+0000', likes: 2, authorId: null, replies: [{ id: 'n2', text: 'Olá!', username: null, timestamp: null, authorId: null }] }, 'formato novo (data) da Outstand');
     void gestaoId;
   });
 });

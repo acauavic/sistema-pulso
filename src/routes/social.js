@@ -478,6 +478,7 @@ router.get('/social/comentarios', requirePerm('social.comments'), wrap(async (re
     title: 'Comentários', tab: 'comentarios', cfg, counts, rows, more, vista, pubId, posts, eta, VIEWS: replies.VIEWS, MODES: replies.MODES, NETWORK_LABEL: replies.NETWORK_LABEL,
     summary: replies.summary(cfg), lastSweep: parse(sweepState), canSetup: can(req.user.role, 'social.automate'), outstandLive: config.outstand.live,
     aiReady: config.geminiConfigured, outstandReady: config.outstandConfigured, showAll, REPLY_MAX: replies.REPLY_MAX,
+    dmToday: await replies.dmToday(), communityOk: Boolean((await require('../services/commentAutomation').links()).whatsapp_community), DM_DAYS: replies.DM_PER_PERSON_DAYS,
   });
 }));
 
@@ -514,19 +515,20 @@ router.post('/social/comentarios/aprovar-todas', requirePerm('social.comments'),
 
 router.post('/social/comentarios/:id/resposta', requirePerm('social.comments'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);
-  const r = await replies.setReply(Number(req.params.id), req.body.texto, req.user.id);
+  const r = await replies.setReply(Number(req.params.id), req.body.texto, req.user.id, { dm: req.body.direct === undefined ? undefined : String(req.body.direct) });
   await req.flash(r.error ? 'error' : 'ok', r.error || 'Resposta na fila. Sai na próxima vez que o ritmo deixar.');
   if (!r.error) await audit(req, 'respostas_ia.editada', 'social_comment', Number(req.params.id));
   res.redirect(backTo(req));
 }));
 
-router.post('/social/comentarios/:id/:acao(aprovar|ignorar|tirar|tentar|apagar)', requirePerm('social.comments'), wrap(async (req, res) => {
+router.post('/social/comentarios/:id/:acao(aprovar|ignorar|tirar|tentar|apagar|sem-direct)', requirePerm('social.comments'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);
   const id = Number(req.params.id); const acao = req.params.acao;
   let msg = null; let error = null;
   if (acao === 'aprovar' || acao === 'tentar') msg = (await replies.approve([id], req.user.id)) ? 'Resposta na fila.' : null;
   else if (acao === 'ignorar') msg = (await replies.skip(id, req.user.id)) ? 'Este comentário fica sem resposta.' : null;
   else if (acao === 'tirar') msg = (await replies.unqueue(id)) ? 'Saiu da fila e voltou para aprovar.' : null;
+  else if (acao === 'sem-direct') msg = (await replies.skipDm(id)) ? 'O direct não vai. A resposta pública continua.' : null;
   else if (acao === 'apagar') { const r = await replies.undo(id); error = r.error || null; msg = r.ok ? 'Resposta apagada da rede.' : null; }
   if (!msg && !error) error = 'Este comentário mudou enquanto você olhava. A lista foi atualizada.';
   if (msg) await audit(req, `respostas_ia.${acao}`, 'social_comment', id);

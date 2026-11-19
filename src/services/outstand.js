@@ -382,9 +382,10 @@ async function listComments({ postRef, network }) {
   const { json } = await call('GET', `/v1/posts/${encodeURIComponent(postRef)}/replies?network=${encodeURIComponent(network)}&include_replies=true`, { timeout: 25_000 });
   const who = (x) => x.author_username || x.username || x.from?.username || x.platform_specific?.username || null;
   if (Array.isArray(json.data)) { // formato novo, igual em toda rede
+    const authorId = (x) => x.platform_specific?.from?.id || x.from?.id || x.author_id || null; // id na rede (o direct precisa)
     return json.data.map((k) => ({
-      id: String(k.id), text: String(k.text || ''), username: who(k), timestamp: k.created_at || k.timestamp || null, likes: Number(k.like_count) || 0,
-      replies: (Array.isArray(k.replies) ? k.replies : k.replies?.data || []).map((x) => ({ id: String(x.id), text: String(x.text || ''), username: who(x), timestamp: x.created_at || x.timestamp || null })),
+      id: String(k.id), text: String(k.text || ''), username: who(k), timestamp: k.created_at || k.timestamp || null, likes: Number(k.like_count) || 0, authorId: authorId(k) ? String(authorId(k)) : null,
+      replies: (Array.isArray(k.replies) ? k.replies : k.replies?.data || []).map((x) => ({ id: String(x.id), text: String(x.text || ''), username: who(x), timestamp: x.created_at || x.timestamp || null, authorId: authorId(x) ? String(authorId(x)) : null })),
     }));
   }
   const list = json.replies?.comments || json.comments || [];

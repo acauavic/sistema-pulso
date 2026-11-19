@@ -2152,6 +2152,8 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
 .cmt-reply-bad { border-left-color: var(--st-cancelado-fg); }
 .cmt-reply-off { opacity: .6; } .cmt-reply-off .cmt-reply-text { text-decoration: line-through; }
 .cmt-why { display: flex; gap: 6px; align-items: center; }
+.cmt-dm { display: grid; gap: 4px; padding: 8px 10px; border-left: 2px dashed var(--line-strong); }
+.cmt-dm-text { color: var(--text-2); overflow-wrap: anywhere; white-space: pre-line; }
 .cmt-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .cmt-ignorada .cmt-text, .cmt-respondida .cmt-text { color: var(--text-2); }
 .cmt-quote { display: block; padding: 8px 10px; border-left: 2px solid var(--line-strong); background: var(--raised); color: var(--text-2); font-size: 13px; overflow-wrap: anywhere; white-space: pre-line; max-height: 140px; overflow: auto; }

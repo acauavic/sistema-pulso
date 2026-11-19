@@ -44,6 +44,7 @@
   <div class="cmt-setup-main">
     <span class="kicker mono">Respostas por IA</span>
     <p class="m-0"><strong><%= cfg.on ? 'Ligada' : 'Desligada' %></strong><span class="muted"> · <%= summary %></span></p>
+    <% if (cfg.on && cfg.dm_on) { %><p class="mono small muted m-0">DIRECTS NAS ÚLTIMAS 24 H <%= dmToday %> DE <%= cfg.dm_per_day %></p><% } %>
     <% if (lastSweep && lastSweep.at) { %><p class="mono small muted m-0">ÚLTIMA LEITURA <%= when(lastSweep.at) %> · <%= lastSweep.posts %> POST<%= lastSweep.posts === 1 ? '' : 'S' %><%= lastSweep.errors ? ' · ' + lastSweep.errors + ' COM ERRO' : '' %></p><% } %>
   </div>
   <% if (canSetup) { %>
@@ -62,6 +63,7 @@
 </section>
 <% } %>
 <% if (!outstandLive) { %><p class="test-mode small"><%- icon('info', 14) %> <span>A Outstand está em modo de teste: as respostas aprovadas são só simuladas, nada sai para as redes.</span></p><% } %>
+<% if (cfg.on && cfg.dm_on && !communityOk) { %><div class="notice"><%- icon('link', 16) %> O direct com a comunidade está esperando o link: cadastre "Comunidade no WhatsApp" em <a href="/social/automacoes">Social &gt; Automações</a>. Até lá, os directs ficam na fila.</div><% } %>
 <% if (cfg.on && !aiReady) { %><div class="notice"><%- icon('triangle-alert', 16) %> A IA não está configurada neste servidor: os comentários chegam, mas ficam sem resposta proposta.</div><% } %>
 
 <% if (cfg.on || rows.length || Object.keys(counts).some(function (k) { return counts[k]; })) { %>
@@ -98,7 +100,9 @@
 <ul class="plain cmt-list">
   <% rows.forEach(function (c) {
        var others = (c.thread || []).filter(function (t) { return t.texto; });
-       var fill = JSON.stringify({ texto: c.reply_text || '', comentario: c.id, voltar: here, original: '@' + (c.author_username || 'alguém') + ': ' + (c.text || '') }); %>
+       var dmEditable = c.network === 'instagram' && ['enviada', 'simulada'].indexOf(c.dm_status) < 0;
+       var fill = JSON.stringify({ texto: c.reply_text || '', comentario: c.id, voltar: here, original: '@' + (c.author_username || 'alguém') + ': ' + (c.text || ''), direct: dmEditable ? (c.dm_text || '') : '', dm_ok: dmEditable ? '1' : '' });
+       var dmLabel = { proposta: ['b-gray', 'para aprovar'], aprovada: ['b-gray', c.status === 'enviada' || c.status === 'simulada' ? 'na fila' : 'depois da resposta'], enviada: ['b-gray', 'enviado'], simulada: ['b-gray', 'simulado'], erro: ['b-red', 'não saiu'], pulada: ['b-gray', 'não vai'] }; %>
   <li class="cmt-row cmt-<%= c.status %>">
     <a class="cmt-thumb" href="/social/publicacoes/<%= c.publication_id %>" tabindex="-1" aria-hidden="true"><% if (c.thumb_cover) { %><img src="/capas/<%= c.thumb_cover %>/imagem?v=<%= c.thumb_at ? new Date(c.thumb_at).getTime() : 0 %>&w=640" alt="" loading="lazy" decoding="async"><% } else { %><%- icon('image', 18) %><% } %></a>
     <div class="cmt-body">
@@ -122,7 +126,16 @@
             <% } else if (c.status === 'apagada') { %>APAGADA DA REDE
             <% } else { %>IA: <%= (c.reason || '').toUpperCase() %><% } %>
           </p>
+          <% if (c.invited) { %><p class="mono small muted m-0"><%- icon('user-plus', 12) %> COM CONVITE PARA SEGUIR</p><% } %>
         </div>
+        <% if (c.dm_text && c.dm_status) { %>
+        <div class="cmt-dm<%= c.dm_status === 'pulada' ? ' cmt-reply-off' : '' %>">
+          <p class="m-0"><span class="mono small muted"><%- icon('send', 12) %> DIRECT</span> <span class="badge <%= dmLabel[c.dm_status][0] %>"><%= dmLabel[c.dm_status][1] %></span><% if (c.dm_sent_at) { %> <span class="mono small muted"><%= when(c.dm_sent_at) %></span><% } %></p>
+          <p class="m-0 small cmt-dm-text"><%= c.dm_text.replace(/\{comunidade\}/g, '[link da comunidade]') %></p>
+          <% if (c.dm_error) { %><p class="small m-0 <%= c.dm_status === 'erro' ? 'bad-text' : 'muted' %>"><%= c.dm_error %></p><% } %>
+          <% if (['proposta', 'aprovada', 'erro'].indexOf(c.dm_status) >= 0) { %><form method="post" action="/social/comentarios/<%= c.id %>/sem-direct" class="inline"><%- csrfField %><%- back %><button class="link small" type="submit">sem direct</button></form><% } %>
+        </div>
+        <% } %>
       <% } else if (['ignorada', 'respondida'].indexOf(c.status) >= 0) { %>
         <p class="small muted m-0 cmt-why"><%- icon(c.status === 'respondida' ? 'check' : 'eye-off', 12) %> <%= c.reason || 'Sem resposta.' %></p>
       <% } %>
@@ -164,6 +177,12 @@
       <textarea id="cmt-texto" name="texto" rows="4" maxlength="<%= REPLY_MAX %>" required data-ai="resposta" placeholder="ex.: Faz sentido. E no seu dia a dia, como isso aparece?"></textarea>
     </label>
     <p class="small muted m-0">Só um emoji vira reação. A resposta entra na fila e sai no ritmo configurado.</p>
+    <div data-if="dm_ok">
+      <label>Direct com o link da comunidade <small class="counter" data-counter-for="cmt-direct" data-max="900"></small>
+        <textarea id="cmt-direct" name="direct" rows="4" maxlength="900" placeholder="ex.: Gostei do que você contou sobre a rotina. A conversa continua na nossa comunidade: {comunidade}"></textarea>
+      </label>
+      <p class="small muted m-0">Só Instagram, sai depois da resposta pública. <span class="mono">{comunidade}</span> vira o link. Em branco, não vai direct. A mesma pessoa recebe no máximo um a cada <%= DM_DAYS %> dias.</p>
+    </div>
     <div class="row modal-actions"><button class="btn primary" type="submit">Pôr na fila</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>
@@ -184,6 +203,11 @@
       <label>Das (hora)<input type="number" name="from" min="0" max="23" value="<%= cfg.from %>" inputmode="numeric"></label>
       <label>Até (hora)<input type="number" name="to" min="1" max="24" value="<%= cfg.to %>" inputmode="numeric"></label>
     </div>
+    <fieldset class="m-0 stack"><legend class="small">Instagram</legend>
+      <label class="check"><input type="checkbox" name="invite_on" value="1" <%= cfg.invite_on ? 'checked' : '' %>> Convidar para seguir o Pulso em parte das respostas (no máximo 1 a cada 4, nunca duas vezes para a mesma pessoa)</label>
+      <label class="check"><input type="checkbox" name="dm_on" value="1" <%= cfg.dm_on ? 'checked' : '' %>> Mandar direct com o link da comunidade para quem comentou com conteúdo</label>
+      <label>Directs por dia, no máximo<input type="number" name="dm_per_day" min="1" max="300" value="<%= cfg.dm_per_day %>" inputmode="numeric"></label>
+    </fieldset>
     <label>Perfis da equipe (a IA não responde)<input type="text" name="team_handles" value="<%= cfg.team_handles.map(function (h) { return '@' + h; }).join(', ') %>" placeholder="ex.: @produtora, @host"></label>
     <p class="small muted m-0">O próprio perfil do Pulso e o convidado do post já ficam de fora.</p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>

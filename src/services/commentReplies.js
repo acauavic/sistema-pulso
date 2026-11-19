@@ -14,7 +14,12 @@ const SEND_KEY = 'respostas_ia_envio';
 const NETWORKS = ['instagram', 'facebook', 'threads'];
 const NETWORK_LABEL = { instagram: 'Instagram', facebook: 'Facebook', threads: 'Threads' };
 const MODES = { aprovar: 'Aprovar antes', automatico: 'Automático' };
-const DEFAULTS = { on: false, mode: 'aprovar', per_hour: 25, from: 8, to: 23, team_handles: [] };
+const DEFAULTS = { on: false, mode: 'aprovar', per_hour: 25, from: 8, to: 23, team_handles: [], dm_on: true, dm_per_day: 150, invite_on: true };
+const DM_KEY = 'respostas_ia_direct';
+const DM_MAX_AGE_DAYS = 6.5; // o Instagram aceita a resposta privada até 7 dias depois do comentário
+const DM_PER_PERSON_DAYS = 30; // a mesma pessoa recebe no máximo um direct nesse período
+const DM_MAX = 900;
+const INVITE_EVERY = 4; // no máximo 1 convite para seguir a cada 4 respostas (olhando as 20 últimas)
 const REPLY_MAX = 300;
 const MIN_CONFIDENCE = 0.6;
 const MAX_AI_PER_PERSON = 2; // respostas da IA à mesma pessoa no mesmo post (a conversa continua, mas não vira bate-boca)
@@ -47,12 +52,13 @@ async function setConfig(body, { onlyToggle = false } = {}) {
     from: clampInt(body.from, 0, 23, cur.from),
     to: clampInt(body.to, 1, 24, cur.to),
     team_handles: [...new Set(String(body.team_handles || '').split(/[\s,;]+/).map(handleOf).filter((h) => /^[a-z0-9._]{1,30}$/.test(h)))].slice(0, 40),
+    dm_on: String(body.dm_on) === '1', dm_per_day: clampInt(body.dm_per_day, 1, 300, cur.dm_per_day), invite_on: String(body.invite_on) === '1',
   };
   if (!onlyToggle && next.to <= next.from) return { error: 'O horário de fim precisa ser depois do de início.' };
   await settings.set(KEY, JSON.stringify(next));
   return { config: next };
 }
-const summary = (c) => `${MODES[c.mode].toLowerCase()} · até ${c.per_hour} por hora, das ${c.from}h às ${c.to}h`;
+const summary = (c) => `${MODES[c.mode].toLowerCase()} · até ${c.per_hour} por hora, das ${c.from}h às ${c.to}h${c.dm_on ? ` · direct até ${c.dm_per_day} por dia` : ''}`;
 
 // ---------------------------------------------------------------- posts acompanhados
 // Cada rede de cada publicação que saiu pela Outstand, com o contexto que a IA usa. days: só as publicadas nesse período.
@@ -119,20 +125,21 @@ async function ingest(post, comments, mine) {
       if (back.length && oursCount < MAX_AI_PER_PERSON) {
         const x = back[back.length - 1];
         const { rowCount } = await db.query(
-          `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, parent_comment_id, author_username, text, commented_at, thread)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (provider, network, comment_id) DO NOTHING`,
-          [...base, x.id, k.id, x.username, String(x.text || '').slice(0, 2000), x.timestamp || null,
-            JSON.stringify([{ id: k.id, usuario: k.username, texto: String(k.text || '').slice(0, 400), pulso: false }, ...thread])]);
+          `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, parent_comment_id, author_username, text, commented_at, thread, author_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (provider, network, comment_id) DO NOTHING`,
+          [...base, x.id, k.id, x.username || k.username, String(x.text || '').slice(0, 2000), x.timestamp || null,
+            JSON.stringify([{ id: k.id, usuario: k.username, texto: String(k.text || '').slice(0, 400), pulso: false }, ...thread]), x.authorId || k.authorId || null]);
         fresh += rowCount;
       }
       continue;
     }
     const { rows: [ins] } = await db.query(
-      `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, author_username, text, commented_at, likes, thread)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (provider, network, comment_id) DO UPDATE SET thread = EXCLUDED.thread, likes = EXCLUDED.likes, updated_at = now()
+      `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, author_username, text, commented_at, likes, thread, author_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (provider, network, comment_id) DO UPDATE SET thread = EXCLUDED.thread, likes = EXCLUDED.likes, updated_at = now(),
+         author_id = coalesce(social_comments.author_id, EXCLUDED.author_id)
        RETURNING (xmax = 0) AS inserted`,
-      [...base, k.id, k.username, String(k.text || '').slice(0, 2000), k.timestamp, k.likes || 0, JSON.stringify(thread)]);
+      [...base, k.id, k.username, String(k.text || '').slice(0, 2000), k.timestamp, k.likes || 0, JSON.stringify(thread), k.authorId || null]);
     if (ins?.inserted) fresh += 1;
   }
   return fresh;
@@ -168,7 +175,7 @@ async function sweep({ days = 14, pubId = null, force = false } = {}) {
 }
 
 // Aviso comment.received: lê o post inteiro daqui a 1 minuto (junta comentários que chegam em sequência) e faz a triagem.
-async function fromWebhook({ network, post_ref: postRef, platform_post_id: platformPostId, comment_id: commentId = null, parent_comment_id: parentId = null, author_username: author = null, text = '' }) {
+async function fromWebhook({ network, post_ref: postRef, platform_post_id: platformPostId, comment_id: commentId = null, parent_comment_id: parentId = null, author_username: author = null, author_id: authorId = null, text = '' }) {
   const c = await getConfig();
   if (!c.on || !NETWORKS.includes(network)) return null;
   const { rows: [pub] } = await db.query(
@@ -180,9 +187,9 @@ async function fromWebhook({ network, post_ref: postRef, platform_post_id: platf
   const mine = commentId && !parentId ? (await ourHandles())[network] : null;
   if (commentId && !parentId && !(mine && handleOf(author) === mine)) {
     await db.query(
-      `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, author_username, text, commented_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7, now()) ON CONFLICT (provider, network, comment_id) DO NOTHING`,
-      [network, pub.post_ref || postRef, pub.platform_post_id || platformPostId, pub.id, String(commentId), author, String(text || '').slice(0, 2000)]);
+      `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, author_username, text, commented_at, author_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8) ON CONFLICT (provider, network, comment_id) DO UPDATE SET author_id = coalesce(social_comments.author_id, EXCLUDED.author_id)`,
+      [network, pub.post_ref || postRef, pub.platform_post_id || platformPostId, pub.id, String(commentId), author, String(text || '').slice(0, 2000), authorId ? String(authorId) : null]);
   }
   return jobs.enqueue('comentarios_ia', { refId: pub.id, payload: { fetch: true }, delayMs: 60_000, maxAttempts: 4 });
 }
@@ -201,6 +208,8 @@ Regras de tom (são da marca e valem sempre):
 - Não dê conselho médico, jurídico ou financeiro individual. Não invente fatos sobre o convidado nem sobre o episódio.
 - "Link da bio" só se a pessoa perguntar onde assistir.
 - Varie as respostas: duas respostas no mesmo post não podem começar igual nem repetir a mesma ideia.
+Convite para seguir ("convite", opcional, só com "responder"): quando couber de forma natural — pessoa engajada, principalmente em Reel de teste (quem vê ainda não segue) —, uma frase curta e calorosa que convide a acompanhar o Pulso, sem "segue aí", sem pedir like, sem urgência (ex.: "E se ainda não acompanha o Pulso, toda semana tem conversa nova por aqui."). Não repita o convite dentro da "resposta": ele vai separado.
+Direct ("direct", opcional, só Instagram e só com "responder"): para quem comentou com conteúdo (opinião, relato, pergunta, quem respondeu o Pulso), uma mensagem privada curta (até 350 caracteres), em tom de conversa, citando o que a pessoa disse, chamando para a comunidade do Pulso no WhatsApp, onde a conversa continua, e terminando com o marcador {comunidade} (vira o link). Sem "olá, tudo bem?" genérico, sem vender nada. Para reação com emoji, ignorar e equipe, deixe vazio.
 Devolva um item por comentário recebido, com o mesmo id, o motivo em poucas palavras e a confiança (0 a 1).`;
 
 const SCHEMA = {
@@ -212,7 +221,7 @@ const SCHEMA = {
         type: 'OBJECT', required: ['id', 'acao', 'motivo', 'confianca'],
         properties: {
           id: { type: 'STRING' }, acao: { type: 'STRING', enum: ['responder', 'reagir', 'ignorar', 'equipe'] },
-          motivo: { type: 'STRING' }, resposta: { type: 'STRING' }, confianca: { type: 'NUMBER' },
+          motivo: { type: 'STRING' }, resposta: { type: 'STRING' }, confianca: { type: 'NUMBER' }, convite: { type: 'STRING' }, direct: { type: 'STRING' },
         },
       },
     },
@@ -236,6 +245,36 @@ function cleanReply(action, s) {
   if (action === 'reagir') return [...t].length && [...t].length <= 4 && !/[\p{L}\p{N}]/u.test(t) ? t : EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
   if ([...t].length > REPLY_MAX) t = `${[...t].slice(0, REPLY_MAX - 1).join('').replace(/\s+\S*$/, '')}…`;
   return t;
+}
+
+// Direct: limpa o texto e garante o marcador do link (se a IA esqueceu, o link vai no fim).
+function cleanDm(s) {
+  let t = String(s || '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/!{2,}/g, '!').trim().slice(0, DM_MAX);
+  if (!t) return null;
+  if (!t.includes('{comunidade}')) t = `${t}\n\n{comunidade}`;
+  return t;
+}
+// A mesma pessoa já recebeu (ou está para receber) um direct nos últimos 30 dias?
+async function dmRecently(network, username, exceptId = null) {
+  if (!username) return false;
+  const { rows: [r] } = await db.query(
+    `SELECT 1 FROM social_comments WHERE network = $1 AND lower(author_username) = lower($2) AND id IS DISTINCT FROM $3
+        AND ((dm_status IN ('enviada','simulada') AND dm_sent_at > now() - ($4 || ' days')::interval) OR dm_status IN ('proposta','aprovada')) LIMIT 1`,
+    [network, username, exceptId, String(DM_PER_PERSON_DAYS)]);
+  return Boolean(r);
+}
+// Cabe mais um convite para seguir? No máximo 1 a cada INVITE_EVERY respostas, olhando as 20 últimas (e nunca duas vezes para a mesma pessoa).
+async function inviteAllowed(username) {
+  const { rows: last } = await db.query(
+    "SELECT invited FROM social_comments WHERE action = 'responder' AND status IN ('proposta','aprovada','enviada','simulada') ORDER BY coalesce(decided_at, updated_at) DESC, id DESC LIMIT 20");
+  const used = last.filter((r) => r.invited).length;
+  if (used >= Math.ceil(Math.max(last.length, 1) / INVITE_EVERY) && last.length >= INVITE_EVERY) return false;
+  if (last.slice(0, INVITE_EVERY - 1).some((r) => r.invited)) return false; // espaçados: não dois convites seguidos
+  if (username) {
+    const { rows: [r] } = await db.query('SELECT 1 FROM social_comments WHERE invited AND lower(author_username) = lower($1) LIMIT 1', [username]);
+    if (r) return false;
+  }
+  return true;
 }
 
 // Triagem dos comentários novos de uma publicação (em lotes de 25).
@@ -279,10 +318,17 @@ async function classifyPublication(pubId) {
       const text = action === 'responder' || action === 'reagir' ? cleanReply(action, it.resposta) : null;
       if ((action === 'responder' && !text) || (conf < MIN_CONFIDENCE && action !== 'ignorar')) action = 'equipe';
       const status = action === 'ignorar' ? 'ignorada' : action === 'equipe' ? 'equipe' : c.mode === 'automatico' ? 'aprovada' : 'proposta';
+      let reply = text; let invited = false; let dm = null;
+      if (action === 'responder' && c.invite_on && String(it.convite || '').trim() && await inviteAllowed(row.author_username)) {
+        const extra = cleanReply('responder', it.convite);
+        if (extra && [...`${reply} ${extra}`].length <= REPLY_MAX) { reply = `${reply} ${extra}`; invited = true; }
+      }
+      if (action === 'responder' && c.dm_on && row.network === 'instagram' && !(await dmRecently(row.network, row.author_username, row.id))) dm = cleanDm(it.direct);
       await db.query(
-        `UPDATE social_comments SET status = $2, action = $3, reason = $4, ai_text = $5, reply_text = $5, confidence = $6,
+        `UPDATE social_comments SET status = $2, action = $3, reason = $4, ai_text = $5, reply_text = $5, confidence = $6, invited = $7,
+            dm_text = $8, dm_status = CASE WHEN $8::text IS NULL THEN NULL WHEN $2 = 'aprovada' THEN 'aprovada' ELSE 'proposta' END,
             decided_at = CASE WHEN $2 = 'aprovada' THEN now() ELSE decided_at END, updated_at = now() WHERE id = $1 AND status = 'nova'`,
-        [row.id, status, action, String(it.motivo || '').slice(0, 200) || null, text, conf]);
+        [row.id, status, action, String(it.motivo || '').slice(0, 200) || null, reply, conf, invited, dm]);
       classified += 1;
       if (status === 'equipe') needTeam.push(row);
       if (status === 'proposta') proposed += 1;
@@ -369,6 +415,75 @@ async function sendTick({ now = new Date() } = {}) {
   return { sent: 1, id: row.id };
 }
 
+// ---------------------------------------------------------------- direct com a comunidade (Instagram)
+// O link da comunidade sai encurtado uma vez (dá para ver os cliques no encurtador); sem encurtador, vai o link direto.
+async function communityLink() {
+  const long = (await require('./commentAutomation').links()).whatsapp_community;
+  if (!long) return null;
+  const cache = parseJson(await settings.get(`${DM_KEY}_link`), {});
+  if (cache.long === long && cache.short) return cache.short;
+  if (!config.yourlsConfigured) return long;
+  try {
+    const { shortUrl } = await require('./yourls').shorten(long, { title: 'Comunidade · direct dos comentários' });
+    await settings.set(`${DM_KEY}_link`, JSON.stringify({ long, short: shortUrl }));
+    return shortUrl;
+  } catch { return long; }
+}
+const renderDm = (text, link) => String(text || '').replace(/\{comunidade\}/g, link).trim();
+const dmGap = (c) => Math.max(30_000, ((c.to - c.from) * 3600_000 / Math.max(1, c.dm_per_day)) * (0.6 + Math.random() * 0.8));
+
+function dmFriendly(err) {
+  const m = String(err?.message || err);
+  if (/\(409\)/.test(m)) return 'Esse comentário já tinha recebido um direct.';
+  if (/\(422\)/.test(m)) return 'Passou do prazo: o Instagram só deixa mandar direct até 7 dias depois do comentário.';
+  if (/\(40[13]\)/.test(m)) return 'O Instagram não deu acesso às mensagens: reconecte o Instagram em Integrações (com acesso às mensagens).';
+  if (/\(429\)/.test(m)) return 'O Instagram pediu para ir mais devagar. O direct sai mais tarde.';
+  return friendly(err);
+}
+
+// Uma volta (a cada minuto): manda no máximo um direct, depois que a resposta pública já saiu, no ritmo do dia.
+async function dmTick({ now = new Date() } = {}) {
+  const c = await getConfig();
+  if (!c.on || !c.dm_on || !inWindow(c, now)) return { sent: 0, reason: !c.on || !c.dm_on ? 'desligado' : 'fora do horário' };
+  const state = parseJson(await settings.get(DM_KEY), {});
+  if (state.next_at && new Date(state.next_at) > now) return { sent: 0, reason: 'intervalo' };
+  const { rows: [{ n }] } = await db.query("SELECT count(*)::int AS n FROM social_comments WHERE dm_status IN ('enviada','simulada') AND dm_sent_at > $1::timestamptz - interval '1 day'", [now]);
+  if (n >= c.dm_per_day) return { sent: 0, reason: 'limite do dia' };
+  // passou do prazo do Instagram: não tenta
+  await db.query(`UPDATE social_comments SET dm_status = 'pulada', dm_error = 'Passou de 7 dias do comentário.' WHERE dm_status = 'aprovada'
+                   AND coalesce(commented_at, created_at) < $1::timestamptz - ($2 || ' hours')::interval`, [now, String(DM_MAX_AGE_DAYS * 24)]);
+  const link = await communityLink();
+  if (!link) return { sent: 0, reason: 'sem link da comunidade' };
+  const { rows: [row] } = await db.query(
+    `SELECT * FROM social_comments WHERE dm_status = 'aprovada' AND status IN ('enviada','simulada') AND network = 'instagram' AND author_id IS NOT NULL
+      ORDER BY sent_at, id LIMIT 1`);
+  if (!row) return { sent: 0, reason: 'fila vazia' };
+  if (await dmRecently(row.network, row.author_username, row.id) && (await db.query(
+    "SELECT 1 FROM social_comments WHERE network = $1 AND lower(author_username) = lower($2) AND id <> $3 AND dm_status IN ('enviada','simulada') AND dm_sent_at > now() - ($4 || ' days')::interval",
+    [row.network, row.author_username, row.id, String(DM_PER_PERSON_DAYS)])).rows.length) {
+    await db.query("UPDATE social_comments SET dm_status = 'pulada', dm_error = 'Já recebeu um direct há pouco.' WHERE id = $1", [row.id]);
+    return { sent: 0, reason: 'pessoa já recebeu' };
+  }
+  const live = config.outstand.live;
+  try {
+    if (live) {
+      const conn = await require('./outstand').connected().catch(() => ({ platforms: {} }));
+      const accountId = conn.platforms?.instagram?.accountId;
+      if (!accountId) throw new Error('Instagram não conectado na Outstand.');
+      await require('./outstand').privateReply({ accountId, commentId: row.comment_id, authorId: row.author_id, content: renderDm(row.dm_text, link) });
+    }
+    await db.query("UPDATE social_comments SET dm_status = $2, dm_sent_at = $3, dm_error = NULL WHERE id = $1", [row.id, live ? 'enviada' : 'simulada', now]);
+  } catch (err) {
+    const slow = /\(429\)/.test(String(err.message));
+    await db.query('UPDATE social_comments SET dm_status = $2, dm_error = $3 WHERE id = $1', [row.id, slow ? 'aprovada' : /\(422\)/.test(String(err.message)) ? 'pulada' : 'erro', dmFriendly(err)]);
+    await settings.set(DM_KEY, JSON.stringify({ next_at: new Date(now.getTime() + (slow ? 30 * 60_000 : dmGap(c))).toISOString() }));
+    return { sent: 0, reason: 'erro', error: dmFriendly(err) };
+  }
+  await settings.set(DM_KEY, JSON.stringify({ next_at: new Date(now.getTime() + dmGap(c)).toISOString() }));
+  return { sent: 1, id: row.id };
+}
+const dmToday = () => db.query("SELECT count(*)::int AS n FROM social_comments WHERE dm_status IN ('enviada','simulada') AND dm_sent_at > now() - interval '1 day'").then((r) => r.rows[0].n);
+
 // Previsão de saída de cada resposta da fila (na ordem em que vão sair), para a aba "Na fila".
 function estimate(rows, c, { now = new Date(), nextAt = null } = {}) {
   const gap = baseGap(c);
@@ -386,7 +501,8 @@ function estimate(rows, c, { now = new Date(), nextAt = null } = {}) {
 const ACTIONABLE = ['proposta', 'equipe', 'erro'];
 async function approve(ids, userId) {
   const { rowCount } = await db.query(
-    `UPDATE social_comments SET status = 'aprovada', decided_by = $2, decided_at = now(), error = NULL, attempts = 0, updated_at = now()
+    `UPDATE social_comments SET status = 'aprovada', decided_by = $2, decided_at = now(), error = NULL, attempts = 0, updated_at = now(),
+        dm_status = CASE WHEN dm_status = 'proposta' THEN 'aprovada' ELSE dm_status END
       WHERE id = ANY($1::bigint[]) AND status = ANY($3) AND coalesce(reply_text, '') <> ''`, [ids, userId, ACTIONABLE]);
   return rowCount;
 }
@@ -395,18 +511,30 @@ async function approveAll({ userId, pubId = null }) {
   return approve(rows.map((r) => r.id), userId);
 }
 // Texto escrito (ou editado) por alguém: vai para a fila. Só emoji = reação.
-async function setReply(id, text, userId) {
+// dm: undefined = não mexe no direct; '' = sem direct; texto = o direct (só Instagram, e só se a pessoa não recebeu um há pouco).
+async function setReply(id, text, userId, { dm } = {}) {
   const t = String(text || '').replace(/\r/g, '').trim().slice(0, REPLY_MAX);
   if (!t) return { error: 'Escreva a resposta.' };
   const action = /[\p{L}\p{N}]/u.test(t) ? 'responder' : 'reagir';
+  const { rows: [row] } = await db.query('SELECT * FROM social_comments WHERE id = $1', [id]);
+  if (!row) return { error: 'Comentário não encontrado.' };
+  let dmText = row.dm_text; let dmStatus = row.dm_status;
+  if (dm !== undefined && !['enviada', 'simulada'].includes(row.dm_status)) {
+    const clean = row.network === 'instagram' ? cleanDm(dm) : null;
+    if (clean && await dmRecently(row.network, row.author_username, row.id)) return { error: `@${row.author_username} já recebeu um direct nos últimos ${DM_PER_PERSON_DAYS} dias. Deixe o direct em branco.` };
+    dmText = clean; dmStatus = clean ? 'aprovada' : null;
+  } else if (dmStatus === 'proposta') dmStatus = 'aprovada';
   const { rowCount } = await db.query(
-    `UPDATE social_comments SET reply_text = $2, action = $3, status = 'aprovada', decided_by = $4, decided_at = now(), error = NULL, attempts = 0, updated_at = now()
-      WHERE id = $1 AND status IN ('proposta','equipe','erro','aprovada','ignorada')`, [id, t, action, userId]);
+    `UPDATE social_comments SET reply_text = $2, action = $3, status = 'aprovada', decided_by = $4, decided_at = now(), error = NULL, attempts = 0, updated_at = now(),
+        dm_text = $5, dm_status = $6, dm_error = NULL
+      WHERE id = $1 AND status IN ('proposta','equipe','erro','aprovada','ignorada')`, [id, t, action, userId, dmText, dmStatus]);
   return rowCount ? { ok: true } : { error: 'Este comentário já foi respondido.' };
 }
+// Tira só o direct (a resposta pública continua).
+const skipDm = (id) => db.query("UPDATE social_comments SET dm_status = 'pulada', updated_at = now() WHERE id = $1 AND dm_status IN ('proposta','aprovada','erro')", [id]).then((r) => r.rowCount);
 async function skip(id, userId) {
   const { rowCount } = await db.query(
-    `UPDATE social_comments SET status = 'ignorada', reason = coalesce(nullif(reason, ''), 'Sem resposta'), decided_by = $2, decided_at = now(), updated_at = now()
+    `UPDATE social_comments SET status = 'ignorada', dm_status = CASE WHEN dm_status IN ('proposta','aprovada','erro') THEN 'pulada' ELSE dm_status END, reason = coalesce(nullif(reason, ''), 'Sem resposta'), decided_by = $2, decided_at = now(), updated_at = now()
       WHERE id = $1 AND status IN ('proposta','equipe','erro','aprovada')`, [id, userId]);
   return rowCount;
 }
@@ -464,5 +592,6 @@ async function ofPublication(pubId) {
 module.exports = {
   KEY, SEND_KEY, NETWORKS, NETWORK_LABEL, MODES, DEFAULTS, VIEWS, EMOJIS, REPLY_MAX, SYSTEM,
   getConfig, setConfig, summary, watchedPosts, postContext, ingest, sweep, fromWebhook, classifyPublication, cleanReply,
-  hourBR, inWindow, sendTick, estimate, friendly, approve, approveAll, setReply, skip, unqueue, undo, counts, pendingCount, list, postsWithComments, ofPublication,
+  hourBR, inWindow, sendTick, estimate, friendly, approve, approveAll, setReply, skip, unqueue, undo,
+  DM_KEY, DM_PER_PERSON_DAYS, cleanDm, dmRecently, inviteAllowed, communityLink, renderDm, dmTick, dmToday, skipDm, counts, pendingCount, list, postsWithComments, ofPublication,
 };
