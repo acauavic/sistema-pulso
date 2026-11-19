@@ -1,0 +1,55 @@
+<%# Filtros combináveis (no estilo do ClickUp). Variável: filterUi = { entity, action, keep, def, count, summary, query, current, views }.
+   Botão "Filtros" com a contagem; o painel tem uma linha por filtro (Onde / E | Ou · campo · operador · valor) e é montado pelo
+   src/public/filters.js a partir do JSON abaixo. Visualizações salvas são chips (os da equipe com "equipe" em mono). %>
+<% var fu = filterUi;
+   var keepQs = Object.keys(fu.keep).filter(function (k) { return fu.keep[k]; }).map(function (k) { return k + '=' + encodeURIComponent(fu.keep[k]); }).join('&');
+   var hrefOf = function (q) { return fu.action + (q ? '?' + q : ''); };
+   var onView = fu.views.find(function (v) { return v.query === fu.current; }); %>
+<% if (fu.views.length) { %>
+<nav class="cal-views fb-views" aria-label="Visualizações salvas">
+  <a class="cal-chip <%= !fu.count ? 'on' : '' %>" href="<%= hrefOf(keepQs) %>">Tudo</a>
+  <% fu.views.forEach(function (v) { %>
+  <span class="fb-view">
+    <a class="cal-chip <%= onView && onView.id === v.id ? 'on' : '' %>" href="<%= hrefOf(v.query) %>" title="<%= v.shared ? 'Compartilhada por ' + v.owner_name : 'Só sua' %>"><%= v.name %><% if (v.shared) { %> <span class="mono small muted">equipe</span><% } %></a>
+    <% if (String(v.user_id) === String(currentUser.id) || currentUser.role === 'superadmin') { %>
+    <form method="post" action="/filtros/visualizacoes/<%= v.id %>/excluir" class="inline" data-confirm="Apagar a visualização &quot;<%= v.name %>&quot;? Os filtros dela deixam de ficar salvos."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn fb-view-del" type="submit" aria-label="Apagar a visualização <%= v.name %>" title="Apagar"><%- icon('x', 12) %></button></form>
+    <% } %>
+  </span>
+  <% }) %>
+</nav>
+<% } %>
+<div class="fb-bar">
+  <details class="cal-filter fb" data-popover <%= fu.open ? 'open' : '' %>>
+    <summary class="btn sm"><%- icon('sliders-horizontal', 14) %> Filtros<% if (fu.count) { %> <span class="nav-count"><%= fu.count %></span><% } %></summary>
+    <div class="cal-filter-panel fb-panel" role="group" aria-label="Filtros">
+      <form method="get" action="<%= fu.action %>" data-fb-form>
+        <% Object.keys(fu.keep).forEach(function (k) { if (fu.keep[k]) { %><input type="hidden" name="<%= k %>" value="<%= fu.keep[k] %>"><% } }) %>
+        <div class="fb-rows" data-fb-rows></div>
+        <p class="small muted fb-empty" data-fb-empty hidden>Nenhum filtro ainda. Combine campos, datas e conexões, por exemplo: Etapa é Agendado e E-mail está vazio.</p>
+        <div class="fb-foot">
+          <button class="link small" type="button" data-fb-add><%- icon('plus', 14) %> Adicionar filtro</button>
+          <% if (fu.count) { %><a class="link small" href="<%= hrefOf(keepQs) %>">Limpar tudo</a><% } %>
+        </div>
+      </form>
+    </div>
+  </details>
+  <% if (fu.count) { %>
+  <span class="small muted fb-summary" title="<%= fu.summary %>"><%= fu.summary %></span>
+  <% if (!onView) { %><button class="cal-chip save" type="button" data-modal-open="modal-fb-salvar"><%- icon('bookmark', 14) %> Salvar esta visualização</button><% } %>
+  <% } %>
+</div>
+<template data-fb-icons><span data-i="x"><%- icon('x', 14) %></span></template>
+<script type="application/json" data-fb-def><%- JSON.stringify(fu.def).replace(/</g, '\\u003c') %></script>
+<% if (fu.count && !onView) { %>
+<dialog class="modal" id="modal-fb-salvar" aria-labelledby="mfb-h">
+  <form method="post" action="/filtros/visualizacoes" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="entidade" value="<%= fu.entity %>"><input type="hidden" name="query" value="<%= fu.current %>">
+    <h2 id="mfb-h">Salvar esta visualização</h2>
+    <p class="small muted"><%= fu.summary %></p>
+    <label>Nome *<input type="text" name="nome" maxlength="60" required placeholder="ex.: Agendados sem e-mail"></label>
+    <label class="check"><input type="checkbox" name="compartilhar" value="1"> Compartilhar com a equipe</label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<script src="/static/filters.js?v=<%= assetV %>" defer></script>

@@ -24,6 +24,9 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const idsOf = (body) => [...new Set([].concat(body.ids || []).map(String).filter(isIntId))].slice(0, MAX).map(Number);
 
 const back = (req, tab) => {
+  // a lista filtrada de onde veio (só endereço de Conteúdo), para a pessoa não perder os filtros depois da ação
+  const voltar = String(req.body.voltar || '');
+  if (/^\/conteudo\?[\w\-~|%=&.+]*$/.test(voltar) && voltar.length < 1500) return voltar;
   const ep = isIntId(req.body.episodio) ? `&episodio=${req.body.episodio}` : '';
   return `/conteudo?vista=${tab}${ep}`;
 };
@@ -57,6 +60,13 @@ router.post('/conteudo/em-massa/cortes', requirePerm('episodes.read'), wrap(asyn
     if (!ok) { await req.flash('error', lastError || 'Nenhum corte foi atribuído.'); return res.redirect(to); }
     const { rows: [e] } = await db.query('SELECT number, title FROM episodes WHERE id = $1', [req.body.episode_id]);
     await req.flash('ok', `${plural(ok, 'corte atribuído', 'cortes atribuídos')} ao ${e.number ? `EP.${String(e.number).padStart(3, '0')}` : 'episódio'} ${e.title}.${list.length - ok ? ` ${list.length - ok} ficou de fora: ${lastError}` : ''}`);
+    return res.redirect(to);
+  }
+  if (req.body.acao === 'categoria') {
+    const out = await clips.setCategory(list.map((c) => c.id), req.body.video_type, req.user);
+    if (out.error) { await req.flash('error', out.error); return res.redirect(to); }
+    await audit(req, 'corte.categoria', 'clip', null, { ids: list.map((c) => c.id), categoria: req.body.video_type, em_massa: true });
+    await req.flash('ok', out.n ? `${plural(out.n, 'vídeo agora é', 'vídeos agora são')} ${out.label}.` : `Os vídeos marcados já eram ${out.label}.`);
     return res.redirect(to);
   }
   if (req.body.acao === 'excluir') {

@@ -66,6 +66,7 @@ function createApp() {
   app.use(require('./routes/tasks'));
   app.use(require('./routes/outreach')); // Cadência de abordagem: registro por canal, follow-ups e painel da gestão
   app.use(require('./routes/catalog')); // Gestão > Sistema > Categorias
+  app.use(require('./routes/savedFilters')); // visualizações salvas dos filtros (Convidados, Conteúdo > Cortes)
   app.use(require('./routes/goals')); // Gestão > Metas: até 3 metas por pessoa, contadas sozinhas
   app.use(require('./routes/releases')); // Novidades: versões do sistema e aviso de atualização
   app.use(require('./routes/calendar')); // Calendário: tudo que tem data, com filtros e visualizações salvas

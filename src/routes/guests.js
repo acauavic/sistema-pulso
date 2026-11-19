@@ -127,6 +127,13 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   }
   if (owner) { params.push(owner); where.push(`g.owner_id = $${params.length}`); }
   if (status && view === 'lista') { params.push(status); where.push(`g.status = $${params.length}`); }
+  // filtros combináveis (botão Filtros): campo + operador + valor, todos (E) ou qualquer um (OU)
+  const ff = require('../services/filters'); const fieldsDef = require('../services/filterFields');
+  const fields = await fieldsDef.guestFields();
+  const fctx = { userId: req.user.id };
+  const fstate = ff.parse(req.query, fields, fctx);
+  const fsql = ff.toSql(fstate, fields, params);
+  if (fsql) where.push(fsql);
   const [{ rows: guests }, { rows: owners }, { rows: sponsors }] = await Promise.all([
     db.query(
       `SELECT g.id, g.name, g.instagram, g.profile, g.company, g.job_title, g.topic, g.status, g.proposed_at, g.invite_sent_at, g.invite_viewed_at,
@@ -150,7 +157,13 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
     const pg = pageOf(req, 100);
     ({ rows: listed, pager } = paginate(req, shown.slice(pg.offset, pg.offset + pg.limit), pg));
   }
-  res.render('guests/index', { pager, total: shown.length, followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: listed, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
+  const filterUi = {
+    entity: 'guest', action: '/convidados', keep: { view, q, owner: req.query.owner || '', status, followup: followupOnly ? '1' : '' },
+    def: ff.clientDef(fields, fstate, fctx), count: fstate.filters.length, summary: ff.summary(fstate, fields, fctx),
+    query: ff.toQuery(fstate, fctx), views: await fieldsDef.savedViews('guest', req.user.id),
+    current: require('./savedFilters').cleanQuery('guest', req.originalUrl.split('?')[1] || ''), open: req.query.fa === '1',
+  };
+  res.render('guests/index', { filterUi, pager, total: shown.length, followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: listed, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
 }));
 
 // ---- criar ----

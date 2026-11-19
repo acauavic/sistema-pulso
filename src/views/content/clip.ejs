@@ -27,6 +27,7 @@
     <span class="kicker"><%= clip.title %> · <%= episode ? epLabel(episode) : 'sem episódio ainda' %></span>
     <h1><%= clip.post_title || clip.title %> <span class="badge <%= ST[0] %>" data-clip-badge><%= ST[1] %></span></h1>
     <p class="handle muted"><%= clip.duration_ms ? fmt.formatClock(clip.duration_ms) : '—' %><%= clip.width ? ' · ' + clip.width + '×' + clip.height : '' %><%= clip.size_bytes ? ' · ' + fmt.formatBytes(clip.size_bytes) : '' %><%= clip.filename ? ' · ' + clip.filename : '' %></p>
+    <p class="clip-category small"><span class="mono muted">CATEGORIA</span> <span class="badge b-gray"><%= (K[clip.video_type] && K[clip.video_type].label) || clip.video_type %></span><% if (perm.cut) { %> <button class="link small" type="button" data-modal-open="modal-categoria">mudar</button><% } %></p>
   </div>
   <div class="row">
     <a class="btn ghost" href="/conteudo<%= episode ? '?episodio=' + episode.id : '' %>"><%- icon('arrow-left') %> Conteúdo</a>
@@ -241,6 +242,21 @@
 <% } %>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
 <script src="/static/autocta.js?v=<%= assetV %>" defer></script>
+<% if (perm.cut) { %>
+<dialog class="modal" id="modal-categoria" aria-labelledby="mcat-h">
+  <form method="post" action="/cortes/<%= clip.id %>/categoria" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="mcat-h">Categoria do vídeo</h2>
+    <label>Categoria
+      <select name="video_type" required>
+        <% videoTypes.forEach(function (k) { %><option value="<%= k %>" <%= clip.video_type === k ? 'selected' : '' %>><%= (K[k] && K[k].label) || k %></option><% }) %>
+      </select>
+    </label>
+    <p class="small muted">As categorias são os tipos de vídeo de Gestão &gt; Sistema &gt; Categorias. Servem para achar e filtrar os vídeos em Conteúdo &gt; Cortes.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 <script src="/static/publicar.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/ai-assist') %>
 <%- include('../partials/foot') %>

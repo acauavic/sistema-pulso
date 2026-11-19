@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.88.0', date: '2026-11-19', title: 'Categoria dos vídeos e filtros combináveis',
+    items: [
+      { kind: 'novo', text: 'Cada vídeo de Conteúdo > Cortes agora tem categoria (os tipos de vídeo de Gestão > Categorias): mude na página do vídeo ou em vários de uma vez pela seleção, por exemplo um bastidor que entrou como corte ou um vídeo longo horizontal.' },
+      { kind: 'novo', text: 'Botão Filtros em Convidados e em Conteúdo > Cortes: combine campos, etapa, responsável, datas e conexões, com "está vazio" e "está preenchido", e escolha se a lista mostra o que passa em todos (E) ou em qualquer um (OU).' },
+      { kind: 'novo', text: 'Visualizações salvas: guarde uma combinação de filtros com nome, só para você ou para a equipe.' },
+    ],
+  },
+  {
     version: '1.87.0', date: '2026-11-19', title: '"Não sou robô" nas telas públicas',
     items: [
       { kind: 'novo', text: 'O login, o "Esqueci minha senha", o link do estúdio, o pedido de participação na plateia e os formulários do site passam a ter a confirmação "não sou robô" do Cloudflare. Quase sempre ela é invisível; a caixa só aparece quando a visita parece suspeita.' },

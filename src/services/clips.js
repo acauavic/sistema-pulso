@@ -30,7 +30,10 @@ async function startUpload({ filename, size, contentType, userId, requestId = nu
   const ext = (name.match(/\.([A-Za-z0-9]{1,6})$/)?.[1] || 'mp4').toLowerCase();
   const partSize = prod.partSizeFor(size);
   const { rows: [clip] } = await db.query(
-    "INSERT INTO episode_clips (title, source, status, filename, content_type, part_size, size_bytes, created_by, request_id, episode_id) VALUES ('Corte', 'upload', 'enviando', $1, $2, $3, $4, $5, $6, $7) RETURNING id",
+    // a categoria nasce do tipo do pedido (quando é um tipo de vídeo); sem pedido, "Cortes do episódio"
+    `INSERT INTO episode_clips (title, source, status, filename, content_type, part_size, size_bytes, created_by, request_id, episode_id, video_type)
+     VALUES ('Corte', 'upload', 'enviando', $1, $2, $3, $4, $5, $6, $7,
+             coalesce((SELECT r.kind FROM content_requests r JOIN video_types t ON t.key = r.kind WHERE r.id = $6), 'cortes')) RETURNING id`,
     [name, type, partSize, size, userId, requestId, episodeId]);
   const key = await b2.keyFor('cortes', clip.id, `video-${crypto.randomBytes(6).toString('hex')}.${ext}`);
   let uploadId;
@@ -287,6 +290,22 @@ async function coverWithText(clipId, { baseCoverId = null, text, userId = null }
   return { ...row, approved: true };
 }
 
+// Categoria (tipo de vídeo de Gestão > Categorias) de um ou mais vídeos. Só tipos ativos; devolve { n, label } ou { error }.
+async function setCategory(ids, type, user = null) {
+  const catalog = require('./catalog');
+  await catalog.refresh();
+  const key = String(type || '');
+  if (!catalog.isVideoType(key)) return { error: 'Escolha uma categoria da lista.' };
+  const recordChanges = require('./recordChanges');
+  let n = 0;
+  for (const id of ids) {
+    const before = await recordChanges.snapshot('clip', id);
+    const { rowCount } = await db.query('UPDATE episode_clips SET video_type = $2, updated_at = now() WHERE id = $1 AND video_type <> $2', [id, key]);
+    if (rowCount) { n += 1; if (before && user) await recordChanges.updated({ type: 'clip', before, actor: user }); }
+  }
+  return { n, label: require('./contentRequests').KINDS[key]?.label || key };
+}
+
 // Atribui o corte a um episódio (só se ele já foi gravado). Refaz as capas para levar o nome do convidado e o número do episódio.
 async function assign(clipId, episodeId, userId = null) {
   const { rows: [clip] } = await db.query('SELECT * FROM episode_clips WHERE id = $1', [clipId]);
@@ -445,4 +464,4 @@ async function announceToReview(clip, covers) {
 
 jobs.register('corte', runProcess);
 jobs.register('capas_corte', async (job) => ({ covers: (await buildCovers(job.ref_id, job.payload?.userId || null)).length }));
-module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, startUpload, receivePart, registerPart, finishUpload, cancelUpload, replaceState, pendingReplacement, cancelReplacement, startReplacement, finishReplacement, versionsOf, writeTexts, textsPrompt, buildCovers, coverTextOf, coverWithText, assign, runProcess, removeClip, momentsFor, cleanCoverText };
+module.exports = { VIDEO_EXT, MAX_BYTES, ELIGIBLE_STATUSES, setCategory, startUpload, receivePart, registerPart, finishUpload, cancelUpload, replaceState, pendingReplacement, cancelReplacement, startReplacement, finishReplacement, versionsOf, writeTexts, textsPrompt, buildCovers, coverTextOf, coverWithText, assign, runProcess, removeClip, momentsFor, cleanCoverText };

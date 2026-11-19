@@ -85,8 +85,20 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const ordem = ['antigos', 'episodio', 'duracao'].includes(req.query.ordem) ? req.query.ordem : 'recentes';
   const allClips = clipRows.rows.map((c) => ({ ...c, pub: board.stateOf(idx.byClip.get(c.id)) }));
   const readyCount = allClips.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !c.pub).length;
-  let list = []; let clipPager = null; let clipTotals = null; let running = false;
+  let list = []; let clipPager = null; let clipTotals = null; let running = false; let filterUi = null;
   if (vista === 'cortes') {
+    // filtros combináveis (botão Filtros): categoria, situação no Social, formato, datas, conexões…
+    const ff = require('../services/filters'); const fieldsDef = require('../services/filterFields');
+    const fields = await fieldsDef.clipFields();
+    const fctx = { userId: req.user.id };
+    const fstate = ff.parse(req.query, fields, fctx);
+    const passes = ff.matcher(fstate, fields);
+    filterUi = {
+      entity: 'clip', action: '/conteudo', keep: { vista: 'cortes', situacao, ordem: ordem === 'recentes' ? '' : ordem, episodio: only || '' },
+      def: ff.clientDef(fields, fstate, fctx), count: fstate.filters.length, summary: ff.summary(fstate, fields, fctx),
+      query: ff.toQuery(fstate, fctx), views: await fieldsDef.savedViews('clip', req.user.id),
+      current: require('./savedFilters').cleanQuery('clip', req.originalUrl.split('?')[1] || ''), open: req.query.fa === '1',
+    };
     const natural = (a, b) => String(a.title).localeCompare(String(b.title), 'pt-BR', { numeric: true });
     const sorters = {
       recentes: (a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id,
@@ -94,7 +106,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
       episodio: (a, b) => (a.ep_number ?? 9999) - (b.ep_number ?? 9999) || natural(a, b),
       duracao: (a, b) => (a.duration_ms || 0) - (b.duration_ms || 0) || natural(a, b),
     };
-    const filtered = allClips.filter((c) => !situacao || (c.status === 'pronto' && !c.pub && (c.episode_id || c.request_id))).sort(sorters[ordem]);
+    const filtered = allClips.filter((c) => (!situacao || (c.status === 'pronto' && !c.pub && (c.episode_id || c.request_id))) && passes(c)).sort(sorters[ordem]);
     const { pageOf, paginate } = require('../utils/pager');
     const pg = pageOf(req, req.query.todos === '1' ? 1000 : 60);
     const out = paginate(req, filtered.slice(pg.offset, pg.offset + pg.limit), pg);
@@ -128,7 +140,9 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
 
   const moments = only && vista === 'cortes' ? await clips.momentsFor(only) : [];
   const pedir = Object.prototype.hasOwnProperty.call(R.KINDS, req.query.pedir) ? req.query.pedir : (req.query.pedir === '1' ? 'trailer' : null);
+  await require('../services/catalog').refresh();
   res.render('content/index', {
+    filterUi, videoTypes: require('../services/catalog').videoOptions(),
     uploadPost: up, autoDefaults: vista === 'cortes' ? await require('../services/commentAutomation').formDefaults({}) : null, situacao, ordem, readyCount, clipPager, clipTotals,
     tabCounts: { cortes: allClips.length, posts: postCountRow.rows[0].n },
     columns, hiddenOld, tipo, vista,
@@ -310,7 +324,9 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     Promise.all(pubs.rows.map(async (p) => [p.id, await automation.ofPublication(p.id)])).then((l) => Object.fromEntries(l.filter(([, r]) => r))),
     pubs.rows.length ? require('../services/postMetrics').forClips([c.id]).then((m) => m[c.id] || null) : null,
   ]);
+  await require('../services/catalog').refresh();
   res.render('content/clip', {
+    videoTypes: require('../services/catalog').videoOptions(c.video_type), K: require('../services/contentRequests').KINDS,
     ctas: require('../services/socialCopy').forClip(c), autoDefaults, autoOf, nums,
     comments: thread, request, versions, replace, light,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
@@ -330,6 +346,16 @@ router.post('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =
   await db.query('UPDATE episode_clips SET title = $2, post_title = $3, caption = $4, updated_at = now() WHERE id = $1', [c.id, title, postTitle, caption]);
   await recordChanges.updated({ type: 'clip', before, actor: req.user });
   await req.flash('ok', 'Corte salvo.');
+  res.redirect(`/cortes/${c.id}`);
+}));
+
+// Categoria do vídeo (tipos de Gestão > Categorias): um corte que era bastidor, um vídeo longo horizontal…
+router.post('/cortes/:id/categoria', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canCut(req.user.role)) return deny(req, res);
+  const c = await findClip(req); if (!c) return notFound(res);
+  const out = await clips.setCategory([c.id], req.body.video_type, req.user);
+  if (out.error) await req.flash('error', out.error);
+  else await req.flash('ok', `Categoria: ${out.label}.`);
   res.redirect(`/cortes/${c.id}`);
 }));
 

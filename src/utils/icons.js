@@ -1,6 +1,7 @@
 // Ícones Lucide (ISC, https://lucide.dev) embutidos: traço 2px, sem CDN (a CSP só aceita recursos locais).
 // Uso nas views: <%- icon('users') %> (16px no desktop) ou <%- icon('users', 20) %> (20px no mobile).
 const PATHS = {
+  "tag": "<path d=\"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z\" /> <circle cx=\"7.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />",
   "repeat": "<path d=\"m17 2 4 4-4 4\" /> <path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /> <path d=\"m7 22-4-4 4-4\" /> <path d=\"M21 13v1a4 4 0 0 1-4 4H3\" />",
   "qr-code": "<rect width=\"5\" height=\"5\" x=\"3\" y=\"3\" rx=\"1\" /> <rect width=\"5\" height=\"5\" x=\"16\" y=\"3\" rx=\"1\" /> <rect width=\"5\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" /> <path d=\"M21 16h-3a2 2 0 0 0-2 2v3\" /> <path d=\"M21 21v.01\" /> <path d=\"M12 7v3a2 2 0 0 1-2 2H7\" /> <path d=\"M3 12h.01\" /> <path d=\"M12 3h.01\" /> <path d=\"M12 16v.01\" /> <path d=\"M16 12h1\" /> <path d=\"M21 12v.01\" /> <path d=\"M12 21v-1\" />",
   "frame": "<line x1=\"22\" x2=\"2\" y1=\"6\" y2=\"6\" /> <line x1=\"22\" x2=\"2\" y1=\"18\" y2=\"18\" /> <line x1=\"6\" x2=\"6\" y1=\"2\" y2=\"22\" /> <line x1=\"18\" x2=\"18\" y1=\"2\" y2=\"22\" />",
