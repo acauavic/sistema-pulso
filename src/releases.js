@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.86.0', date: '2026-11-18', title: 'Banco de horas do estúdio',
+    items: [
+      { kind: 'novo', text: 'Banco de horas do estúdio no Financeiro: as horas compradas, as usadas pelas gravações (a duração real, ou 1 h enquanto não é registrada) e as reservadas pelas gravações marcadas, com o que sobra. "Registrar compra" lança a compra como despesa paga de estúdio.' },
+      { kind: 'novo', text: 'Aviso para renovar: quando sobram 3 h ou menos (ajustável em Custos automáticos > Estúdio e caixa), a gestão recebe um aviso e uma faixa aparece no Início e no Financeiro.' },
+      { kind: 'ajuste', text: 'Gravações no banco de horas não geram mais sinal, saldo nem hora extra por episódio. Ao ligar o banco, as contas de estúdio ainda não pagas desses episódios e das gravações marcadas saem da lista; o que já foi pago fica como está.' },
+    ],
+  },
+  {
     version: '1.85.0', date: '2026-11-18', title: 'Estreia prevista em todo calendário de publicação',
     items: [
       { kind: 'novo', text: 'A estreia prevista do convidado (preenchida a partir de Agendado, antes de o episódio existir) agora aparece em todo calendário de publicação: no site, no media kit ("Quem vem por aí", como estreia), no portal do patrocinador, no Calendário do sistema (como publicação prevista) e no portal do convidado.' },
