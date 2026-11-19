@@ -70,6 +70,7 @@ async function main() {
   require('./services/clips');
   require('./services/social');
   require('./services/commentAutomation'); // registra 'comentario_recebido' (automação de comentário → direct pela Outstand)
+  require('./services/commentReplies'); // registra 'comentarios_ia' e 'comentarios_varredura' (sem isto, o que chega logo depois de subir falha)
   require('./services/notify');
   require('./services/push'); // registra o trabalho 'push_notificacao'
   require('./services/videoViews'); // registra 'video_leve' (versão leve para assistir)

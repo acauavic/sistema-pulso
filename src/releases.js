@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.93.1', date: '2026-11-19', title: 'Respostas por IA logo depois de uma atualização',
+    items: [
+      { kind: 'correcao', text: 'Um comentário que chegasse no primeiro minuto depois de uma atualização do sistema não era lido pela IA (ficava parado até a leitura seguinte, ou de vez num post antigo). Agora é lido na hora, como os outros.' },
+    ],
+  },
+  {
     version: '1.93.0', date: '2026-11-19', title: 'Números dos comentários e das automações',
     items: [
       { kind: 'novo', text: 'Social > Comentários > Números: o dia inteiro das respostas por IA num painel só. O caminho do comentário à comunidade (recebidos, respondidos em texto e com reação, com convite para seguir, directs e cliques no link), quem voltou a comentar depois da resposta, o saldo de seguidores, os posts que mais conversaram (com o total da rede ao lado do que o sistema leu), a automação por palavra e as barras de 30 em 30 minutos. Dá para voltar aos dias anteriores, com a média dos 7 dias antes.' },
