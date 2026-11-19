@@ -27,7 +27,8 @@ async function usersWithRoles(roles) {
 
 // Cria as notificações. users: ids (repetidos e nulos são ignorados). broadcast: soma quem tem os papéis configurados para o tipo.
 // dedupe: mesma chave para a mesma pessoa não duplica (ex.: "tarefa vence hoje" uma vez por dia).
-async function notify({ type, users = [], broadcast = false, title, body = null, url = null, actorId = null, entity = null, dedupe = null }) {
+// topic: assunto do aviso dentro da entidade ('prazo', 'bloqueada'), para clearTopics marcar como lido quando deixa de valer.
+async function notify({ type, users = [], broadcast = false, title, body = null, url = null, actorId = null, entity = null, dedupe = null, topic = null }) {
   if (!TYPES.includes(type)) throw new Error(`Tipo de notificação desconhecido: ${type}`);
   const cfg = (await settings())[type];
   if (!cfg.in_app && !cfg.email) return [];
@@ -41,10 +42,10 @@ async function notify({ type, users = [], broadcast = false, title, body = null,
   if (!active.length) return [];
   // uma gravação para todas as pessoas (antes: um INSERT por pessoa)
   const { rows: inserted } = await db.query(
-    `INSERT INTO notifications (user_id, type, title, body, url, actor_id, entity_type, entity_id, dedupe_key, read_at)
-     SELECT u, $2::text, $3::text, $4::text, $5::text, $6::uuid, $7::text, $8::int, $9::text, CASE WHEN $10::boolean THEN NULL ELSE now() END FROM unnest($1::uuid[]) AS u
+    `INSERT INTO notifications (user_id, type, title, body, url, actor_id, entity_type, entity_id, dedupe_key, read_at, topic)
+     SELECT u, $2::text, $3::text, $4::text, $5::text, $6::uuid, $7::text, $8::int, $9::text, CASE WHEN $10::boolean THEN NULL ELSE now() END, $11::text FROM unnest($1::uuid[]) AS u
      ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING *`,
-    [active.map((u) => u.id), type, String(title).slice(0, 300), body ? String(body).slice(0, 1000) : null, url, actorId, entity?.type || null, entity?.id || null, dedupe, cfg.in_app]);
+    [active.map((u) => u.id), type, String(title).slice(0, 300), body ? String(body).slice(0, 1000) : null, url, actorId, entity?.type || null, entity?.id || null, dedupe, cfg.in_app, topic]);
   const byUser = new Map(inserted.map((n) => [String(n.user_id), n]));
   const created = active.map((u) => byUser.get(String(u.id))).filter(Boolean); // mesma ordem de antes
   // e-mail vai pela fila (com novas tentativas), fora da requisição
@@ -81,4 +82,16 @@ const markRead = (userId, id) => db.query('UPDATE notifications SET read_at = co
 const markAllRead = (userId, type = null) => db.query(
   `UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL ${type && TYPES.includes(type) ? 'AND type = $2' : ''}`, type && TYPES.includes(type) ? [userId, type] : [userId]);
 
-module.exports = { TYPES, settings, notify, unreadCount, list, markRead, markAllRead, usersWithRoles };
+// O aviso deixou de valer (ex.: a tarefa começou ou terminou): os não lidos destes assuntos ficam lidos, para todo mundo que recebeu.
+// Quem está com o painel aberto recebe 'notifications-read' e o contador se refaz na hora.
+async function clearTopics({ entity, topics }) {
+  if (!entity?.type || !entity?.id || !topics?.length) return 0;
+  const { rows } = await db.query(
+    `UPDATE notifications SET read_at = now() WHERE entity_type = $1 AND entity_id = $2 AND topic = ANY($3::text[]) AND read_at IS NULL RETURNING user_id`,
+    [entity.type, entity.id, topics]);
+  const users = [...new Set(rows.map((r) => String(r.user_id)))];
+  if (users.length) await realtime.publish(users, { type: 'notifications-read' });
+  return rows.length;
+}
+
+module.exports = { TYPES, settings, notify, unreadCount, list, markRead, markAllRead, usersWithRoles, clearTopics };

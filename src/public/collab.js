@@ -249,6 +249,8 @@
       window.pulsoToast({ title: n.title, body: n.body, url: n.url });
       window.pulsoBrowserAlert?.(n); // aba em segundo plano: alerta do sistema (push.js)
     });
+    // avisos que deixaram de valer (a tarefa começou ou terminou): o contador se refaz pelo servidor
+    es.addEventListener('notifications-read', () => refresh());
     // Mensagem não é Notificação: não soma no sino; tem o aviso próprio (destaque e som) e o contador de Mensagens
     es.addEventListener('chat-alert', (e) => {
       let n; try { n = JSON.parse(e.data); } catch { return; }

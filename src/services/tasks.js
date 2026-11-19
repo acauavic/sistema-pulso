@@ -3,7 +3,7 @@
 const db = require('../db/pool');
 const C = require('../constants');
 const { can } = require('../permissions');
-const { notify } = require('./notify');
+const { notify, clearTopics } = require('./notify');
 const { clean, parseInputDate, timeParts, toInputTime, formatTime } = require('../utils/format');
 const richText = require('./richText');
 
@@ -107,8 +107,10 @@ async function update(task, values, user, { assigneeId } = {}) {
     [task.id, next.title, next.description, next.kind, next.status, next.block_reason, next.due_on, next.notes, reassign ? (assigneeId || null) : task.assignee_id, next.due_on ? (next.due_time ? toInputTime(next.due_time) : null) : null, next.description_html || null]);
   const url = `/tarefas/${t.id}`;
   if (t.status !== task.status) {
+    // começou ou terminou: "vence hoje", "falta pouco", "atrasada" e "bloqueada" que ainda estavam no sino deixam de ser pendentes
+    if (['fazendo', 'feito'].includes(t.status)) await clearTopics({ entity: { type: 'task', id: t.id }, topics: ['prazo', 'bloqueada'] });
     if (t.status === 'feito') await notify({ type: 'tarefa', users: [task.created_by], title: `${user.name} concluiu: ${t.title}`, url, actorId: user.id, entity: { type: 'task', id: t.id } });
-    if (t.status === 'bloqueada') await notify({ type: 'tarefa', users: [task.created_by, task.assignee_id], title: `Tarefa bloqueada: ${t.title}`, body: `Motivo: ${t.block_reason}`, url, actorId: user.id, entity: { type: 'task', id: t.id } });
+    if (t.status === 'bloqueada') await notify({ type: 'tarefa', users: [task.created_by, task.assignee_id], title: `Tarefa bloqueada: ${t.title}`, body: `Motivo: ${t.block_reason}`, url, actorId: user.id, entity: { type: 'task', id: t.id }, topic: 'bloqueada' });
   }
   if (reassign && t.assignee_id) await notify({ type: 'tarefa', users: [t.assignee_id], title: `${user.name} atribuiu uma tarefa a você: ${t.title}`, body: dueText(t), url, actorId: user.id, entity: { type: 'task', id: t.id } });
   // prazo (data ou hora) mudou: quem é responsável fica sabendo, a menos que tenha sido ele mesmo a mudar
@@ -170,7 +172,7 @@ async function dueTick(now = new Date()) {
     const due = isoDate(t.due_on);
     const at = t.due_time ? formatTime(t.due_time) : '';
     const late = isLate({ status: 'a_fazer', due_on: due, due_time: t.due_time }, today, hhmm);
-    const base = { type: 'tarefa', users: [t.assignee_id], url: `/tarefas/${t.id}`, entity: { type: 'task', id: t.id } };
+    const base = { type: 'tarefa', users: [t.assignee_id], url: `/tarefas/${t.id}`, entity: { type: 'task', id: t.id }, topic: 'prazo' };
     if (late) {
       sent += (await notify({ ...base, title: `Tarefa atrasada: ${t.title}`, body: due < today ? `Venceu em ${formatDay(due)}${at ? ` às ${at}` : ''}.` : `Venceu hoje às ${at}.`, dedupe: `late-${t.id}-${today}` })).length;
       continue;
