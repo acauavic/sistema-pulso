@@ -259,8 +259,8 @@ async function sendFile(res, file, { inline = true, req = null, maxSide = 2000 }
 }
 
 // ---- agenda do media kit: convidados em Agendado (gravação confirmada), em uma galeria que passa sozinha e abre ao clicar ----
-// Agenda do media kit ("Quem vem por aí"): episódios gravados com data de estreia marcada e, depois, convidados com gravação
-// marcada (ainda sem episódio). Foto, nome, @ e alcance saem do cadastro do convidado (o alcance cai para o do episódio no kit).
+// Agenda do media kit ("Quem vem por aí"): episódios gravados com data de estreia marcada e convidados agendados com estreia
+// prevista (ainda sem episódio) e, depois, convidados com gravação marcada e sem estreia prevista. Foto, nome, @ e alcance saem do cadastro do convidado (o alcance cai para o do episódio no kit).
 async function kitAgendaHtml() {
   const { rows } = await db.query(
     `SELECT * FROM (
@@ -269,9 +269,14 @@ async function kitAgendaHtml() {
          FROM episodes e JOIN guests g ON g.id = e.guest_id
         WHERE e.status <> 'publicado' AND e.aired_on >= CURRENT_DATE
        UNION ALL
+       SELECT g.id, g.name, g.instagram, (g.photo_key IS NOT NULL), nullif(g.reach, ''), g.premiere_on::timestamp, 'estreia', 0
+         FROM guests g
+        WHERE g.status = 'agendado' AND g.premiere_on >= CURRENT_DATE AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.guest_id = g.id)
+       UNION ALL
        SELECT g.id, g.name, g.instagram, (g.photo_key IS NOT NULL), nullif(g.reach, ''), g.proposed_at, 'gravacao', 1
          FROM guests g
         WHERE g.status = 'agendado' AND (g.proposed_at IS NULL OR g.proposed_at >= now() - interval '1 day')
+          AND (g.premiere_on IS NULL OR g.premiere_on < CURRENT_DATE)
           AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.guest_id = g.id)
      ) x ORDER BY ord, at NULLS LAST, lower(name) LIMIT 24`);
   const { esc } = require('./inviteTemplate');
@@ -368,14 +373,14 @@ async function portalData(sponsor) {
     db.query(
       // episódios gravados + gravações reservadas na agenda (convidado ainda sem episódio)
       `SELECT * FROM (
-         SELECT e.id, e.number, e.title, coalesce(e.aired_on, e.recorded_on) AS aired_on, e.status, se.role, false AS booking,
+         SELECT e.id, e.number, e.title, coalesce(e.aired_on, e.recorded_on) AS aired_on, e.status, se.role, false AS booking, false AS premiere,
                 g.name AS guest_name, g.instagram AS guest_instagram, g.positioning AS guest_positioning, g.bio AS guest_bio,
                 g.id AS guest_id, (g.photo_key IS NOT NULL) AS guest_has_photo
            FROM sponsor_episodes se JOIN episodes e ON e.id = se.episode_id LEFT JOIN guests g ON g.id = e.guest_id
           WHERE se.sponsor_id = $1
          UNION ALL
-         SELECT NULL, NULL, 'Conversa com ' || g.name, (g.proposed_at AT TIME ZONE 'America/Sao_Paulo')::date,
-                CASE WHEN g.status = 'agendado' THEN 'gravacao_marcada' ELSE 'previsto' END, b.role, true,
+         SELECT NULL, NULL, 'Conversa com ' || g.name, coalesce(g.premiere_on, (g.proposed_at AT TIME ZONE 'America/Sao_Paulo')::date),
+                CASE WHEN g.status = 'agendado' THEN 'gravacao_marcada' ELSE 'previsto' END, b.role, true, g.premiere_on IS NOT NULL,
                 g.name, g.instagram, g.positioning, g.bio, g.id, (g.photo_key IS NOT NULL)
            FROM sponsor_bookings b JOIN guests g ON g.id = b.guest_id
           WHERE b.sponsor_id = $1 AND g.status NOT IN ('perdido', 'cancelado')

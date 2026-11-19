@@ -51,7 +51,7 @@ const newToken = () => crypto.randomBytes(18).toString('base64url');
 const DATES_SQL = `
   WITH b AS (SELECT g.*, e.id AS episode_id, e.number AS episode_number, e.title AS episode_title, e.status AS episode_status,
                     e.youtube_url AS ep_youtube, e.spotify_url AS ep_spotify,
-                    coalesce(g.portal_release_on, e.aired_on, (e.published_at AT TIME ZONE 'America/Sao_Paulo')::date) AS rel
+                    coalesce(g.portal_release_on, e.aired_on, CASE WHEN e.id IS NULL THEN g.premiere_on END, (e.published_at AT TIME ZONE 'America/Sao_Paulo')::date) AS rel
                FROM guests g LEFT JOIN episodes e ON e.guest_id = g.id)
   SELECT b.*, to_char(rel, 'YYYY-MM-DD') AS release_on,
          to_char(coalesce(portal_cuts_from, rel - (extract(isodow FROM rel)::int - 1)), 'YYYY-MM-DD') AS cuts_from,

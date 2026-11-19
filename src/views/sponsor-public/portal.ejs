@@ -84,7 +84,7 @@
   <div class="exclusive-card">
     <div>
       <div class="exclusive-date"><%= e.aired_on ? fmt.formatDayLong(e.aired_on) : 'Data a definir' %></div>
-      <div class="exclusive-time"><%= e.booking ? "Gravação marcada · episódio exclusivo" : "Episódio exclusivo" %></div>
+      <div class="exclusive-time"><%= e.booking ? (e.premiere ? "Estreia prevista · episódio exclusivo" : "Gravação marcada · episódio exclusivo") : "Episódio exclusivo" %></div>
     </div>
     <div class="exclusive-desc">
       Episódio <strong>inteiramente dedicado à <%= sponsor.company %></strong><%= e.guest_name ? ', com ' : '' %><% if (e.guest_name) { %><strong><%= e.guest_name %></strong><% } %> — o espaço é só da marca, sem divisão com outros patrocinadores.

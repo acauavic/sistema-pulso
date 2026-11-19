@@ -136,10 +136,20 @@ const SOURCES = {
     const { rows } = await db.query(
       `SELECT e.id, e.number, e.title, e.status, to_char(e.aired_on, 'YYYY-MM-DD') AS day, e.editor_id, u.name AS who FROM episodes e LEFT JOIN users u ON u.id = e.editor_id
         WHERE ${w} ORDER BY e.aired_on, e.number LIMIT ${MAX_PER_TYPE}`, p);
-    return rows.map((e) => ({
+    // convidado ainda sem episódio, com estreia prevista: entra como publicação prevista (vai para o cadastro dele)
+    const p2 = [from, to]; let w2 = "g.status IN ('em_agendamento', 'agendado') AND g.premiere_on BETWEEN $1::date AND $2::date AND NOT EXISTS (SELECT 1 FROM episodes x WHERE x.guest_id = g.id)";
+    if (owner) { p2.push(owner); w2 += ` AND g.owner_id = $${p2.length}`; }
+    const { rows: planned } = await db.query(
+      `SELECT g.id, g.name, to_char(g.premiere_on, 'YYYY-MM-DD') AS day, g.owner_id, u.name AS who FROM guests g LEFT JOIN users u ON u.id = g.owner_id
+        WHERE ${w2} ORDER BY g.premiere_on LIMIT ${MAX_PER_TYPE}`, p2);
+    const fromGuests = planned.map((g) => ({
+      type: 'episodio', id: `estreia-${g.id}`, title: `Estreia prevista: ${g.name}`, sub: 'publicação prevista · gravação marcada',
+      day: g.day, time: null, url: `/convidados/${g.id}`, done: false, late: false, who: g.who, whoId: g.owner_id,
+    }));
+    return fromGuests.concat(rows.map((e) => ({
       type: 'episodio', id: `episodio-${e.id}`, title: `${epNo(e.number)} ${e.title}`, sub: e.status === 'publicado' ? 'publicado' : `publicação prevista · ${C.EPISODE_STATUSES[e.status].toLowerCase()}`,
       day: e.day, time: null, url: `/episodios/${e.id}`, done: e.status === 'publicado', late: e.status !== 'publicado' && e.day < today, who: e.who, whoId: e.editor_id,
-    }));
+    })));
   },
 
   async post({ from, to, owner }, today) {

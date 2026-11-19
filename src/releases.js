@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.85.0', date: '2026-11-18', title: 'Estreia prevista em todo calendário de publicação',
+    items: [
+      { kind: 'novo', text: 'A estreia prevista do convidado (preenchida a partir de Agendado, antes de o episódio existir) agora aparece em todo calendário de publicação: no site, no media kit ("Quem vem por aí", como estreia), no portal do patrocinador, no Calendário do sistema (como publicação prevista) e no portal do convidado.' },
+      { kind: 'ajuste', text: 'Quando o convidado vai para Gravado e o episódio nasce, a estreia prevista vira a data de publicação do episódio, e o calendário passa a mostrar o episódio no lugar do convidado.' },
+    ],
+  },
+  {
     version: '1.84.0', date: '2026-11-18', title: 'Site do Pulso: dados públicos para o podcastpulso.com e pedidos pelo site',
     items: [
       { kind: 'novo', text: 'Os pedidos para ser convidado e para patrocinar feitos no site entram direto no CRM de convidados e em Patrocinadores, com a origem "site" (e a campanha, quando vem) e um aviso para a gestão.' },
