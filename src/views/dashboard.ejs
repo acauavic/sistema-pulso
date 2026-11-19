@@ -54,6 +54,7 @@
 <% if (can('guests.read')) { %>
 
 <% if (money) { %>
+<% if (money.bankAlert) { %><div class="notice<%= money.bankAlert.bad ? ' notice-bad' : '' %>" role="status"><%= money.bankAlert.text %> <a href="/financeiro#banco-de-horas">Abrir o Financeiro</a></div><% } %>
 <a class="card money-strip" href="/financeiro">
   <span class="kicker">Financeiro</span>
   <span><span class="mono"><%= fmt.formatBRL(money.out7) %></span> a pagar nos próximos 7 dias</span>

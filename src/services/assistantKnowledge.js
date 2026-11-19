@@ -229,11 +229,12 @@ const TOPICS = [
     ],
   },
   {
-    key: 'financeiro', title: 'Financeiro e estoque', words: ['financeiro', 'conta', 'contas', 'pagar', 'receber', 'caixa', 'custo', 'custos', 'estoque', 'fluxo', 'cobrança', 'cobranca', 'parcela'],
+    key: 'financeiro', title: 'Financeiro e estoque', words: ['financeiro', 'conta', 'contas', 'pagar', 'receber', 'caixa', 'custo', 'custos', 'estoque', 'fluxo', 'cobrança', 'cobranca', 'parcela', 'banco de horas', 'horas do estúdio', 'horas do estudio'],
     where: '/financeiro', perm: 'finance.read',
     steps: [
       'Financeiro (gestão) reúne contas a pagar e a receber, fluxo de caixa e custo por episódio. Parcelas de patrocínio, pedidos selecionados da plateia e custos automáticos (regras que disparam quando a gravação é agendada, o episódio é gravado ou publicado) viram lançamentos sozinhos.',
       'Estoque do estúdio (gestão e produtora): itens com consumo por episódio e aviso de reposição; a compra gera conta a pagar.',
+      'Banco de horas do estúdio: ligado em Custos automáticos > Estúdio e caixa ("Ligar banco de horas", com o primeiro episódio do banco e a primeira compra). Daí em diante as gravações não geram sinal nem saldo: o convidado Agendado reserva horas e o episódio gravado usa a duração real. O cartão no topo do Financeiro mostra o que sobra, "Registrar compra" lança a renovação como despesa paga e a gestão é avisada quando sobram poucas horas.',
       'Pelo assistente: "financeiro" resume o mês, o caixa e o que vence ou atrasou, "contas" lista lançamentos e "estoque" mostra o que precisa de reposição. O assistente não lança nem paga contas.',
     ],
   },

@@ -4,6 +4,7 @@
   var json = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
   var brl = function (c) { return (Number(c) / 100).toFixed(2).replace('.', ','); };
   var canWrite = can('finance.write');
+  var bankOn = settings.studio_mode === 'banco';
   var hourMin = settings.studio_minutes;
   var total = Math.round(hourMin / 60 * settings.studio_hour_cents);
   var balance = Math.max(0, total - settings.studio_deposit_cents);
@@ -26,6 +27,15 @@
         <div><h2>Estúdio</h2><p class="small muted">Cada gravação gera duas contas sozinhas: o sinal para reservar a data e o saldo no dia.</p></div>
         <% if (canWrite) { %><button class="btn" type="button" data-modal-open="modal-ajustes"><%- icon('pencil') %> Editar</button><% } %>
       </div>
+      <% if (bankOn) { %>
+      <p class="small top-gap">Banco de horas ligado<%= startEp ? ' desde o ' + (startEp.number ? 'EP.' + String(startEp.number).padStart(3, '0') : startEp.title) : '' %>: as gravações a partir dele saem das horas compradas, sem sinal nem saldo por episódio. Avisa quando restarem <span class="mono"><%= hourBank.fmtHours(settings.studio_bank_alert_hours) %></span>. <a href="/financeiro#banco-de-horas">Ver o banco</a></p>
+      <p class="small muted">Os valores abaixo valem para as gravações antes do banco.</p>
+      <% } else { %>
+      <div class="bank-off">
+        <p class="small">Modo atual: Por hora: <span class="mono"><%= money(settings.studio_hour_cents) %>/h</span>, sinal <span class="mono"><%= money(settings.studio_deposit_cents) %></span></p>
+        <% if (canWrite) { %><button class="btn sm" type="button" data-modal-open="modal-banco-ligar"><%- icon('clock') %> Ligar banco de horas</button><% } %>
+      </div>
+      <% } %>
       <dl class="kv">
         <dt>Hora de estúdio</dt><dd><span class="mono"><%= money(settings.studio_hour_cents) %></span></dd>
         <dt>Sinal da reserva</dt><dd><span class="mono"><%= money(settings.studio_deposit_cents) %></span> <span class="muted">· vence quando a gravação é agendada</span></dd>
@@ -91,6 +101,7 @@
       <label>Sinal da reserva (R$)<input type="text" name="studio_deposit" inputmode="decimal" value="<%= brl(settings.studio_deposit_cents) %>" required></label>
     </div>
     <label>Duração esperada da gravação (minutos)<input type="number" name="studio_minutes" min="15" max="1440" value="<%= settings.studio_minutes %>" required></label>
+    <% if (bankOn) { %><label>Avisar quando restarem (horas)<input type="text" name="studio_bank_alert_hours" inputmode="decimal" value="<%= String(settings.studio_bank_alert_hours).replace('.', ',') %>" required></label><% } %>
     <details class="more">
       <summary>Caixa e previsão</summary>
       <div class="stack top-gap">
@@ -105,6 +116,31 @@
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>
+
+<% if (!bankOn) { %>
+<dialog class="modal modal-wide" id="modal-banco-ligar" aria-labelledby="mbl-h">
+  <form method="post" action="/financeiro/banco/ligar" class="stack" data-confirm="Ligar o banco de horas? As contas de estúdio ainda não pagas desses episódios e das gravações marcadas serão canceladas." data-busy="Ligando…">
+    <%- csrfField %>
+    <h2 id="mbl-h">Ligar banco de horas</h2>
+    <p class="small muted">* obrigatório</p>
+    <label>Primeiro episódio do banco *
+      <select name="start_episode_id" required data-search>
+        <option value="">Escolha…</option>
+        <% bankEpisodes.forEach(function (ep) { %><option value="<%= ep.id %>"><%= ep.number ? 'EP.' + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %> · <%= fmt.formatDay(ep.recorded_on) %></option><% }) %>
+      </select>
+    </label>
+    <p class="small muted">Ele e as gravações do mesmo dia em diante saem do banco. As anteriores continuam por hora.</p>
+    <h3 class="kicker">Primeira compra</h3>
+    <div class="grid-3 tight">
+      <label>Data *<input type="date" name="bought_on" value="<%= fin.todayISO() %>" required></label>
+      <label>Horas *<input type="text" name="hours" inputmode="decimal" required placeholder="ex.: 20"></label>
+      <label>Valor (R$) *<input type="text" name="amount" inputmode="decimal" required placeholder="ex.: 5.000,00"></label>
+    </div>
+    <div class="notice">As contas de estúdio ainda não pagas desses episódios e das gravações marcadas serão canceladas. O que já foi pago fica como está.</div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Ligar banco de horas</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
 
 <dialog class="modal modal-wide" id="modal-regra" aria-labelledby="mr-h">
   <form method="post" action="" class="stack" data-fill-form>

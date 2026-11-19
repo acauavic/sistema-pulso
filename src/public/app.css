@@ -514,6 +514,7 @@ input[type="file"] { padding: 8px 12px; }
 
 /* ---- cortes e publicação ---- */
 .notice { margin: 8px 0; padding: 8px 12px; border-left: 3px solid var(--st-edicao-fg, #FFC266); background: var(--raised); border-radius: 0 var(--r-card) var(--r-card) 0; color: var(--text-2); }
+.notice.notice-bad { border-left-color: var(--st-cancelado-fg); }
 .err { color: var(--bad); }
 .clip { margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--raised); display: grid; gap: 8px; }
 .clip h4 { margin: 0 0 2px; }
@@ -1050,6 +1051,16 @@ html[data-sidebar="collapsed"] .version-link { text-align: center; padding: 0; f
 .today-list { display: grid; gap: 10px; margin-top: 8px; } .today-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: baseline; padding-bottom: 10px; border-bottom: 1px solid var(--line); } .today-list li:last-child { border-bottom: 0; padding-bottom: 0; }
 .goal { display: grid; gap: 10px; align-content: start; } .goal-n { margin: 0; font: 700 40px/1 var(--f-display); letter-spacing: -.05em; white-space: nowrap; } .goal-l { margin: -6px 0 0; } .goal-n .mono { font: inherit; } .goal-n .hit { color: var(--action); }
 .goal-bar { width: 100%; height: 6px; display: block; } .goal-bar .bg { fill: var(--raised); } .goal-bar .fg { fill: var(--text-2); } .goal-bar.hit .fg { fill: var(--action); }
+/* banco de horas do estúdio (Financeiro): medir não é ação, nunca lime; âmbar acabando, vermelho no saldo devedor */
+.bank-card { margin-bottom: 16px; display: grid; gap: 12px; }
+.bank-n { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; } .bank-n .stat-n { white-space: nowrap; }
+.bank-line { margin: 0; }
+.bank-bar.is-low .fg { fill: var(--st-edicao-fg); } .bank-bar.is-neg .fg { fill: var(--st-cancelado-fg); }
+.bank-use { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; } .bank-use h3 { margin-bottom: 4px; }
+.bank-use .plan-list > li { grid-template-columns: auto minmax(0, 1fr) auto; } .bank-use .plan-list > li > .mono { grid-column: auto; }
+@media (max-width: 860px) { .bank-use { grid-template-columns: 1fr; gap: 16px; } }
+.bank-off { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-card); }
+.bank-off p { margin: 0; }
 @media (max-width: 860px) { .today-grid { grid-template-columns: 1fr; gap: 20px; } .today-list li { grid-template-columns: 1fr auto; } .today-list li > .mono { grid-column: 1 / -1; order: 3; } }
 .stat-n.hl-bad { color: var(--st-cancelado-fg); }
 .hbar { width: 100%; min-width: 56px; height: 6px; display: block; } .hbar .bg { fill: var(--raised); } .hbar .fg { fill: var(--text-2); }

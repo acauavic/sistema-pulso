@@ -8,6 +8,7 @@
   <% if (can('finance.write')) { %><button class="btn primary" type="button" data-modal-open="modal-novo"><%- icon('plus') %> Novo lançamento</button><% } %>
 </div>
 <%- include('_nav', { active: 'resumo', counts: counts }) %>
+<% if (bank.active) { %><%- include('_hour-bank', { bank: bank, hourBank: hourBank, today: today }) %><% } %>
 
 <section class="stat-grid" aria-label="Números do mês">
   <a class="stat" href="/financeiro/regras"><span class="stat-label">Caixa hoje</span><span class="stat-n money <%= ov.cash < 0 ? 'err' : '' %>"><%= money(ov.cash) %></span></a>

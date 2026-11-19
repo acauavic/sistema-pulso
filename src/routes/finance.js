@@ -3,6 +3,7 @@ const express = require('express');
 const db = require('../db/pool');
 const C = require('../constants');
 const fin = require('../services/finance');
+const hourBank = require('../services/hourBank');
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
 const { can } = require('../permissions');
@@ -20,8 +21,8 @@ const money = (c) => (Number(c) < 0 ? `−\u00a0${formatBRL(-Number(c))}` : form
 // ---------------------------------------------------------------- resumo
 router.get('/financeiro', requirePerm('finance.read'), wrap(async (req, res) => {
   await fin.ensureRecurring(3);
-  const [ov, counts] = await Promise.all([fin.overview(), fin.counts()]);
-  res.render('finance/index', { title: 'Financeiro', ov, counts, fin, C, money, today: fin.todayISO(), here: req.originalUrl, ...(await pickers()) });
+  const [ov, counts, bank] = await Promise.all([fin.overview(), fin.counts(), hourBank.status()]);
+  res.render('finance/index', { title: 'Financeiro', ov, counts, bank, hourBank, fin, C, money, today: fin.todayISO(), here: req.originalUrl, ...(await pickers()) });
 }));
 
 // Listas usadas nos modais (episódios recentes e patrocinadores).
@@ -264,12 +265,15 @@ router.post('/financeiro/estoque/:id/ajustar', requirePerm('stock.write'), wrap(
 
 // ---------------------------------------------------------------- regras e custos mensais
 router.get('/financeiro/regras', requirePerm('finance.read'), wrap(async (req, res) => {
-  const [rules, recurring, settings] = await Promise.all([
+  const [rules, recurring, settings, bankEpisodes] = await Promise.all([
     db.query('SELECT * FROM fin_rules ORDER BY active DESC, trigger, id'),
     db.query('SELECT * FROM fin_recurring ORDER BY active DESC, day_of_month, id'),
     fin.settings(),
+    // episódio de início do banco de horas: os gravados, do mais novo para o mais antigo
+    db.query('SELECT id, number, title, recorded_on FROM episodes WHERE recorded_on IS NOT NULL ORDER BY recorded_on DESC, number DESC NULLS LAST LIMIT 200'),
   ]);
-  res.render('finance/rules', { title: 'Custos automáticos', rules: rules.rows.map((r) => ({ ...r, amount_cents: Number(r.amount_cents) })), recurring: recurring.rows.map((r) => ({ ...r, amount_cents: Number(r.amount_cents), starts_on: fin.iso(r.starts_on), ends_on: fin.iso(r.ends_on) })), settings, fin, C, money, counts: await fin.counts() });
+  const startEp = settings.studio_bank_start_episode_id ? (await db.query('SELECT id, number, title FROM episodes WHERE id = $1', [settings.studio_bank_start_episode_id])).rows[0] || null : null;
+  res.render('finance/rules', { title: 'Custos automáticos', rules: rules.rows.map((r) => ({ ...r, amount_cents: Number(r.amount_cents) })), recurring: recurring.rows.map((r) => ({ ...r, amount_cents: Number(r.amount_cents), starts_on: fin.iso(r.starts_on), ends_on: fin.iso(r.ends_on) })), settings, bankEpisodes: bankEpisodes.rows.map((e) => ({ ...e, recorded_on: fin.iso(e.recorded_on) })), startEp, hourBank, fin, C, money, counts: await fin.counts() });
 }));
 
 router.post('/financeiro/regras/ajustes', requirePerm('finance.write'), wrap(async (req, res) => {
@@ -279,8 +283,14 @@ router.post('/financeiro/regras/ajustes', requirePerm('finance.write'), wrap(asy
   if ([hour, deposit, opening].some((x) => x != null && Number.isNaN(x)) || hour == null || deposit == null || !(minutes > 0 && minutes <= 1440) || !(epm > 0 && epm <= 60)) {
     await req.flash('error', 'Confira os valores: hora e sinal do estúdio, duração, episódios por mês e saldo.'); return res.redirect('/financeiro/regras');
   }
+  let alert = null; // "Avisar quando restarem (horas)": só vem com o banco de horas ligado
+  if (req.body.studio_bank_alert_hours !== undefined) {
+    alert = num(req.body.studio_bank_alert_hours);
+    if (!(alert >= 0 && alert <= 999)) { await req.flash('error', 'Confira as horas do aviso do banco de horas.'); return res.redirect('/financeiro/regras'); }
+  }
   await db.query('UPDATE fin_settings SET studio_hour_cents=$1, studio_deposit_cents=$2, studio_minutes=$3, episodes_per_month=$4, opening_balance_cents=$5, opening_on=$6, updated_at=now() WHERE id=1',
     [hour, deposit, minutes, epm, opening, openingOn]);
+  if (alert !== null) await hourBank.setAlertHours(alert);
   await audit(req, 'financeiro.ajustes', 'fin_settings', 1, { hour, deposit });
   await req.flash('ok', 'Ajustes salvos. Valem para as próximas gravações.');
   res.redirect('/financeiro/regras');
@@ -378,6 +388,41 @@ router.post('/financeiro/mensais/:id/excluir', requirePerm('finance.write'), wra
   await audit(req, 'financeiro.mensal_excluido', 'fin_recurring', req.params.id);
   await req.flash('ok', 'Custo mensal removido. O que já foi pago continua nos lançamentos.');
   res.redirect('/financeiro/regras#mensais');
+}));
+
+// ---------------------------------------------------------------- banco de horas do estúdio
+function parsePack(body) {
+  const hours = num(body.hours); const amount = parseBRL(body.amount);
+  let boughtOn = parseInputDate(body.bought_on) || fin.todayISO(); if (Number.isNaN(boughtOn)) boughtOn = fin.todayISO();
+  if (!(hours > 0 && hours <= 9999)) return { error: 'Informe quantas horas foram compradas.' };
+  if (amount == null || Number.isNaN(amount) || amount < 0) return { error: 'Valor inválido. Use algo como 5.000,00.' };
+  return { v: { hours, amountCents: amount, boughtOn, note: text(body.note, 300) } };
+}
+
+// Liga o banco: episódio de início + primeira compra. O estúdio em aberto do banco é cancelado pelo sistema; o pago fica.
+router.post('/financeiro/banco/ligar', requirePerm('finance.write'), wrap(async (req, res) => {
+  const back = '/financeiro/regras';
+  if (await hourBank.bankActive()) { await req.flash('error', 'O banco de horas já está ligado.'); return res.redirect(back); }
+  if (!isIntId(req.body.start_episode_id)) { await req.flash('error', 'Escolha o episódio de início.'); return res.redirect(back); }
+  const { v, error } = parsePack(req.body);
+  if (error) { await req.flash('error', error); return res.redirect(back); }
+  const r = await hourBank.activate({ startEpisodeId: Number(req.body.start_episode_id) });
+  if (r.error) { await req.flash('error', r.error); return res.redirect(back); }
+  await hourBank.addPack({ ...v, userId: req.user.id });
+  await audit(req, 'financeiro.banco_ligado', 'fin_settings', 1, { episodio_inicio: Number(req.body.start_episode_id), cancelados: r.canceled, horas: v.hours, valor: v.amountCents });
+  await req.flash('ok', `Banco de horas ligado com ${hourBank.fmtHours(v.hours)}.${r.canceled ? ` ${r.canceled} conta${r.canceled > 1 ? 's' : ''} de estúdio em aberto saí${r.canceled > 1 ? 'ram' : 'u'} da lista.` : ''}`);
+  res.redirect('/financeiro');
+}));
+
+router.post('/financeiro/banco/compras', requirePerm('finance.write'), wrap(async (req, res) => {
+  if (!(await hourBank.bankActive())) { await req.flash('error', 'Ligue o banco de horas antes de registrar uma compra.'); return res.redirect('/financeiro/regras'); }
+  const { v, error } = parsePack(req.body);
+  if (error) { await req.flash('error', error); return res.redirect('/financeiro'); }
+  const r = await hourBank.addPack({ ...v, userId: req.user.id });
+  if (r.error) { await req.flash('error', r.error); return res.redirect('/financeiro'); }
+  await audit(req, 'financeiro.banco_compra', 'fin_hour_pack', r.pack.id, { horas: v.hours, valor: v.amountCents });
+  await req.flash('ok', `Compra de ${hourBank.fmtHours(v.hours)} registrada e lançada como despesa paga.`);
+  res.redirect('/financeiro');
 }));
 
 // ---------------------------------------------------------------- episódio e patrocinador

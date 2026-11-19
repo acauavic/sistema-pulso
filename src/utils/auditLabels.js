@@ -16,6 +16,7 @@ const WHOLE = {
   'automacao.links': 'Links do direct alterados', 'piloto_semana.ajustado': 'Agenda da semana ajustada', 'kit.galeria_edita': 'Galeria do media kit editada',
   'patrocinio.regra_exclusivo': 'Regra do episódio exclusivo alterada', 'patrocinio.vagas': 'Vagas no media kit alteradas',
   'portal.link_email': 'Link do portal enviado por e-mail', 'portal.link_whatsapp': 'Link do portal enviado por WhatsApp',
+  'financeiro.banco_ligado': 'Banco de horas do estúdio ligado', 'financeiro.banco_compra': 'Compra de horas do estúdio',
   'integracao.teste_email': 'Teste de e-mail', 'integracao.teste_infinitepay': 'Teste da InfinitePay',
 };
 const WORDS = {
@@ -36,7 +37,7 @@ function auditLabel(action) {
 }
 
 const ENTITIES = { clip: 'Corte', guest: 'Convidado', sponsor: 'Patrocinador', episode: 'Episódio', task: 'Tarefa', user: 'Usuário', publication: 'Publicação',
-  cover: 'Imagem', request: 'Pedido', rule: 'Automação', settings: 'Configuração', fin_entry: 'Lançamento', stock_item: 'Estoque', plateia: 'Plateia' };
+  cover: 'Imagem', request: 'Pedido', rule: 'Automação', settings: 'Configuração', fin_entry: 'Lançamento', fin_hour_pack: 'Banco de horas', stock_item: 'Estoque', plateia: 'Plateia' };
 const entityLabel = (e) => ENTITIES[e] || (e ? cap(String(e).replace(/_/g, ' ')) : '');
 
 module.exports = { AREAS, auditLabel, entityLabel };

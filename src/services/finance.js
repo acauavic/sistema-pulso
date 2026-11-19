@@ -35,7 +35,7 @@ async function settings() {
     ...s,
     studio_hour_cents: Number(s.studio_hour_cents), studio_deposit_cents: Number(s.studio_deposit_cents),
     opening_balance_cents: Number(s.opening_balance_cents), episodes_per_month: Number(s.episodes_per_month),
-    opening_on: iso(s.opening_on),
+    opening_on: iso(s.opening_on), studio_bank_alert_hours: Number(s.studio_bank_alert_hours), studio_bank_start_on: iso(s.studio_bank_start_on),
   };
 }
 
@@ -82,7 +82,9 @@ async function syncGuest(guestId) {
   }
   const s = await settings();
   const recordedOn = dayOf(guest.proposed_at);
-  if (s.studio_deposit_cents > 0) {
+  if (s.studio_mode === 'banco') { // banco de horas: a gravação marcada só reserva horas; sinal em aberto sai
+    await cancelBySystem('auto_key = $1', [`estudio-sinal-g${guestId}`]);
+  } else if (s.studio_deposit_cents > 0) {
     await upsertAuto({ key: `estudio-sinal-g${guestId}`, category: 'estudio', description: `Estúdio · sinal da reserva (${guest.name})`, amount: s.studio_deposit_cents, due: todayISO(), guestId, source: 'estudio' });
   }
   for (const r of await rulesFor('gravacao_agendada')) {
@@ -90,11 +92,16 @@ async function syncGuest(guestId) {
   }
 }
 
-// ---- estúdio: sinal + saldo (duração × hora) + horas extras se a gravação passou do combinado
+// ---- estúdio: sinal + saldo (duração × hora) + horas extras se a gravação passou do combinado.
+// Com o banco de horas ligado, episódio do banco não gera nada (as horas saem do pacote, services/hourBank.js).
 async function recomputeStudio(episodeId) {
   const { rows: [ep] } = await db.query('SELECT * FROM episodes WHERE id = $1', [episodeId]);
   if (!ep) return;
   const s = await settings();
+  if (s.studio_mode === 'banco' && await require('./hourBank').isBankEpisode(ep)) { // gravação do banco de horas: nada por episódio
+    await cancelBySystem("episode_id = $1 AND auto_key LIKE 'estudio-%'", [episodeId]);
+    return;
+  }
   if (!s.studio_hour_cents) return;
   const minutes = ep.recording_minutes || s.studio_minutes;
   const total = Math.round((minutes / 60) * s.studio_hour_cents);
@@ -439,6 +446,7 @@ async function tick() {
   }
   const inn = due.find((d) => d.direction === 'entrada' && d.late > 0);
   if (inn) await require('./notify').notify({ type: 'financeiro', broadcast: true, title: `${inn.late} recebimento${inn.late > 1 ? 's' : ''} em atraso`, body: 'Confira os patrocínios com parcela vencida.', url: '/financeiro/lancamentos?escopo=receber', dedupe: `fin-receber-${today}` });
+  try { await require('./hourBank').tick(); } catch (err) { console.error('Banco de horas (aviso):', err.message); }
   for (const i of (await stockItems()).filter((x) => x.active && ['comprar', 'acabou'].includes(x.state))) {
     await require('./notify').notify({ type: 'financeiro', broadcast: true, title: `Estoque: ${i.name} ${i.state === 'acabou' ? 'acabou' : 'precisa ser reposto'}`, body: i.runs_out ? `Dura até ~${i.runs_out.split('-').reverse().join('/')} (${i.qty} ${i.unit}).` : `Restam ${i.qty} ${i.unit}.`, url: '/financeiro/estoque', dedupe: `fin-estoque-${i.id}-${monthOf(today)}` });
   }
