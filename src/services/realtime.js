@@ -60,7 +60,15 @@ function handler(req, res) {
   const id = String(req.user.id);
   if (!clients.has(id)) clients.set(id, new Set());
   clients.get(id).add(res);
-  const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
+  // a cada ~50 s confere se a sessão ainda vale: quem saiu, foi desativado ou trocou a senha para de receber avisos
+  const tokenHash = req.session?.tokenHash; let beats = 0;
+  const ping = setInterval(async () => {
+    res.write(': ping\n\n');
+    if (!tokenHash || (beats += 1) % 2) return;
+    const alive = await require('../db/pool').query('SELECT 1 FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.active', [tokenHash])
+      .then((r) => r.rowCount > 0).catch(() => true);
+    if (!alive) res.end();
+  }, 25_000);
   req.on('close', () => { clearInterval(ping); clients.get(id)?.delete(res); if (!clients.get(id)?.size) clients.delete(id); });
 }
 

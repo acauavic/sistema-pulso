@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db/pool');
 const config = require('../config');
 const sessions = require('../auth/sessions');
-const { createAuthToken } = require('../auth/tokens');
+const { createAuthToken, revokeAuthTokens } = require('../auth/tokens');
 const mailer = require('../services/mailer');
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
@@ -114,6 +114,11 @@ router.post('/usuarios/:id', requirePerm('users.write'), wrap(async (req, res) =
   if (values.name.length < 2) return rerender(400, 'Informe o nome.');
   if (!isEmail(values.email)) return rerender(400, 'E-mail inválido.');
   if (!isSelf && !roles.includes(values.role)) return rerender(400, 'Perfil inválido para o seu nível de acesso.');
+  // trocar o e-mail de quem já tem senha e depois "Enviar nova senha" daria a conta da pessoa a quem trocou: só o superadmin pode
+  const emailChanged = values.email !== target.email;
+  if (emailChanged && !isSelf && target.password_hash && req.user.role !== 'superadmin') {
+    return rerender(403, 'Esta pessoa já tem senha: só o superadmin troca o e-mail dela. Se ela mudou de e-mail, peça a um superadmin.');
+  }
   if (target.role === 'superadmin' && values.role !== 'superadmin' && (await otherActiveSuperadmins(target.id)) === 0) {
     return rerender(400, 'Este é o único superadmin ativo. Promova outra pessoa antes de rebaixá-lo.');
   }
@@ -125,7 +130,8 @@ router.post('/usuarios/:id', requirePerm('users.write'), wrap(async (req, res) =
     if (err.code === PG_UNIQUE) return rerender(409, 'Já existe um usuário com este e-mail.');
     throw err;
   }
-  if (values.role !== target.role || values.email !== target.email) await sessions.destroyUserSessions(target.id); // força novo login
+  if (values.role !== target.role || emailChanged) await sessions.destroyUserSessions(target.id); // força novo login
+  if (emailChanged) await revokeAuthTokens(target.id); // convite/redefinição que já foi para o e-mail antigo deixa de valer
   await audit(req, 'usuario.editado', 'user', target.id, {
     de: { email: target.email, role: target.role }, para: { email: values.email, role: values.role },
   });

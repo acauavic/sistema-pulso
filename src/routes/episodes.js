@@ -674,9 +674,11 @@ const redirectToFile = (inline) => wrap(async (req, res) => {
   }
   // assistir: a versão leve (720p), se já existe; "?original=1" ou baixar = o arquivo enviado
   if (inline && isVideo && req.query.original !== '1' && await videoViews.viewKeyFor(file.storage_key)) return res.set('Cache-Control', 'no-store').redirect(302, await videoViews.playUrl(file.storage_key));
+  // "ver" só abre no navegador o que é mídia (ou PDF); HTML, SVG e afins baixam, mesmo que alguém tenha declarado esse tipo no envio
+  const viewable = isVideo || /^(video|audio)\/|^image\/(?!svg)|^application\/pdf$/.test(String(file.content_type || '').toLowerCase());
   const url = await b2.presignGet(file.storage_key, {
     expires: inline ? 6 * 3600 : 900,
-    download: inline ? null : file.filename,
+    download: inline && viewable ? null : file.filename,
     contentType: inline && isVideo && !file.content_type.startsWith('video/') ? 'video/mp4' : null,
   });
   res.set('Cache-Control', 'no-store').redirect(302, url);

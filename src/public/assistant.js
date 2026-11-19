@@ -18,7 +18,7 @@
     const lines = esc(text).split('\n');
     let html = ''; let inList = false;
     for (const raw of lines) {
-      let line = raw.replace(/\[([^\]]{1,120})\]\((\/(?!\/)[^)\s]{0,200})\)/g, '<a href="$2">$1</a>').replace(/\*\*([^*]{1,200})\*\*/g, '<strong>$1</strong>');
+      let line = raw.replace(/\[([^\]]{1,120})\]\((\/[A-Za-z0-9][^)\s\\]{0,199})\)/g, '<a href="$2">$1</a>').replace(/\*\*([^*]{1,200})\*\*/g, '<strong>$1</strong>');
       const item = /^\s*[-•]\s+(.*)$/.exec(line);
       if (item) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${item[1]}</li>`; continue; }
       if (inList) { html += '</ul>'; inList = false; }

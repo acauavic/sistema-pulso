@@ -232,7 +232,7 @@ router.get('/gestao/busca', requirePerm('search.manage'), wrap(async (req, res) 
 router.post('/gestao/busca/atalhos', requirePerm('search.manage'), wrap(async (req, res) => {
   const label = clean(req.body.label, 80); const url = String(req.body.url || '').trim().slice(0, 300);
   const keywords = clean(req.body.keywords, 300) || null; const perm = PERMISSIONS[req.body.perm] ? req.body.perm : null;
-  if (!label || !/^\/(?!\/)/.test(url)) { await req.flash('error', 'Dê um nome e um endereço do próprio painel (começando com /).'); return res.redirect('/gestao/busca'); }
+  if (!label || !/^\/(?![\/\\])/.test(url)) { await req.flash('error', 'Dê um nome e um endereço do próprio painel (começando com /).'); return res.redirect('/gestao/busca'); }
   const { rows: [s] } = await db.query('INSERT INTO search_shortcuts (label, url, keywords, perm, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id', [label, url, keywords, perm, req.user.id]);
   if (req.body.sugestao) await db.query('INSERT INTO search_dismissed (key) VALUES ($1) ON CONFLICT DO NOTHING', [String(req.body.sugestao).slice(0, 300)]);
   await audit(req, 'busca.atalho_criado', 'shortcut', s.id, { label, url });

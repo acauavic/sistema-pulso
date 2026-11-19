@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.86.1', date: '2026-11-19', title: 'Mais correções de segurança',
+    items: [
+      { kind: 'correcao', text: 'O e-mail de quem já tem senha só pode ser trocado por um superadmin, e trocar o e-mail ou a senha invalida os links de acesso que já tinham saído.' },
+      { kind: 'correcao', text: 'Errar a senha de alguém de um lugar não trava mais o login dessa pessoa em outro lugar.' },
+      { kind: 'correcao', text: 'Anexos de conversa só podem ser apagados por quem enviou, e a sessão pede um novo login a cada 90 dias.' },
+      { kind: 'correcao', text: 'Reforços nos links públicos (estúdio, parceiro da plateia), na prévia de links e nos nomes dos arquivos dentro do ZIP.' },
+    ],
+  },
+  {
     version: '1.86.0', date: '2026-11-18', title: 'Banco de horas do estúdio',
     items: [
       { kind: 'novo', text: 'Banco de horas do estúdio no Financeiro: as horas compradas, as usadas pelas gravações (a duração real, ou 1 h enquanto não é registrada) e as reservadas pelas gravações marcadas, com o que sobra. "Registrar compra" lança a compra como despesa paga de estúdio.' },

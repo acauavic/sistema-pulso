@@ -221,7 +221,8 @@ function pngHasAlpha(buf) {
   return colorType === 3 && buf.includes(Buffer.from('tRNS'));
 }
 
-router.post('/patrocinador/logo', express.raw({ type: () => true, limit: MAX_LOGO }), withSession({ write: true, json: true }), wrap(async (req, res) => {
+// a sessão (e o CSRF, que vem no cabeçalho) é conferida ANTES de ler o corpo: anônimo não ocupa memória do servidor
+router.post('/patrocinador/logo', withSession({ write: true, json: true }), express.raw({ type: () => true, limit: MAX_LOGO }), wrap(async (req, res) => {
   if (!await writeLimiter.hit(req.ip)) return res.status(429).json({ ok: false, error: 'Muitas tentativas. Aguarde um pouco.' });
   const sponsor = req.sp.sponsor;
   if (!FORM_STAGES.includes(sponsor.stage)) return res.status(403).json({ ok: false, error: 'Formulário ainda não liberado.' });
@@ -238,7 +239,7 @@ router.post('/patrocinador/logo', express.raw({ type: () => true, limit: MAX_LOG
 }));
 
 // ---- voz: grava, guarda o áudio e devolve a transcrição para a pessoa revisar ----
-router.post('/patrocinador/audio', express.raw({ type: () => true, limit: MAX_AUDIO }), withSession({ write: true, json: true }), wrap(async (req, res) => {
+router.post('/patrocinador/audio', withSession({ write: true, json: true }), express.raw({ type: () => true, limit: MAX_AUDIO }), wrap(async (req, res) => {
   if (!await voiceLimiter.hit(req.ip)) return res.status(429).json({ ok: false, error: 'Muitas gravações seguidas. Aguarde um pouco ou digite a resposta.' });
   const sponsor = req.sp.sponsor;
   if (!FORM_STAGES.includes(sponsor.stage)) return res.status(403).json({ ok: false, error: 'Formulário ainda não liberado.' });

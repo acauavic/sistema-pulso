@@ -15,7 +15,7 @@ router.get('/novidades', requireAuth, wrap(async (req, res) => {
 router.post('/novidades/visto', requireAuth, wrap(async (req, res) => {
   await releases.markSeen(req.user.id);
   const back = String(req.body.voltar || '/');
-  res.redirect(/^\/(?!\/)/.test(back) ? back : '/');
+  res.redirect(/^\/(?![\/\\])/.test(back) ? back : '/'); // "/\\evil.com" o navegador lê como //evil.com
 }));
 
 module.exports = router;

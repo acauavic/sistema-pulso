@@ -123,7 +123,7 @@ router.get('/notificacoes/resumo', wrap(async (req, res) => {
 router.get('/notificacoes/:id/abrir', wrap(async (req, res) => {
   if (!/^\d{1,18}$/.test(req.params.id)) return res.redirect('/notificacoes');
   const n = await notifySvc.markRead(req.user.id, req.params.id);
-  res.redirect(n?.url && /^\/(?!\/)/.test(n.url) ? n.url : '/notificacoes'); // só caminho do próprio painel (nada de //outro-site)
+  res.redirect(n?.url && /^\/(?![\/\\])/.test(n.url) ? n.url : '/notificacoes'); // só caminho do próprio painel (nada de //outro-site)
 }));
 
 router.post('/notificacoes/:id/lida', wrap(async (req, res) => {

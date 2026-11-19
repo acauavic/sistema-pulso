@@ -18,6 +18,7 @@ const isBot = (req) => BOT_RE.test(req.get('user-agent') || '');
 
 const leadLimiter = createLimiter({ name: 'plateia_inscricao', max: 12, windowMs: 10 * 60_000 });
 const eventLimiter = createLimiter({ name: 'plateia_evento', max: 300, windowMs: 10 * 60_000 });
+const partnerMissLimiter = createLimiter({ name: 'plateia_parceiro_erro', max: 20, windowMs: 10 * 60_000 }); // link de parceiro errado: só tentativas falhas contam
 
 // Página pública e indexável. Os scripts de análise (Meta Pixel e GA4) só entram se a gestão informar os códigos.
 // mediaOrigin: o Backblaze, quando há o vídeo dos bastidores (o navegador busca o vídeo direto de lá, por link assinado).
@@ -74,8 +75,9 @@ router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], wrap(async (req,
   const g = await page.bySlug(req.params.slug);
   if (!g) return res.status(404).set(require('../services/inviteTemplate').publicHeaders()).type('html').send(require('../services/publicPages').messageHtml('Página não encontrada', 'Esta página de plateia não existe ou foi desligada. Veja as próximas gravações em podcastpulso.com/plateia.'));
   const s = await audience.settings();
+  if (req.params.token && await partnerMissLimiter.blocked(req.ip)) return res.redirect(302, `/plateia/com/${g.audience_slug}`); // chutando links: só a página normal
   const { partner, full } = req.params.token ? await page.partnerFor(g.id, req.params.token) : { partner: null, full: false };
-  if (req.params.token && !partner) return res.redirect(302, `/plateia/com/${g.audience_slug}`); // link desativado ou de outra gravação: a página normal
+  if (req.params.token && !partner) { await partnerMissLimiter.hit(req.ip); return res.redirect(302, `/plateia/com/${g.audience_slug}`); } // link desativado ou de outra gravação: a página normal
   const open = s.active && g.on_agenda && g.audience_status === 'disponivel';
   const closedLabel = !g.on_agenda ? 'Inscrições encerradas' : g.audience_status === 'lotado' ? 'Gravação lotada' : 'Inscrições encerradas';
   const exempt = Boolean(partner && !full);

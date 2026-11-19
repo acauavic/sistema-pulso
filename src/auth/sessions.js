@@ -49,7 +49,7 @@ async function loadSession(req, res = null) {
     `SELECT s.token_hash, s.flash, s.expires_at < now() + ($2 || ' seconds')::interval AS renew,
             u.id, u.name, u.email, u.role, u.active
        FROM sessions s JOIN users u ON u.id = s.user_id
-      WHERE s.token_hash = $1 AND s.expires_at > now()`,
+      WHERE s.token_hash = $1 AND s.expires_at > now() AND s.created_at > now() - interval '90 days'`, // prazo máximo: entra de novo a cada 90 dias
     [tokenHash, String(Math.floor(maxAge / 2))],
   );
   const row = rows[0];

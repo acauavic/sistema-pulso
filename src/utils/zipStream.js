@@ -19,9 +19,16 @@ function dosTime(d) {
 }
 
 // Nomes repetidos ganham -2, -3… (antes da extensão). Lista já sem repetição volta igual.
+// Nome seguro dentro do ZIP: cada pedaço do caminho sem "..", "." ou vazio, sem barra invertida nem barra no começo
+// (um nome vindo de fora não grava fora da pasta ao extrair).
+function safeEntryName(name) {
+  const parts = String(name || '').replace(/\\/g, '/').split('/').map((p) => p.replace(/[\u0000-\u001f]/g, '').trim()).filter((p) => p && p !== '.' && p !== '..');
+  return parts.join('/') || 'arquivo';
+}
+
 function uniqueNames(names) {
   const used = new Set();
-  return names.map((name) => { let n = name; let i = 2; while (used.has(n)) { n = name.replace(/(\.[^.]*)?$/, `-${i}$1`); i += 1; } used.add(n); return n; });
+  return names.map((raw) => { const name = safeEntryName(raw); let n = name; let i = 2; while (used.has(n)) { n = name.replace(/(\.[^.]*)?$/, `-${i}$1`); i += 1; } used.add(n); return n; });
 }
 
 const u64 = (n) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(n)); return b; };
@@ -40,7 +47,7 @@ function zipStream(out, { big = MAX32 } = {}) {
     if (closed) throw new Error('cancelado');
   }
   const used = new Set();
-  const unique = (name) => { let n = name; let i = 2; while (used.has(n)) { n = name.replace(/(\.[^.]*)?$/, `-${i}$1`); i += 1; } used.add(n); return n; };
+  const unique = (raw) => { const name = safeEntryName(raw); let n = name; let i = 2; while (used.has(n)) { n = name.replace(/(\.[^.]*)?$/, `-${i}$1`); i += 1; } used.add(n); return n; };
 
   function localHeader({ fname, flags, crc, size, time, date, z64 }) {
     const head = Buffer.alloc(30);
@@ -141,4 +148,4 @@ function zipLength(files, { big = MAX32 } = {}) {
   return offset + cd + (z64end ? 76 : 0) + 22;
 }
 
-module.exports = { zipStream, zipLength, uniqueNames };
+module.exports = { zipStream, zipLength, uniqueNames, safeEntryName };

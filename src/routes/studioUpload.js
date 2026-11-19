@@ -71,7 +71,7 @@ router.post('/estudio/:token/arquivos/iniciar', wrap(async (req, res) => {
   const { rows: [episode] } = await db.query('SELECT * FROM episodes WHERE id = $1', [link.episode_id]);
   return storageGuard(res, async () => {
     const { file, partSize, totalParts } = await prod.startUpload({
-      episode, kind: links.kindFor(split.filename), label: split.label, filename: split.filename, contentType: req.body.tipo, size, userId: null,
+      episode, kind: links.kindFor(split.filename), label: split.label, filename: split.filename, contentType: studioType(req.body.tipo), size, userId: null,
     });
     await db.query('UPDATE episode_files SET upload_link_id = $2, source_path = $3 WHERE id = $1', [file.id, link.id, split.path]);
     const first = !link.first_upload_at;
@@ -84,7 +84,15 @@ router.post('/estudio/:token/arquivos/iniciar', wrap(async (req, res) => {
   });
 }));
 
-router.put('/estudio/:token/arquivos/:fid/parte/:n', express.raw({ type: () => true, limit: MAX_PART }), wrap(async (req, res) => {
+// Tipo que quem envia pelo link declara: só vídeo, áudio e imagem comum ficam como vieram; o resto (HTML, SVG, scripts…) vira binário,
+// para nunca abrir como página quando alguém clicar em "ver".
+function studioType(tipo) {
+  const t = String(tipo || '').split(';')[0].trim().toLowerCase();
+  return /^(video\/[a-z0-9.+-]+|audio\/[a-z0-9.+-]+|image\/(png|jpe?g|gif|webp|heic|heif|tiff|x-adobe-dng|x-canon-cr2|x-nikon-nef|x-sony-arw))$/.test(t) ? t : 'application/octet-stream';
+}
+
+// Confere o link, o arquivo e o tamanho declarado ANTES de ler o corpo (até 70 MB): quem não tem link válido não ocupa memória.
+const checkPart = wrap(async (req, res, next) => {
   const link = await load(req, res); if (!link) return;
   const file = await loadFile(req, link);
   if (!file || file.status !== 'enviando') return jsonError(res, 404, 'Envio não encontrado ou já concluído.');
@@ -92,6 +100,13 @@ router.put('/estudio/:token/arquivos/:fid/parte/:n', express.raw({ type: () => t
   const total = Math.max(1, Math.ceil(Number(file.size_bytes) / file.part_size));
   if (!Number.isInteger(n) || n < 1 || n > total) return jsonError(res, 400, 'Parte inválida.');
   const expected = n < total ? file.part_size : Number(file.size_bytes) - file.part_size * (total - 1);
+  if (Number(req.get('content-length')) !== expected) return jsonError(res, 400, `A parte ${n} deveria ter ${expected} bytes.`);
+  req.studioPart = { link, file, n, expected };
+  return next();
+});
+
+router.put('/estudio/:token/arquivos/:fid/parte/:n', checkPart, express.raw({ type: () => true, limit: MAX_PART }), wrap(async (req, res) => {
+  const { link, file, n, expected } = req.studioPart;
   if (!Buffer.isBuffer(req.body) || req.body.length !== expected) return jsonError(res, 400, `A parte ${n} deveria ter ${expected} bytes.`);
   return storageGuard(res, async () => { await prod.receivePart(file, n, req.body); await links.touch(link); res.set(HEADERS).json({ ok: true }); });
 }));

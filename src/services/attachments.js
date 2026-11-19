@@ -103,7 +103,8 @@ async function canView(user, att) {
   return Boolean(c) && require('./comments').canSee(user.role, c.entity_type);
 }
 
-const canRemove = (user, att) => String(att.uploaded_by) === String(user.id) || can(user.role, 'tasks.manage');
+// Quem enviou sempre apaga. Anexo de conversa (mensagens privadas) só quem enviou; nos demais, a gestão das tarefas também.
+const canRemove = (user, att) => String(att.uploaded_by) === String(user.id) || (att.entity_type !== 'chat' && can(user.role, 'tasks.manage'));
 
 async function remove(att) {
   await b2.deleteObject(att.storage_key).catch((err) => console.error('[anexos] apagar do bucket:', err.message));

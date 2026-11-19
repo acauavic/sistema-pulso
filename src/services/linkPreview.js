@@ -13,6 +13,26 @@ const MAX_BYTES = 400 * 1024;
 const MAX_REDIRECTS = 3;
 const TIMEOUT_MS = 5000;
 
+// IPv6 em 8 blocos de 16 bits (aceita "::", zona "%eth0" e IPv4 no fim); null se não for IPv6 válido.
+function expandIpv6(ip) {
+  let v = String(ip).toLowerCase().replace(/%.*$/, '');
+  const dotted = v.match(/(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) {
+    const p = dotted[1].split('.').map(Number);
+    if (p.some((n) => n > 255)) return null;
+    v = v.slice(0, -dotted[1].length) + `${((p[0] << 8) | p[1]).toString(16)}:${((p[2] << 8) | p[3]).toString(16)}`;
+  }
+  const halves = v.split('::');
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(':') : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const fill = halves.length === 2 ? 8 - left.length - right.length : 0;
+  if (fill < 0 || (halves.length === 1 && left.length !== 8)) return null;
+  const all = [...left, ...Array(fill).fill('0'), ...right];
+  if (all.length !== 8 || all.some((x) => !/^[0-9a-f]{1,4}$/.test(x))) return null;
+  return all.map((x) => parseInt(x, 16));
+}
+
 // IP que não é da internet pública: privado, loopback, link-local (inclui 169.254.169.254 da nuvem), CGNAT, multicast, reservado.
 function isPrivateIp(ip) {
   if (net.isIPv4(ip)) {
@@ -21,11 +41,20 @@ function isPrivateIp(ip) {
       || (a === 192 && b === 168) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
   }
   if (net.isIPv6(ip)) {
-    const v = ip.toLowerCase();
-    if (v === '::' || v === '::1') return true;
-    const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return isPrivateIp(mapped[1]);
-    return /^f[cd]/.test(v) || /^fe[89ab]/.test(v) || v.startsWith('ff') || v.startsWith('2001:db8');
+    const h = expandIpv6(ip);
+    if (!h) return true;
+    const v4 = (hi, lo) => `${h[hi] >> 8}.${h[hi] & 255}.${h[lo] >> 8}.${h[lo] & 255}`;
+    const zeros = (n) => h.slice(0, n).every((x) => x === 0);
+    if (zeros(8)) return true; // ::
+    if (zeros(7) && h[7] === 1) return true; // ::1
+    if (zeros(5) && h[5] === 0xffff) return isPrivateIp(v4(6, 7)); // ::ffff:a.b.c.d (em qualquer escrita, inclusive hexadecimal)
+    if (zeros(6)) return isPrivateIp(v4(6, 7)); // ::a.b.c.d (compatível, antigo)
+    if (h[0] === 0x64 && h[1] === 0xff9b && h.slice(2, 6).every((x) => x === 0)) return isPrivateIp(v4(6, 7)); // NAT64
+    if (h[0] === 0x2002) return isPrivateIp(v4(1, 2)); // 6to4 leva um IPv4 dentro
+    if (h[0] === 0x2001 && h[1] === 0) return true; // Teredo
+    if (h[0] === 0x2001 && h[1] === 0xdb8) return true; // documentação
+    if (h[0] === 0x100 && zeros(0) && h.slice(1, 4).every((x) => x === 0)) return true; // descarte (100::/64)
+    return (h[0] & 0xfe00) === 0xfc00 || (h[0] & 0xffc0) === 0xfe80 || (h[0] & 0xff00) === 0xff00; // fc00::/7, fe80::/10, ff00::/8
   }
   return true;
 }

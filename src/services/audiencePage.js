@@ -81,7 +81,7 @@ function parsePartner(body) {
   return { values: { name, slots } };
 }
 async function createPartner(guestId, { name, slots }, userId) {
-  const token = crypto.randomBytes(6).toString('base64url');
+  const token = crypto.randomBytes(18).toString('base64url'); // 144 bits, como os outros links (os antigos, de 6 bytes, continuam valendo)
   const { rows: [p] } = await db.query('INSERT INTO plateia_partners (guest_id, name, token, slots, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *', [guestId, name, token, slots, userId]);
   return p;
 }
@@ -94,7 +94,7 @@ async function updatePartner(guestId, id, { name, slots, active }) {
 
 // O parceiro do link, se ainda vale para esta gravação, e se ainda há vaga isenta: { partner, full }.
 async function partnerFor(guestId, token) {
-  if (!/^[A-Za-z0-9_-]{6,20}$/.test(String(token || ''))) return { partner: null, full: false };
+  if (!/^[A-Za-z0-9_-]{6,32}$/.test(String(token || ''))) return { partner: null, full: false };
   const { rows: [p] } = await db.query(
     `SELECT p.*, (SELECT count(*)::int FROM plateia_leads l WHERE l.partner_id = p.id AND l.${HOLDING}) AS used
        FROM plateia_partners p WHERE p.token = $1 AND p.guest_id = $2 AND p.active`, [token, guestId]);
