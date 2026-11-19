@@ -1226,6 +1226,10 @@ dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z
 .voice-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: var(--r-card); }
 .voice-bar .btn { flex: none; } .voice-bar .small { min-width: 0; }
 .voice-bar .voice-err { color: var(--bad); }
+/* Nova tarefa vinda de uma mensagem: a escolha do que a IA lê (só com thread) e o andamento */
+.tf-bar { flex-wrap: wrap; } .tf-bar[hidden] { display: none; }
+.tf-bar.busy [data-tf-status]::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--text-2); vertical-align: middle; animation: day-live 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tf-bar.busy [data-tf-status]::before { animation: none; } }
 .voice-bar.rec { border-color: var(--bad); border-style: solid; }
 .voice-bar.rec .btn { color: var(--bad); border-color: var(--bad); background: var(--bad-bg); }
 .voice-bar.rec [data-voice-label]::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--bad); animation: voice-pulse 1.2s ease-in-out infinite; }
@@ -1827,6 +1831,11 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
 .msg-deleted { margin: 0; font-style: italic; }
 .msg.pending { opacity: .72; } .msg.failed { opacity: 1; }
 .msg-status { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; }
+/* virou tarefa: linha pequena embaixo da mensagem (neutra, nunca lime) */
+.msg-tasks { display: grid; gap: 2px; margin-top: 4px; }
+.msg-task { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; color: var(--text-2); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-task .mono { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.msg-task:hover { color: var(--text); text-decoration: underline; }
 .msg-tools { position: absolute; top: -10px; right: 8px; display: none; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line-strong); border-radius: var(--r-full); background: var(--raised); z-index: 2; }
 .msg:hover .msg-tools, .msg:focus-within .msg-tools, .msg.show-tools .msg-tools { display: flex; }
 .msg-tools .react-pop { position: absolute; top: calc(100% + 4px); right: 0; display: inline-flex; z-index: 3; }

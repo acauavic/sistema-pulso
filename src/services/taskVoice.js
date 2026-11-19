@@ -36,10 +36,15 @@ async function context() {
   return { users: users.rows, episodes: episodes.rows, guests: guests.rows, sponsors: sponsors.rows };
 }
 
-function systemPrompt(user, today, weekday, nowHM) {
+// origin 'voz': a pessoa falou em voz alta. 'mensagem': uma conversa escrita do chat da equipe, uma linha por mensagem ("Nome (dd/mm HH:MM): texto").
+function systemPrompt(user, today, weekday, nowHM, origin = 'voz') {
+  const intro = origin === 'mensagem'
+    ? ['Você lê uma conversa escrita do chat da equipe do Podcast Pulso (cada linha: quem escreveu, dia e hora, e o texto) e transforma o pedido dela em UMA tarefa clara. Português do Brasil, direto, sem enfeite.',
+      `Hoje é ${weekday}, ${today} (AAAA-MM-DD), agora são ${nowHM} em Brasília. Quem está criando a tarefa: ${user.name}. Nas mensagens, "eu", "para mim" e "eu mesmo" são quem escreveu aquela mensagem; "você" é a pessoa a quem ela fala. Datas relativas ("amanhã", "sexta") contam a partir do dia da mensagem.`]
+    : ['Você organiza o que uma pessoa da equipe do Podcast Pulso falou em voz alta e transforma em UMA tarefa clara. Português do Brasil, direto, sem enfeite.',
+      `Hoje é ${weekday}, ${today} (AAAA-MM-DD), agora são ${nowHM} em Brasília. Quem está falando: ${user.name}.`];
   return [
-    'Você organiza o que uma pessoa da equipe do Podcast Pulso falou em voz alta e transforma em UMA tarefa clara. Português do Brasil, direto, sem enfeite.',
-    `Hoje é ${weekday}, ${today} (AAAA-MM-DD), agora são ${nowHM} em Brasília. Quem está falando: ${user.name}.`,
+    ...intro,
     'Regras:',
     '- Não invente nada: nomes, números, datas, links ou etapas que a pessoa não disse ficam de fora.',
     '- "titulo": uma frase curta no imperativo, começando com verbo (ex.: "Confirmar a pauta com a Dra. Ana"). Sem ponto final, sem emoji, no máximo 90 caracteres.',
@@ -57,9 +62,10 @@ function systemPrompt(user, today, weekday, nowHM) {
 const list = (rows, line) => (rows.length ? rows.map(line).join('\n') : '(nenhum)');
 
 // Devolve { draft, warnings } ou { error }. `now` só existe para teste.
-async function organize({ text, user, now = new Date() }) {
+async function organize({ text, user, now = new Date(), origin = 'voz' }) {
+  const fromChat = origin === 'mensagem';
   const speech = String(text || '').trim().slice(0, 6000);
-  if (!speech) return { error: 'Não ouvi nada na gravação.' };
+  if (!speech) return { error: fromChat ? 'A mensagem está vazia.' : 'Não ouvi nada na gravação.' };
   const ctx = await context();
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(now);
   const weekday = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, weekday: 'long' }).format(now);
@@ -69,12 +75,12 @@ async function organize({ text, user, now = new Date() }) {
     `EPISÓDIOS (id | número | título):\n${list(ctx.episodes, (e) => `${e.id} | ${e.number || '—'} | ${e.title}`)}`,
     `CONVIDADOS (id | nome):\n${list(ctx.guests, (g) => `${g.id} | ${g.name}`)}`,
     `PATROCINADORES (id | empresa):\n${list(ctx.sponsors, (s) => `${s.id} | ${s.company}`)}`,
-    `FALA TRANSCRITA:\n"""${speech}"""`,
+    `${fromChat ? 'CONVERSA' : 'FALA TRANSCRITA'}:\n"""${speech}"""`,
   ].join('\n\n');
-  const { data } = await gemini.generateJson({ system: systemPrompt(user, today, weekday, nowHM), parts: [{ text: prompt }], schema: SCHEMA, temperature: 0.2, thinking: 'low', timeoutMs: 45_000, attempts: 2 });
+  const { data } = await gemini.generateJson({ system: systemPrompt(user, today, weekday, nowHM, fromChat ? 'mensagem' : 'voz'), parts: [{ text: prompt }], schema: SCHEMA, temperature: 0.2, thinking: 'low', timeoutMs: 45_000, attempts: 2 });
 
   const title = String(data.titulo || '').replace(/\s+/g, ' ').trim().replace(/[.。]+$/, '').slice(0, 200);
-  if (!title) return { error: 'Não encontrei uma tarefa nessa fala. Tente de novo dizendo o que precisa ser feito.' };
+  if (!title) return { error: fromChat ? 'Não encontrei uma tarefa nessa mensagem. Escreva o título na janela.' : 'Não encontrei uma tarefa nessa fala. Tente de novo dizendo o que precisa ser feito.' };
   const has = (rows, id, key = 'id') => rows.find((r) => String(r[key]) === String(id));
   const warnings = [];
   const assignee = data.responsavel_id && has(ctx.users, data.responsavel_id) ? String(data.responsavel_id) : null;

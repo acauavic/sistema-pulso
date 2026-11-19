@@ -7,6 +7,7 @@ const { wrap, isIntId, isUuid } = require('../utils/wrap');
 
 const router = express.Router();
 const sendLimiter = createLimiter({ name: 'mensagens', max: 240, windowMs: 60_000 });
+const taskLimiter = createLimiter({ name: 'tarefa-mensagem', max: 30, windowMs: 10 * 60_000 });
 const summaryLimiter = createLimiter({ name: 'resumo-chat', max: 30, windowMs: 60 * 60_000 });
 const use = requirePerm('chat.use');
 const out = (res, r) => (r.error ? res.status(r.status || 400).json({ ok: false, error: r.error }) : res.json({ ok: true, ...r }));
@@ -25,7 +26,13 @@ const page = wrap(async (req, res) => {
   if (req.params.id && (!open || !await chat.memberOf(require('../db/pool'), open, req.user.id))) return res.status(404).render('error', { title: 'Conversa não encontrada', message: 'Esta conversa não existe ou você não participa dela.' });
   // conversa individual que acabou de ser aberta ainda pode não estar na lista
   if (open && !conversations.some((c) => c.id === open)) conversations.unshift(await chat.detail(open, req.user.id));
-  return res.render('messages/index', { title: 'Mensagens', conversations, openId: open, reactionEmojis: chat.EMOJIS, aiOn: require('../config').geminiConfigured });
+  // "Criar tarefa" na mensagem abre a mesma janela Nova tarefa, aqui mesmo (sem a parte de voz: quem preenche é a IA lendo a mensagem)
+  const taskOn = require('../permissions').can(req.user.role, 'tasks.write');
+  const taskOpts = taskOn ? await require('../services/tasks').linkOptions() : null;
+  return res.render('messages/index', {
+    title: 'Mensagens', conversations, openId: open, reactionEmojis: chat.EMOJIS, aiOn: require('../config').geminiConfigured,
+    taskOn, ...(taskOpts || {}), C: require('../constants'), prefill: {}, openNew: false, voiceReady: false, back: open ? `/mensagens/${open}` : '/mensagens',
+  });
 });
 router.get('/mensagens', use, page);
 router.get('/mensagens/nao-lidas', use, wrap(async (req, res) => res.json({ ok: true, n: await chat.unreadCount(req.user.id) })));
@@ -78,6 +85,24 @@ router.get('/mensagens/m/:mid/respostas', use, wrap(async (req, res) => {
 // painel "Respostas não lidas" da conversa e a leitura de cada thread
 router.get('/mensagens/conversas/:id/threads-nao-lidas', use, member, wrap(async (req, res) => res.set('Cache-Control', 'no-store').json({ ok: true, threads: await chat.unreadThreads(req.params.id, req.user.id) })));
 router.post('/mensagens/m/:mid/thread-lida', use, mid((req) => chat.markThreadRead(req.params.mid, req.user, intOr(req.body.ate, 0))));
+// "Criar tarefa" na mensagem: a IA lê a mensagem (ou a thread inteira) e devolve o rascunho da janela Nova tarefa; nada é criado aqui.
+router.post('/mensagens/m/:mid/tarefa', use, requirePerm('tasks.write'), wrap(async (req, res) => {
+  const fail = (status, error) => res.status(status).json({ ok: false, error });
+  if (!isIntId(req.params.mid)) return nope(res);
+  const scope = req.body.alcance === 'thread' ? 'thread' : 'mensagem';
+  const src = await chat.taskSource(Number(req.params.mid), req.user.id, scope);
+  if (src.error) return fail(src.status, src.error);
+  if (!require('../config').geminiConfigured) return fail(503, 'A IA (Gemini) não está configurada neste servidor. Preencha a tarefa na janela.');
+  if (!await taskLimiter.hit(req.user.id)) return fail(429, 'Muitos pedidos seguidos. Espere alguns minutos.');
+  let r;
+  try { r = await require('../services/taskVoice').organize({ text: src.text, user: req.user, origin: 'mensagem' }); } catch (err) {
+    console.error('[tarefa da mensagem] organização:', err.message);
+    return fail(502, 'Não consegui organizar a tarefa agora. Preencha na janela ou tente de novo.');
+  }
+  if (r.error) return res.status(422).json({ ok: false, error: r.error, has_thread: src.hasThread });
+  await require('../services/audit').audit(req, 'tarefa.da_mensagem', 'chat_message', Number(req.params.mid), { alcance: scope });
+  res.json({ ok: true, draft: r.draft, warnings: r.warnings, has_thread: src.hasThread, conversation_id: src.conversationId, root_id: src.rootId });
+}));
 router.post('/mensagens/m/:mid/editar', use, mid((req) => chat.edit(req.params.mid, req.user, req.body.html)));
 router.post('/mensagens/m/:mid/apagar', use, mid((req) => chat.remove(req.params.mid, req.user)));
 router.post('/mensagens/m/:mid/reagir', use, mid((req) => chat.react(req.params.mid, req.user, req.body.emoji)));

@@ -44,15 +44,7 @@ function monthGrid(ym) {
 
 const isoOf = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : d ? String(d).slice(0, 10) : null);
 
-async function linkOptions() {
-  const [eps, guests, sponsors, users] = await Promise.all([
-    db.query("SELECT id, number, title FROM episodes WHERE status <> 'publicado' ORDER BY number DESC NULLS LAST, id DESC LIMIT 100"),
-    db.query("SELECT id, name FROM guests WHERE status NOT IN ('perdido','cancelado') ORDER BY updated_at DESC LIMIT 200"),
-    db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY company LIMIT 200"),
-    require('../services/team').activeUsers(),
-  ]);
-  return { episodes: eps.rows, guests: guests.rows, sponsors: sponsors.rows, users: users.rows };
-}
+const linkOptions = () => tasks.linkOptions();
 
 // Liga a tarefa a um item (episódio, convidado, patrocinador), se existir.
 async function readLinks(body) {
@@ -113,6 +105,12 @@ router.post('/tarefas', requirePerm('tasks.write'), wrap(async (req, res) => {
   if (assignee && assignee !== req.user.id && !can(req.user.role, 'tasks.write')) assignee = null;
   const task = await tasks.create({ values, user: req.user, assigneeId: assignee, links: await readLinks(req.body) });
   await attachments.link(attachmentIdsOf(values, req.body), 'task', task.id, req.user);
+  // nasceu de uma mensagem do chat: guarda o link de volta (só se quem cria vê a mensagem) e a mensagem mostra "TAREFA · …"
+  const chat = require('../services/chat');
+  if (isIntId(req.body.source_message_id) && await chat.canSeeMessage(req.user.id, req.body.source_message_id)) {
+    await db.query('UPDATE tasks SET source_message_id = $2, source_scope = $3 WHERE id = $1', [task.id, Number(req.body.source_message_id), req.body.source_scope === 'thread' ? 'thread' : 'mensagem']);
+    await chat.noteTask(Number(req.body.source_message_id));
+  }
   await audit(req, 'tarefa.criada', 'task', task.id, { titulo: task.title });
   // "Repetir": esta é a primeira; a rotina cria as próximas (fica em Gestão > Rotinas)
   const repeat = await require('../services/recurring').fromTask(task, String(req.body.repete || ''), req.user);
@@ -126,7 +124,8 @@ router.get('/tarefas/:id', requirePerm('tasks.read'), wrap(async (req, res) => {
   const task = await tasks.get(req.params.id);
   if (!task) return notFound(res);
   const [opts, thread, files] = await Promise.all([linkOptions(), comments.list('task', task.id), attachments.forEntity('task', task.id)]);
-  res.render('tasks/show', { title: task.title, task, ...opts, comments: thread, docs: files.filter((a) => a.kind === 'file'), C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), repeat: await repeatOf(task, req.user) });
+  const origin = task.source_message_id ? await require('../services/chat').taskOrigin(task.source_message_id, req.user.id) : null;
+  res.render('tasks/show', { title: task.title, task, origin, ...opts, comments: thread, docs: files.filter((a) => a.kind === 'file'), C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), repeat: await repeatOf(task, req.user) });
 }));
 
 // A tarefa nasceu de uma rotina que se repete (ativa): a frase e se quem vê pode parar (quem criou a repetição ou a gestão das rotinas).

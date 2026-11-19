@@ -66,6 +66,9 @@
       ? `<div class="cmt-audio"><audio controls preload="none" src="${esc(a.url)}"></audio>${a.transcript ? `<details><summary class="small muted">Transcrição</summary><p class="rte-transcript small">${esc(a.transcript)}</p></details>` : ''}</div>`
       : `<a class="btn sm" href="${esc(a.url)}/baixar" data-no-skeleton>${ic('file-text')} ${esc(a.name)} <span class="mono small muted">${fmtBytes(a.size)}</span></a>`)).join('')}</div>`;
   };
+  // virou tarefa: uma linha pequena embaixo da mensagem, para quem está na conversa (evita duas pessoas criarem a mesma)
+  const tasksOn = root.dataset.tasks === '1';
+  const tasksHtml = (m) => (m.deleted || !(m.tasks || []).length ? '' : `<div class="msg-tasks">${m.tasks.map((t) => `<a class="msg-task small" href="/tarefas/${t.id}"><span class="mono">Tarefa</span> · ${esc(t.title)}</a>`).join('')}</div>`);
   function msgHtml(m, { inThread = false } = {}) {
     const mine = String(m.author_id) === me;
     const body = m.deleted ? '<p class="msg-deleted small muted">Mensagem apagada</p>' : `${m.html ? `<div class="rich-content msg-text" data-mentions="1"${m.mention_all ? ' data-mentions-all="1"' : ''}>${m.html}</div>` : ''}${filesHtml(m)}`;
@@ -73,9 +76,10 @@
     const tools = m.deleted ? '' : `<div class="msg-tools">`
       + `<button type="button" class="icon-btn" data-chat-react-open aria-label="Reagir" title="Reagir">${ic('smile-plus')}</button>`
       + (!m.parent_id && !inThread ? `<button type="button" class="icon-btn" data-chat-open-thread aria-label="Responder em thread" title="Responder em thread">${ic('message-square')}</button>` : '')
+      + (tasksOn ? `<button type="button" class="icon-btn" data-chat-task aria-label="Criar tarefa" title="Criar tarefa">${ic('check-square')}</button>` : '')
       + (mine ? `<button type="button" class="icon-btn" data-chat-edit aria-label="Editar" title="Editar">${ic('pencil')}</button><button type="button" class="icon-btn danger-ic" data-chat-delete aria-label="Apagar" title="Apagar">${ic('trash-2')}</button>` : '')
       + '</div>';
-    return `<span class="avatar sm">${esc(m.initials)}</span><div class="msg-body"><div class="msg-meta"><strong>${esc(m.author)}</strong><time class="mono small muted" datetime="${esc(m.created_at)}">${esc(hourFmt.format(new Date(m.created_at)))}</time>${m.edited ? '<span class="mono small muted">editada</span>' : ''}</div>${body}${reactsHtml(m)}${replies}</div>${tools}`;
+    return `<span class="avatar sm">${esc(m.initials)}</span><div class="msg-body"><div class="msg-meta"><strong>${esc(m.author)}</strong><time class="mono small muted" datetime="${esc(m.created_at)}">${esc(hourFmt.format(new Date(m.created_at)))}</time>${m.edited ? '<span class="mono small muted">editada</span>' : ''}</div>${body}${reactsHtml(m)}${tasksHtml(m)}${replies}</div>${tools}`;
   }
   function makeLi(m, opts) {
     const li = document.createElement('li');
@@ -406,6 +410,11 @@
     }
     closePops();
     if (e.target.closest('[data-chat-open-thread]')) { openThread(Number(li.dataset.id)); return; }
+    if (e.target.closest('[data-chat-task]')) {
+      const m = findMsg(li); if (!m || !S.cur || !window.PulsoTaskFromMessage) return;
+      window.PulsoTaskFromMessage.open({ id: m.id, hasThread: !m.parent_id && m.reply_count > 0, back: `/mensagens/${S.cur.id}${S.thread ? `?thread=${S.thread.id}` : ''}` });
+      return;
+    }
     if (e.target.closest('[data-chat-edit]')) {
       const m = findMsg(li); if (!m) return;
       editing = m; const dlg = $('#chat-edit'); const rich = $('[data-rich]', dlg);

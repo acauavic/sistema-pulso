@@ -10,6 +10,14 @@
     </div>
     <details class="small" data-voice-heard hidden><summary>O que eu ouvi</summary><p class="muted" data-voice-text></p></details>
     <% } %>
+    <% if (locals.taskOn) { %>
+    <%# Vindo de Mensagens ("Criar tarefa" na mensagem): a IA lê a mensagem (ou a thread) e preenche; tarefa-msg.js %>
+    <input type="hidden" name="source_message_id" value="" data-tf-source><input type="hidden" name="source_scope" value="" data-tf-scope-input>
+    <div class="voice-bar tf-bar" data-task-from hidden>
+      <div class="seg" role="group" aria-label="O que a IA lê" data-tf-seg hidden><button type="button" data-tf-scope="mensagem">Esta mensagem</button><button type="button" data-tf-scope="thread">A thread inteira</button></div>
+      <span class="small muted" data-tf-status role="status"></span>
+    </div>
+    <% } %>
     <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="Ex.: confirmar a pauta com o convidado"></label>
     <div class="field"><span class="field-label">Detalhes <small class="muted">(opcional)</small></span>
       <%- include('../partials/rich-editor', { name: 'description_html', attach: 'attachment_ids', placeholder: 'Descreva a tarefa. Cole imagens com Ctrl+V, anexe PDF, HTML ou ZIP, monte tabelas…', label: 'Detalhes da tarefa', size: 'sm' }) %>

@@ -78,11 +78,14 @@ async function canSeeMessage(userId, messageId) {
 async function views(rows) {
   if (!rows.length) return [];
   const ids = rows.map((r) => Number(r.id));
-  const [reacts, atts, authors] = await Promise.all([
+  const [reacts, atts, authors, made] = await Promise.all([
     db.query('SELECT r.message_id, r.emoji, r.user_id, u.name FROM chat_reactions r JOIN users u ON u.id = r.user_id WHERE r.message_id = ANY($1::bigint[]) ORDER BY r.created_at', [ids]),
     db.query("SELECT * FROM attachments WHERE entity_type = 'chat' AND entity_id = ANY($1::int[]) AND kind <> 'image' ORDER BY id", [ids]),
     db.query('SELECT id, name FROM users WHERE id = ANY($1::uuid[])', [[...new Set(rows.map((r) => r.author_id).filter(Boolean))]]),
+    db.query('SELECT id, title, source_message_id FROM tasks WHERE source_message_id = ANY($1::bigint[]) ORDER BY id', [ids]), // "TAREFA · …" embaixo da mensagem
   ]);
+  const tasksOf = {};
+  for (const t of made.rows) (tasksOf[t.source_message_id] ||= []).push({ id: t.id, title: t.title });
   const names = new Map(authors.rows.map((u) => [String(u.id), u.name]));
   const byMsg = {};
   for (const r of reacts.rows) {
@@ -101,6 +104,7 @@ async function views(rows) {
       author_id: m.author_id, author: name, initials: fmt.initials(name), html: deleted ? '' : m.body_html || '', text: deleted ? '' : m.body, event: m.event || null, mentions: deleted ? [] : (m.mentions || []).map(String), mention_all: !deleted && Boolean(m.mention_all),
       created_at: m.created_at, edited: Boolean(m.edited_at) && !deleted, deleted, reply_count: m.reply_count, last_reply_at: m.last_reply_at,
       reactions: deleted ? [] : (byMsg[m.id] || []).sort((a, b) => EMOJIS.indexOf(a.emoji) - EMOJIS.indexOf(b.emoji)), attachments: deleted ? [] : files[m.id] || [],
+      tasks: tasksOf[m.id] || [],
     };
   });
 }
@@ -475,6 +479,54 @@ async function markThreadRead(parentId, user, upto) {
   return { ok: true };
 }
 
+// ---------------------------------------------------------------- tarefa a partir da mensagem
+const stamp = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+const lineOf = (m, names) => `${names.get(String(m.author_id)) || 'Ex-integrante'} (${stamp.format(m.created_at).replace(',', '')}): ${String(m.body || '').replace(/\s+/g, ' ').trim() || '(anexo)'}`;
+
+// O texto que vai para a IA: a mensagem sozinha ou a thread inteira (original + respostas, sem as apagadas), uma linha por mensagem.
+// scope 'thread' só vale na mensagem original que tem respostas.
+async function taskSource(messageId, userId, scope = 'mensagem') {
+  const { rows: [m] } = await db.query(
+    `SELECT x.* FROM chat_messages x JOIN chat_members mb ON mb.conversation_id = x.conversation_id AND mb.user_id = $2 AND mb.left_at IS NULL
+      WHERE x.id = $1 AND x.deleted_at IS NULL AND x.event IS NULL`, [messageId, userId]);
+  if (!m) return fail(404, 'Mensagem não encontrada.');
+  const hasThread = !m.parent_id && m.reply_count > 0;
+  if (scope === 'thread' && !hasThread) return fail(400, 'Esta mensagem não tem thread.');
+  const list = scope === 'thread'
+    ? [m, ...(await db.query('SELECT * FROM chat_messages WHERE parent_id = $1 AND deleted_at IS NULL ORDER BY id LIMIT 200', [m.id])).rows]
+    : [m];
+  const { rows: people } = await db.query('SELECT id, name FROM users WHERE id = ANY($1::uuid[])', [[...new Set(list.map((x) => x.author_id).filter(Boolean))]]);
+  const names = new Map(people.map((p) => [String(p.id), p.name]));
+  return { text: list.map((x) => lineOf(x, names)).join('\n'), conversationId: Number(m.conversation_id), rootId: Number(m.parent_id || m.id), hasThread };
+}
+
+// Virou tarefa: a mensagem ganha a rev nova e chega de novo a quem participa, já com a linha "TAREFA · …".
+async function noteTask(messageId) {
+  const { rows: [found] } = await db.query('SELECT conversation_id FROM chat_messages WHERE id = $1', [messageId]);
+  if (!found) return;
+  await tx(async (c) => {
+    const rev = await bump(c, found.conversation_id);
+    await c.query('UPDATE chat_messages SET rev = $2 WHERE id = $1', [messageId, rev]);
+    await emit(c, 'evento.mensagem', { conversationId: Number(found.conversation_id), rev, messageIds: [Number(messageId)], users: await activeIds(c, found.conversation_id) });
+  });
+  relay.kick();
+}
+
+// De onde veio a tarefa, para a página dela: quem escreveu e a conversa (nome só para quem participa).
+async function taskOrigin(messageId, userId) {
+  const { rows: [m] } = await db.query(
+    `SELECT x.id, x.parent_id, x.conversation_id, u.name AS author, c.kind, c.name AS conv_name,
+            (SELECT o.name FROM chat_members om JOIN users o ON o.id = om.user_id WHERE om.conversation_id = c.id AND om.user_id <> $2 LIMIT 1) AS other_name,
+            EXISTS (SELECT 1 FROM chat_members mm WHERE mm.conversation_id = c.id AND mm.user_id = $2 AND mm.left_at IS NULL) AS member
+       FROM chat_messages x JOIN chat_conversations c ON c.id = x.conversation_id LEFT JOIN users u ON u.id = x.author_id WHERE x.id = $1`, [messageId, userId]);
+  if (!m) return null;
+  if (!m.member) return { member: false };
+  return {
+    member: true, author: m.author || 'Ex-integrante', place: m.kind === 'group' ? m.conv_name : `conversa com ${m.other_name || 'alguém'}`,
+    url: `/mensagens/${m.conversation_id}?thread=${m.parent_id || m.id}`,
+  };
+}
+
 const conversationOf = async (messageId) => num((await db.query('SELECT conversation_id FROM chat_messages WHERE id = $1', [messageId])).rows[0]?.conversation_id);
 
 // Tudo o que mudou depois da rev (novas, editadas, apagadas, reações, respostas): a conferência de quem esteve fora.
@@ -651,5 +703,5 @@ async function stop() {
 
 module.exports = {
   EMOJIS, SCOPES, canSeeMessage, listConversations, detail, setNotify, setDefaultNotify, findMentions, unreadCount, openDirect, createGroup, renameGroup, addMembers, removeMember, setRole, leaveGroup,
-  send, edit, remove, react, history, thread, conversationOf, unreadThreads, markThreadRead, changes, markRead, requestSummary, getSummary, runSummary, runNotice, handleTask, handleLive, memberOf, start, stop,
+  send, edit, remove, react, history, thread, conversationOf, unreadThreads, markThreadRead, taskSource, noteTask, taskOrigin, changes, markRead, requestSummary, getSummary, runSummary, runNotice, handleTask, handleLive, memberOf, start, stop,
 };

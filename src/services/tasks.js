@@ -121,6 +121,17 @@ async function update(task, values, user, { assigneeId } = {}) {
   return { task: t };
 }
 
+// O que a janela "Nova tarefa" oferece para escolher: pessoas e os itens a que a tarefa pode se ligar (Tarefas e Mensagens).
+async function linkOptions() {
+  const [eps, guests, sponsors, users] = await Promise.all([
+    db.query("SELECT id, number, title FROM episodes WHERE status <> 'publicado' ORDER BY number DESC NULLS LAST, id DESC LIMIT 100"),
+    db.query("SELECT id, name FROM guests WHERE status NOT IN ('perdido','cancelado') ORDER BY updated_at DESC LIMIT 200"),
+    db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY company LIMIT 200"),
+    require('./team').activeUsers(),
+  ]);
+  return { episodes: eps.rows, guests: guests.rows, sponsors: sponsors.rows, users: users.rows };
+}
+
 // ---------------------------------------------------------------- rotinas
 const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
@@ -185,4 +196,4 @@ async function dueTick(now = new Date()) {
   return sent;
 }
 
-module.exports = { STATUSES, nowTime, isLate, isoDate, dueText, todayISO, addDays, get, list, parse, create, update, canEdit, applyRoutines, dueTick, formatDay };
+module.exports = { linkOptions, STATUSES, nowTime, isLate, isoDate, dueText, todayISO, addDays, get, list, parse, create, update, canEdit, applyRoutines, dueTick, formatDay };

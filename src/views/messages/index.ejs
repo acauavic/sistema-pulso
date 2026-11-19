@@ -1,7 +1,7 @@
 <%# Jornada: alguém da equipe abre Mensagens para falar com uma pessoa ou um grupo; vê as conversas (não lidas em cima), entra, lê e responde;
     assunto paralelo vai para uma thread ao lado. Editar, gerenciar grupo e resumir ficam em janelas. Comportamento em chat.js. %>
 <%- include('../partials/head') %>
-<section class="chat" data-chat data-view="<%= openId ? 'conv' : 'list' %>" data-me="<%= currentUser.id %>" data-open="<%= openId || '' %>" data-ai="<%= aiOn ? '1' : '' %>" aria-label="Mensagens">
+<section class="chat" data-chat data-view="<%= openId ? 'conv' : 'list' %>" data-me="<%= currentUser.id %>" data-open="<%= openId || '' %>" data-ai="<%= aiOn ? '1' : '' %>" data-tasks="<%= taskOn ? '1' : '' %>" aria-label="Mensagens">
   <aside class="chat-side">
     <header class="chat-side-head"><h1>Mensagens</h1><button class="btn primary sm" type="button" data-chat-new><%- icon('plus', 14) %> Nova conversa</button></header>
     <nav class="chat-convs" data-chat-convs aria-label="Conversas"></nav>
@@ -109,7 +109,8 @@
 </dialog>
 <% } %>
 
-<template data-chat-icons><% ['pencil', 'trash-2', 'smile-plus', 'message-square', 'clock', 'rotate-cw', 'file-text', 'users', 'check', 'x'].forEach(function (n) { %><span data-i="<%= n %>"><%- icon(n, 14) %></span><% }) %></template>
+<template data-chat-icons><% ['pencil', 'trash-2', 'smile-plus', 'message-square', 'clock', 'rotate-cw', 'file-text', 'users', 'check', 'x', 'check-square'].forEach(function (n) { %><span data-i="<%= n %>"><%- icon(n, 14) %></span><% }) %></template>
 <script type="application/json" id="chat-data"><%- JSON.stringify({ conversations: conversations, emojis: reactionEmojis }).replace(/</g, '\\u003c') %></script>
 <script src="/static/chat.js?v=<%= assetV %>" defer></script>
+<% if (taskOn) { %><%- include('../tasks/_new') %><script src="/static/tarefa-msg.js?v=<%= assetV %>" defer></script><% } %>
 <%- include('../partials/foot') %>
