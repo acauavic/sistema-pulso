@@ -92,7 +92,9 @@ async function request(method, key, { body, contentType, query = {}, timeout = 6
 }
 
 async function putObject(key, body, contentType) {
-  const res = await request('PUT', key, { body, contentType });
+  // Content-MD5: o Backblaze confere o corpo e o exige em bucket com retenção padrão (Object Lock)
+  const headers = Buffer.isBuffer(body) ? { 'content-md5': crypto.createHash('md5').update(body).digest('base64') } : {};
+  const res = await request('PUT', key, { body, contentType, headers });
   if (!res.ok) throw b2Error('Backblaze recusou o envio', res.status, await res.text());
   return { etag: String(res.headers.get('etag') || '').replace(/"/g, '') }; // envio simples: o ETag é o MD5 do corpo
 }
