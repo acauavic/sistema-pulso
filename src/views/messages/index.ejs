@@ -16,6 +16,10 @@
         <button class="chat-title" type="button" data-chat-info title="Detalhes da conversa"><span class="avatar sm" data-chat-avatar></span><span class="chat-title-txt"><strong data-chat-name></strong><span class="mono small muted" data-chat-sub></span></span></button>
         <% if (aiOn) { %><button class="btn sm ghost" type="button" data-chat-summary><%- icon('sparkles', 14) %> <span>Resumir</span></button><% } %>
       </header>
+      <details class="chat-unread-threads" data-chat-unread-threads hidden>
+        <summary><%- icon('message-square', 14) %> <span data-chat-ut-sum></span><%- icon('chevron-down', 14) %></summary>
+        <ul class="plain chat-ut-list" data-chat-ut-list></ul>
+      </details>
       <div class="chat-scroll" data-chat-scroll>
         <div class="chat-older"><button class="btn sm ghost" type="button" data-chat-older hidden>Mensagens anteriores</button></div>
         <ol class="chat-msgs" data-chat-msgs aria-live="polite"></ol>

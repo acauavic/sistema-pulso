@@ -75,6 +75,9 @@ router.get('/mensagens/m/:mid/respostas', use, wrap(async (req, res) => {
   const t = await chat.thread(req.params.mid);
   return t ? res.json({ ok: true, ...t }) : nope(res);
 }));
+// painel "Respostas não lidas" da conversa e a leitura de cada thread
+router.get('/mensagens/conversas/:id/threads-nao-lidas', use, member, wrap(async (req, res) => res.set('Cache-Control', 'no-store').json({ ok: true, threads: await chat.unreadThreads(req.params.id, req.user.id) })));
+router.post('/mensagens/m/:mid/thread-lida', use, mid((req) => chat.markThreadRead(req.params.mid, req.user, intOr(req.body.ate, 0))));
 router.post('/mensagens/m/:mid/editar', use, mid((req) => chat.edit(req.params.mid, req.user, req.body.html)));
 router.post('/mensagens/m/:mid/apagar', use, mid((req) => chat.remove(req.params.mid, req.user)));
 router.post('/mensagens/m/:mid/reagir', use, mid((req) => chat.react(req.params.mid, req.user, req.body.emoji)));

@@ -158,6 +158,7 @@
     if (!S.cur || m.conversation_id !== S.cur.id) return;
     S.maxId = Math.max(S.maxId, m.id);
     if (m.parent_id) {
+      if (String(m.author_id) !== me) { if (S.thread?.id === m.parent_id) threadRead(); else refreshUT(); }
       if (S.thread?.id === m.parent_id) {
         const known = S.replies.get(m.id);
         if (known && known.rev >= m.rev) return;
@@ -197,6 +198,7 @@
     if (!conv) { try { S.convs = (await api('/mensagens/conversas')).conversations; } catch { return; } if (!S.convs.find((c) => c.id === id)) { location.href = `/mensagens/${id}`; return; } return open(id, { push }); }
     closeThread();
     S.cur = conv; S.msgs = new Map(); S.maxId = conv.last_message_id || 0;
+    ut.box.hidden = true; loadUT();
     if (conv.kind === 'group') membersOf(id); // para o @ do editor
     S.unreadCount = conv.unread; S.firstUnread = conv.unread ? conv.last_read_id + 1 : null;
     el.msgs.replaceChildren(); el.jump.hidden = true;
@@ -218,7 +220,7 @@
   }
   function closeConv({ push = true } = {}) {
     closeThread();
-    S.cur = null; el.conv.hidden = true; el.pick.hidden = false; setView('list'); paintConvs();
+    S.cur = null; ut.box.hidden = true; el.conv.hidden = true; el.pick.hidden = false; setView('list'); paintConvs();
     if (push) history.pushState({}, '', '/mensagens');
     document.title = 'Mensagens';
     refreshConvs();
@@ -257,6 +259,36 @@
     } catch (e) { window.alert(e.message); } finally { el.older.disabled = false; }
   }
 
+  // ---------------------------------------------------------------- respostas não lidas (threads que a pessoa segue, nesta conversa)
+  // Uma faixa recolhida entre o cabeçalho e as mensagens: só aparece quando há resposta nova; tocar numa linha abre a thread.
+  const ut = { box: $('[data-chat-unread-threads]'), sum: $('[data-chat-ut-sum]'), list: $('[data-chat-ut-list]') };
+  function paintUT(threads) {
+    const list = threads.filter((t) => t.id !== S.thread?.id); // a thread aberta já está sendo lida
+    const total = list.reduce((n, t) => n + t.unread, 0);
+    ut.box.hidden = !list.length;
+    if (!list.length) { ut.box.open = false; return; }
+    ut.sum.innerHTML = `<span class="mono">${total}</span> ${total === 1 ? 'resposta não lida' : 'respostas não lidas'}${list.length > 1 ? ` em <span class="mono">${list.length}</span> threads` : ''}`;
+    ut.list.innerHTML = list.map((t) => `<li><button type="button" class="chat-ut-item" data-chat-ut="${t.id}">`
+      + `<span class="chat-ut-main"><span class="chat-ut-prev">${esc(t.author)}: ${esc(t.preview)}</span>`
+      + `<span class="small muted">${t.last_reply_author ? `${esc(t.last_reply_author)} respondeu · ` : ''}<time class="mono" datetime="${esc(t.last_reply_at)}">${esc(when(t.last_reply_at))}</time></span></span>`
+      + `<span class="nav-count">${t.unread}</span></button></li>`).join('');
+  }
+  async function loadUT() {
+    const id = S.cur?.id;
+    if (!id) { ut.box.hidden = true; return; }
+    try { const r = await api(`/mensagens/conversas/${id}/threads-nao-lidas`); if (S.cur?.id === id) paintUT(r.threads); } catch { /* na próxima */ }
+  }
+  const refreshUT = debounce(loadUT, 300);
+  // a thread aberta (e à vista) fica lida até a última resposta que chegou
+  const threadRead = debounce(async () => {
+    if (!S.thread || document.visibilityState !== 'visible') return;
+    const upto = Math.max(0, ...S.replies.keys());
+    if (!upto) return;
+    try { await api(`/mensagens/m/${S.thread.id}/thread-lida`, { ate: upto }); } catch { /* na próxima */ }
+    refreshUT();
+  }, 300);
+  ut.list.addEventListener('click', (e) => { const b = e.target.closest('[data-chat-ut]'); if (!b) return; ut.box.open = false; openThread(Number(b.dataset.chatUt)); });
+
   // ---------------------------------------------------------------- thread
   const paintThreadSub = () => { el.tSub.textContent = `${S.replies.size} ${S.replies.size === 1 ? 'resposta' : 'respostas'}`; };
   async function openThread(id) {
@@ -269,12 +301,14 @@
     decorate(el.tMsgs); hydrate(el.tParent); hydrate(el.tMsgs); paintThreadSub();
     el.thread.hidden = false; setView('thread'); toBottom(el.tScroll);
     t.replies.forEach((m) => { S.maxId = Math.max(S.maxId, m.id); });
-    markRead();
+    markRead(); threadRead(); refreshUT();
     $('[data-chat-thread-form] .rte-area')?.focus({ preventScroll: true });
   }
   function closeThread() {
     if (!S.thread) return;
     S.thread = null; S.replies = new Map(); el.thread.hidden = true; if (S.cur) setView('conv');
+    if (new URLSearchParams(location.search).has('thread')) history.replaceState(history.state, '', location.pathname);
+    refreshUT();
   }
 
   // ---------------------------------------------------------------- envio garantido
@@ -580,6 +614,10 @@
   setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 30000); // rede de segurança, mesmo com o tempo real ligado
 
   paintConvs();
-  if (root.dataset.open) open(Number(root.dataset.open), { push: false });
+  // /mensagens/:id?thread=:mid abre a conversa já com a thread (link de volta da tarefa criada a partir da mensagem)
+  if (root.dataset.open) {
+    const tid = Number(new URLSearchParams(location.search).get('thread'));
+    open(Number(root.dataset.open), { push: false }).then(() => { if (tid > 0 && S.cur) openThread(tid); });
+  }
   if (pending.length) flush();
 }());

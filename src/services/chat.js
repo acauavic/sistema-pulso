@@ -308,7 +308,10 @@ async function send({ user, conversationId, clientId, html, attachmentIds = [], 
     if (!m) return { duplicate: true }; // já recebida: o clique repetido ou a nova tentativa da rede não cria outra
     if (ids.length) await c.query("UPDATE attachments SET entity_type = 'chat', entity_id = $2 WHERE id = ANY($1::int[]) AND entity_id IS NULL AND uploaded_by = $3", [ids, m.id, user.id]);
     await c.query('UPDATE chat_conversations SET last_message_id = $2, last_message_at = $3 WHERE id = $1', [conversationId, m.id, m.created_at]);
-    if (parentId) await c.query('UPDATE chat_messages SET reply_count = reply_count + 1, last_reply_at = $2, rev = $3 WHERE id = $1', [parentId, m.created_at, rev]);
+    if (parentId) {
+      await c.query('UPDATE chat_messages SET reply_count = reply_count + 1, last_reply_at = $2, rev = $3 WHERE id = $1', [parentId, m.created_at, rev]);
+      await upsertThreadRead(c, user.id, parentId, m.id); // quem responde já leu a thread até a própria resposta
+    }
     await c.query('UPDATE chat_members SET last_read_id = GREATEST(last_read_id, $3), notified_upto = GREATEST(notified_upto, $3) WHERE conversation_id = $1 AND user_id = $2', [conversationId, user.id, m.id]);
     await emit(c, 'evento.mensagem', { conversationId: Number(conversationId), rev, messageIds: parentId ? [Number(m.id), Number(parentId)] : [Number(m.id)], users: await activeIds(c, conversationId) });
     await emit(c, 'espera.aviso', { conversationId: Number(conversationId), messageId: Number(m.id) });
@@ -435,6 +438,43 @@ async function thread(messageId) {
   const [parent, ...replies] = await views([root, ...rows]);
   return { parent, replies };
 }
+// ---------------------------------------------------------------- respostas não lidas das threads que a pessoa segue
+// Segue a thread quem escreveu a mensagem original, quem respondeu nela e quem foi marcado (no original ou numa resposta, @todos incluso).
+// A leitura de cada thread fica em chat_thread_reads (a da conversa, chat_members.last_read_id, não serve: abrir a conversa não é ler a thread).
+const upsertThreadRead = (c, userId, parentId, upto) => c.query(
+  `INSERT INTO chat_thread_reads (user_id, parent_id, last_read_id) VALUES ($1, $2, $3)
+   ON CONFLICT (user_id, parent_id) DO UPDATE SET last_read_id = GREATEST(chat_thread_reads.last_read_id, EXCLUDED.last_read_id)`, [userId, parentId, upto]);
+
+async function unreadThreads(conversationId, userId) {
+  const { rows } = await db.query(
+    `SELECT r.id, r.body, r.deleted_at IS NOT NULL AS root_deleted, ua.name AS author, count(x.id)::int AS unread, max(x.created_at) AS last_reply_at,
+            (SELECT u.name FROM chat_messages y JOIN users u ON u.id = y.author_id WHERE y.parent_id = r.id AND y.deleted_at IS NULL AND y.author_id IS DISTINCT FROM $2 ORDER BY y.id DESC LIMIT 1) AS last_reply_author
+       FROM chat_messages r
+       JOIN chat_messages x ON x.parent_id = r.id AND x.deleted_at IS NULL AND x.author_id IS DISTINCT FROM $2
+       LEFT JOIN chat_thread_reads tr ON tr.parent_id = r.id AND tr.user_id = $2
+       LEFT JOIN users ua ON ua.id = r.author_id
+      WHERE r.conversation_id = $1 AND r.parent_id IS NULL AND r.event IS NULL AND x.id > coalesce(tr.last_read_id, 0)
+        AND (r.author_id = $2 OR $2 = ANY(r.mentions) OR r.mention_all
+             OR EXISTS (SELECT 1 FROM chat_messages f WHERE f.parent_id = r.id AND f.deleted_at IS NULL AND (f.author_id = $2 OR $2 = ANY(f.mentions) OR f.mention_all)))
+      GROUP BY r.id, ua.name ORDER BY max(x.id) DESC LIMIT 50`, [conversationId, userId]);
+  return rows.map((r) => ({
+    id: Number(r.id), author: r.author || 'Ex-integrante', preview: r.root_deleted ? 'Mensagem apagada' : String(r.body || 'Anexo').replace(/\s+/g, ' ').slice(0, 120),
+    unread: r.unread, last_reply_at: r.last_reply_at, last_reply_author: r.last_reply_author,
+  }));
+}
+
+// Abriu a thread: lida até a resposta mais nova que ela tinha (nunca além do que existe).
+async function markThreadRead(parentId, user, upto) {
+  const { rows: [root] } = await db.query(
+    `SELECT r.id, (SELECT max(x.id) FROM chat_messages x WHERE x.parent_id = r.id) AS last FROM chat_messages r
+       JOIN chat_members m ON m.conversation_id = r.conversation_id AND m.user_id = $2 AND m.left_at IS NULL
+      WHERE r.id = $1 AND r.parent_id IS NULL`, [parentId, user.id]);
+  if (!root) return fail(404, 'Thread não encontrada.');
+  if (!root.last) return { ok: true };
+  await upsertThreadRead(db, user.id, root.id, Math.min(Number(upto) || 0, Number(root.last)));
+  return { ok: true };
+}
+
 const conversationOf = async (messageId) => num((await db.query('SELECT conversation_id FROM chat_messages WHERE id = $1', [messageId])).rows[0]?.conversation_id);
 
 // Tudo o que mudou depois da rev (novas, editadas, apagadas, reações, respostas): a conferência de quem esteve fora.
@@ -611,5 +651,5 @@ async function stop() {
 
 module.exports = {
   EMOJIS, SCOPES, canSeeMessage, listConversations, detail, setNotify, setDefaultNotify, findMentions, unreadCount, openDirect, createGroup, renameGroup, addMembers, removeMember, setRole, leaveGroup,
-  send, edit, remove, react, history, thread, conversationOf, changes, markRead, requestSummary, getSummary, runSummary, runNotice, handleTask, handleLive, memberOf, start, stop,
+  send, edit, remove, react, history, thread, conversationOf, unreadThreads, markThreadRead, changes, markRead, requestSummary, getSummary, runSummary, runNotice, handleTask, handleLive, memberOf, start, stop,
 };
