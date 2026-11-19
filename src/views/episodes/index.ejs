@@ -3,18 +3,18 @@
   <div><span class="kicker">Produção</span><h1>Episódios</h1></div>
   <div class="row">
     <div class="seg">
-      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/episodios?view=quadro<%= mine ? '&editor=eu' : '' %>"><%- icon('columns-3') %> Quadro</a>
-      <a class="<%= view === 'lista' ? 'on' : '' %>" href="/episodios?view=lista<%= mine ? '&editor=eu' : '' %>"><%- icon('list') %> Lista</a>
+      <% var fq = filterUi.query ? '&' + filterUi.query : ''; /* os filtros combináveis seguem entre Quadro e Lista */ %>
+      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/episodios?view=quadro<%= mine ? '&editor=eu' : '' %><%= fq %>"><%- icon('columns-3') %> Quadro</a>
+      <a class="<%= view === 'lista' ? 'on' : '' %>" href="/episodios?view=lista<%= mine ? '&editor=eu' : '' %><%= fq %>"><%- icon('list') %> Lista</a>
     </div>
-    <a class="btn <%= mine ? 'on' : '' %>" href="/episodios?view=<%= view %><%= mine ? '' : '&editor=eu' %>"><%- icon('user') %> <%= mine ? 'Todos' : 'Só os meus' %></a>
+    <a class="btn <%= mine ? 'on' : '' %>" href="/episodios?view=<%= view %><%= mine ? '' : '&editor=eu' %><%= fq %>"><%- icon('user') %> <%= mine ? 'Todos' : 'Só os meus' %></a>
     <% if (can('production.checklists')) { %><a class="btn" href="/episodios/checklists"><%- icon('check') %> Checklists</a><% } %>
     <% if (can('episodes.write')) { %><a class="btn primary" href="/episodios/novo"><%- icon('plus') %> Registrar episódio gravado</a><% } %>
   </div>
 </div>
 <p class="lead">O episódio nasce quando a conversa é <strong>gravada</strong> (o convidado vai para Gravado) e segue até <strong>Publicado</strong>. Antes disso, a gravação marcada fica na agenda do convidado.</p>
 
-<% var card = function (e) { %>
-<% }; %>
+<div class="board-tools"><%- include('../partials/filter-builder') %><% if (view === 'quadro') { %><%- include('../partials/card-fields') %><% } %></div>
 <% if (view === 'quadro') { %>
 <div class="board board-wide">
   <% columns.forEach(function (col) { %>
@@ -24,16 +24,21 @@
       <% if (!col.items.length) { %><p class="col-empty small muted">Nenhum episódio nesta etapa.</p><% } %>
       <% col.items.forEach(function (e) { %>
       <a class="kcard" href="/episodios/<%= e.id %>"><% var o = order[e.id]; %>
-        <span class="handle muted"><% if (o) { %><b class="order-n" title="<%= o.rank %>º na ordem de edição"><%= o.rank %>º</b> · <% } %><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'EP.—' %> · <% if (o) { %><span class="air-<%= o.air.tone || 'ok' %>" title="<%= o.air.line %>"><%= o.air.short %></span><% } else { %><%= fmt.formatDayShort(e.aired_on) %><% } %></span>
+        <span class="handle muted"<%- cardUi.attr('numero') %>><% if (o) { %><b class="order-n" title="<%= o.rank %>º na ordem de edição"><%= o.rank %>º</b> · <% } %><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'EP.—' %> · <% if (o) { %><span class="air-<%= o.air.tone || 'ok' %>" title="<%= o.air.line %>"><%= o.air.short %></span><% } else { %><%= fmt.formatDayShort(e.aired_on) %><% } %></span>
         <strong><%= e.title %></strong>
-        <% if (e.guest_name) { %><span class="muted small"><%= e.guest_name %></span><% } %>
+        <% if (e.guest_name) { %><span class="muted small"<%- cardUi.attr('convidado') %>><%= e.guest_name %></span><% } %>
         <span class="meta small muted">
-          <% if (e.sponsors) { %><span title="<%= fmt.plural(e.sponsors, 'patrocinador', 'patrocinadores') %>"><%- icon('shield-check', 12) %><%= e.sponsors %></span><% } %>
-          <% if (e.files) { %><span title="<%= fmt.plural(e.files, 'arquivo de material', 'arquivos de material') %>"><%- icon('file-text', 12) %><%= e.files %> arq.</span><% } %>
-          <% if (e.tasks) { %><span title="Tarefas feitas de <%= e.tasks %>"><%- icon('check', 12) %><%= e.tasks_done %>/<%= e.tasks %></span><% } %>
-          <% if (e.open_comments) { %><span class="warn" title="<%= fmt.plural(e.open_comments, 'ajuste em aberto', 'ajustes em aberto') %>"><%- icon('message-square', 12) %><%= e.open_comments %></span><% } %>
+          <% if (e.sponsors) { %><span title="<%= fmt.plural(e.sponsors, 'patrocinador', 'patrocinadores') %>"<%- cardUi.attr('patrocinadores') %>><%- icon('shield-check', 12) %><%= e.sponsors %></span><% } %>
+          <% if (e.files) { %><span title="<%= fmt.plural(e.files, 'arquivo de material', 'arquivos de material') %>"<%- cardUi.attr('arquivos') %>><%- icon('file-text', 12) %><%= e.files %> arq.</span><% } %>
+          <% if (e.tasks) { %><span title="Tarefas feitas de <%= e.tasks %>"<%- cardUi.attr('tarefas') %>><%- icon('check', 12) %><%= e.tasks_done %>/<%= e.tasks %></span><% } %>
+          <% if (e.open_comments) { %><span class="warn" title="<%= fmt.plural(e.open_comments, 'ajuste em aberto', 'ajustes em aberto') %>"<%- cardUi.attr('ajustes') %>><%- icon('message-square', 12) %><%= e.open_comments %></span><% } %>
+          <% if (e.recorded_on) { %><span class="mono" title="Gravado em"<%- cardUi.attr('gravado') %>>grav. <%= fmt.formatDayShort(e.recorded_on) %></span><% } %>
+          <% if (e.published_at) { %><span class="mono" title="Publicado em"<%- cardUi.attr('publicado') %>>publ. <%= fmt.shortDate(e.published_at) %></span><% } %>
+          <% if (e.review_round) { %><span title="Rodadas de revisão"<%- cardUi.attr('rodada') %>><%= e.review_round %>ª revisão</span><% } %>
+          <span class="mono" title="Criado em"<%- cardUi.attr('criado') %>>criado <%= fmt.shortDate(e.created_at) %></span>
+          <span class="mono" title="Atualizado em"<%- cardUi.attr('atualizado') %>>atual. <%= fmt.shortDate(e.updated_at) %></span>
         </span>
-        <span class="card-foot"><%- include('../partials/dot', { type: 'episode', id: e.id, user: e.editor_id ? { id: e.editor_id, name: e.editor_name } : null, editable: can('production.manage'), inLink: true }) %></span>
+        <span class="card-foot"<%- cardUi.attr('editor') %>><%- include('../partials/dot', { type: 'episode', id: e.id, user: e.editor_id ? { id: e.editor_id, name: e.editor_name } : null, editable: can('production.manage'), inLink: true }) %></span>
       </a>
       <% }) %>
     </div>

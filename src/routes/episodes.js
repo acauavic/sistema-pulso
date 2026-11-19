@@ -118,6 +118,12 @@ async function parseNew(body) {
 router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => {
   const view = req.query.view === 'lista' ? 'lista' : 'quadro';
   const mine = req.query.editor === 'eu';
+  // filtros combináveis (botão Filtros): etapa, editor, datas, campos vazios ou preenchidos, conexões
+  const f = await require('../services/filterUi').build(req, { entity: 'episode', action: '/episodios', fields: await require('../services/filterFields').episodeFields(), keep: { view, editor: mine ? 'eu' : '' } });
+  const where = []; const params = [];
+  if (mine) { params.push(req.user.id); where.push(`e.editor_id = $${params.length}`); }
+  const fsql = require('../services/filters').toSql(f.state, f.fields, params);
+  if (fsql) where.push(fsql);
   const { rows } = await db.query(
     `SELECT e.*, g.name AS guest_name, u.name AS editor_name,
             (SELECT count(*)::int FROM sponsor_episodes se WHERE se.episode_id = e.id) AS sponsors,
@@ -126,8 +132,8 @@ router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => 
             (SELECT count(*)::int FROM tasks t WHERE t.episode_id = e.id AND t.status = 'feito') AS tasks_done,
             (SELECT count(*)::int FROM episode_comments c WHERE c.episode_id = e.id AND NOT c.resolved) AS open_comments
        FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.editor_id
-      ${mine ? 'WHERE e.editor_id = $1' : ''}
-      ORDER BY e.number DESC NULLS LAST, e.id DESC LIMIT 500`, mine ? [req.user.id] : []);
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY e.number DESC NULLS LAST, e.id DESC LIMIT 500`, params);
   // Disponível para edição e Em edição seguem a ordem de edição (pela data de veiculação), com a posição em cada cartão
   const editOrder = require('../services/editOrder');
   const order = await editOrder.byId();
@@ -136,7 +142,7 @@ router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => 
     if (editOrder.STAGES.includes(s.key)) items.sort((a, b) => (order[a.id]?.rank ?? 1e9) - (order[b.id]?.rank ?? 1e9));
     return { ...s, items };
   });
-  res.render('episodes/index', { title: 'Episódios', view, mine, episodes: rows, columns, order, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES });
+  res.render('episodes/index', { filterUi: f.ui, cardUi: require('../services/cardFields').forList('episodios'), title: 'Episódios', view, mine, episodes: rows, columns, order, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES });
 }));
 
 router.get('/episodios/novo', requirePerm('episodes.write'), wrap(async (req, res) => {

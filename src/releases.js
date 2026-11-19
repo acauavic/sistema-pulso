@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.89.0', date: '2026-11-19', title: 'Filtros em todas as listas e campos do cartão',
+    items: [
+      { kind: 'novo', text: 'Botão Filtros também em Episódios, Patrocinadores e nas abas Quadro, Posts e Pedidos de Conteúdo: combine etapa, responsável, datas (inclusive criado e atualizado em), campos vazios ou preenchidos e conexões, com E ou OU, e salve como visualização.' },
+      { kind: 'novo', text: 'Campos do cartão: em cada quadro, escolha o que aparece nos cartões (e-mail, datas, contrato…). Fica guardado no seu navegador e "Restaurar padrão" volta ao cartão de sempre.' },
+      { kind: 'ajuste', text: 'No quadro de Convidados, quem está em Gravado mostra a estreia prevista no cartão, ou "estreia não preenchida" quando falta a data.' },
+    ],
+  },
+  {
     version: '1.88.0', date: '2026-11-19', title: 'Categoria dos vídeos e filtros combináveis',
     items: [
       { kind: 'novo', text: 'Cada vídeo de Conteúdo > Cortes agora tem categoria (os tipos de vídeo de Gestão > Categorias): mude na página do vídeo ou em vários de uma vez pela seleção, por exemplo um bastidor que entrou como corte ou um vídeo longo horizontal.' },

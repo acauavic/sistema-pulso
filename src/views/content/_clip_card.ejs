@@ -3,23 +3,26 @@
    if (c.status === 'pronto' && c.pub) st = c.pub.stage === 'publicado' ? ['b-st-publicado', 'publicado'] : ['b-st-agendado', c.pub.label];
    if (c.status === 'pronto' && !c.episode_id && !c.request_id) st = ['b-gray', 'sem episódio'];
    var chosen = c.covers.find(function (x) { return x.id === c.cover_id; }) || c.covers[0]; %>
-<% var pick = typeof pick !== 'undefined' && pick; %>
+<% var pick = typeof pick !== 'undefined' && pick;
+   var cfa = function (k) { return typeof cardUi !== 'undefined' && cardUi && cardUi.list === 'cortes' ? cardUi.attr(k) : ''; }; /* Campos do cartão (Conteúdo > Cortes) */ %>
 <article class="clip-card" data-clip="<%= c.id %>"<% if (pick) { %> data-dl-item data-id="<%= c.id %>"<% if (c.status === 'pronto' && c.storage_key) { %> data-zip="c<%= c.id %>" data-href="/cortes/<%= c.id %>/video?baixar=1" data-name="<%= c.title %>.mp4" data-bytes="<%= Number(c.size_bytes || 0) %>"<% } %><% } %>>
   <% if (pick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= c.title %>"><% } %>
-  <a class="clip-poster" href="/cortes/<%= c.id %>" aria-label="Abrir <%= c.title %>"<%- pick ? ' data-dl-pick' : '' %>>
+  <a class="clip-poster" href="/cortes/<%= c.id %>" aria-label="Abrir <%= c.title %>"<%- pick ? ' data-dl-pick' : '' %><%- cfa('capa') %>>
     <% if (chosen) { %><img src="/capas/<%= chosen.id %>/imagem?v=<%= new Date(chosen.updated_at).getTime() %>&w=640" alt="Capa de <%= c.title %>" loading="lazy" width="108" height="192"><% } else { %><span class="poster-empty"><%- icon('film', 28) %></span><% } %>
   </a>
   <div class="clip-body">
     <div class="row spread clip-head"><a href="/cortes/<%= c.id %>"><strong><%= c.post_title || c.title %></strong></a><span class="badge <%= st[0] %>" data-clip-badge><%= st[1] %></span></div>
-    <p class="handle muted">
+    <p class="handle muted"<%- cfa('dados') %>>
       <% if (typeof K !== 'undefined' && K[c.video_type]) { %><span class="clip-cat"><%= K[c.video_type].label %></span> · <% } %><%= c.post_title ? c.title + ' · ' : '' %><%= c.duration_ms ? fmt.formatClock(c.duration_ms) : '—' %><%= c.width ? ' · ' + c.width + '×' + c.height : '' %><%= c.size_bytes ? ' · ' + fmt.formatBytes(c.size_bytes) : '' %>
     </p>
-    <% if (c.pub) { %><p class="handle muted"><%= c.pub.platforms.join(' · ') %><% if (c.views && c.views.views) { %> · <span class="clip-views" title="<%= c.views.likes %> curtidas · <%= c.views.comments %> comentários · <%= c.views.shares %> compartilhamentos"><%= fmt.compact(c.views.views) %> views</span><% } %></p><% } %>
-    <% if (c.request_id) { %><p class="small"><span class="muted">Pedido:</span> <a href="/conteudo/pedidos/<%= c.request_id %>"><%= c.request_title || 'ver pedido' %></a></p><% } %>
+    <% if (c.pub) { %><p class="handle muted"<%- cfa('redes') %>><%= c.pub.platforms.join(' · ') %><% if (c.views && c.views.views) { %> · <span class="clip-views" title="<%= c.views.likes %> curtidas · <%= c.views.comments %> comentários · <%= c.views.shares %> compartilhamentos"><%= fmt.compact(c.views.views) %> views</span><% } %></p><% } %>
+    <% if (c.caption) { %><p class="small muted clip-caption"<%- cfa('legenda') %>><%= String(c.caption).slice(0, 140) %><%= String(c.caption).length > 140 ? '…' : '' %></p><% } %>
+    <% if (cfa('enviado')) { %><p class="handle muted"<%- cfa('enviado') %>>enviado <%= fmt.shortDate(c.created_at) %></p><p class="handle muted"<%- cfa('atualizado') %>>atualizado <%= fmt.shortDate(c.updated_at) %></p><% } %>
+    <% if (c.request_id) { %><p class="small"<%- cfa('pedido') %>><span class="muted">Pedido:</span> <a href="/conteudo/pedidos/<%= c.request_id %>"><%= c.request_title || 'ver pedido' %></a></p><% } %>
     <% if (c.status === 'enviando' || c.status === 'processando') { %><div class="bar"><i data-clip-bar data-w="0"></i></div><p class="small muted" data-clip-msg><%= c.status === 'enviando' ? 'Enviando…' : 'Na fila…' %></p><% } %>
     <% if (c.status === 'erro') { %><p class="small err"><%= c.error %></p><% } %>
     <% if (c.episode_id) { %>
-      <p class="small"><span class="muted">Episódio:</span> <a href="/episodios/<%= c.episode_id %>"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.ep_title %></a></p>
+      <p class="small"<%- cfa('episodio') %>><span class="muted">Episódio:</span> <a href="/episodios/<%= c.episode_id %>"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.ep_title %></a></p>
     <% } else if (c.request_id) { %>
     <% } else if (perm.cut && c.status === 'pronto') { %>
       <form method="post" action="/cortes/<%= c.id %>/atribuir" class="assign-row">

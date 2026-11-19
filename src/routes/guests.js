@@ -137,7 +137,8 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   const [{ rows: guests }, { rows: owners }, { rows: sponsors }] = await Promise.all([
     db.query(
       `SELECT g.id, g.name, g.instagram, g.profile, g.company, g.job_title, g.topic, g.status, g.proposed_at, g.invite_sent_at, g.invite_viewed_at,
-              g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason, g.origin
+              g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason, g.origin,
+              g.email, g.phone, g.reach, g.created_at, g.premiere_on
          FROM guests g LEFT JOIN users u ON u.id = g.owner_id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY g.updated_at DESC LIMIT 500`, params),
@@ -163,7 +164,7 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
     query: ff.toQuery(fstate, fctx), views: await fieldsDef.savedViews('guest', req.user.id),
     current: require('./savedFilters').cleanQuery('guest', req.originalUrl.split('?')[1] || ''), open: req.query.fa === '1',
   };
-  res.render('guests/index', { filterUi, pager, total: shown.length, followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: listed, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
+  res.render('guests/index', { filterUi, cardUi: require('../services/cardFields').forList('convidados'), pager, total: shown.length, followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: listed, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
 }));
 
 // ---- criar ----

@@ -35,7 +35,7 @@
   <% if (followupCount || followupOnly) { %><label class="check"><input type="checkbox" name="followup" value="1" <%= followupOnly ? 'checked' : '' %> data-autosubmit> Só follow-ups pendentes (<%= followupCount %>)</label><% } %>
   <% if (q || ownerFilter || status || followupOnly || filterUi.count) { %><a class="link small" href="/convidados?view=<%= view %>">Limpar filtros</a><% } %>
 </form>
-<%- include('../partials/filter-builder') %>
+<div class="board-tools"><%- include('../partials/filter-builder') %><% if (view === 'quadro') { %><%- include('../partials/card-fields') %><% } %></div>
 
 <% if (view === 'quadro') { %>
 <div class="board" data-board data-can-move="<%= can('guests.write') ? '1' : '0' %>">
@@ -46,15 +46,22 @@
       <% col.guests.forEach(function (g) { %>
       <a class="kcard" href="/convidados/<%= g.id %>" data-guest-id="<%= g.id %>" draggable="<%= can('guests.write') ? 'true' : 'false' %>">
         <strong><%= g.name %></strong><% if (g.origin === 'site') { %> <span class="file-tag" title="Pediu pelo site">site</span><% } %>
-        <% if (g.instagram || g.profile) { %><span class="muted small handle"><%= [g.instagram ? '@' + g.instagram : '', g.profile ? profileLabels[g.profile].label : ''].filter(Boolean).join(' · ') %></span><% } %>
-        <% if (g.topic) { %><span class="small topic"><%= g.topic %></span><% } %>
+        <% if (g.instagram || g.profile) { %><span class="muted small handle"<%- cardUi.attr('perfil') %>><%= [g.instagram ? '@' + g.instagram : '', g.profile ? profileLabels[g.profile].label : ''].filter(Boolean).join(' · ') %></span><% } %>
+        <% if (g.company || g.job_title) { %><span class="muted small"<%- cardUi.attr('empresa') %>><%= [g.job_title, g.company].filter(Boolean).join(' · ') %></span><% } %>
+        <% if (g.topic) { %><span class="small topic"<%- cardUi.attr('tema') %>><%= g.topic %></span><% } %>
         <span class="meta small muted">
-          <% if (g.status === 'perdido' && g.loss_reason) { %><span class="mono"><%= lossReasons[g.loss_reason] %></span><% } %>
-          <% if (g.proposed_at) { %><span><%- icon('calendar', 12) %><%= fmt.shortDate(g.proposed_at) %></span><% } %>
-          <% if (g.outreach && g.outreach.state !== 'respondeu') { %><span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %>
-          <% if (g.invite_viewed_at) { %><span title="Abriu o convite em <%= fmt.formatDateTime(g.invite_viewed_at) %>"><%- icon('eye', 12) %>abriu o convite</span><% } else if (g.invite_sent_at) { %><span title="Convite enviado em <%= fmt.formatDateTime(g.invite_sent_at) %>"><%- icon('send', 12) %>convite enviado</span><% } else if (g.invite_token) { %><span title="O link do convite está pronto, ainda não foi enviado"><%- icon('link', 12) %>link pronto</span><% } %>
+          <% if (g.status === 'perdido' && g.loss_reason) { %><span class="mono"<%- cardUi.attr('perda') %>><%= lossReasons[g.loss_reason] %></span><% } %>
+          <% if (g.proposed_at) { %><span<%- cardUi.attr('gravacao') %>><%- icon('calendar', 12) %><%= fmt.shortDate(g.proposed_at) %></span><% } %>
+          <% if (g.status === 'gravado') { %><% if (g.premiere_on) { %><span title="Estreia prevista"<%- cardUi.attr('estreia') %>><%- icon('play', 12) %>estreia <%= fmt.formatDayShort(g.premiere_on) %></span><% } else { %><span class="warn" title="Preencha a estreia prevista no cadastro"<%- cardUi.attr('estreia') %>><%- icon('play', 12) %>estreia não preenchida</span><% } %><% } %>
+          <% if (g.outreach && g.outreach.state !== 'respondeu') { %><span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"<%- cardUi.attr('followup') %>><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %>
+          <% if (g.invite_viewed_at) { %><span title="Abriu o convite em <%= fmt.formatDateTime(g.invite_viewed_at) %>"<%- cardUi.attr('convite') %>><%- icon('eye', 12) %>abriu o convite</span><% } else if (g.invite_sent_at) { %><span title="Convite enviado em <%= fmt.formatDateTime(g.invite_sent_at) %>"<%- cardUi.attr('convite') %>><%- icon('send', 12) %>convite enviado</span><% } else if (g.invite_token) { %><span title="O link do convite está pronto, ainda não foi enviado"<%- cardUi.attr('convite') %>><%- icon('link', 12) %>link pronto</span><% } %>
+          <% if (g.email) { %><span class="mono"<%- cardUi.attr('email') %>><%= g.email %></span><% } %>
+          <% if (g.phone) { %><span class="mono"<%- cardUi.attr('whatsapp') %>><%= fmt.phone(g.phone) %></span><% } %>
+          <% if (g.reach) { %><span<%- cardUi.attr('alcance') %>><%- icon('users', 12) %><%= g.reach %></span><% } %>
+          <span class="mono" title="Cadastrado em"<%- cardUi.attr('cadastro') %>>cad. <%= fmt.shortDate(g.created_at) %></span>
+          <span class="mono" title="Atualizado em"<%- cardUi.attr('atualizado') %>>atual. <%= fmt.shortDate(g.updated_at) %></span>
         </span>
-        <span class="card-foot"><%- include('../partials/dot', { type: 'guest', id: g.id, user: g.owner_id ? { id: g.owner_id, name: g.owner_name } : null, editable: can('guests.write'), inLink: true }) %></span>
+        <span class="card-foot"<%- cardUi.attr('responsavel') %>><%- include('../partials/dot', { type: 'guest', id: g.id, user: g.owner_id ? { id: g.owner_id, name: g.owner_name } : null, editable: can('guests.write'), inLink: true }) %></span>
       </a>
       <% }) %>
     </div>

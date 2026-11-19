@@ -1,0 +1,16 @@
+<%# "Campos do cartão": cada pessoa escolhe o que aparece nos cartões deste quadro (guardado no navegador). Variável: cardUi =
+   services/cardFields.forList(lista). As partes dos cartões levam cardUi.attr('chave'); src/public/card-fields.js aplica. %>
+<details class="cal-filter cf" data-popover data-cf-menu="<%= cardUi.list %>">
+  <summary class="btn sm ghost"><%- icon('eye', 14) %> Campos do cartão</summary>
+  <div class="cal-filter-panel cf-panel" role="group" aria-label="Campos do cartão">
+    <p class="cf-title mono">O QUE APARECE NO CARTÃO</p>
+    <div class="cf-list">
+      <% cardUi.fields.forEach(function (f) { %>
+      <label class="cf-item"><input type="checkbox" value="<%= f.key %>" <%= f.default ? 'checked' : '' %> data-cf-toggle> <span><%= f.label %></span></label>
+      <% }) %>
+    </div>
+    <div class="fb-foot"><button class="link small" type="button" data-cf-reset>Restaurar padrão</button><span class="small muted">Fica guardado só neste navegador.</span></div>
+  </div>
+</details>
+<script type="application/json" data-cf-def="<%= cardUi.list %>"><%- JSON.stringify(cardUi.fields.filter(function (f) { return f.default; }).map(function (f) { return f.key; })) %></script>
+<script src="/static/card-fields.js?v=<%= assetV %>" defer></script>

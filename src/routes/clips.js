@@ -64,13 +64,20 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const byEpisode = {};
   for (const e of episodes.rows) byEpisode[e.id] = e;
 
+  // filtros combináveis (botão Filtros) de cada aba: campos próprios, mesma tela
+  const fieldsDef = require('../services/filterFields'); const filterUiSvc = require('../services/filterUi');
+  let filterUi = null;
+
   // Quadro
   let columns = []; let hiddenOld = 0;
   const tipo = ['video', 'imagem', 'pedido'].includes(req.query.tipo) ? req.query.tipo : '';
   if (vista === 'quadro') {
     const built = await board.build({ episodeId: only, recentDays: req.query.publicados === 'todos' || only ? null : 60 }); // de um episódio: tudo o que já saiu
     hiddenOld = built.hiddenOld;
-    const keep = (c) => !tipo || (tipo === 'pedido' ? c.type === 'pedido' : tipo === 'video' ? c.media === 'video' && c.type !== 'pedido' : c.type !== 'pedido' && c.media !== 'video');
+    const f = await filterUiSvc.build(req, { entity: 'board', action: '/conteudo', fields: await fieldsDef.boardFields(),
+      keep: { vista: 'quadro', tipo, episodio: only || '', publicados: req.query.publicados === 'todos' ? 'todos' : '' } });
+    filterUi = f.ui;
+    const keep = (c) => (!tipo || (tipo === 'pedido' ? c.type === 'pedido' : tipo === 'video' ? c.media === 'video' && c.type !== 'pedido' : c.type !== 'pedido' && c.media !== 'video')) && f.passes(c);
     const views = await require('../services/postMetrics').forClips(built.cards.filter((k) => k.type === 'corte').map((k) => Number(String(k.key).slice(1))));
     // coluna com muitos cartões (ex.: 150 prontos para postar): mostra os 30 primeiros e leva à lista com filtro e seleção
     columns = built.columns.map((col) => {
@@ -85,20 +92,12 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const ordem = ['antigos', 'episodio', 'duracao'].includes(req.query.ordem) ? req.query.ordem : 'recentes';
   const allClips = clipRows.rows.map((c) => ({ ...c, pub: board.stateOf(idx.byClip.get(c.id)) }));
   const readyCount = allClips.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !c.pub).length;
-  let list = []; let clipPager = null; let clipTotals = null; let running = false; let filterUi = null;
+  let list = []; let clipPager = null; let clipTotals = null; let running = false;
   if (vista === 'cortes') {
-    // filtros combináveis (botão Filtros): categoria, situação no Social, formato, datas, conexões…
-    const ff = require('../services/filters'); const fieldsDef = require('../services/filterFields');
-    const fields = await fieldsDef.clipFields();
-    const fctx = { userId: req.user.id };
-    const fstate = ff.parse(req.query, fields, fctx);
-    const passes = ff.matcher(fstate, fields);
-    filterUi = {
-      entity: 'clip', action: '/conteudo', keep: { vista: 'cortes', situacao, ordem: ordem === 'recentes' ? '' : ordem, episodio: only || '' },
-      def: ff.clientDef(fields, fstate, fctx), count: fstate.filters.length, summary: ff.summary(fstate, fields, fctx),
-      query: ff.toQuery(fstate, fctx), views: await fieldsDef.savedViews('clip', req.user.id),
-      current: require('./savedFilters').cleanQuery('clip', req.originalUrl.split('?')[1] || ''), open: req.query.fa === '1',
-    };
+    // categoria, situação no Social, formato, datas, conexões…
+    const f = await filterUiSvc.build(req, { entity: 'clip', action: '/conteudo', fields: await fieldsDef.clipFields(),
+      keep: { vista: 'cortes', situacao, ordem: ordem === 'recentes' ? '' : ordem, episodio: only || '' } });
+    filterUi = f.ui; const { passes } = f;
     const natural = (a, b) => String(a.title).localeCompare(String(b.title), 'pt-BR', { numeric: true });
     const sorters = {
       recentes: (a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id,
@@ -126,27 +125,38 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (vista === 'posts') {
     const [posts, withFrames] = await Promise.all([
       db.query(
-        `SELECT c.id, c.episode_id, c.kind, c.group_key, c.position, c.label, c.lint, c.approved, c.auto, c.width, c.height, c.size_bytes, c.updated_at
+        `SELECT c.id, c.episode_id, c.kind, c.group_key, c.position, c.label, c.lint, c.approved, c.auto, c.width, c.height, c.size_bytes, c.updated_at, c.created_at
            FROM episode_covers c WHERE c.clip_id IS NULL AND c.kind = ANY($1) ${only ? 'AND c.episode_id = $2' : ''} ORDER BY c.episode_id DESC, c.kind, c.group_key, c.position, c.id`, only ? [POST_KINDS, only] : [POST_KINDS]),
       db.query('SELECT DISTINCT episode_id FROM episode_frames WHERE clip_id IS NULL AND episode_id IS NOT NULL'),
     ]);
+    const f = await filterUiSvc.build(req, { entity: 'post', action: '/conteudo', fields: await fieldsDef.postFields(), keep: { vista: 'posts', episodio: only || '' } });
+    filterUi = f.ui;
+    const shownPosts = posts.rows.map((p) => ({ ...p, pub: board.stateOf(idx.byCover.get(p.id)) })).filter(f.passes);
     const hasFrames = new Set(withFrames.rows.map((r) => r.episode_id));
     for (const e of episodes.rows) {
-      const mine = posts.rows.filter((p) => p.episode_id === e.id);
-      if ((only && e.id !== only) || (!mine.length && !hasFrames.has(e.id))) continue;
+      const mine = shownPosts.filter((p) => p.episode_id === e.id);
+      if ((only && e.id !== only) || (!mine.length && (f.ui.count || !hasFrames.has(e.id)))) continue; // filtrando: só episódios com posts que passam
       postGroups.push({ episode: e, covers: mine, canGenerate: hasFrames.has(e.id) });
     }
+  }
+
+  // Pedidos
+  let shownRequests = reqs;
+  if (vista === 'pedidos') {
+    const f = await filterUiSvc.build(req, { entity: 'request', action: '/conteudo', fields: await fieldsDef.requestFields(), keep: { vista: 'pedidos', episodio: only || '' } });
+    filterUi = f.ui;
+    shownRequests = reqs.filter(f.passes);
   }
 
   const moments = only && vista === 'cortes' ? await clips.momentsFor(only) : [];
   const pedir = Object.prototype.hasOwnProperty.call(R.KINDS, req.query.pedir) ? req.query.pedir : (req.query.pedir === '1' ? 'trailer' : null);
   await require('../services/catalog').refresh();
   res.render('content/index', {
-    filterUi, videoTypes: require('../services/catalog').videoOptions(),
+    filterUi, videoTypes: require('../services/catalog').videoOptions(), cardUi: vista === 'quadro' || vista === 'cortes' ? require('../services/cardFields').forList(vista === 'quadro' ? 'conteudo' : 'cortes') : null,
     uploadPost: up, autoDefaults: vista === 'cortes' ? await require('../services/commentAutomation').formDefaults({}) : null, situacao, ordem, readyCount, clipPager, clipTotals,
     tabCounts: { cortes: allClips.length, posts: postCountRow.rows[0].n },
     columns, hiddenOld, tipo, vista,
-    requests: reqs, openRequests: reqs.filter((r) => R.OPEN.includes(r.status)), people: people.rows, episodeList: episodeList.rows, K: R.KINDS, S: R.STATUSES, F: R.FORMATS,
+    requests: shownRequests, openRequests: shownRequests.filter((r) => R.OPEN.includes(r.status)), people: people.rows, episodeList: episodeList.rows, K: R.KINDS, S: R.STATUSES, F: R.FORMATS,
     pedir, today: new Date().toISOString().slice(0, 10), isLate: R.isLate, stageLabel: board.STAGE_LABEL,
     title: 'Conteúdo', clips: list, episodes: episodes.rows, postGroups, only, onlyEpisode: only ? byEpisode[only] || null : null,
     moments, running, storageReady: config.storageConfigured, aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,

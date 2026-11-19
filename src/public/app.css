@@ -1051,6 +1051,15 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
 .fb-views .fb-view { display: inline-flex; align-items: center; gap: 2px; }
 .fb-view-del { width: 22px; height: 22px; color: var(--muted); } .fb-view-del:hover { color: var(--text); background: var(--raised); }
 .clip-category { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; }
+/* "Campos do cartão" (partials/card-fields.ejs): parte desligada some mesmo quando a classe dela define display */
+[data-cf][hidden] { display: none !important; }
+.cf-panel { width: min(320px, calc(100vw - 32px)); gap: 8px; }
+.cf-title { margin: 0; font-size: 11px; letter-spacing: .14em; color: var(--muted); }
+.cf-list { display: grid; gap: 2px; }
+.cf-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--r-tag); font-size: 13px; color: var(--text); cursor: pointer; }
+.cf-item:hover { background: var(--raised); } .cf-item input { accent-color: var(--action); margin: 0; }
+.cf .fb-foot { justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.board-tools { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 12px; } .board-tools .fb-bar { margin-bottom: 0; }
 @media (max-width: 640px) {
   .fb-panel { position: fixed; left: 16px; right: 16px; top: auto; width: auto; max-height: 70vh; overflow: auto; }
   .fb-row { grid-template-columns: 64px minmax(0, 1fr) 28px; row-gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }

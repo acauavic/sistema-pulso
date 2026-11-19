@@ -8,9 +8,15 @@ const { audit } = require('../services/audit');
 
 const router = express.Router();
 
+// base: a lista; home: para onde voltar depois de apagar; keys: os parâmetros que a lista entende (o resto é descartado).
 const ENTITIES = {
-  guest: { base: '/convidados', perm: 'guests.read', keys: ['view', 'q', 'owner', 'status', 'followup', 'f', 'm'] },
-  clip: { base: '/conteudo', perm: 'episodes.read', keys: ['vista', 'episodio', 'situacao', 'ordem', 'f', 'm'] },
+  guest: { base: '/convidados', home: '/convidados', perm: 'guests.read', keys: ['view', 'q', 'owner', 'status', 'followup', 'f', 'm'] },
+  episode: { base: '/episodios', home: '/episodios', perm: 'episodes.read', keys: ['view', 'editor', 'f', 'm'] },
+  sponsor: { base: '/patrocinadores', home: '/patrocinadores', perm: 'sponsors.read', keys: ['view', 'q', 'owner', 'stage', 'f', 'm'] },
+  clip: { base: '/conteudo', home: '/conteudo?vista=cortes', perm: 'episodes.read', keys: ['vista', 'episodio', 'situacao', 'ordem', 'f', 'm'] },
+  board: { base: '/conteudo', home: '/conteudo?vista=quadro', perm: 'episodes.read', keys: ['vista', 'tipo', 'episodio', 'publicados', 'f', 'm'] },
+  post: { base: '/conteudo', home: '/conteudo?vista=posts', perm: 'episodes.read', keys: ['vista', 'episodio', 'f', 'm'] },
+  request: { base: '/conteudo', home: '/conteudo?vista=pedidos', perm: 'episodes.read', keys: ['vista', 'episodio', 'f', 'm'] },
 };
 
 // Só os parâmetros que a lista entende (o resto do endereço é descartado).
@@ -45,7 +51,7 @@ router.post('/filtros/visualizacoes/:id/excluir', wrap(async (req, res) => {
   await db.query('DELETE FROM saved_filters WHERE id = $1', [v.id]);
   await audit(req, 'filtro.visualizacao_apagada', 'saved_filter', v.id, { entidade: v.entity, nome: v.name });
   await req.flash('ok', `Visualização "${v.name}" apagada.`);
-  res.redirect(ENTITIES[v.entity].base + (v.entity === 'clip' ? '?vista=cortes' : ''));
+  res.redirect(ENTITIES[v.entity].home);
 }));
 
 module.exports = router;

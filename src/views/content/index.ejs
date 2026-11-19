@@ -19,9 +19,9 @@
   var colBadge = { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao', pronto: 'b-st-pronto_publicar', fila: 'b-st-agendado', publicado: 'b-st-publicado' };
   var dayShort = function (d) { return d ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }).format(new Date(d)) : ''; };
   var dueShort = function (d) { if (!d) return ''; var iso = new Date(d).toISOString().slice(0, 10); return iso.slice(8, 10) + '/' + iso.slice(5, 7); };
-  var boardHref = function (t) { return '/conteudo?vista=quadro' + (t ? '&tipo=' + t : '') + (only ? '&episodio=' + only : ''); };
-  var fq = filterUi && filterUi.query ? filterUi.query : ''; // os filtros combináveis seguem ao trocar situação, episódio e ordem
-  var cutsHref = function (sit) { return '/conteudo?vista=cortes' + (sit ? '&situacao=' + sit : '') + (ordem !== 'recentes' ? '&ordem=' + ordem : '') + (only ? '&episodio=' + only : '') + (fq ? '&' + fq : ''); };
+  var fq = filterUi && filterUi.query ? filterUi.query : ''; // os filtros combináveis seguem ao trocar tipo, situação, episódio e ordem (na mesma aba)
+  var boardHref = function (t) { return '/conteudo?vista=quadro' + (t ? '&tipo=' + t : '') + (only ? '&episodio=' + only : '') + (fq && vista === 'quadro' ? '&' + fq : ''); };
+  var cutsHref = function (sit) { return '/conteudo?vista=cortes' + (sit ? '&situacao=' + sit : '') + (ordem !== 'recentes' ? '&ordem=' + ordem : '') + (only ? '&episodio=' + only : '') + (fq && vista === 'cortes' ? '&' + fq : ''); };
 %>
 <%# Cada aba é uma página: só a aba aberta é montada no servidor (antes, as quatro vinham juntas). %>
 <% var tabHref = function (v) { return '/conteudo?vista=' + v + (only ? '&episodio=' + only : ''); }; %>
@@ -40,6 +40,7 @@
         <% [['', 'Tudo'], ['video', 'Vídeos'], ['imagem', 'Imagens'], ['pedido', 'Pedidos']].forEach(function (f) { %><a class="<%= tipo === f[0] ? 'on' : '' %>" href="<%= boardHref(f[0]) %>"><%= f[1] %></a><% }) %>
       </div>
       <form method="get" action="/conteudo" class="inline ep-filter"><input type="hidden" name="vista" value="quadro"><% if (tipo) { %><input type="hidden" name="tipo" value="<%= tipo %>"><% } %>
+        <% if (fq) { new URLSearchParams(fq).forEach(function (v, k) { %><input type="hidden" name="<%= k %>" value="<%= v %>"><% }); } %>
         <select name="episodio" data-autosubmit aria-label="Filtrar por episódio">
           <option value="">Todos os episódios</option>
           <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= only === e.id ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
@@ -47,6 +48,7 @@
       </form>
       <% if (hiddenOld) { %><a class="link small" href="<%= boardHref(tipo) %>&publicados=todos">Ver publicados há mais de 60 dias <span class="mono">(<%= hiddenOld %>)</span></a><% } %>
     </div>
+    <div class="board-tools"><%- include('../partials/filter-builder') %><%- include('../partials/card-fields') %></div>
     <div class="board board-wide pboard">
       <% columns.forEach(function (col) { %>
       <section class="column" data-stage="<%= col.key %>">
@@ -55,16 +57,18 @@
           <% if (!col.cards.length) { %><p class="small muted col-hint"><%= col.key === 'pedido' && perm.request ? 'Peça um trailer, um vídeo avulso ou um post no botão “Pedir conteúdo”.' : col.hint %></p><% } %>
           <% col.cards.forEach(function (k) { var kTitle = k.episode && String(k.title).toLowerCase() === String(k.kind).toLowerCase() ? (k.episode.split(' · ').slice(1).join(' · ') || k.title) : k.title; %>
           <a class="kcard has-thumb" href="<%= k.href %>">
-            <% if (k.thumb) { %><img class="kthumb <%= k.media === 'video' && k.vertical === false ? '' : (k.media !== 'video' && k.type !== 'story' ? 'wide' : '') %>" src="<%= k.thumb %>" alt="" loading="lazy"><% } else { %><span class="kthumb ph"><%- icon(k.media === 'video' ? 'film' : 'image', 16) %></span><% } %>
-            <span class="ktype"><%= k.kind %><%= k.episode ? ' · ' + k.episode.split(' · ')[0] : (k.type !== 'pedido' && k.media === 'video' && !k.warn ? ' · avulso' : '') %></span>
+            <% if (k.thumb) { %><img class="kthumb <%= k.media === 'video' && k.vertical === false ? '' : (k.media !== 'video' && k.type !== 'story' ? 'wide' : '') %>" src="<%= k.thumb %>" alt="" loading="lazy"<%- cardUi.attr('capa') %>><% } else { %><span class="kthumb ph"<%- cardUi.attr('capa') %>><%- icon(k.media === 'video' ? 'film' : 'image', 16) %></span><% } %>
+            <span class="ktype"<%- cardUi.attr('tipo') %>><%= k.kind %><%= k.episode ? ' · ' + k.episode.split(' · ')[0] : (k.type !== 'pedido' && k.media === 'video' && !k.warn ? ' · avulso' : '') %></span>
             <strong><%= kTitle %></strong>
             <span class="meta">
-              <% if (k.type === 'pedido') { %><% if (k.priority) { %><span class="warn">prioridade</span><% } %><span><%- icon('user', 12) %><%= k.who %></span><% if (k.due) { %><span class="<%= k.late ? 'late' : '' %>"><%- icon('calendar', 12) %><%= dueShort(k.due) %><%= k.late ? ' · atrasado' : '' %></span><% } %><% if (k.rounds) { %><span><%= k.rounds %>ª volta</span><% } %><% } %>
-              <% if (k.chip) { %><span class="<%= k.chip === 'erro' ? 'late' : '' %>"><%= k.chip %></span><% } %>
-              <% if (k.warn) { %><span class="warn"><%= k.warn %></span><% } %>
-              <% if (k.slides) { %><span><%= k.slides %> slides</span><% } %>
-              <% if (k.views) { %><span class="views"><%- icon('eye', 12) %><%= fmt.compact(k.views) %></span><% } %>
-              <% if (k.pub) { %><span class="nets"><%= k.pub.stage === 'fila' ? k.pub.label + ' · ' : '' %><%= k.pub.platforms.join(' · ') %><%= k.pub.at ? ' · ' + dayShort(k.pub.at) : '' %></span><% if (k.pub.trial) { %> <span class="badge b-trial" title="Reel de teste no Instagram: aparece primeiro só para quem não segue">Reel de teste</span><% } %><% } %>
+              <% if (k.type === 'pedido') { %><% if (k.priority) { %><span class="warn"<%- cardUi.attr('pedido') %>>prioridade</span><% } %><span<%- cardUi.attr('pedido') %>><%- icon('user', 12) %><%= k.who %></span><% if (k.due) { %><span class="<%= k.late ? 'late' : '' %>"<%- cardUi.attr('pedido') %>><%- icon('calendar', 12) %><%= dueShort(k.due) %><%= k.late ? ' · atrasado' : '' %></span><% } %><% if (k.rounds) { %><span<%- cardUi.attr('pedido') %>><%= k.rounds %>ª volta</span><% } %><% } %>
+              <% if (k.chip) { %><span class="<%= k.chip === 'erro' ? 'late' : '' %>"<%- cardUi.attr('situacao') %>><%= k.chip %></span><% } %>
+              <% if (k.warn) { %><span class="warn"<%- cardUi.attr('situacao') %>><%= k.warn %></span><% } %>
+              <% if (k.slides) { %><span<%- cardUi.attr('situacao') %>><%= k.slides %> slides</span><% } %>
+              <% if (k.views) { %><span class="views"<%- cardUi.attr('views') %>><%- icon('eye', 12) %><%= fmt.compact(k.views) %></span><% } %>
+              <% if (k.pub) { %><span class="nets"<%- cardUi.attr('redes') %>><%= k.pub.stage === 'fila' ? k.pub.label + ' · ' : '' %><%= k.pub.platforms.join(' · ') %><%= k.pub.at ? ' · ' + dayShort(k.pub.at) : '' %></span><% if (k.pub.trial) { %> <span class="badge b-trial" title="Reel de teste no Instagram: aparece primeiro só para quem não segue"<%- cardUi.attr('redes') %>>Reel de teste</span><% } %><% } %>
+              <% if (k.created) { %><span class="mono" title="Criado em"<%- cardUi.attr('criado') %>>criado <%= dayShort(k.created) %></span><% } %>
+              <% if (k.updated) { %><span class="mono" title="Atualizado em"<%- cardUi.attr('atualizado') %>>atual. <%= dayShort(k.updated) %></span><% } %>
             </span>
           </a>
           <% }) %>
@@ -110,7 +114,7 @@
         </select>
       </form>
     </div>
-    <%- include('../partials/filter-builder') %>
+    <div class="board-tools"><%- include('../partials/filter-builder') %><% if (clips.length) { %><%- include('../partials/card-fields') %><% } %></div>
     <% if (filterUi.count && !clips.length) { %><div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhum vídeo com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel.</p></div><% } %>
 
     <% var clipPick = perm.cut && clips.length > 1; %>
@@ -158,7 +162,10 @@
 
   <% if (vista === 'posts') { %>
   <div class="pane" id="pane-posts">
-    <% if (!postGroups.length) { %>
+    <%- include('../partials/filter-builder') %>
+    <% if (!postGroups.length && filterUi.count) { %>
+    <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum post com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel.</p></div>
+    <% } else if (!postGroups.length) { %>
     <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum post ainda.</strong></p><p class="muted small">Quando o episódio for analisado pela IA (ao entrar em finalização), o sistema monta posts de frase, tela dividida e carrossel.</p></div>
     <% } %>
     <% postGroups.forEach(function (g) { %>
@@ -230,8 +237,11 @@
 
   <% if (vista === 'pedidos') { %>
   <div class="pane" id="pane-pedidos">
+    <%- include('../partials/filter-builder') %>
     <% var closed = requests.filter(function (r) { return openRequests.indexOf(r) < 0; }); %>
-    <% if (!openRequests.length) { %>
+    <% if (!openRequests.length && filterUi.count) { %>
+    <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido em aberto com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel. Os concluídos que passam no filtro continuam embaixo.</p></div>
+    <% } else if (!openRequests.length) { %>
     <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido em aberto.</strong></p><p class="muted small">Trailer do canal, vídeo avulso, um corte específico, post ou story: peça ao editor por aqui, com briefing e prazo. A entrega volta para você aprovar e já fica pronta no Social.</p><% if (perm.request) { %><p><button class="btn sm" type="button" data-modal-open="modal-pedido"><%- icon('plus', 14) %> Pedir conteúdo</button></p><% } %></div>
     <% } else { %>
     <% var reqPick = openRequests.length > 1 && openRequests.some(function (r) { return perm.review || String(r.created_by) === String(currentUser.id); }); %>

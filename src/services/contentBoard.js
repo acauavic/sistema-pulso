@@ -61,7 +61,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
   const [reqs, clipRows, coverRows] = await Promise.all([
     db.query(`SELECT r.*, a.name AS assignee_name, e.number AS episode_number, e.title AS episode_title FROM content_requests r
       LEFT JOIN users a ON a.id = r.assignee_id LEFT JOIN episodes e ON e.id = r.episode_id WHERE r.status = ANY($1)${epFilter('r.episode_id')}`, [requests.OPEN]),
-    db.query(`SELECT c.id, c.title, c.post_title, c.status, c.error, c.duration_ms, c.width, c.height, c.cover_id, c.episode_id, c.request_id, c.created_at,
+    db.query(`SELECT c.id, c.title, c.post_title, c.status, c.error, c.duration_ms, c.width, c.height, c.cover_id, c.episode_id, c.request_id, c.created_at, c.updated_at,
         cv.updated_at AS cover_at, e.number AS episode_number, e.title AS episode_title, r.status AS request_status, r.kind AS request_kind, r.title AS request_title
       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN episode_covers cv ON cv.id = c.cover_id LEFT JOIN content_requests r ON r.id = c.request_id
       WHERE (c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes')${epFilter('c.episode_id')}`),
@@ -76,7 +76,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     cards.push({
       key: `r${r.id}`, type: 'pedido', stage: r.status === 'pedido' ? 'pedido' : r.status === 'producao' ? 'producao' : 'revisao',
       title: r.title, href: requests.url(r.id), kind: requests.KINDS[r.kind].label, episode: epLabel(r.episode_number, r.episode_title), episodeId: r.episode_id,
-      who: r.assignee_name || 'sem responsável', priority: r.priority, due: r.due_on, late: requests.isLate(r, today), rounds: r.rounds, media: requests.KINDS[r.kind].media, at: r.updated_at,
+      who: r.assignee_name || 'sem responsável', priority: r.priority, due: r.due_on, late: requests.isLate(r, today), rounds: r.rounds, media: requests.KINDS[r.kind].media, at: r.updated_at, created: r.created_at, updated: r.updated_at,
     });
   }
   for (const c of clipRows.rows) {
@@ -85,7 +85,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     cards.push({
       key: `c${c.id}`, type: 'corte', stage, title: c.post_title || c.title, href: `/cortes/${c.id}`, kind: c.request_id ? requests.KINDS[c.request_kind]?.label || 'Vídeo' : 'Corte',
       episode: epLabel(c.episode_number, c.episode_title), episodeId: c.episode_id, thumb: c.cover_id ? thumb(c.cover_id, c.cover_at) : null, vertical: !c.width || c.height >= c.width,
-      chip: c.status === 'erro' ? 'erro' : c.status === 'processando' ? 'lendo' : c.status === 'enviando' ? 'enviando' : null, pub: st, media: 'video', at: st?.at || c.created_at,
+      chip: c.status === 'erro' ? 'erro' : c.status === 'processando' ? 'lendo' : c.status === 'enviando' ? 'enviando' : null, pub: st, media: 'video', at: st?.at || c.created_at, created: c.created_at, updated: c.updated_at,
       warn: c.status === 'pronto' && !c.episode_id && !c.request_id ? 'atribuir episódio' : null, publishable: c.status === 'pronto' && Boolean(c.episode_id || c.request_id),
     });
   }
@@ -99,7 +99,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     cards.push({
       key: `i${c.id}`, type: story ? 'story' : 'post', stage: st ? st.stage : 'pronto', title: c.request_title || c.label || (c.kind === 'post_split' ? 'Tela dividida' : 'Post de frase'),
       href: c.request_id ? requests.url(c.request_id) : `/capas/${c.id}/editar`, kind: story ? 'Story' : c.kind === 'post_split' ? 'Tela dividida' : c.kind === 'entrega' ? 'Post' : 'Post de frase',
-      episode: epLabel(c.episode_number, c.episode_title), episodeId: c.episode_id, thumb: thumb(c.id, c.updated_at), pub: st, media: story ? 'story' : 'imagem', coverIds: [c.id], approved: c.approved, at: st?.at || c.created_at, publishable: true,
+      episode: epLabel(c.episode_number, c.episode_title), episodeId: c.episode_id, thumb: thumb(c.id, c.updated_at), pub: st, media: story ? 'story' : 'imagem', coverIds: [c.id], approved: c.approved, at: st?.at || c.created_at, created: c.created_at, updated: c.updated_at, publishable: true,
     });
   }
   for (const [k, slides] of groups) {
@@ -107,7 +107,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     const ids = slides.map((s) => s.id); const st = stateOfCovers(idx, ids); const first = slides[0];
     cards.push({
       key: `g${k}`, type: 'carrossel', stage: st ? st.stage : 'pronto', title: first.request_title || first.label || 'Carrossel', href: first.request_id ? requests.url(first.request_id) : `/capas/${first.id}/editar`,
-      kind: 'Carrossel', episode: epLabel(first.episode_number, first.episode_title), episodeId: first.episode_id, thumb: thumb(first.id, first.updated_at), slides: slides.length, pub: st, media: 'carrossel', coverIds: ids, at: st?.at || first.created_at, publishable: true,
+      kind: 'Carrossel', episode: epLabel(first.episode_number, first.episode_title), episodeId: first.episode_id, thumb: thumb(first.id, first.updated_at), slides: slides.length, pub: st, media: 'carrossel', coverIds: ids, at: st?.at || first.created_at, created: first.created_at, updated: slides.reduce((m, x) => (new Date(x.updated_at) > new Date(m) ? x.updated_at : m), first.updated_at), publishable: true,
     });
   }
   const cutoff = recentDays ? Date.now() - recentDays * 86400_000 : null;

@@ -38,6 +38,7 @@ async function guestFields() {
     { key: 'gravacao', label: 'Data da gravação', type: 'date', date: 'tz', sql: 'g.proposed_at', group: DATE },
     { key: 'estreia', label: 'Estreia prevista', type: 'date', sql: 'g.premiere_on', group: DATE },
     { key: 'cadastro', label: 'Cadastrado em', type: 'date', date: 'tz', sql: 'g.created_at', group: DATE },
+    { key: 'atualizado', label: 'Atualizado em', type: 'date', date: 'tz', sql: 'g.updated_at', group: DATE },
     { key: 'convite_enviado', label: 'Convite enviado em', type: 'date', date: 'tz', sql: 'g.invite_sent_at', group: DATE },
     { key: 'convite_visto', label: 'Convite visto em', type: 'date', date: 'tz', sql: 'g.invite_viewed_at', group: DATE },
     { key: 'resposta', label: 'Respondeu em', type: 'date', date: 'tz', sql: 'g.responded_at', group: DATE },
@@ -88,12 +89,145 @@ async function clipFields() {
     { key: 'duracao', label: 'Duração (segundos)', type: 'number', get: (c) => (c.duration_ms ? Math.round(c.duration_ms / 1000) : null) },
     { key: 'quem', label: 'Quem subiu', type: 'user', get: (c) => (c.video_by || c.created_by ? String(c.video_by || c.created_by) : null), options: users },
     { key: 'criado', label: 'Enviado em', type: 'date', get: (c) => c.created_at, group: DATE },
+    { key: 'atualizado', label: 'Atualizado em', type: 'date', get: (c) => c.updated_at, group: DATE },
     { key: 'publicado_em', label: 'Publicado em', type: 'date', get: (c) => (c.pub && c.pub.stage === 'publicado' ? c.pub.at : null), group: DATE },
     { key: 'episodio', label: 'Episódio', type: 'enum', get: (c) => (c.episode_id ? String(c.episode_id) : null), options: eps.map((e) => [String(e.id), `${e.number ? `EP.${String(e.number).padStart(3, '0')} · ` : ''}${e.title}`]), group: LINK },
     { key: 'pedido', label: 'Veio de um pedido', type: 'bool', get: (c) => Boolean(c.request_id), group: LINK },
     { key: 'capa', label: 'Tem capa escolhida', type: 'bool', get: (c) => Boolean(c.cover_id), group: LINK },
     { key: 'portal', label: 'Vai para o portal do convidado', type: 'bool', get: (c) => Boolean(c.for_guest), group: LINK },
     { key: 'teste', label: 'Reel de teste', type: 'bool', get: (c) => Boolean(c.pub && c.pub.trial), group: LINK },
+  ];
+}
+
+const epLabel = (e) => `${e.number ? `EP.${String(e.number).padStart(3, '0')} · ` : ''}${e.title}`;
+async function episodeOptions() {
+  const { rows } = await db.query('SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 200');
+  return rows.map((e) => [String(e.id), epLabel(e)]);
+}
+
+// ---------------------------------------------------------------- Episódios (alias e = episodes, g = guests)
+async function episodeFields() {
+  const users = await people();
+  const DATE = 'Datas'; const LINK = 'Conexões';
+  return [
+    { key: 'etapa', label: 'Etapa', type: 'enum', sql: 'e.status', options: opt(C.EPISODE_STAGES) },
+    { key: 'editor', label: 'Editor', type: 'user', sql: 'e.editor_id', options: users },
+    { key: 'titulo', label: 'Título', type: 'text', sql: 'e.title' },
+    { key: 'numero', label: 'Número', type: 'number', sql: 'e.number' },
+    { key: 'convidado', label: 'Convidado', type: 'text', sql: 'g.name' },
+    { key: 'observacoes', label: 'Observações', type: 'text', sql: 'e.notes' },
+    { key: 'obs_editor', label: 'Recado para o editor', type: 'text', sql: 'e.editor_notes' },
+    { key: 'youtube', label: 'Link do YouTube', type: 'text', sql: 'e.youtube_url' },
+    { key: 'spotify', label: 'Link do Spotify', type: 'text', sql: 'e.spotify_url' },
+    { key: 'rodada', label: 'Rodadas de revisão', type: 'number', sql: 'e.review_round' },
+    { key: 'minutos', label: 'Minutos de gravação', type: 'number', sql: 'e.recording_minutes' },
+    { key: 'veiculacao', label: 'Data de veiculação', type: 'date', sql: 'e.aired_on', group: DATE },
+    { key: 'gravado', label: 'Gravado em', type: 'date', sql: 'e.recorded_on', group: DATE },
+    { key: 'publicado', label: 'Publicado em', type: 'date', date: 'tz', sql: 'e.published_at', group: DATE },
+    { key: 'criado', label: 'Criado em', type: 'date', date: 'tz', sql: 'e.created_at', group: DATE },
+    { key: 'atualizado', label: 'Atualizado em', type: 'date', date: 'tz', sql: 'e.updated_at', group: DATE },
+    { key: 'tem_convidado', label: 'Tem convidado', type: 'bool', sql: 'e.guest_id IS NOT NULL', group: LINK },
+    { key: 'tem_patrocinador', label: 'Tem patrocinador', type: 'bool', sql: 'EXISTS (SELECT 1 FROM sponsor_episodes se WHERE se.episode_id = e.id)', group: LINK },
+    { key: 'tem_material', label: 'Tem material enviado', type: 'bool', sql: "EXISTS (SELECT 1 FROM episode_files f WHERE f.episode_id = e.id AND f.status = 'pronto')", group: LINK },
+    { key: 'ajustes', label: 'Tem ajustes em aberto', type: 'bool', sql: 'EXISTS (SELECT 1 FROM episode_comments c WHERE c.episode_id = e.id AND NOT c.resolved)', group: LINK },
+    { key: 'tarefas', label: 'Tem tarefas por fazer', type: 'bool', sql: "EXISTS (SELECT 1 FROM tasks t WHERE t.episode_id = e.id AND t.status <> 'feito')", group: LINK },
+    { key: 'cortes', label: 'Tem cortes', type: 'bool', sql: 'EXISTS (SELECT 1 FROM episode_clips k WHERE k.episode_id = e.id)', group: LINK },
+    { key: 'media_kit', label: 'Destaque no media kit', type: 'bool', sql: 'e.kit_featured', group: LINK },
+  ];
+}
+
+// ---------------------------------------------------------------- Patrocinadores (alias s = sponsors)
+async function sponsorFields() {
+  const users = await people();
+  const DATE = 'Datas'; const LINK = 'Conexões';
+  return [
+    { key: 'etapa', label: 'Etapa', type: 'enum', sql: 's.stage', options: opt(C.SPONSOR_STAGES) },
+    { key: 'responsavel', label: 'Responsável', type: 'user', sql: 's.owner_id', options: users },
+    { key: 'tipo', label: 'Tipo', type: 'enum', sql: 's.kind', options: Object.entries(C.SPONSOR_KINDS) },
+    { key: 'plano', label: 'Plano', type: 'enum', sql: 's.tier', options: Object.entries(C.SPONSOR_TIERS) },
+    { key: 'empresa', label: 'Empresa', type: 'text', sql: 's.company' },
+    { key: 'contato', label: 'Contato', type: 'text', sql: 's.contact_name' },
+    { key: 'email', label: 'E-mail', type: 'text', sql: 's.contact_email' },
+    { key: 'telefone', label: 'Telefone', type: 'text', sql: 's.contact_phone' },
+    { key: 'site', label: 'Site', type: 'text', sql: 's.website' },
+    { key: 'observacoes', label: 'Observações', type: 'text', sql: 's.notes' },
+    { key: 'valor', label: 'Valor (R$)', type: 'number', sql: 's.value_cents / 100.0' },
+    { key: 'origem', label: 'Origem', type: 'enum', sql: "coalesce(s.origin, 'painel')", options: [['painel', 'Cadastrado no painel'], ['site', 'Pedido pelo site']] },
+    { key: 'criado', label: 'Cadastrado em', type: 'date', date: 'tz', sql: 's.created_at', group: DATE },
+    { key: 'atualizado', label: 'Atualizado em', type: 'date', date: 'tz', sql: 's.updated_at', group: DATE },
+    { key: 'etapa_desde', label: 'Na etapa desde', type: 'date', date: 'tz', sql: 's.stage_entered_at', group: DATE },
+    { key: 'inicio', label: 'Início do contrato', type: 'date', sql: 's.starts_on', group: DATE },
+    { key: 'fim', label: 'Fim do contrato', type: 'date', sql: 's.ends_on', group: DATE },
+    { key: 'pago', label: 'Pago em', type: 'date', sql: 's.paid_at', group: DATE },
+    { key: 'kit_visto', label: 'Media kit visto em', type: 'date', date: 'tz', sql: 's.kit_viewed_at', group: DATE },
+    { key: 'briefing', label: 'Briefing concluído em', type: 'date', date: 'tz', sql: 's.brief_completed_at', group: DATE },
+    { key: 'tem_logo', label: 'Tem logo', type: 'bool', sql: "EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo' AND f.status = 'pronto')", group: LINK },
+    { key: 'tem_episodio', label: 'Tem episódio vinculado', type: 'bool', sql: 'EXISTS (SELECT 1 FROM sponsor_episodes se WHERE se.sponsor_id = s.id)', group: LINK },
+    { key: 'reserva', label: 'Tem gravação reservada', type: 'bool', sql: 'EXISTS (SELECT 1 FROM sponsor_bookings b WHERE b.sponsor_id = s.id)', group: LINK },
+    { key: 'oficial', label: 'Patrocinador oficial no site', type: 'bool', sql: 's.site_official', group: LINK },
+    { key: 'escondido', label: 'Escondido do site', type: 'bool', sql: 's.site_hidden', group: LINK },
+    { key: 'media_kit', label: 'Aparece no media kit', type: 'bool', sql: 's.kit_show', group: LINK },
+  ];
+}
+
+// ---------------------------------------------------------------- Conteúdo > Quadro (cartões de contentBoard.build)
+async function boardFields() {
+  const DATE = 'Datas'; const LINK = 'Conexões';
+  const { STAGES } = require('./contentBoard');
+  return [
+    { key: 'tipo', label: 'Tipo', type: 'enum', get: (k) => k.type, options: [['pedido', 'Pedido'], ['corte', 'Vídeo'], ['post', 'Post'], ['story', 'Story'], ['carrossel', 'Carrossel']] },
+    { key: 'etapa', label: 'Etapa', type: 'enum', get: (k) => k.stage, options: opt(STAGES) },
+    { key: 'conteudo', label: 'Tipo de conteúdo', type: 'text', get: (k) => k.kind },
+    { key: 'titulo', label: 'Título', type: 'text', get: (k) => k.title },
+    { key: 'responsavel', label: 'Responsável (pedido)', type: 'text', get: (k) => (k.type === 'pedido' && k.who !== 'sem responsável' ? k.who : null) },
+    { key: 'prioridade', label: 'Prioridade', type: 'bool', get: (k) => Boolean(k.priority) },
+    { key: 'atrasado', label: 'Atrasado', type: 'bool', get: (k) => Boolean(k.late) },
+    { key: 'prazo', label: 'Prazo (pedido)', type: 'date', get: (k) => k.due, group: DATE },
+    { key: 'criado', label: 'Criado em', type: 'date', get: (k) => k.created, group: DATE },
+    { key: 'atualizado', label: 'Atualizado em', type: 'date', get: (k) => k.updated || k.at, group: DATE },
+    { key: 'publicado_em', label: 'Publicado em', type: 'date', get: (k) => (k.pub && k.pub.stage === 'publicado' ? k.pub.at : null), group: DATE },
+    { key: 'episodio', label: 'Episódio', type: 'enum', get: (k) => (k.episodeId ? String(k.episodeId) : null), options: await episodeOptions(), group: LINK },
+    { key: 'capa', label: 'Tem capa', type: 'bool', get: (k) => Boolean(k.thumb), group: LINK },
+    { key: 'teste', label: 'Reel de teste', type: 'bool', get: (k) => Boolean(k.pub && k.pub.trial), group: LINK },
+  ];
+}
+
+// ---------------------------------------------------------------- Conteúdo > Posts e carrosséis (linhas de episode_covers + pub)
+async function postFields() {
+  const DATE = 'Datas'; const LINK = 'Conexões';
+  return [
+    { key: 'tipo', label: 'Tipo', type: 'enum', get: (p) => p.kind, options: [['post_quote', 'Post de frase'], ['post_split', 'Tela dividida'], ['carousel', 'Carrossel']] },
+    { key: 'social', label: 'Situação no Social', type: 'enum', get: pubOf, options: [['nao', 'Não publicado'], ['fila', 'Na fila (agendado ou em revisão)'], ['publicado', 'Publicado']] },
+    { key: 'aprovado', label: 'Aprovado', type: 'bool', get: (p) => Boolean(p.approved) },
+    { key: 'automatico', label: 'Feito pela IA', type: 'bool', get: (p) => Boolean(p.auto) },
+    { key: 'texto', label: 'Texto', type: 'text', get: (p) => p.label },
+    { key: 'criado', label: 'Criado em', type: 'date', get: (p) => p.created_at, group: DATE },
+    { key: 'atualizado', label: 'Atualizado em', type: 'date', get: (p) => p.updated_at, group: DATE },
+    { key: 'episodio', label: 'Episódio', type: 'enum', get: (p) => (p.episode_id ? String(p.episode_id) : null), options: await episodeOptions(), group: LINK },
+  ];
+}
+
+// ---------------------------------------------------------------- Conteúdo > Pedidos (linhas de contentRequests.list)
+async function requestFields() {
+  const R = require('./contentRequests');
+  await catalog.refresh();
+  const users = await people();
+  const DATE = 'Datas'; const LINK = 'Conexões';
+  const today = require('./filters').brDate(new Date());
+  return [
+    { key: 'situacao', label: 'Situação', type: 'enum', get: (r) => r.status, options: Object.entries(R.STATUSES) },
+    { key: 'tipo', label: 'Tipo', type: 'enum', get: (r) => r.kind, options: Object.keys(R.KINDS).map((k) => [k, R.KINDS[k].label]) },
+    { key: 'responsavel', label: 'Responsável', type: 'user', get: (r) => (r.assignee_id ? String(r.assignee_id) : null), options: users },
+    { key: 'pedido_por', label: 'Pedido por', type: 'user', get: (r) => (r.created_by ? String(r.created_by) : null), options: users },
+    { key: 'titulo', label: 'Título', type: 'text', get: (r) => r.title },
+    { key: 'briefing', label: 'Briefing', type: 'text', get: (r) => r.briefing },
+    { key: 'formato', label: 'Formato', type: 'enum', get: (r) => r.format, options: Object.entries(R.FORMATS) },
+    { key: 'prioridade', label: 'Prioridade', type: 'bool', get: (r) => Boolean(r.priority) },
+    { key: 'atrasado', label: 'Atrasado', type: 'bool', get: (r) => R.isLate(r, today) },
+    { key: 'prazo', label: 'Prazo', type: 'date', get: (r) => r.due_on, group: DATE },
+    { key: 'criado', label: 'Pedido em', type: 'date', get: (r) => r.created_at, group: DATE },
+    { key: 'atualizado', label: 'Atualizado em', type: 'date', get: (r) => r.updated_at, group: DATE },
+    { key: 'episodio', label: 'Episódio', type: 'enum', get: (r) => (r.episode_id ? String(r.episode_id) : null), options: await episodeOptions(), group: LINK },
   ];
 }
 
@@ -105,4 +239,4 @@ async function savedViews(entity, userId) {
   return rows;
 }
 
-module.exports = { guestFields, clipFields, savedViews, formatOf, videoTypeOptions };
+module.exports = { guestFields, clipFields, episodeFields, sponsorFields, boardFields, postFields, requestFields, savedViews, formatOf, videoTypeOptions };
