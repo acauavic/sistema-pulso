@@ -242,7 +242,10 @@ async function quickVerdict(row, { team, guestIg, keywords }) {
   return null;
 }
 
+// Código ou marcação no texto da IA (tag HTML, script, javascript:) nunca vai para a rede: a resposta cai para a equipe.
+const looksLikeCode = (t) => /<\/?[a-z!][^>]*>|<script|javascript:|\balert\s*\(|\{\{|\$\{/i.test(String(t || ''));
 function cleanReply(action, s) {
+  if (looksLikeCode(s)) return null;
   let t = String(s || '').replace(/\s+/g, ' ').replace(/!{2,}/g, '!').replace(/^["“\s]+|["”\s]+$/g, '').trim();
   if (action === 'reagir') return [...t].length && [...t].length <= 4 && !/[\p{L}\p{N}]/u.test(t) ? t : EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
   if ([...t].length > REPLY_MAX) t = `${[...t].slice(0, REPLY_MAX - 1).join('').replace(/\s+\S*$/, '')}…`;
@@ -251,6 +254,7 @@ function cleanReply(action, s) {
 
 // Direct: limpa o texto e garante o marcador do link (se a IA esqueceu, o link vai no fim).
 function cleanDm(s) {
+  if (looksLikeCode(s)) return null;
   let t = String(s || '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/!{2,}/g, '!').trim().slice(0, DM_MAX);
   if (!t) return null;
   if (!t.includes('{comunidade}')) t = `${t}\n\n{comunidade}`;
@@ -318,11 +322,12 @@ async function classifyPublication(pubId) {
       const conf = Math.max(0, Math.min(1, Number(it.confianca) || 0));
       let action = ['responder', 'reagir', 'ignorar', 'equipe'].includes(it.acao) ? it.acao : 'equipe';
       const text = action === 'responder' || action === 'reagir' ? cleanReply(action, it.resposta) : null;
-      if ((action === 'responder' && !text) || (conf < MIN_CONFIDENCE && action !== 'ignorar')) action = 'equipe';
+      const odd = (action === 'responder' || action === 'reagir') && !text; // vazia ou com código: alguém confere
+      if (odd || (conf < MIN_CONFIDENCE && action !== 'ignorar')) action = 'equipe';
       const status = action === 'ignorar' ? 'ignorada' : action === 'equipe' ? 'equipe' : c.mode === 'automatico' ? 'aprovada' : 'proposta';
       let reply = text; let invited = false; let dm = null;
       if (action === 'responder' && c.invite_on && String(it.convite || '').trim() && await inviteAllowed(row.author_username)) {
-        const extra = cleanReply('responder', it.convite);
+        const extra = cleanReply('responder', it.convite); // com código, volta vazio e o convite fica de fora
         if (extra && [...`${reply} ${extra}`].length <= REPLY_MAX) { reply = `${reply} ${extra}`; invited = true; }
       }
       if (action === 'responder' && c.dm_on && row.network === 'instagram' && !(await dmRecently(row.network, row.author_username, row.id))) dm = cleanDm(it.direct);
@@ -330,7 +335,7 @@ async function classifyPublication(pubId) {
         `UPDATE social_comments SET status = $2, action = $3, reason = $4, ai_text = $5, reply_text = $5, confidence = $6, invited = $7,
             dm_text = $8, dm_status = CASE WHEN $8::text IS NULL THEN NULL WHEN $2 = 'aprovada' THEN 'aprovada' ELSE 'proposta' END,
             decided_at = CASE WHEN $2 = 'aprovada' THEN now() ELSE decided_at END, updated_at = now() WHERE id = $1 AND status = 'nova'`,
-        [row.id, status, action, String(it.motivo || '').slice(0, 200) || null, reply, conf, invited, dm]);
+        [row.id, status, action, looksLikeCode(it.resposta) ? 'A resposta da IA veio com código no texto e não saiu. Escreva a resposta.' : String(it.motivo || '').slice(0, 200) || null, reply, conf, invited, dm]);
       classified += 1;
       if (status === 'equipe') needTeam.push(row);
       if (status === 'proposta') proposed += 1;
@@ -647,5 +652,5 @@ module.exports = {
   KEY, SEND_KEY, NETWORKS, NETWORK_LABEL, MODES, DEFAULTS, VIEWS, EMOJIS, REPLY_MAX, SYSTEM,
   getConfig, setConfig, summary, watchedPosts, postContext, ingest, sweep, fromWebhook, classifyPublication, cleanReply,
   hourBR, inWindow, sendTick, estimate, friendly, approve, approveAll, setReply, skip, unqueue, undo,
-  DM_KEY, DM_PER_PERSON_DAYS, cleanDm, dmRecently, inviteAllowed, communityLink, catchUpDms, renderDm, dmTick, dmToday, skipDm, counts, pendingCount, list, postsWithComments, ofPublication,
+  DM_KEY, DM_PER_PERSON_DAYS, cleanDm, looksLikeCode, dmRecently, inviteAllowed, communityLink, catchUpDms, renderDm, dmTick, dmToday, skipDm, counts, pendingCount, list, postsWithComments, ofPublication,
 };

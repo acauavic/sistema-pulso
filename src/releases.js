@@ -7,6 +7,7 @@ module.exports = [
     version: '1.92.1', date: '2026-11-19', title: 'Direct também para quem foi respondido à mão',
     items: [
       { kind: 'correcao', text: 'O direct com a comunidade só saía depois de uma resposta da IA. Agora sai também para quem o Pulso respondeu de outro jeito (à mão, no app ou pela fila de respostas), dentro dos 7 dias do Instagram e no mesmo ritmo do dia.' },
+      { kind: 'correcao', text: 'Resposta ou direct escrito pela IA com código no texto (marcação de página, script) não sai mais sozinho: vai para "Precisam de você" para alguém escrever.' },
     ],
   },
   {

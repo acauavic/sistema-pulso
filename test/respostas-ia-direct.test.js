@@ -31,6 +31,7 @@ describe('Respostas por IA: convite para seguir e direct com a comunidade (Insta
       // respondido à mão (antes do direct existir): a resposta do Pulso vem aninhada sem o @ e repetida no primeiro nível
       { ...c('a6', 'Faço isso há 3 anos e confirmo: a constância vence', 'eva.run', 'U6'), replies: [{ id: 'r6', author_username: null, text: 'Três anos! Qual foi o mais difícil?', created_at: now }] },
       c('r6', 'Três anos! Qual foi o mais difícil?', 'podcastpulso', 'IGP'),
+      c('a7', 'Fidelidade é coisa rara hoje', 'gil', 'U7'),
     ];
     global.fetch = async (url, opts = {}) => {
       const s = String(url);
@@ -38,7 +39,9 @@ describe('Respostas por IA: convite para seguir e direct com a comunidade (Insta
         const body = JSON.parse(opts.body);
         const text = body.contents[0].parts.map((p) => p.text || '').join('\n');
         const list = JSON.parse(text.slice(text.indexOf('Comentários (JSON):') + 'Comentários (JSON):'.length));
-        const itens = list.map((k) => (/🔥/.test(k.texto)
+        const itens = list.map((k) => (/rara hoje/.test(k.texto)
+          ? { id: k.id, acao: 'responder', motivo: 'opinião', resposta: 'Rara ou pouco falada? E você?</h3><script>alert(1)</script>', confianca: 0.95, direct: 'Oi {comunidade}' }
+          : /🔥/.test(k.texto)
           ? { id: k.id, acao: 'reagir', motivo: 'apoio', resposta: '🙌', confianca: 0.9, direct: 'não deveria ir' }
           : { id: k.id, acao: 'responder', motivo: 'relato', resposta: `Que bom, @${k.usuario}. O que mais te ajudou?`, confianca: 0.9, convite: 'E se ainda não acompanha o Pulso, toda semana tem conversa nova por aqui.', direct: `Oi! Vi o que você contou sobre "${k.texto.slice(0, 20)}". A conversa continua na nossa comunidade` }));
         return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ itens }) }] } }] });
@@ -64,6 +67,9 @@ describe('Respostas por IA: convite para seguir e direct com a comunidade (Insta
     assert.equal(a1.dm_status, 'proposta'); assert.match(a1.dm_text, /\{comunidade\}$/, 'sem o marcador, o link vai no fim');
     const a2 = await byText('🔥🔥'); assert.equal(a2.action, 'reagir'); assert.equal(a2.dm_text, null, 'reação não leva direct');
     const a4 = await byText('Eu acho que motivação ajuda também'); assert.equal(a4.dm_text, null, 'a mesma pessoa não recebe dois directs');
+    const a7 = await byText('Fidelidade é coisa rara hoje');
+    assert.equal(a7.status, 'equipe', 'resposta com código vai para a equipe'); assert.equal(a7.reply_text, null); assert.equal(a7.dm_text, null);
+    assert.match(a7.reason, /código/);
     const invited = (await q("SELECT author_username FROM social_comments WHERE invited")).map((r) => r.author_username);
     assert.equal(invited.length, 1, 'convite espaçado: um só neste lote'); assert.match((await q('SELECT reply_text FROM social_comments WHERE invited'))[0].reply_text, /O que mais te ajudou\? E se ainda não acompanha o Pulso/);
   });
@@ -117,6 +123,13 @@ describe('Respostas por IA: convite para seguir e direct com a comunidade (Insta
     await R.setConfig({ mode: 'aprovar', per_hour: '60', from: '0', to: '24', dm_per_day: '50', invite_on: '1' }); // dm_on desmarcado
     assert.equal((await R.dmTick({ now: new Date() })).reason, 'desligado');
     void at;
+  });
+
+  it('resposta ou direct da IA com código (tag, script) não sai: vai para a equipe', () => {
+    assert.equal(R.cleanReply('responder', 'Boa pergunta. E você?</h3><script>alert(1)</script>'), null);
+    assert.equal(R.cleanReply('reagir', '<b>🔥</b>'), null);
+    assert.equal(R.cleanDm('Vem para a comunidade <a href="x">aqui</a>'), null);
+    assert.equal(R.cleanReply('responder', 'Faz sentido: 2 < 3 e a constância vence. E você?'), 'Faz sentido: 2 < 3 e a constância vence. E você?');
   });
 
   it('quem foi respondido à mão antes do direct existir também recebe: relê o id de quem comentou e manda no ritmo do dia', async () => {
