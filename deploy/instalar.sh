@@ -103,7 +103,7 @@ fi
 # Backup diário do banco (03:30), guardando os últimos 14 dias em /opt/pulso-backups.
 mkdir -p /opt/pulso-backups && chmod 700 /opt/pulso-backups
 cat > /etc/cron.d/pulso-backup <<CRON
-30 3 * * * root $DIR/deploy/backup.sh >> /var/log/pulso-backup.log 2>&1
+30 3 * * * root bash $DIR/deploy/backup.sh >> /var/log/pulso-backup.log 2>&1
 CRON
 
 echo
