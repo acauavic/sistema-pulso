@@ -6,7 +6,7 @@ const mw = require('./middleware');
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 1); // atrás do Traefik: req.ip e cookie Secure corretos
+  app.set('trust proxy', 1); // atrás do Caddy, que manda um X-Forwarded-For só (o IP real, inclusive via Cloudflare): req.ip e cookie Secure corretos
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'views'));
 
