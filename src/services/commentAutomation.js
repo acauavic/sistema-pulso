@@ -154,6 +154,8 @@ async function receive(raw, signature) {
     [body.event, d.network || null, d.accountId != null ? String(d.accountId) : null, d.postId || null, d.platformPostId || null, String(d.commentId),
       d.parentCommentId || null, d.authorId != null ? String(d.authorId) : null, d.authorUsername || null, String(d.text || '').slice(0, 2000), JSON.stringify(body)]);
   if (row) await jobs.enqueue('comentario_recebido', { refId: Number(row.id), maxAttempts: 3 });
+  // respostas por IA: lê o post daqui a pouco e faz a triagem (services/commentReplies.js)
+  if (row) await require('./commentReplies').fromWebhook({ network: d.network || null, post_ref: d.postId || null, platform_post_id: d.platformPostId || null, comment_id: d.commentId, parent_comment_id: d.parentCommentId || null, author_username: d.authorUsername || null, text: d.text || '' }).catch((err) => console.error('[respostas-ia] aviso:', err.message));
   return { status: 200, body: { ok: true } };
 }
 
@@ -217,7 +219,7 @@ async function handle(job) {
         replies.push(`DM: ${message}`);
       }
       if ((rule.action === 'resposta' || rule.action === 'ambos') && rule.reply_text && m.post_ref) {
-        if (!simulated) await ost.replyToComment({ postRef: m.post_ref, commentId: m.comment_id, content: rule.reply_text });
+        if (!simulated) await ost.replyToComment({ postRef: m.post_ref, commentId: m.comment_id, content: rule.reply_text, platformPostId: m.platform_post_id });
         replies.push(`Resposta: ${rule.reply_text}`);
       }
       await social.record(rule, item, simulated ? 'simulado' : 'enviado', replies.join(' · '));

@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.91.0', date: '2026-11-19', title: 'Respostas por IA nos comentários dos posts',
+    items: [
+      { kind: 'novo', text: 'Social > Comentários: a IA lê os comentários dos posts que saíram pela Outstand (Instagram, Facebook e Threads), escreve uma resposta curta no tom do Pulso ou reage com um emoji e, sempre que dá, termina com uma pergunta para a pessoa comentar de novo. Conversa com o convidado, marcações, robôs e comentários vazios ficam de fora.' },
+      { kind: 'novo', text: 'Você aprova antes (ou deixa no automático): aprove todas de uma vez, edite uma resposta com o "Sugerir com IA" ou marque "não responder". O que é pesado (pedido de orientação de saúde, ameaça, reclamação séria) vai para "Precisam de você" e a gestão e a produtora recebem um aviso.' },
+      { kind: 'novo', text: 'As respostas saem aos poucos, com intervalo variado, até 25 por hora e só das 8h às 23h, para a conta não parecer robô. A aba "Na fila" mostra quando cada uma sai, e uma resposta enviada pode ser apagada da rede.' },
+      { kind: 'novo', text: 'Na página da publicação, o cartão "Respostas por IA" liga e desliga a IA só daquele post e mostra quanto já foi respondido.' },
+      { kind: 'correcao', text: 'A resposta pública da automação por palavra ("quem comentar a palavra recebe o link no direct") não saía no comentário: a Outstand pedia o código do post na rede. Agora sai.' },
+    ],
+  },
+  {
     version: '1.90.0', date: '2026-11-19', title: 'Avisos que se limpam, respostas não lidas e tarefa a partir da mensagem',
     items: [
       { kind: 'ajuste', text: 'Quando uma tarefa passa para Fazendo ou Feito, os avisos dela que ainda estavam em Notificações (vence hoje, falta pouco, atrasada e bloqueada) ficam como lidos, para todo mundo que recebeu. O "criou uma tarefa para você" também, quando é você quem começa. O contador cai na hora.' },

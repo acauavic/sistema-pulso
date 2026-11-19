@@ -131,6 +131,24 @@
       <p class="small m-0"><a href="/social/automacoes/<%= auto.id %>">ver mensagem e respostas</a></p>
     </section>
     <% } %>
+    <% if (canComments && ['publicado', 'parcial'].indexOf(pub.status) >= 0 && (pub.results || []).some(function (r) { return r.provider === 'outstand' && ['instagram', 'facebook', 'threads'].indexOf(r.platform) >= 0; })) { var ac = aiReplies.counts; %>
+    <section class="card">
+      <div class="pub-ai-line">
+        <h2>Respostas por IA</h2>
+        <% if (canAutomate) { %>
+        <form method="post" action="/social/publicacoes/<%= pub.id %>/respostas-ia" class="inline"><%- csrfField %><input type="hidden" name="on" value="<%= aiReplies.on ? '0' : '1' %>">
+          <label class="switch" title="<%= aiReplies.on ? 'Desligar: a IA para de responder os comentários deste post' : 'Ligar: a IA volta a cuidar dos comentários deste post' %>"><input type="checkbox" role="switch" <%= aiReplies.on ? 'checked' : '' %> data-autosubmit aria-label="Respostas por IA neste post"><span class="switch-track" aria-hidden="true"></span><span class="mono small switch-state"><%= aiReplies.on ? 'LIGADA' : 'DESLIGADA' %></span></label>
+        </form>
+        <% } else { %><span class="badge b-gray"><%= aiReplies.on ? 'ligada' : 'desligada' %></span><% } %>
+      </div>
+      <% if (aiReplies.total) { %>
+      <p class="mono small muted"><%= ac.enviadas %> RESPONDIDA<%= ac.enviadas === 1 ? '' : 'S' %><%= ac.aprovar ? ' · ' + ac.aprovar + ' PARA APROVAR' : '' %><%= ac.equipe ? ' · ' + ac.equipe + ' PRECISA' + (ac.equipe === 1 ? '' : 'M') + ' DE VOCÊ' : '' %><%= ac.fila ? ' · ' + ac.fila + ' NA FILA' : '' %></p>
+      <p class="small m-0"><a href="/social/comentarios?pub=<%= pub.id %>">ver comentários</a></p>
+      <% } else { %>
+      <p class="small muted m-0"><%= aiReplies.on ? 'Os comentários deste post aparecem em Social > Comentários com a resposta da IA.' : 'A IA não responde os comentários deste post.' %></p>
+      <% } %>
+    </section>
+    <% } %>
   </div>
 
   <section class="card">

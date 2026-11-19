@@ -8,8 +8,9 @@
   const tpl = document.querySelector('template[data-ai-icons]');
   const icon = (k) => tpl?.content.querySelector(`[data-i="${k}"]`)?.innerHTML || '';
   const SHORTCUTS = [
-    ['variar', 'Outras opções'], ['curto', 'Mais curto'], ['impacto', 'Mais impacto'], ['pergunta', 'Em pergunta'],
-    ['citacao', 'Frase do convidado'], ['numero', 'Com número'], ['serio', 'Mais sério'], ['leve', 'Mais leve'], ['hashtags', 'Com hashtags', ['descricao']],
+    ['variar', 'Outras opções'], ['curto', 'Mais curto'], ['impacto', 'Mais impacto', null, ['resposta']], ['pergunta', 'Em pergunta'],
+    ['citacao', 'Frase do convidado', null, ['resposta']], ['numero', 'Com número', null, ['resposta']], ['serio', 'Mais sério'], ['leve', 'Mais leve'],
+    ['hashtags', 'Com hashtags', ['descricao']], ['acido', 'Com acidez', ['resposta']],
   ];
   const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   let openPanel = null;
@@ -19,6 +20,7 @@
 
   function contextOf(field) {
     const out = { episodio: field.dataset.aiEpisode || '', corte: field.dataset.aiClip || '', tipo_capa: field.dataset.aiKind || '', convidado: field.dataset.aiGuest || '' };
+    if (field.dataset.ai === 'resposta') out.comentario = field.form?.querySelector('[name="comentario"]')?.value || field.dataset.aiComment || ''; // resposta a um comentário
     if (field.dataset.aiScope === 'form') { // "Novo post": o contexto é o item escolhido
       const r = field.form?.querySelector('input[type="radio"][name="clip_id"]:checked, input[type="radio"][name="cover_ids"]:checked');
       if (r?.name === 'clip_id') out.corte = r.value;
@@ -39,13 +41,13 @@
     bar.append(btn, undo);
     const panel = mk('div', 'ai-panel'); panel.hidden = true; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Sugestões da IA');
     const chips = mk('div', 'ai-chips');
-    SHORTCUTS.filter(([, , only]) => !only || only.includes(kind)).forEach(([key, label]) => {
+    SHORTCUTS.filter(([, , only, except]) => (!only || only.includes(kind)) && !(except || []).includes(kind)).forEach(([key, label]) => {
       const c = mk('button', 'ai-chip', label); c.type = 'button'; c.dataset.key = key;
       c.addEventListener('click', () => run({ atalho: key }));
       chips.append(c);
     });
     const ownRow = mk('div', 'ai-own'); // não é <form>: o campo já costuma estar dentro do formulário de publicar
-    const own = mk('input'); own.type = 'text'; own.maxLength = 300; own.placeholder = 'Ou peça do seu jeito: "cite a fala sobre burnout"'; own.setAttribute('aria-label', 'Pedido para a IA');
+    const own = mk('input'); own.type = 'text'; own.maxLength = 300; own.placeholder = kind === 'resposta' ? 'Ou peça do seu jeito: "concorde e pergunte da rotina dela"' : 'Ou peça do seu jeito: "cite a fala sobre burnout"'; own.setAttribute('aria-label', 'Pedido para a IA');
     const go = mk('button', 'btn sm icon-only'); go.type = 'button'; go.innerHTML = icon('send'); go.title = 'Gerar'; go.setAttribute('aria-label', 'Gerar com este pedido');
     ownRow.append(own, go);
     const ask = () => { if (own.value.trim()) run({ pedido: own.value.trim() }); else own.focus(); };

@@ -37,6 +37,7 @@ const PERMISSIONS = {
   'social.ideas': ['superadmin', 'gestao', 'produtora'], // pedir ideias à IA e tocá-las (aprovar, pedir ao editor)
   'social.request': ['superadmin', 'gestao', 'produtora'], // montar post; sem social.publish ele vai para a revisão da gestão
   'social.publish': ['superadmin', 'gestao'],            // publicar direto, aprovar/devolver pedidos, editar posts
+  'social.comments': ['superadmin', 'gestao', 'produtora'], // ver os comentários dos posts, aprovar e editar as respostas da IA, responder
   'social.automate': ['superadmin', 'gestao'],           // criar, ativar e pausar automações de comentários e directs
   // financeiro
   'finance.read': ['superadmin', 'gestao'],   // contas a pagar e receber, fluxo de caixa, custos por episódio

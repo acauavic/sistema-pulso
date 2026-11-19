@@ -367,9 +367,28 @@ async function privateReply({ accountId, commentId, authorId, content }) {
 }
 
 // Resposta pública ao comentário (só em post que saiu pela Outstand).
-async function replyToComment({ postRef, commentId, content }) {
-  const { json } = await call('POST', `/v1/posts/${encodeURIComponent(postRef)}/replies`, { body: { content, parent_comment_id: String(commentId) }, timeout: 30_000 });
-  return { replyId: json.reply_id || null };
+// Resposta pública a um comentário. A Outstand exige o post na rede (platform_post_id): sem ele, recusa (400).
+async function replyToComment({ postRef, commentId, content, platformPostId = null, accountUsername = null }) {
+  const body = { content, parent_comment_id: String(commentId), ...(platformPostId ? { platform_post_id: String(platformPostId) } : {}), ...(!platformPostId && accountUsername ? { account_username: accountUsername } : {}) };
+  const { json } = await call('POST', `/v1/posts/${encodeURIComponent(postRef)}/replies`, { body, timeout: 30_000 });
+  return { replyId: json.reply_id || json.id || null };
+}
+
+// Comentários de um post que saiu pela Outstand, com as respostas de cada um.
+// -> [{ id, text, username, timestamp, likes, replies: [{ id, text, username, timestamp }] }]
+async function listComments({ postRef, network }) {
+  const { json } = await call('GET', `/v1/posts/${encodeURIComponent(postRef)}/replies?network=${encodeURIComponent(network)}&include_replies=true`, { timeout: 25_000 });
+  const list = json.replies?.comments || json.comments || json.data || [];
+  return list.map((k) => ({
+    id: String(k.id), text: String(k.text || ''), username: k.username || k.from?.username || null, timestamp: k.timestamp || k.created_time || null, likes: Number(k.like_count) || 0,
+    replies: (k.replies?.data || []).map((x) => ({ id: String(x.id), text: String(x.text || ''), username: x.username || x.from?.username || null, timestamp: x.timestamp || null })),
+  }));
+}
+
+// Apaga uma resposta que o Pulso publicou (desfazer).
+async function deleteReply({ postRef, replyId, platformPostId }) {
+  await call('DELETE', `/v1/posts/${encodeURIComponent(postRef)}/replies/${encodeURIComponent(replyId)}?platform_post_id=${encodeURIComponent(platformPostId || '')}`, { timeout: 25_000 });
+  return true;
 }
 
 // Resposta dentro de uma conversa do direct (vale até 24 h depois da última mensagem da pessoa).
@@ -387,4 +406,4 @@ async function instagramAuthUrl(redirectUri) {
   return url;
 }
 
-module.exports = { NETWORKS, HEAVY_BYTES, heavy, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator, privateReply, replyToComment, instagramAuthUrl, MESSAGING_SCOPES, sendMessage };
+module.exports = { NETWORKS, HEAVY_BYTES, heavy, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator, privateReply, replyToComment, listComments, deleteReply, instagramAuthUrl, MESSAGING_SCOPES, sendMessage };

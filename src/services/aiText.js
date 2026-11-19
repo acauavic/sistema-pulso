@@ -17,6 +17,7 @@ const FIELDS = {
   descricao: { label: 'legenda do post', max: 600, rule: `legenda para Reels, TikTok e Shorts: de 2 a 4 frases curtas (até 320 caracteres); sem hashtags (a não ser que o pedido peça). ${SC.COPY.legenda}` },
   titulo_youtube: { label: 'título do YouTube', max: 100, rule: 'título do episódio no YouTube: até 70 caracteres de preferência (no máximo 100), com o nome do convidado ou o tema central, sem caixa alta gritada, sem clickbait' },
   convite_motivo: { label: 'texto "Por que você" do convite', max: 600, rule: 'duas ou três frases curtas (até 350 caracteres) falando diretamente com a pessoa convidada ("você"), dizendo por que o Pulso quer conversar com ela: o que ela construiu, o que ela pensa ou faz de diferente e por que isso interessa ao profissional da saúde ou ao público que quer viver com mais saúde. Concreto, caloroso, sem bajulação, sem superlativo vazio, sem exclamações. Use só os dados fornecidos; se faltar dado, fique no que existe' },
+  resposta: { label: 'resposta a um comentário do post', max: 300, rule: 'resposta curta (até 220 caracteres) ao comentário, falando com a pessoa, concreta sobre o assunto do post; se for opinião polêmica ou generalização, discorde com um toque leve de acidez, sem ofender; termine, sempre que der, com uma pergunta que faça a pessoa comentar de novo; sem conselho médico individual, sem hashtags, sem "link da bio" (a não ser que a pessoa pergunte onde assistir)' },
   descricao_youtube: { label: 'descrição do YouTube', max: 3000, rule: 'descrição do episódio no YouTube: um parágrafo de abertura (2 a 3 frases) sobre a conversa, depois quem é o convidado em uma frase; sem links inventados' },
 };
 // Tipo de capa -> qual regra de texto usar.
@@ -33,8 +34,11 @@ const SHORTCUTS = {
   serio: { label: 'Mais sério', ask: 'Tom mais sério e institucional.' },
   leve: { label: 'Mais leve', ask: 'Tom mais leve e próximo, sem gíria.' },
   hashtags: { label: 'Com hashtags', ask: 'Termine com 3 a 5 hashtags relevantes do tema (em minúsculas, sem acento).', only: ['descricao'] },
+  acido: { label: 'Com acidez', ask: 'Discorde com um toque leve de acidez e elegância, sem ofender a pessoa, e termine com uma pergunta.', only: ['resposta'] },
 };
-const shortcutsFor = (field) => Object.entries(SHORTCUTS).filter(([, s]) => !s.only || s.only.includes(field)).map(([key, s]) => ({ key, label: s.label }));
+// Atalhos que não fazem sentido em alguns campos (resposta a comentário não cita a transcrição nem traz número).
+const EXCEPT = { resposta: ['citacao', 'numero', 'impacto', 'hashtags'] };
+const shortcutsFor = (field) => Object.entries(SHORTCUTS).filter(([k, s]) => (!s.only || s.only.includes(field)) && !(EXCEPT[field] || []).includes(k)).map(([key, s]) => ({ key, label: s.label }));
 
 const SCHEMA = { type: 'OBJECT', properties: { opcoes: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['opcoes'] };
 
@@ -77,13 +81,19 @@ function guestBrief(g) {
     g.is_plural ? 'É uma dupla: fale com "vocês".' : ''].filter(Boolean).join('\n');
 }
 
-async function suggest({ field, coverKind = null, current = '', shortcut = null, prompt = '', episodeId = null, clipId = null, guestId = null }) {
+async function suggest({ field, coverKind = null, current = '', shortcut = null, prompt = '', episodeId = null, clipId = null, guestId = null, commentId = null }) {
   if (!config.geminiConfigured) return { error: 'A IA não está configurada neste servidor.', status: 503 };
   const key = field === 'capa' && COVER_FIELD[coverKind] ? COVER_FIELD[coverKind] : field;
   if (!FIELDS[key]) return { error: 'Campo desconhecido.', status: 400 };
   const ask = shortcut && SHORTCUTS[shortcut] ? SHORTCUTS[shortcut].ask : (key === 'convite_motivo' ? 'Escreva o texto a partir dos dados do convidado.' : '');
   const own = String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 300);
   if (!ask && !own) return { error: 'Escolha um atalho ou escreva o que quer.', status: 400 };
+  let comment = null; // resposta a um comentário: o comentário, a conversa e o post entram no contexto
+  if (key === 'resposta') {
+    if (commentId) ({ rows: [comment] } = await db.query('SELECT c.*, p.clip_id, p.episode_id FROM social_comments c LEFT JOIN episode_publications p ON p.id = c.publication_id WHERE c.id = $1', [commentId]));
+    if (!comment) return { error: 'Comentário não encontrado.', status: 404 };
+    clipId = comment.clip_id || clipId; episodeId = comment.episode_id || episodeId;
+  }
   const ctx = await context({ episodeId, clipId, guestId: key === 'convite_motivo' ? guestId : null });
   if (key === 'convite_motivo' && !ctx.guest) return { error: 'Convidado não encontrado.', status: 404 };
   const now = String(current || '').trim().slice(0, 1500);
@@ -93,11 +103,12 @@ async function suggest({ field, coverKind = null, current = '', shortcut = null,
       : ctx.episode ? fin.buildContext({ episode: ctx.episode, guest: ctx.guest, sponsors: [] }) : 'Podcast: Pulso (corte ainda sem episódio definido).',
     ctx.clip ? `Corte: ${ctx.clip.post_title || ctx.clip.title}` : '',
     ['capa', 'titulo', 'descricao'].includes(key) ? await require('./postMetrics').examples() : '',
+    comment ? `Comentário de @${comment.author_username || 'alguém'} no post: ${comment.text}${(comment.thread || []).length ? `\nConversa em volta: ${comment.thread.map((t) => `@${t.usuario || 'alguém'}${t.pulso ? ' (Pulso)' : ''}: ${t.texto}`).join(' | ')}` : ''}` : '',
     '', `Campo: ${FIELDS[key].label}. Regras: ${FIELDS[key].rule}.`,
     now ? `Texto atual: ${now}` : 'O campo está vazio.',
     '', `Pedido: ${[ask, own].filter(Boolean).join(' ')}`,
     'Devolva EXATAMENTE 3 opções em "opcoes", cada uma pronta para colar no campo, diferentes entre si e do texto atual. Não explique nada.',
-    ctx.transcript ? `\nTranscrição (trecho): ${L.fitWords(ctx.transcript, ctx.clip ? 3000 : 5000)}` : '',
+    ctx.transcript && key !== 'resposta' ? `\nTranscrição (trecho): ${L.fitWords(ctx.transcript, ctx.clip ? 3000 : 5000)}` : '',
   ].filter((x) => x !== '').join('\n') }];
   let data;
   try { ({ data } = await gemini.generateJson({ parts, schema: SCHEMA, temperature: shortcut === 'variar' ? 0.95 : 0.8, timeoutMs: 45_000, attempts: 2 })); } catch (err) {
@@ -114,4 +125,4 @@ async function suggest({ field, coverKind = null, current = '', shortcut = null,
   return { opcoes: opcoes.slice(0, 3) };
 }
 
-module.exports = { FIELDS, COVER_FIELD, SHORTCUTS, shortcutsFor, suggest, tidyOption };
+module.exports = { FIELDS, COVER_FIELD, SHORTCUTS, EXCEPT, shortcutsFor, suggest, tidyOption };

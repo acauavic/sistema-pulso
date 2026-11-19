@@ -137,7 +137,7 @@ describe('Automação de comentário → direct ao publicar (Outstand)', () => {
     await deliver(comment({ commentId: 'c7', text: 'TAMIRIS por favor' }));
     await runInbox();
     const pub = calls.find((c) => c.path === '/v1/posts/op9/replies');
-    assert.deepEqual(pub.body, { content: 'Te mandei no direct.', parent_comment_id: 'c7' });
+    assert.deepEqual(pub.body, { content: 'Te mandei no direct.', parent_comment_id: 'c7', platform_post_id: '17890' });
     // em massa: palavra em branco = primeiro nome do convidado de cada corte
     const at = new Date(Date.now() + 2 * 86400_000).toISOString();
     const { created } = await bulk.schedule([{ clipId: clip2.id, at, trial: false }], { platforms: ['instagram', 'tiktok'], userId: null, auto: A.readForm({ auto_on: '1', auto_palavra: '', auto_dias: '7' }) });

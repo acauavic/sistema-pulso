@@ -93,6 +93,7 @@ const NOTIFICATION_TYPES = {
   alteracao: { label: 'Cadastro alterado', hint: 'Quem é responsável por um convidado, patrocinador, episódio, corte ou tarefa recebe um aviso quando outra pessoa altera o cadastro, com o que mudou.' },
   exclusao: { label: 'Cadastro excluído', hint: 'Quem era responsável por um convidado, patrocinador, episódio, corte ou tarefa recebe um aviso quando outra pessoa o exclui.' },
   integracao: { label: 'Contas das redes', hint: 'Uma conta do Instagram, TikTok, YouTube, X ou outra rede foi desconectada ou precisa ser reconectada no provedor (Upload-Post, Zernio ou Outstand). Enquanto isso, as publicações nessa rede falham.' },
+  redes: { label: 'Comentários nas redes', hint: 'Comentário num post do Pulso que a IA preferiu deixar para a equipe (pesado, delicado ou sem segurança) e respostas da IA esperando aprovação.' },
   site: { label: 'Pedidos pelo site', hint: 'Alguém pediu para ser convidado ou para patrocinar pelo site podcastpulso.com.' },
   rotina: { label: 'Rotinas do sistema', hint: 'Análise por IA pronta ou com erro, corte lido, publicação concluída, patrocinador respondeu o formulário.' },
 };

@@ -21,6 +21,11 @@ const notFound = (res) => res.status(404).render('error', { title: 'Não encontr
 const live = () => config.uploadPost.live; // automações e respostas (sempre pelo Upload-Post)
 const pubLive = () => socialApi.liveState(); // publicar: algum provedor em uso (padrão ou rota) em modo de teste?
 
+// contador da aba Comentários (o que precisa de alguém)
+router.use('/social', (req, res, next) => {
+  if (req.method !== 'GET' || !req.user || !can(req.user.role, 'social.comments')) return next();
+  require('../services/commentReplies').pendingCount().then((n) => { res.locals.commentsPending = n; next(); }, next);
+});
 router.get('/social', requirePerm('social.read'), (req, res) => res.redirect('/social/publicacoes'));
 
 // ---------------------------------------------------------------- publicações
@@ -99,7 +104,7 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   const canResend = can(req.user.role, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
   const resend = canResend ? await resendChoices(pub) : null;
   res.render('social/publication', {
-    resend, videoTags: await socialApi.videoTags(), auto: await automation.ofPublication(pub.id), nums: await require('../services/postMetrics').forPublication(pub.id),
+    resend, videoTags: await socialApi.videoTags(), auto: await automation.ofPublication(pub.id), aiReplies: await require('../services/commentReplies').ofPublication(pub.id), canAutomate: can(req.user.role, 'social.automate'), canComments: can(req.user.role, 'social.comments'), nums: await require('../services/postMetrics').forPublication(pub.id),
     title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: providers.every((p) => p.live()), provider: providers[0], providers,
     providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
     testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
@@ -209,12 +214,14 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
 const aiLimiter = require('../auth/rateLimit').createLimiter({ name: 'ia-texto', max: 40, windowMs: 10 * 60_000 });
 router.post('/ia/texto', wrap(async (req, res) => {
   const forInvite = String(req.body.campo || '') === 'convite_motivo';
-  if (!req.user || !(forInvite ? can(req.user.role, 'guests.write') : (can(req.user.role, 'episodes.read') || can(req.user.role, 'social.read')))) return res.status(403).json({ ok: false, error: 'Seu perfil não usa a IA nos textos.' });
+  const forComment = String(req.body.campo || '') === 'resposta';
+  const allowed = forInvite ? can(req.user?.role, 'guests.write') : forComment ? can(req.user?.role, 'social.comments') : (can(req.user?.role, 'episodes.read') || can(req.user?.role, 'social.read'));
+  if (!req.user || !allowed) return res.status(403).json({ ok: false, error: 'Seu perfil não usa a IA nos textos.' });
   if (!await aiLimiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitos pedidos seguidos. Espere alguns minutos.' });
   const id = (v) => (isIntId(String(v || '')) ? Number(v) : null);
   const r = await require('../services/aiText').suggest({
     field: String(req.body.campo || ''), coverKind: req.body.tipo_capa ? String(req.body.tipo_capa) : null, current: req.body.atual,
-    shortcut: req.body.atalho ? String(req.body.atalho) : null, prompt: req.body.pedido, episodeId: id(req.body.episodio), clipId: id(req.body.corte), guestId: id(req.body.convidado),
+    shortcut: req.body.atalho ? String(req.body.atalho) : null, prompt: req.body.pedido, episodeId: id(req.body.episodio), clipId: id(req.body.corte), guestId: id(req.body.convidado), commentId: id(req.body.comentario),
   });
   if (r.error) return res.status(r.status || 400).json({ ok: false, error: r.error });
   res.json({ ok: true, opcoes: r.opcoes });
@@ -449,6 +456,93 @@ router.post('/social/automacoes/:id/:acao(ativar|pausar|excluir|rodar)', require
   }
   await audit(req, `automacao.${acao}`, 'social_rule', rule.id);
   res.redirect(`/social/automacoes/${rule.id}`);
+}));
+
+// ---------------------------------------------------------------- comentários (respostas por IA)
+const replies = require('../services/commentReplies');
+const backTo = (req, fallback = '/social/comentarios') => { const v = String(req.body.voltar || ''); return /^\/social\/(comentarios|publicacoes\/\d+)(\?[\w=&%.-]*)?$/.test(v) ? v : fallback; };
+
+router.get('/social/comentarios', requirePerm('social.comments'), wrap(async (req, res) => {
+  const pubId = isIntId(String(req.query.pub || '')) ? Number(req.query.pub) : null;
+  const [cfg, counts, posts, sweepState, sendState] = await Promise.all([
+    replies.getConfig(), replies.counts({ pubId }), replies.postsWithComments(),
+    require('../services/settings').get(`${replies.KEY}_varredura`), require('../services/settings').get(replies.SEND_KEY),
+  ]);
+  // abre onde há algo a fazer: precisam de você > para aprovar > na fila > enviadas
+  const vista = replies.VIEWS[req.query.vista] ? req.query.vista : (['equipe', 'aprovar', 'fila', 'enviadas'].find((k) => counts[k]) || 'aprovar');
+  const showAll = req.query.todos === '1';
+  const { rows, more } = await replies.list(vista, { pubId, limit: showAll ? 200 : 60 });
+  const parse = (s) => { try { return s ? JSON.parse(s) : {}; } catch { return {}; } };
+  const eta = vista === 'fila' ? replies.estimate(rows, cfg, { nextAt: parse(sendState).next_at }) : new Map();
+  res.render('social/comments', {
+    title: 'Comentários', tab: 'comentarios', cfg, counts, rows, more, vista, pubId, posts, eta, VIEWS: replies.VIEWS, MODES: replies.MODES, NETWORK_LABEL: replies.NETWORK_LABEL,
+    summary: replies.summary(cfg), lastSweep: parse(sweepState), canSetup: can(req.user.role, 'social.automate'), outstandLive: config.outstand.live,
+    aiReady: config.geminiConfigured, outstandReady: config.outstandConfigured, showAll, REPLY_MAX: replies.REPLY_MAX,
+  });
+}));
+
+router.post('/social/comentarios/config', requirePerm('social.automate'), wrap(async (req, res) => {
+  const r = await replies.setConfig(req.body);
+  if (r.error) { await req.flash('error', r.error); return res.redirect('/social/comentarios'); }
+  await audit(req, 'respostas_ia.config', 'settings', null, { mode: r.config.mode, per_hour: r.config.per_hour });
+  await req.flash('ok', 'Respostas por IA atualizadas.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/ligar', requirePerm('social.automate'), wrap(async (req, res) => {
+  const on = String(req.body.on) === '1';
+  await replies.setConfig({ on: on ? '1' : '0' }, { onlyToggle: true });
+  await audit(req, on ? 'respostas_ia.ligada' : 'respostas_ia.desligada', 'settings', null);
+  if (on) await jobs.enqueue('comentarios_varredura', { payload: { days: 14 }, maxAttempts: 2, createdBy: req.user.id });
+  await req.flash('ok', on ? 'Respostas por IA ligadas. Os comentários dos posts das últimas duas semanas estão sendo lidos agora.' : 'Respostas por IA desligadas. Nada mais sai, e a fila fica guardada.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/buscar', requirePerm('social.automate'), wrap(async (req, res) => {
+  await jobs.enqueue('comentarios_varredura', { payload: { days: 60 }, maxAttempts: 2, createdBy: req.user.id });
+  await req.flash('ok', 'Lendo os comentários dos posts dos últimos 60 dias. Em alguns minutos eles aparecem aqui.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/aprovar-todas', requirePerm('social.comments'), wrap(async (req, res) => {
+  const pubId = isIntId(String(req.body.pub || '')) ? Number(req.body.pub) : null;
+  const n = await replies.approveAll({ userId: req.user.id, pubId });
+  await audit(req, 'respostas_ia.aprovadas', 'publication', pubId, { n });
+  await req.flash('ok', n ? `${fmt.plural(n, 'resposta foi', 'respostas foram')} para a fila. Saem aos poucos, no ritmo configurado.` : 'Nada para aprovar.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/:id/resposta', requirePerm('social.comments'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const r = await replies.setReply(Number(req.params.id), req.body.texto, req.user.id);
+  await req.flash(r.error ? 'error' : 'ok', r.error || 'Resposta na fila. Sai na próxima vez que o ritmo deixar.');
+  if (!r.error) await audit(req, 'respostas_ia.editada', 'social_comment', Number(req.params.id));
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/:id/:acao(aprovar|ignorar|tirar|tentar|apagar)', requirePerm('social.comments'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const id = Number(req.params.id); const acao = req.params.acao;
+  let msg = null; let error = null;
+  if (acao === 'aprovar' || acao === 'tentar') msg = (await replies.approve([id], req.user.id)) ? 'Resposta na fila.' : null;
+  else if (acao === 'ignorar') msg = (await replies.skip(id, req.user.id)) ? 'Este comentário fica sem resposta.' : null;
+  else if (acao === 'tirar') msg = (await replies.unqueue(id)) ? 'Saiu da fila e voltou para aprovar.' : null;
+  else if (acao === 'apagar') { const r = await replies.undo(id); error = r.error || null; msg = r.ok ? 'Resposta apagada da rede.' : null; }
+  if (!msg && !error) error = 'Este comentário mudou enquanto você olhava. A lista foi atualizada.';
+  if (msg) await audit(req, `respostas_ia.${acao}`, 'social_comment', id);
+  await req.flash(error ? 'error' : 'ok', error || msg);
+  res.redirect(backTo(req));
+}));
+
+// Liga ou desliga a IA nos comentários de uma publicação.
+router.post('/social/publicacoes/:id/respostas-ia', requirePerm('social.automate'), wrap(async (req, res) => {
+  const pub = await findPub(req.params.id);
+  if (!pub) return notFound(res);
+  const on = String(req.body.on) === '1';
+  await db.query('UPDATE episode_publications SET ai_replies = $2 WHERE id = $1', [pub.id, on]);
+  await audit(req, on ? 'respostas_ia.post_ligado' : 'respostas_ia.post_desligado', 'publication', pub.id);
+  await req.flash('ok', on ? 'A IA volta a cuidar dos comentários deste post.' : 'A IA não responde mais os comentários deste post.');
+  res.redirect(`/social/publicacoes/${pub.id}`);
 }));
 
 module.exports = router;
