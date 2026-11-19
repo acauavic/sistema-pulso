@@ -211,7 +211,8 @@
     if (push && location.pathname !== `/mensagens/${id}`) history.pushState({ id }, '', `/mensagens/${id}`);
     document.title = `${conv.name} · Mensagens`;
     let page;
-    try { page = await api(`/mensagens/conversas/${id}/mensagens`); } catch (e) { el.msgs.innerHTML = `<li class="small err">${esc(e.message)}</li>`; return; }
+    S.opening = id; // enquanto a primeira página não chega, a conferência de novidades espera (senão as mensagens entram duas vezes)
+    try { page = await api(`/mensagens/conversas/${id}/mensagens`); } catch (e) { el.msgs.innerHTML = `<li class="small err">${esc(e.message)}</li>`; return; } finally { if (S.opening === id) S.opening = null; }
     if (S.cur?.id !== id) return;
     S.rev = page.rev; S.more = page.more; el.older.hidden = !page.more;
     page.messages.forEach((m) => { S.msgs.set(m.id, m); S.maxId = Math.max(S.maxId, m.id); el.msgs.appendChild(makeLi(m)); });
@@ -221,6 +222,7 @@
     if (line) el.scroll.scrollTop = line.offsetTop - el.scroll.offsetTop - 24; else toBottom(el.scroll);
     markRead();
     $('[data-chat-form] .rte-area')?.focus({ preventScroll: true });
+    if (S.syncSkipped) { S.syncSkipped = false; sync(); } // o que chegou enquanto a página carregava
   }
   function closeConv({ push = true } = {}) {
     closeThread();
@@ -235,6 +237,7 @@
   async function sync() {
     refreshConvs();
     if (!S.cur || syncing) return;
+    if (S.opening) { S.syncSkipped = true; return; }
     syncing = true;
     try {
       for (;;) {
