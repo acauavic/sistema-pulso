@@ -94,6 +94,7 @@ async function request(method, key, { body, contentType, query = {}, timeout = 6
 async function putObject(key, body, contentType) {
   const res = await request('PUT', key, { body, contentType });
   if (!res.ok) throw b2Error('Backblaze recusou o envio', res.status, await res.text());
+  return { etag: String(res.headers.get('etag') || '').replace(/"/g, '') }; // envio simples: o ETag é o MD5 do corpo
 }
 
 // Devolve a Response do fetch (o chamador faz o stream); 404 vira null.
