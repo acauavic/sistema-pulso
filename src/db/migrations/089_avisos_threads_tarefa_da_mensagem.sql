@@ -1,10 +1,11 @@
--- 1) Assunto do aviso: "prazo" (vence hoje, falta pouco, atrasada) e "bloqueada". Quando a tarefa vai para Fazendo ou Feito,
+-- 1) Assunto do aviso: "prazo" (vence hoje, falta pouco, atrasada), "bloqueada" e "atribuida" (criou/atribuiu para você, mudou o prazo). Quando a tarefa vai para Fazendo ou Feito,
 --    os não lidos desses assuntos ficam como lidos (services/notify.clearTopics).
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS topic TEXT;
 CREATE INDEX IF NOT EXISTS notifications_entity_topic_idx ON notifications (entity_type, entity_id, topic) WHERE read_at IS NULL AND topic IS NOT NULL;
 -- os avisos que já estão no sino ganham o assunto pela chave (prazo) ou pelo título (bloqueio)
 UPDATE notifications SET topic = 'prazo' WHERE topic IS NULL AND entity_type = 'task' AND dedupe_key ~ '^(late|due|soon)-';
 UPDATE notifications SET topic = 'bloqueada' WHERE topic IS NULL AND entity_type = 'task' AND title LIKE 'Tarefa bloqueada:%';
+UPDATE notifications SET topic = 'atribuida' WHERE topic IS NULL AND entity_type = 'task' AND (title LIKE '% criou uma tarefa para você:%' OR title LIKE 'Nova tarefa para você:%' OR title LIKE '% atribuiu uma tarefa a você:%' OR title LIKE '% mudou o prazo:%');
 
 -- 2) Leitura de cada thread, por pessoa: o painel "Respostas não lidas" da conversa mostra as threads seguidas com resposta depois daqui.
 CREATE TABLE IF NOT EXISTS chat_thread_reads (

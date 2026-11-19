@@ -86,7 +86,7 @@ async function create({ values, user, assigneeId = null, links = {}, routineId =
       values.notes || null, assigneeId || null, user?.id || null, links.episodeId || null, links.guestId || null, links.sponsorId || null, routineId, autoKey, values.due_on ? (values.due_time || null) : null, values.description_html || null]);
   if (!t) return null;
   if (notifyAssignee && assigneeId) {
-    await notify({ type: 'tarefa', users: [assigneeId], title: `${user ? `${user.name} criou uma tarefa para você` : 'Nova tarefa para você'}: ${t.title}`, body: dueText(t), url: `/tarefas/${t.id}`, actorId: user?.id || null, entity: { type: 'task', id: t.id } });
+    await notify({ type: 'tarefa', users: [assigneeId], title: `${user ? `${user.name} criou uma tarefa para você` : 'Nova tarefa para você'}: ${t.title}`, body: dueText(t), url: `/tarefas/${t.id}`, actorId: user?.id || null, entity: { type: 'task', id: t.id }, topic: 'atribuida' });
   }
   return t;
 }
@@ -107,16 +107,17 @@ async function update(task, values, user, { assigneeId } = {}) {
     [task.id, next.title, next.description, next.kind, next.status, next.block_reason, next.due_on, next.notes, reassign ? (assigneeId || null) : task.assignee_id, next.due_on ? (next.due_time ? toInputTime(next.due_time) : null) : null, next.description_html || null]);
   const url = `/tarefas/${t.id}`;
   if (t.status !== task.status) {
-    // começou ou terminou: "vence hoje", "falta pouco", "atrasada" e "bloqueada" que ainda estavam no sino deixam de ser pendentes
-    if (['fazendo', 'feito'].includes(t.status)) await clearTopics({ entity: { type: 'task', id: t.id }, topics: ['prazo', 'bloqueada'] });
+    // começou ou terminou: "vence hoje", "falta pouco", "atrasada", "bloqueada" e "criou/atribuiu para você" (ou "mudou o prazo")
+    // que ainda estavam no sino deixam de ser pendentes
+    if (['fazendo', 'feito'].includes(t.status)) await clearTopics({ entity: { type: 'task', id: t.id }, topics: ['prazo', 'bloqueada', 'atribuida'] });
     if (t.status === 'feito') await notify({ type: 'tarefa', users: [task.created_by], title: `${user.name} concluiu: ${t.title}`, url, actorId: user.id, entity: { type: 'task', id: t.id } });
     if (t.status === 'bloqueada') await notify({ type: 'tarefa', users: [task.created_by, task.assignee_id], title: `Tarefa bloqueada: ${t.title}`, body: `Motivo: ${t.block_reason}`, url, actorId: user.id, entity: { type: 'task', id: t.id }, topic: 'bloqueada' });
   }
-  if (reassign && t.assignee_id) await notify({ type: 'tarefa', users: [t.assignee_id], title: `${user.name} atribuiu uma tarefa a você: ${t.title}`, body: dueText(t), url, actorId: user.id, entity: { type: 'task', id: t.id } });
+  if (reassign && t.assignee_id) await notify({ type: 'tarefa', users: [t.assignee_id], title: `${user.name} atribuiu uma tarefa a você: ${t.title}`, body: dueText(t), url, actorId: user.id, entity: { type: 'task', id: t.id }, topic: 'atribuida' });
   // prazo (data ou hora) mudou: quem é responsável fica sabendo, a menos que tenha sido ele mesmo a mudar
   const dueChanged = isoDate(t.due_on) !== isoDate(task.due_on) || toInputTime(t.due_time) !== toInputTime(task.due_time);
   if (dueChanged && !reassign && t.assignee_id && String(t.assignee_id) !== String(user.id)) {
-    await notify({ type: 'tarefa', users: [t.assignee_id], title: `${user.name} mudou o prazo: ${t.title}`, body: t.due_on ? dueText(t).replace('Vence em', 'Novo prazo:') : 'A tarefa ficou sem prazo.', url, actorId: user.id, entity: { type: 'task', id: t.id } });
+    await notify({ type: 'tarefa', users: [t.assignee_id], title: `${user.name} mudou o prazo: ${t.title}`, body: t.due_on ? dueText(t).replace('Vence em', 'Novo prazo:') : 'A tarefa ficou sem prazo.', url, actorId: user.id, entity: { type: 'task', id: t.id }, topic: 'atribuida' });
   }
   return { task: t };
 }
