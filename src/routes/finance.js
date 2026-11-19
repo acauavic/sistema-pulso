@@ -285,7 +285,7 @@ router.post('/financeiro/regras/ajustes', requirePerm('finance.write'), wrap(asy
   }
   let alert = null; // "Avisar quando restarem (horas)": só vem com o banco de horas ligado
   if (req.body.studio_bank_alert_hours !== undefined) {
-    alert = num(req.body.studio_bank_alert_hours);
+    alert = String(req.body.studio_bank_alert_hours).trim() === '' ? NaN : num(req.body.studio_bank_alert_hours); // em branco não vira 0
     if (!(alert >= 0 && alert <= 999)) { await req.flash('error', 'Confira as horas do aviso do banco de horas.'); return res.redirect('/financeiro/regras'); }
   }
   await db.query('UPDATE fin_settings SET studio_hour_cents=$1, studio_deposit_cents=$2, studio_minutes=$3, episodes_per_month=$4, opening_balance_cents=$5, opening_on=$6, updated_at=now() WHERE id=1',
@@ -393,10 +393,12 @@ router.post('/financeiro/mensais/:id/excluir', requirePerm('finance.write'), wra
 // ---------------------------------------------------------------- banco de horas do estúdio
 function parsePack(body) {
   const hours = num(body.hours); const amount = parseBRL(body.amount);
-  let boughtOn = parseInputDate(body.bought_on) || fin.todayISO(); if (Number.isNaN(boughtOn)) boughtOn = fin.todayISO();
-  if (!(hours > 0 && hours <= 9999)) return { error: 'Informe quantas horas foram compradas.' };
+  const date = parseInputDate(String(body.bought_on || '').trim()); // vazio = hoje; data inválida é erro (não vira hoje)
+  if (Number.isNaN(date)) return { error: 'Data da compra inválida.' };
   if (amount == null || Number.isNaN(amount) || amount < 0) return { error: 'Valor inválido. Use algo como 5.000,00.' };
-  return { v: { hours, amountCents: amount, boughtOn, note: text(body.note, 300) } };
+  const v = { hours, amountCents: amount, boughtOn: date || fin.todayISO(), note: text(body.note, 300) };
+  const bad = hourBank.checkPack(v); // horas que arredondam para 0 não passam
+  return bad ? { error: bad } : { v };
 }
 
 // Liga o banco: episódio de início + primeira compra. O estúdio em aberto do banco é cancelado pelo sistema; o pago fica.
@@ -406,9 +408,8 @@ router.post('/financeiro/banco/ligar', requirePerm('finance.write'), wrap(async 
   if (!isIntId(req.body.start_episode_id)) { await req.flash('error', 'Escolha o episódio de início.'); return res.redirect(back); }
   const { v, error } = parsePack(req.body);
   if (error) { await req.flash('error', error); return res.redirect(back); }
-  const r = await hourBank.activate({ startEpisodeId: Number(req.body.start_episode_id) });
+  const r = await hourBank.activate({ startEpisodeId: Number(req.body.start_episode_id), pack: v, userId: req.user.id }); // liga + primeira compra, tudo junto
   if (r.error) { await req.flash('error', r.error); return res.redirect(back); }
-  await hourBank.addPack({ ...v, userId: req.user.id });
   await audit(req, 'financeiro.banco_ligado', 'fin_settings', 1, { episodio_inicio: Number(req.body.start_episode_id), cancelados: r.canceled, horas: v.hours, valor: v.amountCents });
   await req.flash('ok', `Banco de horas ligado com ${hourBank.fmtHours(v.hours)}.${r.canceled ? ` ${r.canceled} conta${r.canceled > 1 ? 's' : ''} de estúdio em aberto saí${r.canceled > 1 ? 'ram' : 'u'} da lista.` : ''}`);
   res.redirect('/financeiro');

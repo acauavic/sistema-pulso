@@ -20,6 +20,11 @@ describe('banco de horas do estúdio', () => {
     return prod.createEpisode({ title: `Conversa ${guestId}`, guestId, recordedOn });
   };
   const pay = (id) => as.gestao.act(`/financeiro/lancamentos/${id}/pagar`, {}, { from: '/financeiro' });
+  // edita a data da gravação pela tela do episódio (chama finance.onEpisodeDates)
+  const editDate = async (id, recordedOn) => {
+    const ep = await one('SELECT * FROM episodes WHERE id = $1', [id]);
+    return as.gestao.act(`/episodios/${id}`, { number: String(ep.number), title: ep.title, recorded_on: recordedOn, aired_on: '', notes: '' }, { from: `/episodios/${id}/editar` });
+  };
   const ids = {};
 
   before(async () => {
@@ -40,6 +45,9 @@ describe('banco de horas do estúdio', () => {
     ids.T = (await record(ids.gT, '2026-11-16')).id;
     // F: gravação marcada, ainda sem episódio (sinal em aberto)
     ids.gF = await mkGuest('Dr. Futuro'); await prod.syncFromGuest(ids.gF);
+    // E: foi agendado (sinal em aberto) e voltou para Em agendamento, sem episódio
+    ids.gE = await mkGuest('Dra. Etapa'); await prod.syncFromGuest(ids.gE);
+    await h.db.query("UPDATE guests SET status = 'em_agendamento' WHERE id = $1", [ids.gE]); await prod.syncFromGuest(ids.gE);
   });
   after(async () => { await app.close(); await h.db.close(); });
 
@@ -67,17 +75,24 @@ describe('banco de horas do estúdio', () => {
   });
 
   it('ligar valida os dados e não deixa compra sem horas', async () => {
-    for (const bad of [{ start_episode_id: '999999', hours: '20' }, { start_episode_id: String(ids.S), hours: '0' }, { start_episode_id: String(ids.S), hours: 'abc' }]) {
+    for (const bad of [{ start_episode_id: '999999', hours: '20' }, { start_episode_id: String(ids.S), hours: '0' }, { start_episode_id: String(ids.S), hours: 'abc' },
+      { start_episode_id: String(ids.S), hours: '0,004' }, { start_episode_id: String(ids.S), hours: '20', bought_on: '2026-13-45' }]) {
       const r = await as.gestao.act('/financeiro/banco/ligar', { bought_on: '2026-11-14', amount: '5.000,00', ...bad }, { from: '/financeiro/regras' });
       assert.equal(r.status, 302); assert.match(r.location, /\/financeiro\/regras/);
       assert.equal((await fin.settings()).studio_mode, 'hora', JSON.stringify(bad));
     }
     assert.equal((await q('SELECT 1 FROM fin_hour_packs')).length, 0);
+    assert.equal((await q("SELECT 1 FROM fin_entries WHERE description LIKE 'Estúdio · banco de horas%'")).length, 0, 'banco nunca fica pela metade');
   });
 
   it('ligar: cancela só o estúdio em aberto do banco (episódios a partir do início e convidados agendados); o pago fica', async () => {
-    const r = await as.gestao.act('/financeiro/banco/ligar', { start_episode_id: String(ids.S), bought_on: '2026-11-14', hours: '20', amount: '5.000,00', note: 'Primeiro pacote' }, { from: '/financeiro/regras' });
-    assert.equal(r.status, 302); assert.equal(r.location, '/financeiro');
+    // dois cliques ao mesmo tempo: só um liga e só uma compra é lançada
+    const form = { start_episode_id: String(ids.S), bought_on: '2026-11-14', hours: '20', amount: '5.000,00', note: 'Primeiro pacote' };
+    const [c1, c2] = await Promise.all([as.gestao.csrf('/financeiro/regras'), as.gestao.csrf('/financeiro/regras')]);
+    const rs = await Promise.all([as.gestao.post('/financeiro/banco/ligar', { _csrf: c1, ...form }), as.gestao.post('/financeiro/banco/ligar', { _csrf: c2, ...form })]);
+    assert.ok(rs.every((r) => r.status === 302));
+    assert.ok(rs.some((r) => r.location === '/financeiro'));
+    assert.equal((await q("SELECT 1 FROM fin_entries WHERE description = 'Estúdio · banco de horas (20 h)'")).length, 1, 'uma despesa paga só');
     const s = await fin.settings();
     assert.equal(s.studio_mode, 'banco'); assert.equal(s.studio_bank_start_episode_id, ids.S);
     // antes do corte: intocado
@@ -93,6 +108,7 @@ describe('banco de horas do estúdio', () => {
     assert.equal((await byKey(`estudio-sinal-g${ids.gT}`)).status, 'cancelado');
     const sinalF = await byKey(`estudio-sinal-g${ids.gF}`);
     assert.equal(sinalF.status, 'cancelado'); assert.equal(sinalF.cancel_reason, 'sistema');
+    assert.equal((await byKey(`estudio-sinal-g${ids.gE}`)).status, 'cancelado', 'sinal em aberto de convidado sem episódio (Em agendamento) também sai');
     // a compra: despesa paga de estúdio, ligada ao pacote
     const pack = await one('SELECT * FROM fin_hour_packs');
     assert.equal(Number(pack.hours), 20); assert.equal(Number(pack.amount_cents), 500000); assert.equal(pack.note, 'Primeiro pacote');
@@ -123,10 +139,40 @@ describe('banco de horas do estúdio', () => {
     assert.equal(await bank.isBankEpisode(ids.B), false);
   });
 
+  it('mudar ou apagar a data do episódio de início não move a fronteira do banco', async () => {
+    assert.equal((await editDate(ids.S, '2026-11-20')).status, 302);
+    assert.equal(fin.iso((await one('SELECT recorded_on FROM episodes WHERE id = $1', [ids.S])).recorded_on), '2026-11-20');
+    await fin.recomputeStudio(ids.T);
+    assert.equal((await byKey(`estudio-saldo-e${ids.T}`)).status, 'cancelado', 'T (16/11) continua no banco');
+    assert.equal(await bank.isBankEpisode(ids.T), true);
+    assert.deepEqual((await bank.status()).used.map((u) => u.id).sort(), [ids.S, ids.T].sort());
+    await h.db.query('UPDATE episodes SET recorded_on = NULL WHERE id = $1', [ids.S]);
+    await fin.recomputeStudio(ids.T); await fin.recomputeStudio(ids.S);
+    assert.equal((await byKey(`estudio-saldo-e${ids.T}`)).status, 'cancelado');
+    assert.equal((await byKey(`estudio-saldo-e${ids.S}`)).status, 'cancelado');
+    assert.equal((await bank.status()).usedHours, 2);
+    await h.db.query("UPDATE episodes SET recorded_on = '2026-11-14' WHERE id = $1", [ids.S]);
+  });
+
   it('episódios antes do início continuam no modelo antigo (saldo refeito, sinal e saldo para gravação antiga lançada agora)', async () => {
     await fin.setDuration(ids.B, 120);
     const saldoB = await byKey(`estudio-saldo-e${ids.B}`);
     assert.equal(saldoB.status, 'previsto'); assert.equal(Number(saldoB.amount_cents), 60000 - 15000, '2 h × R$ 300 − sinal');
+    // a data de B passa para depois do início: entra no banco e o estúdio em aberto sai
+    assert.equal((await editDate(ids.B, '2026-11-15')).status, 302);
+    assert.equal((await byKey(`estudio-saldo-e${ids.B}`)).status, 'cancelado');
+    assert.equal((await byKey(`estudio-sinal-g${ids.gB}`)).status, 'cancelado');
+    assert.ok((await bank.status()).used.some((u) => u.id === ids.B), 'B conta como usado');
+    // e volta para antes: sai do banco e o modelo antigo volta como estava
+    assert.equal((await editDate(ids.B, '2026-11-05')).status, 302);
+    assert.equal((await bank.status()).used.some((u) => u.id === ids.B), false);
+    assert.equal((await byKey(`estudio-sinal-g${ids.gB}`)).status, 'previsto');
+    const back = await byKey(`estudio-saldo-e${ids.B}`);
+    assert.equal(back.status, 'previsto'); assert.equal(Number(back.amount_cents), 45000);
+    // episódio importado do histórico (sem contas automáticas): mudar a data não cria estúdio
+    const imp = await one("INSERT INTO episodes (number, title, status, recorded_on) VALUES (900, 'Importado', 'publicado', '2026-10-01') RETURNING *");
+    assert.equal((await editDate(imp.id, '2026-10-02')).status, 302);
+    assert.equal((await q('SELECT 1 FROM fin_entries WHERE episode_id = $1', [imp.id])).length, 0);
     // gravação antiga registrada só agora (10/11, antes do Sandro): ganha sinal e saldo como antes
     const gOld = await mkGuest('Dr. Atrasado', 'agendado', '2026-11-10T18:00:00Z');
     await fin.syncGuest(gOld);
@@ -191,6 +237,9 @@ describe('banco de horas do estúdio', () => {
     const bad = await as.gestao.act('/financeiro/banco/compras', { bought_on: '2026-11-20', hours: '-1', amount: '100,00' }, { from: '/financeiro' });
     assert.equal(bad.status, 302);
     assert.equal((await q('SELECT 1 FROM fin_hour_packs')).length, 1);
+    const badDate = await as.gestao.act('/financeiro/banco/compras', { bought_on: '2026-02-30', hours: '1', amount: '100,00' }, { from: '/financeiro' });
+    assert.equal(badDate.status, 302);
+    assert.equal((await q('SELECT 1 FROM fin_hour_packs')).length, 1, 'data inválida não vira hoje');
     const r = await as.gestao.act('/financeiro/banco/compras', { bought_on: '2026-11-20', hours: '10,5', amount: '2.625,00' }, { from: '/financeiro' });
     assert.equal(r.status, 302); assert.equal(r.location, '/financeiro');
     const st = await bank.status();
@@ -208,6 +257,8 @@ describe('banco de horas do estúdio', () => {
     const base = { studio_hour: '300,00', studio_deposit: '150,00', studio_minutes: '60', episodes_per_month: '4' };
     await as.gestao.act('/financeiro/regras/ajustes', { ...base, studio_bank_alert_hours: 'x' }, { from: '/financeiro/regras' });
     assert.equal((await bank.status()).alertHours, 3, 'valor inválido não salva');
+    await as.gestao.act('/financeiro/regras/ajustes', { ...base, studio_bank_alert_hours: '' }, { from: '/financeiro/regras' });
+    assert.equal((await bank.status()).alertHours, 3, 'em branco não vira 0');
     await as.gestao.act('/financeiro/regras/ajustes', { ...base, studio_bank_alert_hours: '27' }, { from: '/financeiro/regras' });
     let st = await bank.status();
     assert.equal(st.alertHours, 27); assert.equal(st.low, true, 'disponível 27 <= 27');
@@ -236,9 +287,28 @@ describe('banco de horas do estúdio', () => {
     page = (await as.gestao.get('/financeiro')).text;
     assert.match(page, /<div class="notice notice-bad"/);
     assert.match(page, /bank-bar is-neg/);
-    assert.match(page, /−4,5 h/);
-    // a próxima compra cobre o devedor primeiro
+    assert.match(page, /<span class="stat-n hl-bad">−4,5 h<\/span>/);
+    // a próxima compra cobre o devedor primeiro; zerado também é "acabou" (mesma faixa, mesmo vermelho)
+    await as.gestao.act('/financeiro/banco/compras', { bought_on: '2026-11-21', hours: '4,5', amount: '1.125,00' }, { from: '/financeiro' });
+    st = await bank.status();
+    assert.equal(st.availableHours, 0); assert.equal(bank.isOut(st), true);
+    assert.equal(bank.alertText(st), 'Banco de horas do estúdio: acabou (com as gravações marcadas). Hora de renovar.');
+    await fin.tick();
+    assert.equal((await notes()).length, 2, 'zerado é a mesma faixa do negativo');
+    page = (await as.gestao.get('/financeiro')).text;
+    assert.match(page, /<div class="notice notice-bad"/); assert.match(page, /bank-bar is-neg/); assert.match(page, /stat-n hl-bad">0 h/);
+    assert.match((await as.gestao.get('/')).text, /<div class="notice notice-bad"/);
     await as.gestao.act('/financeiro/banco/compras', { bought_on: '2026-11-21', hours: '20', amount: '5.000,00' }, { from: '/financeiro' });
-    assert.equal((await bank.status()).availableHours, 15.5);
+    assert.equal((await bank.status()).availableHours, 20);
+  });
+
+  it('o Início da gestão abre mesmo se o banco de horas falhar', async () => {
+    const real = bank.status;
+    bank.status = async () => { throw new Error('banco fora'); };
+    try {
+      const r = await as.gestao.get('/');
+      assert.equal(r.status, 200);
+      assert.match(r.text, /money-strip/);
+    } finally { bank.status = real; }
   });
 });

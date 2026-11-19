@@ -42,7 +42,9 @@ router.get('/', wrap(async (req, res) => {
   const pMoney = can(req.user.role, 'finance.read') ? Promise.all([fin.counts(), fin.stockItems(), db.query(
     // mesma conta do Financeiro ("A pagar em 7 dias"): de hoje até daqui a 7 dias; o atrasado aparece à parte
     "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'",
-    [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())]), require('../services/hourBank').status()]) : null;
+    [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())]),
+    // o banco de horas nunca derruba o Início: se falhar, a faixa de aviso só não aparece
+    require('../services/hourBank').status().catch((err) => { console.error('Banco de horas (Início):', err.message); return null; })]) : null;
   const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user) : null;
   // Resumo do dia: o dia vem do endereço (?dia=AAAA-MM-DD); sem ele, hoje. A produtora abre no "Seu dia" (os números dela) e vê o
   // resumo da equipe em ?visao=equipe; as outras pessoas abrem no resumo da equipe.
@@ -69,7 +71,7 @@ router.get('/', wrap(async (req, res) => {
     const [c, stock, { rows: [week] }, bank] = await pMoney;
     money = { late: c.atrasados, out7: Number(week.out7), toBuy: stock.filter((i) => i.active && ['comprar', 'acabou'].includes(i.state)).length,
       // banco de horas do estúdio acabando: faixa de aviso acima do resumo do dinheiro
-      bankAlert: bank.low ? { text: require('../services/hourBank').alertText(bank), bad: bank.availableHours < 0 } : null };
+      bankAlert: bank && bank.low ? { text: require('../services/hourBank').alertText(bank), bad: require('../services/hourBank').isOut(bank) } : null };
   }
   const outToday = pOut ? await pOut : null;
   if (outToday) outToday.items = outToday.items.map((x) => ({ ...x, d: outreach.describe(x) }));

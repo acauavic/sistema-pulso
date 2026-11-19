@@ -102,6 +102,9 @@ async function recomputeStudio(episodeId) {
     await cancelBySystem("episode_id = $1 AND auto_key LIKE 'estudio-%'", [episodeId]);
     return;
   }
+  if (s.studio_mode === 'banco') { // saiu do banco (a data mudou para antes do início): o sinal que o sistema cancelou volta
+    await db.query("UPDATE fin_entries SET status = 'previsto', cancel_reason = NULL, updated_at = now() WHERE episode_id = $1 AND auto_key LIKE 'estudio-sinal-%' AND status = 'cancelado' AND cancel_reason = 'sistema'", [episodeId]);
+  }
   if (!s.studio_hour_cents) return;
   const minutes = ep.recording_minutes || s.studio_minutes;
   const total = Math.round((minutes / 60) * s.studio_hour_cents);
@@ -182,6 +185,10 @@ async function onEpisodeDates(episodeId) {
     if (base) await db.query('UPDATE fin_entries SET due_on = $2, updated_at = now() WHERE id = $1', [r.entry_id, addDays(base, r.offset_days)]);
   }
   if (ep.recorded_on) await db.query("UPDATE fin_entries SET due_on = $2, updated_at = now() WHERE auto_key = $1 AND status = 'previsto'", [`estudio-saldo-e${ep.id}`, iso(ep.recorded_on)]);
+  // A data pode ter levado o episódio para dentro ou para fora do banco de horas: refaz o estúdio (idempotente). Só para quem já
+  // tem conta de estúdio; episódio importado do histórico (sem custos automáticos) continua sem nenhuma.
+  const { rows: [hasStudio] } = await db.query("SELECT 1 FROM fin_entries WHERE episode_id = $1 AND auto_key LIKE 'estudio-%' LIMIT 1", [ep.id]);
+  if (hasStudio) await recomputeStudio(ep.id);
 }
 
 async function setDuration(episodeId, minutes) {
