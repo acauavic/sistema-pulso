@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.92.1', date: '2026-11-19', title: 'Direct também para quem foi respondido à mão',
+    items: [
+      { kind: 'correcao', text: 'O direct com a comunidade só saía depois de uma resposta da IA. Agora sai também para quem o Pulso respondeu de outro jeito (à mão, no app ou pela fila de respostas), dentro dos 7 dias do Instagram e no mesmo ritmo do dia.' },
+    ],
+  },
+  {
     version: '1.92.0', date: '2026-11-19', title: 'Direct com a comunidade e convite para seguir nas respostas',
     items: [
       { kind: 'novo', text: 'Respostas por IA no Instagram: quem comentou com conteúdo (opinião, relato, pergunta) recebe, depois da resposta pública, um direct curto que cita o que a pessoa disse e chama para a comunidade do Pulso no WhatsApp. Até 150 por dia (ajustável), no máximo um por pessoa a cada 30 dias e só até 7 dias depois do comentário.' },

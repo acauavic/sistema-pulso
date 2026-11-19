@@ -28,6 +28,9 @@ describe('Respostas por IA: convite para seguir e direct com a comunidade (Insta
       c('a1', 'Treino todo dia às 5h, disciplina mudou minha vida', 'ana.fit', 'U1'), c('a2', '🔥🔥', 'bia', 'U2'),
       c('a3', 'Comecei semana passada e já sinto diferença', 'caio', 'U3'), c('a4', 'Eu acho que motivação ajuda também', 'ana.fit', 'U1'),
       c('a5', 'Isso vale para o trabalho também', 'duda', 'U5', old),
+      // respondido à mão (antes do direct existir): a resposta do Pulso vem aninhada sem o @ e repetida no primeiro nível
+      { ...c('a6', 'Faço isso há 3 anos e confirmo: a constância vence', 'eva.run', 'U6'), replies: [{ id: 'r6', author_username: null, text: 'Três anos! Qual foi o mais difícil?', created_at: now }] },
+      c('r6', 'Três anos! Qual foi o mais difícil?', 'podcastpulso', 'IGP'),
     ];
     global.fetch = async (url, opts = {}) => {
       const s = String(url);
@@ -114,5 +117,24 @@ describe('Respostas por IA: convite para seguir e direct com a comunidade (Insta
     await R.setConfig({ mode: 'aprovar', per_hour: '60', from: '0', to: '24', dm_per_day: '50', invite_on: '1' }); // dm_on desmarcado
     assert.equal((await R.dmTick({ now: new Date() })).reason, 'desligado');
     void at;
+  });
+
+  it('quem foi respondido à mão antes do direct existir também recebe: relê o id de quem comentou e manda no ritmo do dia', async () => {
+    await q("UPDATE social_comments SET author_id = NULL WHERE comment_id = 'a6'");
+    const before = await q("SELECT status, dm_status FROM social_comments WHERE comment_id = 'a6'");
+    assert.deepEqual(before[0], { status: 'respondida', dm_status: null });
+    await R.setConfig({ mode: 'automatico', per_hour: '60', from: '0', to: '24', dm_on: '1', dm_per_day: '50', invite_on: '1' });
+    const r = await R.catchUpDms();
+    assert.equal(r.proposed, 1, JSON.stringify(r));
+    const [a6] = await q("SELECT * FROM social_comments WHERE comment_id = 'a6'");
+    assert.equal(a6.author_id, 'U6', 'a releitura guarda o id de quem comentou');
+    assert.equal(a6.dm_status, 'aprovada'); assert.match(a6.dm_text, /\{comunidade\}/);
+    assert.equal((await R.catchUpDms()).proposed, 0, 'não escreve de novo');
+    await h.db.query("DELETE FROM app_settings WHERE key = 'respostas_ia_direct'");
+    calls.length = 0;
+    assert.equal((await R.dmTick({ now: new Date() })).sent, 1);
+    const dm = calls.find((x) => x.method === 'POST' && x.path === '/v1/conversations');
+    assert.equal(dm.body.instagram.author_id, 'U6'); assert.equal(dm.body.instagram.comment_id, 'a6');
+    assert.equal((await byText('Faço isso há 3 anos e confirmo: a constância vence')).dm_status, 'enviada');
   });
 });

@@ -112,24 +112,26 @@ async function ingest(post, comments, mine) {
     if (oursAt >= 0) {
       // já respondido (pelo sistema ou à mão no app): não responde de novo
       await db.query(
-        `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, author_username, text, commented_at, likes, thread, status, reason)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'respondida','O Pulso já respondeu este comentário.')
+        `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, author_username, text, commented_at, likes, thread, status, reason, author_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'respondida','O Pulso já respondeu este comentário.',$11)
          ON CONFLICT (provider, network, comment_id) DO UPDATE SET thread = EXCLUDED.thread, likes = EXCLUDED.likes, updated_at = now(),
+           author_id = coalesce(social_comments.author_id, EXCLUDED.author_id),
            status = CASE WHEN social_comments.status IN ('nova','proposta','equipe','aprovada','erro') THEN 'respondida' ELSE social_comments.status END,
            reason = CASE WHEN social_comments.status IN ('nova','proposta','equipe','aprovada','erro') THEN EXCLUDED.reason ELSE social_comments.reason END`,
-        [...base, k.id, k.username, String(k.text || '').slice(0, 2000), k.timestamp, k.likes || 0, JSON.stringify(thread)]);
+        [...base, k.id, k.username, String(k.text || '').slice(0, 2000), k.timestamp, k.likes || 0, JSON.stringify(thread), k.authorId || null]);
       // quem comentou voltou a responder depois do Pulso: a conversa continua (até MAX_AI_PER_PERSON respostas da IA)
       const oursCount = replies.filter(isOurs).length;
       const lastOurs = replies.map(isOurs).lastIndexOf(true);
       const back = replies.slice(lastOurs + 1).filter((x) => handleOf(x.username) === handleOf(k.username) && String(x.text || '').trim());
       if (back.length && oursCount < MAX_AI_PER_PERSON) {
         const x = back[back.length - 1];
-        const { rowCount } = await db.query(
+        const { rows } = await db.query(
           `INSERT INTO social_comments (network, post_ref, platform_post_id, publication_id, comment_id, parent_comment_id, author_username, text, commented_at, thread, author_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (provider, network, comment_id) DO NOTHING`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (provider, network, comment_id) DO UPDATE SET author_id = coalesce(social_comments.author_id, EXCLUDED.author_id)
+           RETURNING (xmax = 0) AS inserted`,
           [...base, x.id, k.id, x.username || k.username, String(x.text || '').slice(0, 2000), x.timestamp || null,
             JSON.stringify([{ id: k.id, usuario: k.username, texto: String(k.text || '').slice(0, 400), pulso: false }, ...thread]), x.authorId || k.authorId || null]);
-        fresh += rowCount;
+        fresh += rows.filter((r) => r.inserted).length;
       }
       continue;
     }
@@ -455,8 +457,8 @@ async function dmTick({ now = new Date() } = {}) {
   const link = await communityLink();
   if (!link) return { sent: 0, reason: 'sem link da comunidade' };
   const { rows: [row] } = await db.query(
-    `SELECT * FROM social_comments WHERE dm_status = 'aprovada' AND status IN ('enviada','simulada') AND network = 'instagram' AND author_id IS NOT NULL
-      ORDER BY sent_at, id LIMIT 1`);
+    `SELECT * FROM social_comments WHERE dm_status = 'aprovada' AND status IN ('enviada','simulada','respondida') AND network = 'instagram' AND author_id IS NOT NULL
+      ORDER BY sent_at NULLS LAST, id LIMIT 1`);
   if (!row) return { sent: 0, reason: 'fila vazia' };
   if (await dmRecently(row.network, row.author_username, row.id) && (await db.query(
     "SELECT 1 FROM social_comments WHERE network = $1 AND lower(author_username) = lower($2) AND id <> $3 AND dm_status IN ('enviada','simulada') AND dm_sent_at > now() - ($4 || ' days')::interval",
@@ -483,6 +485,58 @@ async function dmTick({ now = new Date() } = {}) {
   return { sent: 1, id: row.id };
 }
 const dmToday = () => db.query("SELECT count(*)::int AS n FROM social_comments WHERE dm_status IN ('enviada','simulada') AND dm_sent_at > now() - interval '1 day'").then((r) => r.rows[0].n);
+
+// Directs que ficaram para trás: comentários do Instagram com resposta pública (da IA ou à mão) que ainda não tiveram direct, até
+// 7 dias depois do comentário. Relê os posts (para guardar o id de quem comentou) e a IA escreve o direct só de quem comentou com
+// conteúdo. Depois, saem pela rotina de sempre, no ritmo do dia.
+const DM_SYSTEM = `Você escreve directs do Pulso Podcast (saúde, inovação, empreendedorismo e negócios) para quem comentou num post e já recebeu a resposta pública do Pulso.
+Para cada comentário com conteúdo (opinião, relato, pergunta, discordância, quem respondeu o Pulso), escreva "direct": uma mensagem privada curta (até 350 caracteres), em português do Brasil, em tom de conversa, citando o que a pessoa disse, chamando para a comunidade do Pulso no WhatsApp, onde a conversa continua, e terminando com o marcador {comunidade} (vira o link).
+Sem "olá, tudo bem?" genérico, sem vender nada, sem "!!!", sem urgência, sem repetir a resposta pública.
+Deixe "direct" vazio para: só emoji, só marcação de amigo, elogio de uma ou duas palavras, spam, ofensa pesada ou algo sem conteúdo.`;
+const DM_SCHEMA = { type: 'OBJECT', properties: { itens: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: { type: 'STRING' }, direct: { type: 'STRING' } }, required: ['id'] } } }, required: ['itens'] };
+
+async function catchUpDms({ postDays = 60 } = {}) {
+  const c = await getConfig();
+  if (!c.dm_on) return { proposed: 0, skipped: 'direct desligado' };
+  if (!config.geminiConfigured) return { proposed: 0, skipped: 'sem IA' };
+  if (config.outstandConfigured) {
+    const mine = await ourHandles();
+    for (const post of (await watchedPosts({ days: postDays })).filter((p) => p.network === 'instagram')) {
+      await fetchPost(post, mine);
+      await new Promise((res) => setTimeout(res, process.env.NODE_ENV === 'test' ? 0 : 300));
+    }
+  }
+  const { rows } = await db.query(
+    `SELECT * FROM social_comments WHERE network = 'instagram' AND status IN ('enviada','simulada','respondida') AND dm_status IS NULL
+        AND author_id IS NOT NULL AND coalesce(action, 'responder') = 'responder'
+        AND coalesce(commented_at, created_at) > now() - ($1 || ' hours')::interval
+      ORDER BY coalesce(commented_at, created_at) DESC, id DESC`, [String(DM_MAX_AGE_DAYS * 24)]);
+  const team = new Set(c.team_handles.map(handleOf));
+  const guests = new Map(); const seen = new Set(); const pick = [];
+  for (const r of rows) {
+    const who = handleOf(r.author_username);
+    if (!who || team.has(who) || seen.has(who) || !String(r.text || '').trim()) continue;
+    if (!guests.has(r.publication_id)) guests.set(r.publication_id, handleOf((await postContext(r.publication_id))?.guest_ig));
+    if (guests.get(r.publication_id) === who) continue;
+    if (await dmRecently(r.network, r.author_username, r.id)) continue;
+    seen.add(who); pick.push(r);
+  }
+  let proposed = 0;
+  for (let i = 0; i < pick.length; i += 25) {
+    const part = pick.slice(i, i + 25);
+    const brief = `Comentários (JSON):\n${JSON.stringify(part.map((r) => ({ id: String(r.id), usuario: r.author_username, texto: r.text, conversa: r.thread, resposta_do_pulso: r.reply_text || undefined })))}`;
+    const { data } = await gemini.generateJson({ system: DM_SYSTEM, parts: [{ text: brief }], schema: DM_SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
+    const byId = new Map((data?.itens || []).map((it) => [String(it.id), it]));
+    for (const r of part) {
+      const dm = cleanDm(byId.get(String(r.id))?.direct);
+      if (!dm) continue;
+      const { rowCount } = await db.query("UPDATE social_comments SET dm_text = $2, dm_status = $3, updated_at = now() WHERE id = $1 AND dm_status IS NULL",
+        [r.id, dm, c.mode === 'automatico' ? 'aprovada' : 'proposta']);
+      proposed += rowCount;
+    }
+  }
+  return { candidates: pick.length, proposed };
+}
 
 // Previsão de saída de cada resposta da fila (na ordem em que vão sair), para a aba "Na fila".
 function estimate(rows, c, { now = new Date(), nextAt = null } = {}) {
@@ -593,5 +647,5 @@ module.exports = {
   KEY, SEND_KEY, NETWORKS, NETWORK_LABEL, MODES, DEFAULTS, VIEWS, EMOJIS, REPLY_MAX, SYSTEM,
   getConfig, setConfig, summary, watchedPosts, postContext, ingest, sweep, fromWebhook, classifyPublication, cleanReply,
   hourBR, inWindow, sendTick, estimate, friendly, approve, approveAll, setReply, skip, unqueue, undo,
-  DM_KEY, DM_PER_PERSON_DAYS, cleanDm, dmRecently, inviteAllowed, communityLink, renderDm, dmTick, dmToday, skipDm, counts, pendingCount, list, postsWithComments, ofPublication,
+  DM_KEY, DM_PER_PERSON_DAYS, cleanDm, dmRecently, inviteAllowed, communityLink, catchUpDms, renderDm, dmTick, dmToday, skipDm, counts, pendingCount, list, postsWithComments, ofPublication,
 };
