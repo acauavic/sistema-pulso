@@ -389,8 +389,12 @@ async function portalData(sponsor) {
   };
 }
 
+// Site: no máximo um patrocinador oficial (índice único sponsors_site_official_one). Quem muda o oficial (o interruptor, juntar
+// duplicatas, restaurar da lixeira) pega esta trava na transação, para dois pedidos ao mesmo tempo não baterem no índice.
+const lockSiteOfficial = (q) => q("SELECT pg_advisory_xact_lock(hashtext('pulso:site-oficial'))");
+
 module.exports = {
-  addEvent, missingFor, STAGE_HINTS, publicPath, publicUrl, ensureToken, whatsappUrl, recordClick, clickStats,
+  lockSiteOfficial, addEvent, missingFor, STAGE_HINTS, publicPath, publicUrl, ensureToken, whatsappUrl, recordClick, clickStats,
   BRIEF_QUESTIONS, QUESTION_KEYS, briefState, briefStatus, reconcileBrief, applyAnswer, hasLogoFile,
   parseBrief, loadBrief, saveBrief, storeFile, deleteFile, sendFile, portalData, kitAgendaHtml, kitSlots, kitSlotsHtml, kitBrandsHtml,
 };

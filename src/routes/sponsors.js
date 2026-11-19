@@ -97,7 +97,7 @@ router.get('/patrocinadores', requirePerm('sponsors.read'), wrap(async (req, res
   if (stage && view === 'lista') { params.push(stage); where.push(`s.stage = $${params.length}`); }
   const [{ rows: sponsors }, { rows: owners }, totals] = await Promise.all([
     db.query(
-      `SELECT s.id, s.company, s.kind, s.tier, s.value_cents, s.contact_name, s.stage, s.public_token, s.brief_completed_at, s.updated_at, s.owner_id, u.name AS owner_name,
+      `SELECT s.id, s.company, s.kind, s.tier, s.value_cents, s.contact_name, s.stage, s.public_token, s.brief_completed_at, s.updated_at, s.owner_id, u.name AS owner_name, s.origin,
               b.skipped AS b_skipped, b.na AS b_na, b.landing_url, b.landing_perk, b.offer, b.presentation, b.key_points, b.restrictions, b.slogan, b.goal, b.goal_other,
               EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo' AND f.status = 'pronto') AS has_logo
          FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id LEFT JOIN sponsor_briefs b ON b.sponsor_id = s.id
@@ -231,6 +231,34 @@ router.post('/patrocinadores/:id/media-kit', requirePerm('sponsors.write'), wrap
   await sponsorsSvc.addEvent(s.id, req.user.id, 'kit', on ? 'Passou a aparecer no media kit (marcas que já estão com o Pulso)' : 'Saiu do media kit (marcas que já estão com o Pulso)');
   await audit(req, on ? 'patrocinador.kit_mostra' : 'patrocinador.kit_tira', 'sponsor', s.id);
   await req.flash('ok', on ? `${s.company} aparece no media kit.` : `${s.company} saiu do media kit.`);
+  res.redirect(`/patrocinadores/${s.id}`);
+}));
+
+// Site (podcastpulso.com): um patrocinador oficial (no máximo) e "esconder do site". O formulário manda os dois interruptores juntos.
+router.post('/patrocinadores/:id/site', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const id = Number(req.params.id);
+  const official = req.body.official === 'on';
+  const hidden = req.body.hidden === 'on';
+  const client = await db.getPool().connect();
+  let before; let s;
+  try {
+    await client.query('BEGIN');
+    await sponsorsSvc.lockSiteOfficial((text, params) => client.query(text, params));
+    ({ rows: [before] } = await client.query('SELECT id, company, site_official, site_hidden FROM sponsors WHERE id = $1 FOR UPDATE', [id]));
+    if (!before) { await client.query('ROLLBACK'); return notFound(res); }
+    if (official) await client.query('UPDATE sponsors SET site_official = false, updated_at = now() WHERE site_official AND id <> $1', [id]);
+    ({ rows: [s] } = await client.query('UPDATE sponsors SET site_official = $2, site_hidden = $3, updated_at = now() WHERE id = $1 RETURNING id, company', [id, official, hidden]));
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; } finally { client.release(); }
+  const notes = [];
+  if (before.site_official !== official) notes.push(official ? 'virou o patrocinador oficial no site' : 'deixou de ser o patrocinador oficial no site');
+  if (before.site_hidden !== hidden) notes.push(hidden ? 'foi escondido do site' : 'voltou a aparecer no site');
+  if (notes.length) {
+    await sponsorsSvc.addEvent(s.id, req.user.id, 'site', notes.join('; ').replace(/^./, (c) => c.toUpperCase()));
+    await audit(req, 'patrocinador.site', 'sponsor', s.id, { official, hidden });
+    await req.flash('ok', `${s.company}: ${notes.join('; ')}.`);
+  }
   res.redirect(`/patrocinadores/${s.id}`);
 }));
 

@@ -255,8 +255,9 @@ async function createEpisode({ title, guestId = null, recordedOn = null, userId 
   for (let attempt = 0; attempt < 3 && !ep; attempt += 1) {
     try {
       ({ rows: [ep] } = await db.query(
-        `INSERT INTO episodes (number, title, status, guest_id, recorded_on)
-         VALUES ((SELECT coalesce(max(number), 0) + 1 FROM episodes), $1, 'gravado', $2, $3) RETURNING *`, [title, guestId, recordedOn]));
+        `INSERT INTO episodes (number, title, status, guest_id, recorded_on, aired_on)
+         VALUES ((SELECT coalesce(max(number), 0) + 1 FROM episodes), $1, 'gravado', $2, $3,
+                 (SELECT premiere_on FROM guests WHERE id = $2)) RETURNING *`, [title, guestId, recordedOn]));
     } catch (err) {
       if (err.code !== '23505') throw err;
       if (guestId && /guest/.test(err.constraint || '')) { const { rows: [existing] } = await db.query('SELECT * FROM episodes WHERE guest_id = $1', [guestId]); if (existing) return existing; }

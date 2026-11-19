@@ -19,7 +19,7 @@ const { GUEST_STATUSES, STATUS_BY_KEY, isStatus, PROFILES, PROFILE_BY_KEY, CLICK
 const stageMessage = (from, to, g) => `Etapa: ${STATUS_BY_KEY[from].label} → ${STATUS_BY_KEY[to].label}${to === 'perdido' && g.loss_reason ? ` (motivo: ${LOSS_REASONS[g.loss_reason]}${g.loss_note ? `: “${g.loss_note}”` : ''})` : ''}`;
 const lossFields = (b) => ({ loss_reason: Object.prototype.hasOwnProperty.call(LOSS_REASONS, b.loss_reason) ? b.loss_reason : null, loss_note: clean(b.loss_note, 500) || null });
 const { wrap, isUuid, isIntId } = require('../utils/wrap');
-const { clean, isEmail, parseInputDateTime, firstName } = require('../utils/format');
+const { clean, isEmail, parseInputDateTime, parseInputDate, firstName } = require('../utils/format');
 
 const router = express.Router();
 
@@ -30,7 +30,7 @@ const flag = (v) => v === '1' || v === 'on' || v === 'true';
 async function findGuest(id) {
   if (!isIntId(id)) return null;
   const { rows } = await db.query(
-    'SELECT g.*, u.name AS owner_name FROM guests g LEFT JOIN users u ON u.id = g.owner_id WHERE g.id = $1', [id]);
+    'SELECT g.*, g.premiere_on::text AS premiere_on, u.name AS owner_name FROM guests g LEFT JOIN users u ON u.id = g.owner_id WHERE g.id = $1', [id]);
   return rows[0] || null;
 }
 
@@ -61,6 +61,7 @@ async function parseGuestForm(body, guest = null) {
     bio: clean(body.bio, 2000),
     notes: clean(body.notes, 4000),
     proposed_at: parseInputDateTime(body.proposed_at),
+    premiere_on: parseInputDate(body.premiere_on),
     owner_id: isUuid(body.owner_id) ? body.owner_id : null,
     status: isStatus(body.status) ? body.status : 'prospect',
     gender: body.gender === 'f' ? 'f' : 'm',
@@ -82,6 +83,7 @@ async function parseGuestForm(body, guest = null) {
   else if (!values.profile) error = 'Escolha o perfil do convidado.';
   else if (values.email && !isEmail(values.email)) error = 'E-mail do convidado inválido.';
   else if (body.proposed_at && !values.proposed_at) error = 'Data/hora inválida.';
+  else if (Number.isNaN(values.premiere_on)) error = 'Estreia prevista inválida.';
   if (!error && values.owner_id) {
     const { rowCount } = await db.query('SELECT 1 FROM users WHERE id = $1 AND active', [values.owner_id]);
     if (!rowCount) error = 'Responsável inválido.';
@@ -102,13 +104,13 @@ async function parseGuestForm(body, guest = null) {
 
 // O formulário reexibe o que foi digitado (inclusive o que não passou na validação).
 const echoValues = (body, values) => ({
-  ...values, instagram: body.instagram || '', profile: body.profile || '', proposed_at: body.proposed_at,
+  ...values, instagram: body.instagram || '', profile: body.profile || '', proposed_at: body.proposed_at, premiere_on: body.premiere_on || '',
 });
 
 const COLUMNS = ['name', 'email', 'phone', 'instagram', 'profile', 'invite_reason', 'reach', 'company', 'job_title', 'positioning', 'topic', 'bio',
-  'notes', 'proposed_at', 'owner_id', 'status', 'gender', 'is_plural', 'scheduled_studio', 'scheduled_hosts', 'scheduled_guest',
+  'notes', 'proposed_at', 'premiere_on', 'owner_id', 'status', 'gender', 'is_plural', 'scheduled_studio', 'scheduled_hosts', 'scheduled_guest',
   'sponsor_id', 'sponsor_relation', 'loss_reason', 'loss_note'];
-const NULLABLE = new Set(['email', 'phone', 'invite_reason', 'reach', 'company', 'job_title', 'positioning', 'topic', 'bio', 'notes', 'loss_reason', 'loss_note']);
+const NULLABLE = new Set(['email', 'phone', 'invite_reason', 'reach', 'company', 'job_title', 'positioning', 'topic', 'bio', 'notes', 'loss_reason', 'loss_note', 'premiere_on']);
 const columnValues = (values) => COLUMNS.map((c) => (NULLABLE.has(c) ? values[c] || null : values[c]));
 
 // ---- quadro / lista ----
@@ -128,7 +130,7 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   const [{ rows: guests }, { rows: owners }, { rows: sponsors }] = await Promise.all([
     db.query(
       `SELECT g.id, g.name, g.instagram, g.profile, g.company, g.job_title, g.topic, g.status, g.proposed_at, g.invite_sent_at, g.invite_viewed_at,
-              g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason
+              g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason, g.origin
          FROM guests g LEFT JOIN users u ON u.id = g.owner_id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY g.updated_at DESC LIMIT 500`, params),
