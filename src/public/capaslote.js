@@ -33,14 +33,16 @@
       const res = await fetch('/conteudo/capas-em-lote/sugerir', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': csrf }, body });
       const out = await res.json().catch(() => ({}));
       if (!res.ok || !out.ok) throw new Error(out.error || 'A IA não respondeu agora. Tente de novo.');
-      let filled = 0; let failed = 0;
+      let filled = 0; let failed = 0; let kept = 0;
+      const fill = window.PulsoAIFill.create(); // o campo que a pessoa mudou (antes ou enquanto a IA pensava) fica; as sugestões viram botões
       list.forEach((f) => {
         const opts = out.sugestoes?.[f.dataset.coverText];
         if (!Array.isArray(opts) || !opts.length) { failed += 1; return; }
         const before = form.querySelector(`input[name="antes_${f.dataset.coverText}"]`)?.value || '';
-        set(f, opts[0]); alternatives(f, opts, before); filled += 1;
+        if (fill.write(f, opts[0])) filled += 1; else kept += 1;
+        alternatives(f, opts, before);
       });
-      status.textContent = `${filled} ${filled === 1 ? 'texto sugerido' : 'textos sugeridos'}${failed ? `; ${failed} sem resposta da IA` : ''}. Revise e toque em "Salvar as capas".`;
+      status.textContent = `${filled} ${filled === 1 ? 'texto sugerido' : 'textos sugeridos'}${kept ? `; ${kept} ${kept === 1 ? 'mantido' : 'mantidos'} como você escreveu (as sugestões estão embaixo)` : ''}${failed ? `; ${failed} sem resposta da IA` : ''}. Revise e toque em "Salvar as capas".`;
     } catch (err) { status.textContent = err.message; } finally { btn.disabled = false; }
   });
 })();

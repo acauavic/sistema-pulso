@@ -19,12 +19,21 @@
   const say = (text, tone) => { status.textContent = text; status.classList.toggle('voice-err', tone === 'err'); };
   const reset = () => { bar.classList.remove('rec', 'busy'); icons('idle'); label.textContent = 'Falar a tarefa'; btn.disabled = false; clearInterval(timer); };
 
+  // a IA só escreve no que está vazio, no padrão da janela ou no que ela mesma pôs: o que a pessoa escreveu fica (aifill.js)
+  const rich = form.querySelector('[data-rich]');
+  const details = rich && { label: 'Detalhes', defaultValue: '', get value() { return rich.rte ? rich.rte.getHTML() : ''; }, set value(v) { rich.rte?.setPlain(v); } };
   function fill(draft) {
-    const set = (name, value) => { const el = form.elements[name]; if (el && value !== null && value !== undefined && value !== '') el.value = value; };
-    set('title', draft.title); const rte = form.querySelector('[data-rich]'); if (draft.description && rte && rte.rte) rte.rte.setPlain(draft.description); else set('description', draft.description); set('assignee_id', draft.assignee_id); set('due_on', draft.due_on); if (draft.due_on && form.elements.due_time) form.elements.due_time.value = draft.due_time || ''; // prazo novo vale com a hora dita (ou sem hora) set('kind', draft.kind);
+    const f = window.PulsoAIFill.create();
+    const set = (name, value) => f.write(form.elements[name], value);
+    set('title', draft.title);
+    if (details && rich.rte) f.write(details, draft.description); else set('description', draft.description);
+    set('assignee_id', draft.assignee_id);
+    if (set('due_on', draft.due_on)) set('due_time', draft.due_time); // a hora só vale junto com o prazo que a IA pôs
+    set('kind', draft.kind);
     set('episode_id', draft.episode_id); set('guest_id', draft.guest_id); set('sponsor_id', draft.sponsor_id);
     if (draft.episode_id || draft.guest_id || draft.sponsor_id) { const d = form.querySelector('details'); if (d) d.open = true; }
     form.elements.title?.focus();
+    return window.PulsoAIFill.keptText(f.kept());
   }
 
   async function send(blob) {
@@ -34,8 +43,8 @@
       const body = await res.json().catch(() => ({}));
       if (body.transcript && heard) { heardText.textContent = body.transcript; heard.hidden = false; }
       if (!res.ok || !body.ok) throw new Error(body.error || `erro ${res.status}`);
-      fill(body.draft);
-      say(body.warnings && body.warnings.length ? body.warnings.join(' ') : 'Pronto. Confira os campos e toque em Criar tarefa.', body.warnings && body.warnings.length ? 'err' : undefined);
+      const kept = fill(body.draft);
+      say(body.warnings && body.warnings.length ? `${body.warnings.join(' ')} ${kept}`.trim() : `Pronto. Confira os campos e toque em Criar tarefa. ${kept}`.trim(), body.warnings && body.warnings.length ? 'err' : undefined);
     } catch (err) {
       say(err.message, 'err');
     } finally { busy = false; reset(); }

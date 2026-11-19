@@ -9,6 +9,7 @@ module.exports = [
       { kind: 'ajuste', text: 'Quando uma tarefa passa para Fazendo ou Feito, os avisos dela que ainda estavam em Notificações (vence hoje, falta pouco, atrasada e bloqueada) ficam como lidos, para todo mundo que recebeu. O "criou uma tarefa para você" também, quando é você quem começa. O contador cai na hora.' },
       { kind: 'novo', text: 'Mensagens: dentro de cada conversa, a faixa "Respostas não lidas" junta as respostas novas nas threads que você segue (as suas mensagens, as threads em que respondeu e as em que foi marcado). Toque numa linha para abrir a thread.' },
       { kind: 'novo', text: 'Criar tarefa a partir de uma mensagem: no ícone de tarefa, ao lado de reagir e responder, a IA lê a mensagem (ou a thread inteira, se você escolher) e abre a janela Nova tarefa já preenchida. Confira e crie. A mensagem mostra "Tarefa · …" e a tarefa leva de volta à conversa.' },
+      { kind: 'ajuste', text: 'Quando a IA preenche campos sozinha (tarefa por voz, tarefa da mensagem e "Sugerir textos para todos" nas capas em lote), o que você escreveu antes ou enquanto ela trabalhava fica como está. A IA só completa o que está vazio e avisa: "Mantive o que você escreveu em …".' },
       { kind: 'correcao', text: 'Ao abrir uma conversa, algumas mensagens podiam aparecer duas vezes.' },
     ],
   },

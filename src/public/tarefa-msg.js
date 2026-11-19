@@ -13,8 +13,9 @@
   let cur = null; let seq = 0;
 
   const say = (text, tone) => { status.textContent = text; status.classList.toggle('voice-err', tone === 'err'); };
-  const set = (name, value) => { const el = form.elements[name]; if (el && value !== null && value !== undefined && value !== '') { el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); } };
   const rte = () => form.querySelector('[data-rich]')?.rte;
+  // a IA só escreve no que está vazio, no padrão da janela ou no que ela mesma pôs: o que a pessoa escreveu (antes ou durante) fica
+  const details = { label: 'Detalhes', defaultValue: '', get value() { return rte() ? rte().getHTML() : ''; }, set value(v) { rte()?.setPlain(v); } };
 
   function clear() {
     form.reset();
@@ -22,13 +23,16 @@
     const d = form.querySelector('details'); if (d) d.open = false;
   }
   function fill(draft) {
+    const f = window.PulsoAIFill.create();
+    const set = (name, value) => f.write(form.elements[name], value);
     set('title', draft.title);
-    if (draft.description && rte()) rte().setPlain(draft.description);
-    set('assignee_id', draft.assignee_id); set('due_on', draft.due_on);
-    if (draft.due_on && form.elements.due_time) form.elements.due_time.value = draft.due_time || '';
+    f.write(details, draft.description);
+    set('assignee_id', draft.assignee_id);
+    if (set('due_on', draft.due_on)) set('due_time', draft.due_time);
     set('kind', draft.kind);
     set('episode_id', draft.episode_id); set('guest_id', draft.guest_id); set('sponsor_id', draft.sponsor_id);
     if (draft.episode_id || draft.guest_id || draft.sponsor_id) { const d = form.querySelector('details'); if (d) d.open = true; }
+    return window.PulsoAIFill.keptText(f.kept());
   }
 
   async function run(scope) {
@@ -42,9 +46,9 @@
       const body = await res.json().catch(() => ({}));
       if (mine !== seq) return; // trocou de escolha no meio: vale a última
       if (!res.ok || !body.ok) throw new Error(body.error || `Erro ${res.status}`);
-      clear(); keep(); fill(body.draft);
-      say(body.warnings && body.warnings.length ? body.warnings.join(' ') : 'Pronto. Confira os campos e toque em Criar tarefa.', body.warnings && body.warnings.length ? 'err' : undefined);
-      form.elements.title?.focus();
+      keep(); const kept = fill(body.draft); // sem limpar a janela: o que a pessoa escreveu enquanto a IA lia fica
+      say(body.warnings && body.warnings.length ? `${body.warnings.join(' ')} ${kept}`.trim() : `Pronto. Confira os campos e toque em Criar tarefa. ${kept}`.trim(), body.warnings && body.warnings.length ? 'err' : undefined);
+      if (!form.contains(document.activeElement) || document.activeElement === form) form.elements.title?.focus(); // não tira o cursor de quem está digitando
     } catch (err) {
       if (mine === seq) say(err.message, 'err');
     } finally { if (mine === seq) bar.classList.remove('busy'); }
