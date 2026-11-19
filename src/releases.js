@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.85.1', date: '2026-11-18', title: 'Correções de segurança',
+    items: [
+      { kind: 'correcao', text: 'O resumo das reuniões com patrocinador passa a ser guardado só como texto formatado limpo, e os arquivos do patrocinador que não são imagem, áudio, vídeo ou PDF agora sempre baixam, em vez de abrir no painel.' },
+      { kind: 'correcao', text: 'Bibliotecas do servidor atualizadas (leitura de formulários e envio de e-mail), fechando falhas conhecidas.' },
+      { kind: 'ajuste', text: 'O backup diário do banco passa a ter uma cópia fora do servidor, no Backblaze.' },
+    ],
+  },
+  {
     version: '1.85.0', date: '2026-11-18', title: 'Estreia prevista em todo calendário de publicação',
     items: [
       { kind: 'novo', text: 'A estreia prevista do convidado (preenchida a partir de Agendado, antes de o episódio existir) agora aparece em todo calendário de publicação: no site, no media kit ("Quem vem por aí", como estreia), no portal do patrocinador, no Calendário do sistema (como publicação prevista) e no portal do convidado.' },
