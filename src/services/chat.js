@@ -455,9 +455,11 @@ async function unreadThreads(conversationId, userId) {
             (SELECT u.name FROM chat_messages y JOIN users u ON u.id = y.author_id WHERE y.parent_id = r.id AND y.deleted_at IS NULL AND y.author_id IS DISTINCT FROM $2 ORDER BY y.id DESC LIMIT 1) AS last_reply_author
        FROM chat_messages r
        JOIN chat_messages x ON x.parent_id = r.id AND x.deleted_at IS NULL AND x.author_id IS DISTINCT FROM $2
+       JOIN chat_members mb ON mb.conversation_id = r.conversation_id AND mb.user_id = $2 AND mb.left_at IS NULL
        LEFT JOIN chat_thread_reads tr ON tr.parent_id = r.id AND tr.user_id = $2
        LEFT JOIN users ua ON ua.id = r.author_id
       WHERE r.conversation_id = $1 AND r.parent_id IS NULL AND r.event IS NULL AND x.id > coalesce(tr.last_read_id, 0)
+        AND x.created_at > mb.joined_at /* quem entrou depois vê o histórico, mas ele não conta como não lido */
         AND (r.author_id = $2 OR $2 = ANY(r.mentions) OR r.mention_all
              OR EXISTS (SELECT 1 FROM chat_messages f WHERE f.parent_id = r.id AND f.deleted_at IS NULL AND (f.author_id = $2 OR $2 = ANY(f.mentions) OR f.mention_all)))
       GROUP BY r.id, ua.name ORDER BY max(x.id) DESC LIMIT 50`, [conversationId, userId]);

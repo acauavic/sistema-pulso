@@ -160,6 +160,8 @@
   // Junta o que chegou; se for mais antigo do que o que já está na tela, ignora.
   function merge(m) {
     if (!S.cur || m.conversation_id !== S.cur.id) return;
+    if (S.opening === m.conversation_id) { S.syncSkipped = true; return; } // a primeira página ainda vem; a conferência depois dela traz esta
+
     S.maxId = Math.max(S.maxId, m.id);
     if (m.parent_id) {
       if (String(m.author_id) !== me) { if (S.thread?.id === m.parent_id) threadRead(); else refreshUT(); }

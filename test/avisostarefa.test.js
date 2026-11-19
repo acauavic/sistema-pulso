@@ -54,6 +54,13 @@ describe('avisos de tarefa que já não fazem sentido ficam lidos', () => {
     assert.deepEqual(await unread(u.prod.id, id), []);
   });
 
+  it('se outra pessoa move a tarefa, o "criou para você" de quem recebeu continua pendente (o de prazo some)', async () => {
+    const id = (await tasks.create({ values: { title: 'Editar o teaser', kind: 'geral', status: 'a_fazer', due_on: today }, user: u.gestao, assigneeId: u.prod.id })).id;
+    await tasks.dueTick(at('09:00'));
+    await setStatus(as.gestao, id, 'fazendo');
+    assert.deepEqual(await unread(u.prod.id, id), ['Gil Gestão criou uma tarefa para você: Editar o teaser']);
+  });
+
   it('voltar para A fazer não mexe em nada; o prazo continua avisando nos dias seguintes', async () => {
     const id = await make('Revisar o corte');
     await tasks.dueTick(at('09:00'));

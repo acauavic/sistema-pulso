@@ -107,9 +107,13 @@ async function update(task, values, user, { assigneeId } = {}) {
     [task.id, next.title, next.description, next.kind, next.status, next.block_reason, next.due_on, next.notes, reassign ? (assigneeId || null) : task.assignee_id, next.due_on ? (next.due_time ? toInputTime(next.due_time) : null) : null, next.description_html || null]);
   const url = `/tarefas/${t.id}`;
   if (t.status !== task.status) {
-    // começou ou terminou: "vence hoje", "falta pouco", "atrasada", "bloqueada" e "criou/atribuiu para você" (ou "mudou o prazo")
-    // que ainda estavam no sino deixam de ser pendentes
-    if (['fazendo', 'feito'].includes(t.status)) await clearTopics({ entity: { type: 'task', id: t.id }, topics: ['prazo', 'bloqueada', 'atribuida'] });
+    // começou ou terminou: "vence hoje", "falta pouco", "atrasada" e "bloqueada" que ainda estavam no sino deixam de ser pendentes, para todos;
+    // "criou/atribuiu para você" e "mudou o prazo" só para quem mexeu (se foi outra pessoa, quem recebeu ainda não viu)
+    if (['fazendo', 'feito'].includes(t.status)) {
+      const entity = { type: 'task', id: t.id };
+      await clearTopics({ entity, topics: ['prazo', 'bloqueada'] });
+      await clearTopics({ entity, topics: ['atribuida'], users: [user.id] });
+    }
     if (t.status === 'feito') await notify({ type: 'tarefa', users: [task.created_by], title: `${user.name} concluiu: ${t.title}`, url, actorId: user.id, entity: { type: 'task', id: t.id } });
     if (t.status === 'bloqueada') await notify({ type: 'tarefa', users: [task.created_by, task.assignee_id], title: `Tarefa bloqueada: ${t.title}`, body: `Motivo: ${t.block_reason}`, url, actorId: user.id, entity: { type: 'task', id: t.id }, topic: 'bloqueada' });
   }

@@ -214,6 +214,7 @@ describe('assistente de IA: conhece o sistema novo e age com segurança', () => 
   });
 
   it('notificacoes, novidades e equipe: respondem do que a pessoa pode ver', async () => {
+    await tool(as.gestao, 'criar_tarefa', { titulo: 'Conferir o som', responsavel: 'Edu' }); // aviso novo e ainda não lido (o da outra tarefa ficou lido quando ele a começou)
     let r = await tool(as.editor, 'notificacoes', {}); assert.ok(r.nao_lidas >= 1); assert.ok(r.mais_recentes.some((n) => /criou uma tarefa para você/.test(n.aviso)));
     const gestao = await tool(as.gestao, 'notificacoes', {}); assert.notDeepEqual(gestao.mais_recentes, r.mais_recentes, 'cada pessoa vê só as suas');
     r = await tool(as.editor, 'novidades', { quantidade: 2 }); assert.equal(r.versao_atual, require('../package.json').version); assert.equal(r.versoes.length, 2); assert.ok(r.versoes[0].itens.length);

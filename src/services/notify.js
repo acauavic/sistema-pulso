@@ -84,13 +84,17 @@ const markAllRead = (userId, type = null) => db.query(
 
 // O aviso deixou de valer (ex.: a tarefa começou ou terminou): os não lidos destes assuntos ficam lidos, para todo mundo que recebeu.
 // Quem está com o painel aberto recebe 'notifications-read' e o contador se refaz na hora.
-async function clearTopics({ entity, topics }) {
+// users: só os avisos destas pessoas (sem users = de todo mundo que recebeu).
+async function clearTopics({ entity, topics, users = null }) {
   if (!entity?.type || !entity?.id || !topics?.length) return 0;
+  const only = users ? [...new Set(users.filter(Boolean).map(String))] : null;
+  if (only && !only.length) return 0;
   const { rows } = await db.query(
-    `UPDATE notifications SET read_at = now() WHERE entity_type = $1 AND entity_id = $2 AND topic = ANY($3::text[]) AND read_at IS NULL RETURNING user_id`,
-    [entity.type, entity.id, topics]);
-  const users = [...new Set(rows.map((r) => String(r.user_id)))];
-  if (users.length) await realtime.publish(users, { type: 'notifications-read' });
+    `UPDATE notifications SET read_at = now() WHERE entity_type = $1 AND entity_id = $2 AND topic = ANY($3::text[]) AND read_at IS NULL
+       ${only ? 'AND user_id = ANY($4::uuid[])' : ''} RETURNING user_id`,
+    only ? [entity.type, entity.id, topics, only] : [entity.type, entity.id, topics]);
+  const touched = [...new Set(rows.map((r) => String(r.user_id)))];
+  if (touched.length) await realtime.publish(touched, { type: 'notifications-read' });
   return rows.length;
 }
 

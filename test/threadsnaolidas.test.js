@@ -62,6 +62,16 @@ describe('Mensagens: respostas não lidas das threads que eu sigo', () => {
     assert.deepEqual((await unread(c.ana)).filter((t) => t.id === root.id), []);
   });
 
+  it('quem entra no grupo depois não vê as threads antigas como não lidas; a resposta nova aparece', async () => {
+    const root = await say(c.ana, 'Aviso geral @todos');
+    await say(c.bia, 'Ciente', root.id);
+    await post(c.ana, `/mensagens/conversas/${g}/pessoas`, { pessoas: [u.zeca.id] });
+    assert.deepEqual(await unread(c.zeca), [], 'o histórico de antes de entrar não conta');
+    await say(c.bia, 'Mais um ponto', root.id);
+    assert.equal((await unread(c.zeca)).find((t) => t.id === root.id).unread, 1);
+    await post(c.ana, `/mensagens/conversas/${g}/pessoas/${u.zeca.id}/remover`);
+  });
+
   it('quem não participa recebe 404', async () => {
     assert.equal((await get(c.zeca, `/mensagens/conversas/${g}/threads-nao-lidas`)).status, 404);
     const root = await say(c.ana, 'Só do grupo');
