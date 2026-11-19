@@ -89,5 +89,5 @@ O sistema precisa mostrar quanto sobra e avisar quando for hora de renovar.
 - Testes no banco `*_test` próprio (`.superpowers/testdb.env`); a suíte inteira uma vez no fim.
 
 ## Produção (depois do deploy, com o OK do dono)
-- Ligar o banco com início no episódio `id 29` (Sandro Ferraz) e registrar a compra: 14/11/2026? (o dono confirma a data
-  da compra), 20 h, R$ 5.000,00.
+- Ligar o banco com início no episódio `id 29` (Sandro Ferraz) e registrar a compra: **13/11/2026** (sexta-feira, confirmado
+  pelo dono), 20 h, R$ 5.000,00.
