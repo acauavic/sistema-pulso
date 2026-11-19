@@ -376,12 +376,21 @@ async function replyToComment({ postRef, commentId, content, platformPostId = nu
 
 // Comentários de um post que saiu pela Outstand, com as respostas de cada um.
 // -> [{ id, text, username, timestamp, likes, replies: [{ id, text, username, timestamp }] }]
+// Atenção (Instagram, visto em 19/11/2026): vêm só os 25 itens mais recentes, sem paginação; as respostas do próprio perfil
+// aparecem duas vezes (aninhadas, sem o @, e soltas no primeiro nível, com o @ do perfil).
 async function listComments({ postRef, network }) {
   const { json } = await call('GET', `/v1/posts/${encodeURIComponent(postRef)}/replies?network=${encodeURIComponent(network)}&include_replies=true`, { timeout: 25_000 });
-  const list = json.replies?.comments || json.comments || json.data || [];
+  const who = (x) => x.author_username || x.username || x.from?.username || x.platform_specific?.username || null;
+  if (Array.isArray(json.data)) { // formato novo, igual em toda rede
+    return json.data.map((k) => ({
+      id: String(k.id), text: String(k.text || ''), username: who(k), timestamp: k.created_at || k.timestamp || null, likes: Number(k.like_count) || 0,
+      replies: (Array.isArray(k.replies) ? k.replies : k.replies?.data || []).map((x) => ({ id: String(x.id), text: String(x.text || ''), username: who(x), timestamp: x.created_at || x.timestamp || null })),
+    }));
+  }
+  const list = json.replies?.comments || json.comments || [];
   return list.map((k) => ({
-    id: String(k.id), text: String(k.text || ''), username: k.username || k.from?.username || null, timestamp: k.timestamp || k.created_time || null, likes: Number(k.like_count) || 0,
-    replies: (k.replies?.data || []).map((x) => ({ id: String(x.id), text: String(x.text || ''), username: x.username || x.from?.username || null, timestamp: x.timestamp || null })),
+    id: String(k.id), text: String(k.text || ''), username: who(k), timestamp: k.timestamp || k.created_time || null, likes: Number(k.like_count) || 0,
+    replies: (k.replies?.data || []).map((x) => ({ id: String(x.id), text: String(x.text || ''), username: who(x), timestamp: x.timestamp || null })),
   }));
 }
 

@@ -94,11 +94,14 @@ async function ourHandles() {
 async function ingest(post, comments, mine) {
   let fresh = 0;
   const me = handleOf(mine);
+  // No Instagram, a resposta do Pulso vem aninhada sem o @ e repetida no primeiro nível com o @: é nossa se o id está lá.
+  const ourIds = new Set(comments.filter((k) => me && handleOf(k.username) === me).map((k) => String(k.id)));
+  const isOurs = (x) => Boolean((me && handleOf(x.username) === me) || ourIds.has(String(x.id)));
   for (const k of comments) {
-    if (me && handleOf(k.username) === me) continue; // comentário da própria conta
+    if (ourIds.has(String(k.id))) continue; // comentário (ou resposta) da própria conta
     const replies = k.replies || [];
-    const oursAt = replies.findIndex((x) => me && handleOf(x.username) === me);
-    const thread = replies.slice(0, 20).map((x) => ({ id: x.id, usuario: x.username || null, texto: String(x.text || '').slice(0, 400), pulso: Boolean(me && handleOf(x.username) === me) }));
+    const oursAt = replies.findIndex(isOurs);
+    const thread = replies.slice(0, 20).map((x) => ({ id: x.id, usuario: isOurs(x) ? me : (x.username || null), texto: String(x.text || '').slice(0, 400), pulso: isOurs(x) }));
     const base = [post.network, post.post_ref, post.platform_post_id, post.publication_id];
     if (oursAt >= 0) {
       // já respondido (pelo sistema ou à mão no app): não responde de novo
@@ -110,8 +113,8 @@ async function ingest(post, comments, mine) {
            reason = CASE WHEN social_comments.status IN ('nova','proposta','equipe','aprovada','erro') THEN EXCLUDED.reason ELSE social_comments.reason END`,
         [...base, k.id, k.username, String(k.text || '').slice(0, 2000), k.timestamp, k.likes || 0, JSON.stringify(thread)]);
       // quem comentou voltou a responder depois do Pulso: a conversa continua (até MAX_AI_PER_PERSON respostas da IA)
-      const oursCount = replies.filter((x) => me && handleOf(x.username) === me).length;
-      const lastOurs = replies.map((x) => me && handleOf(x.username) === me).lastIndexOf(true);
+      const oursCount = replies.filter(isOurs).length;
+      const lastOurs = replies.map(isOurs).lastIndexOf(true);
       const back = replies.slice(lastOurs + 1).filter((x) => handleOf(x.username) === handleOf(k.username) && String(x.text || '').trim());
       if (back.length && oursCount < MAX_AI_PER_PERSON) {
         const x = back[back.length - 1];

@@ -29,7 +29,8 @@ describe('Respostas por IA nos comentários (Social > Comentários)', () => {
     const c = (id, text, username, replies = []) => ({ id, text, username, timestamp: '2026-11-18T12:00:00+0000', like_count: 0, replies: { data: replies } });
     comments.op1 = [
       c('c1', '50% das mulheres mentem', 'ana1'), c('c2', '👏👏', 'bia2'), c('c3', 'Qual remédio eu tomo para ansiedade?', 'caio3'),
-      c('c4', '@marivabo você é incrível', 'duda4'), c('c5', 'Já respondido', 'edu5', [{ id: 'r5', text: 'Valeu!', username: 'podcastpulso' }]),
+      c('c4', '@marivabo você é incrível', 'duda4'), c('c5', 'Já respondido', 'edu5', [{ id: 'r5', text: 'Valeu!', username: null }]),
+      c('r5', 'Valeu!', 'podcastpulso'), // como o Instagram devolve: a resposta do Pulso também solta, com o @
       c('c6', 'Post nosso', 'podcastpulso'), c('c7', 'Obrigada pelo carinho', 'marivabo'), c('c8', 'texto ambíguo', 'fabi8'),
       c('c9', 'Concordo', 'gui9', [{ id: 'r9', text: 'E você, já viveu isso?', username: 'podcastpulso' }, { id: 'r9b', text: 'Vivi sim, no trabalho', username: 'gui9' }]),
       c('c10', '', 'h10'),
@@ -62,6 +63,7 @@ describe('Respostas por IA nos comentários (Social > Comentários)', () => {
       const body = opts.body ? JSON.parse(opts.body) : null;
       calls.push({ method, path, body });
       if (method === 'GET' && path.startsWith('/v1/social-accounts?')) return Response.json({ success: true, data: [{ id: 'IG1', network: 'instagram', username: 'podcastpulso', isActive: 1 }] });
+      if (method === 'GET' && path.startsWith('/v1/posts/op3/replies')) return Response.json({ success: true, replies: { comments: [] }, data: [{ id: 'n1', author_username: 'kika', text: 'Oi', created_at: '2026-11-19T10:00:00+0000', like_count: 2, replies: [{ id: 'n2', author_username: null, text: 'Olá!' }] }] });
       const m = path.match(/^\/v1\/posts\/(op\d)\/replies/);
       if (m && method === 'GET') return Response.json({ success: true, replies: { comments: comments[m[1]] } });
       if (m && method === 'POST') return body.platform_post_id ? Response.json({ success: true, reply_id: `rep-${body.parent_comment_id}` }) : Response.json({ error: 'platform_post_id required' }, { status: 400 });
@@ -235,6 +237,8 @@ describe('Respostas por IA nos comentários (Social > Comentários)', () => {
     const ost = require('../src/services/outstand');
     await ost.replyToComment({ postRef: 'op1', commentId: 'x1', content: 'Oi', platformPostId: '1789' });
     assert.equal(calls.filter((c) => c.method === 'POST').pop().body.platform_post_id, '1789');
+    const list = await ost.listComments({ postRef: 'op3', network: 'instagram' });
+    assert.deepEqual(list[0], { id: 'n1', text: 'Oi', username: 'kika', timestamp: '2026-11-19T10:00:00+0000', likes: 2, replies: [{ id: 'n2', text: 'Olá!', username: null, timestamp: null }] }, 'formato novo (data) da Outstand');
     void gestaoId;
   });
 });
