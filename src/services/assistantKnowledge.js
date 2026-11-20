@@ -1,4 +1,4 @@
-// Base de conhecimento do assistente: como o Pulso Gestão funciona hoje, por assunto. O assistente consulta pela ferramenta
+// Base de conhecimento do assistente: como o Health Scale Studio funciona hoje, por assunto. O assistente consulta pela ferramenta
 // "como_fazer" (em vez de carregar tudo no prompt) e responde com os passos e o lugar certo no painel.
 // perm: a permissão de quem FAZ o passo (o assistente confere o perfil de quem pergunta e indica quem faz).
 // Mantenha este arquivo junto das mudanças do sistema: assunto novo ou fluxo que mudou entra aqui.

@@ -24,11 +24,31 @@ function getTransport() {
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// Moldura de e-mail na marca Pulso (docs/manual-de-marca.md): cabeçalho preto com wordmark "pulso." e ponto lime,
-// corpo em bone, botão preto com ponto lime. Tabelas + estilos inline e fontes seguras (clientes de e-mail não carregam as da marca).
+// Duas molduras de e-mail, uma por público. Tabelas + estilos inline e fontes seguras (clientes de e-mail não carregam as da marca).
+// 'pulso' (padrão: convidado, patrocinador, tudo o que sai para fora pelo projeto Pulso; docs/manual-de-marca.md): cabeçalho preto com
+// o wordmark "pulso." e ponto lime, corpo em bone, botão preto com ponto lime.
+// 'studio' (equipe: acesso, senha, avisos do painel; docs/design-system.md): cabeçalho escuro com a assinatura Health Scale + STUDIO.
 const DISPLAY = "'Space Grotesk','Helvetica Neue',Arial,sans-serif";
 const MONO = "'JetBrains Mono',Menlo,Consolas,monospace";
-function layout({ title, bodyHtml, button, footer }) {
+const STUDIO = 'Health Scale Studio';
+function layoutStudio({ title, bodyHtml, button, footer }) {
+  const sans = "Archivo,'Helvetica Neue',Arial,sans-serif";
+  const btn = button
+    ? `<p style="margin:28px 0"><a href="${esc(button.url)}" style="background:#101210;color:#F4F4F0;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:600;display:inline-block">${esc(button.label)}</a></p>
+       <p style="font-size:12px;color:#5E6159;word-break:break-all">Se o botão não funcionar, copie este endereço no navegador:<br>${esc(button.url)}</p>`
+    : '';
+  return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#F4F4F0;font-family:${sans}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:6px;overflow:hidden">
+<tr><td style="background:#0E0F0D;color:#F4F4F0;padding:20px 28px;font-size:24px;line-height:1"><span style="font-family:'Instrument Serif',Georgia,'Times New Roman',serif;font-style:italic">Health</span><span style="font-family:${sans};font-weight:800;letter-spacing:-0.02em">Scale</span><span style="color:#54574F;padding:0 12px">|</span><span style="font-family:${MONO};font-size:11px;letter-spacing:.2em;color:#9EDD55">STUDIO</span></td></tr>
+<tr><td style="padding:28px;color:#101210;font-size:15px;line-height:1.6">
+<h1 style="font-family:${sans};font-size:24px;letter-spacing:-0.02em;line-height:1.15;margin:0 0 16px">${esc(title)}</h1>${bodyHtml}${btn}
+</td></tr>
+<tr><td style="padding:16px 28px;background:#F4F4F0;color:#5E6159;font-family:${MONO};font-size:11px;letter-spacing:.08em;text-transform:uppercase">${esc(footer || `Mensagem enviada pelo ${STUDIO}.`)}</td></tr>
+</table></td></tr></table></body></html>`;
+}
+function layout({ title, bodyHtml, button, footer, brand = 'pulso' }) {
+  if (brand === 'studio') return layoutStudio({ title, bodyHtml, button, footer });
   const btn = button
     ? `<p style="margin:28px 0"><a href="${esc(button.url)}" style="background:#0A0A0A;color:#FAFAFA;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:600;display:inline-block">${esc(button.label)} <span style="color:#C8FF42">&#9679;</span></a></p>
        <p style="font-size:12px;color:#6B6B6B;word-break:break-all">Se o botão não funcionar, copie este endereço no navegador:<br>${esc(button.url)}</p>`
@@ -47,14 +67,15 @@ function layout({ title, bodyHtml, button, footer }) {
 // Caixa de saída do modo MAIL_DRY_RUN (útil em dev e nos testes).
 const outbox = [];
 
-async function sendMail({ to, subject, html, text, replyTo, icalEvent }) {
+// fromName: os e-mails da equipe saem como "Health Scale Studio"; sem ele, vale o remetente do projeto (BREVO_FROM_NAME).
+async function sendMail({ to, subject, html, text, replyTo, icalEvent, fromName }) {
   if (config.mailDryRun) {
-    outbox.push({ to, subject, html, replyTo, icalEvent });
+    outbox.push({ to, subject, html, replyTo, icalEvent, fromName });
     console.log(`[mail:dry-run] para=${to} assunto="${subject}"`);
     return `dry-run-${outbox.length}`;
   }
   const info = await getTransport().sendMail({
-    from: { name: config.brevo.fromName, address: config.brevo.from },
+    from: { name: fromName || config.brevo.fromName, address: config.brevo.from },
     to,
     replyTo,
     subject,
@@ -78,10 +99,12 @@ const paragraphs = (text) =>
 async function sendUserInvite({ to, name, url, invitedBy }) {
   return sendMail({
     to,
-    subject: `Seu acesso à gestão do ${config.podcastName}`,
+    fromName: STUDIO,
+    subject: `Seu acesso ao ${STUDIO}`,
     html: layout({
-      title: `Olá, ${name}!`,
-      bodyHtml: `<p style="margin:0 0 14px">${esc(invitedBy)} criou um acesso para você na plataforma de gestão do ${esc(config.podcastName)}.</p>
+      brand: 'studio',
+      title: `Olá, ${name}`,
+      bodyHtml: `<p style="margin:0 0 14px">${esc(invitedBy)} criou um acesso para você no ${STUDIO}, o painel da equipe.</p>
                  <p style="margin:0 0 14px">Clique abaixo para definir sua senha. O link vale por 72 horas e só funciona uma vez.</p>`,
       button: { label: 'Definir minha senha', url },
     }),
@@ -91,8 +114,10 @@ async function sendUserInvite({ to, name, url, invitedBy }) {
 async function sendPasswordReset({ to, name, url }) {
   return sendMail({
     to,
-    subject: `Redefinição de senha — ${config.podcastName}`,
+    fromName: STUDIO,
+    subject: `Redefinição de senha: ${STUDIO}`,
     html: layout({
+      brand: 'studio',
       title: `Olá, ${name}`,
       bodyHtml: `<p style="margin:0 0 14px">Recebemos um pedido para redefinir sua senha. O link vale por 1 hora e só funciona uma vez.</p>
                  <p style="margin:0 0 14px">Se não foi você, ignore este e-mail: sua senha continua a mesma.</p>`,
@@ -118,10 +143,12 @@ async function sendGuestInvite({ to, guestName, subject, message, url, replyTo }
 async function sendRsvpNotice({ to, guestName, accepted, message, url }) {
   return sendMail({
     to,
+    fromName: STUDIO,
     subject: `${guestName} ${accepted ? 'aceitou' : 'recusou'} o convite`,
     html: layout({
+      brand: 'studio',
       title: `${guestName} ${accepted ? 'aceitou' : 'recusou'} o convite`,
-      bodyHtml: message ? `<p style="margin:0 0 14px">Mensagem do convidado:</p><blockquote style="margin:0 0 14px;padding:8px 14px;border-left:3px solid #2D1B4E;color:#4A4A4A">${esc(message)}</blockquote>` : '<p style="margin:0">Sem mensagem adicional.</p>',
+      bodyHtml: message ? `<p style="margin:0 0 14px">Mensagem do convidado:</p><blockquote style="margin:0 0 14px;padding:8px 14px;border-left:3px solid #C9C9C1;color:#54574F">${esc(message)}</blockquote>` : '<p style="margin:0">Sem mensagem adicional.</p>',
       button: { label: 'Abrir no CRM', url },
     }),
   });
@@ -147,8 +174,9 @@ ${address ? `<p style="margin:0 0 16px">${esc(address)}</p>` : ''}
 async function sendSponsorNotice({ to, title, text, url }) {
   return sendMail({
     to,
+    fromName: STUDIO,
     subject: title,
-    html: layout({ title, bodyHtml: `<p style="margin:0">${esc(text)}</p>`, button: { label: 'Abrir no CRM', url } }),
+    html: layout({ brand: 'studio', title, bodyHtml: `<p style="margin:0">${esc(text)}</p>`, button: { label: 'Abrir no CRM', url } }),
   });
 }
 
@@ -173,8 +201,9 @@ async function sendGuestPortal({ to, guestName, url, kind, posts = [] }) {
 async function sendNotification({ to, title, text, url }) {
   return sendMail({
     to,
+    fromName: STUDIO,
     subject: title,
-    html: layout({ title, bodyHtml: `<p style="margin:0">${esc(text || '')}</p>`, button: url ? { label: 'Abrir no painel', url } : null }),
+    html: layout({ brand: 'studio', title, bodyHtml: `<p style="margin:0">${esc(text || '')}</p>`, button: url ? { label: 'Abrir no painel', url } : null }),
   });
 }
 

@@ -88,7 +88,7 @@ async function main() {
     await require('./services/realtime').listen();
     const app = createApp();
     server = app.listen(config.port, () => {
-      console.log(`Pulso Gestão (${ROLE}) no ar em ${config.appBaseUrl} (porta ${config.port})`);
+      console.log(`Health Scale Studio (${ROLE}) no ar em ${config.appBaseUrl} (porta ${config.port})`);
       if (!config.mailConfigured) console.warn('AVISO: SMTP da Brevo não configurado — e-mails não serão enviados.');
       if (!config.yourlsConfigured) console.warn('AVISO: YOURLS não configurado — links curtos desativados.');
     });
@@ -97,7 +97,7 @@ async function main() {
     server = http.createServer(async (req, res) => {
       if (req.url !== '/healthz') { res.writeHead(404); return res.end(); }
       try { await db.query('SELECT 1'); res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"ok":true,"role":"worker"}'); } catch { res.writeHead(503); res.end('{"ok":false}'); }
-    }).listen(config.port, () => console.log(`Pulso Gestão (worker) rodando a fila e as rotinas; saúde em :${config.port}/healthz`));
+    }).listen(config.port, () => console.log(`Health Scale Studio (worker) rodando a fila e as rotinas; saúde em :${config.port}/healthz`));
   }
 
   await chat.start({ web: runsWeb, worker: runsWorker }); // mensagens: RabbitMQ (ou Postgres, se ele faltar) e o publicador da chat_outbox

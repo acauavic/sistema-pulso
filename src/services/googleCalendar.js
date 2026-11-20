@@ -115,7 +115,7 @@ function payload(e, { extra = null, address = '', minutes = 120 } = {}) {
   const timed = e.time && TIMED.has(e.type);
   const body = {
     summary: e.type === 'gravacao' ? e.title.replace(/^Gravação: /, 'Gravação Pulso: ') : e.title,
-    description: lines.join('\n'), status: 'confirmed', source: { title: 'Pulso Gestão', url: link },
+    description: lines.join('\n'), status: 'confirmed', source: { title: 'Health Scale Studio', url: link },
     extendedProperties: { private: { pulsoKey: e.id, pulsoType: e.type } },
   };
   if (timed) {

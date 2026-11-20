@@ -66,7 +66,7 @@ self.addEventListener('push', (event) => {
     const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (data.tag !== 'teste' && open.some((c) => c.focused && c.visibilityState === 'visible')) return;
     const chat = data.kind === 'mensagem';
-    await self.registration.showNotification(data.title || 'Pulso', {
+    await self.registration.showNotification(data.title || 'Health Scale Studio', {
       body: data.body || '',
       tag: data.tag || undefined,
       icon: '/static/icon-192.png',

@@ -36,4 +36,38 @@ describe('identidade: marca do painel nas páginas', () => {
     assert.match(off, /class="brand brand-sign"/); assert.match(off, /Sem conexão/); assert.match(off, /Health Scale Studio/);
     assert.doesNotMatch(off, /wordmark|O Pulso está|style=|#333333/);
   });
+
+  it('e-mails da equipe saem como Health Scale Studio; os do convidado continuam com a marca do Pulso', async () => {
+    const mailer = require('../src/services/mailer');
+    mailer.outbox.length = 0;
+    await mailer.sendUserInvite({ to: 'nova@t.com', name: 'Ana', url: 'http://x/definir', invitedBy: 'Gil' });
+    await mailer.sendPasswordReset({ to: 'nova@t.com', name: 'Ana', url: 'http://x/senha' });
+    await mailer.sendNotification({ to: 'nova@t.com', title: 'Tarefa nova', text: 'Revisar o corte', url: 'http://x/tarefas/1' });
+    await mailer.sendRsvpNotice({ to: 'nova@t.com', guestName: 'Dr. Fulano', accepted: true, message: '', url: 'http://x/convidados/1' });
+    await mailer.sendSponsorNotice({ to: 'nova@t.com', title: 'Briefing recebido', text: 'A marca respondeu', url: 'http://x/patrocinadores/1' });
+    const equipe = mailer.outbox.splice(0);
+    assert.equal(equipe.length, 5);
+    for (const m of equipe) {
+      assert.match(m.html, /Health<\/span>/, m.subject); assert.match(m.html, /STUDIO/); assert.match(m.html, /#9EDD55/);
+      assert.doesNotMatch(m.html, /pulso<span|#C8FF42/i, `${m.subject}: e-mail interno sem a marca do Pulso`);
+      assert.equal(m.fromName, 'Health Scale Studio');
+    }
+    assert.equal(equipe[0].subject, 'Seu acesso ao Health Scale Studio');
+    assert.match(equipe[0].html, /Health Scale Studio/);
+    assert.equal(equipe[1].subject, 'Redefinição de senha: Health Scale Studio');
+
+    await mailer.sendGuestInvite({ to: 'convidado@t.com', guestName: 'Dr. Fulano', subject: 'Convite', message: 'Venha gravar', url: 'http://x/convite/abc' });
+    const [convite] = mailer.outbox.splice(0);
+    assert.match(convite.html, /pulso<span style="color:#C8FF42">/, 'o convidado continua recebendo o e-mail do Pulso');
+    assert.doesNotMatch(convite.html, /STUDIO/);
+    assert.equal(convite.fromName, undefined, 'o remetente do convite é o do projeto (o padrão)');
+  });
+
+  it('nenhum "Pulso Gestão" sobra no código do painel', () => {
+    const fs = require('node:fs'); const path = require('node:path');
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+    const src = path.join(__dirname, '..', 'src');
+    for (const f of walk(src).filter((f) => /\.(js|ejs|css|html|webmanifest)$/.test(f) && !path.basename(f).startsWith('._') && !f.endsWith(path.join('src', 'releases.js'))))
+      assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /Pulso Gestão/, path.relative(src, f));
+  });
 });

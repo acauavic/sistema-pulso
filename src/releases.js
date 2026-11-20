@@ -1,4 +1,4 @@
-// Histórico de versões do Pulso Gestão, da mais nova para a mais antiga. A primeira entrada é a versão no ar:
+// Histórico de versões do Health Scale Studio (antes, Pulso Gestão), da mais nova para a mais antiga. A primeira entrada é a versão no ar:
 // ela tem que ser igual ao "version" do package.json (o teste confere). Ao lançar: acrescente a entrada no topo,
 // suba o package.json e avise no memory.md. Cada pessoa vê um aviso uma vez por versão nova e a página /novidades.
 // kind: novo | ajuste | correcao

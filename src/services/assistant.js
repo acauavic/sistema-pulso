@@ -294,7 +294,7 @@ const toolsFor = (user) => TOOLS.filter((t) => !t.perm || can(user.role, t.perm)
 function systemPrompt(user, page) {
   const today = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' }).format(new Date());
   return [
-    'Você é o assistente do Pulso Gestão, o painel da equipe do Podcast Pulso ("As conversas que estão movimentando a saúde").',
+    'Você é o assistente do Health Scale Studio, o painel da equipe do Podcast Pulso ("As conversas que estão movimentando a saúde").',
     `Agora é ${today} (horário de Brasília). Quem pergunta: ${user.name} (${ROLES[user.role]?.label || user.role}).${page ? ` A pessoa está na página ${page}.` : ''}`,
     'Tom: português do Brasil, direto e cordial, frases curtas, sem exclamações, sem emoji, sem superlativos. Responda em poucas linhas; use listas curtas com "-" quando ajudar.',
     'Regra de ouro: nunca invente números, nomes, datas, valores ou passos. Dado do painel vem das ferramentas; se não vier, diga que não encontrou. Datas relativas (amanhã, sexta, dia 25) você converte pela data de hoje; "às 14" é a hora, em Brasília.',
