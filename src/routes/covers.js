@@ -14,7 +14,11 @@ const { wrap, isIntId } = require('../utils/wrap');
 
 const router = express.Router();
 const MAX_IMAGE = 12 * 1024 * 1024;
-const KINDS = { youtube_thumb: 'Thumbnail do YouTube', reel_cover: 'Capa de Reels/TikTok', post_quote: 'Post de frase', post_split: 'Tela dividida', carousel: 'Carrossel', entrega: 'Imagem entregue' };
+const KINDS = { youtube_thumb: 'Thumbnail do YouTube', reel_cover: 'Capa de Reels/TikTok', post_quote: 'Post de frase', post_split: 'Tela dividida', carousel: 'Carrossel', entrega: 'Imagem entregue', spotify_cover: 'Capa do Spotify' };
+const pieces = require('../services/coverPieces');
+const sheets = require('../services/coverSheet');
+const M = require('../public/design/models');
+const EP_PIECES = ['youtube_thumb', 'spotify_cover']; // as peças do episódio que nascem da ficha
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Capa não encontrada.' });
 const canDesign = (role) => can(role, 'covers.edit'); // gestão, editor e produtora (ela ajusta a capa ao agendar o post)
 const canGenerate = (role) => can(role, 'production.review') || can(role, 'production.edit'); // gerar com a IA é passo da finalização
@@ -52,7 +56,7 @@ async function episodePhotos(episodeId) {
 const THUMB_SIDE = require('../services/coverStore').THUMB_SIDE;
 const fileName = (ep, c) => `${ep?.number ? `ep${String(ep.number).padStart(3, '0')}` : (c.clip_id ? `corte${c.clip_id}` : 'episodio')}-${c.kind.replace(/_/g, '-')}-${c.position + 1}.jpg`;
 // Para onde voltar depois de aprovar/excluir: cada tipo de capa mora num lugar.
-const homeOf = (c) => (c.clip_id ? `/cortes/${c.clip_id}` : (c.kind === 'youtube_thumb' ? `/episodios/${c.episode_id}#capas` : `/conteudo?episodio=${c.episode_id}#posts`));
+const homeOf = (c) => (c.clip_id ? `/cortes/${c.clip_id}` : (EP_PIECES.includes(c.kind) ? `/episodios/${c.episode_id}?capas=${c.kind === 'spotify_cover' ? 'spotify' : 'youtube'}#capas` : `/conteudo?episodio=${c.episode_id}#posts`));
 
 router.get(both('/imagem'), requirePerm('episodes.read'), wrap(async (req, res) => {
   const c = await findCover(req);
@@ -66,6 +70,10 @@ router.get(both('/imagem'), requirePerm('episodes.read'), wrap(async (req, res) 
     if (sent !== false) return sent;
   }
   const { rows: [ep] } = c.episode_id ? await db.query('SELECT number FROM episodes WHERE id = $1', [c.episode_id]) : { rows: [] };
+  if (req.query.baixar === '1' && c.model && EP_PIECES.includes(c.kind) && !c.clip_id) { // peça do guia: nome e formato do guia (PNG quando cabe)
+    const file = await pieces.download(c, ep);
+    if (file) return res.set({ 'Content-Type': file.mime, 'Content-Disposition': `attachment; filename="${file.name}"`, 'Cache-Control': 'no-store' }).send(file.buffer);
+  }
   const url = await b2.presignGet(c.storage_key, { expires: 3600, download: req.query.baixar === '1' ? fileName(ep, c) : null });
   // A capa muda de arquivo quando é editada (o antigo é apagado do bucket). Só dá para guardar o redirecionamento no navegador
   // quando o endereço traz a versão atual (?v=updated_at); "Baixar" e links sem versão perguntam sempre, para nunca cair no
@@ -77,6 +85,18 @@ router.post('/episodios/:id/capas/gerar', requirePerm('episodes.read'), wrap(asy
   if (!canGenerate(req.user.role)) return deny(res);
   if (!isIntId(req.params.id)) return notFound(res);
   const kinds = [].concat(req.body.kinds || ['youtube_thumb', 'post_quote', 'post_split', 'carousel']).filter((k) => KINDS[k]);
+  if (req.body.pecas === '1') { // capas pelo guia: a ficha, 3 thumbnails (uma por ângulo) e a capa do Spotify
+    try {
+      const out = await pieces.generate(req.params.id, { userId: req.user.id, newSheet: req.body.ficha === 'nova' });
+      await prod.addEvent(req.params.id, req.user.id, 'capas', `${out.created.length} capas geradas pela ficha`);
+      await req.flash(out.created.length ? 'ok' : 'error', out.created.length
+        ? `${out.created.length === 1 ? '1 capa pronta' : `${out.created.length} capas prontas`}.${out.fails.length ? ` ${out.fails.map((f) => f.what).join(' e ')} ${out.fails.length === 1 ? 'ficou' : 'ficaram'} de fora: veja o motivo no cartão.` : ''}`
+        : (out.fails.length ? 'Nenhuma capa saiu: os textos passam do limite. Ajuste cada uma no cartão.' : 'Nada novo para gerar: as capas aprovadas ou ajustadas ficam como estão.'));
+    } catch (err) {
+      await req.flash('error', `Não foi possível gerar: ${err.message}`);
+    }
+    return res.redirect(`/episodios/${req.params.id}?capas=youtube#capas`);
+  }
   try {
     const made = await store.generateForEpisode(req.params.id, { kinds, userId: req.user.id });
     await prod.addEvent(req.params.id, req.user.id, 'capas', `${made.length} capas e posts gerados`);
@@ -188,14 +208,118 @@ router.post(both('/aprovar'), requirePerm('episodes.read'), wrap(async (req, res
     return res.redirect(homeOf(c));
   }
   if (c.kind === 'youtube_thumb') {
-    await db.query('UPDATE episode_covers SET approved = false WHERE episode_id = $1 AND kind = $2', [c.episode_id, c.kind]);
+    // Várias podem ser aprovadas (vão juntas para o teste A/B do YouTube). A principal é a que sai na publicação: a primeira
+    // aprovada, até alguém escolher outra. Tirar a aprovação da principal passa a vez para outra aprovada.
     await db.query('UPDATE episode_covers SET approved = $2 WHERE id = $1', [c.id, approve]);
+    const { rows: [meta] } = await db.query('SELECT thumb_cover_id FROM episode_metadata WHERE episode_id = $1', [c.episode_id]);
+    const { rows: ok } = await db.query("SELECT id FROM episode_covers WHERE episode_id = $1 AND kind = 'youtube_thumb' AND clip_id IS NULL AND approved ORDER BY position, id", [c.episode_id]);
+    const main = ok.some((r) => r.id === meta?.thumb_cover_id) ? meta.thumb_cover_id : (ok[0]?.id || null);
     await db.query(
       `INSERT INTO episode_metadata (episode_id, thumb_cover_id) VALUES ($1, $2) ON CONFLICT (episode_id) DO UPDATE SET thumb_cover_id = $2, updated_at = now()`,
-      [c.episode_id, approve ? c.id : null]);
+      [c.episode_id, main]);
+  } else if (c.kind === 'spotify_cover') { // a capa do Spotify é uma só
+    await db.query("UPDATE episode_covers SET approved = (id = $2 AND $3) WHERE episode_id = $1 AND kind = 'spotify_cover' AND clip_id IS NULL", [c.episode_id, c.id, approve]);
   } else await db.query('UPDATE episode_covers SET approved = $2 WHERE id = $1', [c.id, approve]);
   await prod.addEvent(c.episode_id, req.user.id, 'capas', `${approve ? 'Aprovada' : 'Aprovação removida'}: ${c.label || KINDS[c.kind]}`);
   res.redirect(homeOf(c));
+}));
+
+// A principal das aprovadas: é a que vai para o YouTube quando o episódio é publicado.
+router.post(both('/principal'), requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!can(req.user.role, 'production.review') && !can(req.user.role, 'production.manage')) return deny(res);
+  const c = await findCover(req);
+  if (!c || c.kind !== 'youtube_thumb' || c.clip_id) return notFound(res);
+  await db.query('UPDATE episode_covers SET approved = true WHERE id = $1', [c.id]);
+  await db.query('INSERT INTO episode_metadata (episode_id, thumb_cover_id) VALUES ($1, $2) ON CONFLICT (episode_id) DO UPDATE SET thumb_cover_id = $2, updated_at = now()', [c.episode_id, c.id]);
+  await prod.addEvent(c.episode_id, req.user.id, 'capas', `Thumbnail principal: ${c.label || KINDS[c.kind]}`);
+  res.redirect(homeOf(c));
+}));
+
+// ---------------------------------------------------------------- peças do guia: ficha e a janela "Ajustar capa"
+// Nome, credencial e eixo (a base da ficha). As peças que usam esses campos são refeitas; a aprovada fica "desatualizada".
+router.post('/episodios/:id/ficha-das-capas', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canGenerate(req.user.role) && !canDesign(req.user.role)) return deny(res);
+  if (!isIntId(req.params.id)) return notFound(res);
+  const tag = sheets.clean(req.body.tag);
+  const bad = M.fieldError('tag', tag) || M.fieldError('guest', sheets.clean(req.body.guest));
+  if (bad) { await req.flash('error', bad); return res.redirect(`/episodios/${req.params.id}?capas=youtube&abrir=modal-ficha#capas`); }
+  await sheets.update(req.params.id, { guest: req.body.guest, tag, axis: req.body.axis });
+  const r = await pieces.refresh(Number(req.params.id), { userId: req.user.id });
+  await prod.addEvent(req.params.id, req.user.id, 'capas', 'Ficha das capas atualizada');
+  await req.flash('ok', `Ficha salva.${r.redone ? ` ${r.redone === 1 ? '1 capa refeita' : `${r.redone} capas refeitas`}.` : ''}${r.stale ? ` ${r.stale === 1 ? 'A aprovada ficou' : 'As aprovadas ficaram'} como estava${r.stale === 1 ? '' : 'm'}: use Atualizar no cartão.` : ''}`);
+  res.redirect(`/episodios/${req.params.id}?capas=youtube#capas`);
+}));
+
+// Um ângulo que ainda não tem capa (o texto passou do limite na geração): a mesma janela, e salvar cria a capa.
+async function angleCover(req) {
+  if (!isIntId(req.params.id) || !sheets.ANGLE_KEYS.includes(req.params.angle)) return null;
+  const { rows: [meta] } = await db.query('SELECT m.cover_sheet FROM episodes e LEFT JOIN episode_metadata m ON m.episode_id = e.id WHERE e.id = $1', [req.params.id]);
+  if (!meta?.cover_sheet) return null;
+  const angle = req.params.angle;
+  return { id: null, episode_id: Number(req.params.id), clip_id: null, kind: 'youtube_thumb', angle, model: sheets.pickModel(meta.cover_sheet, angle, meta.cover_sheet.angles?.[angle]?.model), spec: null, position: sheets.ANGLE_KEYS.indexOf(angle) };
+}
+const ADJUST = [...both('/ajustar'), '/episodios/:id/capas/angulo/:angle/ajustar'];
+const adjustTarget = (req) => (req.params.angle ? angleCover(req) : findCover(req));
+
+// O que a janela precisa: os campos da ficha desta peça, os quadros e as fotografias que podem virar foto.
+router.get(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não ajusta capas.' });
+  const c = await adjustTarget(req);
+  if (!c || !c.model || c.clip_id) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
+  const ctx = await sheets.context(c.episode_id);
+  const sheet = ctx.meta?.cover_sheet || {};
+  const frames = (await store.loadFrames(c.episode_id, { clipId: null, custom: true })).map((f) => ({
+    ref: f.ref, url: `/quadros/${f.id}`, w: f.width, h: f.height, face: pieces.photoOf(f).face, photo: Boolean(f.analysis?.from_file), custom: Boolean(f.analysis?.custom), fileId: f.analysis?.from_file || null,
+  }));
+  const { rows: [g] } = await db.query(
+    `SELECT e.number FROM episode_covers c JOIN episodes e ON e.id = c.episode_id WHERE c.model = 'YT-G' AND c.approved AND c.episode_id <> $1 ORDER BY e.number DESC NULLS LAST LIMIT 1`, [c.episode_id]);
+  const recent = g?.number && ctx.episode?.number && ctx.episode.number - g.number < 5 && ctx.episode.number > g.number;
+  res.json({
+    ok: true,
+    cover: { id: c.id, kind: c.kind, model: c.model, angle: c.angle, flip: Boolean(c.spec?.flip), photo: c.spec?.photo || null },
+    data: sheets.dataFor(sheet, ctx.episode, c.angle), quoteFound: sheet.quote?.found !== false,
+    frames, photos: c.id ? await episodePhotos(c.episode_id) : [], photoUrl: c.id ? `/capas/${c.id}/foto` : null, saveUrl: c.id ? `/capas/${c.id}/ajustar` : `/episodios/${c.episode_id}/capas/angulo/${c.angle}/ajustar`,
+    special: g?.number ? { last: `EP.${String(g.number).padStart(3, '0')}`, recent: Boolean(recent) } : null,
+  });
+}));
+
+router.post(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não ajusta capas.' });
+  const c = await adjustTarget(req);
+  if (!c || !c.model || c.clip_id) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
+  const b = req.body || {};
+  const fields = {};
+  for (const k of ['pre', 'hl', 'post', 'setup', 'punch', 'num', 'line', 'quote', 'hook', 'guest']) if (typeof b.fields?.[k] === 'string') fields[k] = b.fields[k].slice(0, 300);
+  const out = await pieces.adjust(c, { model: String(b.model || ''), fields, frame: typeof b.frame === 'string' ? b.frame : null, flip: b.flip === undefined ? undefined : b.flip === true, face: b.face }, req.user.id);
+  if (out.error) return res.status(422).json({ ok: false, error: out.error.join(' ') });
+  await prod.addEvent(c.episode_id, req.user.id, 'capas', `Capa ajustada: ${out.row.label || KINDS[c.kind]}`);
+  await req.flash('ok', 'Capa ajustada.');
+  res.json({ ok: true, back: homeOf(c) });
+}));
+
+// A ficha mudou depois da aprovação: refaz esta capa com os textos de agora.
+router.post(both('/atualizar'), requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return deny(res);
+  const c = await findCover(req);
+  if (!c || !c.model || c.clip_id) return notFound(res);
+  const r = await pieces.refresh(c.episode_id, { only: c.id, userId: req.user.id });
+  await req.flash(r.redone ? 'ok' : 'error', r.redone ? 'Capa atualizada com a ficha.' : 'Não deu para atualizar: algum texto passa do limite. Use Ajustar.');
+  res.redirect(homeOf(c));
+}));
+
+// As thumbnails aprovadas num ZIP, com os nomes do guia, para subir no teste de miniatura do YouTube Studio.
+router.get('/episodios/:id/capas/teste.zip', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const { rows: [ep] } = await db.query('SELECT id, number FROM episodes WHERE id = $1', [req.params.id]);
+  const { rows } = ep ? await db.query("SELECT * FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND kind = 'youtube_thumb' AND approved ORDER BY position, id", [ep.id]) : { rows: [] };
+  if (!rows.length) return notFound(res);
+  const files = (await Promise.all(rows.map((c) => pieces.download(c, ep)))).filter(Boolean);
+  const { zipStream, uniqueNames } = require('../utils/zipStream');
+  const names = uniqueNames(files.map((f) => f.name));
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="pulso_${ep.number ? `ep${String(ep.number).padStart(3, '0')}` : `episodio${ep.id}`}_youtube_teste.zip"`, 'Cache-Control': 'no-store' });
+  const zip = zipStream(res);
+  for (const [i, f] of files.entries()) await zip.add(names[i], f.buffer);
+  await zip.end();
 }));
 
 router.post(both('/excluir'), requirePerm('episodes.read'), wrap(async (req, res) => {

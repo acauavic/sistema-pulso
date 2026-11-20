@@ -37,7 +37,7 @@
       img: { x: Math.round(l), y: Math.round(t), w: Math.round(dw), h: Math.round(dh) },
       fade: t > 1 ? Math.round(Math.min(dh * 0.16, 240)) : 0,
       face: { x: l + f.x * dw - ew / 2, y: t + f.y * dh - eh / 2, w: ew, h: eh }, // elipse do rosto, relativa ao painel
-      zoom, soft: zoom > MAX_ZOOM,
+      zoom, soft: Math.round(zoom * 10) / 10 > MAX_ZOOM, // 1,5× ainda passa; o aviso começa em 1,6×
     };
   }
 

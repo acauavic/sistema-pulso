@@ -279,7 +279,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     db.query("SELECT id, at_ms, width, height, analysis, score FROM episode_frames WHERE episode_id = $1 AND clip_id IS NULL AND NOT (coalesce(analysis, '{}'::jsonb) ? 'custom') ORDER BY score DESC NULLS LAST, at_ms", [ep.id]),
     jobs.latest(ep.id, 'finalizacao'),
     db.query('SELECT duration_ms, length(text) AS chars, jsonb_array_length(segments) AS segments, source_file_id FROM episode_transcripts WHERE episode_id = $1', [ep.id]),
-    db.query('SELECT id, kind, group_key, position, label, lint, width, height, size_bytes, approved, auto, updated_at FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL ORDER BY kind, group_key, position, id', [ep.id]),
+    db.query('SELECT id, kind, group_key, position, label, lint, width, height, size_bytes, approved, auto, updated_at, model, angle, stale FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL ORDER BY kind, group_key, position, id', [ep.id]),
     db.query(`SELECT (SELECT count(*)::int FROM episode_clips WHERE episode_id = $1) AS clips,
                      (SELECT count(*)::int FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND kind IN ('post_quote','post_split','carousel')) AS posts,
                      (SELECT count(*)::int FROM episode_publications WHERE episode_id = $1 AND status IN ('publicado','parcial') AND (clip_id IS NOT NULL OR media <> 'video')) AS published,
@@ -331,6 +331,9 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     epComments,
     content: { ...contentRows.rows[0], total: contentRows.rows[0].clips + contentRows.rows[0].posts }, tabs, defaultTab, publications: pubRows.rows, social, uploadPost, uploadLive: ls.live, testAt: ls.testAt, provider,
     covers: coverRows.rows, meta: meta.rows[0] || null, frames: frames.rows, job, transcript: transcript.rows[0] || null, trJob,
+    // capas pelo guia: os modelos (nome de cada um) e o que falta para cada ângulo que ainda não saiu
+    coverModels: require('../public/design/models'), coverMissing: require('../services/coverPieces').missing(meta.rows[0]?.cover_sheet, ep, coverRows.rows),
+    capasTab: req.query.capas === 'spotify' ? 'spotify' : 'youtube', capasOpen: req.query.capas !== undefined, openModal: typeof req.query.abrir === 'string' ? req.query.abrir : '',
     aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,
     finData, fin: finSvc, money: fmt.formatBRL, today: finSvc.todayISO(), here: req.originalUrl,
     stageIndex, allSponsors: allSponsors.rows,

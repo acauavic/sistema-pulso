@@ -308,16 +308,20 @@ describe('capas e posts do episódio (rotas, B2 e permissões)', () => {
     assert.equal(edApprove.status, 403);
   });
 
-  it('aprovar uma thumbnail desmarca as outras e grava a escolha nos metadados', async () => {
+  it('dá para aprovar mais de uma thumbnail (teste A/B): a primeira é a principal, gravada nos metadados', async () => {
     const thumbs = (await covers()).filter((c) => c.kind === 'youtube_thumb');
     const [a, b] = thumbs;
+    const main = async () => (await h.db.query('SELECT thumb_cover_id FROM episode_metadata WHERE episode_id=$1', [ep.id])).rows[0].thumb_cover_id;
     await as.gestao.post(`/episodios/${ep.id}/capas/${a.id}/aprovar`, { _csrf: await as.gestao.csrf('/episodios') });
     await as.gestao.post(`/episodios/${ep.id}/capas/${b.id}/aprovar`, { _csrf: await as.gestao.csrf('/episodios') });
     const now = (await covers()).filter((c) => c.kind === 'youtube_thumb');
-    assert.deepEqual(now.filter((c) => c.approved).map((c) => c.id), [b.id], 'só uma thumbnail aprovada');
-    assert.equal((await h.db.query('SELECT thumb_cover_id FROM episode_metadata WHERE episode_id=$1', [ep.id])).rows[0].thumb_cover_id, b.id);
+    assert.deepEqual(now.filter((c) => c.approved).map((c) => c.id).sort(), [a.id, b.id].sort(), 'as duas ficam aprovadas');
+    assert.equal(await main(), a.id, 'a principal é a primeira aprovada');
+    await as.gestao.post(`/episodios/${ep.id}/capas/${a.id}/aprovar`, { _csrf: await as.gestao.csrf('/episodios'), aprovar: '0' });
+    assert.equal(await main(), b.id, 'sem a principal, a outra aprovada assume');
     await as.gestao.post(`/episodios/${ep.id}/capas/${b.id}/aprovar`, { _csrf: await as.gestao.csrf('/episodios'), aprovar: '0' });
-    assert.equal((await h.db.query('SELECT thumb_cover_id FROM episode_metadata WHERE episode_id=$1', [ep.id])).rows[0].thumb_cover_id, null);
+    assert.equal(await main(), null);
+    await as.gestao.post(`/episodios/${ep.id}/capas/${b.id}/aprovar`, { _csrf: await as.gestao.csrf('/episodios') }); // os testes seguintes contam com uma aprovada
   });
 
   it('a edição salva troca a imagem, apaga a antiga e devolve a conferência', async () => {

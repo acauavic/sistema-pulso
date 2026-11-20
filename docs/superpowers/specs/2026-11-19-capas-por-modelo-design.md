@@ -127,7 +127,18 @@ Em todas: testes automatizados (limites da ficha, cada modelo gera sem problema 
 - Teste A/B automático no YouTube (o YouTube não abre isso para sistemas; o ZIP sai pronto para subir no Studio).
 - O selo redondo do YT-A+ ("01 · único no Brasil"): entra sem o selo; se quiser, vira um campo opcional depois.
 
-## 9. O que eu preciso de você
+## 9. Decisões do dono (19/11/2026)
+
+- **Sem trilha nos vídeos**: a trilha entra na hora de postar.
+- **Arquivo da thumbnail**: PNG quando cabe em 2 MB, senão JPG. O sistema guarda o JPG e monta o PNG na hora de baixar.
+- **Aprovar várias thumbnails**: a primeira aprovada é a principal (vai para o YouTube); as outras ficam no teste A/B, com o ZIP nos nomes do guia.
+
+## 10. O que mudou em relação ao plano, durante a construção
+
+- **Ajuste fino no editor livre**: as capas dos modelos do guia não abrem no editor livre (ele não conhece as camadas novas: foto recortada, tarja, degradê). Em troca, a aba Foto da janela Ajustar ganhou "toque no rosto", Aproximar, Afastar e Espelhar o desenho. Capas antigas e posts continuam no editor livre.
+- **Credencial**: o limite na tela é de 8 palavras (o ideal continua 6), porque o próprio guia usa uma credencial de 8.
+
+## 11. Perguntas originais (respondidas acima)
 
 1. **Trilha da vinheta** (arquivo de áudio) para o fim do teaser e para o story. Sem ela, os vídeos saem sem trilha.
 2. **Arquivo das thumbnails**: o guia pede PNG até 2 MB; foto em PNG costuma passar disso. Proposta: PNG quando couber, senão JPG de alta qualidade. Confirma?

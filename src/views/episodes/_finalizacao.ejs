@@ -44,16 +44,15 @@
     <li class="final-step <%= approved ? 'is-done' : '' %>">
       <span class="step-n mono"><%= step(2) %></span>
       <div class="final-body">
-        <div class="row"><h3>Thumbnail do YouTube</h3><% if (approved) { %><span class="badge b-green">aprovada</span><% } else if (thumbs.length) { %><span class="badge b-amber">escolha uma</span><% } else { %><span class="badge b-gray">sem opções</span><% } %></div>
-        <p class="small muted"><%= approved ? (approved.label || 'Thumbnail aprovada') : (thumbs.length ? thumbs.length + ' opção' + (thumbs.length === 1 ? '' : 'ões') + ' prontas. Aprove uma (obrigatório para finalizar).' : 'Depois da análise por IA o sistema monta 3 opções.') %></p>
+        <% var spCovers = covers.filter(function (c) { return c.kind === 'spotify_cover'; }); var okThumbs = thumbs.filter(function (c) { return c.approved; }).length; var spOk = spCovers.some(function (c) { return c.approved; }); %>
+        <div class="row"><h3>Capas</h3><% if (approved) { %><span class="badge b-green">thumbnail aprovada</span><% } else if (thumbs.length) { %><span class="badge b-amber">aprove a thumbnail</span><% } else { %><span class="badge b-gray">sem capas</span><% } %></div>
+        <p class="small muted"><% if (thumbs.length || spCovers.length) { %>YouTube: <span class="mono"><%= okThumbs %></span> de <span class="mono"><%= thumbs.length %></span> <%= okThumbs === 1 ? 'aprovada' : 'aprovadas' %><%= okThumbs > 1 ? ' (vão juntas no teste A/B)' : '' %> · Spotify: <%= spOk ? 'aprovada' : (spCovers.length ? 'para aprovar' : 'sem capa') %><%= approved ? '' : '. Aprove pelo menos uma thumbnail (obrigatório para finalizar).' %><% } else { %>A IA lê a transcrição e monta 3 thumbnails, uma por ângulo, e a capa do Spotify.<% } %></p>
       </div>
-      <div class="final-actions"><% if (canWriteMeta && !isPublished) { %><button class="btn sm" type="button" data-modal-open="modal-textos" data-tab="th">Texto da thumbnail</button><% } %></div>
-      <% if (thumbs.length) { %>
-      <details class="final-more" <%= next === 2 ? 'open' : '' %>>
-        <summary><%= approved || isPublished ? 'Ver as opções' : 'Ver as opções e aprovar' %> <span class="count"><%= thumbs.length %></span></summary>
-        <%- include('_capas') %>
+      <div class="final-actions"></div>
+      <details class="final-more" <%= next === 2 || locals.capasOpen ? 'open' : '' %>>
+        <summary><%= thumbs.length || spCovers.length ? (approved || isPublished ? 'Ver as capas' : 'Ver as capas e aprovar') : 'Gerar as capas' %> <% if (thumbs.length + spCovers.length) { %><span class="count"><%= thumbs.length + spCovers.length %></span><% } %></summary>
+        <%- include('_capas', { stepNext: next === 2 }) %>
       </details>
-      <% } else if (canWriteMeta && !isPublished) { %><details class="final-more"><summary>Gerar as opções</summary><%- include('_capas') %></details><% } %>
     </li>
 
     <li class="final-step <%= listItems.length && done === listItems.length ? 'is-done' : '' %>">
