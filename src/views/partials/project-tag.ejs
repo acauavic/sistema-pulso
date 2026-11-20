@@ -1,0 +1,3 @@
+<%# Sigla do projeto em mono entre colchetes ([ P100 ]): só aparece para quem vê mais de um projeto, quando o item é de um projeto
+    diferente do escolhido no menu. Variável: id (project_id do item). Neutra: nunca verde, nunca plum. %>
+<% var _sigla = projectTag(id); if (_sigla) { %><span class="project-tag mono" title="Projeto <%= _sigla %>">[ <%= _sigla %> ]</span><% } %>

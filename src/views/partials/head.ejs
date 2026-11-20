@@ -33,8 +33,10 @@
 <aside class="sidebar" data-sidebar>
   <div class="sidebar-top">
     <%- include('brand', { variant: 'menu' }) %>
+    <% if (scope && scope.multi) { %><span class="project-now mono"><%= scope.current ? scope.current.sigla : 'Todos' %></span><% } %>
     <button class="icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-label="Recolher o menu" title="Recolher o menu" aria-pressed="false"><%- icon('panel-left', 18) %></button>
   </div>
+  <%- include('project-switch') %>
   <button class="icon-btn sidebar-toggle" type="button" data-nav-toggle aria-label="Abrir menu"><%- icon('menu', 20) %></button>
   <button class="search-trigger" type="button" data-palette-open aria-label="Buscar (Ctrl+K)"><%- icon('search') %><span>Buscar…</span><kbd>Ctrl K</kbd></button>
   <nav class="nav" aria-label="Principal">
@@ -44,13 +46,13 @@
     <% if (can('tasks.read')) { %><a href="/tarefas" class="<%= currentPath.startsWith('/tarefas') ? 'active' : '' %>"><%- icon('check-square') %><span>Tarefas</span><% if (navCounts && navCounts.tasks) { %><span class="nav-count muted-count"><%= navCounts.tasks %></span><% } %></a><% } %>
     <% if (can('calendar.read')) { %><%- navItem('/calendario', 'calendar-days', 'Calendário', currentPath.startsWith('/calendario')) %><% } %>
     <span class="kicker nav-group">Operação</span>
-    <% if (can('guests.read')) { %><%- navItem('/convidados', 'mic', 'Convidados', currentPath.startsWith('/convidados')) %><% } %>
-    <% if (can('sponsors.read')) { %><%- navItem('/patrocinadores', 'shield-check', 'Patrocinadores', currentPath.startsWith('/patrocinadores')) %><% } %>
-    <% if (can('episodes.read')) { %><%- navItem('/episodios', 'calendar', 'Episódios', currentPath.startsWith('/episodios')) %><% } %>
-    <% if (can('episodes.read')) { %><%- navItem('/conteudo', 'film', 'Conteúdo', currentPath.startsWith('/conteudo') || currentPath.startsWith('/cortes') || currentPath.startsWith('/capas')) %><% } %>
-    <% if (can('social.read')) { %><a href="<%= navCounts && navCounts.reviews ? '/social/publicacoes?status=revisao' : '/social' %>" class="<%= currentPath.startsWith('/social') ? 'active' : '' %>"><%- icon('share-2') %><span>Social</span><% if (navCounts && navCounts.reviews) { %><span class="nav-count" title="Posts esperando sua aprovação"><%= navCounts.reviews %></span><% } %></a><% } %>
-    <% if (can('audience.read')) { %><%- navItem('/plateia/painel', 'users', 'Plateia', currentPath.startsWith('/plateia')) %><% } %>
-    <% if (can('finance.read') || can('stock.read')) { %><%- navItem(can('finance.read') ? '/financeiro' : '/financeiro/estoque', 'wallet', 'Financeiro', currentPath.startsWith('/financeiro')) %><% } %>
+    <% if (can('guests.read') && hasModule('convidados')) { %><%- navItem('/convidados', 'mic', 'Convidados', currentPath.startsWith('/convidados')) %><% } %>
+    <% if (can('sponsors.read') && hasModule('patrocinio')) { %><%- navItem('/patrocinadores', 'shield-check', 'Patrocinadores', currentPath.startsWith('/patrocinadores')) %><% } %>
+    <% if (can('episodes.read') && hasModule('producao')) { %><%- navItem('/episodios', 'calendar', videoLabel, currentPath.startsWith('/episodios')) %><% } %>
+    <% if (can('episodes.read') && hasModule('producao')) { %><%- navItem('/conteudo', 'film', 'Conteúdo', currentPath.startsWith('/conteudo') || currentPath.startsWith('/cortes') || currentPath.startsWith('/capas')) %><% } %>
+    <% if (can('social.read') && hasModule('redes')) { %><a href="<%= navCounts && navCounts.reviews ? '/social/publicacoes?status=revisao' : '/social' %>" class="<%= currentPath.startsWith('/social') ? 'active' : '' %>"><%- icon('share-2') %><span>Social</span><% if (navCounts && navCounts.reviews) { %><span class="nav-count" title="Posts esperando sua aprovação"><%= navCounts.reviews %></span><% } %></a><% } %>
+    <% if (can('audience.read') && hasModule('plateia')) { %><%- navItem('/plateia/painel', 'users', 'Plateia', currentPath.startsWith('/plateia')) %><% } %>
+    <% if ((can('finance.read') || can('stock.read')) && hasModule('financeiro')) { %><%- navItem(can('finance.read') ? '/financeiro' : '/financeiro/estoque', 'wallet', 'Financeiro', currentPath.startsWith('/financeiro')) %><% } %>
     <% if (adminOpen) { %><span class="kicker nav-group">Gestão</span>
     <%- navItem('/gestao', 'settings', 'Painel de gestão', currentPath.startsWith('/gestao') || currentPath.startsWith('/usuarios') || currentPath.startsWith('/auditoria') || currentPath.startsWith('/integracoes')) %><% } %>
   </nav>
@@ -74,8 +76,8 @@
      { href: '/mensagens', icon: 'message-circle', label: 'Chat', on: currentPath.startsWith('/mensagens'), show: can('chat.use'), count: navCounts ? navCounts.chat_unread : 0 },
      { href: '/tarefas', icon: 'check-square', label: 'Tarefas', on: currentPath.startsWith('/tarefas'), show: can('tasks.read') },
      { href: '/calendario', icon: 'calendar-days', label: 'Agenda', on: currentPath.startsWith('/calendario'), show: can('calendar.read') },
-     { href: '/convidados', icon: 'mic', label: 'Convidados', on: currentPath.startsWith('/convidados'), show: can('guests.read') },
-     { href: '/episodios', icon: 'calendar', label: 'Episódios', on: currentPath.startsWith('/episodios'), show: can('episodes.read') },
+     { href: '/convidados', icon: 'mic', label: 'Convidados', on: currentPath.startsWith('/convidados'), show: can('guests.read') && hasModule('convidados') },
+     { href: '/episodios', icon: 'calendar', label: videoLabel === 'Episódios' ? 'Episódios' : 'Vídeos', on: currentPath.startsWith('/episodios'), show: can('episodes.read') && hasModule('producao') },
    ].filter(function (t) { return t.show; }).slice(0, 3); %>
 <nav class="tabnav" aria-label="Atalhos">
   <% tabItems.forEach(function (t) { %><a href="<%= t.href %>" class="<%= t.on ? 'on' : '' %>"<%- t.on ? ' aria-current="page"' : '' %>><% if (t.href === '/mensagens') { %><span class="tabnav-ico"><%- icon(t.icon, 20) %><span class="tabnav-count" data-chat-unread <%= t.count ? '' : 'hidden' %>><%= t.count %></span></span><% } else { %><%- icon(t.icon, 20) %><% } %><span><%= t.label %></span></a><% }) %>

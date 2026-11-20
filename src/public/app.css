@@ -1056,6 +1056,35 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
 .seg + .stat-grid, .row + .stat-grid.top-gap { margin-top: 20px; }
 .conv-list { margin: 0; }
 
+/* ============ projetos: seletor no topo do menu e sigla nos cartões ============ */
+/* Escolher o recorte não é ação: nada de verde. O atual leva o check na cor do texto. */
+.project-switch { display: block; margin: -10px 0 -14px; }
+.project-switch > summary { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--r-field); color: var(--text); cursor: pointer; transition: background var(--t) var(--ease), border-color var(--t) var(--ease); }
+.project-switch > summary:hover, .project-switch[open] > summary { background: var(--raised); border-color: var(--line-strong); }
+.project-switch > summary .icon { flex: 0 0 auto; color: var(--muted); transition: transform var(--t) var(--ease); } .project-switch[open] > summary .icon { transform: rotate(180deg); }
+.project-switch-txt { display: grid; gap: 1px; flex: 1; min-width: 0; } .project-switch-txt .kicker { margin: 0; }
+.project-switch-txt strong { font: 600 14px var(--f-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-switch-sigla { display: none; color: var(--text); letter-spacing: .08em; }
+.project-switch-list { left: 0; right: 0; min-width: 0; }
+.project-switch-list button { display: flex; align-items: center; gap: 8px; border: 0; background: none; color: var(--text-2); cursor: pointer; font-family: var(--f-body); }
+.project-switch-list button > span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-switch-list button:hover { background: var(--surface); color: var(--text); } .project-switch-list button.on { color: var(--text); font-weight: 600; }
+.project-switch-code { color: var(--muted); letter-spacing: .08em; } .project-switch-list .icon { flex: 0 0 auto; color: var(--text); }
+.project-now { display: none; }
+.project-tag { color: var(--muted); letter-spacing: .08em; white-space: nowrap; }
+@media (min-width: 861px) {
+  html[data-sidebar="collapsed"] .project-switch > summary { justify-content: center; padding: 6px 2px; }
+  html[data-sidebar="collapsed"] .project-switch-txt, html[data-sidebar="collapsed"] .project-switch > summary .icon { display: none; }
+  html[data-sidebar="collapsed"] .project-switch-sigla { display: block; font-size: 11px; }
+  html[data-sidebar="collapsed"] .project-switch-list { right: auto; min-width: 220px; }
+}
+@media (max-width: 860px) {
+  .project-switch { display: none; order: 3; flex-basis: 100%; margin: 12px 0 0; }
+  .sidebar.open .project-switch { display: block; } .project-switch > summary { min-height: 44px; }
+  .project-switch-list button { padding: 12px 10px; }
+  .project-now { display: inline-block; margin-left: 10px; padding: 2px 6px; border: 1px solid var(--line-strong); border-radius: var(--r-tag); color: var(--text-2); letter-spacing: .08em; }
+}
+
 /* ============ menu lateral recolhível (só no computador; no celular o menu já é a barra de cima) ============ */
 .sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sidebar-collapse { padding: 6px; } .sidebar-collapse .icon { transition: transform var(--t) var(--ease); }
