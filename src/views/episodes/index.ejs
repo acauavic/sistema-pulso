@@ -6,6 +6,7 @@
       <% var fq = filterUi.query ? '&' + filterUi.query : ''; /* os filtros combináveis seguem entre Quadro e Lista */ %>
       <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/episodios?view=quadro<%= mine ? '&editor=eu' : '' %><%= fq %>"><%- icon('columns-3') %> Quadro</a>
       <a class="<%= view === 'lista' ? 'on' : '' %>" href="/episodios?view=lista<%= mine ? '&editor=eu' : '' %><%= fq %>"><%- icon('list') %> Lista</a>
+      <a class="<%= view === 'pautas' ? 'on' : '' %>" href="/episodios?view=pautas"><%- icon('file-text') %> Pautas</a>
     </div>
     <a class="btn <%= mine ? 'on' : '' %>" href="/episodios?view=<%= view %><%= mine ? '' : '&editor=eu' %><%= fq %>"><%- icon('user') %> <%= mine ? 'Todos' : 'Só os meus' %></a>
     <% if (can('production.checklists')) { %><a class="btn" href="/episodios/checklists"><%- icon('check') %> Checklists</a><% } %>
@@ -30,7 +31,31 @@
 <% } %>
 
 <div class="board-tools"><%- include('../partials/filter-builder') %><% if (view === 'quadro') { %><%- include('../partials/card-fields') %><% } %></div>
-<% if (view === 'quadro') { %>
+<% if (view === 'pautas') { %>
+<%# Quadro das pautas: onde está cada uma, de uma vez. A aprovação acontece no WhatsApp; aqui fica o rastro. %>
+<div class="board board-wide">
+  <% pautaCols.forEach(function (col) { %>
+  <section class="column">
+    <header><span class="badge <%= col.badge %>"><%= col.label %></span><span class="count"><%= col.items.length %></span></header>
+    <div class="cards">
+      <% col.items.forEach(function (p) { var late = p.due_on && col.key !== 'aprovada' && fmt.toInputDate(p.due_on) < today; %>
+      <a class="kcard" href="<%= p.episode_id ? '/episodios/' + p.episode_id + '#pauta' : '/convidados/' + p.guest_id + '#pauta' %>">
+        <span class="handle muted"><%- include('../partials/project-tag', { id: p.project_id }) %> <%= pautaSvc.KINDS[p.kind].label.toUpperCase() %><%= p.episode_number ? ' · ' + videoNo(p.episode_number, p.project_id) : '' %></span>
+        <strong><%= p.episode_title || p.guest_name %></strong>
+        <span class="meta small muted">
+          <span><%= p.owner_name || 'sem responsável' %></span>
+          <% if (p.due_on) { %><span class="<%= late ? 'err' : '' %>"><%- icon('clock', 12) %> <%= fmt.formatDayShort(p.due_on) %><%= late ? ' · atrasada' : '' %></span><% } %>
+          <% if (p.state === 'aprovacao' && p.sent_to) { %><span><%= p.sent_to %></span><% } %>
+        </span>
+        <% if (p.state === 'ajustes' && p.review_note) { %><span class="small err"><%= p.review_note %></span><% } %>
+      </a>
+      <% }) %>
+    </div>
+    <p class="col-empty small muted">Nenhuma nesta etapa.</p>
+  </section>
+  <% }) %>
+</div>
+<% } else if (view === 'quadro') { %>
 <div class="board board-wide">
   <% columns.forEach(function (col) { %>
   <section class="column" data-status="<%= col.key %>">

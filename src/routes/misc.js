@@ -93,7 +93,13 @@ router.get('/', wrap(async (req, res) => {
   const outToday = pOut ? await pOut : null;
   if (outToday) outToday.items = outToday.items.map((x) => ({ ...x, d: outreach.describe(x) }));
   const myGoals = await pGoals;
+  // "Pautas que travaram": atrasadas ou com ajustes pedidos, no recorte de projeto da pessoa (só para quem escreve pauta)
+  const pautaSvc = require('../services/pautas');
+  const pautasTravadas = visao === 'meu' && can(req.user.role, 'pautas.write')
+    ? await pautaSvc.stuck({ projectIds: require('../services/scope').idsOf(req) }).catch((err) => { console.error('Pautas (Início):', err.message); return []; })
+    : [];
   res.render('dashboard', {
+    pautaSvc, pautasTravadas,
     money, outToday, CHANNELS: outreach.CHANNELS, outBase: (k) => outreach.KINDS[k].base,
     title: 'Início', day, ds: await pDay, mineDay: await pMine, mineNow: await pNow, myGoals, isProducer, visao, cmtDay: await pCmt,
     producerLine: isProducer ? myDay.line(outToday, myGoals) : '',

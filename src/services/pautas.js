@@ -132,4 +132,14 @@ async function moveToEpisode(guestId, episodeId) {
       WHERE p.guest_id = $1 AND NOT EXISTS (SELECT 1 FROM pautas x WHERE x.episode_id = $2 AND x.kind = p.kind)`, [guestId, episodeId]);
 }
 
-module.exports = { KINDS, STATES, ORDER, isKind, get, forOwner, list, events, save, send, answer, whatsappText, moveToEpisode };
+// Para o "Seu dia": as pautas que travaram — atrasadas, ou que voltaram com ajustes. No máximo 5.
+async function stuck({ projectIds = null, today = new Date().toISOString().slice(0, 10) } = {}) {
+  const params = [today]; let w = '';
+  if (projectIds) { params.push(projectIds); w = ` AND p.project_id = ANY($${params.length}::int[])`; }
+  const { rows } = await db.query(
+    `${SELECT} WHERE p.state <> 'aprovada' AND (p.state = 'ajustes' OR (p.due_on IS NOT NULL AND p.due_on < $1::date))${w}
+      ORDER BY (p.state <> 'ajustes'), p.due_on NULLS LAST, p.id LIMIT 5`, params);
+  return rows;
+}
+
+module.exports = { KINDS, STATES, ORDER, isKind, get, forOwner, list, events, save, send, answer, whatsappText, moveToEpisode, stuck };

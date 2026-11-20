@@ -78,6 +78,20 @@
       </div>
     </section>
 
+    <% if ((locals.pautasTravadas || []).length) { %>
+    <section class="day-band" aria-labelledby="mine-b-pauta">
+      <div class="day-band-head"><h3 class="day-band-t" id="mine-b-pauta">Pautas que travaram</h3><a class="link small" href="/episodios?view=pautas">ver o quadro</a></div>
+      <ul class="plain pauta-stuck">
+        <% pautasTravadas.forEach(function (p) { %>
+        <li>
+          <a href="<%= p.episode_id ? '/episodios/' + p.episode_id + '#pauta' : '/convidados/' + p.guest_id + '#pauta' %>"><strong><%= p.episode_title || p.guest_name %></strong></a>
+          <span class="handle muted"><%= pautaSvc.KINDS[p.kind].label %> · <%= p.state === 'ajustes' ? 'ajustes pedidos' : 'prazo ' + fmt.formatDayShort(p.due_on) %></span>
+        </li>
+        <% }) %>
+      </ul>
+    </section>
+    <% } %>
+
     <%- include('loss-reasons', { losses: m.losses, mineOnly: true, bandId: 'mine-b3' }) %>
 
     <% if (locals.cmtDay) { %><%- include('comments-band', { bandId: 'mine-b-cmt' }) %><% } %>

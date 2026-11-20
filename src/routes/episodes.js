@@ -120,7 +120,7 @@ async function parseNew(body) {
 
 // ---- quadro de produção / lista ----
 router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => {
-  const view = req.query.view === 'lista' ? 'lista' : 'quadro';
+  const view = ['lista', 'pautas'].includes(req.query.view) ? req.query.view : 'quadro';
   const mine = req.query.editor === 'eu';
   // filtros combináveis (botão Filtros): etapa, editor, datas, campos vazios ou preenchidos, conexões
   const f = await require('../services/filterUi').build(req, { entity: 'episode', action: '/episodios', fields: await require('../services/filterFields').episodeFields(), keep: { view, editor: mine ? 'eu' : '' } });
@@ -147,12 +147,20 @@ router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => 
     if (editOrder.STAGES.includes(s.key)) items.sort((a, b) => (order[a.id]?.rank ?? 1e9) - (order[b.id]?.rank ?? 1e9));
     return { ...s, items };
   });
+  // quadro das pautas: uma coluna por estado, no recorte de projeto da pessoa
+  const pautaSvc = require('../services/pautas');
+  let pautaCols = null;
+  if (view === 'pautas') {
+    const todas = await pautaSvc.list({ projectIds: require('../services/scope').idsOf(req) });
+    pautaCols = pautaSvc.ORDER.map((key) => ({ key, label: pautaSvc.STATES[key].label, badge: pautaSvc.STATES[key].badge, items: todas.filter((p) => p.state === key) }));
+  }
   // projeto que grava vídeo (e não episódio de podcast): a ação principal é "Novo vídeo", que nasce em Pré-produção
   const projects = require('../services/projects');
   const chosen = projects.get(require('../services/scope').target(req, {}) || projects.defaultId()) || {};
   res.render('episodes/index', { filterUi: f.ui, cardUi: require('../services/cardFields').forList('episodios'), title: res.locals.videoLabel || 'Episódios',
     videoFirst: chosen.default_format === 'video', videoWord: (chosen.video_label || 'Episódio').toLowerCase(),
-    view, mine, episodes: rows, columns, order, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES });
+    view, mine, episodes: rows, columns, order, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES,
+    pautaCols, pautaSvc, today: require('../services/tasks').todayISO() });
 }));
 
 router.get('/episodios/novo', requirePerm('episodes.write'), wrap(async (req, res) => {
