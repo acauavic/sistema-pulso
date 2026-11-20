@@ -13,7 +13,7 @@
 ## Design e marca
 
 - **Jornada do usuário é regra de criação**: descreva e percorra no navegador a jornada antes de dar uma tela por pronta; nada de formulário gigante aberto (ver `docs/design-system.md`, "Experiência e jornada").
-- Toda UI/e-mail/texto novo segue `docs/design-system.md` e `docs/manual-de-marca.md` (originais em `docs/referencias/`). Veja o `CLAUDE.md`.
+- **Duas identidades**: o painel é Health Scale Studio e segue `docs/design-system.md`; o que sai para fora pelo projeto Pulso segue `docs/manual-de-marca.md` (originais em `docs/referencias/`). Veja o `CLAUDE.md`.
 
 ## Releases e versão
 

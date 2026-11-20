@@ -1,4 +1,8 @@
-# 🎙️ Pulso Gestão — gestão do podcast
+# Health Scale Studio — painel da equipe
+
+> Antes "Pulso Gestão". Desde a v1.95.0 o painel tem a identidade da Health Scale (nome, monograma "St", verde, Archivo); tudo o que
+> o convidado, o patrocinador e a plateia veem continua com a marca do Pulso. O sistema está virando multiprojetos
+> (`docs/superpowers/specs/2026-11-20-multiprojetos-design.md`).
 
 Painel web para a equipe do **Podcast Pulso**: usuários com perfis de acesso, um mini-CRM de
 **convidados** (quadro estilo Kanban) e geração do **link do convite** (página personalizada +

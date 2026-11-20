@@ -29,7 +29,7 @@
     const root = document.documentElement;
     const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
     root.setAttribute('data-theme', next);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next === 'light' ? '#F4F2EC' : '#0A0A0A');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next === 'light' ? '#F4F4F0' : '#0E0F0D');
     try { localStorage.setItem('pulso-theme', next); } catch { /* storage bloqueado */ }
   });
 

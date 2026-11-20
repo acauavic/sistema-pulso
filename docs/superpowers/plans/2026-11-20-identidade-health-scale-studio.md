@@ -56,7 +56,7 @@ wordmark e da linha de pulso no painel, ícones novos nos mesmos caminhos, ícon
 - Test: `test/identidade.test.js`
 
 **Interfaces:**
-- Produces: variáveis `--accent` (`#9EDD55`), `--accent-hi` (`#C8E86A`), `--ink` (`#0E0F0D`), `--paper-ink`
+- Produces: variáveis `--accent` (`#9EDD55`), `--accent-hi` (`#C8E86A`), `--ink` (`#0E0F0D`), `--on-dark`
   (`#F4F4F0`), `--brand-deep` (`#3E4A33` escuro / `#2E6B22` claro). `--lime`, `--black`, `--white` deixam de existir;
   `--plum` deixa de existir no `app.css` (avatares usam `--brand-deep`; o "externo" já usa `--external`).
 

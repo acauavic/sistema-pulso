@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.95.0', date: '2026-11-20', title: 'O painel agora é Health Scale Studio',
+    items: [
+      { kind: 'novo', text: 'O painel da equipe ganhou nome e cara novos: Health Scale Studio. Mudam o nome, a marca no menu e no login, o ícone do app (o monograma "St"), as cores (o verde no lugar do lime) e a letra dos títulos e textos. Os botões, as telas e os caminhos continuam nos mesmos lugares.' },
+      { kind: 'ajuste', text: 'Tudo o que é do Pulso continua com a marca do Pulso: convite, portal do convidado, página pós-gravação, media kit, portal do patrocinador, plateia, capas e os e-mails que o convidado e o patrocinador recebem.' },
+      { kind: 'ajuste', text: 'Os e-mails da equipe (acesso, senha e avisos do painel) passam a chegar como Health Scale Studio.' },
+      { kind: 'ajuste', text: 'Quem tem o app instalado no celular vê o ícone e o nome novos depois da próxima atualização do app. Não precisa instalar de novo.' },
+    ],
+  },
+  {
     version: '1.94.0', date: '2026-11-20', title: 'Capas pelos modelos do guia, capa do Spotify e vídeos do convidado',
     items: [
       { kind: 'novo', text: 'Finalização, passo "Capas e vídeos": um botão gera as peças do episódio pelos modelos do Guia de Capas. São 3 thumbnails do YouTube, uma por ângulo (curiosidade, contraste e autoridade), cada uma num modelo diferente, e a capa do Spotify (3000 × 3000). Os textos saem de uma ficha do episódio (quem é o convidado, a frase literal, o número dito), que você confere e edita numa janela.' },

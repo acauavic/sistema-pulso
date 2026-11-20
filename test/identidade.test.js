@@ -59,6 +59,12 @@ describe('identidade: tokens do painel', () => {
       assert.ok(!css.includes(gone), `app.css ainda tem ${gone}`);
   });
 
+  it('a barra do sistema no celular acompanha o tema com as cores novas', () => {
+    assert.match(read('src/public/theme.js'), /'#F4F4F0'/); assert.match(read('src/public/app.js'), /'#F4F4F0' : '#0E0F0D'/);
+    for (const f of ['src/public/theme.js', 'src/public/app.js', 'src/public/offline.html', 'src/views/partials/head.ejs', 'src/views/studio/_top.ejs'])
+      assert.doesNotMatch(read(f), /#0A0A0A|#F4F2EC|#C8FF42/i, f);
+  });
+
   it('Archivo assume título e texto; as fontes das capas do Pulso continuam disponíveis', () => {
     assert.match(dark['f-display'], /^"Archivo"/); assert.match(dark['f-body'], /^"Archivo"/);
     assert.match(css, /@font-face \{ font-family: "Archivo"; font-weight: 400 800;[^}]*archivo-latin-wght-normal\.woff2/);

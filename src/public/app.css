@@ -138,7 +138,7 @@ html { scrollbar-gutter: stable; } /* trocar de aba não muda a largura da pági
 
 /* telas sem login (entrar, senha, erro) */
 .auth { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; position: relative; overflow: hidden; }
-.auth::before { content: ""; position: absolute; inset: 0; background: url(/static/brand/studio/signal-bg.svg) no-repeat right -4vw bottom -6vh / min(64vw, 680px) auto; } /* o Sinal, grande e apagado */
+.auth::before { content: ""; position: absolute; inset: 0; background: url(/static/brand/studio/signal-bg.svg) no-repeat right 5vw bottom 0 / min(40vw, 440px) auto; } /* o Sinal, grande e apagado */
 .auth-box { position: relative; width: min(100%, 420px); display: grid; gap: 28px; }
 .auth-brand { display: grid; gap: 20px; justify-items: start; } .auth-brand .signal { width: 41px; height: 36px; }
 .auth-tag { font-family: var(--f-voice); font-style: italic; font-size: 24px; line-height: 1.15; color: var(--text); margin: 0; }
