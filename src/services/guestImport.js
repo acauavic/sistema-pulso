@@ -44,7 +44,7 @@ async function importGuests(text, user, projectId = null) {
     const history = toImport.filter((r) => r.data.episode);
     if (history.length) {
       await client.query('LOCK TABLE episodes IN SHARE ROW EXCLUSIVE MODE'); // ninguém numera ao mesmo tempo
-      const { rows: [{ max }] } = await client.query('SELECT coalesce(max(number), 0) AS max FROM episodes');
+      const { rows: [{ max }] } = await client.query('SELECT coalesce(max(number), 0) AS max FROM episodes WHERE project_id = $1', [projectId || require('./projects').defaultId()]);
       let next = Math.max(Number(max), ...history.map((r) => r.data.episode.number || 0)) + 1;
       for (const r of history.filter((x) => !x.data.episode.number).sort((a, b) => a.data.proposed_at - b.data.proposed_at)) r.data.episode.number = next++;
     }

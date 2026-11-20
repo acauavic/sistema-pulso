@@ -83,6 +83,9 @@ async function attachSession(req, res, next) {
     res.locals.can = (perm) => Boolean(req.user && can(req.user.role, perm));
     res.locals.ROLES = ROLES;
     res.locals.fmt = fmt;
+    // número do vídeo com o prefixo do projeto dele (EP.012 no Pulso, V.003 no Projeto 100)
+    res.locals.prefixOf = (projectId) => require('./services/projects').get(projectId)?.number_prefix || 'EP.';
+    res.locals.videoNo = (number, projectId) => fmt.epNo(number, res.locals.prefixOf(projectId));
     res.locals.icon = icon;
     res.locals.reactionEmojis = require('./services/reactions').EMOJIS;
     res.locals.podcastName = config.podcastName;

@@ -247,7 +247,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
     guestsSvc.clickStats(guest.id),
     require('../services/comments').list('guest', guest.id),
     db.query("SELECT t.id, t.title, t.status, t.due_on, t.due_time, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.guest_id = $1 ORDER BY (t.status = 'feito'), t.due_on NULLS LAST", [guest.id]),
-    db.query('SELECT id, number, status, youtube_url, spotify_url FROM episodes WHERE guest_id = $1', [guest.id]),
+    db.query('SELECT id, number, status, youtube_url, spotify_url, project_id, format FROM episodes WHERE guest_id = $1', [guest.id]),
     db.query('SELECT b.role, s.id, s.company FROM sponsor_bookings b JOIN sponsors s ON s.id = b.sponsor_id WHERE b.guest_id = $1 ORDER BY s.company', [guest.id]),
     guest.sponsor_id ? db.query('SELECT id, company FROM sponsors WHERE id = $1', [guest.sponsor_id]) : { rows: [] },
     db.query("SELECT count(*)::int AS leads, count(*) FILTER (WHERE status = 'confirmado')::int AS confirmed FROM plateia_leads WHERE guest_id = $1", [guest.id]),

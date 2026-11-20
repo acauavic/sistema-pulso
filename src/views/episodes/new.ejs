@@ -81,7 +81,7 @@
     <h2 class="form-section">Episódio</h2>
     <div class="grid-2 tight">
       <label>Gravado em<input type="date" name="recorded_on" value="<%= v.recorded_on || '' %>"></label>
-      <label>Número (EP.)<input type="number" name="number" min="1" max="99999" value="<%= v.number || '' %>"></label>
+      <label>Número (<%= numberPrefix %>)<input type="number" name="number" min="1" max="99999" value="<%= v.number || '' %>"></label>
     </div>
     <label>Título <small class="muted">(vazio: “Conversa com …”)</small><input type="text" name="title" value="<%= v.title || '' %>" maxlength="200"></label>
     <% if (locals.pedidoRoutines && pedidoRoutines.length) { var marked = v.pedir_ok ? [].concat(v.pedir || []).map(String) : null; %>

@@ -12,7 +12,7 @@ const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 // A fila inteira, já com a posição (rank 1 = editar primeiro).
 async function list() {
   const { rows } = await db.query(
-    `SELECT e.id, e.number, e.title, e.status, e.editor_id, e.review_round, to_char(e.aired_on, 'YYYY-MM-DD') AS aired, u.name AS editor_name
+    `SELECT e.id, e.number, e.title, e.status, e.editor_id, e.review_round, e.project_id, to_char(e.aired_on, 'YYYY-MM-DD') AS aired, u.name AS editor_name
        FROM episodes e LEFT JOIN users u ON u.id = e.editor_id
       WHERE e.status = ANY($1::text[])
       ORDER BY e.aired_on NULLS LAST, e.number NULLS LAST, e.id`, [STAGES]);

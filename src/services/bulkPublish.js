@@ -65,7 +65,7 @@ function plan(clipIds, { start, from, to, perDay, trialPerDay }, now = new Date(
 // Cortes que podem entrar: prontos, com episódio (ou de um pedido) e que ainda não saíram nem estão na fila. Mantém a ordem pedida.
 async function eligible(ids) {
   const { rows } = await db.query(
-    `SELECT c.id, c.title, c.post_title, c.caption, c.ctas, c.status, c.episode_id, c.request_id, c.cover_id, c.duration_ms, e.number AS ep_number, g.name AS guest_name,
+    `SELECT c.id, c.title, c.post_title, c.caption, c.ctas, c.status, c.episode_id, c.request_id, c.cover_id, c.duration_ms, c.project_id, e.number AS ep_number, g.name AS guest_name,
             (SELECT p.status FROM episode_publications p WHERE p.clip_id = c.id AND p.status = ANY($2) ORDER BY p.id DESC LIMIT 1) AS queued
        FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id WHERE c.id = ANY($1)`, [ids, QUEUED]);
   const byId = new Map(rows.map((r) => [r.id, r]));

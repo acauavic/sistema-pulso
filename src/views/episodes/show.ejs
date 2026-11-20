@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <%
-  var epNo = ep.number ? 'EP.' + String(ep.number).padStart(3, '0') : 'EP.—';
+  var epNo = videoNo(ep.number, ep.project_id) || '—';
   var fileBase = '/episodios/' + ep.id + '/arquivos/';
   var rawFiles = files.filter(function (f) { return f.kind !== 'editado'; });
   var editedFiles = files.filter(function (f) { return f.kind === 'editado'; });
@@ -569,7 +569,7 @@
       <label class="chip-radio"><input type="radio" name="formato" value="texto"><span>Lista em texto (.txt)</span></label></div>
     </fieldset>
     <div class="small muted" data-mk-only="premiere">
-      <p>No Premiere, <span class="mono">Arquivo &gt; Importar</span> e escolha o arquivo: ele cria a sequência "<%= ep.number ? 'EP.' + String(ep.number).padStart(3, '0') : 'Episódio' %> · ajustes da revisão" com um marcador por comentário (passe o mouse para ler; a lista inteira fica no painel Marcadores).</p>
+      <p>No Premiere, <span class="mono">Arquivo &gt; Importar</span> e escolha o arquivo: ele cria a sequência "<%= videoNo(ep.number, ep.project_id) || 'Episódio' %> · ajustes da revisão" com um marcador por comentário (passe o mouse para ler; a lista inteira fica no painel Marcadores).</p>
       <p>Para trabalhar com eles na sua edição: na sua sequência, selecione tudo e copie (<span class="mono">Cmd+A</span>, <span class="mono">Cmd+C</span>); na sequência dos ajustes, com a agulha no início, cole (<span class="mono">Cmd+V</span>). Ou deixe a sequência dos ajustes aberta ao lado, como guia.</p>
     </div>
     <p class="small muted" data-mk-only="davinci" hidden>No DaVinci Resolve: <span class="mono">Timeline &gt; Import &gt; Timeline Markers from EDL</span> (em português: Linha do tempo &gt; Importar &gt; Marcadores da linha do tempo a partir de EDL). Cada comentário vira um marcador na linha do tempo aberta.</p>

@@ -24,7 +24,7 @@
   <div class="tc-meta handle">
     <%- include('../partials/project-tag', { id: t.project_id }) %>
     <% if (due) { %><span class="<%= late ? 'err' : '' %>"><%- icon('clock', 12) %> <%= fmt.formatDueShort(t.due_on, t.due_time) %><%= late ? ' · atrasada' : '' %></span><% } %>
-    <% if (t.episode_id) { %><span><%= t.episode_number ? 'EP.' + String(t.episode_number).padStart(3, '0') : 'Episódio' %></span><% } %>
+    <% if (t.episode_id) { %><span><%= videoNo(t.episode_number, t.project_id) || 'Episódio' %></span><% } %>
     <% if (t.guest_id) { %><span><%= t.guest_name %></span><% } %>
     <% if (t.sponsor_id) { %><span><%= t.sponsor_name %></span><% } %>
     <% if (t.comments) { %><span><%- icon('message-square', 12) %> <%= t.comments %></span><% } %>

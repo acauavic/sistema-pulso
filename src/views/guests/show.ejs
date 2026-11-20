@@ -8,7 +8,7 @@
   var closed = idx < 0;
   var inviteUrl = guest.short_url || longUrl;
   var canEmail = canInv && guest.email && mailReady;
-  var epNo = episode && episode.number ? 'EP.' + String(episode.number).padStart(3, '0') : 'Episódio';
+  var epNo = (episode && videoNo(episode.number, episode.project_id)) || 'Episódio';
   var agendaMissing = [!guest.scheduled_studio && 'estúdio', !guest.scheduled_hosts && 'hosts', !guest.scheduled_guest && 'convidado'].filter(Boolean);
   var showInvite = guest.invite_token || idx <= 2;
   var future = guest.proposed_at && new Date(guest.proposed_at).getTime() > Date.now();

@@ -133,7 +133,7 @@ async function update(task, values, user, { assigneeId } = {}) {
 // O que a janela "Nova tarefa" oferece para escolher: pessoas e os itens a que a tarefa pode se ligar (Tarefas e Mensagens).
 async function linkOptions() {
   const [eps, guests, sponsors, users] = await Promise.all([
-    db.query("SELECT id, number, title FROM episodes WHERE status <> 'publicado' ORDER BY number DESC NULLS LAST, id DESC LIMIT 100"),
+    db.query("SELECT id, number, title, project_id FROM episodes WHERE status <> 'publicado' ORDER BY number DESC NULLS LAST, id DESC LIMIT 100"),
     db.query("SELECT id, name FROM guests WHERE status NOT IN ('perdido','cancelado') ORDER BY updated_at DESC LIMIT 200"),
     db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY company LIMIT 200"),
     require('./team').activeUsers(),

@@ -1,6 +1,6 @@
 <%- include('partials/head') %>
 <%
-  var epNo = function (e) { return e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'Episódio'; };
+  var epNo = function (e) { return videoNo(e.number, e.project_id) || 'Episódio'; };
 %>
 <header class="hello">
   <span class="kicker"><%= fmt.todayLabel() %> · <%= podcastName %></span>
@@ -9,7 +9,7 @@
 </header>
 <%- include('partials/app-card') %>
 
-<% var r = rhythm, epNoShort = function (e) { return e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'Episódio'; }; var again = r.deliveries.filter(function (d) { return d.again; }).length; %>
+<% var r = rhythm, epNoShort = function (e) { return videoNo(e.number, e.project_id) || 'Episódio'; }; var again = r.deliveries.filter(function (d) { return d.again; }).length; %>
 <section class="day-sum rhythm" aria-labelledby="ritmo-h">
   <div class="day-sum-head"><h2 id="ritmo-h">Seu ritmo <span class="day-when">HOJE E ESTA SEMANA</span></h2></div>
   <div class="day-panel">

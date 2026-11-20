@@ -251,15 +251,20 @@ const fmtWhen = (d) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao
 // Corridas (dois cliques, duas réplicas): convidado já com episódio devolve o existente; número repetido tenta o seguinte.
 // requests: rotinas de pedido marcadas no formulário (Q&A, bastidores…); null = as marcadas por padrão (episódio criado pelo convidado).
 // projectId: só vale para episódio sem convidado; com convidado, o episódio é do projeto dele (o vínculo vence o seletor).
-async function createEpisode({ title, guestId = null, recordedOn = null, userId = null, origin = '', sponsor = null, requests = null, projectId = null }) {
+// stage: 'gravado' (padrão) ou 'pre_producao' (vídeo criado à mão, antes da gravação). format: null = o padrão do projeto.
+async function createEpisode({ title, guestId = null, recordedOn = null, userId = null, origin = '', sponsor = null, requests = null, projectId = null, stage = 'gravado', format = null }) {
   let ep = null;
   for (let attempt = 0; attempt < 3 && !ep; attempt += 1) {
     try {
       ({ rows: [ep] } = await db.query(
-        `INSERT INTO episodes (number, title, status, guest_id, recorded_on, aired_on, project_id)
-         VALUES ((SELECT coalesce(max(number), 0) + 1 FROM episodes), $1, 'gravado', $2, $3,
-                 (SELECT premiere_on FROM guests WHERE id = $2),
-                 coalesce((SELECT project_id FROM guests WHERE id = $2), $4)) RETURNING *`, [title, guestId, recordedOn, projectId || require('./projects').defaultId()]));
+        // a numeração é por projeto (EP.012 no Pulso e V.003 no Projeto 100 convivem); o formato vem do projeto quando não é dito
+        `WITH alvo AS (SELECT coalesce((SELECT project_id FROM guests WHERE id = $2), $4) AS project_id)
+         INSERT INTO episodes (number, title, status, guest_id, recorded_on, aired_on, project_id, format)
+         SELECT (SELECT coalesce(max(e.number), 0) + 1 FROM episodes e WHERE e.project_id = a.project_id),
+                $1, $5, $2, $3, (SELECT premiere_on FROM guests WHERE id = $2), a.project_id,
+                coalesce($6, (SELECT default_format FROM projects WHERE id = a.project_id))
+           FROM alvo a RETURNING *`,
+        [title, guestId, recordedOn, projectId || require('./projects').defaultId(), stage, format]));
     } catch (err) {
       if (err.code !== '23505') throw err;
       if (guestId && /guest/.test(err.constraint || '')) { const { rows: [existing] } = await db.query('SELECT * FROM episodes WHERE guest_id = $1', [guestId]); if (existing) return existing; }

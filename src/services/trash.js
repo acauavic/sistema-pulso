@@ -17,10 +17,10 @@ const ATTACH_TYPE = { tasks: 'task', content_requests: 'content_request', commen
 const FILE_COLUMNS = { episode_files: 'storage_key', episode_clips: 'storage_key', episode_covers: 'storage_key', episode_frames: 'storage_key', sponsor_files: 'storage_key', attachments: 'storage_key', guests: 'photo_key', plateia_partners: 'logo_key', clip_versions: 'storage_key' };
 
 const PUB_PENDING = "clip_id::text = $1 AND (status IN ('agendado','revisao') OR retry_at IS NOT NULL)";
-const epTag = (n) => (n ? `EP.${String(n).padStart(3, '0')}` : '');
+const epTag = (n, projectId) => (n ? `${(require('./projects').get(projectId) || {}).number_prefix || 'EP.'}${String(n).padStart(3, '0')}` : '');
 const COVER_KINDS = { youtube_thumb: 'Thumbnail do YouTube', reel_cover: 'Capa de Reels/TikTok', post_quote: 'Post de frase', post_split: 'Tela dividida', carousel: 'Carrossel', entrega: 'Imagem entregue' };
 const KINDS = {
-  episode: { table: 'episodes', label: 'Episódio', title: (r) => [epTag(r.number), r.title].filter(Boolean).join(' · '), url: (r) => `/episodios/${r.id}` },
+  episode: { table: 'episodes', label: 'Episódio', title: (r) => [epTag(r.number, r.project_id), r.title].filter(Boolean).join(' · '), url: (r) => `/episodios/${r.id}` },
   guest: { table: 'guests', label: 'Convidado', title: (r) => r.name, url: (r) => `/convidados/${r.id}` },
   sponsor: { table: 'sponsors', label: 'Patrocinador', title: (r) => r.company, url: (r) => `/patrocinadores/${r.id}` },
   task: { table: 'tasks', label: 'Tarefa', title: (r) => r.title, url: (r) => `/tarefas/${r.id}` },
@@ -109,8 +109,8 @@ const filesOf = (snap) => [...new Set(snap.rows.map((r) => FILE_COLUMNS[r.table]
 async function contextOf(q, kind, row) {
   if (kind === 'episode') return row.guest_id ? (await q('SELECT name FROM guests WHERE id = $1', [row.guest_id])).rows[0]?.name || null : null;
   if (row.episode_id && kind !== 'episode') {
-    const { rows: [e] } = await q('SELECT number, title FROM episodes WHERE id = $1', [row.episode_id]);
-    if (e) return [epTag(e.number), e.title].filter(Boolean).join(' · ');
+    const { rows: [e] } = await q('SELECT number, title, project_id FROM episodes WHERE id = $1', [row.episode_id]);
+    if (e) return [epTag(e.number, e.project_id), e.title].filter(Boolean).join(' · ');
   }
   if (row.sponsor_id) return (await q('SELECT company FROM sponsors WHERE id = $1', [row.sponsor_id])).rows[0]?.company || null;
   if (row.guest_id) return (await q('SELECT name FROM guests WHERE id = $1', [row.guest_id])).rows[0]?.name || null;

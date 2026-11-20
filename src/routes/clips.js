@@ -64,7 +64,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
                WHERE c.clip_id IS NULL AND c.kind = ANY($1) AND ${coverProject} = ANY($2::int[]) ${only ? 'AND c.episode_id = $3' : ''}`, only ? [POST_KINDS, pids, only] : [POST_KINDS, pids]),
     board.publicationIndex(),
     R.list({ episodeId: only, projectIds: pids }), db.query("SELECT id, name, role FROM users WHERE active AND role IN ('editor_video','gestao','superadmin') ORDER BY (role = 'editor_video') DESC, name"),
-    db.query('SELECT id, number, title FROM episodes WHERE project_id = ANY($1::int[]) ORDER BY number DESC NULLS LAST, id DESC LIMIT 80', [pids]),
+    db.query('SELECT id, number, title, project_id FROM episodes WHERE project_id = ANY($1::int[]) ORDER BY number DESC NULLS LAST, id DESC LIMIT 80', [pids]),
   ]);
   const byEpisode = {};
   for (const e of episodes.rows) byEpisode[e.id] = e;

@@ -16,7 +16,7 @@
   <div class="bulk-cover-row" data-cover-row="<%= c.id %>">
     <input type="hidden" name="ids" value="<%= c.id %>">
     <div>
-      <span class="ktype mono small"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.title %></span>
+      <span class="ktype mono small"><%= c.ep_number ? videoNo(c.ep_number, c.project_id) + ' · ' : '' %><%= c.title %></span>
       <p class="m-0"><a href="/cortes/<%= c.id %>" target="_blank" rel="noopener"><strong><%= c.post_title || c.title %></strong></a></p>
       <% if (c.guest_name) { %><p class="small muted m-0"><%= c.guest_name %></p><% } %>
     </div>

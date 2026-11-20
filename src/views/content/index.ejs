@@ -1,7 +1,7 @@
 <%- include('../partials/head') %>
 <%
   var KINDS = { post_quote: 'Posts de frase', post_split: 'Tela dividida', carousel: 'Carrossel' };
-  var epLabel = function (e) { return (e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '') + e.title; };
+  var epLabel = function (e) { return fmt.epLabel(e.number, e.title, prefixOf(e.project_id)); };
   var unassigned = clips.filter(function (c) { return !c.episode_id; });
   var assigned = clips.filter(function (c) { return c.episode_id; });
   var postCount = postGroups.reduce(function (n, g) { return n + g.covers.length; }, 0);
@@ -43,7 +43,7 @@
         <% if (fq) { new URLSearchParams(fq).forEach(function (v, k) { %><input type="hidden" name="<%= k %>" value="<%= v %>"><% }); } %>
         <select name="episodio" data-autosubmit aria-label="Filtrar por episódio">
           <option value="">Todos os episódios</option>
-          <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= only === e.id ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
+          <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= only === e.id ? 'selected' : '' %>><%= fmt.epLabel(e.number, e.title, prefixOf(e.project_id)) %></option><% }) %>
         </select>
       </form>
       <% if (hiddenOld) { %><a class="link small" href="<%= boardHref(tipo) %>&publicados=todos">Ver publicados há mais de 60 dias <span class="mono">(<%= hiddenOld %>)</span></a><% } %>
@@ -107,7 +107,7 @@
         <% if (fq) { new URLSearchParams(fq).forEach(function (v, k) { %><input type="hidden" name="<%= k %>" value="<%= v %>"><% }); } %>
         <select name="episodio" data-autosubmit aria-label="Filtrar por episódio">
           <option value="">Todos os episódios</option>
-          <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= only === e.id ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
+          <% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= only === e.id ? 'selected' : '' %>><%= fmt.epLabel(e.number, e.title, prefixOf(e.project_id)) %></option><% }) %>
         </select>
         <select name="ordem" data-autosubmit aria-label="Ordenar">
           <% [['recentes', 'Mais recentes'], ['antigos', 'Mais antigos'], ['episodio', 'Por episódio'], ['duracao', 'Mais curtos primeiro']].forEach(function (o) { %><option value="<%= o[0] %>" <%= ordem === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %>
@@ -172,7 +172,7 @@
     <% var postCount = g.covers.length; var epTag = g.episode.number ? 'ep' + String(g.episode.number).padStart(3, '0') : 'episodio'; %>
     <section class="card top-gap"<%- postCount > 1 ? ' data-dl data-dl-zip="' + epTag + '-posts"' : '' %>>
       <div class="row spread">
-        <div><span class="kicker"><%= g.episode.number ? 'EP.' + String(g.episode.number).padStart(3, '0') : 'Episódio' %></span><h2><a href="/episodios/<%= g.episode.id %>"><%= g.episode.title %></a></h2><% if (g.episode.guest_name) { %><p class="small muted"><%= g.episode.guest_name %></p><% } %></div>
+        <div><span class="kicker"><%= videoNo(g.episode.number, g.episode.project_id) || 'Episódio' %></span><h2><a href="/episodios/<%= g.episode.id %>"><%= g.episode.title %></a></h2><% if (g.episode.guest_name) { %><p class="small muted"><%= g.episode.guest_name %></p><% } %></div>
         <% if (perm.cut && g.canGenerate && aiReady) { %>
         <form method="post" action="/episodios/<%= g.episode.id %>/capas/gerar" class="inline" data-busy="Gerando as capas…"<%- g.covers.length ? ' data-confirm="Gerar os posts de novo? As imagens automáticas que ainda não foram aprovadas são refeitas; as aprovadas e as editadas ficam."' : '' %>>
           <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="conteudo">
@@ -276,7 +276,7 @@
       <% if (mayPick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= r.title %>"><% } %>
       <a class="req-row" href="/conteudo/pedidos/<%= r.id %>"<%- mayPick ? ' data-dl-pick' : '' %>>
         <% var sameAsKind = String(r.title).toLowerCase() === String(K[r.kind].label).toLowerCase(); %>
-        <span><span class="ktype mono small muted"><%- include('../partials/project-tag', { id: r.project_id }) %> <%= sameAsKind && r.episode_title ? (r.episode_number ? 'EP.' + String(r.episode_number).padStart(3, '0') + ' · ' : '') + r.episode_title : K[r.kind].label + (r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '') %></span><br><strong><%= r.title %></strong>
+        <span><span class="ktype mono small muted"><%- include('../partials/project-tag', { id: r.project_id }) %> <%= sameAsKind && r.episode_title ? fmt.epLabel(r.episode_number, r.episode_title, prefixOf(r.project_id)) : K[r.kind].label + (r.episode_number ? ' · ' + videoNo(r.episode_number, r.project_id) : '') %></span><br><strong><%= r.title %></strong>
           <span class="meta"><span><%- icon('user', 12) %><%= r.assignee_name || 'qualquer editor' %></span><% if (r.due_on) { %><span class="<%= late ? 'err' : '' %>"><%- icon('calendar', 12) %><%= dueShort(r.due_on) %><%= late ? ' · atrasado' : '' %></span><% } %><% if (r.rounds) { %><span><%= r.rounds %>ª volta</span><% } %></span></span>
         <span class="badge <%= { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao' }[r.status] %>"><%= S[r.status] %></span>
       </a>
@@ -323,7 +323,7 @@
     <label>Episódio
       <select name="episode_id" required>
         <option value="">Escolha…</option>
-        <% episodes.forEach(function (e) { %><option value="<%= e.id %>"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
+        <% episodes.forEach(function (e) { %><option value="<%= e.id %>"><%= fmt.epLabel(e.number, e.title, prefixOf(e.project_id)) %></option><% }) %>
       </select>
     </label>
     <p class="small muted">Só aparecem episódios já gravados. Os cortes que já tinham episódio mudam para este, e as capas são refeitas.</p>

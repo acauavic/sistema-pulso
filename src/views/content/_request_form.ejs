@@ -34,7 +34,7 @@
     </div>
     <div class="grid-2 tight">
       <label data-when="kind=<%= videoKinds %>">Formato<select name="format"><option value="">— tanto faz —</option><% Object.keys(F).forEach(function (f) { %><option value="<%= f %>" <%= cur.format === f ? 'selected' : '' %>><%= F[f] %></option><% }) %></select></label>
-      <label>Episódio<select name="episode_id"><option value="">— nenhum (avulso) —</option><% episodeList.forEach(function (e) { %><option value="<%= e.id %>" <%= String(epId) === String(e.id) ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %></select></label>
+      <label>Episódio<select name="episode_id"><option value="">— nenhum (avulso) —</option><% episodeList.forEach(function (e) { %><option value="<%= e.id %>" <%= String(epId) === String(e.id) ? 'selected' : '' %>><%= fmt.epLabel(e.number, e.title, prefixOf(e.project_id)) %></option><% }) %></select></label>
       <label>Para quem<select name="assignee_id"><option value="">— qualquer editor —</option><% people.forEach(function (u) { %><option value="<%= u.id %>" <%= String(cur.assignee_id || '') === String(u.id) ? 'selected' : '' %>><%= u.name %></option><% }) %></select></label>
       <label>Entregar até<input type="date" name="due_on" value="<%= dueIso %>"></label>
     </div>

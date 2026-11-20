@@ -10,7 +10,7 @@
   var UP = uploadPost.PLATFORMS;
   var ready = clip.status === 'pronto';
   var chosen = covers.find(function (x) { return x.id === clip.cover_id; });
-  var epLabel = function (e) { return (e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '') + e.title; };
+  var epLabel = function (e) { return fmt.epLabel(e.number, e.title, prefixOf(e.project_id)); };
   var boxes = [];
   // redes onde o corte já está no ar: não entram de novo (sairia duplicado)
   var liveNets = {};

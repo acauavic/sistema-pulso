@@ -74,7 +74,7 @@
       <% if (r.cover) { %><img src="/capas/<%= r.cover.id %>/imagem?v=<%= new Date(r.cover.updated_at).getTime() %>&w=640" alt="" loading="lazy"><% } else { %><span class="poster-empty"><%- icon('film', 16) %></span><% } %>
       <div>
         <a href="/cortes/<%= c.id %>" target="_blank" rel="noopener"><strong><%= c.post_title || c.title %></strong></a>
-        <p class="handle muted m-0"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.title %><%= c.duration_ms ? ' · ' + fmt.formatClock(c.duration_ms) : '' %><%= r.cover ? '' : ' · sem capa' %><%= auto ? ' · comente ' + keywordOf(c) : '' %></p>
+        <p class="handle muted m-0"><%= c.ep_number ? videoNo(c.ep_number, c.project_id) + ' · ' : '' %><%= c.title %><%= c.duration_ms ? ' · ' + fmt.formatClock(c.duration_ms) : '' %><%= r.cover ? '' : ' · sem capa' %><%= auto ? ' · comente ' + keywordOf(c) : '' %></p>
       </div>
       <% if (ig) { %><label class="check small trial-cell"><input type="checkbox" name="teste_<%= c.id %>" value="1" <%= r.trial ? 'checked' : '' %>> Reel de teste</label><% } %>
     </div>

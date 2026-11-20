@@ -23,14 +23,14 @@
     <% if (c.status === 'enviando' || c.status === 'processando') { %><div class="bar"><i data-clip-bar data-w="0"></i></div><p class="small muted" data-clip-msg><%= c.status === 'enviando' ? 'Enviando…' : 'Na fila…' %></p><% } %>
     <% if (c.status === 'erro') { %><p class="small err"><%= c.error %></p><% } %>
     <% if (c.episode_id) { %>
-      <p class="small"<%- cfa('episodio') %>><span class="muted">Episódio:</span> <a href="/episodios/<%= c.episode_id %>"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') + ' · ' : '' %><%= c.ep_title %></a></p>
+      <p class="small"<%- cfa('episodio') %>><span class="muted">Episódio:</span> <a href="/episodios/<%= c.episode_id %>"><%= fmt.epLabel(c.ep_number, c.ep_title, prefixOf(c.project_id)) %></a></p>
     <% } else if (c.request_id) { %>
     <% } else if (perm.cut && c.status === 'pronto') { %>
       <form method="post" action="/cortes/<%= c.id %>/atribuir" class="assign-row">
         <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="lista">
         <select name="episode_id" aria-label="Episódio de <%= c.title %>" required>
           <option value="">Atribuir a um episódio…</option>
-          <% episodes.forEach(function (e) { %><option value="<%= e.id %>"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %>
+          <% episodes.forEach(function (e) { %><option value="<%= e.id %>"><%= fmt.epLabel(e.number, e.title, prefixOf(e.project_id)) %></option><% }) %>
         </select>
         <button class="btn" type="submit">Atribuir</button>
       </form>

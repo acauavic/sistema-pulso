@@ -29,7 +29,7 @@
       <% if (r.format) { %> · <%= F[r.format] %><% } %>
       · pedido por <%= r.creator_name || '—' %> em <%= when(r.created_at) %>
     </p>
-    <% if (r.episode_id) { %><p class="small top-gap"><span class="muted">Episódio:</span> <a href="/episodios/<%= r.episode_id %>"><%= r.episode_number ? 'EP.' + String(r.episode_number).padStart(3, '0') + ' · ' : '' %><%= r.episode_title %></a></p><% } %>
+    <% if (r.episode_id) { %><p class="small top-gap"><span class="muted">Episódio:</span> <a href="/episodios/<%= r.episode_id %>"><%= r.episode_number ? videoNo(r.episode_number, r.project_id) + ' · ' : '' %><%= r.episode_title %></a></p><% } %>
   </div>
   <div class="row">
     <a class="btn ghost" href="/conteudo?vista=pedidos"><%- icon('arrow-left') %> Conteúdo</a>

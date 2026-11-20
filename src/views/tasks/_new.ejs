@@ -40,7 +40,7 @@
     <details <%= prefill.episode_id || prefill.guest_id || prefill.sponsor_id ? 'open' : '' %>>
       <summary>Ligar a um episódio, convidado ou patrocinador</summary>
       <div class="form-grid form-grid-3 top-gap">
-        <label>Episódio<select name="episode_id"><option value="">Nenhum</option><% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= String(prefill.episode_id) === String(e.id) ? 'selected' : '' %>><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= e.title %></option><% }) %></select></label>
+        <label>Episódio<select name="episode_id"><option value="">Nenhum</option><% episodes.forEach(function (e) { %><option value="<%= e.id %>" <%= String(prefill.episode_id) === String(e.id) ? 'selected' : '' %>><%= fmt.epLabel(e.number, e.title, prefixOf(e.project_id)) %></option><% }) %></select></label>
         <label>Convidado<select name="guest_id"><option value="">Nenhum</option><% guests.forEach(function (g) { %><option value="<%= g.id %>" <%= String(prefill.guest_id) === String(g.id) ? 'selected' : '' %>><%= g.name %></option><% }) %></select></label>
         <label>Patrocinador<select name="sponsor_id"><option value="">Nenhum</option><% sponsors.forEach(function (s) { %><option value="<%= s.id %>" <%= String(prefill.sponsor_id) === String(s.id) ? 'selected' : '' %>><%= s.company %></option><% }) %></select></label>
       </div>

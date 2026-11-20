@@ -178,6 +178,10 @@ const formatDueShort = (d, t) => (d ? `${formatDayShort(d)}${formatTime(t) ? ` �
 
 // HTML guardado (já limpo) ou, em registros antigos, o texto puro formatado.
 const richHtml = (html, plain) => require('../services/richText').display(html, plain);
+// Número do vídeo com o prefixo do projeto: EP.012 no Pulso, V.003 no Projeto 100. Sem número, nada (vídeo ainda em pauta).
+const epNo = (n, prefix = 'EP.') => (n ? `${prefix}${String(n).padStart(3, '0')}` : '');
+const epLabel = (n, title, prefix = 'EP.') => [epNo(n, prefix), title].filter(Boolean).join(' · ');
+
 const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Texto de comentário: escapa o HTML e destaca as menções (@Nome) de pessoas da equipe.
 function commentHtml(text, names = []) {
@@ -200,7 +204,7 @@ function relativeDays(v, now = new Date()) {
 }
 const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
-module.exports = { compact, plural, phone, waLink, formatRange, escHtml, richHtml, commentHtml, initials, relativeDays,
+module.exports = { epNo, epLabel, compact, plural, phone, waLink, formatRange, escHtml, richHtml, commentHtml, initials, relativeDays,
   formatBRL, parseBRL, parseInputDate, toInputDate, formatDay, formatDayShort, formatDayLong, timeParts, formatTime, toInputTime, formatDue, formatDueShort, formatBytes, formatClock,
   TZ, formatDateTime, formatDate, formatSoon, formatLong, toInputValue, parseInputDateTime,
   shortDate, monthShort, dayNum, todayLabel, greeting,

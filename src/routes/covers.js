@@ -112,7 +112,7 @@ router.get(both('/editar'), requirePerm('episodes.read'), wrap(async (req, res) 
   const c = await findCover(req);
   if (!c) return notFound(res);
   if (c.kind === 'entrega') return res.redirect(`/conteudo/pedidos/${c.request_id}`); // imagem pronta do editor: não passa pelo editor de capa
-  const { rows: [ep] } = c.episode_id ? await db.query('SELECT id, number, title FROM episodes WHERE id = $1', [c.episode_id]) : { rows: [] };
+  const { rows: [ep] } = c.episode_id ? await db.query('SELECT id, number, title, project_id FROM episodes WHERE id = $1', [c.episode_id]) : { rows: [] };
   const frames = (await store.loadFrames(c.episode_id, { clipId: c.clip_id ?? null, custom: true })).map((f) => ({ id: f.id, ref: f.ref, width: f.width, height: f.height, at_ms: f.at_ms, score: f.score, analysis: { rostos: f.analysis.rostos || [], caixas_de_texto: f.analysis.caixas_de_texto || [], custom: Boolean(f.analysis.custom), unchecked: Boolean(f.analysis.unchecked) } }));
   const siblings = c.clip_id
     ? await db.query('SELECT id, label, position FROM episode_covers WHERE clip_id = $1 ORDER BY position', [c.clip_id])

@@ -6,7 +6,8 @@ const { can } = require('../permissions');
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const like = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
-const pad3 = (n) => (n ? `EP.${String(n).padStart(3, '0')}` : '');
+const prefixOf = (projectId) => (require('./projects').get(projectId) || {}).number_prefix || 'EP.'; // EP.012 no Pulso, V.003 no Projeto 100
+const pad3 = (n, projectId) => (n ? `${prefixOf(projectId)}${String(n).padStart(3, '0')}` : '');
 const allowed = (user, perm) => !perm || [].concat(perm).some((p) => can(user.role, p));
 
 // ---------------------------------------------------------------- atalhos de ação (o sistema cresce: adicione aqui ou pela Gestão > Busca)
@@ -83,9 +84,9 @@ const PROVIDERS = [
   { key: 'episodes', label: 'Episódios', tables: ['episodes'], perm: 'episodes.read', async search(q) {
     const num = (norm(q).trim().match(/^(?:ep(?:isodio)?\.?\s*)?(\d{1,4})$/) || [])[1]; // "12", "ep 12", "ep.12", "episódio 12"
     const m = match(['e.title', 'g.name', "'ep episodio ' || coalesce(e.number::text, '')", 'e.number::text'], q);
-    const { rows } = await db.query(`SELECT e.id, e.number, e.title, g.name AS guest FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
+    const { rows } = await db.query(`SELECT e.id, e.number, e.title, e.project_id, g.name AS guest FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
       WHERE (${m.sql}) ${num ? `OR e.number = $${m.params.length + 1}` : ''} ORDER BY e.number DESC NULLS LAST LIMIT 6`, num ? [...m.params, Number(num)] : m.params);
-    return rows.map((r) => ({ title: `${pad3(r.number) ? `${pad3(r.number)} · ` : ''}${r.title}`, sub: r.guest || 'episódio', url: `/episodios/${r.id}` }));
+    return rows.map((r) => ({ title: `${pad3(r.number, r.project_id) ? `${pad3(r.number, r.project_id)} · ` : ''}${r.title}`, sub: r.guest || 'episódio', url: `/episodios/${r.id}` }));
   } },
   { key: 'tasks', label: 'Tarefas', tables: ['tasks', 'task_routines'], perm: 'tasks.read', async search(q) {
     const m = match(['t.title', 't.description'], q);

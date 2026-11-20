@@ -258,7 +258,7 @@ router.get('/conteudo/capas-em-lote', requirePerm('episodes.read'), wrap(async (
   const ids = idsOf({ ids: req.query.ids });
   if (!ids.length) return res.redirect('/conteudo?vista=cortes');
   const { rows: list } = await db.query(
-    `SELECT c.id, c.title, c.post_title, c.cover_id, c.cover_texts, c.status, e.number AS ep_number, g.name AS guest_name,
+    `SELECT c.id, c.title, c.post_title, c.cover_id, c.cover_texts, c.status, c.project_id, e.number AS ep_number, g.name AS guest_name,
             EXISTS (SELECT 1 FROM episode_frames f WHERE f.clip_id = c.id) AS has_frames
        FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id WHERE c.id = ANY($1)`, [ids]);
   const covers = await coverList(ids);

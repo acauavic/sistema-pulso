@@ -81,7 +81,8 @@ const timeOf = (col) => `to_char(${col} AT TIME ZONE '${TZ}', 'HH24:MI')`;
 // Dia de Brasília entre $1 e $2 (inclusive), escrito como faixa da própria coluna para o índice dela servir
 // (antes: (col AT TIME ZONE …)::date BETWEEN …, que obrigava a ler a tabela inteira).
 const inRange = (col) => `(${col} >= ($1::date::timestamp AT TIME ZONE '${TZ}') AND ${col} < (($2::date + 1)::timestamp AT TIME ZONE '${TZ}'))`;
-const epNo = (n) => (n ? `EP.${String(n).padStart(3, '0')}` : 'Episódio');
+const prefixOf = (projectId) => (require('./projects').get(projectId) || {}).number_prefix || 'EP.'; // EP.012 no Pulso, V.003 no Projeto 100
+const epNo = (n, projectId) => (n ? `${prefixOf(projectId)}${String(n).padStart(3, '0')}` : 'Episódio');
 const POST_STATUS = { revisao: 'em revisão', recusado: 'devolvido', simulado: 'simulado', enviando: 'enviando', agendado: 'agendado', publicado: 'publicado', parcial: 'parcial', erro: 'com erro' };
 
 // Cada fonte devolve eventos { type, id, title, sub, day, time, url, done, late, tentative, who, whoId, amount }.
@@ -111,8 +112,8 @@ const SOURCES = {
     }));
     if (!owner) { // gravação só com os hosts (episódio sem convidado)
       const { rows: eps } = await db.query(
-        `SELECT e.id, e.number, e.title, to_char(e.recorded_on, 'YYYY-MM-DD') AS day FROM episodes e WHERE e.guest_id IS NULL AND e.recorded_on BETWEEN $1::date AND $2::date ORDER BY e.recorded_on LIMIT ${MAX_PER_TYPE}`, [from, to]);
-      for (const e of eps) out.push({ type: 'gravacao', id: `gravacao-ep-${e.id}`, title: `Gravação: ${epNo(e.number)} ${e.title}`, sub: 'gravada', day: e.day, time: null, url: `/episodios/${e.id}`, done: true, late: false });
+        `SELECT e.id, e.number, e.title, e.project_id, to_char(e.recorded_on, 'YYYY-MM-DD') AS day FROM episodes e WHERE e.guest_id IS NULL AND e.recorded_on BETWEEN $1::date AND $2::date ORDER BY e.recorded_on LIMIT ${MAX_PER_TYPE}`, [from, to]);
+      for (const e of eps) out.push({ type: 'gravacao', id: `gravacao-ep-${e.id}`, title: `Gravação: ${epNo(e.number, e.project_id)} ${e.title}`, sub: 'gravada', day: e.day, time: null, url: `/episodios/${e.id}`, done: true, late: false });
     }
     return out;
   },
@@ -134,7 +135,7 @@ const SOURCES = {
     const p = [from, to]; let w = 'e.aired_on BETWEEN $1::date AND $2::date';
     if (owner) { p.push(owner); w += ` AND e.editor_id = $${p.length}`; }
     const { rows } = await db.query(
-      `SELECT e.id, e.number, e.title, e.status, to_char(e.aired_on, 'YYYY-MM-DD') AS day, e.editor_id, u.name AS who FROM episodes e LEFT JOIN users u ON u.id = e.editor_id
+      `SELECT e.id, e.number, e.title, e.status, e.project_id, to_char(e.aired_on, 'YYYY-MM-DD') AS day, e.editor_id, u.name AS who FROM episodes e LEFT JOIN users u ON u.id = e.editor_id
         WHERE ${w} ORDER BY e.aired_on, e.number LIMIT ${MAX_PER_TYPE}`, p);
     // convidado ainda sem episódio, com estreia prevista: entra como publicação prevista (vai para o cadastro dele)
     const p2 = [from, to]; let w2 = "g.status IN ('em_agendamento', 'agendado') AND g.premiere_on BETWEEN $1::date AND $2::date AND NOT EXISTS (SELECT 1 FROM episodes x WHERE x.guest_id = g.id)";
@@ -147,7 +148,7 @@ const SOURCES = {
       day: g.day, time: null, url: `/convidados/${g.id}`, done: false, late: false, who: g.who, whoId: g.owner_id,
     }));
     return fromGuests.concat(rows.map((e) => ({
-      type: 'episodio', id: `episodio-${e.id}`, title: `${epNo(e.number)} ${e.title}`, sub: e.status === 'publicado' ? 'publicado' : `publicação prevista · ${C.EPISODE_STATUSES[e.status].toLowerCase()}`,
+      type: 'episodio', id: `episodio-${e.id}`, title: `${epNo(e.number, e.project_id)} ${e.title}`, sub: e.status === 'publicado' ? 'publicado' : `publicação prevista · ${C.EPISODE_STATUSES[e.status].toLowerCase()}`,
       day: e.day, time: null, url: `/episodios/${e.id}`, done: e.status === 'publicado', late: e.status !== 'publicado' && e.day < today, who: e.who, whoId: e.editor_id,
     })));
   },
