@@ -228,11 +228,12 @@ O painel deixa a identidade do Pulso e passa a usar a da casa. Fonte: `docs/refe
 
 Hoje tudo abre em `sistema.podcastpulso.com` (painel e links públicos) e os links curtos em `link.podcastpulso.com`.
 
-- **Painel**: um endereço da casa (domínio da Health Scale, a definir). Login, sessão, app instalado e avisos vivem só
-  nele.
+- **Painel**: `studio.healthscale.com.br`. Login, sessão, app instalado e avisos vivem só nele.
 - **Cada projeto tem o seu endereço público** (`projects.public_host`). O do Pulso é o de hoje,
   `sistema.podcastpulso.com`: **nenhum link já enviado muda ou quebra** (convites, portais, media kits, QR Code do cartão
-  de agradecimento, links curtos). O Projeto 100 ganha o dele quando tiver domínio.
+  de agradecimento, links curtos). O do Projeto 100 fica em `projeto100.com`, num subdomínio (adotado
+  `links.projeto100.com`, a confirmar), do mesmo jeito que o Pulso usa `sistema.` e deixa `podcastpulso.com` para o
+  site: assim a raiz `projeto100.com` fica livre para o site do projeto, sem disputa de caminhos.
 - **Como funciona**: todos os endereços chegam no mesmo sistema (um bloco por domínio no Caddy). Um passo novo logo na
   entrada (`middleware/hostContext.js`) olha o domínio e decide:
   - **domínio do painel**: tudo do painel. Um link público aberto ali é levado para o domínio do projeto dono do link;
@@ -296,7 +297,8 @@ Cada fase é um lançamento que funciona sozinho.
 5. **Dinheiro por projeto.** Dono do lançamento, compartilhado com divisão, cotas do banco de horas, resultado por
    projeto e consolidado.
 6. **Endereços.** Painel no domínio da casa; links públicos, favicon, links curtos e remetente por projeto. Depende só
-   da fase 2 e de o dono ter os domínios; pode subir na fila.
+   da fase 2; pode subir na fila. Antes de publicar, o dono aponta `studio.healthscale.com.br` e o subdomínio do
+   Projeto 100 para o servidor (registro no DNS, com o Cloudflare na frente como hoje).
 7. **Acesso por projeto.** Equipe da casa, membros, "Vê o financeiro", isolamento em todas as superfícies, teste de
    isolamento. Só depois entra a equipe do Dr. José Bento.
 8. **Redes por projeto.** Contas e provedores por projeto (`social_account_status` e os perfis da Zernio/Outstand),
@@ -348,9 +350,8 @@ As fases 8 e 9 podem subir se o Projeto 100 precisar publicar pelo sistema antes
 
 ## Em aberto (do dono)
 
-- **Domínio do painel**: qual endereço da Health Scale o painel usa (ex.: `studio.` + o domínio da casa)? Até decidir,
-  o painel continua em `sistema.podcastpulso.com`, já com a identidade nova.
-- **Domínio do Projeto 100**: qual será, quando houver.
+- **Subdomínio público do Projeto 100**: adotado `links.projeto100.com`; pode ser outro nome (só importa antes da
+  fase 6).
 - **Custo do banco de horas**: adotado pela **cota** (10/10, ajustável quando um projeto usa horas do outro). A
   alternativa é cobrar pelo uso real.
 - **Sigla e prefixo do Projeto 100**: adotados `P100` e `V.` até segunda ordem.
