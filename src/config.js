@@ -31,6 +31,7 @@ const config = {
   previewDir: env.PREVIEW_DIR || require('path').join(__dirname, '..', 'data', 'previews'),
   mailDryRun: env.MAIL_DRY_RUN === 'true', // dev/teste: registra o e-mail em vez de enviar
   podcastName: env.PODCAST_NAME || 'Podcast Pulso',
+  appName: env.APP_NAME || 'Health Scale Studio', // nome do painel (a gerência); o que é público leva o nome do projeto
   // WhatsApp da produção (só dígitos, com DDI): destino dos botões do convite.
   // WhatsApp comercial (media kit): destino dos botões "Quero ser patrocinador" e "Falar com a equipe".
   whatsappPatrocinio: String(env.PATROCINIO_WHATSAPP || '5511971739061').replace(/\D/g, ''),

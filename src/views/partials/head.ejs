@@ -6,20 +6,19 @@
   <meta name="csrf" content="<%= csrf %>">
   <% if (currentUser) { %><meta name="push-key" content="<%= pushKey %>"><% } %>
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#0A0A0A">
-  <title><%= title %> · <%= podcastName || 'Pulso' %></title>
+  <meta name="theme-color" content="#0E0F0D">
+  <title><%= title %> · <%= (typeof appName !== 'undefined' && appName) || 'Health Scale Studio' %></title>
   <link rel="icon" href="/static/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
   <link rel="icon" href="/favicon.ico" sizes="48x48">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Pulso">
+  <meta name="apple-mobile-web-app-title" content="Studio">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <script src="/static/theme.js?v=<%= assetV %>"></script>
-  <%# fontes do texto e dos títulos começam a baixar junto com o CSS (sem esperar o navegador descobrir que precisa delas) %>
-  <link rel="preload" href="/static/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/static/fonts/space-grotesk-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <%# a fonte do texto e dos títulos começa a baixar junto com o CSS (sem esperar o navegador descobrir que precisa dela) %>
+  <link rel="preload" href="/static/fonts/archivo-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/app.css?v=<%= assetV %>">
 </head>
 <body>
@@ -33,7 +32,7 @@
 <div class="app">
 <aside class="sidebar" data-sidebar>
   <div class="sidebar-top">
-    <a class="wordmark" href="/" aria-label="pulso. — início"><span class="wm-p">p</span><span class="wm-rest">ulso</span><span class="dot">.</span></a>
+    <%- include('brand', { variant: 'menu' }) %>
     <button class="icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-label="Recolher o menu" title="Recolher o menu" aria-pressed="false"><%- icon('panel-left', 18) %></button>
   </div>
   <button class="icon-btn sidebar-toggle" type="button" data-nav-toggle aria-label="Abrir menu"><%- icon('menu', 20) %></button>
@@ -86,9 +85,9 @@
 <main class="main" id="conteudo" tabindex="-1"><div class="container">
 <% } else { %>
 <div class="auth"><div class="auth-box">
-  <div>
-    <div class="wordmark" role="img" aria-label="pulso.">pulso<span class="dot">.</span></div>
-    <%- include('pulse-line') %>
+  <div class="auth-brand">
+    <%- include('brand', { variant: 'sign' }) %>
+    <%- include('signal') %>
   </div>
 <% } %>
 <% if (flash) { %><div class="flash <%= flash.type === 'ok' ? 'flash-ok' : 'flash-error' %><%= flash.undo ? ' flash-undo' : '' %>" role="status"><span><%= flash.message %></span><% if (flash.undo) { %><form method="post" action="/lixeira/lote/<%= flash.undo %>/restaurar" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentUrl %>"><button class="btn sm" type="submit"><%- icon('rotate-ccw', 14) %> Desfazer</button></form><% } %></div><% } %>

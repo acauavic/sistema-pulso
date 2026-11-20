@@ -85,15 +85,32 @@ strong { font-weight: 600; }
 .voz { font-family: var(--f-voice); font-style: italic; font-weight: 400; letter-spacing: 0; }
 
 /* marca */
-.wordmark { font-family: var(--f-display); font-weight: 700; letter-spacing: -.02em; line-height: 1; color: var(--text); font-size: 24px; }
-.wordmark .dot { color: var(--accent); }
-.wordmark:hover { color: var(--text); text-decoration: none; }
-.pulse-line { display: block; width: 100%; height: 36px; }
+/* marca do painel: Health Scale Studio (partials/brand.ejs). No menu: ícone + duas linhas em mono. Na assinatura (login, páginas
+   sem menu): logotipo + filete + STUDIO na cor de ação; o logotipo é claro e, no tema claro, vira preto. */
+.brand { display: inline-flex; align-items: center; color: var(--text); text-decoration: none; }
+.brand:hover { color: var(--text); text-decoration: none; }
+.brand-menu { gap: 12px; min-width: 0; }
+.brand-mark { flex: none; width: 36px; height: 36px; display: block; }
+.brand-text { display: grid; gap: 5px; font-family: var(--f-mono); letter-spacing: .16em; line-height: 1; white-space: nowrap; }
+.brand-house { font-size: 11px; color: var(--muted); }
+.brand-menu .brand-name { font-size: 15px; font-weight: 500; }
+.brand-sign { font-size: 34px; height: 1em; }
+.brand-logo { flex: none; display: block; height: 1em; width: auto; }
+.brand-rule { flex: none; width: 1px; height: 1.05em; margin: 0 .5em; background: var(--line-strong); }
+.brand-sign .brand-name { font: 500 .46em/1 var(--f-mono); letter-spacing: .2em; margin-right: -.2em; color: var(--accent); white-space: nowrap; }
+:root[data-theme="light"] .brand-logo { filter: brightness(0); }
+/* o Sinal (partials/signal.ejs): quatro barras que crescem, símbolo de apoio do painel. Nas cores da marca no login; no estado vazio
+   e sem conexão, baixo e apagado (nada aconteceu ainda). Nunca vira decoração de cartão. */
+.signal { display: block; width: 34px; height: 30px; }
+.signal .s1 { fill: var(--sig-1); } .signal .s2 { fill: var(--sig-2); } .signal .s3 { fill: var(--sig-3); } .signal .s4 { fill: var(--sig-4); }
+.empty .signal, .signal.flat { width: 28px; height: 24px; }
+.empty .signal rect, .signal.flat rect { fill: var(--line-strong); transform-box: fill-box; transform-origin: center; transform: scaleY(.3); }
+@keyframes signal { 0% { background-size: 2px 30%, 2px 20%, 2px 20%, 2px 20%; } 25% { background-size: 2px 30%, 2px 55%, 2px 20%, 2px 20%; } 50% { background-size: 2px 30%, 2px 55%, 2px 80%, 2px 20%; } 75%, 100% { background-size: 2px 30%, 2px 55%, 2px 80%, 2px 100%; } }
 
 /* ============ shell: barra lateral + conteúdo ============ */
 .app { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); min-height: 100vh; }
 .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 24px; padding: 24px 16px; background: var(--bg); border-right: 1px solid var(--line); }
-.sidebar .wordmark { padding: 0 10px; font-size: 26px; }
+.sidebar .brand-menu { padding: 0 6px; }
 .sidebar .sidebar-toggle { display: none; }
 .nav { display: grid; gap: 2px; align-content: start; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; } /* em tela baixa só a lista rola; usuário e "Sair" ficam à vista */
 .nav a { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: var(--r-field); color: var(--text-2); font-weight: 500; transition: background var(--t) var(--ease), color var(--t) var(--ease); }
@@ -121,9 +138,9 @@ html { scrollbar-gutter: stable; } /* trocar de aba não muda a largura da pági
 
 /* telas sem login (entrar, senha, erro) */
 .auth { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; position: relative; overflow: hidden; }
-.auth::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(var(--line) 1.2px, transparent 1.4px); background-size: 22px 22px; opacity: .9; }
+.auth::before { content: ""; position: absolute; inset: 0; background: url(/static/brand/studio/signal-bg.svg) no-repeat right -4vw bottom -6vh / min(64vw, 680px) auto; } /* o Sinal, grande e apagado */
 .auth-box { position: relative; width: min(100%, 420px); display: grid; gap: 28px; }
-.auth-box .wordmark { font-size: 64px; }
+.auth-brand { display: grid; gap: 20px; justify-items: start; } .auth-brand .signal { width: 41px; height: 36px; }
 .auth-tag { font-family: var(--f-voice); font-style: italic; font-size: 24px; line-height: 1.15; color: var(--text); margin: 0; }
 .auth-card { padding: 28px; }
 /* Cloudflare Turnstile: sem altura enquanto confirma sozinho; quando o Cloudflare pede a caixa (300×65), ela aparece centralizada */
@@ -219,7 +236,7 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; grid-template
 .date-block .d { display: block; font: 700 20px var(--f-display); margin-top: 3px; letter-spacing: -.02em; }
 .feed li { display: grid; gap: 2px; padding-left: 14px; border-left: 2px solid var(--line); }
 .empty { text-align: center; padding: 32px 16px; color: var(--text-2); display: grid; gap: 8px; justify-items: center; }
-.empty strong { font-family: var(--f-display); font-size: 16px; color: var(--text); } .empty .pulse-line { height: 24px; max-width: 280px; opacity: .8; }
+.empty strong { font-family: var(--f-display); font-size: 16px; color: var(--text); }
 
 /* ============ quadro (kanban) ============ */
 .board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: start; }
@@ -250,8 +267,9 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; grid-template
 .day-sum-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 12px; }
 .day-sum-head h2 { margin: 0; display: flex; align-items: baseline; gap: 4px 14px; flex-wrap: wrap; }
 .day-when { display: inline-flex; align-items: center; gap: 8px; font: 500 11px var(--f-mono); letter-spacing: .14em; color: var(--muted); }
-.day-live { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: day-live 1.2s ease-in-out infinite; } /* ao vivo */
-:root[data-theme="light"] .day-live { background: var(--text); }
+.day-live { width: 11px; height: 10px; animation: signal 1.2s ease-in-out infinite; /* ao vivo: o Sinal pequeno, as barras subindo em sequência */
+  background: linear-gradient(var(--accent), var(--accent)) 0 100% / 2px 30% no-repeat, linear-gradient(var(--accent), var(--accent)) 3px 100% / 2px 55% no-repeat,
+    linear-gradient(var(--accent), var(--accent)) 6px 100% / 2px 80% no-repeat, linear-gradient(var(--accent), var(--accent)) 9px 100% / 2px 100% no-repeat; }
 @keyframes day-live { 50% { opacity: .25; } }
 .day-nav { display: flex; align-items: center; gap: 8px; --control-h: 32px; } /* o calendário com a altura das setas (.btn.sm) */
 .day-nav .btn.sm { padding: 0 10px; } .day-nav [aria-disabled="true"] { opacity: .4; pointer-events: none; }
@@ -403,12 +421,12 @@ dl.vars { grid-template-columns: 1fr; gap: 2px; } dl.vars dd { margin-bottom: 8p
 @media (max-width: 860px) {
   .app { grid-template-columns: 1fr; }
   .sidebar { position: sticky; z-index: 20; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0; padding: 12px 16px; border-right: 0; border-bottom: 1px solid var(--line); }
-  .sidebar .wordmark { padding: 0; font-size: 24px; }
+  .sidebar .brand-menu { padding: 0; } .sidebar .brand-mark { width: 32px; height: 32px; }
   .sidebar .sidebar-toggle { display: inline-flex; margin-left: auto; }
   .nav, .sidebar-foot { display: none; flex-basis: 100%; }
   .sidebar.open .nav { display: grid; padding: 12px 0; } .sidebar.open .sidebar-foot { display: grid; }
   .main { padding-top: 24px; }
-  .auth-box .wordmark { font-size: 52px; }
+  .brand-sign { font-size: 28px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
@@ -1041,15 +1059,14 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
 /* ============ menu lateral recolhível (só no computador; no celular o menu já é a barra de cima) ============ */
 .sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sidebar-collapse { padding: 6px; } .sidebar-collapse .icon { transition: transform var(--t) var(--ease); }
-.wordmark .wm-p, .wordmark .wm-rest { display: inline; }
 .app { transition: grid-template-columns var(--t) var(--ease); }
 @media (max-width: 860px) { .sidebar-collapse { display: none; } }
 @media (min-width: 861px) {
   html[data-sidebar="collapsed"] { --sidebar: 76px; }
   html[data-sidebar="collapsed"] .sidebar { padding: 20px 10px; }
   html[data-sidebar="collapsed"] .sidebar-top { flex-direction: column; gap: 10px; }
-  html[data-sidebar="collapsed"] .sidebar .wordmark { padding: 0; }
-  html[data-sidebar="collapsed"] .wordmark .wm-rest { display: none; }
+  html[data-sidebar="collapsed"] .sidebar .brand-menu { padding: 0; }
+  html[data-sidebar="collapsed"] .brand-text { display: none; }
   html[data-sidebar="collapsed"] .sidebar-collapse .icon { transform: scaleX(-1); }
   html[data-sidebar="collapsed"] .search-trigger { justify-content: center; padding: 9px 0; }
   html[data-sidebar="collapsed"] .search-trigger span, html[data-sidebar="collapsed"] .search-trigger kbd { display: none; }
@@ -1432,7 +1449,7 @@ dialog[data-material-dialog] .modal-actions { position: sticky; bottom: -20px; z
   .page-head > .row { gap: 6px; } .page-head > .row .btn { padding: 0 14px; }
   .row.spread { flex-wrap: wrap; }
 }
-.offline-card { display: grid; gap: 12px; } .offline-card h1 { font-size: 24px; } .offline-card p { margin: 0; } .offline-card .pulse-line { height: 24px; width: 100%; }
+.offline-card { display: grid; gap: 12px; } .offline-card h1 { font-size: 24px; } .offline-card p { margin: 0; }
 @media (hover: none) and (pointer: coarse) { .kbd-hint, .palette-input kbd, .palette-foot > span { display: none; } } /* toque: sem dicas de teclado */
 @media (max-width: 600px) { /* celular: janelas sobem de baixo, como folha de app; o botão de ação fica acima da barra do aparelho */
   dialog.modal, dialog.modal.modal-wide, dialog.modal.modal-xl { width: 100%; max-width: 100%; margin: auto 0 0; max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px)); overflow: auto; overscroll-behavior: contain; border-radius: var(--r-card) var(--r-card) 0 0; border-width: 1px 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
@@ -2021,7 +2038,7 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
 /* Link do estúdio: página pública de envio do material da gravação (/estudio/<token>) e o cartão no painel */
 .studio-page { min-height: 100vh; background: var(--bg); }
 .studio-main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; display: grid; gap: 24px; }
-.studio-mark { font-size: 32px; }
+.studio-main > .brand-sign { font-size: 28px; }
 .studio-card { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 24px; }
 .studio-card h1 { font-size: 28px; }
 .studio-drop { display: grid; justify-items: center; gap: 10px; padding: 32px 16px; border: 1px dashed var(--line-strong); border-radius: var(--r-card); background: var(--bg); text-align: center; color: var(--text-2); transition: border-color var(--t) var(--ease), background var(--t) var(--ease); }

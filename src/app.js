@@ -100,7 +100,7 @@ function createApp() {
     if (res.headersSent) return;
     const locals = { title: 'Algo deu errado', message: 'Ocorreu um erro inesperado. Tente novamente em instantes.' };
     // attachSession pode ter falhado antes de definir os locals do layout
-    res.status(500).render('error', { currentUser: null, flash: null, can: () => false, csrf: '', podcastName: '', currentPath: '', ...locals });
+    res.status(500).render('error', { currentUser: null, flash: null, can: () => false, csrf: '', podcastName: '', appName: require('./config').appName, currentPath: '', ...locals });
   });
 
   return app;

@@ -160,7 +160,7 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       const sw = await as.editor.get('/sw.js');
       assert.equal(sw.status, 200); assert.match(sw.headers.get('content-type'), /javascript/); assert.match(sw.text, /showNotification/);
       const mf = await as.editor.get('/manifest.webmanifest');
-      assert.equal(mf.status, 200); assert.equal(JSON.parse(mf.text).short_name, 'Pulso');
+      assert.equal(mf.status, 200); assert.equal(JSON.parse(mf.text).short_name, 'Studio');
       assert.match((await as.editor.get('/notificacoes')).text, /data-push data-push-key=""/);
     });
 
