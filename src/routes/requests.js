@@ -41,6 +41,7 @@ router.post('/conteudo/pedidos', requirePerm('episodes.read'), wrap(async (req, 
 
 router.get('/conteudo/pedidos/:id', requirePerm('episodes.read'), wrap(async (req, res) => {
   const r = await load(req); if (!r) return notFound(res);
+  require('../services/scope').assert(req, r.project_id); // de outro projeto de que a pessoa não participa: 404
   const [d, thread, files, ppl, eps] = await Promise.all([R.deliveries(r), require('../services/comments').list('content_request', r.id), attachments.forEntity('content_request', r.id), people(), episodeOptions()]);
   const board = require('../services/contentBoard');
   const idx = r.status === 'aprovado' || R.KINDS[r.kind].continuous ? await board.publicationIndex() : null; // cortes: cada um sai assim que fica pronto

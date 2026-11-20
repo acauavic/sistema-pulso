@@ -25,7 +25,7 @@
 <div class="page-head" data-cortes data-single="<%= clip.id %>" data-running="<%= running ? '1' : '0' %>" data-url="/cortes/status">
   <div>
     <span class="kicker"><%= clip.title %> · <%= episode ? epLabel(episode) : 'sem episódio ainda' %></span>
-    <h1><%= clip.post_title || clip.title %> <span class="badge <%= ST[0] %>" data-clip-badge><%= ST[1] %></span></h1>
+    <h1><%= clip.post_title || clip.title %> <span class="badge <%= ST[0] %>" data-clip-badge><%= ST[1] %></span> <%- include('../partials/project-tag', { id: clip.project_id }) %></h1>
     <p class="handle muted"><%= clip.duration_ms ? fmt.formatClock(clip.duration_ms) : '—' %><%= clip.width ? ' · ' + clip.width + '×' + clip.height : '' %><%= clip.size_bytes ? ' · ' + fmt.formatBytes(clip.size_bytes) : '' %><%= clip.filename ? ' · ' + clip.filename : '' %></p>
     <p class="clip-category small"><span class="mono muted">CATEGORIA</span> <span class="badge b-gray"><%= (K[clip.video_type] && K[clip.video_type].label) || clip.video_type %></span><% if (perm.cut) { %> <button class="link small" type="button" data-modal-open="modal-categoria">mudar</button><% } %></p>
   </div>

@@ -3,7 +3,7 @@
 <div class="page-head">
   <div>
     <span class="kicker">Tarefa · <%= C.TASK_KINDS[task.kind] %></span>
-    <h1><%= task.title %> <span class="badge tb-<%= task.status %>"><%= C.TASK_STATUSES[task.status] %></span></h1>
+    <h1><%= task.title %> <span class="badge tb-<%= task.status %>"><%= C.TASK_STATUSES[task.status] %></span> <%- include('../partials/project-tag', { id: task.project_id }) %></h1>
     <p class="muted top-gap">Criada<%= task.creator_name ? ' por ' + task.creator_name : ' por uma rotina' %> em <%= fmt.formatDateTime(task.created_at) %><%= task.routine_id ? ' · rotina de tarefas' : '' %><%= task.completed_at ? ' · feita em ' + fmt.formatDateTime(task.completed_at) : '' %></p>
     <% if (locals.origin) { %><p class="small task-repeat-line"><%- icon('message-circle', 14) %> <% if (origin.member) { %><span>Veio de uma mensagem de <%= origin.author %> em <%= origin.place %> · <a href="<%= origin.url %>">abrir</a></span><% } else { %><span>Veio de uma mensagem do chat</span><% } %></p><% } %>
     <% if (locals.repeat) { %><p class="small task-repeat-line"><%- icon('repeat', 14) %> <span>Repete: <%= repeat.text %></span><% if (repeat.canStop) { %> · <form method="post" action="/tarefas/<%= task.id %>/parar-de-repetir" class="inline" data-confirm="Parar de repetir? Esta tarefa continua; as próximas não são mais criadas."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">parar de repetir</button></form><% } %></p><% } %>

@@ -22,7 +22,7 @@
 <div class="page-head">
   <div>
     <span class="kicker">Pedido de conteúdo · <%= k.label %></span>
-    <h1><%= r.title %> <span class="badge <%= allPublished ? 'b-st-publicado' : badge %>"><%= allPublished ? 'Publicado' : cont && r.status === 'aprovado' ? 'Concluído' : S[r.status] %></span><% if (r.priority && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %> <span class="badge b-amber">Prioridade</span><% } %></h1>
+    <h1><%= r.title %> <%- include('../partials/project-tag', { id: r.project_id }) %> <span class="badge <%= allPublished ? 'b-st-publicado' : badge %>"><%= allPublished ? 'Publicado' : cont && r.status === 'aprovado' ? 'Concluído' : S[r.status] %></span><% if (r.priority && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %> <span class="badge b-amber">Prioridade</span><% } %></h1>
     <p class="handle muted top-gap">
       <%= r.assignee_name ? 'Para ' + r.assignee_name : 'Para qualquer editor' %>
       <% if (r.due_on) { %> · <span class="<%= late ? 'err' : '' %>">entregar até <%= br(r.due_on) %><%= late ? ' (atrasado)' : '' %></span><% } %>

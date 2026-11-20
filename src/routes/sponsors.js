@@ -151,6 +151,7 @@ router.post('/patrocinadores', requirePerm('sponsors.write'), wrap(async (req, r
 router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req, res) => {
   const sponsor = await findSponsor(req.params.id);
   if (!sponsor) return notFound(res);
+  require('../services/scope').assert(req, sponsor.project_id); // de outro projeto de que a pessoa não participa: 404
   const [events, brief, files, deliverables, linked, episodes, clicks] = await Promise.all([
     db.query(`SELECT e.*, u.name AS user_name FROM sponsor_events e LEFT JOIN users u ON u.id = e.user_id
                WHERE e.sponsor_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT 100`, [sponsor.id]),

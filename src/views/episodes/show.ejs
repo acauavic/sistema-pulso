@@ -16,7 +16,7 @@
   <div>
     <% var airedPast = ep.aired_on && (ep.status === 'publicado' || fmt.toInputDate(ep.aired_on) <= new Intl.DateTimeFormat('en-CA', { timeZone: fmt.TZ }).format(new Date())); %>
     <span class="kicker"><%= epNo %> · gravado <%= fmt.formatDay(ep.recorded_on) %><%= ep.aired_on ? (airedPast ? ' · foi ao ar ' : ' · vai ao ar ') + fmt.formatDay(ep.aired_on) : '' %></span>
-    <h1><%= ep.title %> <span class="badge b-st-<%= ep.status %>"><%= C.EPISODE_STATUSES[ep.status] %></span></h1>
+    <h1><%= ep.title %> <span class="badge b-st-<%= ep.status %>"><%= C.EPISODE_STATUSES[ep.status] %></span> <%- include('../partials/project-tag', { id: ep.project_id }) %></h1>
     <% if (orderPos) { %><p class="order-note mono"><b class="order-n"><%= orderPos.rank %>º</b> na ordem de edição · <span class="air-<%= orderPos.air.tone || 'ok' %>"><%= orderPos.air.line %></span></p><% } %>
     <p class="muted top-gap"><%= ep.guest_name ? ep.guest_name : (sponsors.length ? 'Só os hosts · ' + sponsors.map(function (s) { return s.company; }).join(', ') : 'Só os hosts') %><%= ep.editor_name ? ' · editor: ' + ep.editor_name : '' %></p>
   </div>

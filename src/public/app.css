@@ -1072,6 +1072,7 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
 .project-switch-code { color: var(--muted); letter-spacing: .08em; } .project-switch-list .icon { flex: 0 0 auto; color: var(--text); }
 .project-now { display: none; }
 .project-tag { color: var(--muted); letter-spacing: .08em; white-space: nowrap; }
+h1 .project-tag { vertical-align: middle; font-weight: 500; }
 @media (min-width: 861px) {
   html[data-sidebar="collapsed"] .project-switch > summary { justify-content: center; padding: 6px 2px; }
   html[data-sidebar="collapsed"] .project-switch-txt, html[data-sidebar="collapsed"] .project-switch > summary .icon { display: none; }

@@ -321,6 +321,7 @@ router.get('/cortes/status', requirePerm('episodes.read'), wrap(async (req, res)
 router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) => {
   const c = await findClip(req);
   if (!c) return notFound(res);
+  require('../services/scope').assert(req, c.project_id); // de outro projeto de que a pessoa não participa: 404
   const [covers, pubs, episodes, ep] = await Promise.all([
     db.query('SELECT id, kind, position, label, lint, approved, auto, updated_at, model FROM episode_covers WHERE clip_id = $1 ORDER BY position', [c.id]),
     db.query('SELECT * FROM episode_publications WHERE clip_id = $1 ORDER BY created_at DESC, id DESC', [c.id]),

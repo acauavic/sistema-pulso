@@ -229,6 +229,7 @@ router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) =>
 router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) => {
   const guest = await findGuest(req.params.id);
   if (!guest) return notFound(res);
+  require('../services/scope').assert(req, guest.project_id); // de outro projeto de que a pessoa não participa: 404
   const defaultMessage =
     `Olá, ${firstName(guest.name)}! Tudo bem?\n\nÉ um prazer convidar você para participar do ${config.podcastName}.` +
     `${guest.topic ? ` Gostaríamos de conversar sobre: ${guest.topic}.` : ''}\n\nPreparamos um convite com todos os detalhes. É só clicar no botão abaixo e responder.`;

@@ -270,6 +270,7 @@ router.post('/episodios/checklists/:tid/excluir', requirePerm('production.checkl
 router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res) => {
   const ep = await findEpisode(req.params.id);
   if (!ep) return notFound(res);
+  require('../services/scope').assert(req, ep.project_id); // de outro projeto de que a pessoa não participa: 404
   const [files, events, tasks, checklist, comments, sponsors, users, moves, meta, frames, job, transcript, coverRows, contentRows, pubRows] = await Promise.all([
     db.query(`SELECT f.*, u.name AS uploader FROM episode_files f LEFT JOIN users u ON u.id = f.uploaded_by WHERE f.episode_id = $1 ORDER BY f.created_at DESC, f.id DESC`, [ep.id]),
     db.query('SELECT e.*, u.name AS user_name FROM episode_events e LEFT JOIN users u ON u.id = e.user_id WHERE e.episode_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT 100', [ep.id]),

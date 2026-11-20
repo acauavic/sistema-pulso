@@ -128,6 +128,7 @@ router.get('/tarefas/:id', requirePerm('tasks.read'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);
   const task = await tasks.get(req.params.id);
   if (!task) return notFound(res);
+  require('../services/scope').assert(req, task.project_id); // de outro projeto de que a pessoa não participa: 404 (tarefa geral abre para todos)
   const [opts, thread, files] = await Promise.all([linkOptions(), comments.list('task', task.id), attachments.forEntity('task', task.id)]);
   const origin = task.source_message_id ? await require('../services/chat').taskOrigin(task.source_message_id, req.user.id) : null;
   res.render('tasks/show', { title: task.title, task, origin, ...opts, comments: thread, docs: files.filter((a) => a.kind === 'file'), C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), repeat: await repeatOf(task, req.user) });
