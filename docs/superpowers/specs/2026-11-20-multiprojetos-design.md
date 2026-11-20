@@ -230,7 +230,7 @@ O painel deixa a identidade do Pulso e passa a usar a da casa. Fonte: `docs/refe
 
 Hoje tudo abre em `sistema.podcastpulso.com` (painel e links públicos) e os links curtos em `link.podcastpulso.com`.
 
-- **Painel**: `studio.healthscale.com` (o dono citou antes `.com.br`; confirmar a terminação ao apontar o DNS, na fase 6). Login, sessão, app instalado e avisos vivem só nele.
+- **Painel**: `studio.healthscale.com.br` (confirmado pelo dono em 2026-11-20). Login, sessão, app instalado e avisos vivem só nele.
 - **Cada projeto tem o seu endereço público** (`projects.public_host`). O do Pulso é o de hoje,
   `sistema.podcastpulso.com`: **nenhum link já enviado muda ou quebra** (convites, portais, media kits, QR Code do cartão
   de agradecimento, links curtos). O do Projeto 100 fica em `projeto100.com`, num subdomínio (adotado
@@ -299,7 +299,7 @@ Cada fase é um lançamento que funciona sozinho.
 5. **Dinheiro por projeto.** Dono do lançamento, compartilhado com divisão, cotas do banco de horas, resultado por
    projeto e consolidado.
 6. **Endereços.** Painel no domínio da casa; links públicos, favicon, links curtos e remetente por projeto. Depende só
-   da fase 2; pode subir na fila. Antes de publicar, o dono aponta `studio.healthscale.com` e o subdomínio do
+   da fase 2; pode subir na fila. Antes de publicar, o dono aponta `studio.healthscale.com.br` e o subdomínio do
    Projeto 100 para o servidor (registro no DNS, com o Cloudflare na frente como hoje).
 7. **Acesso por projeto.** Equipe da casa, membros, "Vê o financeiro", isolamento em todas as superfícies, teste de
    isolamento. Só depois entra a equipe do Dr. José Bento.
