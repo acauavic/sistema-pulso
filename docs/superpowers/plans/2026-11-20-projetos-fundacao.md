@@ -80,7 +80,7 @@ projeto", "Quem vê o quê", "Dados", "Código" e a fase 2 em "Fases").
   BOOLEAN NOT NULL DEFAULT false, created_at, PRIMARY KEY (project_id, user_id))`, `users.house BOOLEAN NOT NULL
   DEFAULT true`, `users.last_project_id INT REFERENCES projects(id) ON DELETE SET NULL`.
 - `project_id INT NOT NULL DEFAULT 1 REFERENCES projects(id)` + índice em: `guests`, `sponsors`, `episodes`,
-  `episode_clips`, `content_requests`, `social_ideas`, `sponsor_plans`, `invite_templates`, `plateia_events`.
+  `episode_clips`, `content_requests`, `social_ideas`, `sponsor_plans`, `plateia_events`.
 - `project_id INT REFERENCES projects(id)` (opcional) em: `tasks`, `task_routines`, `user_goals`, `audit_log`,
   `trash_items`; tudo o que existe recebe `1`. As tabelas `fin_*` ficam para a fase 5, junto com a divisão.
 

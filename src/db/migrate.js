@@ -5,7 +5,8 @@ const { getPool, close } = require('./pool');
 const DIR = path.join(__dirname, 'migrations');
 const LOCK_ID = 7_340_001; // advisory lock: evita 2 réplicas migrando juntas
 
-async function migrate() {
+// `until`: para depois do arquivo cujo nome começa com esse prefixo (os testes de migração montam o banco "de antes").
+async function migrate({ until = null } = {}) {
   const client = await getPool().connect();
   try {
     await client.query('SELECT pg_advisory_lock($1)', [LOCK_ID]);
@@ -15,6 +16,7 @@ async function migrate() {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql') && !f.startsWith('.')).sort();
     const applied = [];
     for (const file of files) {
+      if (until && file.slice(0, until.length) > until) break;
       if (done.has(file)) continue;
       await client.query('BEGIN');
       try {

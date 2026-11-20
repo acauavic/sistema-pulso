@@ -265,7 +265,7 @@ Hoje tudo abre em `sistema.podcastpulso.com` (painel e links públicos) e os lin
   `position`), `project_members`, `people`, `companies`, `pautas`,
   `pauta_events`, `fin_entry_splits`, `fin_hour_quotas`.
 - **`project_id NOT NULL`** nas raízes: `guests`, `sponsors`, `episodes`, `episode_clips`, `content_requests`,
-  `social_ideas`, `sponsor_plans`, `invite_templates`, `plateia_events`, `pautas`. **Opcional** em `tasks`,
+  `social_ideas`, `sponsor_plans`, `plateia_events`, `pautas`. **Opcional** em `tasks`,
   `task_routines`, `user_goals`, `fin_entries`, `fin_recurring`, `fin_rules`, `audit_log`, `trash_items`.
 - **Filhas herdam pela raiz** (arquivos, capas, comentários, publicações, cortes de um episódio): sem coluna nova.
 - **Migração**: cria o projeto Pulso e preenche tudo o que existe com ele; cria uma pessoa por convidado e uma empresa
