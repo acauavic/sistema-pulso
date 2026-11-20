@@ -22,6 +22,11 @@ com o Dr. José Bento, com a mesma equipe de edição e produção por enquanto.
 - **Um sistema só.** Ninguém acessa dois sistemas para saber o que fazer.
 - **O painel passa para a identidade da Health Scale** (nome Health Scale Studio, logotipo, verde, Archivo). O que é do
   Pulso continua com a marca do Pulso, dentro do projeto Pulso. A marca do Projeto 100 ainda está em definição.
+- **Só a gerência é Health Scale Studio.** Tudo o que sai para fora (convite, portal, media kit, plateia) abre no
+  domínio do projeto, com o favicon e a marca do projeto: links do Pulso no domínio do Pulso, links do Projeto 100 no
+  domínio do Projeto 100.
+- **Ícone do painel: o monograma "St".** O Sinal (as quatro barras) entra como elemento de apoio. As formas dos
+  componentes continuam as de hoje.
 - **Projeto novo: Projeto 100** (canal de YouTube com o Dr. José Bento).
 - **Mesmo convidado e mesmo patrocinador nos dois projetos**, cada um com a sua história em cada projeto.
 - **Financeiro por projeto**: patrocínio entra no projeto dele; custo compartilhado é dividido (ex.: banco de 20 h do
@@ -182,9 +187,18 @@ O painel deixa a identidade do Pulso e passa a usar a da casa. Fonte: `docs/refe
   ação. No claro: logotipo em preto e o nome em verde escuro.
 - **Menu**: ícone de 40 px + duas linhas em mono ("HEALTH SCALE" 11 px muted; "STUDIO" 17 px). Recolhido: só o ícone.
   Item ativo: fundo `line` e um quadrado de 6 px na cor de ação.
-- **Ícone** (favicon, app instalado, menu, login): o estudo traz duas direções, **1a Monograma** (serifa itálica +
-  grotesca, as duas primeiras letras do nome) e **1b Sinal** (quatro barras que crescem, do verde escuro ao claro).
-  Escolha do dono (ver Em aberto).
+- **Ícone** (favicon do painel, app instalado, menu, login): o **monograma "St"** do estudo (1a): "S" em Instrument
+  Serif itálico, `#F4F4F0`, e "t" em Archivo 800 na cor de ação, sobre quadrado `#0E0F0D`. No SVG do favicon as letras
+  viram contorno (o navegador não carrega fonte dentro do ícone).
+- **Sinal** (1b, quatro barras que crescem do verde escuro ao claro) é o símbolo de apoio do painel, no lugar da linha
+  de pulso, que é do Pulso:
+  - **estado vazio** e página **Sem conexão**: as quatro barras baixas, em muted (`partials/pulse-line.ejs` dá lugar a
+    `partials/signal.ejs` no painel; as páginas do Pulso continuam com a linha de pulso);
+  - **login**: o Sinal grande e apagado no fundo, no lugar do campo de pontos do Pulso;
+  - **"ao vivo"** do Resumo do dia e andamento de ação demorada (`data-busy`): as barras subindo em sequência a 1,2 s,
+    paradas com movimento reduzido, no lugar do ponto lime que pulsa;
+  - abertura do app instalado.
+  Fora disso o Sinal não aparece: não vira decoração de cartão nem marcador de lista.
 - **Cores do escuro** (do estudo): fundo `#0E0F0D`, superfície `#16180F`, borda `#262A22`, texto `#F4F4F0`, texto de
   apoio `#A8ABA1`, muted `#8A8D83`, **ação `#9EDD55`** (hover `#C8E86A`), texto sobre a ação `#0E0F0D`. `raised` e
   `line-strong` não estão no estudo: derivados da mesma família e conferidos por contraste (4,5:1 para texto) no navegador.
@@ -196,24 +210,56 @@ O painel deixa a identidade do Pulso e passa a usar a da casa. Fonte: `docs/refe
   hospedada no repositório (`src/public/fonts/`, woff2 latin, licença OFL), porque a CSP só aceita `'self'`.
 - **O que continua**: as regras de uso (uma ação por área, dados em mono, sem emoji, ícones Lucide), só que a cor de
   ação passa a ser o verde. Âmbar, vermelho e a cor do "externo" (hoje plum) são funcionais e ficam como estão até
-  existir um guia de interface da Health Scale. Formas dos componentes (botão em pílula, raios 2/6/10) continuam nesta
-  migração; os cantos retos do estudo são decisão em aberto.
+  existir um guia de interface da Health Scale. As formas dos componentes continuam as de hoje (botão em pílula, raios
+  2/6/10): os cantos retos do estudo eram sugestão, não direção.
 - **O que não muda**: tudo o que é do Pulso continua com a marca do Pulso: convite, portal do convidado, pós-gravação,
   media kit, portal do patrocinador, plateia, capas e e-mails ao convidado e ao patrocinador. Essas páginas têm CSS
   próprio (`portal.css`, `plateia.css`, `patrocinador.css`, `convite-pulso.html`, `media-kit.html`) e não dependem dos
   tokens do painel; a migração confere isso com um teste visual de cada uma, antes e depois.
 - **Projeto 100**: a marca ainda está em estudo (azul e rosa, laço infinito). As páginas públicas dele esperam a
-  definição (fase 8).
+  definição (fase 9).
 - **Documentos**: `docs/design-system.md` passa a descrever a interface Health Scale; `docs/manual-de-marca.md` vira o
   manual do **projeto Pulso**; a decisão vai para o `memory.md` e para o `CLAUDE.md`.
 - **Tamanho do trabalho**: as cores do painel já são variáveis (`:root` do `app.css`, 27 cores escritas à mão no
   arquivo todo), o nome "pulso." aparece em 10 views e há 6 ícones do app. É uma troca de tokens, fontes, ícones e
   textos, não um redesenho de telas.
 
+### Endereços: a gerência na casa, o que é público no projeto
+
+Hoje tudo abre em `sistema.podcastpulso.com` (painel e links públicos) e os links curtos em `link.podcastpulso.com`.
+
+- **Painel**: um endereço da casa (domínio da Health Scale, a definir). Login, sessão, app instalado e avisos vivem só
+  nele.
+- **Cada projeto tem o seu endereço público** (`projects.public_host`). O do Pulso é o de hoje,
+  `sistema.podcastpulso.com`: **nenhum link já enviado muda ou quebra** (convites, portais, media kits, QR Code do cartão
+  de agradecimento, links curtos). O Projeto 100 ganha o dele quando tiver domínio.
+- **Como funciona**: todos os endereços chegam no mesmo sistema (um bloco por domínio no Caddy). Um passo novo logo na
+  entrada (`middleware/hostContext.js`) olha o domínio e decide:
+  - **domínio do painel**: tudo do painel. Um link público aberto ali é levado para o domínio do projeto dono do link;
+  - **domínio de projeto**: só as páginas públicas (convite, portal do convidado, pós-gravação, media kit, portal do
+    patrocinador, plateia, link do estúdio, formulários do site) e os avisos que as redes mandam para o sistema.
+    Qualquer tela do painel aberta ali leva ao domínio do painel. Link de um projeto aberto no domínio de outro é
+    levado ao domínio certo.
+- **Favicon, título e imagem de compartilhamento por domínio**: `/favicon.ico`, o ícone do celular e a imagem que
+  aparece no WhatsApp saem do projeto dono do domínio (`src/public/brand/<projeto>/`); no painel, o monograma "St".
+  As páginas públicas passam a usar um cabeçalho comum (`partials/public-head.ejs`) que lê a marca do projeto.
+- **Gerar link**: um lugar só, `publicUrl(projeto, caminho)`, no lugar de `config.publicBaseUrl` e dos usos públicos de
+  `config.appBaseUrl`. Link para a equipe (aviso, e-mail interno) usa o endereço do painel.
+- **Links curtos**: cada projeto com o seu encurtador (`link.podcastpulso.com` é do Pulso). Projeto sem encurtador usa
+  o link inteiro. As chaves continuam em variáveis de ambiente, uma por projeto, nunca no banco.
+- **E-mails para fora**: remetente do projeto (nome e endereço no domínio dele, autenticado no Brevo). E-mails da
+  equipe saem como Health Scale Studio.
+- **O que a troca do endereço do painel custa**: quem instalou o app no celular instala de novo e liga os alertas de
+  novo (o navegador trata o endereço novo como outro app). O endereço antigo leva o login para o novo. O "Não sou
+  robô" (Cloudflare) e os avisos das redes ganham os domínios novos na configuração.
+- **Antes dessa fase** (já na fase 1): o favicon se separa por tipo de página, para o ícone novo do painel não aparecer
+  no convite do Pulso. Páginas públicas ficam com o ícone do Pulso; o painel, com o "St".
+
 ## Dados (resumo)
 
 - **Novas**: `projects` (`slug`, `name`, `sigla`, `video_label`, `video_label_plural`, `number_prefix`,
-  `default_format`, `modules JSONB`, `active`, `position`), `project_members`, `people`, `companies`, `pautas`,
+  `default_format`, `modules JSONB`, `public_host`, `short_link_host`, `mail_from_name`, `mail_from_address`, `active`,
+  `position`), `project_members`, `people`, `companies`, `pautas`,
   `pauta_events`, `fin_entry_splits`, `fin_hour_quotas`.
 - **`project_id NOT NULL`** nas raízes: `guests`, `sponsors`, `episodes`, `episode_clips`, `content_requests`,
   `social_ideas`, `sponsor_plans`, `invite_templates`, `plateia_events`, `pautas`. **Opcional** em `tasks`,
@@ -239,8 +285,8 @@ O painel deixa a identidade do Pulso e passa a usar a da casa. Fonte: `docs/refe
 
 Cada fase é um lançamento que funciona sozinho.
 
-1. **Identidade Health Scale.** Nome, logotipo, ícone, cores e Archivo no painel; design system reescrito; páginas do
-   Pulso intactas. Não depende de nada das outras fases.
+1. **Identidade Health Scale Studio.** Nome, logotipo, monograma, Sinal, cores e Archivo no painel; favicon separado
+   entre painel e páginas públicas; design system reescrito; páginas do Pulso intactas. Não depende das outras fases.
 2. **Fundação.** `projects`, `project_members`, `project_id` nas raízes (tudo vira Pulso), `services/scope.js`, seletor,
    sigla nos cartões, Gestão > Projetos, Projeto 100 criado. Ninguém restrito ainda.
 3. **Vídeo e pauta.** Formato do vídeo, numeração por projeto, etapa Pré-produção, pautas e roteiros com o quadro.
@@ -249,18 +295,20 @@ Cada fase é um lançamento que funciona sozinho.
    duplicatas por pessoa.
 5. **Dinheiro por projeto.** Dono do lançamento, compartilhado com divisão, cotas do banco de horas, resultado por
    projeto e consolidado.
-6. **Acesso por projeto.** Equipe da casa, membros, "Vê o financeiro", isolamento em todas as superfícies, teste de
+6. **Endereços.** Painel no domínio da casa; links públicos, favicon, links curtos e remetente por projeto. Depende só
+   da fase 2 e de o dono ter os domínios; pode subir na fila.
+7. **Acesso por projeto.** Equipe da casa, membros, "Vê o financeiro", isolamento em todas as superfícies, teste de
    isolamento. Só depois entra a equipe do Dr. José Bento.
-7. **Redes por projeto.** Contas e provedores por projeto (`social_account_status` e os perfis da Zernio/Outstand),
+8. **Redes por projeto.** Contas e provedores por projeto (`social_account_status` e os perfis da Zernio/Outstand),
    publicar, agenda da semana, comentários, automações, insights e contexto da IA (nome, tom, links) por projeto.
-8. **Marca por projeto nas páginas públicas.** Convite, portal, media kit e capas com a identidade do Projeto 100
-   (espera a marca dele ficar pronta).
+9. **Marca do Projeto 100 nas páginas públicas.** Convite, portal, media kit e capas com a identidade dele (espera a
+   marca ficar pronta).
 
-As fases 7 e 8 podem subir se o Projeto 100 precisar publicar pelo sistema antes; até lá ele publica por fora.
+As fases 8 e 9 podem subir se o Projeto 100 precisar publicar pelo sistema antes; até lá ele publica por fora.
 
 ## Testes
 
-- **Isolamento** (`test/project-isolation.test.js`, trava da fase 6): dois projetos com um item de cada tipo e um texto
+- **Isolamento** (`test/project-isolation.test.js`, trava da fase 7): dois projetos com um item de cada tipo e um texto
   marcador em cada; uma pessoa só do projeto B percorre todas as rotas GET registradas e nenhum marcador do projeto A
   pode aparecer; ids do projeto A respondem 404 em GET e POST; busca, notificações, assistente, downloads e arquivos por
   chave entram na lista. Rota nova entra no teste sozinha (ele lê a tabela de rotas do Express).
@@ -270,6 +318,10 @@ As fases 7 e 8 podem subir se o Projeto 100 precisar publicar pelo sistema antes
   projetos = consolidado; cota, uso e saldo do banco por projeto; quem é de um projeto vê só a parte dele.
 - Numeração: dois projetos com `number = 1` convivem; corrida de criação continua resolvida por projeto.
 - Quem tem um projeto só: nenhuma tela mostra seletor, sigla ou campo de projeto.
+- Endereços: no domínio de um projeto, toda rota do painel leva ao domínio do painel e nenhuma responde com tela
+  interna; link público aberto no domínio errado é levado ao certo; todo link antigo do Pulso
+  (`sistema.podcastpulso.com/convite/…`, portal, media kit, `/pos-gravacao`) responde como antes; `/favicon.ico` e a
+  imagem de compartilhamento mudam com o domínio; a sessão do painel não vale em domínio de projeto.
 - Identidade: nenhuma cor escrita à mão fora dos tokens no `app.css`; contraste dos tokens novos (texto 4,5:1) conferido;
   convite, portal, pós-gravação, media kit, portal do patrocinador e plateia iguais antes e depois (captura de tela de
   cada uma, no computador e no celular); nenhum "Pulso Gestão" sobrando no painel.
@@ -277,27 +329,28 @@ As fases 7 e 8 podem subir se o Projeto 100 precisar publicar pelo sistema antes
 ## Riscos
 
 - **Vazamento entre projetos** é o risco maior, porque há centenas de consultas. Mitigação: um ponto único de recorte,
-  filhas herdando pela raiz, o teste de isolamento como trava, e usuários restritos só na fase 6.
+  filhas herdando pela raiz, o teste de isolamento como trava, e usuários restritos só na fase 7.
 - **Pessoa e funil na mesma linha** (`guests`, 158 consultas em 58 arquivos): a cópia espelhada evita reescrever tudo
   de uma vez; o custo é manter o espelho coberto por teste.
 - **Nome "Pulso" escrito à mão** em prompts de IA e textos: some por fase, junto com a área que ele toca; a busca por
-  "Pulso" no `src/` é o critério de pronto da fase 7.
+  "Pulso" no `src/` é o critério de pronto da fase 8.
 - **Tamanho**: é o maior trabalho já feito no sistema. Por isso as fases são independentes e nenhuma muda o dia a dia do
   Pulso além do seletor.
 
 ## Fora do escopo
 
-- Marca, domínio e painel diferentes por projeto (o painel é um só, da casa).
+- Painel diferente por projeto (o painel é um só, da casa; só o que é público muda de domínio e de marca).
+- Páginas públicas do Pulso em `podcastpulso.com/convite/…` (sem o "sistema."): possível depois, com o endereço de hoje
+  continuando a valer.
 - Aprovação da pauta por gente de fora dentro do sistema (link público com botão de aprovar).
 - Perfis diferentes por projeto para a mesma pessoa (o perfil é um; os projetos dizem onde ele vale).
 - Faturamento entre projetos ou contabilidade por competência.
 
 ## Em aberto (do dono)
 
-- **Ícone**: 1a Monograma ("St") ou 1b Sinal.
-- **Formas**: manter botão em pílula e cantos arredondados de hoje, ou adotar os cantos retos do estudo.
-- **Endereço**: continua `sistema.podcastpulso.com` ou muda? (Trocar exige domínio novo e redirecionamento; fica fora
-  das fases até decidir.)
+- **Domínio do painel**: qual endereço da Health Scale o painel usa (ex.: `studio.` + o domínio da casa)? Até decidir,
+  o painel continua em `sistema.podcastpulso.com`, já com a identidade nova.
+- **Domínio do Projeto 100**: qual será, quando houver.
 - **Custo do banco de horas**: adotado pela **cota** (10/10, ajustável quando um projeto usa horas do outro). A
   alternativa é cobrar pelo uso real.
 - **Sigla e prefixo do Projeto 100**: adotados `P100` e `V.` até segunda ordem.
