@@ -186,6 +186,10 @@ jobs.register('video_convidado', run);
 // Pede o vídeo: entra na fila (leva 1 a 2 minutos). Devolve { row } ou { error }.
 async function request(episodeId, kind, userId = null) {
   if (!KINDS[kind]) return { error: 'Vídeo desconhecido.' };
+  // story e teaser são do convidado: vídeo sem convidado não tem o que mostrar
+  const { rows: [ep] } = await db.query('SELECT format, guest_id FROM episodes WHERE id = $1', [episodeId]);
+  if (!ep) return { error: 'Episódio não encontrado.' };
+  if (ep.format === 'video' || !ep.guest_id) return { error: 'Os vídeos de lançamento são do convidado: este vídeo não tem convidado.' };
   const { missing } = await inputs(episodeId, kind);
   if (missing.length) return { error: missing[0] };
   const { rows: [row] } = await db.query(

@@ -94,8 +94,8 @@
   <div class="tabs-wrap" data-tabs data-default="<%= capasTab %>">
     <div class="seg seg-tabs" role="tablist" aria-label="Peças do episódio">
       <button type="button" role="tab" data-tab-btn="youtube">YouTube <span class="mono"><%= yt.length %></span></button>
-      <button type="button" role="tab" data-tab-btn="spotify">Spotify <span class="mono"><%= sp.length %></span></button>
-      <button type="button" role="tab" data-tab-btn="videos">Vídeos <span class="mono"><%= guestVideos.filter(function (v) { return v.row && v.row.status === 'pronto'; }).length %></span></button>
+      <% if (isPodcast) { %><button type="button" role="tab" data-tab-btn="spotify">Spotify <span class="mono"><%= sp.length %></span></button><% } %>
+      <% if (isPodcast && ep.guest_id) { %><button type="button" role="tab" data-tab-btn="videos">Vídeos <span class="mono"><%= guestVideos.filter(function (v) { return v.row && v.row.status === 'pronto'; }).length %></span></button><% } %>
     </div>
 
     <div class="pane" data-pane-id="youtube">
@@ -117,15 +117,15 @@
       <% if (!yt.length && !coverMissing.length) { %><p class="small muted">Nenhuma thumbnail ainda. Use "Gerar as que faltam" no menu acima.</p><% } %>
     </div>
 
-    <div class="pane" data-pane-id="spotify" hidden>
+    <% if (isPodcast) { %><div class="pane" data-pane-id="spotify" hidden>
       <div class="piece-grid piece-grid-sp">
         <% sp.forEach(function (c) { card(c, 'sp'); }); %>
       </div>
       <% if (!sp.length) { %><p class="small muted">Sem capa do Spotify ainda. Use "Gerar as que faltam" no menu acima.</p><% } else { %>
       <p class="small muted">O arquivo sai em 3000×3000, abaixo de 512 KB. Foto de câmera fica melhor que quadro do vídeo: troque em Ajustar &gt; Foto.</p><% } %>
-    </div>
+    </div><% } %>
 
-    <div class="pane" data-pane-id="videos" hidden<% if (guestVideos.some(function (v) { return v.row && (v.row.status === 'fila' || v.row.status === 'gerando'); })) { %> data-video-wait="/episodios/<%= ep.id %>/videos/status"<% } %>>
+    <% if (isPodcast && ep.guest_id) { %><div class="pane" data-pane-id="videos" hidden<% if (guestVideos.some(function (v) { return v.row && (v.row.status === 'fila' || v.row.status === 'gerando'); })) { %> data-video-wait="/episodios/<%= ep.id %>/videos/status"<% } %>>
       <div class="piece-grid piece-grid-vd">
         <% guestVideos.forEach(function (v) {
              var r = v.row; var st = r ? r.status : 'novo'; var busy = st === 'fila' || st === 'gerando'; var ready = st === 'pronto';
@@ -161,7 +161,7 @@
         </div>
         <% }) %>
       </div>
-    </div>
+    </div><% } %>
   </div>
   <% } %>
 </div>

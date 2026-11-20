@@ -7,7 +7,7 @@
     <div class="tabs-wrap" data-tabs data-local data-default="yt">
       <div class="tabbar" role="tablist" aria-label="Plataformas">
         <button type="button" role="tab" data-tab-btn="yt" aria-controls="tx-yt">YouTube</button>
-        <button type="button" role="tab" data-tab-btn="sp" aria-controls="tx-sp">Spotify</button>
+        <% if (isPodcast) { %><button type="button" role="tab" data-tab-btn="sp" aria-controls="tx-sp">Spotify</button><% } %>
         <button type="button" role="tab" data-tab-btn="ch" aria-controls="tx-ch">Capítulos</button>
         <button type="button" role="tab" data-tab-btn="th" aria-controls="tx-th">Thumbnail</button>
       </div>
@@ -32,14 +32,14 @@
         </label>
       </div>
 
-      <div class="pane stack" id="tx-sp" data-pane-id="sp" hidden>
+      <% if (isPodcast) { %><div class="pane stack" id="tx-sp" data-pane-id="sp" hidden>
         <label>Título <small class="counter" data-counter-for="sp_title" data-max="<%= L.LIMITS.spotify.title.max %>" data-ideal="<%= L.LIMITS.spotify.title.ideal %>"></small>
           <input type="text" name="sp_title" value="<%= (meta && meta.sp_title) || '' %>" maxlength="<%= L.LIMITS.spotify.title.max %>" <%= ro %>>
         </label>
         <label>Descrição <small class="counter" data-counter-for="sp_description" data-max="<%= L.LIMITS.spotify.description %>"></small>
           <textarea name="sp_description" rows="10" <%= ro %>><%= (meta && meta.sp_description) || '' %></textarea>
         </label>
-      </div>
+      </div><% } %>
 
       <div class="pane stack" id="tx-ch" data-pane-id="ch" hidden>
         <label>Um por linha, "0:00 Título" <small class="muted">(o primeiro em 0:00; mínimo de 3; título abaixo de 40 caracteres)</small>

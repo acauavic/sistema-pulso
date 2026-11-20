@@ -105,7 +105,7 @@
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h2 id="mlk-h">Links de publicação</h2>
     <label>Vídeo no YouTube<input type="url" name="youtube_url" value="<%= ep.youtube_url || '' %>" maxlength="500" placeholder="https://youtu.be/…"></label>
-    <label>Episódio no Spotify<input type="url" name="spotify_url" value="<%= ep.spotify_url || '' %>" maxlength="500" placeholder="https://open.spotify.com/…"></label>
+    <% if (isPodcast) { %><label>Episódio no Spotify<input type="url" name="spotify_url" value="<%= ep.spotify_url || '' %>" maxlength="500" placeholder="https://open.spotify.com/…"></label><% } %>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar links</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>

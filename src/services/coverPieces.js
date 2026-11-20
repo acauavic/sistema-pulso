@@ -85,12 +85,14 @@ const spotifyFrame = (frames, fallback) => frames.filter((f) => f.analysis?.from
 async function generate(episodeId, { userId = null, onProgress, newSheet = false } = {}) {
   const ctx = await sheets.context(episodeId);
   if (!ctx.episode) throw new Error('Episódio não encontrado.');
+  // a capa do Spotify é do podcast; um vídeo só leva as thumbnails
+  const isPodcast = ctx.episode.format !== 'video';
   const all = await store.loadFrames(episodeId, { clipId: null, custom: true });
   const frames = all.filter((f) => !f.analysis?.custom);
   if (!all.length) throw new Error('Não há quadros analisados para montar as capas.');
   onProgress?.('Preenchendo a ficha…');
   const sheet = (!newSheet && ctx.meta?.cover_sheet) || await sheets.generate(episodeId);
-  const kinds = ['youtube_thumb', 'spotify_cover'];
+  const kinds = isPodcast ? ['youtube_thumb', 'spotify_cover'] : ['youtube_thumb'];
   const { rows: old } = await db.query('DELETE FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND auto AND NOT approved AND kind = ANY($2) RETURNING storage_key', [episodeId, kinds]);
   for (const o of old) await b2.deleteObject(o.storage_key).catch(() => {});
   const { rows: kept } = await db.query('SELECT kind, angle FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND kind = ANY($2) AND model IS NOT NULL', [episodeId, kinds]);
@@ -109,7 +111,7 @@ async function generate(episodeId, { userId = null, onProgress, newSheet = false
     if (pick.error) { fails.push({ what: M.ANGLES[angle], angle, model, reasons: pick.error }); continue; }
     created.push(await insert(episodeId, pick, { kind: 'youtube_thumb', position: i, userId }));
   }
-  if (!kept.some((k) => k.kind === 'spotify_cover')) {
+  if (isPodcast && !kept.some((k) => k.kind === 'spotify_cover')) {
     onProgress?.('Montando a capa do Spotify…');
     const frame = spotifyFrame(all, picks[0]);
     const pick = await best('SP-A', sheets.dataFor(sheet, ctx.episode), frame, await load(frame), { flip: false });

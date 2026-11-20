@@ -357,6 +357,8 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   const editOrder = require('../services/editOrder');
   const orderPos = editOrder.STAGES.includes(ep.status) ? await editOrder.positionOf(ep.id) : null; // "1º na ordem de edição"
   res.render('episodes/show', {
+    // podcast leva Spotify, capa do Spotify e os vídeos do convidado; vídeo sem convidado não tem nada disso
+    isPodcast: ep.format !== 'video',
     orderPos, studio, studioWa, kindLabels: C.EPISODE_FILE_KINDS,
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: reviewComments,
