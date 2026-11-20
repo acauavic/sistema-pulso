@@ -87,6 +87,11 @@ async function attachSession(req, res, next) {
     res.locals.reactionEmojis = require('./services/reactions').EMOJIS;
     res.locals.podcastName = config.podcastName;
     res.locals.appName = config.appName;
+    // recorte por projeto: os valores de verdade vêm de services/scope.js, depois do login; aqui, o que vale sem sessão
+    res.locals.scope = null;
+    res.locals.projectTag = () => '';
+    res.locals.videoLabel = 'Episódios';
+    res.locals.hasModule = () => true;
     res.locals.currentPath = req.path;
     res.locals.currentUrl = req.originalUrl; // com a busca (?vista=…): o Desfazer volta para a mesma aba
     res.locals.navCounts = null;

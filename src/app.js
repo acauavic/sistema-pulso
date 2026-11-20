@@ -58,6 +58,7 @@ function createApp() {
   app.use(mw.requireAuth); // tudo abaixo exige login
   app.use((req, res, next) => { require('./services/catalog').refresh().then(() => next(), next); }); // categorias e tipos de vídeo (Gestão > Categorias), a cada 30 s
   app.use((req, res, next) => { require('./services/projects').refresh().then(() => next(), next); }); // projetos (Gestão > Projetos), a cada 30 s
+  app.use(require('./services/scope').attach); // de quais projetos a pessoa participa e qual está escolhido no menu
   app.use(mw.navData);
   app.use(require('./routes/misc'));
   app.use(require('./routes/collab')); // comentários, responsável, notificações e busca global
@@ -97,6 +98,8 @@ function createApp() {
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
+    // item de um projeto de que a pessoa não participa (scope.assert): responde como página que não existe
+    if (err && err.status === 404 && !res.headersSent) return res.status(404).render('error', { title: 'Página não encontrada', message: 'Não encontramos o que você procurava.' });
     console.error(`[erro] ${req.method} ${req.originalUrl}:`, err);
     if (res.headersSent) return;
     const locals = { title: 'Algo deu errado', message: 'Ocorreu um erro inesperado. Tente novamente em instantes.' };
