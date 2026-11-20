@@ -50,7 +50,7 @@
 <table>
   <thead><tr><th class="num">EP.</th><th class="num" title="Ordem de edição: o que vai ao ar antes é editado primeiro">Ordem</th><th>Título</th><th>Convidado</th><th>Veiculação</th><th>Etapa</th><th>Editor</th><th class="num">Patroc.</th><th></th></tr></thead>
   <tbody>
-    <% if (!episodes.length) { %><tr><td colspan="9"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum episódio por aqui</strong><span>Quando um convidado ficar Agendado, o episódio aparece sozinho.</span></div></td></tr><% } %>
+    <% if (!episodes.length) { %><tr><td colspan="9"><div class="empty"><%- include('../partials/signal') %><strong>Nenhum episódio por aqui</strong><span>Quando um convidado ficar Agendado, o episódio aparece sozinho.</span></div></td></tr><% } %>
     <% episodes.forEach(function (e) { var o = order[e.id]; %>
     <tr>
       <td class="num mono"><%= e.number ? String(e.number).padStart(3, '0') : '—' %></td>

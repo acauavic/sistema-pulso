@@ -10,7 +10,7 @@
 <section class="stack top-gap">
   <h2>Na hora de mandar <% if (q.now.length) { %><span class="count"><%= q.now.length %></span><% } %></h2>
   <% if (!q.now.length) { %>
-  <div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum lembrete pendente</strong><span>Quando chegar a hora de um lembrete, ele aparece aqui e você recebe um aviso.</span></div>
+  <div class="empty"><%- include('../partials/signal') %><strong>Nenhum lembrete pendente</strong><span>Quando chegar a hora de um lembrete, ele aparece aqui e você recebe um aviso.</span></div>
   <% } %>
   <% q.now.forEach(function (it) { %>
   <article class="card reminder-card is-current">

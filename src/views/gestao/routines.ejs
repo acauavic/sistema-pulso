@@ -42,7 +42,7 @@
   <div class="row"><button class="btn primary" type="button" data-modal-open="modal-routine-new"><%- icon('plus') %> Nova rotina</button></div></div>
 <%- include('../partials/gestao-nav', { active: 'rotinas' }) %>
 <p class="lead">Tarefas e pedidos de conteúdo que nascem sozinhos: em momentos da produção ou repetindo (todo dia útil, toda semana, todo mês), já com responsável e vencimento. O vencimento de cada tarefa continua editável na própria tarefa; mudar a rotina vale para os próximos episódios.</p>
-<% if (!routines.length) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma rotina.</strong></p></div><% } %>
+<% if (!routines.length) { %><div class="empty card"><%- include('../partials/signal') %><p><strong>Nenhuma rotina.</strong></p></div><% } %>
 <% Object.keys(C.ROUTINE_TRIGGERS).forEach(function (trig) { var list = byTrigger[trig]; if (!list) return; %>
 <section class="card top-gap">
   <h2><%= C.ROUTINE_TRIGGERS[trig] %></h2>

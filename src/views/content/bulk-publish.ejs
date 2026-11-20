@@ -58,7 +58,7 @@
 <% } %>
 
 <% if (!rows.length) { %>
-<div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nada para agendar.</strong></p><p class="muted small">Os cortes marcados já saíram, estão na fila ou ainda não estão prontos.</p><p><a class="btn sm" href="<%= backHref %>">Voltar aos cortes</a></p></div>
+<div class="empty top-gap"><%- include('../partials/signal') %><p><strong>Nada para agendar.</strong></p><p class="muted small">Os cortes marcados já saíram, estão na fila ou ainda não estão prontos.</p><p><a class="btn sm" href="<%= backHref %>">Voltar aos cortes</a></p></div>
 <% } else { %>
 <form method="post" action="/conteudo/em-massa/publicar" data-busy="Agendando…">
   <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="episodio" value="<%= episodio %>"><input type="hidden" name="teste_modo" value="<%= opts.trialMode %>">

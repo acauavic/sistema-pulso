@@ -329,7 +329,7 @@
   <div class="pane" id="pane-pagina" data-pane-id="pagina">
     <% if (!guest.audience_page_enabled) { %>
     <section class="card empty page-off">
-      <%- include('../partials/pulse-line') %>
+      <%- include('../partials/signal') %>
       <h2>Página só da gravação com <%= fmt.firstName(guest.name) %></h2>
       <p class="muted">Além da agenda geral, <%= fmt.firstName(guest.name) %> pode ter uma página própria para divulgar: fotos, como será a gravação, horário de chegada da plateia e links de parceiro com participação isenta. Os pedidos caem no mesmo painel da plateia.</p>
       <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/plateia/pagina" class="inline"><%- csrfF %><input type="hidden" name="on" value="1"><button class="btn primary" type="submit"><%- icon('globe') %> Ativar página</button></form><% } %>
@@ -440,7 +440,7 @@
   <div class="pane" id="pane-portal" data-pane-id="portal">
     <% if (!pg.portal_enabled) { %>
     <section class="card empty page-off">
-      <%- include('../partials/pulse-line') %>
+      <%- include('../partials/signal') %>
       <h2>Portal de <%= gFirst %></h2>
       <p class="muted">Uma página só de <%= gFirst %> que se atualiza sozinha durante a semana do episódio: o cronograma, os posts em collab (o sistema reconhece pelo @ no collab do Instagram), os cortes que não foram publicados como exclusivos, os links do episódio e as fotos que vocês escolherem.</p>
       <% if (canW) { %><form method="post" action="/convidados/<%= guest.id %>/portal" class="inline"><%- csrfP %><input type="hidden" name="on" value="1"><button class="btn primary" type="submit"><%- icon('globe') %> Ativar portal</button></form><% } %>

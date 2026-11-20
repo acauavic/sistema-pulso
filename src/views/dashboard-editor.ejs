@@ -54,7 +54,7 @@
     <h2 id="ordem-h">Ordem de edição</h2>
     <% if (order.length > 1) { %><p class="small muted edit-order-hint">O 1º é o que vai ao ar antes.</p><% } %>
     <% if (!order.length) { %>
-      <div class="empty"><%- include('partials/pulse-line') %><strong>Nada para editar agora</strong><span>Quando um episódio for liberado para edição, ele entra aqui na ordem em que vai ao ar e você recebe um aviso.</span></div>
+      <div class="empty"><%- include('partials/signal') %><strong>Nada para editar agora</strong><span>Quando um episódio for liberado para edição, ele entra aqui na ordem em que vai ao ar e você recebe um aviso.</span></div>
     <% } else { %>
     <ol class="plain edit-order">
       <% order.forEach(function (e) { var mineEp = e.editor_id === currentUser.id; %>
@@ -74,7 +74,7 @@
   <section class="card">
     <h2>Meus episódios</h2>
     <% if (!mine.length) { %>
-      <div class="empty"><%- include('partials/pulse-line') %><strong>Nenhum episódio seu fora da edição</strong><span>Depois que você envia para revisão, o episódio aparece aqui até ser publicado.</span></div>
+      <div class="empty"><%- include('partials/signal') %><strong>Nenhum episódio seu fora da edição</strong><span>Depois que você envia para revisão, o episódio aparece aqui até ser publicado.</span></div>
     <% } else { %>
     <ul class="plain today-list two-col">
       <% mine.forEach(function (e) { %>

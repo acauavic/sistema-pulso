@@ -86,7 +86,7 @@
 <table>
   <thead><tr><% if (canBulk) { %><th class="check-col"><input type="checkbox" data-bulk-all aria-label="Marcar todos os convidados da lista"></th><% } %><th>Convidado</th><th>Perfil</th><th>Etapa</th><th class="nowrap">Gravação</th><th class="nowrap">Convite</th><th class="nowrap">Responsável</th></tr></thead>
   <tbody>
-    <% if (!guests.length) { %><tr><td colspan="<%= canBulk ? 7 : 6 %>"><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum convidado por aqui ainda</strong><span>Cadastre o primeiro convidado ou ajuste os filtros.</span></div></td></tr><% } %>
+    <% if (!guests.length) { %><tr><td colspan="<%= canBulk ? 7 : 6 %>"><div class="empty"><%- include('../partials/signal') %><strong>Nenhum convidado por aqui ainda</strong><span>Cadastre o primeiro convidado ou ajuste os filtros.</span></div></td></tr><% } %>
     <% guests.forEach(function (g) { %>
     <tr>
       <% if (canBulk) { %><td class="check-col"><input type="checkbox" form="form-massa" name="ids" value="<%= g.id %>" data-bulk-pick aria-label="Marcar <%= g.name %>"></td><% } %>

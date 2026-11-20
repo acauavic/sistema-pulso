@@ -96,7 +96,7 @@
 <% } %>
 
 <% if (!rows.length) { %>
-<div class="empty card"><%- include('../partials/pulse-line') %><p><strong><%= empty[vista][0] %></strong></p><p class="muted small"><%= empty[vista][1] %></p></div>
+<div class="empty card"><%- include('../partials/signal') %><p><strong><%= empty[vista][0] %></strong></p><p class="muted small"><%= empty[vista][1] %></p></div>
 <% } else { %>
 <ul class="plain cmt-list">
   <% rows.forEach(function (c) {

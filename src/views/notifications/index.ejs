@@ -39,7 +39,7 @@
 
 <section class="card notif-list-card">
   <% if (!items.length) { %>
-  <div class="empty"><%- include('../partials/pulse-line') %><p><strong><%= unread ? 'Tudo lido.' : 'Nenhuma notificação.' %></strong></p><p class="muted small"><%= unread ? 'Quando chegar algo novo, aparece aqui e no ícone de Avisos.' : 'Mensagens, tarefas, comentários e as etapas dos episódios aparecem aqui.' %></p></div>
+  <div class="empty"><%- include('../partials/signal') %><p><strong><%= unread ? 'Tudo lido.' : 'Nenhuma notificação.' %></strong></p><p class="muted small"><%= unread ? 'Quando chegar algo novo, aparece aqui e no ícone de Avisos.' : 'Mensagens, tarefas, comentários e as etapas dos episódios aparecem aqui.' %></p></div>
   <% } %>
   <ul class="plain notif-list">
     <% items.forEach(function (n) { %>

@@ -25,7 +25,7 @@
 
 <% var storyPosts = tipo === 'story' ? images.storyPosts : []; %>
 <% if (!items.length && !storyPosts.length) { %>
-<div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nada para postar aqui.</strong></p><p class="muted small"><%= emptyText[tipo] %></p><% if (tipo !== 'video') { %><p><a class="btn sm" href="/conteudo?pedir=<%= tipo === 'imagem' ? 'post' : tipo %>"><%- icon('plus', 14) %> Pedir ao editor</a></p><% } %></div>
+<div class="empty card"><%- include('../partials/signal') %><p><strong>Nada para postar aqui.</strong></p><p class="muted small"><%= emptyText[tipo] %></p><% if (tipo !== 'video') { %><p><a class="btn sm" href="/conteudo?pedir=<%= tipo === 'imagem' ? 'post' : tipo %>"><%- icon('plus', 14) %> Pedir ao editor</a></p><% } %></div>
 <% } else { %>
 <form method="post" action="/social/publicar" class="stack-lg" data-compose data-busy="Enviando…" data-publish="<%= live ? 'live' : 'test' %>">
   <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>">

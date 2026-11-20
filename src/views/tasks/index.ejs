@@ -30,7 +30,7 @@
 </div>
 
 <% if (view === 'lista') { %>
-  <% if (!items.length) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong><%= empty[scope] %></strong></p><p class="muted small">Crie uma tarefa ou veja as da equipe em "Todas".</p></div><% } %>
+  <% if (!items.length) { %><div class="empty card"><%- include('../partials/signal') %><p><strong><%= empty[scope] %></strong></p><p class="muted small">Crie uma tarefa ou veja as da equipe em "Todas".</p></div><% } %>
   <% BUCKETS.forEach(function (b) { var list = items.filter(function (t) { return bucket(t) === b[0]; }); if (!list.length) return; %>
   <section class="task-section">
     <h2 class="task-section-h <%= b[0] === 'atrasadas' ? 'err' : '' %>"><%= b[1] %> <span class="count"><%= list.length %></span></h2>

@@ -18,7 +18,7 @@
 </form>
 <% var targetHref = function (r) { var m = { clip: '/cortes/', guest: '/convidados/', sponsor: '/patrocinadores/', episode: '/episodios/', task: '/tarefas/', publication: '/social/publicacoes/', request: '/conteudo/pedidos/' }; return r.entity && r.entity_id && m[r.entity] && /^\d+$/.test(String(r.entity_id)) ? m[r.entity] + r.entity_id : null; }; %>
 <% if (!rows.length) { %>
-<div class="empty card"><%- include('partials/pulse-line') %><p><strong><%= area || quem ? 'Nada com esse filtro.' : 'Nada registrado ainda.' %></strong></p><p class="muted small">Cada ação importante (cadastros, etapas, publicações, exclusões, acessos) fica registrada aqui com quem fez e quando.</p></div>
+<div class="empty card"><%- include('partials/signal') %><p><strong><%= area || quem ? 'Nada com esse filtro.' : 'Nada registrado ainda.' %></strong></p><p class="muted small">Cada ação importante (cadastros, etapas, publicações, exclusões, acessos) fica registrada aqui com quem fez e quando.</p></div>
 <% } else { %>
 <div class="table-wrap">
 <table>

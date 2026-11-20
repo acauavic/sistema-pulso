@@ -15,7 +15,7 @@
   <% TABS.forEach(function (t) { var d = t[2]; %>
   <div class="pane" id="pane-<%= t[0] %>" data-pane-id="<%= t[0] %>">
     <% if (!d.pairs.length) { %>
-    <div class="empty"><%- include('../partials/pulse-line') %><h3>Nenhuma duplicata</h3><p>O sistema confere a cada cadastro novo e avisa antes de criar outro igual.</p></div>
+    <div class="empty"><%- include('../partials/signal') %><h3>Nenhuma duplicata</h3><p>O sistema confere a cada cadastro novo e avisa antes de criar outro igual.</p></div>
     <% } else { %>
     <div class="req-list">
       <% d.pairs.forEach(function (p) { %>

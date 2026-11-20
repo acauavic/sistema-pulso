@@ -106,3 +106,23 @@ describe('identidade: ícones do painel e ícones do Pulso', () => {
     }
   });
 });
+
+describe('identidade: o Sinal no lugar da linha de pulso (só no painel)', () => {
+  const walk = (dir) => fs.readdirSync(path.join(root, dir), { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`])).filter((f) => !path.basename(f).startsWith('._'));
+  const pulso = ['src/views/plateia/guest.ejs', 'src/views/plateia/page.ejs', 'src/views/partials/pulse-line.ejs'];
+
+  it('a linha de pulso fica só nas páginas públicas do Pulso', () => {
+    assert.ok(exists('src/views/partials/pulse-line.ejs'), 'a plateia do Pulso continua usando');
+    for (const f of walk('src/views')) if (!pulso.includes(f)) assert.doesNotMatch(read(f), /pulse-line/, `${f} ainda inclui a linha de pulso`);
+    assert.match(read('src/views/plateia/page.ejs'), /pulse-line/);
+    assert.doesNotMatch(css, /pulse-line/, 'o estilo da linha de pulso sai da folha do painel');
+  });
+
+  it('o Sinal tem estilo próprio e o "ao vivo" para com movimento reduzido', () => {
+    assert.match(css, /\.signal \{/); assert.match(css, /@keyframes signal \{/);
+    assert.match(css, /\.day-live \{[^}]*animation: signal/);
+    assert.match(css, /prefers-reduced-motion: reduce\) \{ \.day-live \{ animation: none; \} \}/);
+    assert.match(read('src/views/partials/signal.ejs'), /class="signal"[\s\S]*class="s4"/);
+  });
+});

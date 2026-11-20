@@ -11,7 +11,7 @@
 <div class="pane" id="pane-reunioes" data-pane-id="reunioes">
   <% if (!allMeet) { %>
   <section class="card">
-    <div class="empty"><%- include('../partials/pulse-line') %>
+    <div class="empty"><%- include('../partials/signal') %>
       <strong>Nenhuma reunião com <%= sponsor.company %> ainda</strong>
       <span>Marque aqui: a reunião vai para o Google Agenda do Pulso, o Google cria o Meet e manda o convite. Depois da reunião, o resumo fica guardado nela.</span>
       <% if (canWrite) { %><p class="top-gap"><button class="btn primary" type="button" data-modal-open="modal-reuniao-nova"><%- icon('plus') %> Marcar reunião</button></p><% } %>

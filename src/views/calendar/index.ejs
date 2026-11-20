@@ -57,7 +57,7 @@
 </div>
 
 <% if (!cfg.tipos.length) { %>
-<div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum tipo escolhido</strong><span>Marque o que você quer ver: tarefas, gravações, publicações, contas…</span></div>
+<div class="empty"><%- include('../partials/signal') %><strong>Nenhum tipo escolhido</strong><span>Marque o que você quer ver: tarefas, gravações, publicações, contas…</span></div>
 
 <% } else if (cfg.visao === 'mes') { %>
 <div class="calendar cal-month" role="grid" aria-label="Eventos por dia">
@@ -85,7 +85,7 @@
 <% } else { %>
 <% var days = Object.keys(byDay).sort(); %>
 <% if (!days.length) { %>
-<div class="empty"><%- include('../partials/pulse-line') %><strong>Nada com data neste período</strong><span>Tente outro período ou marque mais tipos nos filtros.</span></div>
+<div class="empty"><%- include('../partials/signal') %><strong>Nada com data neste período</strong><span>Tente outro período ou marque mais tipos nos filtros.</span></div>
 <% } %>
 <% days.forEach(function (iso) { %>
 <section class="cal-list-day <%= iso === today ? 'today' : '' %>">

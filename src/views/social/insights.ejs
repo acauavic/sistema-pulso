@@ -26,7 +26,7 @@
 
   <div class="pane" data-pane-id="resumo">
     <% if (!nets.length) { %>
-    <div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma rede com números ainda.</strong></p><p class="muted small">Conecte as contas em Integrações &gt; Redes sociais. Cada rede aparece aqui com os números do provedor em que está conectada.</p></div>
+    <div class="empty card"><%- include('../partials/signal') %><p><strong>Nenhuma rede com números ainda.</strong></p><p class="muted small">Conecte as contas em Integrações &gt; Redes sociais. Cada rede aparece aqui com os números do provedor em que está conectada.</p></div>
     <% } else { %>
     <div class="req-list">
       <% nets.forEach(function (d) { %>

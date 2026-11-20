@@ -2151,9 +2151,6 @@ img[loading="lazy"] { background: var(--raised); }
 @media (max-width: 640px) { .filters { margin-bottom: 12px; } .filters input[type=search] { flex-basis: 100%; } .filters select, .filters .combo { flex: 1 1 140px; min-width: 0; width: auto; } } /* celular: os seletores lado a lado, a lista aparece antes */
 @media (max-width: 600px) { .combo .combo-pop, .combo.opens-up .combo-pop { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); max-height: 70dvh; min-width: 0; } .combo-list { max-height: calc(70dvh - 80px); } .combo-search { font-size: 16px; height: 44px; } }
 
-/* linha de pulso: batimento em verde (no claro, preto) e o rastro em plum, pelos tokens */
-.pulse-line .pl-beat { stroke: var(--accent); } .pulse-line .pl-bars { fill: var(--accent); } .pulse-line .pl-tail { stroke: var(--line-strong); }
-:root[data-theme="light"] .pulse-line .pl-beat { stroke: var(--text); } :root[data-theme="light"] .pulse-line .pl-bars { fill: var(--text); }
 .foot-actions form.push-right { margin-left: auto; }
 /* grades de formulário: campos da mesma linha com larguras pensadas (antes, cada um do tamanho do próprio conteúdo) */
 .form-grid { display: grid; gap: 12px 16px; align-items: start; }

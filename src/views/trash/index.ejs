@@ -17,7 +17,7 @@
 <% } %>
 
 <% if (!items.length) { %>
-<div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong><%= total ? 'Nada deste tipo na lixeira.' : 'A lixeira está vazia.' %></strong></p><p class="muted small">Ao apagar um corte, um post, um pedido, um episódio ou um cadastro, ele fica aqui por <%= DAYS %> dias. Logo depois de apagar, o aviso no topo da página também tem o botão Desfazer.</p></div>
+<div class="empty top-gap"><%- include('../partials/signal') %><p><strong><%= total ? 'Nada deste tipo na lixeira.' : 'A lixeira está vazia.' %></strong></p><p class="muted small">Ao apagar um corte, um post, um pedido, um episódio ou um cadastro, ele fica aqui por <%= DAYS %> dias. Logo depois de apagar, o aviso no topo da página também tem o botão Desfazer.</p></div>
 <% } else { %>
 <%# itens apagados juntos e do mesmo tipo (os slides de um carrossel, uma seleção de posts) viram uma linha só %>
 <% var bundles = []; items.forEach(function (t) { var last = bundles[bundles.length - 1]; if (last && t.batch && last.batch === t.batch && last.kind === t.kind) last.items.push(t); else bundles.push({ batch: t.batch, kind: t.kind, items: [t] }); }); %>

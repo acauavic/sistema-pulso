@@ -71,7 +71,7 @@
     <h2>Próximas gravações</h2>
     <% if (!upcoming.length) { %>
       <div class="empty">
-        <%- include('partials/pulse-line') %>
+        <%- include('partials/signal') %>
         <strong>Nenhuma gravação marcada</strong>
         <span>Quando um convidado entra em Agendado, a gravação aparece aqui.</span>
       </div>
@@ -93,7 +93,7 @@
     <h2>Atividade recente</h2>
     <% if (!recent.length) { %>
       <div class="empty">
-        <%- include('partials/pulse-line') %>
+        <%- include('partials/signal') %>
         <strong>Sem atividade ainda</strong>
         <span>Cadastros, convites e respostas aparecem aqui.</span>
       </div>

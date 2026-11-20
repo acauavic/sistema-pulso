@@ -24,7 +24,7 @@
 
   <div class="pane" id="pane-real" data-pane-id="real">
     <% if (!r.pages.length) { %>
-      <div class="empty"><%- include('../partials/pulse-line') %><h3>Ainda sem medições</h3><p>Cada página aberta no painel manda o tempo que levou no navegador da pessoa. Os números aparecem aqui depois das primeiras visitas.</p></div>
+      <div class="empty"><%- include('../partials/signal') %><h3>Ainda sem medições</h3><p>Cada página aberta no painel manda o tempo que levou no navegador da pessoa. Os números aparecem aqui depois das primeiras visitas.</p></div>
     <% } else { %>
       <p class="small muted">Valor de 3 em cada 4 visitas (p75). Cinza = bom, âmbar = dá para melhorar, vermelho = lento. Aparece = maior elemento na tela (LCP, bom até <span class="mono">2,5 s</span>); responde ao clique (INP, bom até <span class="mono">200 ms</span>); pula na tela (CLS, bom até <span class="mono">0,10</span>); servidor = primeira resposta (TTFB, bom até <span class="mono">800 ms</span>).</p>
       <div class="table-wrap">
@@ -48,7 +48,7 @@
 
   <div class="pane" id="pane-lentas" data-pane-id="lentas" hidden>
     <% if (!r.slow.length) { %>
-      <div class="empty"><%- include('../partials/pulse-line') %><h3>Nenhuma resposta lenta</h3><p>Toda resposta do servidor acima de <span class="mono"><%= ms(r.slowMs) %></span> entra aqui, com o tempo que foi gasto no banco.</p></div>
+      <div class="empty"><%- include('../partials/signal') %><h3>Nenhuma resposta lenta</h3><p>Toda resposta do servidor acima de <span class="mono"><%= ms(r.slowMs) %></span> entra aqui, com o tempo que foi gasto no banco.</p></div>
     <% } else { %>
       <div class="table-wrap">
         <table>
@@ -74,9 +74,9 @@
 
   <div class="pane" id="pane-banco" data-pane-id="banco" hidden>
     <% if (r.statements === null) { %>
-      <div class="empty"><%- include('../partials/pulse-line') %><h3>Medição do banco desligada</h3><p>Ligue a extensão <span class="mono">pg_stat_statements</span> no Postgres para ver aqui as consultas que mais tomam tempo.</p></div>
+      <div class="empty"><%- include('../partials/signal') %><h3>Medição do banco desligada</h3><p>Ligue a extensão <span class="mono">pg_stat_statements</span> no Postgres para ver aqui as consultas que mais tomam tempo.</p></div>
     <% } else if (!r.statements.length) { %>
-      <div class="empty"><%- include('../partials/pulse-line') %><h3>Ainda sem dados</h3><p>As consultas aparecem conforme o painel é usado.</p></div>
+      <div class="empty"><%- include('../partials/signal') %><h3>Ainda sem dados</h3><p>As consultas aparecem conforme o painel é usado.</p></div>
     <% } else { %>
       <p class="small muted">Desde que o banco foi reiniciado, ordenadas pelo tempo total (o que mais pesa somando todas as vezes).</p>
       <div class="table-wrap">

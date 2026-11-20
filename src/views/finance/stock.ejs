@@ -15,7 +15,7 @@
 <p class="lead">O que sai a cada episódio gravado desconta sozinho. O aviso de reposição conta o prazo que leva para chegar e considera <span class="mono"><%= String(settings.episodes_per_month).replace('.', ',') %></span> episódios por mês<% if (can('finance.write')) { %> (muda em <a href="/financeiro/regras">Custos automáticos</a>)<% } %>.</p>
 
 <% if (!items.length) { %>
-<div class="empty card"><%- include('../partials/pulse-line') %>
+<div class="empty card"><%- include('../partials/signal') %>
   <p><strong>Nenhum item no estoque</strong></p>
   <p class="muted small">Cadastre canecas, caixas de presente, cartões de visita… com quanto sai por episódio. Daí em diante o saldo cai a cada gravação e você sabe quando comprar.</p></div>
 <% } %>

@@ -58,7 +58,7 @@
         <div><h2>Custos que nascem com o episódio</h2><p class="small muted">Edição, Uber dos hosts, produtora por episódio… cada um vira uma conta no momento escolhido.</p></div>
         <% if (canWrite) { %><button class="btn" type="button" data-fill-modal="modal-regra" data-fill-mode="new" data-fill-action="/financeiro/regras" data-fill='<%- json({ name: '', category: 'edicao', trigger: 'episodio_gravado', amount: '', anchor: 'gatilho', offset_days: '0', supplier: '', active: '1' }) %>'><%- icon('plus') %> Novo custo</button><% } %>
       </div>
-      <% if (!rules.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum custo por episódio</strong><span>O estúdio já é automático. Adicione o que mais custa a cada episódio (ex.: edição, transporte dos hosts).</span></div><% } %>
+      <% if (!rules.length) { %><div class="empty"><%- include('../partials/signal') %><strong>Nenhum custo por episódio</strong><span>O estúdio já é automático. Adicione o que mais custa a cada episódio (ex.: edição, transporte dos hosts).</span></div><% } %>
       <ul class="plain plan-list">
         <% rules.forEach(function (r) { %>
         <li class="<%= r.active ? '' : 'is-off' %>">
@@ -77,7 +77,7 @@
         <div><h2>Custos mensais</h2><p class="small muted">Salário da produtora, assinaturas, hospedagem… lançados todo mês, com três meses de antecedência.</p></div>
         <% if (canWrite) { %><button class="btn" type="button" data-fill-modal="modal-mensal" data-fill-mode="new" data-fill-action="/financeiro/mensais" data-fill='<%- json({ name: '', category: 'equipe', amount: '', day_of_month: '5', starts_on: fin.todayISO(), ends_on: '', supplier: '', active: '1' }) %>'><%- icon('plus') %> Novo custo mensal</button><% } %>
       </div>
-      <% if (!recurring.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhum custo mensal</strong><span>Cadastre o salário da produtora e as assinaturas para o caixa prever o mês.</span></div><% } %>
+      <% if (!recurring.length) { %><div class="empty"><%- include('../partials/signal') %><strong>Nenhum custo mensal</strong><span>Cadastre o salário da produtora e as assinaturas para o caixa prever o mês.</span></div><% } %>
       <ul class="plain plan-list">
         <% recurring.forEach(function (r) { %>
         <li class="<%= r.active ? '' : 'is-off' %>">

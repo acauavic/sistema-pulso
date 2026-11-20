@@ -8,7 +8,7 @@
     <h2 id="agenda-h">Próximas gravações e reuniões</h2>
     <% if (!agenda.length) { %>
       <div class="empty">
-        <%- include('pulse-line') %>
+        <%- include('signal') %>
         <strong>Nada marcado</strong>
         <span>Gravações (convidado em Agendado) e reuniões com patrocinador aparecem aqui.</span>
       </div>
@@ -30,7 +30,7 @@
     <div class="today-head"><h2 id="tarefas-h">Suas tarefas</h2><a class="small" href="/tarefas">Ver todas</a></div>
     <% if (!tasks.length) { %>
       <div class="empty">
-        <%- include('pulse-line') %>
+        <%- include('signal') %>
         <strong>Nenhuma tarefa sua para os próximos dias</strong>
         <span>As tarefas em que você é a responsável, com prazo até daqui a uma semana, aparecem aqui.</span>
       </div>

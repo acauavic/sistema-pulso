@@ -48,7 +48,7 @@
 
   <section class="ideas-list">
     <% if (!ideas.length) { %>
-      <div class="empty card top-gap"><%- include('../partials/pulse-line') %><p><strong><%= status === 'sugerida' ? 'Nenhuma ideia esperando.' : 'Nada aqui.' %></strong></p><p class="muted small"><%= status === 'sugerida' ? 'Use “Pedir ideias” e escolha os episódios: a IA sugere cortes, stories e carrosséis.' : 'As ideias mudam de lista quando alguém aprova, marca como feita ou descarta.' %></p></div>
+      <div class="empty card top-gap"><%- include('../partials/signal') %><p><strong><%= status === 'sugerida' ? 'Nenhuma ideia esperando.' : 'Nada aqui.' %></strong></p><p class="muted small"><%= status === 'sugerida' ? 'Use “Pedir ideias” e escolha os episódios: a IA sugere cortes, stories e carrosséis.' : 'As ideias mudam de lista quando alguém aprova, marca como feita ou descarta.' %></p></div>
     <% } %>
     <% groups.forEach(function (g) { %>
       <h3 class="idea-ep kicker"><a href="/episodios/<%= g.id %>"><%= g.label %></a></h3>

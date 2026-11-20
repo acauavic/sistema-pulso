@@ -26,9 +26,9 @@
 
 <% if (!pubs.length) { %>
 <% if (q || media || status) { %>
-<div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nada com esse filtro.</strong></p><p class="muted small">Tente outra palavra ou <a href="/social/publicacoes">veja todas as publicações</a>.</p></div>
+<div class="empty card"><%- include('../partials/signal') %><p><strong>Nada com esse filtro.</strong></p><p class="muted small">Tente outra palavra ou <a href="/social/publicacoes">veja todas as publicações</a>.</p></div>
 <% } else { %>
-<div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nada por aqui ainda.</strong></p><p class="muted small">Os cortes, posts, carrosséis e stories publicados ou agendados aparecem nesta lista.<% if (can('social.request')) { %> Comece em <a href="/social/novo">Novo post</a>.<% } %></p></div>
+<div class="empty card"><%- include('../partials/signal') %><p><strong>Nada por aqui ainda.</strong></p><p class="muted small">Os cortes, posts, carrosséis e stories publicados ou agendados aparecem nesta lista.<% if (can('social.request')) { %> Comece em <a href="/social/novo">Novo post</a>.<% } %></p></div>
 <% } %>
 <% } else { %>
 <div class="table-wrap">

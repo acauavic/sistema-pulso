@@ -99,8 +99,8 @@
       <% } else { %><span>Mostrando também as gravações que já passaram.</span> <a href="<%= qs({ anteriores: '' }) %>">Ocultar</a><% } %>
     </p>
     <% } %>
-    <% if (!leads.length && filtersOn) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido com esses filtros</strong></p><p class="muted small"><a href="<%= qs({ q: '', convidado: '', status: '', origem: '' }) %>">Limpar filtros</a></p></div>
-    <% } else if (!leads.length) { %><div class="empty card"><%- include('../partials/pulse-line') %><p><strong>Nenhuma inscrição por aqui</strong></p><p class="muted small">Quando alguém pedir para participar pela página pública, o pedido aparece aqui com o WhatsApp e a origem do clique. A seleção da plateia é sua. Quem você já combinou por fora entra em "Adicionar pessoa".</p></div><% } %>
+    <% if (!leads.length && filtersOn) { %><div class="empty card"><%- include('../partials/signal') %><p><strong>Nenhum pedido com esses filtros</strong></p><p class="muted small"><a href="<%= qs({ q: '', convidado: '', status: '', origem: '' }) %>">Limpar filtros</a></p></div>
+    <% } else if (!leads.length) { %><div class="empty card"><%- include('../partials/signal') %><p><strong>Nenhuma inscrição por aqui</strong></p><p class="muted small">Quando alguém pedir para participar pela página pública, o pedido aparece aqui com o WhatsApp e a origem do clique. A seleção da plateia é sua. Quem você já combinou por fora entra em "Adicionar pessoa".</p></div><% } %>
 
     <% if (leads.length && view === 'quadro') { %>
     <div class="board board-wide pboard" data-board data-can-move="1" data-base="/plateia/painel/leads" data-status-path="mover" data-fail-msg="Não foi possível mover o pedido. Tente de novo.">
@@ -177,7 +177,7 @@
 
   <div class="pane" id="pane-agenda" data-pane-id="agenda" hidden>
     <p class="muted small">É isto que a pessoa vê agora na página. Para tirar um convidado, abra o card dele e desmarque "Aberto para plateia"; para fechar as vagas, marque Lotado ou Encerrado.</p>
-    <% if (!agenda.length) { %><div class="empty card top-gap"><%- include('../partials/pulse-line') %><p><strong>Agenda vazia</strong></p><p class="muted small">Convidados em Agendado com data futura entram aqui sozinhos.</p></div><% } %>
+    <% if (!agenda.length) { %><div class="empty card top-gap"><%- include('../partials/signal') %><p><strong>Agenda vazia</strong></p><p class="muted small">Convidados em Agendado com data futura entram aqui sozinhos.</p></div><% } %>
     <ul class="plain plan-list card top-gap">
       <% agenda.forEach(function (g) { %>
       <li><div class="plan-list-main"><a href="/convidados/<%= g.id %>#plateia"><strong><%= g.name %></strong></a><span class="small muted"><%= g.date %>, <%= g.time %><%= g.topic ? ' · ' + g.topic : '' %></span></div>

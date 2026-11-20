@@ -96,7 +96,7 @@
     <% } %>
 
     <% if (!clips.length && !(filterUi && filterUi.count)) { %>
-    <div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhum corte <%= only ? 'neste episódio' : 'ainda' %>.</strong></p><p class="muted small">Os vídeos editados aparecem aqui já com título, legenda e capas sugeridos.</p><% if (perm.cut && storageReady) { %><p><button class="btn sm" type="button" data-modal-open="modal-cortes"><%- icon('upload', 14) %> Enviar cortes</button></p><% } %></div>
+    <div class="empty top-gap"><%- include('../partials/signal') %><p><strong>Nenhum corte <%= only ? 'neste episódio' : 'ainda' %>.</strong></p><p class="muted small">Os vídeos editados aparecem aqui já com título, legenda e capas sugeridos.</p><% if (perm.cut && storageReady) { %><p><button class="btn sm" type="button" data-modal-open="modal-cortes"><%- icon('upload', 14) %> Enviar cortes</button></p><% } %></div>
     <% } %>
 
     <div class="board-filter cuts-filter">
@@ -115,7 +115,7 @@
       </form>
     </div>
     <div class="board-tools"><%- include('../partials/filter-builder') %><% if (clips.length) { %><%- include('../partials/card-fields') %><% } %></div>
-    <% if (filterUi.count && !clips.length) { %><div class="empty top-gap"><%- include('../partials/pulse-line') %><p><strong>Nenhum vídeo com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel.</p></div><% } %>
+    <% if (filterUi.count && !clips.length) { %><div class="empty top-gap"><%- include('../partials/signal') %><p><strong>Nenhum vídeo com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel.</p></div><% } %>
 
     <% var clipPick = perm.cut && clips.length > 1; %>
     <div<%- clipPick ? ' data-dl data-dl-zip="cortes"' : '' %>>
@@ -164,9 +164,9 @@
   <div class="pane" id="pane-posts">
     <%- include('../partials/filter-builder') %>
     <% if (!postGroups.length && filterUi.count) { %>
-    <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum post com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel.</p></div>
+    <div class="empty"><%- include('../partials/signal') %><p><strong>Nenhum post com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel.</p></div>
     <% } else if (!postGroups.length) { %>
-    <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum post ainda.</strong></p><p class="muted small">Quando o episódio for analisado pela IA (ao entrar em finalização), o sistema monta posts de frase, tela dividida e carrossel.</p></div>
+    <div class="empty"><%- include('../partials/signal') %><p><strong>Nenhum post ainda.</strong></p><p class="muted small">Quando o episódio for analisado pela IA (ao entrar em finalização), o sistema monta posts de frase, tela dividida e carrossel.</p></div>
     <% } %>
     <% postGroups.forEach(function (g) { %>
     <% var postCount = g.covers.length; var epTag = g.episode.number ? 'ep' + String(g.episode.number).padStart(3, '0') : 'episodio'; %>
@@ -240,9 +240,9 @@
     <%- include('../partials/filter-builder') %>
     <% var closed = requests.filter(function (r) { return openRequests.indexOf(r) < 0; }); %>
     <% if (!openRequests.length && filterUi.count) { %>
-    <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido em aberto com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel. Os concluídos que passam no filtro continuam embaixo.</p></div>
+    <div class="empty"><%- include('../partials/signal') %><p><strong>Nenhum pedido em aberto com esses filtros.</strong></p><p class="muted small">Tire algum filtro ou troque para "qualquer um" (OU) no painel. Os concluídos que passam no filtro continuam embaixo.</p></div>
     <% } else if (!openRequests.length) { %>
-    <div class="empty"><%- include('../partials/pulse-line') %><p><strong>Nenhum pedido em aberto.</strong></p><p class="muted small">Trailer do canal, vídeo avulso, um corte específico, post ou story: peça ao editor por aqui, com briefing e prazo. A entrega volta para você aprovar e já fica pronta no Social.</p><% if (perm.request) { %><p><button class="btn sm" type="button" data-modal-open="modal-pedido"><%- icon('plus', 14) %> Pedir conteúdo</button></p><% } %></div>
+    <div class="empty"><%- include('../partials/signal') %><p><strong>Nenhum pedido em aberto.</strong></p><p class="muted small">Trailer do canal, vídeo avulso, um corte específico, post ou story: peça ao editor por aqui, com briefing e prazo. A entrega volta para você aprovar e já fica pronta no Social.</p><% if (perm.request) { %><p><button class="btn sm" type="button" data-modal-open="modal-pedido"><%- icon('plus', 14) %> Pedir conteúdo</button></p><% } %></div>
     <% } else { %>
     <% var reqPick = openRequests.length > 1 && openRequests.some(function (r) { return perm.review || String(r.created_by) === String(currentUser.id); }); %>
     <div<%- reqPick ? ' data-dl' : '' %>>

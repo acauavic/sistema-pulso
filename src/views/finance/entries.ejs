@@ -39,7 +39,7 @@
 <% } %>
 
 <% if (!items.length) { %>
-<div class="empty card"><%- include('../partials/pulse-line') %>
+<div class="empty card"><%- include('../partials/signal') %>
   <p><strong><%= scope === 'historico' ? 'Nada movimentado neste mês' : scope === 'pagar' ? 'Nenhuma conta a pagar' : 'Nada a receber' %></strong></p>
   <p class="muted small"><%= scope === 'receber' ? 'Combine o pagamento do patrocinador na página dele e as parcelas aparecem aqui.' : scope === 'pagar' ? 'Os custos do estúdio nascem sozinhos quando a gravação é agendada.' : 'Use as setas para ver outros meses.' %></p></div>
 <% } %>

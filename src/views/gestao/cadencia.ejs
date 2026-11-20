@@ -38,7 +38,7 @@
   <div class="pane" id="pane-canais" data-pane-id="canais">
     <section class="card">
       <h2>Abordagens por canal</h2>
-      <% if (!r.sent && !r.replies) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Nenhuma abordagem no período</strong><span>Quando a equipe registrar contatos na página do convidado ou do patrocinador, eles aparecem aqui.</span></div><% } else { %>
+      <% if (!r.sent && !r.replies) { %><div class="empty"><%- include('../partials/signal') %><strong>Nenhuma abordagem no período</strong><span>Quando a equipe registrar contatos na página do convidado ou do patrocinador, eles aparecem aqui.</span></div><% } else { %>
       <div class="table-wrap"><table>
         <thead><tr><th>Canal</th><th class="num">Convidados</th><th class="num">Patrocinadores</th><th class="num">Total</th><th class="num">Respostas</th><th class="bar-col" aria-label="Participação"></th></tr></thead>
         <tbody>
@@ -60,7 +60,7 @@
     <section class="card">
       <h2>Por pessoa</h2>
       <p class="small muted">A meta é de abordagens novas de patrocinadores por dia útil: só a primeira abordagem de cada um conta, follow-up não. As metas ficam em <a href="/gestao/metas">Gestão &gt; Metas</a>.</p>
-      <% if (!r.people.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Ninguém registrou abordagens ainda</strong><span>Defina a meta diária das produtoras em Gestão &gt; Metas e peça para registrarem cada contato.</span></div><% } else { %>
+      <% if (!r.people.length) { %><div class="empty"><%- include('../partials/signal') %><strong>Ninguém registrou abordagens ainda</strong><span>Defina a meta diária das produtoras em Gestão &gt; Metas e peça para registrarem cada contato.</span></div><% } else { %>
       <div class="table-wrap"><table>
         <thead><tr><th>Pessoa</th><th class="num">Convidados</th><th class="num">Patrocinadores</th><th class="num">Respostas</th><th class="num">Meta/dia</th><th class="num">Média/dia</th><th class="num">Dias com meta</th><th class="num">Atrasados</th></tr></thead>
         <tbody>
@@ -82,7 +82,7 @@
   <div class="pane" id="pane-fila" data-pane-id="fila">
     <section class="card">
       <h2>Quem precisa de ação</h2>
-      <% if (!r.queue.length) { %><div class="empty"><%- include('../partials/pulse-line') %><strong>Nada atrasado</strong><span>Todos os follow-ups estão em dia.</span></div><% } else { %>
+      <% if (!r.queue.length) { %><div class="empty"><%- include('../partials/signal') %><strong>Nada atrasado</strong><span>Todos os follow-ups estão em dia.</span></div><% } else { %>
       <ul class="plain today-list">
         <% r.queue.forEach(function (x) { %>
         <li>
