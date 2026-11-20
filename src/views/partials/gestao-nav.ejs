@@ -1,6 +1,6 @@
 <%# Painel de gestão em dois níveis: grupos (linha de cima) e abas do grupo (linha de baixo). Variável: active (chave da aba). %>
 <%
-  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage', 'trash.manage', 'goals.manage', 'catalog.manage'];
+  var ANY = ['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage', 'trash.manage', 'goals.manage', 'catalog.manage', 'projects.manage'];
   var groups = [
     { label: 'Visão geral', tabs: [['geral', '/gestao', 'Visão geral', ANY]] },
     { label: 'Equipe', tabs: [
@@ -20,6 +20,7 @@
       ['galeria', '/gestao/galeria-kit', 'Galeria do media kit', ['plans.manage']],
     ] },
     { label: 'Sistema', tabs: [
+      ['projetos', '/gestao/projetos', 'Projetos', ['projects.manage']],
       ['integracoes', '/integracoes', 'Integrações', ['integrations.manage']],
       ['categorias', '/gestao/categorias', 'Categorias', ['catalog.manage']],
       ['busca', '/gestao/busca', 'Busca global', ['search.manage']],

@@ -1073,6 +1073,8 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
 .project-now { display: none; }
 .project-tag { color: var(--muted); letter-spacing: .08em; white-space: nowrap; }
 h1 .project-tag { vertical-align: middle; font-weight: 500; }
+.proj-list { margin-top: 0; } .proj-list .cat-row:first-child { border-top: 0; padding-top: 0; }
+.proj-mods { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; } .proj-note { margin: 16px 0 0; }
 @media (min-width: 861px) {
   html[data-sidebar="collapsed"] .project-switch > summary { justify-content: center; padding: 6px 2px; }
   html[data-sidebar="collapsed"] .project-switch-txt, html[data-sidebar="collapsed"] .project-switch > summary .icon { display: none; }

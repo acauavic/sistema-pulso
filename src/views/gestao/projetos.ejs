@@ -1,0 +1,61 @@
+<%- include('../partials/head') %>
+<%# Gestão > Sistema > Projetos. Jornada: a gestão chega aqui quando alguém começa a trabalhar em outro projeto (marca a pessoa) ou
+    quando o projeto muda de nome. Nada de ação principal nesta tela: são ajustes eventuais, cada um numa janela. %>
+<% var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">'; %>
+<div class="page-head"><div><span class="kicker">Gestão · Sistema</span><h1>Projetos</h1></div></div>
+<%- include('../partials/gestao-nav', { active: 'projetos' }) %>
+<p class="lead">Cada projeto tem os seus vídeos, convidados, tarefas e números. Aqui você ajusta o nome e marca quem trabalha em cada um.</p>
+
+<section class="card">
+  <ul class="plain cat-list proj-list">
+    <% projects.forEach(function (p) { var n = p.members.length; %>
+    <li class="cat-row">
+      <span class="cat-name">
+        <strong><%= p.name %></strong>
+        <span class="mono small muted"><%= p.sigla %> · <%= p.video_label_plural %> · <%= p.number_prefix %>001</span>
+        <span class="proj-mods"><% p.moduleLabels.forEach(function (m) { %><span class="badge b-gray"><%= m %></span><% }) %></span>
+      </span>
+      <span class="mono small muted"><%= n %> <%= n === 1 ? 'pessoa' : 'pessoas' %></span>
+      <span class="row cat-actions">
+        <button class="btn sm" type="button" data-modal-open="proj-pessoas-<%= p.id %>"><%- icon('users', 14) %> Pessoas</button>
+        <button class="btn sm ghost" type="button" data-fill-modal="proj-editar" data-fill-action="/gestao/projetos/<%= p.id %>" data-fill="<%= JSON.stringify({ name: p.name, sigla: p.sigla, video_label: p.video_label, video_label_plural: p.video_label_plural, number_prefix: p.number_prefix }) %>"><%- icon('pencil', 14) %> Editar</button>
+      </span>
+    </li>
+    <% }) %>
+  </ul>
+  <p class="small muted proj-note">Quem participa de um projeto só não vê o seletor de projeto nem a sigla nos cartões: para essa pessoa, o sistema é o de sempre.</p>
+</section>
+
+<% projects.forEach(function (p) { %>
+<dialog class="modal" id="proj-pessoas-<%= p.id %>" aria-labelledby="proj-pessoas-<%= p.id %>-h">
+  <form method="post" action="/gestao/projetos/<%= p.id %>/pessoas" class="stack"><%- csrfField %>
+    <h2 id="proj-pessoas-<%= p.id %>-h">Quem trabalha no <%= p.name %></h2>
+    <p class="small muted m-0">Quem está marcado vê o que é deste projeto. Toda pessoa participa de pelo menos um projeto.</p>
+    <% if (people.length > 8) { %><div class="row list-filter"><input type="search" placeholder="Buscar pelo nome" aria-label="Buscar pessoa" data-list-filter="#proj-pessoas-lista-<%= p.id %>" data-list-item="label" autocomplete="off"><span class="mono small muted list-filter-count" data-list-filter-count></span></div><% } %>
+    <div class="check-list" id="proj-pessoas-lista-<%= p.id %>">
+      <% people.forEach(function (u) { %>
+      <label class="check"><input type="checkbox" name="users" value="<%= u.id %>"<%= p.memberIds.indexOf(u.id) !== -1 ? ' checked' : '' %>> <%= u.name %> <span class="mono small muted"><%= ROLES[u.role].label %></span></label>
+      <% }) %>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% }) %>
+
+<dialog class="modal" id="proj-editar" aria-labelledby="proj-editar-h">
+  <form method="post" action="" class="stack" data-fill-form><%- csrfField %>
+    <h2 id="proj-editar-h">Editar projeto</h2>
+    <div class="grid-2">
+      <label>Nome<input type="text" name="name" maxlength="60" required></label>
+      <label>Sigla<input type="text" name="sigla" maxlength="6" required pattern="[A-Za-z0-9]{2,6}" placeholder="ex.: P100" autocapitalize="characters"></label>
+    </div>
+    <p class="small muted m-0">A sigla aparece nos cartões, entre colchetes, para quem vê mais de um projeto.</p>
+    <div class="grid-3">
+      <label>Um vídeo se chama<input type="text" name="video_label" maxlength="30" required placeholder="ex.: Episódio"></label>
+      <label>Vários se chamam<input type="text" name="video_label_plural" maxlength="30" required placeholder="ex.: Episódios"></label>
+      <label>Prefixo do número<input type="text" name="number_prefix" maxlength="8" required placeholder="ex.: EP."></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<%- include('../partials/foot') %>
