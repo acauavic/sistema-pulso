@@ -61,7 +61,7 @@
   <section class="column" data-status="<%= col.key %>">
     <header><span class="badge b-st-<%= col.key %>"><%= col.label %></span><span class="count"><%= col.items.length %></span></header>
     <div class="cards">
-      <% if (!col.items.length) { %><p class="col-empty small muted">Nenhum episódio nesta etapa.</p><% } %>
+      <% if (!col.items.length) { %><p class="col-empty small muted">Nenhum <%= videoWord %> nesta etapa.</p><% } %>
       <% col.items.forEach(function (e) { %>
       <a class="kcard" href="/episodios/<%= e.id %>"><% var o = order[e.id]; %>
         <span class="handle muted"<%- cardUi.attr('numero') %>><%- include('../partials/project-tag', { id: e.project_id }) %> <% if (o) { %><b class="order-n" title="<%= o.rank %>º na ordem de edição"><%= o.rank %>º</b> · <% } %><%= videoNo(e.number, e.project_id) || '—' %> · <% if (o) { %><span class="air-<%= o.air.tone || 'ok' %>" title="<%= o.air.line %>"><%= o.air.short %></span><% } else { %><%= fmt.formatDayShort(e.aired_on) %><% } %></span>

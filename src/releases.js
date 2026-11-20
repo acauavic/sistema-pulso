@@ -4,6 +4,18 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.98.0', date: '2026-11-20', title: 'Vídeo que não é episódio, e a pauta acompanhada',
+    items: [
+      { kind: 'novo', text: 'Cada projeto numera os seus vídeos do seu jeito: EP.012 no Pulso e V.003 no Projeto 100, lado a lado, sem um atrapalhar o outro.' },
+      { kind: 'novo', text: 'Etapa nova no começo da produção: Pré-produção. No projeto que grava vídeo, "Novo vídeo" cria o vídeo ali (título e data prevista), a pauta é escrita e, quando a gravação acontece, "Marcar como gravado" segue o fluxo de sempre.' },
+      { kind: 'novo', text: 'Pauta e roteiro ganharam aba própria no vídeo (e no convidado, a partir de Em agendamento): quem escreve, prazo, o texto no editor ou o link do documento, e o estado de cada um — A fazer, Em elaboração, Enviada para aprovação, Ajustes pedidos, Aprovada.' },
+      { kind: 'novo', text: 'A aprovação continua acontecendo no WhatsApp: "Copiar para o WhatsApp" copia o texto já formatado e marca a pauta como enviada, com data e para quem. A resposta que vier você registra em dois cliques.' },
+      { kind: 'novo', text: 'Em Vídeos, a visualização "Pautas" mostra um quadro com uma coluna por estado. No Início da produtora, "Pautas que travaram" avisa as atrasadas e as que voltaram com ajustes.' },
+      { kind: 'ajuste', text: 'O vídeo sem convidado não mostra Spotify, capa do Spotify nem os vídeos de lançamento do convidado: isso é do podcast. No Pulso, nada muda.' },
+      { kind: 'ajuste', text: 'O Projeto 100 passou a usar Vídeos, Convidados e Conteúdo. Convites, portal, plateia, redes e financeiro entram nas próximas versões.' },
+    ],
+  },
+  {
     version: '1.97.0', date: '2026-11-20', title: 'O quadro das tarefas ficou do jeito que se usa',
     items: [
       { kind: 'novo', text: 'Tarefas abre na visão que você escolheu da última vez (lista, quadro ou calendário), no computador e no celular.' },

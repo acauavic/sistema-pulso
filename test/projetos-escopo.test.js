@@ -87,7 +87,8 @@ describe('projetos: recorte (scope)', () => {
   it('trocar para um projeto que não usa a tela aberta leva ao Início', async () => {
     const c = h.client(app.base); await c.login('s@t.com');
     assert.equal((await c.act('/projeto', { project: '2', voltar: '/plateia/painel' })).location, '/', 'o Projeto 100 não usa plateia');
-    assert.equal((await c.act('/projeto', { project: '2', voltar: '/convidados?view=lista' })).location, '/');
+    assert.equal((await c.act('/projeto', { project: '2', voltar: '/patrocinadores' })).location, '/', 'o Projeto 100 não tem patrocínio');
+    assert.equal((await c.act('/projeto', { project: '2', voltar: '/convidados?view=lista' })).location, '/convidados?view=lista', 'convidados ele tem');
     assert.equal((await c.act('/projeto', { project: '2', voltar: '/tarefas?escopo=todas' })).location, '/tarefas?escopo=todas');
     assert.equal((await c.act('/projeto', { project: '1', voltar: '/plateia/painel' })).location, '/plateia/painel');
     assert.equal((await c.act('/projeto', { project: '', voltar: '/plateia/painel' })).location, '/plateia/painel');

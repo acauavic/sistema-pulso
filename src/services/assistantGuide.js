@@ -50,6 +50,8 @@ const ACTIONS = {
   'search.manage': { text: 'editar os atalhos da busca global', where: 'Gestão > Busca global' },
   'contacts.manage': { text: 'mudar o WhatsApp da produção (botões do convite do convidado) e o do comercial (media kit e portal do patrocinador), e as mensagens prontas que abrem nele', where: 'Gestão > WhatsApp dos convites' },
   'outreach.manage': { text: 'configurar a cadência de follow-up (intervalos entre abordagens) e acompanhar o painel de abordagens por canal e por pessoa', where: 'Gestão > Cadência' },
+  'pautas.read': { text: 'ler a pauta e o roteiro do vídeo (o editor lê o roteiro aprovado)', where: 'Vídeo > aba Pauta' },
+  'pautas.write': { text: 'escrever a pauta e o roteiro, copiar para o grupo do WhatsApp e registrar a resposta de quem aprova', where: 'Vídeo > aba Pauta' },
   'projects.manage': { text: 'ajustar o nome, a sigla e como cada projeto chama os seus vídeos, e marcar quem participa de cada projeto', where: 'Gestão > Sistema > Projetos' },
   'catalog.manage': { text: 'criar, renomear e desativar os tipos de vídeo (Pedir conteúdo, rotinas e a meta Vídeos entregues) e as categorias de tarefa', where: 'Gestão > Sistema > Categorias' },
   'goals.manage': { text: 'definir as metas de cada pessoa (até 3: o que contar, período, alvo e se aparece em número ou porcentagem) e ver o andamento das metas de todos', where: 'Gestão > Equipe > Metas' },

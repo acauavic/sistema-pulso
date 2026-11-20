@@ -351,7 +351,9 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   const pautaDocs = await pautaSvc.forOwner({ episodeId: ep.id });
   for (const d of pautaDocs) if (d.id) d.events = await pautaSvc.events(d.id);
   const pautaPendente = pautaDocs.some((d) => d.id && ['elaboracao', 'aprovacao', 'ajustes'].includes(d.state));
-  tabs.push({ key: 'pauta', label: 'Pauta', badge: pautaDocs.filter((d) => d.state === 'aprovada').length || null });
+  // o copo fica na cozinha: a aba só existe antes da gravação (é o próximo passo) ou quando já há pauta escrita
+  const showPauta = ep.status === 'pre_producao' || pautaDocs.some((d) => d.id);
+  if (showPauta) tabs.push({ key: 'pauta', label: 'Pauta', badge: pautaDocs.filter((d) => d.state === 'aprovada').length || null });
   tabs.push({ key: 'material', label: 'Material' }); // o episódio já nasce gravado
   if (ep.status === 'em_revisao') tabs.push({ key: 'revisao', label: 'Revisão', badge: openComments || null });
   if (stageIndex >= finIdx) tabs.push({ key: 'finalizacao', label: 'Finalização' });
@@ -373,7 +375,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   res.render('episodes/show', {
     // podcast leva Spotify, capa do Spotify e os vídeos do convidado; vídeo sem convidado não tem nada disso
     isPodcast: ep.format !== 'video',
-    pautaSvc, pautaDocs, pautaPendente, today: require('../services/tasks').todayISO(),
+    pautaSvc, pautaDocs, pautaPendente, showPauta, today: require('../services/tasks').todayISO(),
     orderPos, studio, studioWa, kindLabels: C.EPISODE_FILE_KINDS,
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: reviewComments,

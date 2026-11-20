@@ -10,7 +10,8 @@
   var canEmail = canInv && guest.email && mailReady;
   var epNo = (episode && videoNo(episode.number, episode.project_id)) || 'Episódio';
   var agendaMissing = [!guest.scheduled_studio && 'estúdio', !guest.scheduled_hosts && 'hosts', !guest.scheduled_guest && 'convidado'].filter(Boolean);
-  var showInvite = guest.invite_token || idx <= 2;
+  var guestMods = projectModules(guest.project_id); // o que o projeto deste convidado usa (convite e plateia são do Pulso por enquanto)
+  var showInvite = guestMods.convites && (guest.invite_token || idx <= 2);
   var future = guest.proposed_at && new Date(guest.proposed_at).getTime() > Date.now();
   var whenUpper = function (d) { return fmt.formatLong(d).replace(' de ' + new Date(d).getFullYear(), '').toUpperCase(); };
   var hidden = function (name, value) { return '<input type="hidden" name="' + name + '" value="' + value + '">'; };
@@ -21,7 +22,7 @@
   };
   var openOnLoad = function (name) { return openModal === name ? 'data-open-on-load' : ''; };
   // a página da plateia é para divulgar a gravação: depois de gravado, só aparece se já estiver ligada
-  var showPagina = pagePlateia && (guest.audience_page_enabled || idx >= 0 && idx <= 3);
+  var showPagina = guestMods.plateia && pagePlateia && (guest.audience_page_enabled || idx >= 0 && idx <= 3);
 %>
 <div class="page-head">
   <div>

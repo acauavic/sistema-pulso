@@ -15,6 +15,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 
 - [O que tem](#o-que-tem)
 - [Projetos](#projetos)
+- [Vídeos, episódios e pauta](#vídeos-episódios-e-pauta)
 - [Perfis e permissões](#perfis-e-permissões)
 - [Como o convite funciona](#como-o-convite-funciona)
 - [Rodando localmente](#rodando-localmente)
@@ -81,6 +82,23 @@ dinheiro são sempre de um projeto**. Convidados, patrocinadores, episódios, co
 - **Módulos** (`projects.modules`): o menu mostra só o que o projeto escolhido usa. O Projeto 100 começa só com
   tarefas; a produção liga junto com a numeração por projeto.
 - Desenho completo e as fases: `docs/superpowers/specs/2026-11-20-multiprojetos-design.md`.
+
+## Vídeos, episódios e pauta
+
+O episódio é o caso "podcast" de uma coisa mais geral, o **vídeo** (`episodes.format`: `podcast` ou `video`; o padrão vem
+do projeto). O que muda:
+
+- **Numeração por projeto**: `EP.012` no Pulso e `V.003` no Projeto 100 convivem (`UNIQUE (project_id, number)`), e o
+  prefixo é do projeto (`projects.number_prefix`). Nas telas, use `videoNo(numero, projectId)`.
+- **Pré-produção**: etapa nova, antes de Gravado. "Novo vídeo" (nos projetos que gravam vídeo) cria o vídeo nela, com
+  título e data prevista; as tarefas das rotinas, os custos automáticos e o link do estúdio só nascem quando alguém usa
+  **Marcar como gravado**. O episódio que vem do convidado continua nascendo em Gravado.
+- **Formato**: vídeo não mostra Spotify, capa do Spotify nem os vídeos de lançamento do convidado.
+- **Pauta e roteiro** (`pautas`): um documento de cada tipo por vídeo (ou por convidado, enquanto o episódio não
+  existe), com quem escreve, prazo, texto no editor rico ou link. Estados: A fazer → Em elaboração → Enviada para
+  aprovação → Ajustes pedidos → Aprovada. **A aprovação acontece no WhatsApp**: o sistema não manda nada sozinho;
+  "Copiar para o WhatsApp" copia o texto e marca a pauta como enviada, e a resposta é registrada por gestão ou
+  produtora. Quadro por estado em `/episodios?view=pautas`; as que travaram aparecem no "Seu dia".
 
 ## Perfis e permissões
 

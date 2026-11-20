@@ -7,6 +7,7 @@
 <%
   var P = pautaSvc; var canWrite = can('pautas.write');
   var owner = episodeId ? { field: 'episode_id', id: episodeId } : { field: 'guest_id', id: guestId };
+  var primeiroVazio = (docs.filter(function (x) { return x.novo; })[0] || {}).kind; // um verde por área: só o primeiro convite para escrever
   var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">' + '<input type="hidden" name="voltar" value="' + voltar + '">';
 %>
 <div class="pauta-list">
@@ -23,7 +24,7 @@
         </p>
       </div>
       <% if (canWrite) { %>
-      <button class="btn sm <%= d.novo ? 'primary' : 'ghost' %>" type="button" data-modal-open="pauta-edit-<%= d.kind %>"><%- icon(d.novo ? 'plus' : 'pencil', 14) %> <%= d.novo ? 'Escrever' : 'Editar' %></button>
+      <button class="btn sm <%= d.kind === primeiroVazio ? 'primary' : (d.novo ? '' : 'ghost') %>" type="button" data-modal-open="pauta-edit-<%= d.kind %>"><%- icon(d.novo ? 'plus' : 'pencil', 14) %> <%= d.novo ? 'Escrever' : 'Editar' %></button>
       <% } %>
     </div>
 

@@ -15,10 +15,10 @@
 <div class="page-head">
   <div>
     <% var airedPast = ep.aired_on && (ep.status === 'publicado' || fmt.toInputDate(ep.aired_on) <= new Intl.DateTimeFormat('en-CA', { timeZone: fmt.TZ }).format(new Date())); %>
-    <span class="kicker"><%= epNo %> · gravado <%= fmt.formatDay(ep.recorded_on) %><%= ep.aired_on ? (airedPast ? ' · foi ao ar ' : ' · vai ao ar ') + fmt.formatDay(ep.aired_on) : '' %></span>
+    <span class="kicker"><%= epNo %> · <% if (ep.status === 'pre_producao') { %><%= ep.recorded_on ? 'gravação prevista ' + fmt.formatDay(ep.recorded_on) : 'sem data de gravação' %><% } else { %>gravado <%= fmt.formatDay(ep.recorded_on) %><% } %><%= ep.aired_on ? (airedPast ? ' · foi ao ar ' : ' · vai ao ar ') + fmt.formatDay(ep.aired_on) : '' %></span>
     <h1><%= ep.title %> <span class="badge b-st-<%= ep.status %>"><%= C.EPISODE_STATUSES[ep.status] %></span> <%- include('../partials/project-tag', { id: ep.project_id }) %></h1>
     <% if (orderPos) { %><p class="order-note mono"><b class="order-n"><%= orderPos.rank %>º</b> na ordem de edição · <span class="air-<%= orderPos.air.tone || 'ok' %>"><%= orderPos.air.line %></span></p><% } %>
-    <p class="muted top-gap"><%= ep.guest_name ? ep.guest_name : (sponsors.length ? 'Só os hosts · ' + sponsors.map(function (s) { return s.company; }).join(', ') : 'Só os hosts') %><%= ep.editor_name ? ' · editor: ' + ep.editor_name : '' %></p>
+    <p class="muted top-gap"><%= ep.guest_name ? ep.guest_name : (!isPodcast ? (sponsors.length ? sponsors.map(function (s) { return s.company; }).join(', ') : '') : (sponsors.length ? 'Só os hosts · ' + sponsors.map(function (s) { return s.company; }).join(', ') : 'Só os hosts')) %><%= ep.editor_name ? ' · editor: ' + ep.editor_name : '' %></p>
   </div>
   <div class="row">
     <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
@@ -38,13 +38,16 @@
 <section class="card moves" id="etapa">
   <span class="kicker">Próximo passo</span>
   <div class="move-list">
-    <% moves.filter(function (m) { return m.allowed; }).forEach(function (m) { var askDate = m.to === 'disponivel_edicao' && ep.status === 'gravado' && !ep.aired_on && !m.missing.length; %>
+    <% var semPauta = ep.status === 'pre_producao' && !pautaDocs.some(function (d) { return d.state === 'aprovada'; }); %>
+    <% moves.filter(function (m) { return m.allowed; }).forEach(function (m) { var askDate = m.to === 'disponivel_edicao' && ep.status === 'gravado' && !ep.aired_on && !m.missing.length;
+         var tone = semPauta && m.to === 'gravado' ? '' : m.tone; /* sem pauta aprovada, o passo verde é escrever a pauta */ %>
     <div class="move">
-      <% if (askDate) { %><button class="btn <%= m.tone %>" type="button" data-modal-open="modal-liberar"><%= m.label %></button><% } else { %>
+      <% if (askDate) { %><button class="btn <%= tone %>" type="button" data-modal-open="modal-liberar"><%= m.label %></button><% } else { %>
       <form method="post" action="/episodios/<%= ep.id %>/etapa" class="inline">
         <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="to" value="<%= m.to %>">
-        <button class="btn <%= m.tone %>" type="submit"><%= m.label %></button>
+        <button class="btn <%= tone %>" type="submit"><%= m.label %></button>
       </form><% } %>
+      <% if (semPauta && m.to === 'gravado') { %><span class="small muted"><%- icon('info', 14) %> A pauta ainda não foi aprovada. Dá para seguir assim mesmo.</span><% } %>
       <% if (m.missing.length) { %><span class="small blocked"><%- icon('info', 14) %> Antes: <%= m.missing.join(' · ') %></span><% } %>
     </div>
     <% }) %>
@@ -74,12 +77,14 @@
   </div>
 
   <!-- ================= PAUTA ================= -->
+  <% if (showPauta) { %>
   <div class="pane" id="pane-pauta" data-pane-id="pauta" hidden>
     <% if (ep.status === 'pre_producao') { %>
     <p class="lead">Escreva a pauta, mande para o grupo do WhatsApp e registre a resposta. Com a gravação feita, use <strong>Marcar como gravado</strong> ali em cima.</p>
     <% } %>
     <%- include('../partials/pauta', { docs: pautaDocs, episodeId: ep.id, guestId: null, people: users, prefix: prefixOf(ep.project_id), sentTo: 'Grupo ' + ((projectScope && projectScope.projects.find(function (p) { return p.id === ep.project_id; })) || {}).name, voltar: '/episodios/' + ep.id + '#pauta' }) %>
   </div>
+  <% } %>
 
   <!-- ================= RESUMO ================= -->
   <div class="pane" id="pane-resumo" data-pane-id="resumo">

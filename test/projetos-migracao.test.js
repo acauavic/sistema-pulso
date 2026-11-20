@@ -39,7 +39,9 @@ describe('projetos: migração', () => {
       [2, 'projeto-100', 'Projeto 100', 'P100', 'Vídeo', 'Vídeos', 'V.', 'video', 2],
     ]);
     assert.ok(projects[0].modules.producao && projects[0].modules.plateia && projects[0].modules.redes);
-    assert.deepEqual(projects[1].modules, { tarefas: true }, 'o Projeto 100 só liga a produção na fase dos vídeos');
+    // a migração 093 cria o Projeto 100 só com tarefas; a 096 (fase do vídeo) liga produção e convidados
+    assert.deepEqual(projects[1].modules, { tarefas: true, producao: true, convidados: true });
+    assert.ok(!projects[1].modules.redes && !projects[1].modules.financeiro, 'redes e financeiro esperam as fases deles');
     for (const t of [...ROOTS, ...OPTIONAL]) {
       const { rows: [r] } = await h.db.query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE project_id = 1)::int AS pulso FROM ${t}`);
       assert.equal(r.n, before092[t], `${t}: nenhuma linha some`);

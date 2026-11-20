@@ -86,6 +86,7 @@ async function attachSession(req, res, next) {
     // número do vídeo com o prefixo do projeto dele (EP.012 no Pulso, V.003 no Projeto 100)
     res.locals.prefixOf = (projectId) => require('./services/projects').get(projectId)?.number_prefix || 'EP.';
     res.locals.videoNo = (number, projectId) => fmt.epNo(number, res.locals.prefixOf(projectId));
+    res.locals.projectModules = (projectId) => (require('./services/projects').get(projectId) || {}).modules || {};
     res.locals.icon = icon;
     res.locals.reactionEmojis = require('./services/reactions').EMOJIS;
     res.locals.podcastName = config.podcastName;

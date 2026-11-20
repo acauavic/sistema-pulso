@@ -268,7 +268,8 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   // portal do convidado: nasce com o episódio
   const pg = episode.rows[0] ? await portalSvc.byId(guest.id) : null;
   const pgContent = pg ? await portalSvc.content(pg) : null;
-  const portalTab = pg ? {
+  const portalMod = (require('../services/projects').get(guest.project_id) || {}).modules || {};
+  const portalTab = pg && portalMod.portal ? {
     g: pg, url: pg.portal_token ? portalSvc.url(pg.portal_token) : null, c: pgContent, pending: pg.portal_enabled ? await portalSvc.pending(pg, pgContent) : [],
     channel: portalSvc.channelOf(pg), NOTIFY: portalSvc.NOTIFY, dayLabel: portalSvc.dayLabel, ytUrl: portalSvc.youtubeUrl(pg.portal_yt_channel),
     hasPhone: Boolean(require('../services/contacts').normalizeNumber(pg.phone)), hasEmail: isEmail(pg.email || ''),

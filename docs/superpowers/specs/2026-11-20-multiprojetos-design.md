@@ -294,6 +294,8 @@ Cada fase é um lançamento que funciona sozinho.
    sigla nos cartões, Gestão > Projetos, Projeto 100 criado. Ninguém restrito ainda. O seletor vale em Convidados,
    Patrocinadores, Episódios, Conteúdo e Tarefas (plano em `docs/superpowers/plans/2026-11-20-projetos-fundacao.md`).
 3. **Vídeo e pauta.** Formato do vídeo, numeração por projeto, etapa Pré-produção, pautas e roteiros com o quadro.
+   Feita em duas partes: **3A (v1.98.0)** o vídeo e a pauta; **3B (v1.99.0)** Início, Resumo do dia, Seu dia, Calendário,
+   Busca e Notificações seguindo o seletor.
    Liga os módulos de produção do Projeto 100 (na fase 2 ele nasce só com tarefas, para não pegar número de episódio
    do Pulso) e faz Início, Resumo do dia, Seu dia, Calendário, Busca e Notificações seguirem o seletor.
    A partir daqui o Projeto 100 trabalha no sistema (vídeos, pauta, edição, cortes, pedidos, tarefas).
