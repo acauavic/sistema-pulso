@@ -265,18 +265,49 @@
   document.addEventListener('visibilitychange', refresh);
 
   // ---------------------------------------------------------------- tarefas: status rápido (bloqueada pede motivo) e quadro
-  const askReason = () => { const r = window.prompt('Por que a tarefa está bloqueada? (o motivo fica visível para a equipe)'); return r && r.trim() ? r.trim() : null; };
+  // O motivo do bloqueio é pedido numa janela do próprio sistema (partials/task-block.ejs). Sem a janela na página (telas antigas),
+  // cai na caixinha do navegador. Devolve o motivo, ou null quando a pessoa desiste.
+  const blockDlg = document.getElementById('modal-bloquear');
+  const askReason = () => new Promise((resolve) => {
+    if (!blockDlg) { const r = window.prompt('Por que a tarefa está bloqueada? (o motivo fica visível para a equipe)'); resolve(r && r.trim() ? r.trim() : null); return; }
+    const form = blockDlg.querySelector('form');
+    const input = form.querySelector('[name="reason"]');
+    let value = null;
+    const onSubmit = () => { value = input.value.trim() || null; }; // method="dialog": enviar já fecha a janela
+    const onClose = () => { form.removeEventListener('submit', onSubmit); blockDlg.removeEventListener('close', onClose); resolve(value); };
+    form.addEventListener('submit', onSubmit);
+    blockDlg.addEventListener('close', onClose);
+    input.value = '';
+    blockDlg.showModal();
+    input.focus();
+  });
+  const withReason = (form, reason) => {
+    let input = form.querySelector('input[name="block_reason"]');
+    if (!input) { input = document.createElement('input'); input.type = 'hidden'; input.name = 'block_reason'; form.appendChild(input); }
+    input.value = reason;
+  };
   document.querySelectorAll('select[data-status-select]').forEach((sel) => {
     const original = sel.value;
-    sel.addEventListener('change', () => {
+    sel.addEventListener('change', async () => {
       const form = sel.form;
       if (sel.value === 'bloqueada') {
-        const reason = askReason();
+        const reason = await askReason();
         if (!reason) { sel.value = original; return; }
-        let input = form.querySelector('input[name="block_reason"]');
-        if (!input) { input = document.createElement('input'); input.type = 'hidden'; input.name = 'block_reason'; form.appendChild(input); }
-        input.value = reason;
+        withReason(form, reason);
       }
+      form.submit();
+    });
+  });
+
+  // menu do cartão ("Mover para"): mover sem arrastar, no celular e pelo teclado. Bloquear pede o motivo antes de enviar.
+  document.querySelectorAll('form[data-block-form]').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      if (form.dataset.blockOk === '1') return;
+      e.preventDefault();
+      const reason = await askReason();
+      if (!reason) return;
+      withReason(form, reason);
+      form.dataset.blockOk = '1';
       form.submit();
     });
   });
@@ -303,7 +334,7 @@
         const card = dragged; const status = col.dataset.statusCol; const from = card.closest('[data-status-col]');
         if (from === col) return;
         let reason = null;
-        if (status === 'bloqueada') { reason = askReason(); if (!reason) return; }
+        if (status === 'bloqueada') { reason = await askReason(); if (!reason) return; }
         col.querySelector('[data-cards]').prepend(card);
         try {
           await post(`/tarefas/${card.dataset.task}/status`, { status, block_reason: reason });

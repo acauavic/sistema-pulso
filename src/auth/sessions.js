@@ -47,7 +47,7 @@ async function loadSession(req, res = null) {
   const maxAge = config.sessionDays * 86400;
   const { rows } = await db.query(
     `SELECT s.token_hash, s.flash, s.expires_at < now() + ($2 || ' seconds')::interval AS renew,
-            u.id, u.name, u.email, u.role, u.active
+            u.id, u.name, u.email, u.role, u.active, u.prefs
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now() AND s.created_at > now() - interval '90 days'`, // prazo máximo: entra de novo a cada 90 dias
     [tokenHash, String(Math.floor(maxAge / 2))],
@@ -62,7 +62,7 @@ async function loadSession(req, res = null) {
     tokenHash: row.token_hash,
     flash: row.flash,
     csrf: crypto.createHmac('sha256', config.sessionSecret).update(row.token_hash).digest('hex'),
-    user: { id: row.id, name: row.name, email: row.email, role: row.role },
+    user: { id: row.id, name: row.name, email: row.email, role: row.role, prefs: row.prefs || {} },
   };
 }
 

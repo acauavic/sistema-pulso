@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.97.0', date: '2026-11-20', title: 'O quadro das tarefas ficou do jeito que se usa',
+    items: [
+      { kind: 'novo', text: 'Tarefas abre na visão que você escolheu da última vez (lista, quadro ou calendário), no computador e no celular.' },
+      { kind: 'novo', text: 'No celular dá para mover a tarefa sem arrastar: cada cartão tem um menu "Mover para" com as outras etapas. No computador ele também funciona pelo teclado.' },
+      { kind: 'ajuste', text: 'A coluna "Feito" mostra o que terminou nos últimos 14 dias; o resto fica atrás do link "+ N feitas antes". Em cima vem o que terminou por último.' },
+      { kind: 'ajuste', text: 'Bloquear uma tarefa pede o motivo numa janela do sistema, no lugar da caixinha cinza do navegador.' },
+      { kind: 'ajuste', text: 'Coluna vazia diz "Nenhuma nesta etapa." em vez de ficar em branco.' },
+    ],
+  },
+  {
     version: '1.96.0', date: '2026-11-20', title: 'O sistema agora tem projetos',
     items: [
       { kind: 'novo', text: 'O sistema passa a cuidar de mais de um projeto. Tudo o que já existia é do Pulso, e o Projeto 100 foi criado, ainda vazio. Para quem trabalha num projeto só, nada muda: as telas, os endereços e os números dos episódios são os mesmos.' },

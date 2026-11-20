@@ -776,6 +776,19 @@ span.dot:not([data-dot]) { cursor: default; }
 .tc-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; } .tc-title { color: var(--text); font-weight: 600; font-family: var(--f-display, inherit); }
 .tc-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 10px; color: var(--muted); }
 .column.drop { outline: 2px dashed var(--action); outline-offset: -4px; } .col-hint { padding: 0 10px 10px; margin: 0; }
+/* menu "Mover para" no cartão: abre dentro do próprio cartão (a coluna rola, e um menu flutuante ficaria cortado) */
+.task-card { position: relative; }
+.task-card .tc-top { padding-right: 26px; }
+.task-card .tc-move { position: static; display: block; } /* .row-menu é relativo e vem depois na folha: aqui quem ancora o botão é o cartão */
+.tc-move:not([open]) { margin-bottom: -6px; } /* fechado não ocupa linha: só o botão, preso no canto */
+.tc-move > summary { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--r-full); color: var(--muted); cursor: pointer; }
+.tc-move > summary:hover, .tc-move[open] > summary { background: var(--surface); color: var(--text); }
+.tc-move .row-menu-list { position: static; width: 100%; min-width: 0; margin-top: 6px; box-shadow: none; }
+.tc-move .row-menu-list .kicker { padding: 2px 10px 4px; }
+.tc-move .row-menu-list form { margin: 0; } .tc-move .row-menu-list button { color: var(--text-2); } .tc-move .row-menu-list button:hover { background: var(--surface); color: var(--text); }
+.task-board .column:has(.task-card) > .col-empty { display: none; }
+.task-board .col-more { display: block; padding: 8px 2px 0; }
+@media (pointer: coarse) { .tc-move > summary { top: 4px; right: 4px; width: 36px; height: 36px; } .task-card .tc-top { padding-right: 34px; } .task-card { cursor: default; } }
 .cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; } .cal-title { margin: 0 6px; min-width: 200px; }
 .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; background: var(--line); gap: 1px; }
 .cal-dow { background: var(--surface); padding: 8px; font: 500 10px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }

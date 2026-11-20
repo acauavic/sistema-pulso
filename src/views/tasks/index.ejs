@@ -1,9 +1,10 @@
 <%- include('../partials/head') %>
 <%
   var here = '/tarefas?escopo=' + scope + '&visao=' + view + (q ? '&q=' + encodeURIComponent(q) : '') + (cal ? '&mes=' + cal.ym : '');
-  var url = function (o) { var s = Object.assign({ escopo: scope, visao: view, q: q, mes: cal ? cal.ym : '' }, o); var parts = []; Object.keys(s).forEach(function (k) { if (s[k]) parts.push(k + '=' + encodeURIComponent(s[k])); }); return '/tarefas?' + parts.join('&'); };
+  var url = function (o) { var s = Object.assign({ escopo: scope, visao: view, q: q, mes: cal ? cal.ym : '', feitas: allDone ? 'todas' : '' }, o); var parts = []; Object.keys(s).forEach(function (k) { if (s[k]) parts.push(k + '=' + encodeURIComponent(s[k])); }); return '/tarefas?' + parts.join('&'); };
   var bucket = function (t) { var d = isoOf(t.due_on); if (t.status === 'feito') return 'feitas'; if (!d) return 'semprazo'; if (lateOf(t)) return 'atrasadas'; if (d === today) return 'hoje'; return 'proximas'; };
   var BUCKETS = [['atrasadas', 'Atrasadas'], ['hoje', 'Para hoje'], ['proximas', 'Próximas'], ['semprazo', 'Sem prazo'], ['feitas', 'Feitas']];
+  var allDone = Boolean(board && board.allDone);
   var empty = { minhas: 'Nenhuma tarefa sua em aberto.', hoje: 'Nada vence hoje para você.', todas: 'Nenhuma tarefa ainda.' };
 %>
 <div class="page-head">
@@ -63,16 +64,19 @@
   <% }) %>
 <% } else if (view === 'quadro') { %>
   <div class="board task-board" data-task-board>
-    <% Object.keys(C.TASK_STATUSES).forEach(function (k) { var list = items.filter(function (t) { return t.status === k; }); %>
-    <section class="column" data-status-col="<%= k %>">
-      <header><span class="badge tb-<%= k %>"><%= C.TASK_STATUSES[k] %></span><span class="count" data-count><%= list.length %></span></header>
+    <% board.columns.forEach(function (col) { %>
+    <section class="column" data-status-col="<%= col.key %>">
+      <header><span class="badge tb-<%= col.key %>"><%= col.label %></span><span class="count" data-count><%= col.items.length %></span></header>
       <div class="cards" data-cards>
-        <% list.forEach(function (t) { %><%- include('_card', { t: t }) %><% }) %>
+        <% col.items.forEach(function (t) { %><%- include('_card', { t: t, back: here }) %><% }) %>
       </div>
-      <% if (k === 'bloqueada') { %><p class="small muted col-hint">Arraste para cá e diga o motivo.</p><% } %>
+      <p class="col-empty small muted">Nenhuma nesta etapa.<%= col.key === 'bloqueada' ? ' Mova um cartão para cá e diga o motivo.' : '' %></p>
+      <% if (col.key === 'feito' && board.hiddenDone) { %><a class="link small col-more" href="<%= url({ feitas: 'todas' }) %>">+ <span class="mono"><%= board.hiddenDone %></span> <%= board.hiddenDone === 1 ? 'feita antes' : 'feitas antes' %></a><% } %>
+      <% if (col.key === 'feito' && board.allDone) { %><a class="link small col-more" href="<%= url({ feitas: '' }) %>">Mostrar só os últimos <span class="mono"><%= board.days %></span> dias</a><% } %>
     </section>
     <% }) %>
   </div>
+  <p class="small muted top-gap">Arraste um cartão entre as colunas, ou use o menu dele. "Feito" mostra o que terminou nos últimos <span class="mono"><%= board.days %></span> dias.</p>
 <% } else { %>
   <div class="cal-head">
     <a class="btn sm" href="<%= url({ mes: cal.prev }) %>" aria-label="Mês anterior"><%- icon('chevron-left') %></a>
@@ -93,7 +97,7 @@
   <p class="small muted top-gap">O calendário mostra as tarefas pelo dia em que vencem. Tarefas sem prazo aparecem na lista.</p>
 <% } %>
 
-<% if (can('tasks.write')) { %><%- include('_new', { back: here }) %><% } %>
+<% if (can('tasks.write')) { %><%- include('_new', { back: here }) %><%- include('../partials/task-block') %><% } %>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
 <script src="/static/tarefa-voz.js?v=<%= assetV %>" defer></script>
 <%- include('../partials/foot') %>

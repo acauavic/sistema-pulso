@@ -21,6 +21,7 @@ const MAX_AUDIO = 8 * 1024 * 1024; // ~2 min de voz
 const voiceReady = () => config.groqConfigured && config.geminiConfigured;
 const SCOPES = { minhas: 'Minhas tarefas', hoje: 'Hoje', todas: 'Todas' };
 const VIEWS = { lista: 'Lista', quadro: 'Quadro', calendario: 'Calendário' };
+const DONE_DAYS = 14; // no quadro, "Feito" mostra as duas últimas semanas; o que terminou antes fica atrás de um link
 const wantsJson = (req) => /json/.test(req.get('accept') || '');
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Tarefa não encontrada.' });
 // Anexos que a pessoa enviou para esta tarefa: imagens que estão no texto + documentos listados no formulário.
@@ -44,6 +45,21 @@ function monthGrid(ym) {
 
 const isoOf = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : d ? String(d).slice(0, 10) : null);
 
+// Colunas do quadro. "Feito" cresce para sempre: mostra o que terminou nas duas últimas semanas e deixa o resto atrás de um link.
+// Dentro de cada coluna a ordem é a da lista (prazo; atrasadas primeiro); em "Feito", o que terminou por último vem em cima.
+function boardOf(items, allDone = false) {
+  const cut = new Date(Date.now() - DONE_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const done = items.filter((t) => t.status === 'feito');
+  const recent = done.filter((t) => (isoOf(t.completed_at) || '') >= cut);
+  const columns = Object.keys(C.TASK_STATUSES).map((key) => ({
+    key,
+    label: C.TASK_STATUSES[key],
+    items: key !== 'feito' ? items.filter((t) => t.status === key)
+      : [...(allDone ? done : recent)].sort((a, b) => new Date(b.completed_at || 0) - new Date(a.completed_at || 0)),
+  }));
+  return { columns, hiddenDone: allDone ? 0 : done.length - recent.length, allDone, days: DONE_DAYS };
+}
+
 const linkOptions = () => tasks.linkOptions();
 
 // Liga a tarefa a um item (episódio, convidado, patrocinador), se existir.
@@ -56,8 +72,12 @@ async function readLinks(body) {
 }
 
 router.get('/tarefas', requirePerm('tasks.read'), wrap(async (req, res) => {
+  const prefs = require('../services/prefs');
   const scope = SCOPES[req.query.escopo] ? req.query.escopo : 'minhas';
-  const view = VIEWS[req.query.visao] ? req.query.visao : 'lista';
+  // a visão escolhida da última vez volta igual (guardada na pessoa, vale no computador e no celular)
+  const saved = prefs.get(req.user, 'tarefas_visao');
+  const view = VIEWS[req.query.visao] ? req.query.visao : (VIEWS[saved] ? saved : 'lista');
+  if (req.query.visao) await prefs.set(req.user, 'tarefas_visao', view);
   const q = String(req.query.q || '').trim().slice(0, 80);
   const cal = view === 'calendario' ? monthGrid(req.query.mes) : null;
   const pids = require('../services/scope').idsOf(req); // os projetos da pessoa, ou o escolhido no menu (tarefa geral aparece sempre)
@@ -71,7 +91,7 @@ router.get('/tarefas', requirePerm('tasks.read'), wrap(async (req, res) => {
   ]);
   const prefill = { episode_id: req.query.episodio || '', guest_id: req.query.convidado || '', sponsor_id: req.query.patrocinador || '' };
   res.render('tasks/index', {
-    title: 'Tarefas', items, scope, view, q, cal, scopes: SCOPES, views: VIEWS, counts: counts.rows[0], ...opts, prefill, openNew: req.query.nova === '1',
+    title: 'Tarefas', items, scope, view, q, cal, scopes: SCOPES, views: VIEWS, counts: counts.rows[0], ...opts, prefill, openNew: req.query.nova === '1', board: view === 'quadro' ? boardOf(items, req.query.feitas === 'todas') : null,
     voiceReady: voiceReady(), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), isoOf, C, canEdit: (t) => tasks.canEdit(req.user, t),
   });
 }));
