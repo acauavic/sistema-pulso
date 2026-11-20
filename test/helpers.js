@@ -170,6 +170,7 @@ async function resetDb() {
   await migrate();
   // Em agendamento/Agendado exigem foto: nos testes todo convidado nasce com uma (os testes da regra apagam a foto).
   await db.query("ALTER TABLE guests ALTER COLUMN photo_key SET DEFAULT 'teste/foto-convidado.jpg'");
+  await require('../src/services/projects').refresh(true); // a lista em memória é a do banco recém-criado
   mailer.outbox.length = 0;
   b2Store.clear();
   b2Multipart.clear();
@@ -178,10 +179,12 @@ async function resetDb() {
   groqFail = false;
 }
 
-async function createUser({ name, email, role, password = 'SenhaForte-123', active = true }) {
+// `projects`: de quais projetos a pessoa participa (padrão: só o Pulso, como quem é criado pela tela de Usuários).
+async function createUser({ name, email, role, password = 'SenhaForte-123', active = true, projects = [1] }) {
   const { rows } = await db.query(
     'INSERT INTO users (name, email, role, password_hash, active) VALUES ($1,$2,$3,$4,$5) RETURNING *',
     [name, email, role, password ? await hashPassword(password) : null, active]);
+  for (const p of projects) await db.query('INSERT INTO project_members (project_id, user_id, finance) VALUES ($1, $2, true)', [p, rows[0].id]);
   return rows[0];
 }
 

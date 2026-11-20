@@ -78,6 +78,8 @@ router.post('/usuarios', requirePerm('users.write'), wrap(async (req, res) => {
     if (err.code === PG_UNIQUE) return res.status(409).render('users/form', { title: 'Novo usuário', target: null, values, roles, error: 'Já existe um usuário com este e-mail.' });
     throw err;
   }
+  const projects = require('../services/projects');
+  await projects.addMember(user.id, projects.defaultId(), { finance: true }); // entra no projeto padrão; Gestão > Projetos marca os outros
   await audit(req, 'usuario.criado', 'user', user.id, { email: user.email, role: user.role });
   try {
     await sendAccessLink(user, req.user.name);

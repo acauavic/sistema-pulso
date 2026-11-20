@@ -57,6 +57,7 @@ function createApp() {
 
   app.use(mw.requireAuth); // tudo abaixo exige login
   app.use((req, res, next) => { require('./services/catalog').refresh().then(() => next(), next); }); // categorias e tipos de vídeo (Gestão > Categorias), a cada 30 s
+  app.use((req, res, next) => { require('./services/projects').refresh().then(() => next(), next); }); // projetos (Gestão > Projetos), a cada 30 s
   app.use(mw.navData);
   app.use(require('./routes/misc'));
   app.use(require('./routes/collab')); // comentários, responsável, notificações e busca global
