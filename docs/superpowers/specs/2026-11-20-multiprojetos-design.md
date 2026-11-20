@@ -1,4 +1,4 @@
-# Multiprojetos (Health Scale Manager) — desenho
+# Multiprojetos (Health Scale Studio) — desenho
 
 Data: 2026-11-20 · Direção aprovada pelo dono na conversa. Este documento é o guarda-chuva: cada fase abaixo ganha o seu
 plano de implementação, a sua branch e o seu lançamento, e só vai para produção com autorização.
@@ -20,7 +20,7 @@ com o Dr. José Bento, com a mesma equipe de edição e produção por enquanto.
 ## Decidido pelo dono
 
 - **Um sistema só.** Ninguém acessa dois sistemas para saber o que fazer.
-- **O painel passa para a identidade da Health Scale** (nome Health Scale Manager, logotipo, verde, Archivo). O que é do
+- **O painel passa para a identidade da Health Scale** (nome Health Scale Studio, logotipo, verde, Archivo). O que é do
   Pulso continua com a marca do Pulso, dentro do projeto Pulso. A marca do Projeto 100 ainda está em definição.
 - **Projeto novo: Projeto 100** (canal de YouTube com o Dr. José Bento).
 - **Mesmo convidado e mesmo patrocinador nos dois projetos**, cada um com a sua história em cada projeto.
@@ -170,15 +170,17 @@ Até lá, todos continuam vendo tudo, como hoje.
 ### Identidade do painel: Health Scale
 
 O painel deixa a identidade do Pulso e passa a usar a da casa. Fonte: `docs/referencias/Health_Scale_Studio_Logo.dc.html`
-(estudo do designer; o nome "Studio" nele é provisório) e `docs/referencias/health-scale/health-scale-logo.png`.
+(estudo do designer) e `docs/referencias/health-scale/health-scale-logo.png`.
 
-- **Nome**: `config.appName = 'Health Scale Manager'` substitui "Pulso Gestão" (título das páginas, login, manifesto do
+- **Nome**: `config.appName = 'Health Scale Studio'` substitui "Pulso Gestão" (título das páginas, login, manifesto do
   app, e-mails internos de acesso e senha, assistente, agenda do Google, Novidades). `config.podcastName` deixa de ser
   usado: o nome vem do projeto do item.
+- **"Studio" não é "estúdio"**: no sistema, "estúdio" continua sendo o lugar da gravação (link do estúdio, banco de
+  horas do estúdio). O nome do painel aparece sempre como "Health Scale Studio" ou "Studio" com maiúscula, nunca traduzido.
 - **Assinatura** (login, relatórios, e-mails internos): logotipo Health Scale ("Health" em Instrument Serif itálico,
-  "Scale" em Archivo 800) + filete vertical + **MANAGER** em JetBrains Mono 500, caixa alta, tracking .2em, na cor de
+  "Scale" em Archivo 800) + filete vertical + **STUDIO** em JetBrains Mono 500, caixa alta, tracking .2em, na cor de
   ação. No claro: logotipo em preto e o nome em verde escuro.
-- **Menu**: ícone de 40 px + duas linhas em mono ("HEALTH SCALE" 11 px muted; "MANAGER" 17 px). Recolhido: só o ícone.
+- **Menu**: ícone de 40 px + duas linhas em mono ("HEALTH SCALE" 11 px muted; "STUDIO" 17 px). Recolhido: só o ícone.
   Item ativo: fundo `line` e um quadrado de 6 px na cor de ação.
 - **Ícone** (favicon, app instalado, menu, login): o estudo traz duas direções, **1a Monograma** (serifa itálica +
   grotesca, as duas primeiras letras do nome) e **1b Sinal** (quatro barras que crescem, do verde escuro ao claro).
@@ -292,9 +294,7 @@ As fases 7 e 8 podem subir se o Projeto 100 precisar publicar pelo sistema antes
 
 ## Em aberto (do dono)
 
-- **Nome**: "Manager" (dito na conversa) ou "Studio" (como está no estudo do logo, marcado como provisório)? A
-  especificação usa Manager.
-- **Ícone**: 1a Monograma ou 1b Sinal. O monograma muda com o nome ("Ma" ou "St"); o Sinal não depende dele.
+- **Ícone**: 1a Monograma ("St") ou 1b Sinal.
 - **Formas**: manter botão em pílula e cantos arredondados de hoje, ou adotar os cantos retos do estudo.
 - **Endereço**: continua `sistema.podcastpulso.com` ou muda? (Trocar exige domínio novo e redirecionamento; fica fora
   das fases até decidir.)
