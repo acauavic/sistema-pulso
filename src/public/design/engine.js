@@ -26,6 +26,8 @@
     reel_cover: { label: 'Capa de Reels/TikTok (9:16)', w: 1080, h: 1920, safe: { l: 72, r: 72, t: 300, b: 300 }, avoid: [], maxLines: 4, kind: 'cover', crop34: { y: 240, h: 1440 } },
     post_4x5: { label: 'Post 4:5', w: 1080, h: 1350, safe: { l: 72, r: 72, t: 84, b: 96 }, avoid: [], maxLines: 6, kind: 'quote' },
     post_split: { label: 'Post de tela dividida 4:5', w: 1080, h: 1350, safe: { l: 72, r: 72, t: 40, b: 40 }, avoid: [], maxLines: 4, kind: 'quote' },
+    // Capa do Spotify: desenhada em base 1000 e exportada em 3000×3000 (spec.scale = 3). Margem de 56 px (5,6%).
+    spotify_cover: { label: 'Capa do Spotify (1:1)', w: 1000, h: 1000, safe: { l: 56, r: 56, t: 56, b: 56 }, avoid: [], maxLines: 3, kind: 'square' },
   };
 
   const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
@@ -35,6 +37,14 @@
   function setFont(ctx, f, size, tracking = 0) {
     ctx.font = fontString(f, size);
     if ('letterSpacing' in ctx) ctx.letterSpacing = `${(tracking * size).toFixed(2)}px`;
+  }
+
+  // Linha de base como o CSS a põe: a caixa da linha tem `lineHeight × size` e a fonte (subida + descida) fica centrada nela.
+  // Os modelos do guia foram medidos em CSS; com isto a posição vertical do texto bate com o guia.
+  function cssBaseline(ctx, size, lineHeight) {
+    const m = ctx.measureText('Hg');
+    const asc = m.fontBoundingBoxAscent ?? size * 0.98; const desc = m.fontBoundingBoxDescent ?? size * 0.29;
+    return (size * lineHeight - (asc + desc)) / 2 + asc;
   }
 
   // Quebra por palavras (nunca no meio da palavra). Respeita \n do usuário. { lines, overflow } — overflow = uma palavra sozinha não cabe.
@@ -344,6 +354,13 @@
       const w = ctx.measureText('pulso.').width;
       return { x: layer.x, y: layer.y, w, h: layer.size * 0.9 };
     }
+    if (layer.type === 'tarja') { // palavra dentro de uma tarja: a caixa segue a largura do texto
+      const text = layer.upper ? String(layer.text).toUpperCase() : String(layer.text);
+      setFont(ctx, layer.font || FONTS.display, layer.size, layer.tracking ?? -0.065);
+      const p = layer.pad || { t: 12, r: 30, b: 26, l: 20 };
+      const tw = ctx.measureText(text).width;
+      return { x: layer.x, y: layer.y, w: tw + p.l + p.r, h: layer.size * (layer.lineHeight || 0.85) + p.t + p.b, lines: [text], widths: [tw] };
+    }
     if (layer.type === 'rect') return { x: layer.x, y: layer.y, w: layer.w, h: layer.h };
     if (layer.type === 'arrow') return { x: layer.x, y: layer.y, w: layer.size, h: layer.size };
     return { x: layer.x || 0, y: layer.y || 0, w: layer.w || 0, h: layer.h || 0 };
@@ -354,16 +371,31 @@
     if (layer.chip) { // fundo escuro translúcido: garante leitura de rótulos pequenos sobre qualquer imagem
       const padX = layer.chip.padX ?? 14; const padY = layer.chip.padY ?? 8;
       ctx.fillStyle = layer.chip.color || 'rgba(10,10,10,0.62)';
-      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(box.x - padX, box.y - padY, box.w + 2 * padX, box.h + 2 * padY, layer.chip.radius ?? 8); ctx.fill(); } else ctx.fillRect(box.x - padX, box.y - padY, box.w + 2 * padX, box.h + 2 * padY);
+      const paint = () => { if (layer.chip.color !== 'none') ctx.fill(); if (layer.chip.stroke) { ctx.lineWidth = layer.chip.strokeWidth || 2; ctx.strokeStyle = layer.chip.stroke; ctx.stroke(); } };
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(box.x - padX, box.y - padY, box.w + 2 * padX, box.h + 2 * padY, layer.chip.radius ?? 8); else ctx.rect(box.x - padX, box.y - padY, box.w + 2 * padX, box.h + 2 * padY);
+      paint();
     }
     setFont(ctx, layer.font, layer.size, layer.tracking || 0);
-    ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+    ctx.textBaseline = layer.css ? 'alphabetic' : 'top'; ctx.textAlign = 'left';
     const lh = layer.size * (layer.lineHeight || 1.05);
+    const base = layer.css ? cssBaseline(ctx, layer.size, layer.lineHeight || 1.05) : 0;
     const hl = layer.highlight; // { color, lines: 'last' | n } -> destaca a última linha (um único elemento lime por peça)
+    const marks = layer.marks && layer.marks.words && layer.marks.words.length ? new Set(layer.marks.words) : null; // palavras em outra cor (índice na frase)
+    let wordAt = 0;
     box.lines.forEach((line, i) => {
       const lineW = box.widths[i];
       const x = layer.align === 'center' ? layer.x + (layer.w - lineW) / 2 : layer.align === 'right' ? layer.x + layer.w - lineW : layer.x;
-      const y = layer.y + i * lh + (lh - layer.size) / 2 - layer.size * 0.08;
+      const y = layer.css ? layer.y + i * lh + base : layer.y + i * lh + (lh - layer.size) / 2 - layer.size * 0.08;
+      if (marks) { // palavra por palavra: as marcadas saem na cor do destaque (um destaque por peça)
+        let cx = x; const space = ctx.measureText(' ').width;
+        for (const word of line.split(' ')) {
+          if (!word) continue;
+          ctx.fillStyle = marks.has(wordAt) ? (layer.marks.color || BRAND.lime) : layer.color;
+          ctx.fillText(word, cx, y); cx += ctx.measureText(word).width + space; wordAt += 1;
+        }
+        return;
+      }
       const isHl = hl && (hl.lines === 'last' ? i === box.lines.length - 1 : hl.lines === i);
       const fill = isHl ? hl.color : layer.color;
       const strokeW = layer.stroke && layer.stroke.width > 0 ? layer.stroke.width * layer.size : 0;
@@ -470,10 +502,85 @@
 
   function drawWordmark(ctx, layer) {
     setFont(ctx, FONTS.display, layer.size, -0.06);
-    ctx.textBaseline = 'top'; ctx.textAlign = 'left';
-    ctx.fillStyle = layer.color || BRAND.white; ctx.fillText('pulso', layer.x, layer.y);
+    ctx.textBaseline = layer.css ? 'alphabetic' : 'top'; ctx.textAlign = 'left';
+    const y = layer.css ? layer.y + cssBaseline(ctx, layer.size, 1) : layer.y;
+    ctx.fillStyle = layer.color || BRAND.white; ctx.fillText('pulso', layer.x, y);
     const w = ctx.measureText('pulso').width;
-    ctx.fillStyle = layer.dotColor || BRAND.lime; ctx.fillText('.', layer.x + w, layer.y);
+    ctx.fillStyle = layer.dotColor || BRAND.lime; ctx.fillText('.', layer.x + w, y);
+  }
+
+  // ---------------------------------------------------------------- camadas dos modelos do guia
+  // Foto recortada num painel (retângulo ou círculo). `img` é onde a foto inteira cai, relativo ao painel (o recorte sai do rosto).
+  // `fade`: a foto não alcança o topo do painel; os primeiros px dela somem no fundo, como a máscara do guia.
+  function drawPhoto(ctx, layer, images) {
+    const im = images[layer.ref];
+    const { x, y, w, h } = layer; const circle = layer.shape === 'circle';
+    ctx.save();
+    ctx.beginPath();
+    if (circle) ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2); else ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.fillStyle = layer.bgColor || BRAND.black; ctx.fillRect(x, y, w, h);
+    if (im && layer.img) {
+      const f = layer.filter || {};
+      const parts = [];
+      if (f.saturate != null && f.saturate !== 1) parts.push(`saturate(${f.saturate})`);
+      if (f.contrast != null && f.contrast !== 1) parts.push(`contrast(${f.contrast})`);
+      if (f.brightness != null && f.brightness !== 1) parts.push(`brightness(${f.brightness})`);
+      if (parts.length) ctx.filter = parts.join(' ');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(im, x + layer.img.x, y + layer.img.y, layer.img.w, layer.img.h);
+      ctx.filter = 'none';
+      if (layer.fade > 0 && layer.img.y > 0) {
+        const top = y + layer.img.y;
+        const g = ctx.createLinearGradient(0, top, 0, top + layer.fade);
+        const [r, gg, b] = hexToRgb(layer.bgColor || BRAND.black);
+        g.addColorStop(0, `rgba(${r},${gg},${b},1)`); g.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+        ctx.fillStyle = g; ctx.fillRect(x, y, w, layer.img.y + layer.fade + 1);
+      }
+    }
+    ctx.restore();
+    if (layer.border) {
+      ctx.save(); ctx.lineWidth = layer.border.width; ctx.strokeStyle = layer.border.color; ctx.beginPath();
+      const half = layer.border.width / 2;
+      if (circle) ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2 - half, 0, Math.PI * 2); else ctx.rect(x + half, y + half, w - layer.border.width, h - layer.border.width);
+      ctx.stroke(); ctx.restore();
+    }
+  }
+
+  // Degradê linear num retângulo. dir: para onde ele anda ('right', 'left', 'down', 'up'); stops: [[posição 0–1, cor], …].
+  function drawGradient(ctx, layer) {
+    const { x, y, w, h } = layer;
+    const g = layer.dir === 'right' ? ctx.createLinearGradient(x, 0, x + w, 0) : layer.dir === 'left' ? ctx.createLinearGradient(x + w, 0, x, 0)
+      : layer.dir === 'up' ? ctx.createLinearGradient(0, y + h, 0, y) : ctx.createLinearGradient(0, y, 0, y + h);
+    for (const [at, color] of layer.stops) g.addColorStop(clamp(at, 0, 1), color);
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  }
+
+  // Palavra dentro de uma tarja (o destaque da peça): fundo do tamanho do texto, com as folgas do guia.
+  function drawTarja(ctx, layer) {
+    const box = layerBox(ctx, layer);
+    const p = layer.pad || { t: 12, r: 30, b: 26, l: 20 };
+    ctx.fillStyle = layer.bg || BRAND.lime; ctx.fillRect(box.x, box.y, box.w, box.h);
+    setFont(ctx, layer.font || FONTS.display, layer.size, layer.tracking ?? -0.065);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    ctx.fillStyle = layer.color || BRAND.black;
+    ctx.fillText(box.lines[0], box.x + p.l, box.y + p.t + cssBaseline(ctx, layer.size, layer.lineHeight || 0.85));
+    return box;
+  }
+
+  // Campo de pontos (padrão P1 da marca) e linha de pulso (batimento no meio de um filete).
+  function drawDots(ctx, layer) {
+    const step = layer.step || 40; const r = layer.r || 3;
+    ctx.save(); ctx.beginPath(); ctx.rect(layer.x, layer.y, layer.w, layer.h); ctx.clip();
+    ctx.fillStyle = layer.color || '#3a2663';
+    for (let py = layer.y + step / 2; py < layer.y + layer.h; py += step) for (let px = layer.x + step / 2; px < layer.x + layer.w; px += step) { ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+  function drawPulse(ctx, layer) {
+    const { x, y, w } = layer; const k = layer.beat || 10; const c = x + w * (layer.at ?? 0.5);
+    ctx.save(); ctx.strokeStyle = layer.color || BRAND.lime; ctx.lineWidth = layer.width || 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(c - k * 1.4, y); ctx.lineTo(c - k * 0.7, y - k * 0.5); ctx.lineTo(c - k * 0.2, y + k); ctx.lineTo(c + k * 0.4, y - k * 0.8);
+    ctx.lineTo(c + k * 0.9, y + k * 0.3); ctx.lineTo(c + k * 1.4, y); ctx.lineTo(x + w, y); ctx.stroke(); ctx.restore();
   }
 
   // Desenha o spec inteiro. images: { [ref]: Image/Canvas }. makeCanvas(w,h) cria canvas auxiliar (desfoque).
@@ -485,6 +592,10 @@
     for (const layer of spec.layers || []) {
       if (layer.hidden) continue;
       if (layer.type === 'text') boxes[layer.id] = drawText(ctx, layer);
+      else if (layer.type === 'photo') { drawPhoto(ctx, layer, images); boxes[layer.id] = layerBox(ctx, layer); } else if (layer.type === 'gradient') drawGradient(ctx, layer);
+      else if (layer.type === 'tarja') boxes[layer.id] = drawTarja(ctx, layer);
+      else if (layer.type === 'dots') drawDots(ctx, layer);
+      else if (layer.type === 'pulse') drawPulse(ctx, layer);
       else if (layer.type === 'wordmark') { drawWordmark(ctx, layer); boxes[layer.id] = layerBox(ctx, layer); } else if (layer.type === 'rect') {
         ctx.fillStyle = layer.color || BRAND.lime;
         if (layer.radius && ctx.roundRect) { ctx.beginPath(); ctx.roundRect(layer.x, layer.y, layer.w, layer.h, layer.radius); ctx.fill(); } else ctx.fillRect(layer.x, layer.y, layer.w, layer.h);
@@ -515,18 +626,27 @@
     const blocks = uncoveredBlocks(spec, allBlocks);
     const F = FORMATS[spec.format] || { w: spec.width, h: spec.height, safe: { l: 0, r: 0, t: 0, b: 0 }, avoid: [], kind: 'quote', maxLines: 6 };
     const issues = []; const warnings = [];
-    const safe = { x: F.safe.l, y: F.safe.t, w: F.w - F.safe.l - F.safe.r, h: F.h - F.safe.t - F.safe.b };
+    const S = spec.safe || F.safe; const avoid = spec.avoid || F.avoid || []; // os modelos do guia trazem a própria zona segura
+    const safe = { x: S.l, y: S.t, w: F.w - S.l - S.r, h: F.h - S.t - S.b };
     for (const layer of spec.layers || []) {
-      if (layer.hidden || (layer.type !== 'text' && layer.type !== 'wordmark')) continue;
+      if (layer.hidden || (layer.type !== 'text' && layer.type !== 'wordmark' && layer.type !== 'tarja')) continue;
       const role = layer.role || (layer.type === 'wordmark' ? 'meta' : 'main');
       const b = layerBox(ctx, layer);
+      if (layer.type === 'tarja') { // o destaque: não pode cobrir rosto, sair do quadro nem cair na área que a plataforma cobre
+        const name = `A tarja “${String(layer.text).slice(0, 24)}”`;
+        if (b.x < 0 || b.y < 0 || b.x + b.w > spec.width || b.y + b.h > spec.height) issues.push(`${name} sai do quadro.`);
+        for (const f of faces) if (overlap(b, grow(f, 4)) > 0) { issues.push(`${name} cobre um rosto.`); break; }
+        for (const a of avoid) if (overlap(b, a) > 0) { warnings.push(`${name} invade a área de ${a.why}.`); break; }
+        continue;
+      }
       const label = layer.type === 'wordmark' ? 'O logotipo' : `Texto “${String(layer.text).replace(/\n/g, ' ').slice(0, 28)}”`;
       if (layer.type === 'wordmark') {
         for (const f of faces) if (overlap(b, grow(f, 4)) > 0) { issues.push(`${label} cobre um rosto.`); break; }
         for (const blk of blocks) if (overlap(b, blk) > 0) { issues.push(`${label} cobre a legenda do vídeo.`); break; }
         continue;
       }
-      if (b.lines.length > (F.maxLines || 6) && role === 'main') issues.push(`${label} tem ${b.lines.length} linhas (máximo ${F.maxLines}).`);
+      const maxL = layer.maxLines || F.maxLines || 6;
+      if (b.lines.length > maxL && role === 'main') issues.push(`${label} tem ${b.lines.length} linhas (máximo ${maxL}).`);
       const broken = b.lines.some((l) => ctx.measureText(l).width > layer.w + 1 && l.split(' ').length === 1);
       if (broken) issues.push(`${label} tem uma palavra mais larga que a caixa.`);
       if (b.x < 0 || b.y < 0 || b.x + b.w > spec.width || b.y + b.h > spec.height) issues.push(`${label} sai do quadro.`);
@@ -537,8 +657,8 @@
       }
       for (const blk of blocks) if (overlap(b, blk) > 0) { issues.push(`${label} cobre a legenda do vídeo.`); break; }
       if (role === 'main') for (const r of insets) if (overlap(b, r) > 0) { issues.push(`${label} invade a foto.`); break; }
-      for (const a of F.avoid || []) if (overlap(b, a) > 0) { warnings.push(`${label} invade a área de ${a.why}.`); break; }
-      const minSize = role === 'meta' ? 18 : role === 'deco' ? 0 : (F.kind === 'thumb' ? 64 : F.kind === 'cover' ? 56 : 40);
+      for (const a of avoid) if (overlap(b, a) > 0) { warnings.push(`${label} invade a área de ${a.why}.`); break; }
+      const minSize = layer.minSize ?? (role === 'meta' ? 18 : role === 'deco' ? 0 : (F.kind === 'thumb' ? 64 : F.kind === 'cover' ? 56 : 40));
       if (layer.size < minSize) warnings.push(`${label} está pequeno (${Math.round(layer.size)} px; o mínimo recomendado é ${minSize}).`);
       if (behind && role !== 'deco' && !layer.chip) {
         const m = behind(b);
@@ -552,7 +672,7 @@
   }
 
   return {
-    orientBox, orientedSize, photoFilter, BRAND, FONTS, FORMATS, fontString, setFont, wrap, balance, fitText, overlap, grow, mapBox, bgTransform, freeBands, autoText,
+    orientBox, orientedSize, photoFilter, BRAND, FONTS, FORMATS, fontString, setFont, cssBaseline, wrap, balance, fitText, overlap, grow, mapBox, bgTransform, freeBands, autoText,
     emptyRects, layerBox, render, lint, uncoveredBlocks, visibleArea, framings, placeSmall, luminance, hexToRgb, contrast, clamp,
   };
 }));

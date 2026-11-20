@@ -17,11 +17,11 @@ function ensureFonts() {
 const makeCanvas = (w, h) => createCanvas(w, h);
 
 // Faixas de pixels para medir contraste: luminância média e 10º percentil do fundo atrás de um retângulo.
-function sampler(canvas) {
+function sampler(canvas, k = 1) {
   const ctx = canvas.getContext('2d');
   return (r) => {
-    const x = Math.max(0, Math.floor(r.x)); const y = Math.max(0, Math.floor(r.y));
-    const w = Math.max(1, Math.min(canvas.width - x, Math.ceil(r.w))); const h = Math.max(1, Math.min(canvas.height - y, Math.ceil(r.h)));
+    const x = Math.max(0, Math.floor(r.x * k)); const y = Math.max(0, Math.floor(r.y * k));
+    const w = Math.max(1, Math.min(canvas.width - x, Math.ceil(r.w * k))); const h = Math.max(1, Math.min(canvas.height - y, Math.ceil(r.h * k)));
     const step = Math.max(1, Math.floor(Math.sqrt((w * h) / 4000)));
     const data = ctx.getImageData(x, y, w, h).data; const lums = [];
     for (let j = 0; j < h; j += step) for (let i = 0; i < w; i += step) { const o = (j * w + i) * 4; lums.push(engine.luminance(data[o], data[o + 1], data[o + 2])); }
@@ -40,17 +40,19 @@ async function loadImages(refs) {
 async function renderSpec(spec, imageSources, ctxData = {}, { type = 'image/jpeg', quality = 0.92 } = {}) {
   ensureFonts();
   const images = await loadImages(imageSources);
-  const canvas = createCanvas(spec.width, spec.height);
+  const k = spec.scale || 1; // a capa do Spotify é desenhada em base 1000 e sai em 3000×3000
+  const canvas = createCanvas(spec.width * k, spec.height * k);
   const ctx = canvas.getContext('2d');
+  if (k !== 1) ctx.scale(k, k);
   // 1) fundo + faixas, sem texto: para medir o contraste real atrás de cada texto
-  const bareSpec = { ...spec, layers: (spec.layers || []).filter((l) => l.type !== 'text') };
+  const bareSpec = { ...spec, layers: (spec.layers || []).filter((l) => l.type !== 'text' && l.type !== 'tarja') };
   engine.render(ctx, bareSpec, images, { makeCanvas });
-  const behind = sampler(canvas);
+  const behind = sampler(canvas, k);
   const linted = engine.lint(ctx, spec, { ...ctxData, behind });
   // 2) render final
   engine.render(ctx, spec, images, { makeCanvas });
   const buffer = type === 'image/png' ? canvas.toBuffer('image/png') : canvas.toBuffer('image/jpeg', Math.round(quality * 100));
-  return { buffer, lint: linted, width: spec.width, height: spec.height, mime: type };
+  return { buffer, lint: linted, width: spec.width * k, height: spec.height * k, mime: type };
 }
 
 // Mede texto (para quem precisa de layout sem renderizar).
