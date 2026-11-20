@@ -14,10 +14,11 @@ describe('interface: menu recolhível e quadros', () => {
   after(async () => { await app.close(); await h.db.close(); });
   const get = async (path) => (await fetch(`${app.base}${path}`)).text();
 
-  it('o menu tem o botão de recolher, o logo vira "p." e a escolha é restaurada antes da pintura', async () => {
+  it('o menu tem o botão de recolher, a marca vira só o monograma e a escolha é restaurada antes da pintura', async () => {
     const page = (await prod.get('/')).text;
     assert.match(page, /<button class="icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-label="Recolher o menu"[^>]*aria-pressed="false"/);
-    assert.match(page, /<span class="wm-p">p<\/span><span class="wm-rest">ulso<\/span><span class="dot">\.<\/span>/);
+    assert.match(page, /<a class="brand brand-menu"[^>]*><img class="brand-mark"[^>]*><span class="brand-text">/, 'monograma + texto: recolhido, o CSS esconde o texto');
+    assert.match(await get('/static/app.css'), /html\[data-sidebar="collapsed"\] \.brand-text \{ display: none; \}/);
     const theme = await get('/static/theme.js');
     assert.match(theme, /pulso-sidebar/); assert.match(theme, /dataset\.sidebar = 'collapsed'/);
     const js = await get('/static/app.js');
