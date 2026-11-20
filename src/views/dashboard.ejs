@@ -1,13 +1,13 @@
 <%- include('partials/head') %>
 <header class="hello">
-  <span class="kicker"><%= fmt.todayLabel() %> · <%= podcastName %></span>
+  <span class="kicker"><%= fmt.todayLabel() %><%= projectNow() ? ' · ' + projectNow() : '' %></span>
   <h1><%= fmt.greeting() %>, <%= currentUser.name.split(' ')[0] %>.</h1>
   <% if (isProducer) { %>
     <p class="voz"><%= producerLine %></p>
   <% } else if (can('guests.read')) { %>
     <p class="voz"><%= myOpen ? 'Você tem ' + myOpen + (myOpen === 1 ? ' convidado seu aguardando' : ' convidados seus aguardando') + ' convite ou resposta.' : 'Nenhum convidado seu aguardando convite ou resposta.' %></p>
   <% } else { %>
-    <p class="voz">Bem-vindo(a) à gestão do <%= podcastName %>.</p>
+    <p class="voz">Bem-vindo(a)<%= projectNow() ? ' à gestão do ' + projectNow() : '' %>.</p>
   <% } %>
 </header>
 <%- include('partials/conn-alerts') %>

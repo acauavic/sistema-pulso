@@ -3,7 +3,7 @@
   var epNo = function (e) { return videoNo(e.number, e.project_id) || 'Episódio'; };
 %>
 <header class="hello">
-  <span class="kicker"><%= fmt.todayLabel() %> · <%= podcastName %></span>
+  <span class="kicker"><%= fmt.todayLabel() %><%= projectNow() ? ' · ' + projectNow() : '' %></span>
   <h1><%= fmt.greeting() %>, <%= currentUser.name.split(' ')[0] %>.</h1>
   <p class="voz"><%= adjustCount ? adjustCount + (adjustCount === 1 ? ' episódio seu tem' : ' episódios seus têm') + ' ajustes pedidos.' : (order.length ? 'Comece pelo ' + epNo(order[0]) + (order[0].aired ? ': ' + order[0].air.line + '.' : '.') : 'Nada na fila de edição agora.') %></p>
 </header>
