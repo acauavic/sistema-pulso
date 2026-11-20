@@ -112,8 +112,8 @@ const SOURCES = {
     }));
     if (!owner) { // gravação só com os hosts (episódio sem convidado)
       const { rows: eps } = await db.query(
-        `SELECT e.id, e.number, e.title, e.project_id, to_char(e.recorded_on, 'YYYY-MM-DD') AS day FROM episodes e WHERE e.guest_id IS NULL AND e.recorded_on BETWEEN $1::date AND $2::date ORDER BY e.recorded_on LIMIT ${MAX_PER_TYPE}`, [from, to]);
-      for (const e of eps) out.push({ type: 'gravacao', id: `gravacao-ep-${e.id}`, title: `Gravação: ${epNo(e.number, e.project_id)} ${e.title}`, sub: 'gravada', day: e.day, time: null, url: `/episodios/${e.id}`, done: true, late: false });
+        `SELECT e.id, e.number, e.title, e.project_id, e.status, to_char(e.recorded_on, 'YYYY-MM-DD') AS day FROM episodes e WHERE e.guest_id IS NULL AND e.recorded_on BETWEEN $1::date AND $2::date ORDER BY e.recorded_on LIMIT ${MAX_PER_TYPE}`, [from, to]);
+      for (const e of eps) out.push({ type: 'gravacao', id: `gravacao-ep-${e.id}`, title: `Gravação: ${epNo(e.number, e.project_id)} ${e.title}`, sub: e.status === 'pre_producao' ? 'gravação prevista' : 'gravada', day: e.day, time: null, url: `/episodios/${e.id}`, done: true, late: false });
     }
     return out;
   },

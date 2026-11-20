@@ -204,7 +204,7 @@ td.num, th.num { text-align: right; } td.mono, td .mono-text { font-family: var(
 .b-amber { background: var(--st-edicao-bg); color: var(--st-edicao-fg); } .b-gray { background: var(--st-pauta-bg); color: var(--st-pauta-fg); }
 .b-ext { background: var(--external-bg); color: var(--external); }
 /* etapas do convidado → chips de status do design system (mapeamento em docs/design-system.md) */
-.b-st-prospect { background: var(--st-pauta-bg); color: var(--st-pauta-fg); }
+.b-st-prospect, .b-st-pre_producao { background: var(--st-pauta-bg); color: var(--st-pauta-fg); }
 .b-st-convite_enviado { background: var(--st-agendado-bg); color: var(--st-agendado-fg); }
 .b-st-em_agendamento { background: var(--st-edicao-bg); color: var(--st-edicao-fg); }
 .b-st-agendado { background: var(--st-agendado-bg); color: var(--st-agendado-fg); }
@@ -869,8 +869,8 @@ span.dot:not([data-dot]) { cursor: default; }
 .agenda-summary.warn { color: var(--warn); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 @media (max-width: 860px) { .stepper.s6, .stepper.s4 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.stepper.s5 { grid-template-columns: repeat(5, minmax(0, 1fr)); } .stepper.s7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-@media (max-width: 860px) { .stepper.s5, .stepper.s7 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.stepper.s5 { grid-template-columns: repeat(5, minmax(0, 1fr)); } .stepper.s7 { grid-template-columns: repeat(7, minmax(0, 1fr)); } .stepper.s8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+@media (max-width: 860px) { .stepper.s5, .stepper.s7, .stepper.s8 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .choice-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .choice { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: var(--r-card); cursor: pointer; }
 .choice:has(input:checked) { border-color: var(--text); background: var(--raised); }

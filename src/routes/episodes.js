@@ -147,7 +147,12 @@ router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => 
     if (editOrder.STAGES.includes(s.key)) items.sort((a, b) => (order[a.id]?.rank ?? 1e9) - (order[b.id]?.rank ?? 1e9));
     return { ...s, items };
   });
-  res.render('episodes/index', { filterUi: f.ui, cardUi: require('../services/cardFields').forList('episodios'), title: 'Episódios', view, mine, episodes: rows, columns, order, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES });
+  // projeto que grava vídeo (e não episódio de podcast): a ação principal é "Novo vídeo", que nasce em Pré-produção
+  const projects = require('../services/projects');
+  const chosen = projects.get(require('../services/scope').target(req, {}) || projects.defaultId()) || {};
+  res.render('episodes/index', { filterUi: f.ui, cardUi: require('../services/cardFields').forList('episodios'), title: res.locals.videoLabel || 'Episódios',
+    videoFirst: chosen.default_format === 'video', videoWord: (chosen.video_label || 'Episódio').toLowerCase(),
+    view, mine, episodes: rows, columns, order, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES });
 }));
 
 router.get('/episodios/novo', requirePerm('episodes.write'), wrap(async (req, res) => {
@@ -160,6 +165,23 @@ router.get('/episodios/novo', requirePerm('episodes.write'), wrap(async (req, re
   if (isIntId(String(req.query.convidado || ''))) pre.guest_id = Number(req.query.convidado);
   if (isIntId(String(req.query.patrocinador || ''))) { pre.patrocinador = req.query.patrocinador; pre.origem = 'hosts'; }
   res.render('episodes/new', await formLocals({ title: 'Novo episódio', error: null, values: pre }, req));
+}));
+
+// Novo vídeo (projeto que grava vídeo, não episódio de podcast): nasce em Pré-produção, antes da gravação.
+// Janela curta: título e a data prevista da gravação. O resto vem depois, na pauta.
+router.post('/episodios/video', requirePerm('episodes.write'), wrap(async (req, res) => {
+  const scope = require('../services/scope');
+  const title = String(req.body.title || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  const projectId = scope.target(req, req.body);
+  const plannedOn = require('../services/calendar').isISO(String(req.body.recorded_on || '')) ? String(req.body.recorded_on) : null;
+  if (!title || !projectId) {
+    await req.flash('error', title ? 'Escolha o projeto.' : 'Dê um título para o vídeo.');
+    return res.redirect('/episodios');
+  }
+  const ep = await prod.createEpisode({ title, recordedOn: plannedOn, userId: req.user.id, projectId, stage: 'pre_producao', format: 'video', origin: 'Novo vídeo' });
+  await audit(req, 'episodio.criado', 'episode', ep.id, { title, etapa: 'pre_producao' });
+  await req.flash('ok', 'Vídeo criado. Próximo passo: escrever a pauta.');
+  return res.redirect(`/episodios/${ep.id}`);
 }));
 
 router.post('/episodios', requirePerm('episodes.write'), wrap(async (req, res) => {

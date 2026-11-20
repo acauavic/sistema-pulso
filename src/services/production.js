@@ -106,6 +106,7 @@ const gates = {
 
 // from -> opções. `perm` quem pode; `gate` o que precisa estar pronto; `tone` estilo do botão.
 const TRANSITIONS = [
+  { from: 'pre_producao', to: 'gravado', perm: 'production.manage', label: 'Marcar como gravado', tone: 'primary' },
   { from: 'gravado', to: 'disponivel_edicao', perm: 'production.manage', label: 'Liberar para edição', gate: gates.rawVideo, tone: 'primary' },
   { from: 'disponivel_edicao', to: 'em_edicao', perm: 'production.edit', label: 'Assumir a edição', tone: 'primary' },
   { from: 'em_edicao', to: 'em_revisao', perm: 'production.edit', label: 'Enviar para revisão', gate: gates.editedAndChecklist, tone: 'primary' },
@@ -207,6 +208,8 @@ async function move(ep, to, user) {
   } finally {
     client.release();
   }
+  // o vídeo que estava em pré-produção só agora vira um episódio gravado: tarefas de rotina, custos e link do estúdio
+  if (to === 'gravado' && ep.status === 'pre_producao') await onRecorded({ ...ep, status: to }, user.id);
   try { await notifyStage(ep, to, user); } catch (err) { console.error('Avisos da etapa:', err.message); }
   try { await require('./tasks').applyRoutines(`etapa:${to}`, ep.id, user); } catch (err) { console.error('Rotinas de tarefas:', err.message); }
   try { await require('./finance').onEpisodeStage(ep.id, to); } catch (err) { console.error('Financeiro (etapa):', err.message); }
@@ -277,12 +280,22 @@ async function createEpisode({ title, guestId = null, recordedOn = null, userId 
   }
   if (sponsor) await db.query('INSERT INTO sponsor_episodes (sponsor_id, episode_id, role) VALUES ($1, $2, $3) ON CONFLICT (sponsor_id, episode_id) DO UPDATE SET role = EXCLUDED.role', [sponsor.id, ep.id, sponsor.role || 'exclusivo']);
   const { rows: [actor] } = userId ? await db.query('SELECT id, name FROM users WHERE id = $1', [userId]) : { rows: [] };
-  await createTasks(ep.id, actor || null, requests);
-  try { await require('./finance').onEpisodeCreated(ep.id); } catch (err) { console.error('Financeiro (episódio):', err.message); }
+  if (stage === 'pre_producao') {
+    await addEvent(ep.id, userId, 'criado', `Vídeo criado${origin ? ` a partir de ${origin}` : ''} (em pré-produção)`);
+    return ep;
+  }
   await addEvent(ep.id, userId, 'criado', `Episódio criado${origin ? ` a partir de ${origin}` : ''} (gravação feita)`);
-  // link para o estúdio subir o material da gravação direto para o episódio
-  try { await require('./studioLinks').create(ep.id, userId); await addEvent(ep.id, userId, 'arquivo', 'Link do estúdio gerado para o envio do material'); } catch (err) { console.error('Link do estúdio:', err.message); }
+  await onRecorded(ep, userId, { actor: actor || null, requests });
   return ep;
+}
+
+// O que acontece quando a conversa já foi gravada: as tarefas das rotinas, os custos automáticos e o link do estúdio.
+// Vale tanto para o episódio que nasce gravado quanto para o vídeo que sai da pré-produção.
+async function onRecorded(ep, userId, { actor = undefined, requests = null } = {}) {
+  const who = actor !== undefined ? actor : (userId ? (await db.query('SELECT id, name FROM users WHERE id = $1', [userId])).rows[0] || null : null);
+  await createTasks(ep.id, who, requests);
+  try { await require('./finance').onEpisodeCreated(ep.id); } catch (err) { console.error('Financeiro (episódio):', err.message); }
+  try { await require('./studioLinks').create(ep.id, userId); await addEvent(ep.id, userId, 'arquivo', 'Link do estúdio gerado para o envio do material'); } catch (err) { console.error('Link do estúdio:', err.message); }
 }
 
 // ---------------------------------------------------------------- arquivos (Backblaze, envio em partes)

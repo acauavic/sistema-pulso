@@ -63,6 +63,7 @@ const DELIVERABLE_KINDS = {
 const DELIVERABLE_STATUSES = { pendente: 'Pendente', em_producao: 'Em produção', ativo: 'Ativo', concluido: 'Concluído' };
 // Linha de produção do episódio, em ordem.
 const EPISODE_STAGES = [
+  { key: 'pre_producao', label: 'Pré-produção', hint: 'Pauta, roteiro e data: antes da gravação' },
   { key: 'gravado', label: 'Gravado', hint: 'Gravado; falta subir o material' },
   { key: 'disponivel_edicao', label: 'Disponível para edição', hint: 'Material bruto no ar; esperando o editor' },
   { key: 'em_edicao', label: 'Em edição', hint: 'O editor está trabalhando' },

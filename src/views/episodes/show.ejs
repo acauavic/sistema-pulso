@@ -28,7 +28,7 @@
   </div>
 </div>
 
-<ol class="stepper s7" aria-label="Etapas da produção">
+<ol class="stepper s8" aria-label="Etapas da produção">
   <% C.EPISODE_STAGES.forEach(function (s, i) { %>
   <li class="<%= i < stageIndex ? 'done' : (i === stageIndex ? 'now' : '') %>"><span class="step-n mono"><%= String(i + 1).padStart(2, '0') %></span><span class="step-l"><%= s.label %></span></li>
   <% }) %>
