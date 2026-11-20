@@ -35,7 +35,7 @@ describe('Criar tarefa a partir de uma mensagem ou da thread', () => {
     for (const [k, name, role] of [['ana', 'Ana Gestão', 'gestao'], ['bia', 'Bia Produtora', 'produtora'], ['zeca', 'Zeca Fora', 'produtora']]) {
       u[k] = await h.createUser({ name, email: `${k}@t.com`, role }); c[k] = h.client(app.base); await c[k].login(`${k}@t.com`);
     }
-    g = (await post(c.ana, '/mensagens/conversas', { tipo: 'grupo', nome: 'Capas', pessoas: [u.bia.id] })).json.id;
+    g = (await post(c.ana, '/mensagens/conversas', { tipo: 'grupo', nome: 'Sala Zelkova', pessoas: [u.bia.id] })).json.id;
     root = await say(c.ana, 'Bia, fecha a capa do EP 12 até sexta?');
     reply = await say(c.bia, 'Fecho, mas preciso da foto nova do convidado', root.id);
   });
@@ -76,11 +76,11 @@ describe('Criar tarefa a partir de uma mensagem ou da thread', () => {
     const th = await get(c.bia, `/mensagens/m/${root.id}/respostas`);
     assert.deepEqual(th.json.parent.tasks, [{ id: t.id, title: 'Fechar a capa do EP 12' }]);
     const page = await c.ana.get(`/tarefas/${t.id}`);
-    assert.match(page.text, /Veio de uma mensagem de Ana Gestão em Capas/);
+    assert.match(page.text, /Veio de uma mensagem de Ana Gestão em Sala Zelkova/);
     assert.match(page.text, new RegExp(`/mensagens/${g}\\?thread=${root.id}`));
     const outsider = await c.zeca.get(`/tarefas/${t.id}`);
     assert.match(outsider.text, /Veio de uma mensagem do chat/);
-    assert.doesNotMatch(outsider.text, /Capas/, 'quem não participa não vê o nome da conversa');
+    assert.doesNotMatch(outsider.text, /Sala Zelkova/, 'quem não participa não vê o nome da conversa');
   });
 
   it('a página de Mensagens traz a janela Nova tarefa com a barra "Da mensagem" e sem a parte de voz', async () => {

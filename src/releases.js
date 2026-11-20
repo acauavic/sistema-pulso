@@ -4,6 +4,17 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.94.0', date: '2026-11-20', title: 'Capas pelos modelos do guia, capa do Spotify e vídeos do convidado',
+    items: [
+      { kind: 'novo', text: 'Finalização, passo "Capas e vídeos": um botão gera as peças do episódio pelos modelos do Guia de Capas. São 3 thumbnails do YouTube, uma por ângulo (curiosidade, contraste e autoridade), cada uma num modelo diferente, e a capa do Spotify (3000 × 3000). Os textos saem de uma ficha do episódio (quem é o convidado, a frase literal, o número dito), que você confere e edita numa janela.' },
+      { kind: 'novo', text: 'Cada peça mostra como fica pequena (o tamanho do celular) e avisa quando não lê, quando o texto passa do limite ou quando a foto foi ampliada demais. "Ajustar" abre uma janela com a prévia ao vivo e três abas: Texto, Modelo (8 de thumbnail, 3 de Spotify) e Foto (trocar a foto, tocar no rosto, aproximar, afastar e espelhar).' },
+      { kind: 'novo', text: 'Dá para aprovar mais de uma thumbnail: a primeira é a principal (vai para o YouTube) e as outras ficam para o teste de miniatura. "Baixar para o teste" entrega um ZIP com os nomes do guia. O download sai em PNG quando cabe em 2 MB; senão, em JPG.' },
+      { kind: 'novo', text: 'Aba Vídeos: o story de lançamento (11 s, sem som) e o teaser para quem ainda não conhece (15 s, com a frase na voz do convidado e a legenda entrando palavra por palavra). Ficam prontos em 1 a 2 minutos e saem sem trilha: ela entra na hora de postar.' },
+      { kind: 'novo', text: 'Cortes: as 3 capas sugeridas agora são dos modelos de Reels do guia (gancho com uma palavra em lime, tarja central e a frase literal do trecho). Na página do corte, "Ajustar capa" abre a mesma janela de texto, modelo e foto.' },
+      { kind: 'ajuste', text: 'Mudou a ficha do episódio depois de aprovar uma capa? Ela ganha o chip "desatualizada" com "Atualizar", em vez de ser trocada sozinha. As capas antigas e os posts continuam abrindo no editor de sempre.' },
+    ],
+  },
+  {
     version: '1.93.2', date: '2026-11-19', title: 'Reconectar o Instagram volta a abrir',
     items: [
       { kind: 'correcao', text: 'Integrações > Comentários e directs: o botão "Reconectar o Instagram" não fazia nada (o navegador barrava a ida para o Instagram). Agora ele abre uma página curta que leva ao Instagram na hora, com um botão de reserva.' },
