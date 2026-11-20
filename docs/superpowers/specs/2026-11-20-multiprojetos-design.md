@@ -1,6 +1,6 @@
 # Multiprojetos (Health Scale Studio) — desenho
 
-Data: 2026-11-20 · Direção aprovada pelo dono na conversa. Este documento é o guarda-chuva: cada fase abaixo ganha o seu
+Data: 2026-11-20 · **Aprovada pelo dono em 2026-11-20.** Este documento é o guarda-chuva: cada fase abaixo ganha o seu
 plano de implementação, a sua branch e o seu lançamento, e só vai para produção com autorização.
 
 ## Por que
@@ -134,12 +134,14 @@ com o Dr. José Bento, com a mesma equipe de edição e produção por enquanto.
   "Compartilhado" aparecem os valores por projeto, começando meio a meio.
 - Recorrentes e regras de custo automático (`fin_recurring`, `fin_rules`) guardam o projeto ou a divisão padrão e a
   repassam ao que geram.
-- **Banco de horas**: o pacote continua um só (`fin_hour_packs`). Cada compra é dividida em cotas
-  (`fin_hour_quotas`: `pack_id`, `project_id`, `hours`, somando as horas do pacote); a despesa da compra é compartilhada
-  na mesma proporção. Reserva e uso descontam da cota do projeto da gravação. O cartão mostra o total e uma linha por
-  projeto ("Pulso · 6,5 de 10 h"). Projeto que passa da cota fica com saldo negativo e gera aviso ("Projeto 100 passou
-  1,5 h da cota"); **Ajustar divisão** move horas (e o custo) entre os projetos. O pacote atual entra inteiro no Pulso
-  e o dono ajusta para 10/10 pela tela (dinheiro não se mexe por migração).
+- **Banco de horas**: o pacote continua um só (`fin_hour_packs`), da casa. **Cada projeto paga pelas horas que usou**:
+  custo de estúdio do projeto = horas gravadas por ele × preço da hora do pacote. A despesa da compra é compartilhada e
+  a divisão dela é calculada pelo sistema conforme o uso; as horas ainda não usadas ficam como "a usar", sem dono.
+  A **cota** por projeto (`fin_hour_quotas`: `pack_id`, `project_id`, `hours`; ex.: 10 e 10) é orçamento e alerta, não
+  cobrança: reserva e uso descontam da cota do projeto da gravação, o cartão mostra o total e uma linha por projeto
+  ("Pulso · 6,5 de 10 h") e, quando um projeto passa da cota, aparece o aviso ("Projeto 100 passou 1,5 h da cota").
+  **Ajustar cotas** muda o orçamento sem mexer em dinheiro. O pacote atual entra com a cota inteira no Pulso e o dono
+  ajusta para 10/10 pela tela.
 - **Telas**: o Financeiro segue o seletor. Um projeto: só o que é dele mais a parte dele nos compartilhados (marcada
   "compartilhado · parte deste projeto"). Todos: consolidado, com a sigla em cada linha e "compartilhado · 50/50".
   Resultado por projeto = receitas − custos próprios − parte nos compartilhados.
@@ -228,7 +230,7 @@ O painel deixa a identidade do Pulso e passa a usar a da casa. Fonte: `docs/refe
 
 Hoje tudo abre em `sistema.podcastpulso.com` (painel e links públicos) e os links curtos em `link.podcastpulso.com`.
 
-- **Painel**: `studio.healthscale.com.br`. Login, sessão, app instalado e avisos vivem só nele.
+- **Painel**: `studio.healthscale.com` (o dono citou antes `.com.br`; confirmar a terminação ao apontar o DNS, na fase 6). Login, sessão, app instalado e avisos vivem só nele.
 - **Cada projeto tem o seu endereço público** (`projects.public_host`). O do Pulso é o de hoje,
   `sistema.podcastpulso.com`: **nenhum link já enviado muda ou quebra** (convites, portais, media kits, QR Code do cartão
   de agradecimento, links curtos). O do Projeto 100 fica em `projeto100.com`, num subdomínio (adotado
@@ -297,7 +299,7 @@ Cada fase é um lançamento que funciona sozinho.
 5. **Dinheiro por projeto.** Dono do lançamento, compartilhado com divisão, cotas do banco de horas, resultado por
    projeto e consolidado.
 6. **Endereços.** Painel no domínio da casa; links públicos, favicon, links curtos e remetente por projeto. Depende só
-   da fase 2; pode subir na fila. Antes de publicar, o dono aponta `studio.healthscale.com.br` e o subdomínio do
+   da fase 2; pode subir na fila. Antes de publicar, o dono aponta `studio.healthscale.com` e o subdomínio do
    Projeto 100 para o servidor (registro no DNS, com o Cloudflare na frente como hoje).
 7. **Acesso por projeto.** Equipe da casa, membros, "Vê o financeiro", isolamento em todas as superfícies, teste de
    isolamento. Só depois entra a equipe do Dr. José Bento.
@@ -352,6 +354,4 @@ As fases 8 e 9 podem subir se o Projeto 100 precisar publicar pelo sistema antes
 
 - **Subdomínio público do Projeto 100**: adotado `links.projeto100.com`; pode ser outro nome (só importa antes da
   fase 6).
-- **Custo do banco de horas**: adotado pela **cota** (10/10, ajustável quando um projeto usa horas do outro). A
-  alternativa é cobrar pelo uso real.
 - **Sigla e prefixo do Projeto 100**: adotados `P100` e `V.` até segunda ordem.
