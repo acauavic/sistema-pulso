@@ -16,8 +16,12 @@ router.post('/projeto', wrap(async (req, res) => {
   const raw = String(req.body.project || '');
   const id = raw === '' ? null : Number(raw);
   if (id !== null && !req.scope.ids.includes(id)) return res.status(400).render('error', { title: 'Projeto inválido', message: 'Você não participa deste projeto.' });
-  await require('../services/projects').setLast(req.user.id, id);
-  res.redirect(scope.localPath(req.body.voltar));
+  const projects = require('../services/projects');
+  await projects.setLast(req.user.id, id);
+  // a tela aberta é de algo que o projeto escolhido não usa (ex.: Plateia no Projeto 100): em vez de uma tela vazia, o Início
+  const back = scope.localPath(req.body.voltar);
+  const mod = id ? scope.moduleOfPath(back) : null;
+  res.redirect(mod && !projects.has(projects.get(id), mod) ? '/' : back);
 }));
 
 // Início de quem só edita vídeo (production.edit sem production.manage): a ordem de edição (o que editar primeiro, pela data de

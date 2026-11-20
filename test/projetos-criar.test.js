@@ -41,7 +41,7 @@ describe('projetos: criar no projeto certo', () => {
   it('em "Todos os projetos" o formulário pergunta o projeto primeiro; sem resposta, não cria', async () => {
     await pick('');
     const form = (await sara.get('/convidados/novo')).text;
-    assert.match(form, /<fieldset class="seg-radio project-field"><legend>Projeto \*<\/legend>/);
+    assert.match(form, /<div class="project-field">\s*<fieldset class="seg-radio"><legend>Projeto \*<\/legend>/);
     assert.match(form, /name="project_id" value="1"[^>]*><span>Pulso<\/span>/); assert.match(form, /name="project_id" value="2"[^>]*><span>Projeto 100<\/span>/);
     assert.ok(form.indexOf('project-field') < form.indexOf('name="name"'), 'o campo Projeto vem antes dos outros');
     const no = await sara.act('/convidados', guest('Dra Sem Projeto'), { from: '/convidados/novo' });
@@ -60,7 +60,7 @@ describe('projetos: criar no projeto certo', () => {
   it('tarefa em "Todos os projetos": começa em Geral (sem projeto) e aceita um projeto', async () => {
     await pick('');
     const page = (await sara.get('/tarefas')).text;
-    assert.match(page, /<fieldset class="seg-radio project-field"><legend>Projeto<\/legend>\s*<label><input type="radio" name="project_id" value="" checked><span>Geral<\/span>/);
+    assert.match(page, /<fieldset class="seg-radio"><legend>Projeto<\/legend>\s*<label><input type="radio" name="project_id" value="" checked><span>Geral<\/span>/);
     await sara.act('/tarefas', { title: 'Tarefa de todos', kind: 'geral', project_id: '' }, { from: '/tarefas' });
     assert.equal(await projectOf('tasks', 'title', 'Tarefa de todos'), null);
     await sara.act('/tarefas', { title: 'Tarefa do Pulso', kind: 'geral', project_id: '1' }, { from: '/tarefas' });

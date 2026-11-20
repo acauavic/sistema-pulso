@@ -45,7 +45,8 @@
     <% if (can('chat.use')) { %><a href="/mensagens" class="<%= currentPath.startsWith('/mensagens') ? 'active' : '' %>"><%- icon('message-circle') %><span>Mensagens</span><span class="nav-count" data-chat-unread <%= navCounts && navCounts.chat_unread ? '' : 'hidden' %>><%= navCounts ? navCounts.chat_unread : 0 %></span></a><% } %>
     <% if (can('tasks.read')) { %><a href="/tarefas" class="<%= currentPath.startsWith('/tarefas') ? 'active' : '' %>"><%- icon('check-square') %><span>Tarefas</span><% if (navCounts && navCounts.tasks) { %><span class="nav-count muted-count"><%= navCounts.tasks %></span><% } %></a><% } %>
     <% if (can('calendar.read')) { %><%- navItem('/calendario', 'calendar-days', 'Calendário', currentPath.startsWith('/calendario')) %><% } %>
-    <span class="kicker nav-group">Operação</span>
+    <%# o grupo só aparece se o projeto escolhido usa alguma coisa dele (o Projeto 100 começa só com tarefas) %>
+    <% if ((can('guests.read') && hasModule('convidados')) || (can('sponsors.read') && hasModule('patrocinio')) || (can('episodes.read') && hasModule('producao')) || (can('social.read') && hasModule('redes')) || (can('audience.read') && hasModule('plateia')) || ((can('finance.read') || can('stock.read')) && hasModule('financeiro'))) { %><span class="kicker nav-group">Operação</span><% } %>
     <% if (can('guests.read') && hasModule('convidados')) { %><%- navItem('/convidados', 'mic', 'Convidados', currentPath.startsWith('/convidados')) %><% } %>
     <% if (can('sponsors.read') && hasModule('patrocinio')) { %><%- navItem('/patrocinadores', 'shield-check', 'Patrocinadores', currentPath.startsWith('/patrocinadores')) %><% } %>
     <% if (can('episodes.read') && hasModule('producao')) { %><%- navItem('/episodios', 'calendar', videoLabel, currentPath.startsWith('/episodios')) %><% } %>

@@ -322,6 +322,9 @@ não vê o seletor de projeto."
   ao ser atribuído a um episódio, vai para o projeto dele.
 - `audit_log.project_id` existe, mas a auditoria ainda não grava o projeto: fica para a fase 7, com o resto do isolamento.
 - A lixeira guarda o projeto do item (`trash_items.project_id`).
+- Achado no navegador: grupo do menu sem nenhum item some com o título; trocar para um projeto que não usa a tela aberta
+  (ex.: Convidados no Projeto 100) leva ao Início em vez de uma tela vazia; a frase de apoio do campo Projeto fica fora do
+  controle segmentado.
 
 ## Fora desta fase
 

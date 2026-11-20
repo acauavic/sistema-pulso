@@ -45,6 +45,7 @@ describe('projetos: seletor no menu', () => {
     assert.match(m, /<span class="project-now mono">P100<\/span>/);
     for (const item of ['Convidados', 'Patrocinadores', 'Social', 'Plateia', 'Conteúdo', 'Financeiro']) assert.doesNotMatch(m, new RegExp(`<span>${item}</span>`), item);
     for (const item of ['Painel', 'Tarefas', 'Calendário', 'Mensagens', 'Painel de gestão']) assert.match(m, new RegExp(`<span>${item}</span>`), item);
+    assert.doesNotMatch(m, />Operação</, 'grupo vazio não mostra o título');
   });
 
   it('com o Pulso escolhido, o menu é o do Pulso e o item volta a ser "Episódios"', async () => {

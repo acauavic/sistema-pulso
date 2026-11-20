@@ -68,7 +68,12 @@ function assert(req, projectId) {
   throw err;
 }
 
+// De que módulo é uma tela (projects.modules): ao trocar para um projeto que não usa o módulo da tela aberta, a pessoa vai para o Início.
+const PATH_MODULES = [[/^\/convidados/, 'convidados'], [/^\/patrocinadores/, 'patrocinio'], [/^\/(episodios|conteudo|cortes|capas)/, 'producao'],
+  [/^\/social/, 'redes'], [/^\/plateia/, 'plateia'], [/^\/financeiro/, 'financeiro']];
+const moduleOfPath = (p) => (PATH_MODULES.find(([re]) => re.test(String(p || ''))) || [])[1] || null;
+
 // Só caminho do próprio painel (nunca um endereço de fora): para onde voltar depois de trocar o projeto.
 const localPath = (value) => (typeof value === 'string' && /^\/(?![/\\])/.test(value) && !/[\\\r\n]/.test(value) ? value.slice(0, 2000) : '/');
 
-module.exports = { attach, where, idsOf, target, assert, canSee, localPath };
+module.exports = { attach, where, idsOf, target, assert, canSee, localPath, moduleOfPath };

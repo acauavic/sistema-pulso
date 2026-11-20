@@ -72,8 +72,8 @@ describe('projetos: recorte (scope)', () => {
 
   it('trocar de projeto guarda a escolha e volta para a mesma tela', async () => {
     const c = h.client(app.base); await c.login('s@t.com');
-    const r = await c.act('/projeto', { project: '2', voltar: '/convidados?view=lista' });
-    assert.equal(r.status, 302); assert.equal(r.location, '/convidados?view=lista');
+    const r = await c.act('/projeto', { project: '2', voltar: '/tarefas?visao=quadro' });
+    assert.equal(r.status, 302); assert.equal(r.location, '/tarefas?visao=quadro');
     assert.equal((await scopeOf(sara)).scope.current.slug, 'projeto-100');
     assert.equal((await scopeOf(sara)).locals.projectTag(2), '', 'com o projeto escolhido, a sigla dele some');
     assert.equal((await scopeOf(sara)).locals.projectTag(1), 'PULSO', 'item de outro projeto continua marcado');
@@ -82,6 +82,15 @@ describe('projetos: recorte (scope)', () => {
     // voltar para "Todos"
     assert.equal((await c.act('/projeto', { project: '', voltar: '/' })).status, 302);
     assert.equal((await scopeOf(sara)).scope.current, null);
+  });
+
+  it('trocar para um projeto que não usa a tela aberta leva ao Início', async () => {
+    const c = h.client(app.base); await c.login('s@t.com');
+    assert.equal((await c.act('/projeto', { project: '2', voltar: '/plateia/painel' })).location, '/', 'o Projeto 100 não usa plateia');
+    assert.equal((await c.act('/projeto', { project: '2', voltar: '/convidados?view=lista' })).location, '/');
+    assert.equal((await c.act('/projeto', { project: '2', voltar: '/tarefas?escopo=todas' })).location, '/tarefas?escopo=todas');
+    assert.equal((await c.act('/projeto', { project: '1', voltar: '/plateia/painel' })).location, '/plateia/painel');
+    assert.equal((await c.act('/projeto', { project: '', voltar: '/plateia/painel' })).location, '/plateia/painel');
   });
 
   it('nunca redireciona para fora; projeto de que a pessoa não participa é recusado', async () => {

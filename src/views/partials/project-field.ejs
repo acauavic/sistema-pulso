@@ -6,9 +6,11 @@
      var _pv = typeof value !== 'undefined' && value != null ? String(value) : '';
      var _general = typeof general !== 'undefined' && general;
      var _hint = typeof hint !== 'undefined' ? hint : ''; %>
-<fieldset class="seg-radio project-field"><legend>Projeto<%= _general ? '' : ' *' %></legend>
-  <% if (_general) { %><label><input type="radio" name="project_id" value=""<%= _pv === '' ? ' checked' : '' %>><span>Geral</span></label><% } %>
-  <% projectScope.projects.forEach(function (p) { %><label><input type="radio" name="project_id" value="<%= p.id %>"<%= _pv === String(p.id) ? ' checked' : '' %><%= _general ? '' : ' required' %>><span><%= p.name %></span></label><% }) %>
-  <% if (_hint) { %><small class="muted"><%= _hint %></small><% } %>
-</fieldset>
+<div class="project-field">
+  <fieldset class="seg-radio"><legend>Projeto<%= _general ? '' : ' *' %></legend>
+    <% if (_general) { %><label><input type="radio" name="project_id" value=""<%= _pv === '' ? ' checked' : '' %>><span>Geral</span></label><% } %>
+    <% projectScope.projects.forEach(function (p) { %><label><input type="radio" name="project_id" value="<%= p.id %>"<%= _pv === String(p.id) ? ' checked' : '' %><%= _general ? '' : ' required' %>><span><%= p.name %></span></label><% }) %>
+  </fieldset>
+  <% if (_hint) { %><p class="small muted m-0"><%= _hint %></p><% } %>
+</div>
 <% } %>
