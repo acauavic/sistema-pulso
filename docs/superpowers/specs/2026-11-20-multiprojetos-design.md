@@ -20,7 +20,8 @@ com o Dr. José Bento, com a mesma equipe de edição e produção por enquanto.
 ## Decidido pelo dono
 
 - **Um sistema só.** Ninguém acessa dois sistemas para saber o que fazer.
-- **Nome do painel: Health Scale Manager** ("manager" como submarca da Health Scale). "Pulso" passa a ser o nome de um projeto.
+- **O painel passa para a identidade da Health Scale** (nome Health Scale Manager, logotipo, verde, Archivo). O que é do
+  Pulso continua com a marca do Pulso, dentro do projeto Pulso. A marca do Projeto 100 ainda está em definição.
 - **Projeto novo: Projeto 100** (canal de YouTube com o Dr. José Bento).
 - **Mesmo convidado e mesmo patrocinador nos dois projetos**, cada um com a sua história em cada projeto.
 - **Financeiro por projeto**: patrocínio entra no projeto dele; custo compartilhado é dividido (ex.: banco de 20 h do
@@ -166,16 +167,46 @@ Página de detalhe de outro projeto responde 404.
 **Trava de segurança**: nenhum usuário restrito é criado em produção antes de o teste de isolamento passar (ver Testes).
 Até lá, todos continuam vendo tudo, como hoje.
 
-### Nome e marca do painel
+### Identidade do painel: Health Scale
 
-- `config.appName = 'Health Scale Manager'` substitui "Pulso Gestão" (título das páginas, login, manifesto do app,
-  e-mails internos de acesso e senha, assistente, agenda do Google, Novidades).
-- No menu: "Health Scale" em Space Grotesk e **MANAGER** em mono caixa alta, muted. Recolhido: "hs". O Ponto lime é do
-  Pulso e sai do nome do painel; os tokens da interface (escuro, lime como ação) continuam.
-- O manual de marca do Pulso passa a valer para o **projeto Pulso** (convite, portal, media kit, plateia, e-mails ao
-  convidado e ao patrocinador). `docs/design-system.md` e `docs/manual-de-marca.md` registram a mudança, e a decisão
-  vai para o `memory.md`.
-- `config.podcastName` deixa de ser usado: o nome vem do projeto do item.
+O painel deixa a identidade do Pulso e passa a usar a da casa. Fonte: `docs/referencias/Health_Scale_Studio_Logo.dc.html`
+(estudo do designer; o nome "Studio" nele é provisório) e `docs/referencias/health-scale/health-scale-logo.png`.
+
+- **Nome**: `config.appName = 'Health Scale Manager'` substitui "Pulso Gestão" (título das páginas, login, manifesto do
+  app, e-mails internos de acesso e senha, assistente, agenda do Google, Novidades). `config.podcastName` deixa de ser
+  usado: o nome vem do projeto do item.
+- **Assinatura** (login, relatórios, e-mails internos): logotipo Health Scale ("Health" em Instrument Serif itálico,
+  "Scale" em Archivo 800) + filete vertical + **MANAGER** em JetBrains Mono 500, caixa alta, tracking .2em, na cor de
+  ação. No claro: logotipo em preto e o nome em verde escuro.
+- **Menu**: ícone de 40 px + duas linhas em mono ("HEALTH SCALE" 11 px muted; "MANAGER" 17 px). Recolhido: só o ícone.
+  Item ativo: fundo `line` e um quadrado de 6 px na cor de ação.
+- **Ícone** (favicon, app instalado, menu, login): o estudo traz duas direções, **1a Monograma** (serifa itálica +
+  grotesca, as duas primeiras letras do nome) e **1b Sinal** (quatro barras que crescem, do verde escuro ao claro).
+  Escolha do dono (ver Em aberto).
+- **Cores do escuro** (do estudo): fundo `#0E0F0D`, superfície `#16180F`, borda `#262A22`, texto `#F4F4F0`, texto de
+  apoio `#A8ABA1`, muted `#8A8D83`, **ação `#9EDD55`** (hover `#C8E86A`), texto sobre a ação `#0E0F0D`. `raised` e
+  `line-strong` não estão no estudo: derivados da mesma família e conferidos por contraste (4,5:1 para texto) no navegador.
+  O `#6E7168` do estudo não passa no contraste para texto e fica só para rótulo decorativo do próprio estudo.
+- **Cores do claro**: fundo `#F4F4F0`, texto `#101210`, texto de apoio `#54574F`, borda `#C9C9C1`, verde `#2E6B22`
+  para o nome e os links; botão principal preto.
+- **Tipografia**: **Archivo** (400 a 800) assume títulos e texto, no lugar de Space Grotesk e Inter. JetBrains Mono
+  continua nos dados; Instrument Serif itálico continua para "voz" e agora também assina o logotipo. Archivo fica
+  hospedada no repositório (`src/public/fonts/`, woff2 latin, licença OFL), porque a CSP só aceita `'self'`.
+- **O que continua**: as regras de uso (uma ação por área, dados em mono, sem emoji, ícones Lucide), só que a cor de
+  ação passa a ser o verde. Âmbar, vermelho e a cor do "externo" (hoje plum) são funcionais e ficam como estão até
+  existir um guia de interface da Health Scale. Formas dos componentes (botão em pílula, raios 2/6/10) continuam nesta
+  migração; os cantos retos do estudo são decisão em aberto.
+- **O que não muda**: tudo o que é do Pulso continua com a marca do Pulso: convite, portal do convidado, pós-gravação,
+  media kit, portal do patrocinador, plateia, capas e e-mails ao convidado e ao patrocinador. Essas páginas têm CSS
+  próprio (`portal.css`, `plateia.css`, `patrocinador.css`, `convite-pulso.html`, `media-kit.html`) e não dependem dos
+  tokens do painel; a migração confere isso com um teste visual de cada uma, antes e depois.
+- **Projeto 100**: a marca ainda está em estudo (azul e rosa, laço infinito). As páginas públicas dele esperam a
+  definição (fase 8).
+- **Documentos**: `docs/design-system.md` passa a descrever a interface Health Scale; `docs/manual-de-marca.md` vira o
+  manual do **projeto Pulso**; a decisão vai para o `memory.md` e para o `CLAUDE.md`.
+- **Tamanho do trabalho**: as cores do painel já são variáveis (`:root` do `app.css`, 27 cores escritas à mão no
+  arquivo todo), o nome "pulso." aparece em 10 views e há 6 ícones do app. É uma troca de tokens, fontes, ícones e
+  textos, não um redesenho de telas.
 
 ## Dados (resumo)
 
@@ -206,26 +237,28 @@ Até lá, todos continuam vendo tudo, como hoje.
 
 Cada fase é um lançamento que funciona sozinho.
 
-1. **Fundação.** `projects`, `project_members`, `project_id` nas raízes (tudo vira Pulso), `services/scope.js`, seletor,
-   sigla nos cartões, Gestão > Projetos, nome Health Scale Manager, Projeto 100 criado. Ninguém restrito ainda.
-2. **Vídeo e pauta.** Formato do vídeo, numeração por projeto, etapa Pré-produção, pautas e roteiros com o quadro.
+1. **Identidade Health Scale.** Nome, logotipo, ícone, cores e Archivo no painel; design system reescrito; páginas do
+   Pulso intactas. Não depende de nada das outras fases.
+2. **Fundação.** `projects`, `project_members`, `project_id` nas raízes (tudo vira Pulso), `services/scope.js`, seletor,
+   sigla nos cartões, Gestão > Projetos, Projeto 100 criado. Ninguém restrito ainda.
+3. **Vídeo e pauta.** Formato do vídeo, numeração por projeto, etapa Pré-produção, pautas e roteiros com o quadro.
    A partir daqui o Projeto 100 trabalha no sistema (vídeos, pauta, edição, cortes, pedidos, tarefas).
-3. **Pessoas e empresas.** `people`, `companies`, "Em outros projetos", "Convidar também", contrato por projeto,
+4. **Pessoas e empresas.** `people`, `companies`, "Em outros projetos", "Convidar também", contrato por projeto,
    duplicatas por pessoa.
-4. **Dinheiro por projeto.** Dono do lançamento, compartilhado com divisão, cotas do banco de horas, resultado por
+5. **Dinheiro por projeto.** Dono do lançamento, compartilhado com divisão, cotas do banco de horas, resultado por
    projeto e consolidado.
-5. **Acesso por projeto.** Equipe da casa, membros, "Vê o financeiro", isolamento em todas as superfícies, teste de
+6. **Acesso por projeto.** Equipe da casa, membros, "Vê o financeiro", isolamento em todas as superfícies, teste de
    isolamento. Só depois entra a equipe do Dr. José Bento.
-6. **Redes por projeto.** Contas e provedores por projeto (`social_account_status` e os perfis da Zernio/Outstand),
+7. **Redes por projeto.** Contas e provedores por projeto (`social_account_status` e os perfis da Zernio/Outstand),
    publicar, agenda da semana, comentários, automações, insights e contexto da IA (nome, tom, links) por projeto.
-7. **Marca por projeto nas páginas públicas.** Convite, portal, media kit e capas com a identidade do Projeto 100
-   (precisa do guia visual dele).
+8. **Marca por projeto nas páginas públicas.** Convite, portal, media kit e capas com a identidade do Projeto 100
+   (espera a marca dele ficar pronta).
 
-A ordem 6 e 7 pode subir se o Projeto 100 precisar publicar pelo sistema antes; até lá ele publica por fora.
+As fases 7 e 8 podem subir se o Projeto 100 precisar publicar pelo sistema antes; até lá ele publica por fora.
 
 ## Testes
 
-- **Isolamento** (`test/project-isolation.test.js`, trava da fase 5): dois projetos com um item de cada tipo e um texto
+- **Isolamento** (`test/project-isolation.test.js`, trava da fase 6): dois projetos com um item de cada tipo e um texto
   marcador em cada; uma pessoa só do projeto B percorre todas as rotas GET registradas e nenhum marcador do projeto A
   pode aparecer; ids do projeto A respondem 404 em GET e POST; busca, notificações, assistente, downloads e arquivos por
   chave entram na lista. Rota nova entra no teste sozinha (ele lê a tabela de rotas do Express).
@@ -235,15 +268,18 @@ A ordem 6 e 7 pode subir se o Projeto 100 precisar publicar pelo sistema antes; 
   projetos = consolidado; cota, uso e saldo do banco por projeto; quem é de um projeto vê só a parte dele.
 - Numeração: dois projetos com `number = 1` convivem; corrida de criação continua resolvida por projeto.
 - Quem tem um projeto só: nenhuma tela mostra seletor, sigla ou campo de projeto.
+- Identidade: nenhuma cor escrita à mão fora dos tokens no `app.css`; contraste dos tokens novos (texto 4,5:1) conferido;
+  convite, portal, pós-gravação, media kit, portal do patrocinador e plateia iguais antes e depois (captura de tela de
+  cada uma, no computador e no celular); nenhum "Pulso Gestão" sobrando no painel.
 
 ## Riscos
 
 - **Vazamento entre projetos** é o risco maior, porque há centenas de consultas. Mitigação: um ponto único de recorte,
-  filhas herdando pela raiz, o teste de isolamento como trava, e usuários restritos só na fase 5.
+  filhas herdando pela raiz, o teste de isolamento como trava, e usuários restritos só na fase 6.
 - **Pessoa e funil na mesma linha** (`guests`, 158 consultas em 58 arquivos): a cópia espelhada evita reescrever tudo
   de uma vez; o custo é manter o espelho coberto por teste.
 - **Nome "Pulso" escrito à mão** em prompts de IA e textos: some por fase, junto com a área que ele toca; a busca por
-  "Pulso" no `src/` é o critério de pronto da fase 6.
+  "Pulso" no `src/` é o critério de pronto da fase 7.
 - **Tamanho**: é o maior trabalho já feito no sistema. Por isso as fases são independentes e nenhuma muda o dia a dia do
   Pulso além do seletor.
 
@@ -256,7 +292,10 @@ A ordem 6 e 7 pode subir se o Projeto 100 precisar publicar pelo sistema antes; 
 
 ## Em aberto (do dono)
 
-- **Marca da Health Scale**: logotipo e cores, se houver. Até chegarem, o nome vai só em tipografia, como descrito.
+- **Nome**: "Manager" (dito na conversa) ou "Studio" (como está no estudo do logo, marcado como provisório)? A
+  especificação usa Manager.
+- **Ícone**: 1a Monograma ou 1b Sinal. O monograma muda com o nome ("Ma" ou "St"); o Sinal não depende dele.
+- **Formas**: manter botão em pílula e cantos arredondados de hoje, ou adotar os cantos retos do estudo.
 - **Endereço**: continua `sistema.podcastpulso.com` ou muda? (Trocar exige domínio novo e redirecionamento; fica fora
   das fases até decidir.)
 - **Custo do banco de horas**: adotado pela **cota** (10/10, ajustável quando um projeto usa horas do outro). A
