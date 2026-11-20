@@ -82,9 +82,10 @@ const kindLabel = (r) => KINDS[r.kind]?.label || 'Conteúdo';
 // user pode ser null (episódio criado sozinho, a partir do convidado gravado). priority/routine_id: pedidos que nascem com o episódio.
 async function create(values, user) {
   const { rows: [r] } = await db.query(
-    `INSERT INTO content_requests (kind, title, briefing, briefing_html, format, episode_id, assignee_id, due_on, created_by, priority, routine_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-    [values.kind, values.title, values.briefing || null, values.briefing_html || null, values.format || null, values.episode_id, values.assignee_id, values.due_on, user?.id || null, Boolean(values.priority), values.routine_id || null]);
+    // de que projeto é: o do episódio do pedido; sem episódio, o informado (values.project_id) ou o padrão
+    `INSERT INTO content_requests (kind, title, briefing, briefing_html, format, episode_id, assignee_id, due_on, created_by, priority, routine_id, project_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, coalesce((SELECT project_id FROM episodes WHERE id = $6), $12)) RETURNING id`,
+    [values.kind, values.title, values.briefing || null, values.briefing_html || null, values.format || null, values.episode_id, values.assignee_id, values.due_on, user?.id || null, Boolean(values.priority), values.routine_id || null, values.project_id || require('./projects').defaultId()]);
   if (values.assignee_id && values.assignee_id !== user?.id) {
     await tell({ users: [values.assignee_id], actorId: user?.id || null, title: `${values.priority ? 'Pedido prioritário' : 'Pedido de conteúdo'}: ${values.title}`, body: `${user?.name || 'Novo episódio'}: ${KINDS[values.kind].label}${values.due_on ? ` para ${String(values.due_on).slice(0, 10).split('-').reverse().join('/')}` : ''}.`, url: url(r.id), entity: { type: 'content_request', id: r.id }, dedupe: `pedido-${r.id}` });
   }

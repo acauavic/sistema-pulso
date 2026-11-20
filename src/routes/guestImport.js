@@ -31,7 +31,7 @@ router.post('/convidados/importar/previa', requirePerm('guests.write'), wrap(asy
 
 router.post('/convidados/importar', requirePerm('guests.write'), wrap(async (req, res) => {
   const text = String(req.body.csv || '').slice(0, MAX_CSV_CHARS);
-  const r = await importGuests(text, req.user);
+  const r = await importGuests(text, req.user, require('../services/scope').target(req, req.body));
   if (r.headerError) return page(res.status(400), { csvText: text, headerError: r.headerError });
   await audit(req, 'convidados.importados', 'guest', null, { criados: r.created.length, episodios: r.episodes, ignorados: r.skipped });
   await req.flash('ok', `${r.created.length} convidado(s) importado(s)${r.episodes ? `, com ${r.episodes} episódio(s) do histórico` : ''}${r.skipped ? `; ${r.skipped} linha(s) ignorada(s) por erro ou duplicidade` : ''}.`);

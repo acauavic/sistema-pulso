@@ -12,6 +12,7 @@
   <p class="muted">O episódio nasce quando a conversa é gravada. Gravações marcadas ficam na agenda do convidado; aqui você registra o que já foi gravado.</p>
   <form method="post" action="/episodios" class="stack" data-when-form>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <%- include('../partials/project-field', { value: typeof values !== 'undefined' && values ? values.project_id : '', hint: 'Com um convidado já cadastrado, vale o projeto dele.' }) %>
 
     <h2 class="form-section">Quem sentou à mesa</h2>
     <div class="choice-row" role="radiogroup" aria-label="Quem sentou à mesa">

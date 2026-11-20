@@ -10,6 +10,7 @@
   <form method="post" action="<%= r ? '/conteudo/pedidos/' + r.id : '/conteudo/pedidos' %>" class="stack" data-when-form>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h2 id="<%= id %>-h"><%= r ? 'Editar pedido' : 'Pedir conteúdo ao editor' %></h2>
+    <% if (!r) { %><%- include('../partials/project-field', { hint: 'Pedido de um episódio fica no projeto do episódio.' }) %><% } %>
     <fieldset class="kind-pick">
       <legend class="field-label">O que é</legend>
       <%# em grupos (antes, 11 chips soltos): vídeo, imagem e o que é do episódio %>

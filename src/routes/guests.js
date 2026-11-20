@@ -104,6 +104,7 @@ async function parseGuestForm(body, guest = null) {
 
 // O formulário reexibe o que foi digitado (inclusive o que não passou na validação).
 const echoValues = (body, values) => ({
+  project_id: body.project_id || '', // campo Projeto (só em "Todos os projetos")
   ...values, instagram: body.instagram || '', profile: body.profile || '', proposed_at: body.proposed_at, premiere_on: body.premiere_on || '',
 });
 
@@ -195,7 +196,10 @@ router.post('/convidados/em-massa', requirePerm('guests.write'), wrap(async (req
 }));
 
 router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) => {
-  const { values, error } = await parseGuestForm(req.body);
+  const parsed = await parseGuestForm(req.body);
+  const { values } = parsed;
+  const projectId = require('../services/scope').target(req, req.body); // o projeto escolhido no menu, ou o do campo Projeto
+  const error = parsed.error || (projectId ? null : 'Escolha o projeto.');
   if (error) {
     return formView(res, 400, { title: 'Novo convidado', guest: null, error, values: echoValues(req.body, values), ...(await formOptions()) });
   }
@@ -204,9 +208,9 @@ router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) =>
     if (duplicates.length) return formView(res, 200, { title: 'Novo convidado', guest: null, error: null, duplicates, dupKind: 'guest', values: echoValues(req.body, values), ...(await formOptions()) });
   }
   const { rows: [guest] } = await db.query(
-    `INSERT INTO guests (${COLUMNS.join(', ')}, created_by)
-     VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}) RETURNING id, photo_key`,
-    [...columnValues(values), req.user.id]);
+    `INSERT INTO guests (${COLUMNS.join(', ')}, created_by, project_id)
+     VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}, $${COLUMNS.length + 2}) RETURNING id, photo_key`,
+    [...columnValues(values), req.user.id, projectId]);
   // cadastro novo direto em Em agendamento/Agendado: sem foto, entra em Convite enviado e a janela da foto termina a mudança
   const pendingStage = rules.missingFor(values.status, { ...values, photo_key: guest.photo_key }).includes(rules.PHOTO) ? values.status : null;
   if (pendingStage) await db.query("UPDATE guests SET status = 'convite_enviado' WHERE id = $1", [guest.id]);

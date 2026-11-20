@@ -24,17 +24,19 @@ const NOT_CUSTOM = "NOT (coalesce(analysis, '{}'::jsonb) ? 'custom')";
 
 // ---------------------------------------------------------------- envio em partes (mesmo esquema dos arquivos do episódio)
 // requestId/episodeId: entrega de um pedido de conteúdo (o vídeo já nasce ligado ao pedido e, se houver, ao episódio).
-async function startUpload({ filename, size, contentType, userId, requestId = null, episodeId = null }) {
+// projectId: só vale para o corte solto; com episódio ou pedido, o corte é do projeto dele.
+async function startUpload({ filename, size, contentType, userId, requestId = null, episodeId = null, projectId = null }) {
   const type = String(contentType || 'video/mp4').split(';')[0].trim().toLowerCase().slice(0, 100) || 'video/mp4';
   const name = prod.safeName(filename);
   const ext = (name.match(/\.([A-Za-z0-9]{1,6})$/)?.[1] || 'mp4').toLowerCase();
   const partSize = prod.partSizeFor(size);
   const { rows: [clip] } = await db.query(
     // a categoria nasce do tipo do pedido (quando é um tipo de vídeo); sem pedido, "Cortes do episódio"
-    `INSERT INTO episode_clips (title, source, status, filename, content_type, part_size, size_bytes, created_by, request_id, episode_id, video_type)
+    `INSERT INTO episode_clips (title, source, status, filename, content_type, part_size, size_bytes, created_by, request_id, episode_id, video_type, project_id)
      VALUES ('Corte', 'upload', 'enviando', $1, $2, $3, $4, $5, $6, $7,
-             coalesce((SELECT r.kind FROM content_requests r JOIN video_types t ON t.key = r.kind WHERE r.id = $6), 'cortes')) RETURNING id`,
-    [name, type, partSize, size, userId, requestId, episodeId]);
+             coalesce((SELECT r.kind FROM content_requests r JOIN video_types t ON t.key = r.kind WHERE r.id = $6), 'cortes'),
+             coalesce((SELECT project_id FROM episodes WHERE id = $7), (SELECT project_id FROM content_requests WHERE id = $6), $8)) RETURNING id`,
+    [name, type, partSize, size, userId, requestId, episodeId, projectId || require('./projects').defaultId()]);
   const key = await b2.keyFor('cortes', clip.id, `video-${crypto.randomBytes(6).toString('hex')}.${ext}`);
   let uploadId;
   try { uploadId = await b2.createMultipart(key, type); } catch (err) { await db.query('DELETE FROM episode_clips WHERE id = $1', [clip.id]); throw err; }
@@ -353,7 +355,8 @@ async function assign(clipId, episodeId, userId = null) {
   if (!episode) return { error: 'Episódio não encontrado.' };
   if (!ELIGIBLE_STATUSES.includes(episode.status)) return { error: 'O episódio ainda não foi gravado: só dá para atribuir cortes a episódios gravados.' };
   if (clip.status === 'enviando') return { error: 'O corte ainda está sendo enviado.' };
-  await db.query('UPDATE episode_clips SET episode_id = $2, updated_at = now() WHERE id = $1', [clipId, episodeId]);
+  // o corte passa a ser do projeto do episódio (sem episódio, fica onde estava)
+  await db.query('UPDATE episode_clips SET episode_id = $2, project_id = coalesce((SELECT project_id FROM episodes WHERE id = $2), project_id), updated_at = now() WHERE id = $1', [clipId, episodeId]);
   await db.query('UPDATE episode_frames SET episode_id = $2 WHERE clip_id = $1', [clipId, episodeId]);
   await db.query('UPDATE episode_covers SET episode_id = $2 WHERE clip_id = $1', [clipId, episodeId]);
   await prod.addEvent(episodeId, userId, 'corte', `Corte atribuído: ${clip.title}`);

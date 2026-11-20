@@ -20,15 +20,16 @@ async function createHistoryEpisode(client, guestId, data, user) {
   const ep = data.episode;
   const published = ep.status === 'publicado';
   const { rows: [row] } = await client.query(
-    `INSERT INTO episodes (number, title, status, guest_id, recorded_on, aired_on, published_at, youtube_url, spotify_url)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+    `INSERT INTO episodes (number, title, status, guest_id, recorded_on, aired_on, published_at, youtube_url, spotify_url, project_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, (SELECT project_id FROM guests WHERE id = $4)) RETURNING id`,
     [ep.number, ep.title || `Conversa com ${data.name}`, ep.status, guestId, day(data.proposed_at),
       published && ep.aired_at ? day(ep.aired_at) : null, published ? ep.aired_at || data.proposed_at : null, ep.youtube_url, ep.spotify_url]);
   await production.addEvent(row.id, user.id, 'criado', `Episódio do histórico importado por CSV por ${user.name} (${published ? 'publicado' : 'gravado'})`, client);
 }
 
 // Grava as linhas prontas. Devolve { rows, headerError, created: [ids], episodes, skipped }.
-async function importGuests(text, user) {
+// projectId: em que projeto os convidados entram (o escolhido no menu de quem importa)
+async function importGuests(text, user, projectId = null) {
   const { rows, headerError } = await analyse(text); // reavalia: nada do que veio da prévia é confiável
   if (headerError) return { rows, headerError, created: [], episodes: 0, skipped: 0 };
   const toImport = rows.filter((r) => !r.errors.length && !r.duplicate);
@@ -50,10 +51,10 @@ async function importGuests(text, user) {
     for (const { data } of toImport) {
       const { rows: [g] } = await client.query(
         `INSERT INTO guests (name, instagram, phone, profile, email, invite_reason, gender, owner_id, created_by, status,
-                            proposed_at, scheduled_studio, scheduled_hosts, scheduled_guest, loss_reason, loss_note, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$11,$11,$12,$13,$14) RETURNING id`,
+                            proposed_at, scheduled_studio, scheduled_hosts, scheduled_guest, loss_reason, loss_note, notes, project_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$11,$11,$12,$13,$14,$15) RETURNING id`,
         [data.name, data.instagram, data.phone || null, data.profile, data.email || null, data.invite_reason || null, data.gender, user.id,
-          data.status, data.proposed_at, data.status === 'agendado', data.loss_reason, data.loss_note, data.notes || null]);
+          data.status, data.proposed_at, data.status === 'agendado', data.loss_reason, data.loss_note, data.notes || null, projectId || require('./projects').defaultId()]);
       const details = [data.status !== 'prospect' && `etapa: ${STATUS_BY_KEY[data.status].label}`, data.loss_reason && `motivo: ${LOSS_REASONS[data.loss_reason]}`,
         data.proposed_at && `gravação ${formatDateTime(data.proposed_at)}`].filter(Boolean);
       await client.query('INSERT INTO guest_events (guest_id, user_id, type, message) VALUES ($1,$2,$3,$4)',

@@ -212,8 +212,9 @@ async function generateIdeas(episodeId, kinds, userId = null) {
       ...(i.tipo === 'carrossel' ? { slides: (i.slides || []).map((t) => L.fitWords(fin.stripEmoji(t), 140)).filter(Boolean).slice(0, 10) } : {}),
     };
     const { rowCount } = await db.query(
-      'INSERT INTO social_ideas (episode_id, kind, title, hook, body, fingerprint, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING',
-      [episodeId, i.tipo, title, L.fitWords(fin.stripEmoji(i.gancho || ''), 200) || null, JSON.stringify(body), fingerprint(title), userId]);
+      `INSERT INTO social_ideas (episode_id, kind, title, hook, body, fingerprint, created_by, project_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, coalesce((SELECT project_id FROM episodes WHERE id = $1), $8)) ON CONFLICT DO NOTHING`,
+      [episodeId, i.tipo, title, L.fitWords(fin.stripEmoji(i.gancho || ''), 200) || null, JSON.stringify(body), fingerprint(title), userId, require('./projects').defaultId()]);
     if (rowCount) { created += 1; known.push({ kind: i.tipo, title }); } else skipped += 1;
   }
   return { created, skipped, error: null };

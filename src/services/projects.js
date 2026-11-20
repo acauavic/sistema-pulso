@@ -69,6 +69,15 @@ async function setMembers(projectId, userIds) {
   }
 }
 
+// Projeto em que a pessoa está trabalhando agora, para o que é criado sem formulário (assistente): o escolhido no menu, se ela
+// ainda participa dele; senão o primeiro dos dela; senão o padrão.
+async function currentFor(userId) {
+  const { rows: [u] } = await db.query('SELECT last_project_id FROM users WHERE id = $1', [userId]);
+  const mine = (await membershipsOf(userId)).map((m) => m.project_id).filter((id) => all().some((p) => p.id === id));
+  if (u && mine.includes(u.last_project_id)) return u.last_project_id;
+  return all().map((p) => p.id).find((id) => mine.includes(id)) || defaultId();
+}
+
 async function setLast(userId, projectId) {
   await db.query('UPDATE users SET last_project_id = $2 WHERE id = $1', [userId, projectId || null]);
 }
@@ -100,4 +109,4 @@ async function update(id, body) {
   }
 }
 
-module.exports = { refresh, all, get, defaultId, has, label, membershipsOf, members, addMember, setMembers, setLast, update };
+module.exports = { refresh, all, get, defaultId, has, label, currentFor, membershipsOf, members, addMember, setMembers, setLast, update };

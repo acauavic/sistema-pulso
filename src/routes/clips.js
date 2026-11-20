@@ -180,7 +180,8 @@ router.post('/cortes/iniciar', requirePerm('episodes.read'), wrap(async (req, re
   if (!Number.isSafeInteger(size) || size <= 0) return uploadError(res, 400, 'Arquivo vazio.');
   if (size > clips.MAX_BYTES) return uploadError(res, 400, 'Arquivo grande demais para um corte.');
   if (!clips.VIDEO_EXT.includes(extOf(filename))) return uploadError(res, 400, `Envie vídeo (${clips.VIDEO_EXT.join(', ')}).`);
-  const { clip, partSize, totalParts } = await clips.startUpload({ filename, size, contentType: req.body.tipo, userId: req.user.id });
+  // corte solto: nasce no projeto escolhido no menu (em "Todos os projetos", no padrão); ao ser atribuído a um episódio, vai para o dele
+  const { clip, partSize, totalParts } = await clips.startUpload({ filename, size, contentType: req.body.tipo, userId: req.user.id, projectId: require('../services/scope').target(req, req.body) });
   res.json({ ok: true, id: clip.id, partSize, totalParts });
 }));
 

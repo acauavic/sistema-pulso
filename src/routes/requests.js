@@ -27,7 +27,10 @@ const episodeOptions = () => db.query("SELECT id, number, title FROM episodes OR
 
 router.post('/conteudo/pedidos', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!R.canRequest(req.user.role)) return deny(req, res, 'Seu perfil não pede conteúdo.');
-  const { values, error } = R.parse(req.body);
+  const parsed = R.parse(req.body);
+  const { values } = parsed;
+  values.project_id = require('../services/scope').target(req, req.body); // pedido sem episódio: o projeto do menu ou do campo Projeto
+  const error = parsed.error || (values.episode_id || values.project_id ? null : 'Escolha o projeto.');
   if (error) { await req.flash('error', error); return res.redirect('/conteudo?pedir=1'); }
   const r = await R.create(values, req.user);
   await attachments.link([...(values.attachmentIds || []), ...[].concat(req.body.attachment_ids || [])], 'content_request', r.id, req.user);

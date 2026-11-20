@@ -42,6 +42,9 @@ const ident = (name) => String(name).split('.').map((p) => `"${p.replace(/^"|"$/
 
 // Chaves estrangeiras (de uma coluna) e chaves primárias, lidas do catálogo uma vez por processo.
 let meta = null;
+// Tabelas em que todo item é de um projeto (project_id obrigatório).
+const PROJECT_ROOTS = new Set(['guests', 'sponsors', 'episodes', 'episode_clips', 'content_requests', 'social_ideas', 'sponsor_plans', 'plateia_events']);
+
 async function schema(q) {
   if (meta) return meta;
   const { rows: fk } = await q(
@@ -141,9 +144,10 @@ async function remove(kind, id, { user = null, batch = null, extra = [], states 
     const b = batch || crypto.randomUUID();
     const title = String(def.title(root) || def.label).slice(0, 200);
     const { rows: [t] } = await q(
-      `INSERT INTO trash_items (kind, ref_id, title, context, batch, payload, storage_keys, deleted_by, purge_after)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now() + make_interval(days => $9)) RETURNING id`,
-      [kind, String(root.id), title, context, b, snap, filesOf(snap), user?.id || null, DAYS]);
+      // de que projeto era: o do próprio item; arquivo, capa e outros filhos herdam do episódio (tarefa geral fica sem projeto)
+      `INSERT INTO trash_items (kind, ref_id, title, context, batch, payload, storage_keys, deleted_by, purge_after, project_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now() + make_interval(days => $9), coalesce($10::int, (SELECT project_id FROM episodes WHERE id = $11::int))) RETURNING id`,
+      [kind, String(root.id), title, context, b, snap, filesOf(snap), user?.id || null, DAYS, root.project_id ?? null, Number.isInteger(root.episode_id) ? root.episode_id : null]);
     await q('COMMIT');
     return { id: t.id, batch: b, title, kind };
   } catch (err) {
@@ -168,6 +172,8 @@ async function restore(trashId) {
     if (!t) { await q('ROLLBACK'); return { error: 'Este item não está mais na lixeira.' }; }
     const m = await schema(q);
     let pending = t.payload.rows.map((r) => ({ ...r, row: { ...r.row } }));
+    // item apagado antes de o sistema ter projetos: a linha guardada não tem project_id e a coluna é obrigatória nas raízes
+    for (const it of pending) if (PROJECT_ROOTS.has(it.table) && it.row.project_id == null) it.row.project_id = require('./projects').defaultId();
     // patrocinador oficial no site (no máximo um): se outro virou oficial enquanto este estava na lixeira, volta sem o selo
     for (const it of pending) {
       if (it.table !== 'sponsors' || !it.row.site_official) continue;

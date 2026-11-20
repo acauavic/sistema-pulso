@@ -79,7 +79,7 @@ const listJoin = (items) => (items.length > 1 ? `${items.slice(0, -1).join(', ')
 const COLUMNS = ['company', 'website', 'kind', 'tier', 'value_cents', 'contact_name', 'contact_email', 'contact_phone', 'stage', 'owner_id', 'paid_at', 'starts_on', 'ends_on', 'notes'];
 const NULLABLE = new Set(['contact_name', 'contact_email', 'contact_phone', 'notes']);
 const columnValues = (v) => COLUMNS.map((c) => (NULLABLE.has(c) ? v[c] || null : v[c]));
-const echo = (body, v) => ({ ...v, value: body.value || '', website: body.website || '', paid_at: body.paid_at || '', starts_on: body.starts_on || '', ends_on: body.ends_on || '' });
+const echo = (body, v) => ({ ...v, project_id: body.project_id || '', value: body.value || '', website: body.website || '', paid_at: body.paid_at || '', starts_on: body.starts_on || '', ends_on: body.ends_on || '' });
 
 // ---- quadro / lista ----
 router.get('/patrocinadores', requirePerm('sponsors.read'), wrap(async (req, res) => {
@@ -128,15 +128,18 @@ router.get('/patrocinadores/novo', requirePerm('sponsors.write'), wrap(async (re
 }));
 
 router.post('/patrocinadores', requirePerm('sponsors.write'), wrap(async (req, res) => {
-  const { values, error } = await parseSponsorForm(req.body);
+  const parsed = await parseSponsorForm(req.body);
+  const { values } = parsed;
+  const projectId = require('../services/scope').target(req, req.body); // o projeto escolhido no menu, ou o do campo Projeto
+  const error = parsed.error || (projectId ? null : 'Escolha o projeto.');
   if (error) return res.status(400).render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error, notice: null, values: echo(req.body, values), ...(await formOptions()) });
   if (req.body.confirmar_duplicata !== '1') {
     const duplicates = await require('../services/duplicates').findFor('sponsor', values);
     if (duplicates.length) return res.render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error: null, notice: null, duplicates, dupKind: 'sponsor', values: echo(req.body, values), ...(await formOptions()) });
   }
   const { rows: [s] } = await db.query(
-    `INSERT INTO sponsors (${COLUMNS.join(', ')}, created_by) VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}) RETURNING id`,
-    [...columnValues(values), req.user.id]);
+    `INSERT INTO sponsors (${COLUMNS.join(', ')}, created_by, project_id) VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}, $${COLUMNS.length + 2}) RETURNING id`,
+    [...columnValues(values), req.user.id, projectId]);
   if (values.tier) await require('../services/plans').applyToSponsor(s.id);
   await sponsorsSvc.addEvent(s.id, req.user.id, 'criado', `Patrocinador cadastrado por ${req.user.name}`);
   await audit(req, 'patrocinador.criado', 'sponsor', s.id, { company: values.company });

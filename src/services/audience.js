@@ -101,8 +101,9 @@ const EVENT_TYPES = ['view', 'agenda_click', 'signup_click', 'form_open', 'lead'
 async function recordEvent({ type, guestId = null, visitorId, utm = {}, referrer = null }) {
   if (!EVENT_TYPES.includes(type)) return false;
   await db.query(
-    `INSERT INTO plateia_events (type, guest_id, visitor_id, utm_source, utm_medium, utm_campaign, utm_term, utm_content, referrer) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [type, guestId, cleanVisitor(visitorId), utm.utm_source, utm.utm_medium, utm.utm_campaign, utm.utm_term, utm.utm_content, clip(referrer, 300)]);
+    `INSERT INTO plateia_events (type, guest_id, visitor_id, utm_source, utm_medium, utm_campaign, utm_term, utm_content, referrer, project_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, coalesce((SELECT project_id FROM guests WHERE id = $2), $10))`,
+    [type, guestId, cleanVisitor(visitorId), utm.utm_source, utm.utm_medium, utm.utm_campaign, utm.utm_term, utm.utm_content, clip(referrer, 300), require('./projects').defaultId()]);
   return true;
 }
 

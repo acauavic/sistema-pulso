@@ -105,9 +105,10 @@ async function createGuest(v) {
       "SELECT id, status FROM guests WHERE lower(regexp_replace(coalesce(instagram, ''), '^@+', '')) = $1 ORDER BY id LIMIT 1", [v.instagram]);
     if (found) { id = found.id; existing = found.status; } else {
       ({ rows: [{ id }] } = await client.query(
-        `INSERT INTO guests (name, instagram, phone, email, profile, invite_reason, status, origin, utm)
-         VALUES ($1, $2, $3, $4, $5, $6, 'prospect', 'site', $7::jsonb) RETURNING id`,
-        [v.name, v.instagram, v.phone, v.email, v.profile, v.topic, v.utm ? JSON.stringify(v.utm) : null]));
+        // formulário do site: entra no projeto padrão (o site é do Pulso; a fase dos endereços decide pelo domínio)
+        `INSERT INTO guests (name, instagram, phone, email, profile, invite_reason, status, origin, utm, project_id)
+         VALUES ($1, $2, $3, $4, $5, $6, 'prospect', 'site', $7::jsonb, $8) RETURNING id`,
+        [v.name, v.instagram, v.phone, v.email, v.profile, v.topic, v.utm ? JSON.stringify(v.utm) : null, require('./projects').defaultId()]));
     }
     await client.query('COMMIT');
   } catch (e) {
@@ -133,9 +134,9 @@ async function createGuest(v) {
 async function createSponsor(v) {
   const notes = [v.role && `Cargo: ${v.role}`, v.goal && `O que a marca quer: ${v.goal}`].filter(Boolean).join('\n') || null;
   const { rows: [{ id }] } = await db.query(
-    `INSERT INTO sponsors (company, contact_name, contact_email, contact_phone, website, notes, stage, origin, utm)
-     VALUES ($1, $2, $3, $4, $5, $6, 'prospect', 'site', $7::jsonb) RETURNING id`,
-    [v.company, v.name, v.email, v.phone, v.website, notes, v.utm ? JSON.stringify(v.utm) : null]);
+    `INSERT INTO sponsors (company, contact_name, contact_email, contact_phone, website, notes, stage, origin, utm, project_id)
+     VALUES ($1, $2, $3, $4, $5, $6, 'prospect', 'site', $7::jsonb, $8) RETURNING id`,
+    [v.company, v.name, v.email, v.phone, v.website, notes, v.utm ? JSON.stringify(v.utm) : null, require('./projects').defaultId()]);
   await sponsorsSvc.addEvent(id, null, 'site', `Pediu para patrocinar pelo site: ${v.name}${v.role ? ` (${v.role})` : ''}${v.utm?.source ? ` · veio de ${v.utm.source}` : ''}`);
   await warn(`Nova marca quer patrocinar: ${v.company}`, [v.name, v.role, v.goal].filter(Boolean).join(' · ') || null, `/patrocinadores/${id}`);
   return { id };

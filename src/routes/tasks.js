@@ -105,6 +105,9 @@ router.post('/tarefas', requirePerm('tasks.write'), wrap(async (req, res) => {
   if (error) { if (wantsJson(req)) return res.status(422).json({ ok: false, error }); await req.flash('error', error); return res.redirect(backTo(req, '/tarefas')); }
   let assignee = isUuid(req.body.assignee_id) ? req.body.assignee_id : null;
   if (assignee && assignee !== req.user.id && !can(req.user.role, 'tasks.write')) assignee = null;
+  // tarefa solta: do projeto escolhido no menu; em "Todos os projetos", a do campo Projeto, que começa em Geral (sem projeto)
+  values.project_id = require('../services/scope').target(req, req.body);
+  if (req.scope.multi && !req.scope.current && !req.scope.ids.includes(Number(req.body.project_id))) values.project_id = null;
   const task = await tasks.create({ values, user: req.user, assigneeId: assignee, links: await readLinks(req.body) });
   await attachments.link(attachmentIdsOf(values, req.body), 'task', task.id, req.user);
   // nasceu de uma mensagem do chat: guarda o link de volta (só se quem cria vê a mensagem) e a mensagem mostra "TAREFA · …"

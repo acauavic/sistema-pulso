@@ -17,6 +17,7 @@
   <form method="post" action="<%= guest ? '/convidados/' + guest.id : '/convidados' %>" class="stack" data-guest-form<%- guest ? '' : ' data-busy="Salvando…"' %>>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <%- include('../partials/duplicate-notice') %>
+    <% if (!guest) { %><%- include('../partials/project-field', { value: typeof values !== 'undefined' && values ? values.project_id : '' }) %><% } %>
 
     <div class="row spread"><h2 class="form-section">Cadastro</h2><span class="small muted">* obrigatório</span></div>
     <label>Nome * <small class="muted">(como aparece no convite; para dupla: "Dr. João e Dra. Maria")</small>

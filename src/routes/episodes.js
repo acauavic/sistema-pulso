@@ -166,9 +166,12 @@ router.post('/episodios', requirePerm('episodes.write'), wrap(async (req, res) =
     const msg = dupSp ? `${dupSp.name} já está cadastrado como patrocinador: escolha na lista em vez de criar outro.` : `${dupGu.name} já está cadastrado como convidado (${dupGu.reasons.join(', ')}): escolha na lista em vez de criar outro.`;
     return res.status(400).render('episodes/new', await formLocals({ title: 'Novo episódio', error: msg, values: echo(req.body, {}) }));
   }
+  // De que projeto é: o do convidado já cadastrado; sem ele, o escolhido no menu ou no campo Projeto.
+  const projectId = v.guest ? (await db.query('SELECT project_id FROM guests WHERE id = $1', [v.guest.id])).rows[0]?.project_id : require('../services/scope').target(req, req.body);
+  if (!projectId) return res.status(400).render('episodes/new', await formLocals({ title: 'Novo episódio', error: 'Escolha o projeto.', values: echo(req.body, {}) }));
   const sponsorsSvc2 = require('../services/sponsors');
   if (v.newSponsor) {
-    const { rows: [sp] } = await db.query("INSERT INTO sponsors (company, kind, stage, owner_id, created_by) VALUES ($1, $2, 'negociacao', $3, $3) RETURNING id, company", [v.newSponsor.company, v.newSponsor.kind, req.user.id]);
+    const { rows: [sp] } = await db.query("INSERT INTO sponsors (company, kind, stage, owner_id, created_by, project_id) VALUES ($1, $2, 'negociacao', $3, $3, $4) RETURNING id, company", [v.newSponsor.company, v.newSponsor.kind, req.user.id, projectId]);
     await sponsorsSvc2.addEvent(sp.id, req.user.id, 'criado', `Patrocinador cadastrado por ${req.user.name} ao registrar um episódio`);
     v.sponsor = { id: sp.id, company: sp.company, role: v.role };
   }
@@ -176,8 +179,8 @@ router.post('/episodios', requirePerm('episodes.write'), wrap(async (req, res) =
   let guest = v.guest || null;
   if (v.newGuest) {
     const { rows: [g] } = await db.query(
-      `INSERT INTO guests (name, instagram, profile, status, owner_id, sponsor_id, sponsor_relation, created_by) VALUES ($1,$2,$3,'gravado',$4,$5,$6,$4) RETURNING *`,
-      [v.newGuest.name, v.newGuest.instagram, v.newGuest.profile, req.user.id, v.sponsor && v.relation ? v.sponsor.id : null, v.sponsor && v.relation ? v.relation : null]);
+      `INSERT INTO guests (name, instagram, profile, status, owner_id, sponsor_id, sponsor_relation, created_by, project_id) VALUES ($1,$2,$3,'gravado',$4,$5,$6,$4,$7) RETURNING *`,
+      [v.newGuest.name, v.newGuest.instagram, v.newGuest.profile, req.user.id, v.sponsor && v.relation ? v.sponsor.id : null, v.sponsor && v.relation ? v.relation : null, projectId]);
     guest = g;
     await guestsSvc.addEvent(g.id, req.user.id, 'criado', `Convidado cadastrado por ${req.user.name} ao registrar o episódio (já gravado)`);
   } else if (guest && guest.status !== 'gravado') {
@@ -187,7 +190,7 @@ router.post('/episodios', requirePerm('episodes.write'), wrap(async (req, res) =
   const recordedOn = v.recorded_on || tasksSvc.todayISO();
   const title = v.title || (guest ? `Conversa com ${guest.name}` : `Episódio ${v.sponsor.company}`);
   const requests = req.body.pedir_ok ? [].concat(req.body.pedir || []).filter((x) => isIntId(String(x))).map(Number) : null; // marcados no formulário
-  const ep = await prod.createEpisode({ requests, title, guestId: guest ? guest.id : null, recordedOn, userId: req.user.id, sponsor: v.sponsor || null, origin: guest ? `convidado ${guest.name}` : `patrocinador ${v.sponsor.company} (só os hosts)` });
+  const ep = await prod.createEpisode({ projectId, requests, title, guestId: guest ? guest.id : null, recordedOn, userId: req.user.id, sponsor: v.sponsor || null, origin: guest ? `convidado ${guest.name}` : `patrocinador ${v.sponsor.company} (só os hosts)` });
   await db.query('UPDATE episodes SET number = coalesce($2, number), aired_on = $3, notes = $4 WHERE id = $1', [ep.id, v.number, v.aired_on, v.notes]);
   if (v.sponsor) await sponsorsSvc2.addEvent(v.sponsor.id, req.user.id, 'episodio', `Episódio registrado: ${title} (${v.sponsor.role === 'exclusivo' ? 'exclusivo' : 'inserção'})`);
   await audit(req, 'episodio.criado', 'episode', ep.id, { title, origem: v.origin });

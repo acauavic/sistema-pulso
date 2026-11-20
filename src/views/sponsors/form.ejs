@@ -13,6 +13,7 @@
   <form method="post" action="<%= sponsor ? '/patrocinadores/' + sponsor.id : '/patrocinadores' %>" class="stack"<%- sponsor ? '' : ' data-busy="Salvando…"' %>>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <%- include('../partials/duplicate-notice') %>
+    <% if (!sponsor) { %><%- include('../partials/project-field', { value: typeof values !== 'undefined' && values ? values.project_id : '' }) %><% } %>
 
     <h2 class="form-section">Empresa</h2>
     <div class="grid-2 tight">
