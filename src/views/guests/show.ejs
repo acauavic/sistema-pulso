@@ -160,6 +160,7 @@
     <button type="button" role="tab" data-tab-btn="resumo" aria-controls="pane-resumo">Resumo</button>
     <% if (showInvite) { %><button type="button" role="tab" data-tab-btn="convite" aria-controls="pane-convite">Convite</button><% } %>
     <% if (showPagina) { %><button type="button" role="tab" data-tab-btn="pagina" aria-controls="pane-pagina">Página da plateia<% if (guest.audience_page_enabled) { %> <span class="count"><%= pagePlateia.partners.filter(function (p) { return p.active; }).length || '' %></span><% } %></button><% } %>
+    <% if (showPauta) { %><button type="button" role="tab" data-tab-btn="pauta" aria-controls="pane-pauta">Pauta</button><% } %>
     <% if (portalTab) { %><button type="button" role="tab" data-tab-btn="portal" aria-controls="pane-portal">Portal<% if (portalTab.pending.length) { %> <span class="count"><%= portalTab.pending.length %></span><% } %></button><% } %>
     <button type="button" role="tab" data-tab-btn="historico" aria-controls="pane-historico">Histórico <span class="count"><%= events.length %></span></button>
   </div>
@@ -641,6 +642,13 @@
     <% } %>
     <% } %>
     <% } %>
+  </div>
+  <% } %>
+
+  <% if (showPauta) { %>
+  <div class="pane" id="pane-pauta" data-pane-id="pauta" hidden>
+    <p class="lead">A pauta da conversa com <%= guest.name %>. Quando a gravação acontecer e o episódio nascer, ela vai junto.</p>
+    <%- include('../partials/pauta', { docs: pautaDocs, episodeId: null, guestId: guest.id, people: teamUsers, prefix: prefixOf(guest.project_id), sentTo: 'Grupo ' + ((projectScope && projectScope.projects.find(function (p) { return p.id === guest.project_id; })) || {}).name, voltar: '/convidados/' + guest.id + '#pauta' }) %>
   </div>
   <% } %>
 

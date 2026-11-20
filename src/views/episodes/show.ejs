@@ -73,6 +73,14 @@
     <% tabs.forEach(function (t) { %><%- tabsBtn(t) %><% }) %>
   </div>
 
+  <!-- ================= PAUTA ================= -->
+  <div class="pane" id="pane-pauta" data-pane-id="pauta" hidden>
+    <% if (ep.status === 'pre_producao') { %>
+    <p class="lead">Escreva a pauta, mande para o grupo do WhatsApp e registre a resposta. Com a gravação feita, use <strong>Marcar como gravado</strong> ali em cima.</p>
+    <% } %>
+    <%- include('../partials/pauta', { docs: pautaDocs, episodeId: ep.id, guestId: null, people: users, prefix: prefixOf(ep.project_id), sentTo: 'Grupo ' + ((projectScope && projectScope.projects.find(function (p) { return p.id === ep.project_id; })) || {}).name, voltar: '/episodios/' + ep.id + '#pauta' }) %>
+  </div>
+
   <!-- ================= RESUMO ================= -->
   <div class="pane" id="pane-resumo" data-pane-id="resumo">
     <div class="grid-2 align-start">

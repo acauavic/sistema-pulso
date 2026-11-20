@@ -788,6 +788,15 @@ span.dot:not([data-dot]) { cursor: default; }
 .tc-move .row-menu-list form { margin: 0; } .tc-move .row-menu-list button { color: var(--text-2); } .tc-move .row-menu-list button:hover { background: var(--surface); color: var(--text); }
 .task-board .column:has(.task-card) > .col-empty { display: none; }
 .task-board .col-more { display: block; padding: 8px 2px 0; }
+
+/* ============ pauta e roteiro do vídeo ============ */
+.pauta-list { display: grid; gap: 16px; }
+.pauta-card { display: grid; gap: 10px; }
+.pauta-head { align-items: flex-start; gap: 12px; } .pauta-head h3 { font-size: 16px; }
+.pauta-body { max-height: 420px; overflow: auto; padding-right: 4px; }
+.pauta-actions { gap: 8px; flex-wrap: wrap; align-items: center; }
+.pauta-hist summary { cursor: pointer; } .pauta-hist ul { margin: 8px 0 0; display: grid; gap: 4px; }
+.pauta-card .badge { vertical-align: middle; margin-left: 6px; }
 @media (pointer: coarse) { .tc-move > summary { top: 4px; right: 4px; width: 36px; height: 36px; } .task-card .tc-top { padding-right: 34px; } .task-card { cursor: default; } }
 .cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; } .cal-title { margin: 0 6px; min-width: 200px; }
 .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; background: var(--line); gap: 1px; }

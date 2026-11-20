@@ -91,6 +91,7 @@ function createApp() {
   app.use(require('./routes/requests')); // Conteúdo > pedidos para o editor (trailer, vídeo avulso, post, story…)
   app.use(require('./routes/clips')); // cortes e publicação nas redes
   app.use(require('./routes/social')); // Social: publicações, novo post, ideias, insights e automações
+  app.use(require('./routes/pautas')); // pauta e roteiro do vídeo (antes da gravação)
   app.use(require('./routes/episodes'));
 
   app.use((req, res) => {

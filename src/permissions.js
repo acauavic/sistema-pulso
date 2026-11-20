@@ -22,6 +22,8 @@ const PERMISSIONS = {
   'sponsors.read': ALL, // o editor de vídeo só lê: briefing, restrições e material do patrocinador
   'sponsors.write': ['superadmin', 'gestao', 'produtora'], // cadastrar, mover etapa, gerar links, entregáveis e arquivos
   'sponsors.delete': ['superadmin', 'gestao'],
+  'pautas.read': ALL,                                   // o editor lê o roteiro aprovado
+  'pautas.write': ['superadmin', 'gestao', 'produtora'], // escrever, mandar para o WhatsApp e registrar a resposta
   'episodes.read': ALL,
   'episodes.write': ['superadmin', 'gestao', 'produtora'],
   'episodes.delete': ['superadmin', 'gestao'],

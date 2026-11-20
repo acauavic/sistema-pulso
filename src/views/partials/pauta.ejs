@@ -1,0 +1,123 @@
+<%#
+  Pauta e roteiro do vídeo. Variáveis: docs (os dois documentos), episodeId ou guestId, people (equipe), prefix (EP., V.),
+  sentTo (sugestão de para quem mandar), voltar (para onde voltar depois de salvar).
+  Jornada: quem produz escreve a pauta, copia para o grupo do WhatsApp (é lá que aprovam) e registra a resposta que vier.
+  Um passo por vez: o botão de ação muda com o estado, e o resto fica em texto legível.
+%>
+<%
+  var P = pautaSvc; var canWrite = can('pautas.write');
+  var owner = episodeId ? { field: 'episode_id', id: episodeId } : { field: 'guest_id', id: guestId };
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">' + '<input type="hidden" name="voltar" value="' + voltar + '">';
+%>
+<div class="pauta-list">
+  <% docs.forEach(function (d) { var st = P.STATES[d.state]; var late = d.due_on && !['aprovada'].includes(d.state) && fmt.toInputDate(d.due_on) < today; %>
+  <section class="card pauta-card">
+    <div class="row spread pauta-head">
+      <div>
+        <h3 class="m-0"><%= P.KINDS[d.kind].label %> <span class="badge <%= st.badge %>"><%= st.label %></span></h3>
+        <p class="handle muted m-0">
+          <%= d.owner_name ? d.owner_name : 'sem responsável' %>
+          <% if (d.due_on) { %> · <span class="<%= late ? 'err' : '' %>">prazo <%= fmt.formatDayShort(d.due_on) %><%= late ? ' · atrasada' : '' %></span><% } %>
+          <% if (d.sent_at) { %> · enviada <%= fmt.formatDayShort(d.sent_at) %> para <%= d.sent_to %><% } %>
+          <% if (d.approved_by) { %> · aprovada por <%= d.approved_by %><% } %>
+        </p>
+      </div>
+      <% if (canWrite) { %>
+      <button class="btn sm <%= d.novo ? 'primary' : 'ghost' %>" type="button" data-modal-open="pauta-edit-<%= d.kind %>"><%- icon(d.novo ? 'plus' : 'pencil', 14) %> <%= d.novo ? 'Escrever' : 'Editar' %></button>
+      <% } %>
+    </div>
+
+    <% if (d.state === 'ajustes' && d.review_note) { %>
+    <p class="notice"><%- icon('message-square', 14) %> Pediram ajustes: <%= d.review_note %></p>
+    <% } %>
+
+    <% if (d.link) { %>
+      <p class="small"><%- icon('link', 14) %> <a href="<%= d.link %>" target="_blank" rel="noopener"><%= d.link.replace(/^https?:\/\//, '') %></a></p>
+    <% } else if (d.body_html || d.body) { %>
+      <div class="rich-content pauta-body"><%- fmt.richHtml(d.body_html, d.body) %></div>
+    <% } else { %>
+      <p class="small muted m-0"><%= P.KINDS[d.kind].hint %>. <%= canWrite ? 'Escreva aqui ou cole o link do documento.' : 'Ainda não foi escrita.' %></p>
+    <% } %>
+
+    <% if (canWrite && !d.novo) { %>
+    <div class="row pauta-actions">
+      <% if (['elaboracao', 'ajustes'].includes(d.state)) { %>
+        <button class="btn sm primary" type="button" data-modal-open="pauta-wa-<%= d.kind %>"><%- icon('whatsapp', 14) %> Copiar para o WhatsApp</button>
+      <% } %>
+      <% if (d.state === 'aprovacao') { %>
+        <button class="btn sm" type="button" data-modal-open="pauta-ok-<%= d.kind %>"><%- icon('check', 14) %> Aprovada</button>
+        <button class="btn sm ghost" type="button" data-modal-open="pauta-nok-<%= d.kind %>"><%- icon('message-square', 14) %> Pediram ajustes</button>
+        <button class="link small" type="button" data-copy="<%= P.whatsappText(d, { prefix: prefix }) %>">copiar de novo</button>
+      <% } %>
+      <% if (d.state === 'aprovada') { %>
+        <button class="link small" type="button" data-copy="<%= P.whatsappText(d, { prefix: prefix }) %>">copiar o texto</button>
+      <% } %>
+    </div>
+    <% } %>
+
+    <% if (!d.novo && (d.events || []).length) { %>
+    <details class="pauta-hist">
+      <summary class="small muted">Histórico <span class="mono"><%= d.events.length %></span></summary>
+      <ul class="plain small">
+        <% d.events.forEach(function (ev) { %><li><span class="mono muted"><%= fmt.formatDayShort(ev.created_at) %></span> <%= ev.message %></li><% }) %>
+      </ul>
+    </details>
+    <% } %>
+  </section>
+
+  <% if (canWrite) { %>
+  <dialog class="modal" id="pauta-edit-<%= d.kind %>" aria-labelledby="pauta-edit-<%= d.kind %>-h">
+    <form method="post" action="/pautas" class="stack" data-busy="Salvando…">
+      <%- csrfField %><input type="hidden" name="<%= owner.field %>" value="<%= owner.id %>"><input type="hidden" name="kind" value="<%= d.kind %>">
+      <h2 id="pauta-edit-<%= d.kind %>-h"><%= d.novo ? 'Escrever' : 'Editar' %> <%= P.KINDS[d.kind].label.toLowerCase() %></h2>
+      <p class="small muted m-0"><%= P.KINDS[d.kind].hint %>. Quem aprova está no WhatsApp: o sistema não manda nada sozinho.</p>
+      <%- include('rich-editor', { name: 'body_html', attach: 'anexos', html: fmt.richHtml(d.body_html, d.body), placeholder: d.kind === 'pauta' ? 'Temas, perguntas, a ordem da conversa…' : 'O texto do vídeo…' }) %>
+      <label>Ou o link do documento <small class="muted">(Google Docs, por exemplo)</small><input type="url" name="link" value="<%= d.link || '' %>" maxlength="500" placeholder="https://docs.google.com/…"></label>
+      <div class="grid-2">
+        <label>Quem escreve
+          <select name="owner_id">
+            <option value="">Escolha…</option>
+            <% people.forEach(function (u) { %><option value="<%= u.id %>" <%= String(d.owner_id || '') === String(u.id) ? 'selected' : '' %>><%= u.name %></option><% }) %>
+          </select>
+        </label>
+        <label>Prazo<input type="date" name="due_on" value="<%= d.due_on ? fmt.toInputDate(d.due_on) : '' %>"></label>
+      </div>
+      <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <% if (!d.novo) { %>
+  <dialog class="modal" id="pauta-wa-<%= d.kind %>" aria-labelledby="pauta-wa-<%= d.kind %>-h">
+    <form method="post" action="/pautas/<%= d.id %>/enviada" class="stack">
+      <%- csrfField %>
+      <h2 id="pauta-wa-<%= d.kind %>-h">Mandar para aprovação</h2>
+      <p class="small muted m-0">Copie o texto e cole no grupo. Aqui fica o registro de quando e para quem; a resposta você marca depois.</p>
+      <label>Para quem<input type="text" name="to" value="<%= sentTo %>" maxlength="120" placeholder="ex.: Grupo Projeto 100"></label>
+      <div class="row modal-actions">
+        <button class="btn primary" type="submit" data-copy="<%= P.whatsappText(d, { prefix: prefix }) %>"><%- icon('copy', 14) %> Copiar e marcar como enviada</button>
+        <button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="pauta-ok-<%= d.kind %>" aria-labelledby="pauta-ok-<%= d.kind %>-h">
+    <form method="post" action="/pautas/<%= d.id %>/resposta" class="stack">
+      <%- csrfField %><input type="hidden" name="resposta" value="aprovada">
+      <h2 id="pauta-ok-<%= d.kind %>-h">Aprovada</h2>
+      <label>Quem aprovou <small class="muted">(opcional)</small><input type="text" name="by" maxlength="120" placeholder="ex.: Dr. José, no grupo"></label>
+      <div class="row modal-actions"><button class="btn primary" type="submit">Registrar aprovação</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="pauta-nok-<%= d.kind %>" aria-labelledby="pauta-nok-<%= d.kind %>-h">
+    <form method="post" action="/pautas/<%= d.id %>/resposta" class="stack">
+      <%- csrfField %><input type="hidden" name="resposta" value="ajustes">
+      <h2 id="pauta-nok-<%= d.kind %>-h">Pediram ajustes</h2>
+      <label>O que pediram *<textarea name="note" rows="3" maxlength="500" required placeholder="ex.: trocar a ordem dos blocos e tirar a pergunta 4"></textarea></label>
+      <div class="row modal-actions"><button class="btn primary" type="submit">Registrar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </form>
+  </dialog>
+  <% } %>
+  <% } %>
+  <% }) %>
+</div>

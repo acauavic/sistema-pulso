@@ -275,6 +275,7 @@ async function createEpisode({ title, guestId = null, recordedOn = null, userId 
   }
   if (!ep) throw new Error('Não consegui numerar o episódio. Tente de novo.');
   if (guestId) {
+    await require('./pautas').moveToEpisode(guestId, ep.id); // a pauta escrita no cadastro acompanha o episódio
     await db.query('INSERT INTO sponsor_episodes (sponsor_id, episode_id, role) SELECT sponsor_id, $2, role FROM sponsor_bookings WHERE guest_id = $1 ON CONFLICT DO NOTHING', [guestId, ep.id]);
     await db.query('DELETE FROM sponsor_bookings WHERE guest_id = $1', [guestId]);
   }

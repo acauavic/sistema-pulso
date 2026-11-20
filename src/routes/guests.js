@@ -276,7 +276,13 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const outSm = outEval.get(guest.id) || null;
   const epRow = episode.rows[0] || null;
   const studio = epRow && can(req.user.role, 'production.upload') ? await require('../services/studioLinks').panelState(epRow.id) : null;
+  // Pauta: a partir de "Em agendamento" (a conversa já vai acontecer). Sem episódio ainda, ela mora no convidado.
+  const pautaSvc = require('../services/pautas');
+  const showPauta = !episode.rows.length && ['em_agendamento', 'agendado'].includes(guest.status);
+  const pautaDocs = showPauta ? await pautaSvc.forOwner({ guestId: guest.id }) : [];
+  for (const d of pautaDocs) if (d.id) d.events = await pautaSvc.events(d.id);
   res.render('guests/show', {
+    pautaSvc, showPauta, pautaDocs, today: require('../services/tasks').todayISO(),
     studio: studio && studio.state === 'aguardando' ? studio : null,
     dupes: can(req.user.role, 'guests.write') ? await require('../services/duplicates').findFor('guest', guest, { excludeId: guest.id }) : [],
     outreachCtx: { kind: 'guest', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (guest.instagram ? 'instagram' : guest.phone ? 'whatsapp' : guest.email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/convidados', subjectId: guest.id },
