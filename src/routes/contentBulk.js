@@ -268,7 +268,7 @@ router.get('/conteudo/capas-em-lote', requirePerm('episodes.read'), wrap(async (
     const chosen = mine.find((v) => v.id === c.cover_id) || mine[0] || null;
     return { ...c, covers: mine, chosen, text: clips.coverTextOf(chosen) };
   });
-  res.render('content/bulk-covers', { title: 'Capas em lote', rows, episodio: isIntId(req.query.episodio) ? req.query.episodio : '', aiOn: require('../config').geminiConfigured });
+  res.render('content/bulk-covers', { title: 'Capas em lote', coverModels: require('../public/design/models').MODELS, rows, episodio: isIntId(req.query.episodio) ? req.query.episodio : '', aiOn: require('../config').geminiConfigured });
 }));
 
 // IA para todos de uma vez: 3 textos de capa por corte, 5 cortes em paralelo (um pedido só conta no limite de uso da IA).

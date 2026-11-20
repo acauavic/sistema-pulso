@@ -516,6 +516,8 @@ input[type="file"] { padding: 8px 12px; }
 .piece-read { display: flex; align-items: center; gap: 12px; }
 .piece-mini { flex: 0 0 auto; width: 84px; height: auto; border-radius: 2px; background: var(--surface); border: 1px solid var(--line); }
 .piece-mini-sp { width: 40px; }
+.cover-pick .cover-model { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.adjust-preview [data-aj-mini][height="128"] { width: 60px; }
 .piece-checks { display: grid; gap: 2px; min-width: 0; }
 .piece-actions { align-items: center; gap: 8px; } .piece-actions .row-menu { margin-left: auto; }
 dialog.modal.modal-adjust { width: min(1080px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }

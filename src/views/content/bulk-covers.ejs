@@ -26,13 +26,14 @@
       <label class="cover-pick" title="<%= v.label || 'Capa' %>">
         <input type="radio" name="capa_<%= c.id %>" value="<%= v.id %>" <%= c.chosen && c.chosen.id === v.id ? 'checked' : '' %>>
         <img src="/capas/<%= v.id %>/imagem?v=<%= new Date(v.updated_at).getTime() %>&w=640" alt="<%= v.label || 'Capa' %>" loading="lazy">
+        <% if (v.spec && v.spec.model && coverModels[v.spec.model]) { %><span class="mono small muted cover-model"><%= coverModels[v.spec.model].name %></span><% } %>
       </label>
       <% }) %>
     </div>
     <div class="stack">
       <input type="hidden" name="antes_<%= c.id %>" value="<%= c.text %>">
       <label>Texto da capa
-        <input type="text" name="texto_<%= c.id %>" value="<%= c.text %>" maxlength="60" placeholder="<%= c.text ? '' : (c.chosen ? 'A capa escolhida já vem com o texto na imagem; escreva para gerar outra' : 'Escreva para gerar a capa') %>" data-ai="capa" data-ai-clip="<%= c.id %>" data-ai-kind="reel_cover" data-cover-text="<%= c.id %>">
+        <input type="text" name="texto_<%= c.id %>" value="<%= c.text %>" maxlength="90" placeholder="<%= c.text ? '' : (c.chosen ? 'A capa escolhida já vem com o texto na imagem; escreva para gerar outra' : 'Escreva para gerar a capa') %>" data-ai="capa" data-ai-clip="<%= c.id %>" data-ai-kind="reel_cover" data-cover-text="<%= c.id %>">
       </label>
       <div class="ai-chips" data-cover-alts="<%= c.id %>" hidden></div>
     </div>

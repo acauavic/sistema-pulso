@@ -314,7 +314,7 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
   const c = await findClip(req);
   if (!c) return notFound(res);
   const [covers, pubs, episodes, ep] = await Promise.all([
-    db.query('SELECT id, kind, position, label, lint, approved, auto, updated_at FROM episode_covers WHERE clip_id = $1 ORDER BY position', [c.id]),
+    db.query('SELECT id, kind, position, label, lint, approved, auto, updated_at, model FROM episode_covers WHERE clip_id = $1 ORDER BY position', [c.id]),
     db.query('SELECT * FROM episode_publications WHERE clip_id = $1 ORDER BY created_at DESC, id DESC', [c.id]),
     eligibleEpisodes(),
     c.episode_id ? db.query('SELECT e.id, e.number, e.title, g.name AS guest_name, g.instagram AS guest_instagram FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.id = $1', [c.episode_id]) : { rows: [] },
@@ -338,7 +338,7 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
   res.render('content/clip', {
     videoTypes: require('../services/catalog').videoOptions(c.video_type), K: require('../services/contentRequests').KINDS,
     ctas: require('../services/socialCopy').forClip(c), autoDefaults, autoOf, nums,
-    comments: thread, request, versions, replace, light,
+    comments: thread, request, versions, replace, light, coverModels: require('../public/design/models').MODELS,
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C, videoTags: await socialApi.videoTags(),
     running: ['enviando', 'processando'].includes(c.status) || pubs.rows.some((p) => p.status === 'enviando'),

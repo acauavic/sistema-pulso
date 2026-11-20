@@ -219,7 +219,9 @@ describe('cortes enviados pelo editor', { skip: !hasFfmpeg && 'precisa de ffmpeg
     assert.equal((await h.db.query('SELECT count(*)::int n FROM episode_frames WHERE clip_id=$1 AND episode_id=$2', [v.id, ep.id])).rows[0].n, 6);
     const after = (await h.db.query('SELECT id, spec FROM episode_covers WHERE clip_id=$1 ORDER BY position', [v.id])).rows;
     assert.ok(after.every((c) => !before.some((b) => b.id === c.id)), 'capas refeitas');
-    assert.ok(after.every((c) => c.spec.layers.some((l) => /EP\.012/.test(l.text || ''))), 'o número do episódio entra nas capas');
+    // pelo guia de peças, a capa do corte leva o nome do convidado (o número do episódio não diz nada a quem não conhece o programa)
+    assert.ok(after.every((c) => c.spec.model && c.spec.sheet.guest), 'as capas são dos modelos do guia e levam o convidado');
+    assert.ok(new Set(after.map((c) => c.spec.model)).size >= 2, 'as opções vêm em modelos diferentes');
     assert.ok((await h.db.query("SELECT 1 FROM episode_events WHERE episode_id=$1 AND type='corte'", [ep.id])).rows.length);
     assert.notEqual((await clipRow(v.id)).cover_id, null);
     assert.match((await as.gestao.get(`/conteudo?vista=cortes&episodio=${ep.id}`)).text, /Momentos que a IA sugere cortar/, 'com o filtro do episódio, aparecem os momentos da análise como dica');

@@ -66,9 +66,13 @@
     }
     canvas.classList.remove('is-off'); save.disabled = false;
     paint(canvas, built);
-    const square = built.spec.format === 'spotify_cover';
-    paint(mini, built, square ? 64 : built.spec.format === 'reel_cover' ? 95 : 168);
-    $('[data-aj-mini-label]').textContent = square ? '64 PX · LISTA DO APP' : built.spec.format === 'reel_cover' ? 'GRID DO PERFIL' : '168 PX · CELULAR';
+    const square = built.spec.format === 'spotify_cover'; const reel = built.spec.format === 'reel_cover';
+    if (reel) { // no grid do perfil o Instagram mostra só a faixa central 3:4 (y 240 a 1680)
+      const tmp = makeCanvas(10, 10); paint(tmp, built, 96);
+      mini.width = 96; mini.height = 128;
+      mini.getContext('2d').drawImage(tmp, 0, Math.round(240 * (96 / 1080)), 96, 128, 0, 0, 96, 128);
+    } else paint(mini, built, square ? 64 : 168);
+    $('[data-aj-mini-label]').textContent = square ? '64 PX · LISTA DO APP' : reel ? 'GRID DO PERFIL · 3:4' : '168 PX · CELULAR';
     const lint = E.lint(ctx, built.spec, built.ctxData);
     const reads = M.reads(built.spec);
     if (lint.issues.length) setStatus(lint.issues[0], 'bad');
@@ -100,6 +104,7 @@
       total ? 'A capa inteira leva até 6 palavras.' : '',
       m.fields.includes('quote') && st.quoteFound === false ? 'Não achei esta frase na transcrição: confira no áudio antes de usar.' : '',
       m.fields.includes('num') ? 'Só número dito no episódio.' : '',
+      m.kind === 'reel_cover' && m.fields.includes('hook') ? 'O texto é o gancho do trecho; a palavra em destaque tem que estar escrita igual no gancho.' : '',
       'Se não cabe no limite, reescreva ou troque de modelo: a fonte não diminui abaixo do mínimo.',
     ].filter(Boolean).join(' ');
   }

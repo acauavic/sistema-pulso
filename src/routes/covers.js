@@ -265,7 +265,17 @@ const adjustTarget = (req) => (req.params.angle ? angleCover(req) : findCover(re
 router.get(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não ajusta capas.' });
   const c = await adjustTarget(req);
-  if (!c || !c.model || c.clip_id) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
+  if (!c || !c.model) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
+  if (c.clip_id) { // capa de corte: os campos vêm da própria capa; os quadros são os do corte
+    const frames = (await store.loadFrames(null, { clipId: c.clip_id, custom: true })).map((f) => ({
+      ref: f.ref, url: `/quadros/${f.id}`, w: f.width, h: f.height, face: pieces.photoOf(f).face, photo: Boolean(f.analysis?.from_file), custom: Boolean(f.analysis?.custom), fileId: f.analysis?.from_file || null,
+    }));
+    return res.json({
+      ok: true, cover: { id: c.id, kind: c.kind, model: c.model, angle: null, flip: false, photo: c.spec?.photo || null },
+      data: { ...(c.spec?.sheet || {}) }, quoteFound: true,
+      frames, photos: await episodePhotos(await episodeOfCover(c)), photoUrl: `/capas/${c.id}/foto`, saveUrl: `/capas/${c.id}/ajustar`, special: null,
+    });
+  }
   const ctx = await sheets.context(c.episode_id);
   const sheet = ctx.meta?.cover_sheet || {};
   const frames = (await store.loadFrames(c.episode_id, { clipId: null, custom: true })).map((f) => ({
@@ -286,10 +296,17 @@ router.get(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
 router.post(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não ajusta capas.' });
   const c = await adjustTarget(req);
-  if (!c || !c.model || c.clip_id) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
+  if (!c || !c.model) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
   const b = req.body || {};
   const fields = {};
-  for (const k of ['pre', 'hl', 'post', 'setup', 'punch', 'num', 'line', 'quote', 'hook', 'guest']) if (typeof b.fields?.[k] === 'string') fields[k] = b.fields[k].slice(0, 300);
+  for (const k of ['pre', 'hl', 'post', 'setup', 'punch', 'num', 'line', 'quote', 'hook', 'guest', 'sub']) if (typeof b.fields?.[k] === 'string') fields[k] = b.fields[k].slice(0, 300);
+  if (c.clip_id) {
+    const done = await pieces.adjustClip(c, { model: String(b.model || ''), fields, frame: typeof b.frame === 'string' ? b.frame : null, face: b.face }, req.user.id);
+    if (done.error) return res.status(422).json({ ok: false, error: done.error.join(' ') });
+    if (c.episode_id) await prod.addEvent(c.episode_id, req.user.id, 'capas', `Capa de corte ajustada: ${done.row.label || ''}`);
+    await req.flash('ok', 'Capa ajustada.');
+    return res.json({ ok: true, back: homeOf(c) });
+  }
   const out = await pieces.adjust(c, { model: String(b.model || ''), fields, frame: typeof b.frame === 'string' ? b.frame : null, flip: b.flip === undefined ? undefined : b.flip === true, face: b.face }, req.user.id);
   if (out.error) return res.status(422).json({ ok: false, error: out.error.join(' ') });
   await prod.addEvent(c.episode_id, req.user.id, 'capas', `Capa ajustada: ${out.row.label || KINDS[c.kind]}`);

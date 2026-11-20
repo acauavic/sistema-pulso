@@ -412,7 +412,7 @@
     'SP-A': { kind: 'spotify_cover', name: 'Padrão', hint: 'Logo e número no topo, foto, nome e chamada.', fields: ['guest', 'hook'], build: spA },
     'SP-B': { kind: 'spotify_cover', name: 'Foto cheia', hint: 'Nome grande: lê melhor na lista. Pede foto vertical em alta.', fields: ['guest', 'hook'], build: spB },
     'SP-C': { kind: 'spotify_cover', name: 'Plum com retrato', hint: 'Episódio especial ou série. Aceita foto menor.', fields: ['guest', 'hook'], special: true, build: spC },
-    'RL-A': { kind: 'reel_cover', name: 'Gancho', hint: 'O gancho do trecho, com uma palavra em lime.', fields: ['hook', 'sub'], build: rlA },
+    'RL-A': { kind: 'reel_cover', name: 'Gancho', hint: 'O gancho do trecho, com uma palavra em lime.', fields: ['hook', 'hl', 'sub'], build: rlA },
     'RL-B': { kind: 'reel_cover', name: 'Frase', hint: 'A frase literal do corte, em serifa. Para cortes de opinião.', fields: ['quote'], build: rlB },
     'RL-C': { kind: 'reel_cover', name: 'Tarja central', hint: 'A mesma copy da thumbnail de tarja.', fields: ['pre', 'hl', 'post'], build: rlC },
   };
@@ -448,12 +448,12 @@
     return '';
   }
   // O que falta ou passa do limite para um modelo sair. [] = pode gerar.
-  const GENERIC = /^(q\s*&\s*a|q\s*e\s*a|corte|perguntas e respostas)$/i;
+  const GENERIC = /^(q\s*&\s*a|q\s*e\s*a|corte(\s*\d+)?|perguntas e respostas)$/i;
   function problems(modelId, d) {
     const m = MODELS[modelId]; if (!m) return ['Modelo desconhecido.'];
     const out = [];
     const need = (f, msg) => { if (!tidy(d[f])) out.push(msg); };
-    if (m.fields.includes('hl')) need('hl', 'Falta a palavra em destaque.');
+    if (m.fields.includes('pre')) need('hl', 'Falta a palavra em destaque.'); // no gancho do corte (RL-A) o destaque é opcional
     if (m.fields.includes('setup')) { need('setup', 'Falta a frase.'); need('punch', 'Falta a palavra da tarja.'); }
     if (m.fields.includes('num')) { need('num', 'Este modelo pede um número dito no episódio.'); need('line', 'Falta a linha do número.'); }
     if (m.fields.includes('quote')) need('quote', 'Este modelo pede uma frase literal do convidado.');

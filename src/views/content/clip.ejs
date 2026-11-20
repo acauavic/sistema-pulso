@@ -62,11 +62,14 @@
               <button type="<%= perm.cover ? 'submit' : 'button' %>" class="cover-pick <%= cv.id === clip.cover_id ? 'on' : '' %>" title="<%= cv.label %>" <%= perm.cover ? '' : 'disabled' %>>
                 <img src="/capas/<%= cv.id %>/imagem?v=<%= new Date(cv.updated_at).getTime() %>&w=640" alt="<%= cv.label %>" loading="lazy" width="108" height="192">
                 <span class="handle"><%= cv.id === clip.cover_id ? 'escolhida' : 'usar' %></span>
+                <% if (cv.model && coverModels[cv.model]) { %><span class="mono small muted cover-model"><%= coverModels[cv.model].name %></span><% } %>
               </button>
             </form>
             <% }) %>
           </div>
-          <% if (chosen && perm.cover) { %><p class="row small"><a class="btn sm" href="/capas/<%= chosen.id %>/editar">Editar capa</a><span class="muted">Troque o quadro ou envie uma imagem sua.</span></p><% } %>
+          <% if (chosen && perm.cover && chosen.model) { %><p class="row small"><button class="btn sm" type="button" data-ajustar-open="/capas/<%= chosen.id %>/ajustar"><%- icon('sliders-horizontal', 14) %> Ajustar capa</button><span class="muted">Mude o gancho, o modelo ou a foto.</span></p>
+          <% } else if (chosen && perm.cover) { %><p class="row small"><a class="btn sm" href="/capas/<%= chosen.id %>/editar">Editar capa</a><span class="muted">Troque o quadro ou envie uma imagem sua.</span></p><% } %>
+          <% var badCover = chosen && chosen.lint && (chosen.lint.issues || [])[0]; if (badCover) { %><p class="small bad-text m-0"><%= badCover %></p><% } %>
         </div>
       </div>
       <% if (versions.length) { %>
@@ -240,7 +243,11 @@
   </div>
 </dialog>
 <% } %>
+<% if (perm.cover) { %><%- include('../partials/cover-adjust') %><% } %>
 <script src="/static/producao.js?v=<%= assetV %>" defer></script>
+<script src="/static/design/engine.js?v=<%= assetV %>" defer></script>
+<script src="/static/design/models.js?v=<%= assetV %>" defer></script>
+<script src="/static/capas.js?v=<%= assetV %>" defer></script>
 <script src="/static/autocta.js?v=<%= assetV %>" defer></script>
 <% if (perm.cut) { %>
 <dialog class="modal" id="modal-categoria" aria-labelledby="mcat-h">

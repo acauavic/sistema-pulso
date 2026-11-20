@@ -71,8 +71,8 @@ async function best(modelId, data, frame, buffers, opts = {}) {
   return pick;
 }
 
-async function insert(episodeId, pick, { kind, position = 0, userId = null, clipId = null, auto = true }) {
-  const row = await store.insertCover(episodeId, { kind, spec: pick.built.spec, ctx: pick.built.ctxData, lint: pick.res.lint, label: labelOf(pick.built.spec), position, clipId }, pick.res, userId);
+async function insert(episodeId, pick, { kind, position = 0, userId = null, clipId = null, auto = true, group = null, label = null }) {
+  const row = await store.insertCover(episodeId, { kind, spec: pick.built.spec, ctx: pick.built.ctxData, lint: pick.res.lint, label: label || labelOf(pick.built.spec), position, clipId, group }, pick.res, userId);
   const { rows: [out] } = await db.query('UPDATE episode_covers SET model = $2, angle = $3, auto = $4 WHERE id = $1 RETURNING *', [row.id, pick.built.spec.model, pick.built.spec.angle || null, auto]);
   return out;
 }
@@ -206,6 +206,72 @@ function missing(sheet, episode, coversList) {
   return out;
 }
 
+// ---------------------------------------------------------------- capas de corte (Reels 1080×1920)
+// O que todo modelo de corte recebe: nome, credencial (a da ficha do episódio, se houver) e o número do episódio.
+function clipBase({ episode = null, guest = null, epSheet = null } = {}) {
+  const role = sheets.clean(guest?.positioning || guest?.job_title || '');
+  return { guest: sheets.clean(epSheet?.guest || guest?.name || ''), tag: sheets.clean(epSheet?.tag || (M.countWords(role) <= 8 ? role : '')), ep: episode?.number || '' };
+}
+// O texto da capa de corte por modelo (para as listas e para o campo "Texto da capa").
+function clipText(spec) {
+  const s = spec?.sheet || {};
+  return M.tidy(spec?.model === 'RL-C' ? [s.pre, s.hl, s.post].filter(Boolean).join(' ') : spec?.model === 'RL-B' ? s.quote : s.hook);
+}
+// Os campos de um modelo de corte a partir de um texto só (o campo "Texto da capa"): gancho, tarja ou frase.
+function clipDataFor(model, text, base, keep = {}) {
+  const t = sheets.clean(text);
+  if (model === 'RL-C') return { ...base, ...sheets.splitText(t) };
+  if (model === 'RL-B') return { ...base, quote: t };
+  const hl = keep.hl && M.hookMarks(t, keep.hl).words.length ? keep.hl : sheets.splitText(t).hl;
+  return { ...base, hook: t, hl, sub: keep.sub || '' };
+}
+// Até 3 opções em modelos diferentes: o gancho (RL-A), a tarja central (RL-C) e a frase literal (RL-B). Só entra o que cabe nos
+// limites do guia. [] = os textos do corte não servem para os modelos (quem chama cai na capa antiga).
+function clipOptions(clip, base) {
+  const cs = clip.cover_sheet || {}; const texts = (clip.cover_texts || []).map(sheets.clean).filter(Boolean);
+  const hook = sheets.clean(cs.hook) || texts[0] || sheets.clean(clip.post_title);
+  const out = [];
+  const push = (model, data) => {
+    if (!M.tidy(clipText({ model, sheet: data }))) return;
+    if (M.problems(model, data).length || out.some((o) => o.model === model && clipText({ model, sheet: o.data }) === clipText({ model, sheet: data }))) return;
+    out.push({ model, data });
+  };
+  if (hook) push('RL-A', clipDataFor('RL-A', hook, base, { hl: cs.hl, sub: cs.sub }));
+  for (const t of [texts[1], texts[0], hook].filter(Boolean)) { if (out.some((o) => o.model === 'RL-C')) break; push('RL-C', clipDataFor('RL-C', t, base)); }
+  if (cs.quote) push('RL-B', clipDataFor('RL-B', cs.quote, base));
+  for (const t of texts.slice(1)) { if (out.length >= 3) break; push('RL-A', clipDataFor('RL-A', t, base)); }
+  return out.slice(0, 3);
+}
+
+// Refaz a capa de um corte com o que veio da janela Ajustar (ou das capas em lote). Guarda os textos na ficha do corte.
+async function adjustClip(cover, input, userId = null) {
+  const model = M.MODELS[input.model]?.kind === 'reel_cover' ? input.model : (cover.model || 'RL-A');
+  const { rows: [clip] } = await db.query('SELECT * FROM episode_clips WHERE id = $1', [cover.clip_id]);
+  if (!clip) return { error: ['Corte não encontrado.'] };
+  const ctx = clip.episode_id ? await sheets.context(clip.episode_id) : { episode: null, meta: null };
+  const { rows: [guest] } = ctx.episode?.guest_id ? await db.query('SELECT name, positioning, job_title FROM guests WHERE id = $1', [ctx.episode.guest_id]) : { rows: [] };
+  const fields = Object.fromEntries(Object.entries(input.fields || {}).filter(([k, v]) => ['hook', 'hl', 'sub', 'quote', 'pre', 'post'].includes(k) && v !== undefined && v !== null).map(([k, v]) => [k, sheets.clean(v)]));
+  const data = { ...clipBase({ episode: ctx.episode, guest, epSheet: ctx.meta?.cover_sheet }), ...(cover.spec?.sheet || {}), ...fields };
+  const errs = M.problems(model, data);
+  if (errs.length) return { error: errs };
+  const all = await store.loadFrames(null, { clipId: clip.id, custom: true });
+  const ref = input.frame && all.some((f) => f.ref === input.frame) ? input.frame : (cover.spec?.photo?.ref || cover.spec?.bg?.ref);
+  const frame = all.find((f) => f.ref === ref) || store.pickFrames(all, 1, clip.duration_ms || 60_000)[0];
+  if (!frame) return { error: ['Este corte ainda não tem quadros lidos: use "Ler de novo" no corte.'] };
+  const face = cleanFace(input.face) || (ref === cover.spec?.photo?.ref ? cover.spec?.photo?.face : null) || null;
+  const pick = await best(model, data, frame, await store.imageBuffers(all, [frame.ref]), { face, flip: false });
+  if (pick.error) return { error: pick.error };
+  const sheet = { ...(clip.cover_sheet || {}), ...Object.fromEntries(['hook', 'hl', 'sub', 'quote'].filter((k) => fields[k] !== undefined).map((k) => [k, fields[k]])), by: 'equipe', updated_at: new Date().toISOString() };
+  await db.query('UPDATE episode_clips SET cover_sheet = $2, updated_at = now() WHERE id = $1', [clip.id, JSON.stringify(sheet)]);
+  if (!cover.id) { // capa nova (capas em lote): fica escolhida e aprovada
+    const { rows: [{ n }] } = await db.query('SELECT coalesce(max(position), -1) + 1 AS n FROM episode_covers WHERE clip_id = $1', [clip.id]);
+    return { row: await insert(clip.episode_id, pick, { kind: 'reel_cover', position: n, userId, clipId: clip.id, auto: false, group: `clip-${clip.id}`, label: `Capa: ${clipText(pick.built.spec)}` }) };
+  }
+  const row = await replace(cover, pick, userId);
+  await db.query('UPDATE episode_covers SET label = $2 WHERE id = $1', [row.id, `Capa: ${clipText(pick.built.spec)}`.slice(0, 160)]);
+  return { row };
+}
+
 // Arquivo para baixar no padrão do guia: PNG quando cabe no limite da peça, senão o JPG guardado.
 const pieceName = (episode, cover, ext) => {
   const ep = episode?.number ? `ep${String(episode.number).padStart(3, '0')}` : `episodio${cover.episode_id}`;
@@ -226,4 +292,4 @@ async function download(cover, episode) {
   return { buffer: Buffer.from(await obj.arrayBuffer()), mime: 'image/jpeg', name: pieceName(episode, cover, 'jpg') };
 }
 
-module.exports = { YT_MAX, SP_MAX, LETTERS, photoOf, build, render, best, generate, adjust, replace, refresh, missing, download, pieceName, labelOf };
+module.exports = { YT_MAX, SP_MAX, LETTERS, photoOf, build, render, best, insert, generate, adjust, replace, refresh, missing, download, pieceName, labelOf, clipBase, clipText, clipDataFor, clipOptions, adjustClip };

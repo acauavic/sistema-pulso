@@ -166,6 +166,8 @@ const TEXTS_SCHEMA = {
   type: 'OBJECT',
   properties: {
     titulo: { type: 'STRING' }, legenda: { type: 'STRING' }, textos_capa: { type: 'ARRAY', items: { type: 'STRING' } },
+    // ficha da capa do corte (guia de peças): gancho com a palavra de destaque, apoio e uma frase literal
+    gancho_capa: { type: 'STRING' }, destaque_capa: { type: 'STRING' }, apoio_capa: { type: 'STRING' }, frase_literal: { type: 'STRING' },
     chamadas: { type: 'OBJECT', properties: Object.fromEntries(SC.NETWORKS.map((n) => [n, { type: 'STRING' }])), required: SC.NETWORKS },
   },
   required: ['titulo', 'legenda', 'textos_capa', 'chamadas'],
@@ -186,6 +188,10 @@ function textsPrompt({ episode = null, guest = null, transcript, avoid = [], exa
     'Abaixo está a fala de UM corte vertical de até 2 minutos para Reels, TikTok e Shorts. Escreva como um bom copywriter de redes sociais: o objetivo é a pessoa parar de rolar, assistir até o fim e querer mais do Pulso, sem prometer o que o trecho não diz.',
     `- titulo: de 4 a 9 palavras, até 60 caracteres, sem ponto final. ${SC.COPY.titulo}`,
     `- textos_capa: EXATAMENTE 3 textos para a capa do vídeo, de 2 a 5 palavras e no máximo ${L.LIMITS.thumbnailText.maxChars - 4} caracteres, cada um por um caminho diferente. ${SC.COPY.capa}`,
+    '- gancho_capa: o gancho deste trecho para a capa, de 4 a 9 palavras, para quem não conhece o convidado nem o Pulso. Fale com quem assiste; nunca "Q&A", "Corte" ou só o nome do convidado.',
+    '- destaque_capa: UMA palavra do gancho_capa (a que carrega o desejo ou o medo), escrita igual à do gancho.',
+    '- apoio_capa: uma frase de apoio de até 12 palavras que completa o gancho, ou vazio.',
+    '- frase_literal: uma frase LITERAL da fala, de 4 a 10 palavras, copiada sem mudar nenhuma palavra; vazio se não houver uma frase forte.',
     `- legenda: de 2 a 4 frases curtas (até 320 caracteres), sem hashtags e sem exclamações. ${SC.COPY.legenda}`,
     `- chamadas: uma chamada por rede, em 1 frase de até ${SC.CTA_MAX} caracteres, que diz o que fazer e dá um motivo ligado ao tema deste corte (não um motivo genérico). ${SC.NETWORKS.map((n) => SC.CTA_RULE[n]).join('; ')}. Sem "link na bio", sem exclamações em sequência.`,
     examples ? `\n${examples}` : '',
@@ -197,7 +203,7 @@ function textsPrompt({ episode = null, guest = null, transcript, avoid = [], exa
 // Título, legenda, 3 textos de capa e a chamada de cada rede a partir do que a pessoa fala no corte. Sem IA ou sem fala, devolve
 // vazio (a equipe escreve). Legenda com frase genérica proibida ganha uma segunda tentativa.
 async function writeTexts({ episode = null, guest = null, transcript, hashtags = [] }) {
-  const empty = { post_title: null, caption: null, cover_texts: [], ctas: null };
+  const empty = { post_title: null, caption: null, cover_texts: [], ctas: null, cover_sheet: null };
   if (!config.geminiConfigured || !transcript || transcript.length < 20) return empty;
   try {
     let data; let avoid = [];
@@ -211,11 +217,29 @@ async function writeTexts({ episode = null, guest = null, transcript, hashtags =
     const cover = [...new Set((data.textos_capa || []).map(cleanCoverText).filter(goodCover))].slice(0, 3);
     const body = L.fitWords(L.balanceQuotes(L.stripAngles(fin.stripEmoji(data.legenda || ''))), 360);
     const ctas = Object.fromEntries(SC.NETWORKS.map((n) => [n, SC.tidyCta(fin.stripEmoji(data.chamadas?.[n] || ''))]).filter(([, t]) => t));
-    return { post_title: title || null, caption: L.tidy([body, hashtagLine(hashtags)].filter(Boolean).join('\n\n')) || null, cover_texts: cover, ctas: Object.keys(ctas).length ? ctas : null };
+    return { post_title: title || null, caption: L.tidy([body, hashtagLine(hashtags)].filter(Boolean).join('\n\n')) || null, cover_texts: cover, ctas: Object.keys(ctas).length ? ctas : null, cover_sheet: coverSheetOf(data, transcript) };
   } catch (err) {
     console.error('Falha ao escrever textos do corte:', err.message);
     return empty;
   }
+}
+
+// Ficha da capa do corte a partir do que a IA devolveu: só o que cabe nos limites do guia; a frase só vale se foi dita.
+function coverSheetOf(data, transcript) {
+  const M = require('../public/design/models'); const sheets = require('./coverSheet');
+  const norm = (s) => String(s || '').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const out = {};
+  const hook = sheets.clean(fin.stripEmoji(data.gancho_capa || ''));
+  if (hook && !M.fieldError('hook', hook, 'reel_cover') && M.countWords(hook) >= 2) {
+    out.hook = hook;
+    const hl = sheets.clean(data.destaque_capa || '');
+    if (hl && M.hookMarks(hook, hl).words.length && !M.fieldError('hl', hl, 'reel_cover')) out.hl = hl;
+  }
+  const sub = sheets.clean(fin.stripEmoji(data.apoio_capa || ''));
+  if (sub && !M.fieldError('sub', sub, 'reel_cover')) out.sub = sub;
+  const quote = sheets.clean(data.frase_literal || '');
+  if (quote && M.countWords(quote) >= 3 && !M.fieldError('quote', quote, 'reel_cover') && norm(transcript).includes(norm(quote))) out.quote = quote;
+  return Object.keys(out).length ? { ...out, by: 'ia' } : null;
 }
 
 // ---------------------------------------------------------------- capas e atribuição
@@ -238,7 +262,17 @@ async function buildCovers(clipId, userId = null) {
   const texts = (clip.cover_texts || []).filter(Boolean);
   const epLabel = episode?.number ? `EP.${String(episode.number).padStart(3, '0')}` : '';
   const made = [];
-  for (let i = 0; i < picks.length; i += 1) {
+  // Pelo guia de peças: até 3 opções em modelos diferentes (gancho, tarja central e frase literal), cada uma num quadro.
+  const pieces = require('./coverPieces');
+  const { rows: [epMeta] } = clip.episode_id ? await db.query('SELECT cover_sheet FROM episode_metadata WHERE episode_id = $1', [clip.episode_id]) : { rows: [] };
+  const options = picks.length ? pieces.clipOptions(clip, pieces.clipBase({ episode, guest, epSheet: epMeta?.cover_sheet })) : [];
+  for (const [i, o] of options.entries()) {
+    const frame = picks[i % picks.length];
+    const pick = await pieces.best(o.model, o.data, frame, { [frame.ref]: buffers[frame.ref] }, { flip: false });
+    if (!pick.error) made.push({ pick, text: pieces.clipText(pick.built.spec), i: made.length });
+  }
+  // textos que não cabem em nenhum modelo (corte antigo, sem IA): a capa de antes, com o texto onde há espaço
+  for (let i = 0; !made.length && i < picks.length; i += 1) {
     const text = texts[i] || texts[0] || L.fitWords(clip.post_title || clip.title, L.LIMITS.thumbnailText.maxChars);
     const built = designs.buildReelCover({ frame: picks[i], text, label: guest?.name || '', epLabel });
     const res = await store.render(built.spec, { [picks[i].ref]: buffers[picks[i].ref] }, built.ctxData);
@@ -249,6 +283,7 @@ async function buildCovers(clipId, userId = null) {
   for (const o of old) await b2.deleteObject(o.storage_key).catch(() => {});
   const rows = [];
   for (const m of made) {
+    if (m.pick) { rows.push(await pieces.insert(clip.episode_id, m.pick, { kind: 'reel_cover', position: m.i, userId, clipId, group: `clip-${clipId}`, label: `Capa ${m.i + 1}: ${m.text}`.slice(0, 160) })); continue; }
     rows.push(await store.insertCover(clip.episode_id, { kind: 'reel_cover', spec: m.built.spec, ctx: m.built.ctxData, lint: m.res.lint, label: `Capa ${m.i + 1}: ${m.text}`, group: `clip-${clipId}`, position: m.i, clipId }, m.res, userId));
   }
   const { rows: [cur] } = await db.query('SELECT cover_id FROM episode_clips WHERE id = $1', [clipId]);
@@ -260,6 +295,7 @@ async function buildCovers(clipId, userId = null) {
 
 // Texto principal de uma capa de corte (capa gerada pelo sistema ou editada). Capa do Drive é imagem pronta: sem texto editável.
 function coverTextOf(cover) {
+  if (cover?.spec?.model && cover.spec.sheet) return require('./coverPieces').clipText(cover.spec); // capa de um modelo do guia: o texto vem da ficha
   const layer = (cover?.spec?.layers || []).find((l) => l.type === 'text' && (l.role === 'main' || l.id === 'texto'));
   return layer?.text ? String(layer.text) : '';
 }
@@ -268,23 +304,25 @@ function coverTextOf(cover) {
 // (Drive, enviada), usa o melhor quadro do vídeo, para não escrever por cima de um texto que já está na imagem.
 // A capa nova fica escolhida e aprovada. Devolve a capa ou { error }.
 async function coverWithText(clipId, { baseCoverId = null, text, userId = null }) {
-  const t = cleanCoverText(text);
-  if (!goodCover(t)) return { error: 'Texto curto demais para a capa (use pelo menos 2 palavras).' };
+  const M = require('../public/design/models'); const pieces = require('./coverPieces'); const sheets = require('./coverSheet');
+  const t = sheets.clean(fin.stripEmoji(String(text || '')));
+  if (M.countWords(t) < 2) return { error: 'Texto curto demais para a capa (use pelo menos 2 palavras).' };
   const { rows: [clip] } = await db.query('SELECT * FROM episode_clips WHERE id = $1', [clipId]);
   if (!clip) return { error: 'Corte não encontrado.' };
   const frames = await store.loadFrames(null, { clipId });
   if (!frames.length) return { error: 'Este corte ainda não tem quadros lidos: use "Ler de novo" no corte.' };
-  const { rows: [base] } = baseCoverId ? await db.query('SELECT spec FROM episode_covers WHERE id = $1 AND clip_id = $2', [baseCoverId, clipId]) : { rows: [] };
-  const ref = base?.spec?.bg?.ref;
-  const frame = frames.find((f) => f.ref === ref) || store.pickFrames(frames, 1, clip.duration_ms || 60_000)[0];
+  const { rows: [base] } = baseCoverId ? await db.query('SELECT spec, model FROM episode_covers WHERE id = $1 AND clip_id = $2', [baseCoverId, clipId]) : { rows: [] };
+  // o mesmo modelo da capa de base, se o texto couber nele; senão o gancho (que aceita até 9 palavras)
   const { episode, guest } = await episodeContext(clip.episode_id);
-  const epLabel = episode?.number ? `EP.${String(episode.number).padStart(3, '0')}` : '';
-  const built = designs.buildReelCover({ frame, text: t, label: guest?.name || '', epLabel });
-  const buffers = await store.imageBuffers(frames, [frame.ref]);
-  const res = await store.render(built.spec, { [frame.ref]: buffers[frame.ref] }, built.ctxData);
-  const { rows: [{ n }] } = await db.query('SELECT coalesce(max(position), -1) + 1 AS n FROM episode_covers WHERE clip_id = $1', [clipId]);
-  const row = await store.insertCover(clip.episode_id, { kind: 'reel_cover', spec: built.spec, ctx: built.ctxData, lint: res.lint, label: `Capa: ${t}`, group: `clip-${clipId}`, position: n, clipId }, res, userId);
-  await db.query('UPDATE episode_covers SET auto = false WHERE id = $1', [row.id]);
+  const { rows: [epMeta] } = clip.episode_id ? await db.query('SELECT cover_sheet FROM episode_metadata WHERE episode_id = $1', [clip.episode_id]) : { rows: [] };
+  const bd = pieces.clipBase({ episode, guest, epSheet: epMeta?.cover_sheet });
+  let model = base?.model && M.MODELS[base.model]?.kind === 'reel_cover' ? base.model : 'RL-A';
+  let data = pieces.clipDataFor(model, t, bd, base?.spec?.sheet || {});
+  if (M.problems(model, data).length && model !== 'RL-A') { model = 'RL-A'; data = pieces.clipDataFor(model, t, bd); }
+  const out = await pieces.adjustClip({ id: null, clip_id: clipId, episode_id: clip.episode_id, kind: 'reel_cover', model, spec: base?.spec ? { photo: base.spec.photo, bg: base.spec.bg } : null },
+    { model, fields: { hook: data.hook, hl: data.hl, sub: data.sub, quote: data.quote, pre: data.pre, post: data.post }, frame: base?.spec?.photo?.ref || base?.spec?.bg?.ref || null }, userId);
+  if (out.error) return { error: out.error[0] };
+  const row = out.row;
   await db.query('UPDATE episode_covers SET approved = (id = $2) WHERE clip_id = $1', [clipId, row.id]);
   await db.query("UPDATE episode_clips SET cover_id = $2, cover_texts = jsonb_build_array($3::text) || coalesce(cover_texts, '[]'::jsonb), updated_at = now() WHERE id = $1", [clipId, row.id, t]);
   return { ...row, approved: true };
@@ -390,8 +428,9 @@ async function runProcess(job, { update }) {
       const texts = await writeTexts({ episode, guest, transcript, hashtags: meta?.suggestions?.hashtags || [] });
       await db.query(
         `UPDATE episode_clips SET transcript = $2, post_title = coalesce($3, post_title), caption = coalesce(nullif(caption, ''), $4),
-           cover_texts = CASE WHEN $5::jsonb = '[]'::jsonb THEN cover_texts ELSE $5::jsonb END, ctas = coalesce($6::jsonb, ctas), updated_at = now() WHERE id = $1`,
-        [clip.id, transcript, texts.post_title, texts.caption, JSON.stringify(texts.cover_texts), texts.ctas ? JSON.stringify(texts.ctas) : null]);
+           cover_texts = CASE WHEN $5::jsonb = '[]'::jsonb THEN cover_texts ELSE $5::jsonb END, ctas = coalesce($6::jsonb, ctas),
+           cover_sheet = coalesce($7::jsonb, cover_sheet), updated_at = now() WHERE id = $1`,
+        [clip.id, transcript, texts.post_title, texts.caption, JSON.stringify(texts.cover_texts), texts.ctas ? JSON.stringify(texts.ctas) : null, texts.cover_sheet ? JSON.stringify(texts.cover_sheet) : null]);
     }
 
     let covers = 0;

@@ -210,6 +210,45 @@ describe('Ficha do episódio e as peças na Finalização', () => {
     assert.deepEqual([fresh.stale, fresh.approved, fresh.spec.sheet.tag], [false, true, 'Quem projeta clínicas']);
   });
 
+  it('capas de corte: 3 opções em modelos diferentes, a janela Ajustar e o texto nas capas em lote', async () => {
+    const clips = require('../src/services/clips');
+    const b2 = require('../src/services/b2');
+    const [clip] = await q(`INSERT INTO episode_clips (title, post_title, source, status, episode_id, storage_key, size_bytes, content_type, width, height, duration_ms, cover_texts, cover_sheet)
+      VALUES ('Corte 7', 'Sua clínica pode fechar por burocracia', 'upload', 'pronto', $1, 'pp/c7.mp4', 100, 'video/mp4', 1080, 1920, 45000, $2, $3) RETURNING *`,
+    [ep.id, JSON.stringify(['Burocracia fecha clínica', 'O alvará que faltava', 'Abrir sem perder dinheiro']),
+      JSON.stringify({ hook: 'Sua clínica pode fechar por burocracia.', hl: 'fechar', sub: 'Como abrir com segurança e não perder dinheiro.', quote: 'Reforma não salva imóvel errado.' })]);
+    for (let i = 0; i < 3; i += 1) {
+      const f = frameImage(1080, 1920, { x: 0.33, y: 0.24, w: 0.34, h: 0.19 });
+      const key = await b2.keyFor('cortes', clip.id, 'quadros', `q${i}.jpg`);
+      await b2.putObject(key, f.buffer, 'image/jpeg');
+      await q('INSERT INTO episode_frames (episode_id, clip_id, at_ms, storage_key, width, height, analysis, score) VALUES ($1,$2,$3,$4,1080,1920,$5,$6)', [ep.id, clip.id, 10000 * (i + 1), key, JSON.stringify({ rostos: [f.face], caixas_de_texto: [] }), 9 - i]);
+    }
+    const made = await clips.buildCovers(clip.id);
+    assert.deepEqual(made.map((c) => c.model), ['RL-A', 'RL-C', 'RL-B'], 'gancho, tarja central e frase');
+    assert.deepEqual(made.map((c) => clips.coverTextOf(c)), ['Sua clínica pode fechar por burocracia.', 'O alvará que faltava', 'Reforma não salva imóvel errado.']);
+    for (const c of made) { assert.deepEqual([c.width, c.height], [1080, 1920]); assert.deepEqual(c.lint.issues, [], c.lint.issues.join(' ')); }
+    assert.equal(made[0].spec.sheet.tag, 'Quem projeta clínicas', 'a credencial vem da ficha do episódio');
+    const page = (await as.prod.get(`/cortes/${clip.id}`)).text;
+    assert.match(page, new RegExp(`data-ajustar-open="/capas/${made[0].id}/ajustar"`)); assert.match(page, /Gancho/); assert.match(page, /Tarja central/); assert.match(page, /id="modal-ajustar"/);
+    const info = JSON.parse((await as.prod.get(`/capas/${made[0].id}/ajustar`)).text);
+    assert.deepEqual([info.cover.kind, info.cover.model, info.data.hook, info.frames.length], ['reel_cover', 'RL-A', 'Sua clínica pode fechar por burocracia.', 3]);
+    const token = await as.prod.csrf('/episodios');
+    const post = (body) => fetch(`${app.base}/capas/${made[0].id}/ajustar`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json', cookie: as.prod.cookie(), 'x-csrf-token': token }, body: JSON.stringify(body) });
+    let res = await post({ model: 'RL-A', fields: { hook: 'Q&A', hl: '', sub: '' } });
+    assert.equal(res.status, 422); assert.match((await res.json()).error, /gancho do trecho/);
+    res = await post({ model: 'RL-C', fields: { pre: 'A burocracia pode', hl: 'fechar', post: 'sua clínica' }, frame: info.frames[1].ref });
+    assert.equal(res.status, 200);
+    const [now] = await q('SELECT model, spec, auto, label FROM episode_covers WHERE id = $1', [made[0].id]);
+    assert.deepEqual([now.model, now.auto, now.spec.photo.ref, now.label], ['RL-C', false, info.frames[1].ref, 'Capa: A burocracia pode fechar sua clínica']);
+    // capas em lote: o texto novo vira uma capa nova no modelo da capa de base (ou no gancho, se não couber)
+    const out = await clips.coverWithText(clip.id, { baseCoverId: made[2].id, text: 'Reforma não salva imóvel errado nunca' });
+    assert.equal(out.model, 'RL-B'); assert.equal(out.approved, true);
+    const long = await clips.coverWithText(clip.id, { baseCoverId: made[1].id, text: 'O alvará que faltava para a sua clínica abrir' });
+    assert.equal(long.model, 'RL-A', 'nove palavras não cabem na tarja: vira gancho');
+    assert.equal((await q('SELECT cover_id FROM episode_clips WHERE id = $1', [clip.id]))[0].cover_id, long.id);
+    assert.match((await clips.coverWithText(clip.id, { text: 'Corte' })).error, /pelo menos 2 palavras/);
+  });
+
   it('ângulo cujo texto passa do limite não sai: a tela diz o motivo e a janela Ajustar cria a capa', async () => {
     const [gone] = await q("SELECT id FROM episode_covers WHERE episode_id = $1 AND angle = 'autoridade'", [ep.id]);
     await as.gestao.act(`/episodios/${ep.id}/capas/${gone.id}/excluir`, {}, { from: `/episodios/${ep.id}` });
