@@ -141,7 +141,7 @@ router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => 
       ORDER BY e.number DESC NULLS LAST, e.id DESC LIMIT 500`, params);
   // Disponível para edição e Em edição seguem a ordem de edição (pela data de veiculação), com a posição em cada cartão
   const editOrder = require('../services/editOrder');
-  const order = await editOrder.byId();
+  const order = await editOrder.byId(require('../services/scope').idsOf(req));
   const columns = C.EPISODE_STAGES.map((s) => {
     const items = rows.filter((e) => e.status === s.key);
     if (editOrder.STAGES.includes(s.key)) items.sort((a, b) => (order[a.id]?.rank ?? 1e9) - (order[b.id]?.rank ?? 1e9));

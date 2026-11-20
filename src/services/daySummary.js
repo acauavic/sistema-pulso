@@ -16,6 +16,21 @@ const EDITOR_ROLES = Object.keys(ROLES).filter((r) => can(r, 'production.edit') 
 const BOUNDS = `b AS (SELECT ($1::date)::timestamp AT TIME ZONE '${TZ}' AS s, ($1::date + 1)::timestamp AT TIME ZONE '${TZ}' AS e)`;
 const NETWORKS = ['instagram', 'youtube'];
 
+// Recorte por projeto: o trecho SQL com os ids (inteiros conferidos aqui, nunca vindos do endereço). Sem ids, não filtra nada.
+// Fica como texto, e não como parâmetro, porque estas consultas são grandes e renumerar os $N delas seria pedir erro.
+const inProject = (ids, col) => {
+  const list = (ids || []).map(Number).filter(Number.isInteger);
+  return ids ? ` AND ${col} = ANY('{${list.join(',')}}'::int[])` : '';
+};
+// Tarefa sem projeto (geral) aparece em qualquer recorte.
+const inProjectOrNull = (ids, col) => (ids ? ` AND (${col} IS NULL OR${inProject(ids, col).slice(4)})` : '');
+// A publicação herda o projeto do corte, ou do episódio.
+const pubProject = (ids) => (ids
+  ? ` AND coalesce((SELECT c.project_id FROM episode_clips c WHERE c.id = p.clip_id), (SELECT e.project_id FROM episodes e WHERE e.id = p.episode_id))`
+    + ` = ANY('{${(ids || []).map(Number).filter(Number.isInteger).join(',')}}'::int[])`
+  : '');
+
+
 // O dia pedido no endereço (?dia=AAAA-MM-DD), dentro do que o sistema tem: do primeiro convidado cadastrado até hoje.
 async function pick(raw) {
   const today = cal.todayISO();
@@ -32,10 +47,10 @@ async function pick(raw) {
 
 // Convidados. A etapa de cada um no fim do dia é a última mudança até ali; uma mudança desfeita no mesmo dia (arrastou errado e
 // voltou) não conta, porque no fim do dia a pessoa não está mais onde a mudança a pôs. ownerId: só os convidados da pessoa.
-async function guests(day, ownerId = null) {
+async function guests(day, ownerId = null, pids = null) {
   const { rows: [r] } = await db.query(`WITH ${BOUNDS},
     st AS (SELECT DISTINCT ON (l.guest_id) l.guest_id, l.to_status AS status FROM guest_stage_log l JOIN guests gg ON gg.id = l.guest_id, b
-            WHERE l.changed_at < b.e AND ($3::uuid IS NULL OR gg.owner_id = $3) ORDER BY l.guest_id, l.changed_at DESC, l.id DESC),
+            WHERE l.changed_at < b.e AND ($3::uuid IS NULL OR gg.owner_id = $3)${inProject(pids, 'gg.project_id')} ORDER BY l.guest_id, l.changed_at DESC, l.id DESC),
     mv AS (SELECT l.guest_id, l.from_status, l.to_status, st.status AS end_status FROM guest_stage_log l JOIN st USING (guest_id), b
             WHERE l.changed_at >= b.s AND l.changed_at < b.e AND l.from_status IS NOT NULL)
     SELECT count(*) FILTER (WHERE st.status = 'convite_enviado')::int AS waiting,
@@ -55,10 +70,10 @@ async function guests(day, ownerId = null) {
 // chegou nela pelo cadastro (só no dia em que nasceu: voltar da lixeira não é entrada nova) ou por uma mudança que não foi desfeita
 // no mesmo dia, sem já estar nela quando o dia começou. Fechado = entrou em Ganho, ou em Ativo sem passar por Ganho.
 // ownerId: só os patrocinadores da pessoa.
-async function sponsorStages(day, ownerId = null) {
+async function sponsorStages(day, ownerId = null, pids = null) {
   const { rows: [r] } = await db.query(`WITH ${BOUNDS},
     st AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage AS stage FROM sponsor_stage_log l JOIN sponsors ss ON ss.id = l.sponsor_id, b
-            WHERE l.changed_at < b.e AND ($2::uuid IS NULL OR ss.owner_id = $2) ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC),
+            WHERE l.changed_at < b.e AND ($2::uuid IS NULL OR ss.owner_id = $2)${inProject(pids, 'ss.project_id')} ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC),
     st0 AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage AS stage FROM sponsor_stage_log l, b
              WHERE l.changed_at < b.s ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC),
     mv AS (SELECT l.sponsor_id, l.from_stage, l.to_stage, st.stage AS end_stage
@@ -80,26 +95,27 @@ async function sponsorStages(day, ownerId = null) {
 // Abordagens de patrocinadores, a mesma base da cadência (Registrar abordagem) e da meta de abordagens (outreach.SPONSOR_SENDS).
 // A 1ª abordagem do ciclo faz dele "abordado" no dia em que aconteceu (outro canal no mesmo dia ainda é essa abordagem); falar de
 // novo num dia seguinte é follow-up, e cada patrocinador conta um por dia, mesmo por mais de um canal.
-async function sponsorContacts(day) {
+async function sponsorContacts(day, pids = null) {
+  const mine = pids ? ` AND EXISTS (SELECT 1 FROM sponsors s WHERE s.id = sponsor_id${inProject(pids, 's.project_id')})` : '';
   const { rows: [r] } = await db.query(`WITH ${BOUNDS}, ${outreach.SPONSOR_SENDS}
-    SELECT (SELECT count(DISTINCT sponsor_id) FROM firsts, b WHERE firsts.at >= b.s)::int AS approached,
+    SELECT (SELECT count(DISTINCT sponsor_id) FROM firsts, b WHERE firsts.at >= b.s${mine})::int AS approached,
            (SELECT count(DISTINCT x.sponsor_id) FROM sends x JOIN firsts f USING (sponsor_id, cycle), b
-             WHERE x.at >= b.s AND f.at < b.s)::int AS followed`, [day]);
+             WHERE x.at >= b.s AND f.at < b.s${mine.replace('sponsor_id', 'x.sponsor_id')})::int AS followed`, [day]);
   return r;
 }
 
 // Como a cadência estava no fim do dia: quantos em Prospecção ainda sem abordagem, com follow-up para o dia e atrasados. Hoje é a
 // própria cadência (a mesma conta do cartão Hoje e de Gestão > Cadência); num dia que passou, ela é refeita com a etapa daquele
 // dia e as abordagens até o fim dele. ownerId: só os patrocinadores da pessoa.
-async function sponsorCadence(day, isToday, ownerId = null) {
+async function sponsorCadence(day, isToday, ownerId = null, pids = null) {
   let list;
-  if (isToday) list = [...(await outreach.evaluateAll('sponsor', { ownerId })).values()];
+  if (isToday) list = [...(await outreach.evaluateAll('sponsor', { ownerId, projectIds: pids })).values()];
   else {
     const { rows: subjects } = await db.query(`WITH ${BOUNDS},
       st AS (SELECT DISTINCT ON (l.sponsor_id) l.sponsor_id, l.to_stage, l.changed_at FROM sponsor_stage_log l, b
               WHERE l.changed_at < b.e ORDER BY l.sponsor_id, l.changed_at DESC, l.id DESC)
       SELECT st.sponsor_id AS id, st.changed_at AS entered FROM st JOIN sponsors s ON s.id = st.sponsor_id
-       WHERE st.to_stage = 'prospect' AND ($2::uuid IS NULL OR s.owner_id = $2)`, [day, ownerId]);
+       WHERE st.to_stage = 'prospect' AND ($2::uuid IS NULL OR s.owner_id = $2)${inProject(pids, 's.project_id')}`, [day, ownerId]);
     const { rows: attempts } = subjects.length ? await db.query(`WITH ${BOUNDS}
       SELECT a.subject_id, a.channel, a.result, a.at, a.created_at FROM outreach_attempts a, b
        WHERE a.subject_type = 'sponsor' AND a.subject_id = ANY($2::int[]) AND a.at < b.e`, [day, subjects.map((x) => x.id)]) : { rows: [] };
@@ -115,14 +131,14 @@ async function sponsorCadence(day, isToday, ownerId = null) {
 // Por que os convidados foram perdidos: quem entrou em Perdido nos últimos `days` dias até o dia (inclusive) e ainda estava lá no fim
 // dele, pelo motivo marcado no cadastro. ownerId: só os convidados da pessoa. { total, list: [{ key, label, n, pct, bar }] }, do
 // motivo mais comum para o menos; a barra é proporcional ao mais comum.
-async function lossReasons(day, { ownerId = null, days = 30 } = {}) {
+async function lossReasons(day, { ownerId = null, days = 30, pids = null } = {}) {
   const { rows } = await db.query(`WITH b AS (SELECT ($1::date - ($3::int - 1))::timestamp AT TIME ZONE '${TZ}' AS s, ($1::date + 1)::timestamp AT TIME ZONE '${TZ}' AS e),
     st AS (SELECT DISTINCT ON (l.guest_id) l.guest_id, l.to_status AS status FROM guest_stage_log l, b
             WHERE l.changed_at < b.e ORDER BY l.guest_id, l.changed_at DESC, l.id DESC)
     SELECT g.loss_reason AS reason, count(DISTINCT g.id)::int AS n
       FROM guest_stage_log l JOIN st USING (guest_id) JOIN guests g ON g.id = l.guest_id, b
      WHERE l.to_status = 'perdido' AND l.from_status IS NOT NULL AND st.status = 'perdido' AND l.changed_at >= b.s AND l.changed_at < b.e
-       AND ($2::uuid IS NULL OR g.owner_id = $2)
+       AND ($2::uuid IS NULL OR g.owner_id = $2)${inProject(pids, 'g.project_id')}
      GROUP BY g.loss_reason`, [day, ownerId, days]);
   const total = rows.reduce((n, r) => n + r.n, 0);
   const max = rows.reduce((m, r) => Math.max(m, r.n), 0);
@@ -132,11 +148,11 @@ async function lossReasons(day, { ownerId = null, days = 30 } = {}) {
 }
 
 // Episódios: gravados no dia (a data da gravação), os que estavam gravados e ainda sem publicar no fim do dia, e os publicados.
-async function episodes(day) {
+async function episodes(day, pids = null) {
   const { rows: [r] } = await db.query(`WITH ${BOUNDS},
     e AS (SELECT coalesce(recorded_on, (created_at AT TIME ZONE '${TZ}')::date) AS rec,
                  (published_at IS NOT NULL OR status = 'publicado') AS pub, coalesce(published_at, '-infinity'::timestamptz) AS pub_at
-            FROM episodes)
+            FROM episodes WHERE true${inProject(pids, 'project_id')})
     SELECT count(*) FILTER (WHERE e.rec = $1::date)::int AS recorded_in,
            count(*) FILTER (WHERE e.rec <= $1::date AND NOT (e.pub AND e.pub_at < b.e))::int AS to_publish,
            count(*) FILTER (WHERE e.pub AND e.pub_at >= b.s AND e.pub_at < b.e)::int AS published_in,
@@ -147,28 +163,28 @@ async function episodes(day) {
 
 // Cortes subidos no dia: os do editor; os que a gestão subiu (uma importação, por exemplo) ficam à parte.
 // Revisão = versão nova de um corte que já existia (a versão anterior vai para clip_versions na hora da troca).
-async function clips(day) {
+async function clips(day, pids = null) {
   const [{ rows: [up] }, { rows: [rv] }] = await Promise.all([
     db.query(`WITH ${BOUNDS}
       SELECT count(*) FILTER (WHERE u.role = ANY($2::text[]))::int AS by_editor,
              count(*) FILTER (WHERE u.role IS NULL OR NOT (u.role = ANY($2::text[])))::int AS by_team,
              count(DISTINCT c.episode_id) FILTER (WHERE u.role = ANY($2::text[]))::int AS episodes
         FROM episode_clips c LEFT JOIN users u ON u.id = c.created_by, b
-       WHERE c.source = 'upload' AND c.created_at >= b.s AND c.created_at < b.e`, [day, EDITOR_ROLES]),
+       WHERE c.source = 'upload' AND c.created_at >= b.s AND c.created_at < b.e${inProject(pids, 'c.project_id')}`, [day, EDITOR_ROLES]),
     db.query(`WITH ${BOUNDS}
-      SELECT count(*)::int AS versions, count(DISTINCT v.clip_id)::int AS revised FROM clip_versions v, b
-       WHERE v.replaced_at >= b.s AND v.replaced_at < b.e`, [day]),
+      SELECT count(*)::int AS versions, count(DISTINCT v.clip_id)::int AS revised FROM clip_versions v JOIN episode_clips c ON c.id = v.clip_id, b
+       WHERE v.replaced_at >= b.s AND v.replaced_at < b.e${inProject(pids, 'c.project_id')}`, [day]),
   ]);
   return { uploaded: up.by_editor, uploadedByTeam: up.by_team, uploadedEpisodes: up.episodes, versions: rv.versions, revised: rv.revised };
 }
 
 // Posts que foram ao ar no dia. A hora que vale é a da rede (lida com os números do post); sem ela, a hora agendada; sem
 // agendamento, a do envio (ou a do post marcado à mão). Cada corte conta uma vez no dia, mesmo indo para várias redes.
-async function posts(day) {
+async function posts(day, pids = null) {
   const { rows: [r] } = await db.query(`WITH ${BOUNDS},
     p AS (SELECT p.id, p.clip_id, p.options, CASE WHEN jsonb_typeof(p.results) = 'array' THEN p.results ELSE '[]'::jsonb END AS results,
                  coalesce((SELECT min(m.published_at) FROM post_metrics m WHERE m.publication_id = p.id), p.scheduled_at, p.created_at) AS live_at
-            FROM episode_publications p, b WHERE p.status IN ('publicado', 'parcial') AND p.created_at < b.e),
+            FROM episode_publications p, b WHERE p.status IN ('publicado', 'parcial') AND p.created_at < b.e${pubProject(pids)}),
     d AS (SELECT p.* FROM p, b WHERE p.live_at >= b.s AND p.live_at < b.e)
     SELECT (SELECT count(DISTINCT clip_id) FROM d)::int AS posted,
            (SELECT count(*) FROM d, jsonb_array_elements(d.results) x WHERE d.clip_id IS NOT NULL AND x->>'ok' = 'true')::int AS network_posts,
@@ -179,7 +195,7 @@ async function posts(day) {
 
 // Posts agendados para o dia (cortes, imagens, carrosséis, stories), pela hora marcada: já no ar, ainda a sair (agendados, em
 // envio ou esperando aprovação) e com erro.
-async function scheduled(day) {
+async function scheduled(day, pids = null) {
   const { rows: [r] } = await db.query(`WITH ${BOUNDS}
     SELECT count(*)::int AS total,
            count(*) FILTER (WHERE p.clip_id IS NOT NULL)::int AS clips,
@@ -187,15 +203,15 @@ async function scheduled(day) {
            count(*) FILTER (WHERE p.status IN ('agendado', 'enviando', 'revisao'))::int AS pending,
            count(*) FILTER (WHERE p.status = 'erro')::int AS failed
       FROM episode_publications p, b
-     WHERE p.scheduled_at >= b.s AND p.scheduled_at < b.e AND p.status IN ('agendado', 'enviando', 'revisao', 'publicado', 'parcial', 'erro')`, [day]);
+     WHERE p.scheduled_at >= b.s AND p.scheduled_at < b.e AND p.status IN ('agendado', 'enviando', 'revisao', 'publicado', 'parcial', 'erro')${pubProject(pids)}`, [day]);
   return { total: r.total, clips: r.clips, posts: r.total - r.clips, out: r.out, pending: r.pending, failed: r.failed };
 }
 
 // Tarefas atrasadas no fim do dia (hoje: agora), com a mesma regra da lista de tarefas: prazo vencido, ou o dia de hoje com a
 // hora já passada. Entram as que existiam e não estavam feitas naquele momento.
-async function tasks(day, cut) {
+async function tasks(day, cut, pids = null) {
   const { rows: [r] } = await db.query(`WITH ${BOUNDS},
-    t AS (SELECT due_on, due_time FROM tasks, b WHERE created_at < b.e AND NOT (status = 'feito' AND coalesce(completed_at, created_at) < b.e))
+    t AS (SELECT due_on, due_time FROM tasks, b WHERE created_at < b.e AND NOT (status = 'feito' AND coalesce(completed_at, created_at) < b.e)${inProjectOrNull(pids, 'project_id')})
     SELECT count(*)::int AS open,
            count(*) FILTER (WHERE due_on < $1::date OR (due_on = $1::date AND due_time IS NOT NULL AND due_time < $2::time))::int AS late
       FROM t`, [day, cut]);
@@ -229,9 +245,10 @@ async function followers(day) {
 }
 
 // Tudo do dia. Hoje, as tarefas atrasadas seguem a hora de agora; num dia que já passou, o fim do dia.
-async function summary(day, { isToday = day === cal.todayISO() } = {}) {
-  const [g, losses, sp, spc, spk, e, c, p, sc, t, s] = await Promise.all([guests(day), lossReasons(day), sponsorStages(day), sponsorContacts(day), sponsorCadence(day, isToday),
-    episodes(day), clips(day), posts(day), scheduled(day), tasks(day, isToday ? nowTime() : '24:00'), followers(day)]);
+// pids: o recorte de projeto de quem está olhando (services/scope). Seguidores são da casa (as contas das redes ainda não têm projeto).
+async function summary(day, { isToday = day === cal.todayISO(), pids = null } = {}) {
+  const [g, losses, sp, spc, spk, e, c, p, sc, t, s] = await Promise.all([guests(day, null, pids), lossReasons(day, { pids }), sponsorStages(day, null, pids), sponsorContacts(day, pids), sponsorCadence(day, isToday, null, pids),
+    episodes(day, pids), clips(day, pids), posts(day, pids), scheduled(day, pids), tasks(day, isToday ? nowTime() : '24:00', pids), followers(day)]);
   return { guests: g, losses, sponsors: { ...sp, ...spc, ...spk }, episodes: e, clips: { ...c, ...p }, scheduled: sc, tasks: t, social: s };
 }
 

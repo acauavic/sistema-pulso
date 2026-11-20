@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.99.0', date: '2026-11-20', title: 'O dia a dia também segue o projeto',
+    items: [
+      { kind: 'novo', text: 'Início, Resumo do dia, Seu dia, Calendário, Busca (Ctrl+K) e Avisos passaram a seguir o projeto escolhido no menu. Em "Todos os projetos", tudo junto, como antes.' },
+      { kind: 'novo', text: 'O aviso guarda de que projeto é: quem está com o outro projeto escolhido não vê (e não conta no sininho). Avisos do sistema, sem item ligado, continuam aparecendo sempre.' },
+      { kind: 'ajuste', text: 'A ordem de edição, o cartão "Hoje", os follow-ups e as metas do dia também passaram a contar só o projeto escolhido.' },
+      { kind: 'ajuste', text: 'Contas a pagar e a receber ainda aparecem juntas no calendário e na busca: o dinheiro ganha projeto na versão do financeiro.' },
+    ],
+  },
+  {
     version: '1.98.0', date: '2026-11-20', title: 'Vídeo que não é episódio, e a pauta acompanhada',
     items: [
       { kind: 'novo', text: 'Cada projeto numera os seus vídeos do seu jeito: EP.012 no Pulso e V.003 no Projeto 100, lado a lado, sem um atrapalhar o outro.' },

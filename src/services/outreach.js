@@ -89,10 +89,12 @@ function evaluate(kind, enteredAt, attempts, cfg, today = clock.today()) {
 const NEEDS = new Set(['hoje', 'atrasado', 'possivel_perdido']);
 
 // Avaliação de todos os assuntos de uma etapa (ou só de alguns ids): Map id -> { ...subject, ...evaluate() }.
-async function evaluateAll(kind, { ids = null, ownerId = null } = {}) {
+// projectIds: o recorte de projeto de quem está olhando (services/scope).
+async function evaluateAll(kind, { ids = null, ownerId = null, projectIds = null } = {}) {
   const k = KINDS[kind]; const cfg = await config(); const p = [k.stage]; let w = `s.${k.col} = $1`;
   if (ids) { p.push(ids); w += ` AND s.id = ANY($${p.length})`; }
   if (ownerId) { p.push(ownerId); w += ` AND s.owner_id = $${p.length}`; }
+  if (projectIds) { p.push(projectIds); w += ` AND s.project_id = ANY($${p.length}::int[])`; }
   const nameCol = kind === 'guest' ? 's.name' : 's.company AS name';
   const { rows: subjects } = await db.query(`SELECT s.id, ${nameCol}, s.owner_id, s.stage_entered_at, u.name AS owner_name FROM ${k.table} s LEFT JOIN users u ON u.id = s.owner_id WHERE ${w}`, p);
   const { rows: attempts } = subjects.length ? await db.query(
@@ -168,8 +170,9 @@ const sponsorFirstsToday = async (userId) => {
 };
 
 // O que a pessoa tem para fazer hoje: follow-ups dela (e o que está sem dono, que é de todos) + meta de patrocinadores.
-async function todayFor(user) {
-  const [g, s] = await Promise.all([evaluateAll('guest'), evaluateAll('sponsor')]);
+// projectIds: o recorte de projeto de quem está olhando (services/scope).
+async function todayFor(user, projectIds = null) {
+  const [g, s] = await Promise.all([evaluateAll('guest', { projectIds }), evaluateAll('sponsor', { projectIds })]);
   const mine = (x) => !x.owner_id || x.owner_id === user.id;
   const items = [...g.values(), ...s.values()].filter((x) => NEEDS.has(x.state) && mine(x))
     .sort((a, b) => ({ possivel_perdido: 2, atrasado: 0, hoje: 1 }[a.state] - { possivel_perdido: 2, atrasado: 0, hoje: 1 }[b.state]) || a.name.localeCompare(b.name, 'pt-BR'));

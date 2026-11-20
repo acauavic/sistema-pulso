@@ -28,12 +28,14 @@ router.post('/projeto', wrap(async (req, res) => {
 // veiculação), os episódios dele que já saíram da edição e as tarefas dele. Nada de convidados, patrocinadores ou financeiro.
 async function editorHome(req, res) {
   const me = req.user.id;
+  const pids = require('../services/scope').idsOf(req); // o recorte de projeto da pessoa
   const goalsSvc = require('../services/goals');
   const [order, { rows: mine }, { rows: tasks }, rhythm, myGoals] = await Promise.all([
-    require('../services/editOrder').list(),
-    db.query(`SELECT id, number, title, status, review_round FROM episodes WHERE editor_id = $1 AND status IN ('em_revisao', 'em_finalizacao', 'pronto_publicar')
-               ORDER BY CASE status WHEN 'em_revisao' THEN 0 ELSE 1 END, number DESC NULLS LAST`, [me]),
-    db.query("SELECT id, title, status, due_on, to_char(due_time, 'HH24:MI') AS due_time FROM tasks WHERE assignee_id = $1 AND status <> 'feito' ORDER BY due_on NULLS LAST, due_time NULLS LAST, id LIMIT 8", [me]),
+    require('../services/editOrder').list(pids),
+    db.query(`SELECT id, number, title, status, review_round, project_id FROM episodes WHERE editor_id = $1 AND status IN ('em_revisao', 'em_finalizacao', 'pronto_publicar')
+                AND project_id = ANY($2::int[])
+               ORDER BY CASE status WHEN 'em_revisao' THEN 0 ELSE 1 END, number DESC NULLS LAST`, [me, pids]),
+    db.query("SELECT id, title, status, due_on, to_char(due_time, 'HH24:MI') AS due_time, project_id FROM tasks WHERE assignee_id = $1 AND status <> 'feito' AND (project_id IS NULL OR project_id = ANY($2::int[])) ORDER BY due_on NULLS LAST, due_time NULLS LAST, id LIMIT 8", [me, pids]),
     goalsSvc.rhythmFor(me), // Seu ritmo: cortes e revisões de hoje e da semana, entregas da semana, próxima entrega
     goalsSvc.progressFor(me), // Minhas metas (Gestão > Metas)
   ]);
@@ -42,9 +44,10 @@ async function editorHome(req, res) {
   const adjust = inEdit.filter((e) => e.review_round > 0);
   // pedidos de conteúdo: os meus e os sem responsável que ainda não começaram (qualquer editor pode pegar)
   const { rows: requests } = await db.query(
-    `SELECT id, kind, title, status, due_on, rounds, assignee_id FROM content_requests
+    `SELECT id, kind, title, status, due_on, rounds, assignee_id, project_id FROM content_requests
       WHERE status IN ('pedido','producao','revisao') AND (assignee_id = $1 OR (assignee_id IS NULL AND status = 'pedido'))
-      ORDER BY CASE WHEN status = 'producao' AND rounds > 0 THEN 0 WHEN status = 'producao' THEN 1 WHEN status = 'pedido' THEN 2 ELSE 3 END, due_on NULLS LAST, id`, [me]);
+        AND project_id = ANY($2::int[])
+      ORDER BY CASE WHEN status = 'producao' AND rounds > 0 THEN 0 WHEN status = 'producao' THEN 1 WHEN status = 'pedido' THEN 2 ELSE 3 END, due_on NULLS LAST, id`, [me, pids]);
   res.render('dashboard-editor', { requests, requestKinds: require('../services/contentRequests').KINDS, title: 'Início', order, queue, inEditCount: inEdit.length, mine, rhythm, myGoals, tasks: tasks.map((t) => ({ ...t, late: require('../services/tasks').isLate(t) })), adjustCount: adjust.length, today: require('../services/calendar').todayISO(), EPISODE_STATUSES: require('../constants').EPISODE_STATUSES });
 }
 
@@ -59,29 +62,31 @@ router.get('/', wrap(async (req, res) => {
     [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())]),
     // o banco de horas nunca derruba o Início: se falhar, a faixa de aviso só não aparece
     require('../services/hourBank').status().catch((err) => { console.error('Banco de horas (Início):', err.message); return null; })]) : null;
-  const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user) : null;
+  const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user, require('../services/scope').idsOf(req)) : null;
   // Resumo do dia: o dia vem do endereço (?dia=AAAA-MM-DD); sem ele, hoje. A produtora abre no "Seu dia" (os números dela) e vê o
   // resumo da equipe em ?visao=equipe; as outras pessoas abrem no resumo da equipe.
   const daySummary = require('../services/daySummary');
   const myDay = require('../services/myDay');
+  const pids = require('../services/scope').idsOf(req); // o recorte de projeto de quem está olhando
   const isProducer = myDay.isProducer(req.user);
   const visao = isProducer && req.query.visao !== 'equipe' ? 'meu' : 'equipe';
   const day = await daySummary.pick(req.query.dia);
   const quiet = (p) => { if (p) p.catch(() => {}); return p; }; // se outra consulta falhar antes, esta não vira rejeição solta (o erro aparece no await)
-  const pDay = quiet(visao === 'equipe' ? daySummary.summary(day.day, { isToday: day.isToday }) : null);
-  const pMine = quiet(visao === 'meu' ? myDay.plan(req.user, day.day, day.isToday) : null);
-  const pNow = quiet(isProducer ? myDay.now(req.user, day.today) : null);
+  const pDay = quiet(visao === 'equipe' ? daySummary.summary(day.day, { isToday: day.isToday, pids }) : null);
+  const pMine = quiet(visao === 'meu' ? myDay.plan(req.user, day.day, day.isToday, pids) : null);
+  const pNow = quiet(isProducer ? myDay.now(req.user, day.today, pids) : null);
   const pGoals = quiet(require('../services/goals').progressFor(req.user.id)); // Minhas metas (Gestão > Metas), no cartão Hoje
   // faixa "Comentários nas redes" (respostas por IA) para quem cuida dos comentários; se falhar, a faixa só não aparece
   const pCmt = can(req.user.role, 'social.comments') ? require('../services/commentStats').brief(day.day, { isToday: day.isToday })
     .catch((err) => { console.error('Comentários (Início):', err.message); return null; }) : null;
   const [upcoming, recent, mine] = await Promise.all([
-    isProducer ? { rows: [] } : db.query(`SELECT id, name, topic, proposed_at FROM guests
-               WHERE status = 'agendado' AND proposed_at >= now() ORDER BY proposed_at LIMIT 6`),
+    isProducer ? { rows: [] } : db.query(`SELECT id, name, topic, proposed_at, project_id FROM guests
+               WHERE status = 'agendado' AND proposed_at >= now() AND project_id = ANY($1::int[]) ORDER BY proposed_at LIMIT 6`, [pids]),
     isProducer ? { rows: [] } : db.query(`SELECT e.type, e.message, e.created_at, g.id AS guest_id, g.name AS guest_name, u.name AS user_name
                 FROM guest_events e JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.user_id
-               ORDER BY e.created_at DESC, e.id DESC LIMIT 10`),
-    db.query(`SELECT count(*)::int AS n FROM guests WHERE owner_id = $1 AND status IN ('prospect','convite_enviado')`, [req.user.id]),
+               WHERE g.project_id = ANY($1::int[])
+               ORDER BY e.created_at DESC, e.id DESC LIMIT 10`, [pids]),
+    db.query(`SELECT count(*)::int AS n FROM guests WHERE owner_id = $1 AND status IN ('prospect','convite_enviado') AND project_id = ANY($2::int[])`, [req.user.id, pids]),
   ]);
   let money = null;
   if (pMoney) {
@@ -96,7 +101,7 @@ router.get('/', wrap(async (req, res) => {
   // "Pautas que travaram": atrasadas ou com ajustes pedidos, no recorte de projeto da pessoa (só para quem escreve pauta)
   const pautaSvc = require('../services/pautas');
   const pautasTravadas = visao === 'meu' && can(req.user.role, 'pautas.write')
-    ? await pautaSvc.stuck({ projectIds: require('../services/scope').idsOf(req) }).catch((err) => { console.error('Pautas (Início):', err.message); return []; })
+    ? await pautaSvc.stuck({ projectIds: pids }).catch((err) => { console.error('Pautas (Início):', err.message); return []; })
     : [];
   res.render('dashboard', {
     pautaSvc, pautasTravadas,

@@ -9,13 +9,13 @@ const STAGES = ['disponivel_edicao', 'em_edicao'];
 const SOON_DAYS = 2; // âmbar: vai ao ar hoje ou nos próximos 2 dias
 const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
-// A fila inteira, já com a posição (rank 1 = editar primeiro).
-async function list() {
+// A fila inteira, já com a posição (rank 1 = editar primeiro). projectIds: o recorte de quem está olhando.
+async function list(projectIds = null) {
   const { rows } = await db.query(
     `SELECT e.id, e.number, e.title, e.status, e.editor_id, e.review_round, e.project_id, to_char(e.aired_on, 'YYYY-MM-DD') AS aired, u.name AS editor_name
        FROM episodes e LEFT JOIN users u ON u.id = e.editor_id
-      WHERE e.status = ANY($1::text[])
-      ORDER BY e.aired_on NULLS LAST, e.number NULLS LAST, e.id`, [STAGES]);
+      WHERE e.status = ANY($1::text[]) AND ($2::int[] IS NULL OR e.project_id = ANY($2))
+      ORDER BY e.aired_on NULLS LAST, e.number NULLS LAST, e.id`, [STAGES, projectIds]);
   return rows.map((r, i) => ({ ...r, rank: i + 1, air: airInfo(r.aired) }));
 }
 
@@ -36,6 +36,6 @@ function airInfo(aired, today = cal.todayISO()) {
 // A posição de um episódio (null se ele não está esperando edição).
 async function positionOf(id) { return (await list()).find((e) => e.id === Number(id)) || null; }
 // id -> item, para o quadro e a lista de Episódios.
-async function byId() { return Object.fromEntries((await list()).map((e) => [e.id, e])); }
+async function byId(projectIds = null) { return Object.fromEntries((await list(projectIds)).map((e) => [e.id, e])); }
 
 module.exports = { STAGES, list, airInfo, positionOf, byId };

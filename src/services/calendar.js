@@ -86,9 +86,22 @@ const epNo = (n, projectId) => (n ? `${prefixOf(projectId)}${String(n).padStart(
 const POST_STATUS = { revisao: 'em revisão', recusado: 'devolvido', simulado: 'simulado', enviando: 'enviando', agendado: 'agendado', publicado: 'publicado', parcial: 'parcial', erro: 'com erro' };
 
 // Cada fonte devolve eventos { type, id, title, sub, day, time, url, done, late, tentative, who, whoId, amount }.
+
+// Recorte por projeto: trecho SQL com os ids (inteiros conferidos aqui). Sem ids, não filtra.
+// Contas a pagar e a receber ainda não têm projeto (fin_entries só ganha o dono na fase do dinheiro).
+const inProject = (ids, col) => {
+  const list = (ids || []).map(Number).filter(Number.isInteger);
+  return ids ? ` AND ${col} = ANY('{${list.join(',')}}'::int[])` : '';
+};
+const inProjectOrNull = (ids, col) => (ids ? ` AND (${col} IS NULL OR${inProject(ids, col).slice(4)})` : '');
+const pubProject = (ids) => (ids
+  ? ` AND coalesce((SELECT c.project_id FROM episode_clips c WHERE c.id = p.clip_id), (SELECT e.project_id FROM episodes e WHERE e.id = p.episode_id))`
+    + ` = ANY('{${(ids || []).map(Number).filter(Number.isInteger).join(',')}}'::int[])`
+  : '');
+
 const SOURCES = {
-  async tarefa({ from, to, owner }, today) {
-    const p = [from, to]; let w = 't.due_on BETWEEN $1::date AND $2::date';
+  async tarefa({ from, to, owner, pids }, today) {
+    const p = [from, to]; let w = `t.due_on BETWEEN $1::date AND $2::date${inProjectOrNull(pids, 't.project_id')}`;
     if (owner) { p.push(owner); w += ` AND t.assignee_id = $${p.length}`; }
     const { rows } = await db.query(
       `SELECT t.id, t.title, t.status, to_char(t.due_on, 'YYYY-MM-DD') AS day, to_char(t.due_time, 'HH24:MI') AS time, t.assignee_id, u.name AS who FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id
@@ -100,8 +113,8 @@ const SOURCES = {
     }));
   },
 
-  async gravacao({ from, to, owner }, today) {
-    const p = [from, to]; let w = `g.proposed_at IS NOT NULL AND g.status IN ('em_agendamento', 'agendado', 'gravado') AND ${inRange('g.proposed_at')}`;
+  async gravacao({ from, to, owner, pids }, today) {
+    const p = [from, to]; let w = `g.proposed_at IS NOT NULL AND g.status IN ('em_agendamento', 'agendado', 'gravado') AND ${inRange('g.proposed_at')}${inProject(pids, 'g.project_id')}`;
     if (owner) { p.push(owner); w += ` AND g.owner_id = $${p.length}`; }
     const { rows } = await db.query(
       `SELECT g.id, g.name, g.status, g.owner_id, u.name AS who, ${dayOf('g.proposed_at')} AS day, ${timeOf('g.proposed_at')} AS time
@@ -112,15 +125,15 @@ const SOURCES = {
     }));
     if (!owner) { // gravação só com os hosts (episódio sem convidado)
       const { rows: eps } = await db.query(
-        `SELECT e.id, e.number, e.title, e.project_id, e.status, to_char(e.recorded_on, 'YYYY-MM-DD') AS day FROM episodes e WHERE e.guest_id IS NULL AND e.recorded_on BETWEEN $1::date AND $2::date ORDER BY e.recorded_on LIMIT ${MAX_PER_TYPE}`, [from, to]);
+        `SELECT e.id, e.number, e.title, e.project_id, e.status, to_char(e.recorded_on, 'YYYY-MM-DD') AS day FROM episodes e WHERE e.guest_id IS NULL AND e.recorded_on BETWEEN $1::date AND $2::date${inProject(pids, 'e.project_id')} ORDER BY e.recorded_on LIMIT ${MAX_PER_TYPE}`, [from, to]);
       for (const e of eps) out.push({ type: 'gravacao', id: `gravacao-ep-${e.id}`, title: `Gravação: ${epNo(e.number, e.project_id)} ${e.title}`, sub: e.status === 'pre_producao' ? 'gravação prevista' : 'gravada', day: e.day, time: null, url: `/episodios/${e.id}`, done: true, late: false });
     }
     return out;
   },
 
-  async lembrete({ from, to, owner }, today) {
+  async lembrete({ from, to, owner, pids }, today) {
     const reminders = require('./reminders');
-    const p = [from, to]; let w = `g.status = 'agendado' AND date_trunc('milliseconds', g.proposed_at) = r.recording_at AND ${inRange('r.due_at')}`;
+    const p = [from, to]; let w = `g.status = 'agendado' AND date_trunc('milliseconds', g.proposed_at) = r.recording_at AND ${inRange('r.due_at')}${inProject(pids, 'g.project_id')}`;
     if (owner) { p.push(owner); w += ` AND g.owner_id = $${p.length}`; }
     const { rows } = await db.query(
       `SELECT r.id, r.kind, r.sent_at, ${dayOf('r.due_at')} AS day, ${timeOf('r.due_at')} AS time, g.id AS guest_id, g.name, g.owner_id, u.name AS who
@@ -131,14 +144,14 @@ const SOURCES = {
     }));
   },
 
-  async episodio({ from, to, owner }, today) {
-    const p = [from, to]; let w = 'e.aired_on BETWEEN $1::date AND $2::date';
+  async episodio({ from, to, owner, pids }, today) {
+    const p = [from, to]; let w = `e.aired_on BETWEEN $1::date AND $2::date${inProject(pids, 'e.project_id')}`;
     if (owner) { p.push(owner); w += ` AND e.editor_id = $${p.length}`; }
     const { rows } = await db.query(
       `SELECT e.id, e.number, e.title, e.status, e.project_id, to_char(e.aired_on, 'YYYY-MM-DD') AS day, e.editor_id, u.name AS who FROM episodes e LEFT JOIN users u ON u.id = e.editor_id
         WHERE ${w} ORDER BY e.aired_on, e.number LIMIT ${MAX_PER_TYPE}`, p);
     // convidado ainda sem episódio, com estreia prevista: entra como publicação prevista (vai para o cadastro dele)
-    const p2 = [from, to]; let w2 = "g.status IN ('em_agendamento', 'agendado') AND g.premiere_on BETWEEN $1::date AND $2::date AND NOT EXISTS (SELECT 1 FROM episodes x WHERE x.guest_id = g.id)";
+    const p2 = [from, to]; let w2 = `g.status IN ('em_agendamento', 'agendado') AND g.premiere_on BETWEEN $1::date AND $2::date AND NOT EXISTS (SELECT 1 FROM episodes x WHERE x.guest_id = g.id)${inProject(pids, 'g.project_id')}`;
     if (owner) { p2.push(owner); w2 += ` AND g.owner_id = $${p2.length}`; }
     const { rows: planned } = await db.query(
       `SELECT g.id, g.name, to_char(g.premiere_on, 'YYYY-MM-DD') AS day, g.owner_id, u.name AS who FROM guests g LEFT JOIN users u ON u.id = g.owner_id
@@ -153,8 +166,8 @@ const SOURCES = {
     })));
   },
 
-  async post({ from, to, owner }, today) {
-    const p = [from, to]; let w = `p.scheduled_at IS NOT NULL AND ${inRange('p.scheduled_at')}`;
+  async post({ from, to, owner, pids }, today) {
+    const p = [from, to]; let w = `p.scheduled_at IS NOT NULL AND ${inRange('p.scheduled_at')}${pubProject(pids)}`;
     if (owner) { p.push(owner); w += ` AND p.created_by = $${p.length}`; }
     const { rows } = await db.query(
       `SELECT p.id, p.title, p.status, p.platforms, p.created_by, u.name AS who, ${dayOf('p.scheduled_at')} AS day, ${timeOf('p.scheduled_at')} AS time
@@ -166,11 +179,11 @@ const SOURCES = {
   },
 
   // Cobranças da plateia: pagamento combinado com quem foi selecionado (a produtora confirma o valor e marca o recebimento)
-  async cobranca({ from, to }, today) {
+  async cobranca({ from, to, pids }, today) {
     const { rows } = await db.query(
       `SELECT l.id, l.name, l.guest_id, l.entry_id, e.amount_cents, e.status, to_char(e.due_on, 'YYYY-MM-DD') AS day
          FROM plateia_leads l JOIN fin_entries e ON e.id = l.entry_id AND e.status <> 'cancelado'
-        WHERE e.due_on BETWEEN $1::date AND $2::date ORDER BY e.due_on, l.id LIMIT ${MAX_PER_TYPE}`, [from, to]);
+        WHERE e.due_on BETWEEN $1::date AND $2::date${pids ? ` AND EXISTS (SELECT 1 FROM guests g WHERE g.id = l.guest_id${inProject(pids, 'g.project_id')})` : ''} ORDER BY e.due_on, l.id LIMIT ${MAX_PER_TYPE}`, [from, to]);
     return rows.map((l) => ({
       type: 'cobranca', id: `cobranca-${l.id}`, entryId: l.entry_id, title: `Cobrar ${l.name}`, sub: `plateia${l.status === 'pago' ? ' · pago' : ''}`, amount: `+${fmt.formatBRL(l.amount_cents)}`,
       day: l.day, time: null, url: l.guest_id ? `/plateia/painel?convidado=${l.guest_id}` : '/plateia/painel', done: l.status === 'pago', late: l.status === 'previsto' && l.day < today,
@@ -193,8 +206,8 @@ const SOURCES = {
     });
   },
 
-  async reuniao({ from, to, owner }) {
-    const p = [from, to]; let w = "m.status = 'marcada' AND (m.starts_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $1::date AND $2::date";
+  async reuniao({ from, to, owner, pids }) {
+    const p = [from, to]; let w = `m.status = 'marcada' AND (m.starts_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $1::date AND $2::date${inProject(pids, 's.project_id')}`;
     if (owner) { p.push(owner); w += ` AND (m.owner_id = $${p.length} OR $${p.length} = ANY(m.team_ids))`; }
     const { rows } = await db.query(
       `SELECT m.id, m.sponsor_id, m.mode, m.owner_id, u.name AS who, s.company,
@@ -205,8 +218,8 @@ const SOURCES = {
     return rows.map((m) => ({ type: 'reuniao', id: `reuniao-${m.id}`, title: `Reunião: ${m.company}`, sub: m.mode === 'presencial' ? 'presencial' : 'Google Meet', day: m.day, time: m.time, url: `/patrocinadores/${m.sponsor_id}#reunioes`, done: m.over, late: false, who: m.who, whoId: m.owner_id }));
   },
 
-  async patrocinio({ from, to, owner }, today) {
-    const p = [from, to]; let w = "s.stage IN ('ganho', 'ativo') AND (s.starts_on BETWEEN $1::date AND $2::date OR s.ends_on BETWEEN $1::date AND $2::date)";
+  async patrocinio({ from, to, owner, pids }, today) {
+    const p = [from, to]; let w = `s.stage IN ('ganho', 'ativo') AND (s.starts_on BETWEEN $1::date AND $2::date OR s.ends_on BETWEEN $1::date AND $2::date)${inProject(pids, 's.project_id')}`;
     if (owner) { p.push(owner); w += ` AND s.owner_id = $${p.length}`; }
     const { rows } = await db.query(
       `SELECT s.id, s.company, s.owner_id, u.name AS who, to_char(s.starts_on, 'YYYY-MM-DD') AS starts, to_char(s.ends_on, 'YYYY-MM-DD') AS ends
@@ -223,7 +236,8 @@ const SOURCES = {
 // owner: id de quem responde. Entram os itens dessa pessoa (tipos com responsável) e os que são do PERFIL dela (ROLE_DUTIES):
 // a gestão responde por todas as gravações, contas a pagar e a receber; a produtora, por todos os lembretes e cobranças.
 // hideDone: tira o que já foi feito.
-async function events({ user, from, to, types, owner = null, hideDone = false }) {
+// pids: o recorte de projeto de quem está olhando (services/scope).
+async function events({ user, from, to, types, owner = null, hideDone = false, pids = null }) {
   const allowed = new Set(allowedTypes(user).map((t) => t.key));
   let wanted = new Set(types.filter((k) => allowed.has(k)));
   const ownerFor = {}; // tipo -> id para filtrar (ausente = sem filtro de pessoa)
@@ -236,7 +250,7 @@ async function events({ user, from, to, types, owner = null, hideDone = false })
   }
   const today = todayISO();
   const jobs = [];
-  for (const k of ['tarefa', 'gravacao', 'lembrete', 'episodio', 'post', 'patrocinio', 'reuniao', 'cobranca']) if (wanted.has(k)) jobs.push(SOURCES[k]({ from, to, owner: ownerFor[k] || null }, today));
+  for (const k of ['tarefa', 'gravacao', 'lembrete', 'episodio', 'post', 'patrocinio', 'reuniao', 'cobranca']) if (wanted.has(k)) jobs.push(SOURCES[k]({ from, to, owner: ownerFor[k] || null, pids }, today));
   if (wanted.has('receber') || wanted.has('pagar')) jobs.push(SOURCES.financeiro({ from, to }, today, wanted));
   let list = (await Promise.all(jobs)).flat();
   if (wanted.has('cobranca')) { // a conta da plateia aparece uma vez só: como cobrança

@@ -72,38 +72,51 @@ const find = async (table, cols, q, select, order, limit = 6, extra = '') => {
   return rows;
 };
 
+
+// Recorte por projeto: trecho SQL com os ids (inteiros conferidos aqui). Sem ids, não filtra.
+// Financeiro, estoque e plateia ficam de fora: o dinheiro ganha projeto na fase dele, e os outros dois são da casa.
+const inProject = (ids, col) => {
+  const list = (ids || []).map(Number).filter(Number.isInteger);
+  return ids ? ` AND ${col} = ANY('{${list.join(',')}}'::int[])` : '';
+};
+const inProjectOrNull = (ids, col) => (ids ? ` AND (${col} IS NULL OR${inProject(ids, col).slice(4)})` : '');
+const pubProject = (ids) => (ids
+  ? ` AND coalesce((SELECT c.project_id FROM episode_clips c WHERE c.id = p.clip_id), (SELECT e.project_id FROM episodes e WHERE e.id = p.episode_id))`
+    + ` = ANY('{${(ids || []).map(Number).filter(Number.isInteger).join(',')}}'::int[])`
+  : '');
+
 const PROVIDERS = [
-  { key: 'guests', label: 'Convidados', tables: ['guests'], perm: 'guests.read', async search(q) {
-    const rows = await find('guests g', ['g.name', 'g.instagram', 'g.email', 'g.phone', 'g.company', 'g.topic'], q, 'g.id, g.name, g.instagram, g.company', 'g.updated_at DESC');
+  { key: 'guests', label: 'Convidados', tables: ['guests'], perm: 'guests.read', async search(q, user, pids) {
+    const rows = await find('guests g', ['g.name', 'g.instagram', 'g.email', 'g.phone', 'g.company', 'g.topic'], q, 'g.id, g.name, g.instagram, g.company', 'g.updated_at DESC', 6, inProject(pids, 'g.project_id'));
     return rows.map((r) => ({ title: r.name, sub: r.instagram ? `@${r.instagram}` : (r.company || 'convidado'), url: `/convidados/${r.id}` }));
   } },
-  { key: 'sponsors', label: 'Patrocinadores', tables: ['sponsors', 'sponsor_briefs'], perm: 'sponsors.read', async search(q) {
-    const rows = await find('sponsors s', ['s.company', 's.contact_name', 's.contact_email', 's.contact_phone', 's.website'], q, 's.id, s.company, s.contact_name', 's.updated_at DESC');
+  { key: 'sponsors', label: 'Patrocinadores', tables: ['sponsors', 'sponsor_briefs'], perm: 'sponsors.read', async search(q, user, pids) {
+    const rows = await find('sponsors s', ['s.company', 's.contact_name', 's.contact_email', 's.contact_phone', 's.website'], q, 's.id, s.company, s.contact_name', 's.updated_at DESC', 6, inProject(pids, 's.project_id'));
     return rows.map((r) => ({ title: r.company, sub: r.contact_name || 'patrocinador', url: `/patrocinadores/${r.id}` }));
   } },
-  { key: 'episodes', label: 'Episódios', tables: ['episodes'], perm: 'episodes.read', async search(q) {
+  { key: 'episodes', label: 'Episódios', tables: ['episodes'], perm: 'episodes.read', async search(q, user, pids) {
     const num = (norm(q).trim().match(/^(?:ep(?:isodio)?\.?\s*)?(\d{1,4})$/) || [])[1]; // "12", "ep 12", "ep.12", "episódio 12"
     const m = match(['e.title', 'g.name', "'ep episodio ' || coalesce(e.number::text, '')", 'e.number::text'], q);
     const { rows } = await db.query(`SELECT e.id, e.number, e.title, e.project_id, g.name AS guest FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
-      WHERE (${m.sql}) ${num ? `OR e.number = $${m.params.length + 1}` : ''} ORDER BY e.number DESC NULLS LAST LIMIT 6`, num ? [...m.params, Number(num)] : m.params);
+      WHERE ((${m.sql}) ${num ? `OR e.number = $${m.params.length + 1}` : ''})${inProject(pids, 'e.project_id')} ORDER BY e.number DESC NULLS LAST LIMIT 6`, num ? [...m.params, Number(num)] : m.params);
     return rows.map((r) => ({ title: `${pad3(r.number, r.project_id) ? `${pad3(r.number, r.project_id)} · ` : ''}${r.title}`, sub: r.guest || 'episódio', url: `/episodios/${r.id}` }));
   } },
-  { key: 'tasks', label: 'Tarefas', tables: ['tasks', 'task_routines'], perm: 'tasks.read', async search(q) {
+  { key: 'tasks', label: 'Tarefas', tables: ['tasks', 'task_routines'], perm: 'tasks.read', async search(q, user, pids) {
     const m = match(['t.title', 't.description'], q);
     const { rows } = await db.query(`SELECT t.id, t.title, t.status, u.name AS who FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id
-      WHERE (${m.sql}) ORDER BY (t.status = 'feito'), t.due_on NULLS LAST LIMIT 6`, m.params);
+      WHERE (${m.sql})${inProjectOrNull(pids, 't.project_id')} ORDER BY (t.status = 'feito'), t.due_on NULLS LAST LIMIT 6`, m.params);
     return rows.map((r) => ({ title: r.title, sub: `${r.who || 'sem responsável'}${r.status === 'feito' ? ' · feita' : ''}`, url: `/tarefas/${r.id}` }));
   } },
-  { key: 'clips', label: 'Cortes', tables: ['episode_clips'], perm: 'episodes.read', async search(q) {
-    const rows = await find('episode_clips c', ['c.title', 'c.post_title', 'c.caption'], q, 'c.id, c.title, c.post_title', 'c.id DESC', 5);
+  { key: 'clips', label: 'Cortes', tables: ['episode_clips'], perm: 'episodes.read', async search(q, user, pids) {
+    const rows = await find('episode_clips c', ['c.title', 'c.post_title', 'c.caption'], q, 'c.id, c.title, c.post_title', 'c.id DESC', 5, inProject(pids, 'c.project_id'));
     return rows.map((r) => ({ title: r.post_title || r.title, sub: r.post_title ? r.title : 'corte', url: `/cortes/${r.id}` })); // o gancho é o que todos reconhecem
   } },
-  { key: 'publications', label: 'Publicações nas redes', tables: ['episode_publications'], perm: 'social.read', async search(q) {
-    const rows = await find('episode_publications p', ['p.title', 'p.description'], q, 'p.id, p.title, p.status, p.media', 'p.created_at DESC', 5);
+  { key: 'publications', label: 'Publicações nas redes', tables: ['episode_publications'], perm: 'social.read', async search(q, user, pids) {
+    const rows = await find('episode_publications p', ['p.title', 'p.description'], q, 'p.id, p.title, p.status, p.media', 'p.created_at DESC', 5, pubProject(pids));
     return rows.map((r) => ({ title: r.title, sub: `${{ video: 'vídeo', imagem: 'post', carrossel: 'carrossel', story: 'story' }[r.media]} · ${r.status}`, url: `/social/publicacoes/${r.id}` }));
   } },
-  { key: 'ideas', label: 'Ideias para as redes', tables: ['social_ideas'], perm: 'social.read', async search(q) {
-    const rows = await find('social_ideas i', ['i.title', 'i.hook'], q, 'i.id, i.title, i.kind, i.status', 'i.created_at DESC', 4);
+  { key: 'ideas', label: 'Ideias para as redes', tables: ['social_ideas'], perm: 'social.read', async search(q, user, pids) {
+    const rows = await find('social_ideas i', ['i.title', 'i.hook'], q, 'i.id, i.title, i.kind, i.status', 'i.created_at DESC', 4, inProject(pids, 'i.project_id'));
     return rows.map((r) => ({ title: r.title, sub: `${r.kind} · ${r.status}`, url: '/social/ideias' }));
   } },
   { key: 'rules', label: 'Automações', tables: ['social_rules'], perm: 'social.read', async search(q) {
@@ -166,7 +179,8 @@ async function actionsFor(user) {
 }
 
 // Resultado agrupado. Sem texto: os atalhos principais.
-async function search(q, user) {
+// pids: o recorte de projeto de quem busca (services/scope).
+async function search(q, user, pids = null) {
   const query = String(q || '').trim().slice(0, 80);
   const actions = await actionsFor(user);
   if (query.length < 1) return { q: '', groups: [{ label: 'Atalhos', items: actions.filter((a) => ['Criar', 'Atalhos da equipe'].includes(a.group) || ['minhas-tarefas', 'tarefas-hoje', 'notificacoes'].includes(a.id)).slice(0, 10).map(asItem) }], total: 0 };
@@ -175,7 +189,7 @@ async function search(q, user) {
   const groups = [];
   if (matched.length) groups.push({ label: 'Ações e atalhos', items: matched });
   if (query.length >= 2) {
-    const results = await Promise.all(PROVIDERS.filter((p) => allowed(user, p.perm)).map(async (p) => ({ label: p.label, items: (await p.search(query, user)).map((r) => ({ ...r, kind: p.key })) })));
+    const results = await Promise.all(PROVIDERS.filter((p) => allowed(user, p.perm)).map(async (p) => ({ label: p.label, items: (await p.search(query, user, pids)).map((r) => ({ ...r, kind: p.key })) })));
     for (const g of results) if (g.items.length) groups.push(g);
   }
   const total = groups.reduce((n, g) => n + g.items.length, 0);

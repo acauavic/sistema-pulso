@@ -74,8 +74,9 @@ router.get('/notificacoes', wrap(async (req, res) => {
   const { pageOf, paginate } = require('../utils/pager');
   const pg = pageOf(req, 100);
   const [raw, counts, mutes] = await Promise.all([
-    notifySvc.list(req.user.id, { type, unread, limit: pg.limit, offset: pg.offset }),
-    db.query('SELECT type, count(*)::int AS total, count(*) FILTER (WHERE read_at IS NULL)::int AS unread FROM notifications WHERE user_id = $1 GROUP BY type', [req.user.id]),
+    notifySvc.list(req.user.id, { type, unread, limit: pg.limit, offset: pg.offset, pids: require('../services/scope').idsOf(req) }),
+    db.query(`SELECT type, count(*)::int AS total, count(*) FILTER (WHERE read_at IS NULL)::int AS unread FROM notifications
+                WHERE user_id = $1 AND (project_id IS NULL OR project_id = ANY($2::int[])) GROUP BY type`, [req.user.id, require('../services/scope').idsOf(req)]),
     db.query('SELECT type FROM notification_mutes WHERE user_id = $1', [req.user.id]),
   ]);
   const { rows: items, pager } = paginate(req, raw, pg);
@@ -163,7 +164,7 @@ async function tipsCount(app) {
 }
 
 router.get('/busca', wrap(async (req, res) => {
-  const result = await search.search(req.query.q, req.user);
+  const result = await search.search(req.query.q, req.user, require('../services/scope').idsOf(req));
   if (result.q.length >= 2 && req.query.registrar !== '0') await search.log(req.user, result.q, result.total);
   let tips = 0;
   if (!result.q && require('../permissions').can(req.user.role, 'search.manage')) tips = await tipsCount(req.app);

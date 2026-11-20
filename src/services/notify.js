@@ -10,6 +10,19 @@ const { memo } = require('../utils/requestCache');
 
 const TYPES = Object.keys(NOTIFICATION_TYPES);
 
+// De que projeto é o aviso, pelo item que ele aponta ($7 = tipo da entidade, $8 = id). Tarefa geral e aviso do sistema ficam sem
+// projeto, e aparecem para quem os recebeu em qualquer recorte.
+const PROJECT_OF = `(CASE $7::text
+  WHEN 'guest' THEN (SELECT project_id FROM guests WHERE id = $8::int)
+  WHEN 'sponsor' THEN (SELECT project_id FROM sponsors WHERE id = $8::int)
+  WHEN 'episode' THEN (SELECT project_id FROM episodes WHERE id = $8::int)
+  WHEN 'clip' THEN (SELECT project_id FROM episode_clips WHERE id = $8::int)
+  WHEN 'content_request' THEN (SELECT project_id FROM content_requests WHERE id = $8::int)
+  WHEN 'task' THEN (SELECT project_id FROM tasks WHERE id = $8::int)
+  WHEN 'publication' THEN (SELECT coalesce((SELECT c.project_id FROM episode_clips c WHERE c.id = p.clip_id), (SELECT e.project_id FROM episodes e WHERE e.id = p.episode_id))
+                             FROM episode_publications p WHERE p.id = $8::int)
+  ELSE NULL END)`;
+
 // Lida uma vez por requisição (uma ação em massa chamava notify várias vezes e relia a tabela a cada aviso).
 const settings = () => memo('notificacoes:config', async () => {
   const { rows } = await db.query('SELECT * FROM notification_settings');
@@ -42,8 +55,9 @@ async function notify({ type, users = [], broadcast = false, title, body = null,
   if (!active.length) return [];
   // uma gravação para todas as pessoas (antes: um INSERT por pessoa)
   const { rows: inserted } = await db.query(
-    `INSERT INTO notifications (user_id, type, title, body, url, actor_id, entity_type, entity_id, dedupe_key, read_at, topic)
-     SELECT u, $2::text, $3::text, $4::text, $5::text, $6::uuid, $7::text, $8::int, $9::text, CASE WHEN $10::boolean THEN NULL ELSE now() END, $11::text FROM unnest($1::uuid[]) AS u
+    // project_id: o projeto do item que o aviso aponta (quem não participa dele não vê o aviso)
+    `INSERT INTO notifications (user_id, type, title, body, url, actor_id, entity_type, entity_id, dedupe_key, read_at, topic, project_id)
+     SELECT u, $2::text, $3::text, $4::text, $5::text, $6::uuid, $7::text, $8::int, $9::text, CASE WHEN $10::boolean THEN NULL ELSE now() END, $11::text, ${PROJECT_OF} FROM unnest($1::uuid[]) AS u
      ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING *`,
     [active.map((u) => u.id), type, String(title).slice(0, 300), body ? String(body).slice(0, 1000) : null, url, actorId, entity?.type || null, entity?.id || null, dedupe, cfg.in_app, topic]);
   const byUser = new Map(inserted.map((n) => [String(n.user_id), n]));
@@ -66,8 +80,10 @@ jobs.register('email_notificacao', async (job) => {
 
 const unreadCount = (userId) => db.query('SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [userId]).then((r) => r.rows[0].n);
 
-async function list(userId, { type = null, unread = false, limit = 50, before = null, offset = 0 } = {}) {
+// pids: o recorte de projeto de quem está olhando (services/scope). Aviso sem projeto aparece sempre.
+async function list(userId, { type = null, unread = false, limit = 50, before = null, offset = 0, pids = null } = {}) {
   const params = [userId]; const where = ['n.user_id = $1'];
+  if (pids) { params.push(pids); where.push(`(n.project_id IS NULL OR n.project_id = ANY($${params.length}::int[]))`); }
   if (type && TYPES.includes(type)) { params.push(type); where.push(`n.type = $${params.length}`); }
   if (unread) where.push('n.read_at IS NULL');
   if (before) { params.push(before); where.push(`n.id < $${params.length}`); }
