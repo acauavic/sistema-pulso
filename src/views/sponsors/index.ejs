@@ -42,7 +42,7 @@
       <a class="kcard" href="/patrocinadores/<%= s.id %>" data-item-id="<%= s.id %>" draggable="<%= can('sponsors.write') ? 'true' : 'false' %>">
         <strong><%= s.company %></strong><% if (s.origin === 'site') { %> <span class="file-tag" title="Pediu pelo site">site</span><% } %>
         <% if (s.contact_name) { %><span class="muted small"<%- cardUi.attr('contato') %>><%= s.contact_name %></span><% } %>
-        <span class="meta small muted">
+        <span class="meta small muted"><%- include('../partials/project-tag', { id: s.project_id }) %>
           <% if (s.tier) { %><span<%- cardUi.attr('plano') %>><%= tiers[s.tier] %></span><% } %>
           <% if (s.kind && s.kind !== 'negocio') { %><span<%- cardUi.attr('tipo') %>><%= kinds[s.kind] %></span><% } %>
           <% if (s.value_cents != null) { %><span<%- cardUi.attr('valor') %>><%= fmt.formatBRL(s.value_cents) %></span><% } %>
@@ -72,7 +72,7 @@
     <% if (!sponsors.length) { %><tr><td colspan="7"><div class="empty"><%- include('../partials/signal') %><strong>Nenhum patrocinador por aqui ainda</strong><span>Cadastre o primeiro ou ajuste os filtros.</span></div></td></tr><% } %>
     <% sponsors.forEach(function (s) { %>
     <tr>
-      <td><a href="/patrocinadores/<%= s.id %>"><strong><%= s.company %></strong></a><% if (s.origin === 'site') { %> <span class="file-tag" title="Pediu pelo site">site</span><% } %></td>
+      <td><a href="/patrocinadores/<%= s.id %>"><strong><%= s.company %></strong></a> <%- include('../partials/project-tag', { id: s.project_id }) %><% if (s.origin === 'site') { %> <span class="file-tag" title="Pediu pelo site">site</span><% } %></td>
       <td><%= s.contact_name || '—' %></td>
       <td><%= s.kind ? kinds[s.kind] : '—' %></td>
       <td><%= s.tier ? tiers[s.tier] : '—' %></td>

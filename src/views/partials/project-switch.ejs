@@ -1,6 +1,6 @@
 <%# Seletor de projeto (topo do menu): só para quem participa de mais de um. Escolher o recorte não é ação: nada de verde.
     A escolha fica guardada por pessoa e a mesma tela recarrega com o outro recorte (POST /projeto). %>
-<% if (scope && scope.multi) { var cur = scope.current; var curName = cur ? cur.name : 'Todos os projetos'; %>
+<% if (projectScope && projectScope.multi) { var cur = projectScope.current; var curName = cur ? cur.name : 'Todos os projetos'; %>
 <details class="row-menu project-switch">
   <summary title="Projeto: <%= curName %>" aria-label="Projeto: <%= curName %>. Trocar">
     <span class="project-switch-txt"><span class="kicker m-0">Projeto</span><strong><%= curName %></strong></span>
@@ -10,7 +10,7 @@
   <form method="post" action="/projeto" class="row-menu-list project-switch-list">
     <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentUrl %>">
     <button type="submit" name="project" value=""<%- cur ? '' : ' class="on" aria-current="true"' %>><span>Todos os projetos</span><%- cur ? '' : icon('check', 14) %></button>
-    <% scope.projects.forEach(function (p) { var on = cur && cur.id === p.id; %>
+    <% projectScope.projects.forEach(function (p) { var on = cur && cur.id === p.id; %>
     <button type="submit" name="project" value="<%= p.id %>"<%- on ? ' class="on" aria-current="true"' : '' %>><span><%= p.name %></span><span class="mono project-switch-code"><%= p.sigla %></span><%- on ? icon('check', 14) : '' %></button>
     <% }) %>
   </form>

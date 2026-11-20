@@ -124,6 +124,7 @@ router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => 
   if (mine) { params.push(req.user.id); where.push(`e.editor_id = $${params.length}`); }
   const fsql = require('../services/filters').toSql(f.state, f.fields, params);
   if (fsql) where.push(fsql);
+  require('../services/scope').where(req, where, params, 'e'); // só os projetos da pessoa, ou o escolhido no menu
   const { rows } = await db.query(
     `SELECT e.*, g.name AS guest_name, u.name AS editor_name,
             (SELECT count(*)::int FROM sponsor_episodes se WHERE se.episode_id = e.id) AS sponsors,

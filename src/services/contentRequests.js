@@ -47,8 +47,10 @@ const SELECT = `SELECT r.*, a.name AS assignee_name, cb.name AS creator_name, e.
 const get = (id) => db.query(`${SELECT} WHERE r.id = $1`, [id]).then((x) => x.rows[0] || null);
 // Vários de uma vez (ações em massa), na ordem pedida: uma consulta em vez de uma por pedido.
 const getMany = (ids) => (ids.length ? db.query(`${SELECT} WHERE r.id = ANY($1)`, [ids]).then((x) => { const by = new Map(x.rows.map((r) => [String(r.id), r])); return ids.map((id) => by.get(String(id))).filter(Boolean); }) : Promise.resolve([]));
-const list = ({ open = false, assigneeId = null, episodeId = null } = {}) => {
+// projectIds: só os pedidos do recorte (scope.idsOf); sem ele, todos
+const list = ({ open = false, assigneeId = null, episodeId = null, projectIds = null } = {}) => {
   const where = []; const p = [];
+  if (projectIds) { p.push(projectIds); where.push(`r.project_id = ANY($${p.length}::int[])`); }
   where.push(open ? `r.status = ANY('{${OPEN.join(',')}}')` : 'true');
   if (assigneeId) { p.push(assigneeId); where.push(`r.assignee_id = $${p.length}`); }
   if (episodeId) { p.push(episodeId); where.push(`r.episode_id = $${p.length}`); }

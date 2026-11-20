@@ -55,26 +55,30 @@ const epLabel = (n, t) => (n ? `EP.${String(n).padStart(3, '0')}` : '') + (t ? `
 const thumb = (id, at) => `/capas/${id}/imagem?v=${new Date(at).getTime()}&w=640`; // miniatura leve (coverStore.THUMB_SIDE)
 
 // Todas as peças, já com etapa. episodeId: só de um episódio. recentDays: corta o "Publicado" antigo (null = tudo).
-async function build({ episodeId = null, recentDays = 60, today = new Date().toISOString().slice(0, 10) } = {}) {
+// projectIds: só as peças do recorte (scope.idsOf); a imagem herda o projeto do episódio ou do pedido dela.
+async function build({ episodeId = null, projectIds = null, recentDays = 60, today = new Date().toISOString().slice(0, 10) } = {}) {
   const idx = await publicationIndex();
   const epFilter = (col) => (episodeId ? ` AND ${col} = ${Number(episodeId)}` : '');
+  const pids = projectIds ? projectIds.map(Number).filter(Number.isInteger) : null;
+  const inProject = (expr) => (pids ? ` AND ${expr} = ANY('{${pids.join(',')}}'::int[])` : '');
+  const coverProject = `coalesce(e.project_id, r.project_id, ${Number(require('./projects').defaultId())})`;
   const [reqs, clipRows, coverRows] = await Promise.all([
     db.query(`SELECT r.*, a.name AS assignee_name, e.number AS episode_number, e.title AS episode_title FROM content_requests r
-      LEFT JOIN users a ON a.id = r.assignee_id LEFT JOIN episodes e ON e.id = r.episode_id WHERE r.status = ANY($1)${epFilter('r.episode_id')}`, [requests.OPEN]),
-    db.query(`SELECT c.id, c.title, c.post_title, c.status, c.error, c.duration_ms, c.width, c.height, c.cover_id, c.episode_id, c.request_id, c.created_at, c.updated_at,
+      LEFT JOIN users a ON a.id = r.assignee_id LEFT JOIN episodes e ON e.id = r.episode_id WHERE r.status = ANY($1)${epFilter('r.episode_id')}${inProject('r.project_id')}`, [requests.OPEN]),
+    db.query(`SELECT c.id, c.title, c.post_title, c.status, c.error, c.duration_ms, c.width, c.height, c.cover_id, c.episode_id, c.request_id, c.created_at, c.updated_at, c.project_id,
         cv.updated_at AS cover_at, e.number AS episode_number, e.title AS episode_title, r.status AS request_status, r.kind AS request_kind, r.title AS request_title
       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN episode_covers cv ON cv.id = c.cover_id LEFT JOIN content_requests r ON r.id = c.request_id
-      WHERE (c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes')${epFilter('c.episode_id')}`),
-    db.query(`SELECT c.id, c.kind, c.group_key, c.position, c.label, c.width, c.height, c.approved, c.updated_at, c.created_at, c.episode_id, c.request_id,
+      WHERE (c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes')${epFilter('c.episode_id')}${inProject('c.project_id')}`),
+    db.query(`SELECT c.id, c.kind, c.group_key, c.position, c.label, c.width, c.height, c.approved, c.updated_at, c.created_at, c.episode_id, c.request_id, ${coverProject} AS project_id,
         e.number AS episode_number, e.title AS episode_title, r.kind AS request_kind, r.title AS request_title, r.status AS request_status
       FROM episode_covers c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id
-      WHERE c.clip_id IS NULL AND ((c.kind IN ('post_quote', 'post_split', 'carousel') AND c.request_id IS NULL) OR (c.kind = 'entrega' AND r.status = 'aprovado'))${epFilter('c.episode_id')}
+      WHERE c.clip_id IS NULL AND ((c.kind IN ('post_quote', 'post_split', 'carousel') AND c.request_id IS NULL) OR (c.kind = 'entrega' AND r.status = 'aprovado'))${epFilter('c.episode_id')}${inProject(coverProject)}
       ORDER BY c.group_key, c.position, c.id`),
   ]);
   const cards = [];
   for (const r of reqs.rows) {
     cards.push({
-      key: `r${r.id}`, type: 'pedido', stage: r.status === 'pedido' ? 'pedido' : r.status === 'producao' ? 'producao' : 'revisao',
+      key: `r${r.id}`, projectId: r.project_id, type: 'pedido', stage: r.status === 'pedido' ? 'pedido' : r.status === 'producao' ? 'producao' : 'revisao',
       title: r.title, href: requests.url(r.id), kind: requests.KINDS[r.kind].label, episode: epLabel(r.episode_number, r.episode_title), episodeId: r.episode_id,
       who: r.assignee_name || 'sem responsável', priority: r.priority, due: r.due_on, late: requests.isLate(r, today), rounds: r.rounds, media: requests.KINDS[r.kind].media, at: r.updated_at, created: r.created_at, updated: r.updated_at,
     });
@@ -83,7 +87,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     const st = c.status === 'pronto' ? stateOf(idx.byClip.get(c.id)) : null;
     const stage = c.status !== 'pronto' ? 'producao' : st ? st.stage : 'pronto';
     cards.push({
-      key: `c${c.id}`, type: 'corte', stage, title: c.post_title || c.title, href: `/cortes/${c.id}`, kind: c.request_id ? requests.KINDS[c.request_kind]?.label || 'Vídeo' : 'Corte',
+      key: `c${c.id}`, projectId: c.project_id, type: 'corte', stage, title: c.post_title || c.title, href: `/cortes/${c.id}`, kind: c.request_id ? requests.KINDS[c.request_kind]?.label || 'Vídeo' : 'Corte',
       episode: epLabel(c.episode_number, c.episode_title), episodeId: c.episode_id, thumb: c.cover_id ? thumb(c.cover_id, c.cover_at) : null, vertical: !c.width || c.height >= c.width,
       chip: c.status === 'erro' ? 'erro' : c.status === 'processando' ? 'lendo' : c.status === 'enviando' ? 'enviando' : null, pub: st, media: 'video', at: st?.at || c.created_at, created: c.created_at, updated: c.updated_at,
       warn: c.status === 'pronto' && !c.episode_id && !c.request_id ? 'atribuir episódio' : null, publishable: c.status === 'pronto' && Boolean(c.episode_id || c.request_id),
@@ -97,7 +101,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     const st = stateOf(idx.byCover.get(c.id));
     const story = c.kind === 'entrega' && c.request_kind === 'story';
     cards.push({
-      key: `i${c.id}`, type: story ? 'story' : 'post', stage: st ? st.stage : 'pronto', title: c.request_title || c.label || (c.kind === 'post_split' ? 'Tela dividida' : 'Post de frase'),
+      key: `i${c.id}`, projectId: c.project_id, type: story ? 'story' : 'post', stage: st ? st.stage : 'pronto', title: c.request_title || c.label || (c.kind === 'post_split' ? 'Tela dividida' : 'Post de frase'),
       href: c.request_id ? requests.url(c.request_id) : `/capas/${c.id}/editar`, kind: story ? 'Story' : c.kind === 'post_split' ? 'Tela dividida' : c.kind === 'entrega' ? 'Post' : 'Post de frase',
       episode: epLabel(c.episode_number, c.episode_title), episodeId: c.episode_id, thumb: thumb(c.id, c.updated_at), pub: st, media: story ? 'story' : 'imagem', coverIds: [c.id], approved: c.approved, at: st?.at || c.created_at, created: c.created_at, updated: c.updated_at, publishable: true,
     });
@@ -106,7 +110,7 @@ async function build({ episodeId = null, recentDays = 60, today = new Date().toI
     if (slides.length < 2) continue;
     const ids = slides.map((s) => s.id); const st = stateOfCovers(idx, ids); const first = slides[0];
     cards.push({
-      key: `g${k}`, type: 'carrossel', stage: st ? st.stage : 'pronto', title: first.request_title || first.label || 'Carrossel', href: first.request_id ? requests.url(first.request_id) : `/capas/${first.id}/editar`,
+      key: `g${k}`, projectId: first.project_id, type: 'carrossel', stage: st ? st.stage : 'pronto', title: first.request_title || first.label || 'Carrossel', href: first.request_id ? requests.url(first.request_id) : `/capas/${first.id}/editar`,
       kind: 'Carrossel', episode: epLabel(first.episode_number, first.episode_title), episodeId: first.episode_id, thumb: thumb(first.id, first.updated_at), slides: slides.length, pub: st, media: 'carrossel', coverIds: ids, at: st?.at || first.created_at, created: first.created_at, updated: slides.reduce((m, x) => (new Date(x.updated_at) > new Date(m) ? x.updated_at : m), first.updated_at), publishable: true,
     });
   }

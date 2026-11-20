@@ -12,10 +12,11 @@ async function people() {
 }
 
 // ---------------------------------------------------------------- Convidados (alias g = guests)
-async function guestFields() {
+// projectIds (aqui e nas outras listas): as opções de conexão (patrocinador, episódio) só do recorte de projetos; sem ele, todas
+async function guestFields(projectIds = null) {
   const [users, { rows: sponsors }] = await Promise.all([
     people(),
-    db.query('SELECT id, company FROM sponsors ORDER BY lower(company)'),
+    db.query('SELECT id, company FROM sponsors WHERE ($1::int[] IS NULL OR project_id = ANY($1)) ORDER BY lower(company)', [projectIds]),
   ]);
   const DATE = 'Datas'; const LINK = 'Conexões';
   return [
@@ -70,11 +71,11 @@ function videoTypeOptions() {
   return [...active.map((k) => [k, K[k]?.label || k]), ...off.map((k) => [k, `${K[k]?.label || k} (desativada)`])];
 }
 
-async function clipFields() {
+async function clipFields(projectIds = null) {
   await catalog.refresh();
   const [users, { rows: eps }] = await Promise.all([
     people(),
-    db.query('SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 200'),
+    db.query('SELECT id, number, title FROM episodes WHERE ($1::int[] IS NULL OR project_id = ANY($1)) ORDER BY number DESC NULLS LAST, id DESC LIMIT 200', [projectIds]),
   ]);
   const DATE = 'Datas'; const LINK = 'Conexões';
   return [
@@ -100,8 +101,8 @@ async function clipFields() {
 }
 
 const epLabel = (e) => `${e.number ? `EP.${String(e.number).padStart(3, '0')} · ` : ''}${e.title}`;
-async function episodeOptions() {
-  const { rows } = await db.query('SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 200');
+async function episodeOptions(projectIds = null) {
+  const { rows } = await db.query('SELECT id, number, title FROM episodes WHERE ($1::int[] IS NULL OR project_id = ANY($1)) ORDER BY number DESC NULLS LAST, id DESC LIMIT 200', [projectIds]);
   return rows.map((e) => [String(e.id), epLabel(e)]);
 }
 
@@ -171,7 +172,7 @@ async function sponsorFields() {
 }
 
 // ---------------------------------------------------------------- Conteúdo > Quadro (cartões de contentBoard.build)
-async function boardFields() {
+async function boardFields(projectIds = null) {
   const DATE = 'Datas'; const LINK = 'Conexões';
   const { STAGES } = require('./contentBoard');
   return [
@@ -186,14 +187,14 @@ async function boardFields() {
     { key: 'criado', label: 'Criado em', type: 'date', get: (k) => k.created, group: DATE },
     { key: 'atualizado', label: 'Atualizado em', type: 'date', get: (k) => k.updated || k.at, group: DATE },
     { key: 'publicado_em', label: 'Publicado em', type: 'date', get: (k) => (k.pub && k.pub.stage === 'publicado' ? k.pub.at : null), group: DATE },
-    { key: 'episodio', label: 'Episódio', type: 'enum', get: (k) => (k.episodeId ? String(k.episodeId) : null), options: await episodeOptions(), group: LINK },
+    { key: 'episodio', label: 'Episódio', type: 'enum', get: (k) => (k.episodeId ? String(k.episodeId) : null), options: await episodeOptions(projectIds), group: LINK },
     { key: 'capa', label: 'Tem capa', type: 'bool', get: (k) => Boolean(k.thumb), group: LINK },
     { key: 'teste', label: 'Reel de teste', type: 'bool', get: (k) => Boolean(k.pub && k.pub.trial), group: LINK },
   ];
 }
 
 // ---------------------------------------------------------------- Conteúdo > Posts e carrosséis (linhas de episode_covers + pub)
-async function postFields() {
+async function postFields(projectIds = null) {
   const DATE = 'Datas'; const LINK = 'Conexões';
   return [
     { key: 'tipo', label: 'Tipo', type: 'enum', get: (p) => p.kind, options: [['post_quote', 'Post de frase'], ['post_split', 'Tela dividida'], ['carousel', 'Carrossel']] },
@@ -203,12 +204,12 @@ async function postFields() {
     { key: 'texto', label: 'Texto', type: 'text', get: (p) => p.label },
     { key: 'criado', label: 'Criado em', type: 'date', get: (p) => p.created_at, group: DATE },
     { key: 'atualizado', label: 'Atualizado em', type: 'date', get: (p) => p.updated_at, group: DATE },
-    { key: 'episodio', label: 'Episódio', type: 'enum', get: (p) => (p.episode_id ? String(p.episode_id) : null), options: await episodeOptions(), group: LINK },
+    { key: 'episodio', label: 'Episódio', type: 'enum', get: (p) => (p.episode_id ? String(p.episode_id) : null), options: await episodeOptions(projectIds), group: LINK },
   ];
 }
 
 // ---------------------------------------------------------------- Conteúdo > Pedidos (linhas de contentRequests.list)
-async function requestFields() {
+async function requestFields(projectIds = null) {
   const R = require('./contentRequests');
   await catalog.refresh();
   const users = await people();
@@ -227,7 +228,7 @@ async function requestFields() {
     { key: 'prazo', label: 'Prazo', type: 'date', get: (r) => r.due_on, group: DATE },
     { key: 'criado', label: 'Pedido em', type: 'date', get: (r) => r.created_at, group: DATE },
     { key: 'atualizado', label: 'Atualizado em', type: 'date', get: (r) => r.updated_at, group: DATE },
-    { key: 'episodio', label: 'Episódio', type: 'enum', get: (r) => (r.episode_id ? String(r.episode_id) : null), options: await episodeOptions(), group: LINK },
+    { key: 'episodio', label: 'Episódio', type: 'enum', get: (r) => (r.episode_id ? String(r.episode_id) : null), options: await episodeOptions(projectIds), group: LINK },
   ];
 }
 

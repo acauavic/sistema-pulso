@@ -7,6 +7,7 @@
   </div>
   <p class="small err" data-reason <%= t.status === 'bloqueada' ? '' : 'hidden' %>><%= t.status === 'bloqueada' ? 'Bloqueada: ' + t.block_reason : '' %></p>
   <div class="tc-meta handle">
+    <%- include('../partials/project-tag', { id: t.project_id }) %>
     <% if (due) { %><span class="<%= late ? 'err' : '' %>"><%- icon('clock', 12) %> <%= fmt.formatDueShort(t.due_on, t.due_time) %><%= late ? ' · atrasada' : '' %></span><% } %>
     <% if (t.episode_id) { %><span><%= t.episode_number ? 'EP.' + String(t.episode_number).padStart(3, '0') : 'Episódio' %></span><% } %>
     <% if (t.guest_id) { %><span><%= t.guest_name %></span><% } %>

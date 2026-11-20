@@ -60,12 +60,14 @@ router.get('/tarefas', requirePerm('tasks.read'), wrap(async (req, res) => {
   const view = VIEWS[req.query.visao] ? req.query.visao : 'lista';
   const q = String(req.query.q || '').trim().slice(0, 80);
   const cal = view === 'calendario' ? monthGrid(req.query.mes) : null;
-  const items = await tasks.list({ user: req.user, scope, q, ...(cal ? { from: cal.from, to: cal.to } : {}) });
+  const pids = require('../services/scope').idsOf(req); // os projetos da pessoa, ou o escolhido no menu (tarefa geral aparece sempre)
+  const items = await tasks.list({ user: req.user, scope, q, projectIds: pids, ...(cal ? { from: cal.from, to: cal.to } : {}) });
   const [opts, counts] = await Promise.all([
     linkOptions(),
     db.query(`SELECT count(*) FILTER (WHERE assignee_id = $1 AND status <> 'feito')::int AS minhas,
                      count(*) FILTER (WHERE assignee_id = $1 AND status <> 'feito' AND due_on <= $2)::int AS hoje,
-                     count(*) FILTER (WHERE status <> 'feito')::int AS todas FROM tasks`, [req.user.id, tasks.todayISO()]),
+                     count(*) FILTER (WHERE status <> 'feito')::int AS todas FROM tasks
+               WHERE project_id IS NULL OR project_id = ANY($3::int[])`, [req.user.id, tasks.todayISO(), pids]),
   ]);
   const prefill = { episode_id: req.query.episodio || '', guest_id: req.query.convidado || '', sponsor_id: req.query.patrocinador || '' };
   res.render('tasks/index', {

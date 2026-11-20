@@ -99,17 +99,19 @@ router.get('/patrocinadores', requirePerm('sponsors.read'), wrap(async (req, res
   const f = await require('../services/filterUi').build(req, { entity: 'sponsor', action: '/patrocinadores', fields: await require('../services/filterFields').sponsorFields(), keep: { view, q, owner: req.query.owner || '', stage } });
   const fsql = require('../services/filters').toSql(f.state, f.fields, params);
   if (fsql) where.push(fsql);
+  const scope = require('../services/scope');
+  scope.where(req, where, params, 's'); // só os projetos da pessoa, ou o escolhido no menu
   const [{ rows: sponsors }, { rows: owners }, totals] = await Promise.all([
     db.query(
       `SELECT s.id, s.company, s.kind, s.tier, s.value_cents, s.contact_name, s.stage, s.public_token, s.brief_completed_at, s.updated_at, s.owner_id, u.name AS owner_name, s.origin,
-              s.contact_email, s.contact_phone, s.website, s.starts_on, s.ends_on, s.created_at, s.stage_entered_at,
+              s.contact_email, s.contact_phone, s.website, s.starts_on, s.ends_on, s.created_at, s.stage_entered_at, s.project_id,
               b.skipped AS b_skipped, b.na AS b_na, b.landing_url, b.landing_perk, b.offer, b.presentation, b.key_points, b.restrictions, b.slogan, b.goal, b.goal_other,
               EXISTS (SELECT 1 FROM sponsor_files f WHERE f.sponsor_id = s.id AND f.kind = 'logo' AND f.status = 'pronto') AS has_logo
          FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id LEFT JOIN sponsor_briefs b ON b.sponsor_id = s.id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY s.updated_at DESC LIMIT 500`, params),
     require('../services/team').activeUsers(),
-    db.query("SELECT stage, count(*)::int AS n, coalesce(sum(value_cents),0)::bigint AS total FROM sponsors GROUP BY stage"),
+    db.query('SELECT stage, count(*)::int AS n, coalesce(sum(value_cents),0)::bigint AS total FROM sponsors WHERE project_id = ANY($1::int[]) GROUP BY stage', [scope.idsOf(req)]),
   ]);
   for (const s of sponsors) { // andamento do formulário (só depois de Ganho)
     if (!['ganho', 'ativo', 'inativo'].includes(s.stage)) continue;

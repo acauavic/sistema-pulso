@@ -33,7 +33,7 @@
 <aside class="sidebar" data-sidebar>
   <div class="sidebar-top">
     <%- include('brand', { variant: 'menu' }) %>
-    <% if (scope && scope.multi) { %><span class="project-now mono"><%= scope.current ? scope.current.sigla : 'Todos' %></span><% } %>
+    <% if (projectScope && projectScope.multi) { %><span class="project-now mono"><%= projectScope.current ? projectScope.current.sigla : 'Todos' %></span><% } %>
     <button class="icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-label="Recolher o menu" title="Recolher o menu" aria-pressed="false"><%- icon('panel-left', 18) %></button>
   </div>
   <%- include('project-switch') %>

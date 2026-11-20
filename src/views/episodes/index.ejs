@@ -24,7 +24,7 @@
       <% if (!col.items.length) { %><p class="col-empty small muted">Nenhum episódio nesta etapa.</p><% } %>
       <% col.items.forEach(function (e) { %>
       <a class="kcard" href="/episodios/<%= e.id %>"><% var o = order[e.id]; %>
-        <span class="handle muted"<%- cardUi.attr('numero') %>><% if (o) { %><b class="order-n" title="<%= o.rank %>º na ordem de edição"><%= o.rank %>º</b> · <% } %><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'EP.—' %> · <% if (o) { %><span class="air-<%= o.air.tone || 'ok' %>" title="<%= o.air.line %>"><%= o.air.short %></span><% } else { %><%= fmt.formatDayShort(e.aired_on) %><% } %></span>
+        <span class="handle muted"<%- cardUi.attr('numero') %>><%- include('../partials/project-tag', { id: e.project_id }) %> <% if (o) { %><b class="order-n" title="<%= o.rank %>º na ordem de edição"><%= o.rank %>º</b> · <% } %><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : 'EP.—' %> · <% if (o) { %><span class="air-<%= o.air.tone || 'ok' %>" title="<%= o.air.line %>"><%= o.air.short %></span><% } else { %><%= fmt.formatDayShort(e.aired_on) %><% } %></span>
         <strong><%= e.title %></strong>
         <% if (e.guest_name) { %><span class="muted small"<%- cardUi.attr('convidado') %>><%= e.guest_name %></span><% } %>
         <span class="meta small muted">
@@ -55,7 +55,7 @@
     <tr>
       <td class="num mono"><%= e.number ? String(e.number).padStart(3, '0') : '—' %></td>
       <td class="num mono"><% if (o) { %><b class="order-n"><%= o.rank %>º</b><% } else { %><span class="muted">—</span><% } %></td>
-      <td><a href="/episodios/<%= e.id %>"><strong><%= e.title %></strong></a></td>
+      <td><a href="/episodios/<%= e.id %>"><strong><%= e.title %></strong></a> <%- include('../partials/project-tag', { id: e.project_id }) %></td>
       <td><%= e.guest_name || '—' %></td>
       <td class="mono nowrap<%= o ? ' air-' + (o.air.tone || 'ok') : '' %>"<% if (o) { %> title="<%= o.air.line %>"<% } %>><%= fmt.formatDay(e.aired_on) %></td>
       <td><span class="badge b-st-<%= e.status %>"><%= statuses[e.status] %></span></td>

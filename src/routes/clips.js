@@ -38,9 +38,10 @@ async function findClip(req) {
 }
 
 // Episódios que já foram gravados: os únicos que aceitam cortes.
-const eligibleEpisodes = () => db.query(
-  `SELECT e.id, e.number, e.title, e.status, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
-    WHERE e.status = ANY($1) ORDER BY e.number DESC NULLS LAST, e.id DESC`, [clips.ELIGIBLE_STATUSES]);
+// projectIds: só os episódios do recorte (scope.idsOf); sem ele, todos
+const eligibleEpisodes = (projectIds = null) => db.query(
+  `SELECT e.id, e.number, e.title, e.status, e.project_id, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
+    WHERE e.status = ANY($1) AND ($2::int[] IS NULL OR e.project_id = ANY($2)) ORDER BY e.number DESC NULLS LAST, e.id DESC`, [clips.ELIGIBLE_STATUSES, projectIds]);
 
 // ---------------------------------------------------------------- tela de conteúdo
 router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
@@ -49,17 +50,21 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const vista = ['quadro', 'cortes', 'posts', 'pedidos'].includes(req.query.vista) ? req.query.vista : 'quadro';
   const board = require('../services/contentBoard');
   const R = require('../services/contentRequests');
-  const clipFilter = `(c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes') ${only ? 'AND c.episode_id = $1' : ''}`;
+  // recorte: os projetos da pessoa, ou o escolhido no menu. Imagem herda o projeto do episódio ou do pedido dela.
+  const pids = require('../services/scope').idsOf(req);
+  const coverProject = `coalesce(e.project_id, r.project_id, ${Number(require('../services/projects').defaultId())})`;
+  const clipFilter = `(c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes') AND c.project_id = ANY($1::int[]) ${only ? 'AND c.episode_id = $2' : ''}`;
   const [clipRows, episodes, postCountRow, idx, reqs, people, episodeList] = await Promise.all([
     db.query(
       `SELECT c.*, e.number AS ep_number, e.title AS ep_title, g.name AS guest_name, r.title AS request_title FROM episode_clips c
          LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN content_requests r ON r.id = c.request_id
-        WHERE ${clipFilter} ORDER BY (c.episode_id IS NULL) DESC, c.created_at DESC, c.id DESC`, only ? [only] : []),
-    eligibleEpisodes(),
-    db.query(`SELECT count(*)::int AS n FROM episode_covers c WHERE c.clip_id IS NULL AND c.kind = ANY($1) ${only ? 'AND c.episode_id = $2' : ''}`, only ? [POST_KINDS, only] : [POST_KINDS]),
+        WHERE ${clipFilter} ORDER BY (c.episode_id IS NULL) DESC, c.created_at DESC, c.id DESC`, only ? [pids, only] : [pids]),
+    eligibleEpisodes(pids),
+    db.query(`SELECT count(*)::int AS n FROM episode_covers c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id
+               WHERE c.clip_id IS NULL AND c.kind = ANY($1) AND ${coverProject} = ANY($2::int[]) ${only ? 'AND c.episode_id = $3' : ''}`, only ? [POST_KINDS, pids, only] : [POST_KINDS, pids]),
     board.publicationIndex(),
-    R.list({ episodeId: only }), db.query("SELECT id, name, role FROM users WHERE active AND role IN ('editor_video','gestao','superadmin') ORDER BY (role = 'editor_video') DESC, name"),
-    db.query('SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 80'),
+    R.list({ episodeId: only, projectIds: pids }), db.query("SELECT id, name, role FROM users WHERE active AND role IN ('editor_video','gestao','superadmin') ORDER BY (role = 'editor_video') DESC, name"),
+    db.query('SELECT id, number, title FROM episodes WHERE project_id = ANY($1::int[]) ORDER BY number DESC NULLS LAST, id DESC LIMIT 80', [pids]),
   ]);
   const byEpisode = {};
   for (const e of episodes.rows) byEpisode[e.id] = e;
@@ -72,9 +77,9 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   let columns = []; let hiddenOld = 0;
   const tipo = ['video', 'imagem', 'pedido'].includes(req.query.tipo) ? req.query.tipo : '';
   if (vista === 'quadro') {
-    const built = await board.build({ episodeId: only, recentDays: req.query.publicados === 'todos' || only ? null : 60 }); // de um episódio: tudo o que já saiu
+    const built = await board.build({ episodeId: only, projectIds: pids, recentDays: req.query.publicados === 'todos' || only ? null : 60 }); // de um episódio: tudo o que já saiu
     hiddenOld = built.hiddenOld;
-    const f = await filterUiSvc.build(req, { entity: 'board', action: '/conteudo', fields: await fieldsDef.boardFields(),
+    const f = await filterUiSvc.build(req, { entity: 'board', action: '/conteudo', fields: await fieldsDef.boardFields(pids),
       keep: { vista: 'quadro', tipo, episodio: only || '', publicados: req.query.publicados === 'todos' ? 'todos' : '' } });
     filterUi = f.ui;
     const keep = (c) => (!tipo || (tipo === 'pedido' ? c.type === 'pedido' : tipo === 'video' ? c.media === 'video' && c.type !== 'pedido' : c.type !== 'pedido' && c.media !== 'video')) && f.passes(c);
@@ -95,7 +100,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   let list = []; let clipPager = null; let clipTotals = null; let running = false;
   if (vista === 'cortes') {
     // categoria, situação no Social, formato, datas, conexões…
-    const f = await filterUiSvc.build(req, { entity: 'clip', action: '/conteudo', fields: await fieldsDef.clipFields(),
+    const f = await filterUiSvc.build(req, { entity: 'clip', action: '/conteudo', fields: await fieldsDef.clipFields(pids),
       keep: { vista: 'cortes', situacao, ordem: ordem === 'recentes' ? '' : ordem, episodio: only || '' } });
     filterUi = f.ui; const { passes } = f;
     const natural = (a, b) => String(a.title).localeCompare(String(b.title), 'pt-BR', { numeric: true });
@@ -126,10 +131,12 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     const [posts, withFrames] = await Promise.all([
       db.query(
         `SELECT c.id, c.episode_id, c.kind, c.group_key, c.position, c.label, c.lint, c.approved, c.auto, c.width, c.height, c.size_bytes, c.updated_at, c.created_at
-           FROM episode_covers c WHERE c.clip_id IS NULL AND c.kind = ANY($1) ${only ? 'AND c.episode_id = $2' : ''} ORDER BY c.episode_id DESC, c.kind, c.group_key, c.position, c.id`, only ? [POST_KINDS, only] : [POST_KINDS]),
+           FROM episode_covers c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN content_requests r ON r.id = c.request_id
+          WHERE c.clip_id IS NULL AND c.kind = ANY($1) AND ${coverProject} = ANY($2::int[]) ${only ? 'AND c.episode_id = $3' : ''}
+          ORDER BY c.episode_id DESC, c.kind, c.group_key, c.position, c.id`, only ? [POST_KINDS, pids, only] : [POST_KINDS, pids]),
       db.query('SELECT DISTINCT episode_id FROM episode_frames WHERE clip_id IS NULL AND episode_id IS NOT NULL'),
     ]);
-    const f = await filterUiSvc.build(req, { entity: 'post', action: '/conteudo', fields: await fieldsDef.postFields(), keep: { vista: 'posts', episodio: only || '' } });
+    const f = await filterUiSvc.build(req, { entity: 'post', action: '/conteudo', fields: await fieldsDef.postFields(pids), keep: { vista: 'posts', episodio: only || '' } });
     filterUi = f.ui;
     const shownPosts = posts.rows.map((p) => ({ ...p, pub: board.stateOf(idx.byCover.get(p.id)) })).filter(f.passes);
     const hasFrames = new Set(withFrames.rows.map((r) => r.episode_id));
@@ -143,7 +150,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   // Pedidos
   let shownRequests = reqs;
   if (vista === 'pedidos') {
-    const f = await filterUiSvc.build(req, { entity: 'request', action: '/conteudo', fields: await fieldsDef.requestFields(), keep: { vista: 'pedidos', episodio: only || '' } });
+    const f = await filterUiSvc.build(req, { entity: 'request', action: '/conteudo', fields: await fieldsDef.requestFields(pids), keep: { vista: 'pedidos', episodio: only || '' } });
     filterUi = f.ui;
     shownRequests = reqs.filter(f.passes);
   }

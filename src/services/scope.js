@@ -22,7 +22,7 @@ async function attach(req, res, next) {
       financeIds: list.filter((p) => mine.get(p.id).finance).map((p) => p.id),
     };
     req.scope = scope;
-    res.locals.scope = scope;
+    res.locals.projectScope = scope; // ("scope" já é o nome do filtro Minhas | Hoje | Todas da tela de Tarefas)
     // a sigla só aparece para quem vê mais de um projeto, e só quando o item é de um projeto diferente do escolhido
     res.locals.projectTag = (projectId) => {
       if (!multi || projectId == null || (current && current.id === Number(projectId))) return '';

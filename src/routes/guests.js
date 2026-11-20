@@ -129,21 +129,23 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   if (status && view === 'lista') { params.push(status); where.push(`g.status = $${params.length}`); }
   // filtros combináveis (botão Filtros): campo + operador + valor, todos (E) ou qualquer um (OU)
   const ff = require('../services/filters'); const fieldsDef = require('../services/filterFields');
-  const fields = await fieldsDef.guestFields();
+  const fields = await fieldsDef.guestFields(require('../services/scope').idsOf(req));
   const fctx = { userId: req.user.id };
   const fstate = ff.parse(req.query, fields, fctx);
   const fsql = ff.toSql(fstate, fields, params);
   if (fsql) where.push(fsql);
+  const scope = require('../services/scope');
+  scope.where(req, where, params, 'g'); // só os projetos da pessoa, ou o escolhido no menu
   const [{ rows: guests }, { rows: owners }, { rows: sponsors }] = await Promise.all([
     db.query(
       `SELECT g.id, g.name, g.instagram, g.profile, g.company, g.job_title, g.topic, g.status, g.proposed_at, g.invite_sent_at, g.invite_viewed_at,
               g.short_url, g.invite_token, g.owner_id, u.name AS owner_name, g.updated_at, g.loss_reason, g.origin,
-              g.email, g.phone, g.reach, g.created_at, g.premiere_on
+              g.email, g.phone, g.reach, g.created_at, g.premiere_on, g.project_id
          FROM guests g LEFT JOIN users u ON u.id = g.owner_id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY g.updated_at DESC LIMIT 500`, params),
     require('../services/team').activeUsers(),
-    can(req.user.role, 'guests.write') && view === 'lista' ? db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)") : { rows: [] },
+    can(req.user.role, 'guests.write') && view === 'lista' ? db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' AND project_id = ANY($1::int[]) ORDER BY lower(company)", [scope.idsOf(req)]) : { rows: [] },
   ]);
   const outreach = require('../services/outreach');
   const outEval = await outreach.evaluateAll('guest', { ids: guests.filter((g) => g.status === outreach.KINDS.guest.stage).map((g) => g.id) });

@@ -13,6 +13,7 @@
   <div class="clip-body">
     <div class="row spread clip-head"><a href="/cortes/<%= c.id %>"><strong><%= c.post_title || c.title %></strong></a><span class="badge <%= st[0] %>" data-clip-badge><%= st[1] %></span></div>
     <p class="handle muted"<%- cfa('dados') %>>
+      <%- include('../partials/project-tag', { id: c.project_id }) %>
       <% if (typeof K !== 'undefined' && K[c.video_type]) { %><span class="clip-cat"><%= K[c.video_type].label %></span> · <% } %><%= c.post_title ? c.title + ' · ' : '' %><%= c.duration_ms ? fmt.formatClock(c.duration_ms) : '—' %><%= c.width ? ' · ' + c.width + '×' + c.height : '' %><%= c.size_bytes ? ' · ' + fmt.formatBytes(c.size_bytes) : '' %>
     </p>
     <% if (c.pub) { %><p class="handle muted"<%- cfa('redes') %>><%= c.pub.platforms.join(' · ') %><% if (c.views && c.views.views) { %> · <span class="clip-views" title="<%= c.views.likes %> curtidas · <%= c.views.comments %> comentários · <%= c.views.shares %> compartilhamentos"><%= fmt.compact(c.views.views) %> views</span><% } %></p><% } %>

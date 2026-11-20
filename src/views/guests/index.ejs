@@ -49,7 +49,7 @@
         <% if (g.instagram || g.profile) { %><span class="muted small handle"<%- cardUi.attr('perfil') %>><%= [g.instagram ? '@' + g.instagram : '', g.profile ? profileLabels[g.profile].label : ''].filter(Boolean).join(' · ') %></span><% } %>
         <% if (g.company || g.job_title) { %><span class="muted small"<%- cardUi.attr('empresa') %>><%= [g.job_title, g.company].filter(Boolean).join(' · ') %></span><% } %>
         <% if (g.topic) { %><span class="small topic"<%- cardUi.attr('tema') %>><%= g.topic %></span><% } %>
-        <span class="meta small muted">
+        <span class="meta small muted"><%- include('../partials/project-tag', { id: g.project_id }) %>
           <% if (g.status === 'perdido' && g.loss_reason) { %><span class="mono"<%- cardUi.attr('perda') %>><%= lossReasons[g.loss_reason] %></span><% } %>
           <% if (g.proposed_at) { %><span<%- cardUi.attr('gravacao') %>><%- icon('calendar', 12) %><%= fmt.shortDate(g.proposed_at) %></span><% } %>
           <% if (g.status === 'gravado') { %><% if (g.premiere_on) { %><span title="Estreia prevista"<%- cardUi.attr('estreia') %>><%- icon('play', 12) %>estreia <%= fmt.formatDayShort(g.premiere_on) %></span><% } else { %><span class="warn" title="Preencha a estreia prevista no cadastro"<%- cardUi.attr('estreia') %>><%- icon('play', 12) %>estreia não preenchida</span><% } %><% } %>
@@ -90,7 +90,7 @@
     <% guests.forEach(function (g) { %>
     <tr>
       <% if (canBulk) { %><td class="check-col"><input type="checkbox" form="form-massa" name="ids" value="<%= g.id %>" data-bulk-pick aria-label="Marcar <%= g.name %>"></td><% } %>
-      <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a><% if (g.origin === 'site') { %> <span class="file-tag" title="Pediu pelo site">site</span><% } %><br><span class="muted small handle"><%= g.instagram ? '@' + g.instagram : '' %></span><% if (g.outreach && g.outreach.state !== 'respondeu') { %> <span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %></td>
+      <td><a href="/convidados/<%= g.id %>"><strong><%= g.name %></strong></a> <%- include('../partials/project-tag', { id: g.project_id }) %><% if (g.origin === 'site') { %> <span class="file-tag" title="Pediu pelo site">site</span><% } %><br><span class="muted small handle"><%= g.instagram ? '@' + g.instagram : '' %></span><% if (g.outreach && g.outreach.state !== 'respondeu') { %> <span class="outreach-chip <%= g.outreach.tone %>" title="<%= g.outreach.attempts %> abordagem(ns). <%= g.outreach.text %>"><%- icon('message-circle', 12) %><%= g.outreach.short %></span><% } %></td>
       <td><%= g.profile ? profileLabels[g.profile].label : '—' %></td>
       <td><span class="badge b-st-<%= g.status %>"><%= statuses.find(function (s) { return s.key === g.status; }).label %></span></td>
       <td class="nowrap mono"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : '—' %></td>

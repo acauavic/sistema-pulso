@@ -88,7 +88,7 @@ async function attachSession(req, res, next) {
     res.locals.podcastName = config.podcastName;
     res.locals.appName = config.appName;
     // recorte por projeto: os valores de verdade vêm de services/scope.js, depois do login; aqui, o que vale sem sessão
-    res.locals.scope = null;
+    res.locals.projectScope = null;
     res.locals.projectTag = () => '';
     res.locals.videoLabel = 'Episódios';
     res.locals.hasModule = () => true;

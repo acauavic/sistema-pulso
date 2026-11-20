@@ -32,9 +32,11 @@ const get = (id) => db.query(`${SELECT} WHERE t.id = $1`, [id]).then((r) => r.ro
 const canEdit = (user, task) => can(user.role, 'tasks.manage') || [task.created_by, task.assignee_id].map(String).includes(String(user.id));
 
 // escopo: 'minhas' (sou o responsável), 'hoje' (minhas que vencem hoje ou estão atrasadas), 'todas'.
-async function list({ user, scope = 'minhas', status = null, from = null, to = null, q = '' }) {
+// projectIds: o recorte de projetos (scope.idsOf); tarefa geral (sem projeto) aparece em qualquer recorte.
+async function list({ user, scope = 'minhas', status = null, from = null, to = null, q = '', projectIds = null }) {
   const params = []; const where = [];
   const p = (v) => { params.push(v); return `$${params.length}`; };
+  if (projectIds) where.push(`(t.project_id IS NULL OR t.project_id = ANY(${p(projectIds)}::int[]))`);
   if (scope === 'minhas' || scope === 'hoje') where.push(`t.assignee_id = ${p(user.id)}`);
   if (scope === 'hoje') where.push(`t.status <> 'feito' AND t.due_on <= ${p(todayISO())}`);
   if (status && STATUSES.includes(status)) where.push(`t.status = ${p(status)}`);

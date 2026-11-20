@@ -58,7 +58,7 @@
           <% col.cards.forEach(function (k) { var kTitle = k.episode && String(k.title).toLowerCase() === String(k.kind).toLowerCase() ? (k.episode.split(' · ').slice(1).join(' · ') || k.title) : k.title; %>
           <a class="kcard has-thumb" href="<%= k.href %>">
             <% if (k.thumb) { %><img class="kthumb <%= k.media === 'video' && k.vertical === false ? '' : (k.media !== 'video' && k.type !== 'story' ? 'wide' : '') %>" src="<%= k.thumb %>" alt="" loading="lazy"<%- cardUi.attr('capa') %>><% } else { %><span class="kthumb ph"<%- cardUi.attr('capa') %>><%- icon(k.media === 'video' ? 'film' : 'image', 16) %></span><% } %>
-            <span class="ktype"<%- cardUi.attr('tipo') %>><%= k.kind %><%= k.episode ? ' · ' + k.episode.split(' · ')[0] : (k.type !== 'pedido' && k.media === 'video' && !k.warn ? ' · avulso' : '') %></span>
+            <span class="ktype"<%- cardUi.attr('tipo') %>><%- include('../partials/project-tag', { id: k.projectId }) %> <%= k.kind %><%= k.episode ? ' · ' + k.episode.split(' · ')[0] : (k.type !== 'pedido' && k.media === 'video' && !k.warn ? ' · avulso' : '') %></span>
             <strong><%= kTitle %></strong>
             <span class="meta">
               <% if (k.type === 'pedido') { %><% if (k.priority) { %><span class="warn"<%- cardUi.attr('pedido') %>>prioridade</span><% } %><span<%- cardUi.attr('pedido') %>><%- icon('user', 12) %><%= k.who %></span><% if (k.due) { %><span class="<%= k.late ? 'late' : '' %>"<%- cardUi.attr('pedido') %>><%- icon('calendar', 12) %><%= dueShort(k.due) %><%= k.late ? ' · atrasado' : '' %></span><% } %><% if (k.rounds) { %><span<%- cardUi.attr('pedido') %>><%= k.rounds %>ª volta</span><% } %><% } %>
@@ -276,7 +276,7 @@
       <% if (mayPick) { %><input type="checkbox" class="dl-check" data-dl-check aria-label="Selecionar <%= r.title %>"><% } %>
       <a class="req-row" href="/conteudo/pedidos/<%= r.id %>"<%- mayPick ? ' data-dl-pick' : '' %>>
         <% var sameAsKind = String(r.title).toLowerCase() === String(K[r.kind].label).toLowerCase(); %>
-        <span><span class="ktype mono small muted"><%= sameAsKind && r.episode_title ? (r.episode_number ? 'EP.' + String(r.episode_number).padStart(3, '0') + ' · ' : '') + r.episode_title : K[r.kind].label + (r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '') %></span><br><strong><%= r.title %></strong>
+        <span><span class="ktype mono small muted"><%- include('../partials/project-tag', { id: r.project_id }) %> <%= sameAsKind && r.episode_title ? (r.episode_number ? 'EP.' + String(r.episode_number).padStart(3, '0') + ' · ' : '') + r.episode_title : K[r.kind].label + (r.episode_number ? ' · EP.' + String(r.episode_number).padStart(3, '0') : '') %></span><br><strong><%= r.title %></strong>
           <span class="meta"><span><%- icon('user', 12) %><%= r.assignee_name || 'qualquer editor' %></span><% if (r.due_on) { %><span class="<%= late ? 'err' : '' %>"><%- icon('calendar', 12) %><%= dueShort(r.due_on) %><%= late ? ' · atrasado' : '' %></span><% } %><% if (r.rounds) { %><span><%= r.rounds %>ª volta</span><% } %></span></span>
         <span class="badge <%= { pedido: 'b-st-prospect', producao: 'b-st-em_edicao', revisao: 'b-st-em_revisao' }[r.status] %>"><%= S[r.status] %></span>
       </a>
