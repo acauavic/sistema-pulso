@@ -128,7 +128,16 @@
     const y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
     return x * y;
   };
-  const grow = (r, m) => ({ x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m });
+  const grow = (r, m) => ({ ...r, x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m });
+  // Um retângulo (texto, logo) toca a zona do rosto? Rosto marcado como oval (os modelos do guia) é conferido pela elipse: o
+  // canto do retângulo em volta dela não é rosto. Devolve a área em comum (0 = não toca).
+  const faceOverlap = (b, f) => {
+    const ov = overlap(b, f);
+    if (!ov || !f.oval) return ov;
+    const cx = f.x + f.w / 2; const cy = f.y + f.h / 2;
+    const px = clamp(cx, b.x, b.x + b.w); const py = clamp(cy, b.y, b.y + b.h);
+    return ((px - cx) / (f.w / 2)) ** 2 + ((py - cy) / (f.h / 2)) ** 2 <= 1 ? ov : 0;
+  };
 
   // ---- girar e espelhar o fundo (bg.rot: 0/90/180/270 no sentido horário; bg.flipX/flipY). Primeiro espelha, depois gira.
   const rotOf = (bg) => ((Math.round((bg?.rot || 0) / 90) * 90) % 360 + 360) % 360;
@@ -658,13 +667,13 @@
       if (layer.type === 'tarja') { // o destaque: não pode cobrir rosto, sair do quadro nem cair na área que a plataforma cobre
         const name = `A tarja “${String(layer.text).slice(0, 24)}”`;
         if (b.x < 0 || b.y < 0 || b.x + b.w > spec.width || b.y + b.h > spec.height) issues.push(`${name} sai do quadro.`);
-        for (const f of faces) if (overlap(b, grow(f, 4)) > 0) { issues.push(`${name} cobre um rosto.`); break; }
+        for (const f of faces) if (faceOverlap(b, grow(f, 4)) > 0) { issues.push(`${name} cobre um rosto.`); break; }
         for (const a of avoid) if (overlap(b, a) > 0) { warnings.push(`${name} invade a área de ${a.why}.`); break; }
         continue;
       }
       const label = layer.type === 'wordmark' ? 'O logotipo' : `Texto “${String(layer.text).replace(/\n/g, ' ').slice(0, 28)}”`;
       if (layer.type === 'wordmark') {
-        for (const f of faces) if (overlap(b, grow(f, 4)) > 0) { issues.push(`${label} cobre um rosto.`); break; }
+        for (const f of faces) if (faceOverlap(b, grow(f, 4)) > 0) { issues.push(`${label} cobre um rosto.`); break; }
         for (const blk of blocks) if (overlap(b, blk) > 0) { issues.push(`${label} cobre a legenda do vídeo.`); break; }
         continue;
       }
@@ -675,7 +684,7 @@
       if (b.x < 0 || b.y < 0 || b.x + b.w > spec.width || b.y + b.h > spec.height) issues.push(`${label} sai do quadro.`);
       else if (role === 'main' && (b.x < safe.x - 1 || b.y < safe.y - 1 || b.x + b.w > safe.x + safe.w + 1 || b.y + b.h > safe.y + safe.h + 1)) warnings.push(`${label} está fora da zona segura.`);
       for (const f of faces) {
-        const ov = overlap(b, grow(f, 4));
+        const ov = faceOverlap(b, grow(f, 4));
         if (ov > 0) { issues.push(`${label} cobre um rosto (${Math.round((ov / (f.w * f.h)) * 100)}% do rosto).`); break; }
       }
       for (const blk of blocks) if (overlap(b, blk) > 0) { issues.push(`${label} cobre a legenda do vídeo.`); break; }

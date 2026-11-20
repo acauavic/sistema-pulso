@@ -510,6 +510,11 @@ input[type="file"] { padding: 8px 12px; }
 .video-blank { display: grid; place-items: center; aspect-ratio: 9 / 16; border-radius: 4px; background: var(--surface); border: 1px dashed var(--line-strong); color: var(--muted); }
 .video-blank.is-busy { border-style: solid; }
 .video-missing { display: grid; gap: 4px; margin: 0; }
+/* No celular o vídeo vira uma linha: a capa pequena à esquerda e o que fazer à direita (os dois cabem na tela). */
+@media (max-width: 640px) {
+  .piece-grid-vd { grid-template-columns: minmax(0, 1fr); }
+  .video-card { grid-template-columns: 104px minmax(0, 1fr); align-items: start; }
+}
 .piece-card, .piece-missing { margin: 0; display: grid; gap: 10px; align-content: start; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--raised); }
 .piece-card.approved { border-color: var(--text); }
 .piece-missing { border-style: dashed; background: none; padding: 14px; }

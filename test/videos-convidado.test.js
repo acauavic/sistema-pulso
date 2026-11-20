@@ -102,7 +102,7 @@ describe('Vídeos do convidado na Finalização', { skip: !hasFfmpeg && 'precisa
     const r = await as.prod.act(`/episodios/${ep.id}/videos/story/gerar`, {}, { from: `/episodios/${ep.id}` });
     assert.match(r.location, /capas=videos/);
     let page = (await as.prod.get(`/episodios/${ep.id}?capas=videos`)).text;
-    assert.match(page, /Montando o vídeo/); assert.match(page, /data-video-wait/);
+    assert.match(page, /Montando o vídeo/); assert.ok(page.includes(`data-video-wait="/episodios/${ep.id}/videos/status"`), 'o endereço da espera sai limpo no atributo');
     assert.equal(JSON.parse((await as.prod.get(`/episodios/${ep.id}/videos/status`)).text).waiting, true);
     await runAll();
     const [row] = await q("SELECT * FROM episode_teasers WHERE episode_id = $1 AND kind = 'story'", [ep.id]);

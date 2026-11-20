@@ -91,7 +91,7 @@
 
   const finish = (model, format, W, H, bg, layers, faces, notes, extra = {}) => ({
     spec: { format, width: W, height: H, model, bg: { kind: 'solid', color: bg }, scrims: [], layers: layers.filter(Boolean), ...extra },
-    ctxData: { faces: faces.filter(Boolean).map((f) => E.grow(f, 36)), blocks: [] }, // rosto + 40 px livre (o verificador soma 4)
+    ctxData: { faces: faces.filter(Boolean).map((f) => ({ ...E.grow(f, 36), oval: true })), blocks: [] }, // a elipse do rosto + 40 px livres (o verificador soma 4)
     notes,
   });
   const notesOf = (c) => ({ zoom: c ? Math.round(c.zoom * 10) / 10 : null, soft: Boolean(c && c.soft) });

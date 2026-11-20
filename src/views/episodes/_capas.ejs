@@ -125,7 +125,7 @@
       <p class="small muted">O arquivo sai em 3000×3000, abaixo de 512 KB. Foto de câmera fica melhor que quadro do vídeo: troque em Ajustar &gt; Foto.</p><% } %>
     </div>
 
-    <div class="pane" data-pane-id="videos" hidden<%= guestVideos.some(function (v) { return v.row && (v.row.status === 'fila' || v.row.status === 'gerando'); }) ? ' data-video-wait="/episodios/' + ep.id + '/videos/status"' : '' %>>
+    <div class="pane" data-pane-id="videos" hidden<% if (guestVideos.some(function (v) { return v.row && (v.row.status === 'fila' || v.row.status === 'gerando'); })) { %> data-video-wait="/episodios/<%= ep.id %>/videos/status"<% } %>>
       <div class="piece-grid piece-grid-vd">
         <% guestVideos.forEach(function (v) {
              var r = v.row; var st = r ? r.status : 'novo'; var busy = st === 'fila' || st === 'gerando'; var ready = st === 'pronto';
