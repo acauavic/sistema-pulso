@@ -505,6 +505,11 @@ input[type="file"] { padding: 8px 12px; }
 .pieces-note { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 12px; }
 .piece-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); align-items: start; }
 .piece-grid-sp { grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 300px)); }
+.piece-grid-vd { grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 280px)); }
+.video-card .video-poster { width: 100%; }
+.video-blank { display: grid; place-items: center; aspect-ratio: 9 / 16; border-radius: 4px; background: var(--surface); border: 1px dashed var(--line-strong); color: var(--muted); }
+.video-blank.is-busy { border-style: solid; }
+.video-missing { display: grid; gap: 4px; margin: 0; }
 .piece-card, .piece-missing { margin: 0; display: grid; gap: 10px; align-content: start; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--raised); }
 .piece-card.approved { border-color: var(--text); }
 .piece-missing { border-style: dashed; background: none; padding: 14px; }

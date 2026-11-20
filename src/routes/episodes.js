@@ -333,7 +333,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     covers: coverRows.rows, meta: meta.rows[0] || null, frames: frames.rows, job, transcript: transcript.rows[0] || null, trJob,
     // capas pelo guia: os modelos (nome de cada um) e o que falta para cada ângulo que ainda não saiu
     coverModels: require('../public/design/models'), coverMissing: require('../services/coverPieces').missing(meta.rows[0]?.cover_sheet, ep, coverRows.rows),
-    capasTab: req.query.capas === 'spotify' ? 'spotify' : 'youtube', capasOpen: req.query.capas !== undefined, openModal: typeof req.query.abrir === 'string' ? req.query.abrir : '',
+    capasTab: ['spotify', 'videos'].includes(req.query.capas) ? req.query.capas : 'youtube', guestVideos: await require('../services/guestVideos').overview(ep.id), capasOpen: req.query.capas !== undefined, openModal: typeof req.query.abrir === 'string' ? req.query.abrir : '',
     aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,
     finData, fin: finSvc, money: fmt.formatBRL, today: finSvc.todayISO(), here: req.originalUrl,
     stageIndex, allSponsors: allSponsors.rows,

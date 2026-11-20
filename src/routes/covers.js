@@ -324,6 +324,31 @@ router.post(both('/atualizar'), requirePerm('episodes.read'), wrap(async (req, r
   res.redirect(homeOf(c));
 }));
 
+// ---------------------------------------------------------------- vídeos do convidado (story de lançamento e teaser)
+const videos = require('../services/guestVideos');
+router.post('/episodios/:id/videos/:kind/gerar', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!canGenerate(req.user.role) && !canDesign(req.user.role)) return deny(res);
+  if (!isIntId(req.params.id) || !videos.KINDS[req.params.kind]) return notFound(res);
+  const out = await videos.request(req.params.id, req.params.kind, req.user.id);
+  if (out.error) await req.flash('error', out.error);
+  else { await prod.addEvent(req.params.id, req.user.id, 'capas', `${videos.KINDS[req.params.kind].label}: vídeo pedido`); await req.flash('ok', `${videos.KINDS[req.params.kind].label} na fila. Leva de 1 a 2 minutos; pode sair desta tela.`); }
+  res.redirect(`/episodios/${req.params.id}?capas=videos#capas`);
+}));
+// O estado dos dois vídeos (a tela pergunta enquanto um deles está sendo gerado).
+router.get('/episodios/:id/videos/status', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return res.status(404).json({ ok: false });
+  const { rows } = await db.query('SELECT kind, status FROM episode_teasers WHERE episode_id = $1', [req.params.id]);
+  res.json({ ok: true, waiting: rows.some((r) => ['fila', 'gerando'].includes(r.status)), videos: rows });
+}));
+router.get('/episodios/:id/videos/:kind/:what(arquivo|capa)', requirePerm('episodes.read'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id) || !videos.KINDS[req.params.kind]) return notFound(res);
+  const { rows: [v] } = await db.query("SELECT t.*, e.number FROM episode_teasers t JOIN episodes e ON e.id = t.episode_id WHERE t.episode_id = $1 AND t.kind = $2 AND t.status = 'pronto'", [req.params.id, req.params.kind]);
+  const key = req.params.what === 'capa' ? v?.poster_key : v?.storage_key;
+  if (!key) return notFound(res);
+  const download = req.params.what === 'arquivo' && req.query.baixar === '1' ? videos.fileName({ id: v.episode_id, number: v.number }, v.kind) : null;
+  res.set('Cache-Control', 'private, max-age=300').redirect(302, await b2.presignGet(key, { expires: 3600, download }));
+}));
+
 // As thumbnails aprovadas num ZIP, com os nomes do guia, para subir no teste de miniatura do YouTube Studio.
 router.get('/episodios/:id/capas/teste.zip', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);

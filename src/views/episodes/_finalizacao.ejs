@@ -45,7 +45,7 @@
       <span class="step-n mono"><%= step(2) %></span>
       <div class="final-body">
         <% var spCovers = covers.filter(function (c) { return c.kind === 'spotify_cover'; }); var okThumbs = thumbs.filter(function (c) { return c.approved; }).length; var spOk = spCovers.some(function (c) { return c.approved; }); %>
-        <div class="row"><h3>Capas</h3><% if (approved) { %><span class="badge b-green">thumbnail aprovada</span><% } else if (thumbs.length) { %><span class="badge b-amber">aprove a thumbnail</span><% } else { %><span class="badge b-gray">sem capas</span><% } %></div>
+        <div class="row"><h3>Capas e vídeos</h3><% if (approved) { %><span class="badge b-green">thumbnail aprovada</span><% } else if (thumbs.length) { %><span class="badge b-amber">aprove a thumbnail</span><% } else { %><span class="badge b-gray">sem capas</span><% } %></div>
         <p class="small muted"><% if (thumbs.length || spCovers.length) { %>YouTube: <span class="mono"><%= okThumbs %></span> de <span class="mono"><%= thumbs.length %></span> <%= okThumbs === 1 ? 'aprovada' : 'aprovadas' %><%= okThumbs > 1 ? ' (vão juntas no teste A/B)' : '' %> · Spotify: <%= spOk ? 'aprovada' : (spCovers.length ? 'para aprovar' : 'sem capa') %><%= approved ? '' : '. Aprove pelo menos uma thumbnail (obrigatório para finalizar).' %><% } else { %>A IA lê a transcrição e monta 3 thumbnails, uma por ângulo, e a capa do Spotify.<% } %></p>
       </div>
       <div class="final-actions"></div>

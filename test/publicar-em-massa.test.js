@@ -120,7 +120,7 @@ describe('Conteúdo: filtro por episódio, ordem, publicar em massa com agenda e
     const [clip] = await q('SELECT cover_id, cover_texts FROM episode_clips WHERE id = $1', [ids.a]);
     const [made] = await q('SELECT * FROM episode_covers WHERE id = $1', [clip.cover_id]);
     assert.equal(made.label, 'Capa: Tédio também educa'); assert.equal(made.approved, true); assert.equal(made.auto, false);
-    assert.equal(made.spec.bg.ref, `f${fr.id}`, 'mesmo quadro da capa de base');
+    assert.equal(made.spec.photo.ref, `f${fr.id}`, 'mesmo quadro da capa de base'); assert.equal(made.model, 'RL-A', 'a capa nova é do modelo de gancho do guia');
     assert.equal(clip.cover_texts[0], 'Tédio também educa');
     assert.equal((await q('SELECT count(*)::int n FROM episode_covers WHERE clip_id = $1 AND approved', [ids.a]))[0].n, 1);
     assert.equal((await as.prod.get(`/conteudo/capas-em-lote?ids=${ids.a}`)).status, 200, 'a produtora também mexe nas capas');

@@ -517,9 +517,11 @@
     const { x, y, w, h } = layer; const circle = layer.shape === 'circle';
     ctx.save();
     ctx.beginPath();
-    if (circle) ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2); else ctx.rect(x, y, w, h);
+    const shown = layer.reveal == null ? 1 : clamp(layer.reveal, 0, 1); // vídeo: a foto aparece de baixo para cima
+    if (circle) ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2); else ctx.rect(x, y + h * (1 - shown), w, h * shown);
     ctx.clip();
     ctx.fillStyle = layer.bgColor || BRAND.black; ctx.fillRect(x, y, w, h);
+    if (layer.zoom && layer.zoom !== 1) { ctx.translate(x + w / 2, y + h / 2); ctx.scale(layer.zoom, layer.zoom); ctx.translate(-(x + w / 2), -(y + h / 2)); } // vídeo: zoom lento
     if (im && layer.img) {
       const f = layer.filter || {};
       const parts = [];
@@ -578,9 +580,19 @@
   }
   function drawPulse(ctx, layer) {
     const { x, y, w } = layer; const k = layer.beat || 10; const c = x + w * (layer.at ?? 0.5);
+    // pts: caminho próprio (relativo a x, y), como o batimento grande da abertura do story; progress: quanto dele já foi desenhado
+    const pts = layer.pts ? layer.pts.map(([px, py]) => [x + px, y + py])
+      : [[x, y], [c - k * 1.4, y], [c - k * 0.7, y - k * 0.5], [c - k * 0.2, y + k], [c + k * 0.4, y - k * 0.8], [c + k * 0.9, y + k * 0.3], [c + k * 1.4, y], [x + w, y]];
+    const seg = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
+    let left = seg.reduce((s2, v) => s2 + v, 0) * clamp(layer.progress ?? 1, 0, 1);
     ctx.save(); ctx.strokeStyle = layer.color || BRAND.lime; ctx.lineWidth = layer.width || 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(c - k * 1.4, y); ctx.lineTo(c - k * 0.7, y - k * 0.5); ctx.lineTo(c - k * 0.2, y + k); ctx.lineTo(c + k * 0.4, y - k * 0.8);
-    ctx.lineTo(c + k * 0.9, y + k * 0.3); ctx.lineTo(c + k * 1.4, y); ctx.lineTo(x + w, y); ctx.stroke(); ctx.restore();
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 0; i < seg.length && left > 0; i += 1) {
+      const f = Math.min(1, left / (seg[i] || 1));
+      ctx.lineTo(pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f);
+      left -= seg[i];
+    }
+    ctx.stroke(); ctx.restore();
   }
 
   // Desenha o spec inteiro. images: { [ref]: Image/Canvas }. makeCanvas(w,h) cria canvas auxiliar (desfoque).
@@ -590,7 +602,16 @@
     drawScrims(ctx, spec);
     const boxes = {};
     for (const layer of spec.layers || []) {
-      if (layer.hidden) continue;
+      if (layer.hidden || layer.alpha === 0) continue;
+      const faded = layer.alpha != null && layer.alpha < 1; // vídeo: cada camada entra e sai com a própria opacidade
+      if (faded) { ctx.save(); ctx.globalAlpha = clamp(layer.alpha, 0, 1); }
+      drawLayer(ctx, layer, images, boxes);
+      if (faded) ctx.restore();
+    }
+    return boxes;
+  }
+  function drawLayer(ctx, layer, images, boxes) {
+    {
       if (layer.type === 'text') boxes[layer.id] = drawText(ctx, layer);
       else if (layer.type === 'photo') { drawPhoto(ctx, layer, images); boxes[layer.id] = layerBox(ctx, layer); } else if (layer.type === 'gradient') drawGradient(ctx, layer);
       else if (layer.type === 'tarja') boxes[layer.id] = drawTarja(ctx, layer);
@@ -598,7 +619,10 @@
       else if (layer.type === 'pulse') drawPulse(ctx, layer);
       else if (layer.type === 'wordmark') { drawWordmark(ctx, layer); boxes[layer.id] = layerBox(ctx, layer); } else if (layer.type === 'rect') {
         ctx.fillStyle = layer.color || BRAND.lime;
-        if (layer.radius && ctx.roundRect) { ctx.beginPath(); ctx.roundRect(layer.x, layer.y, layer.w, layer.h, layer.radius); ctx.fill(); } else ctx.fillRect(layer.x, layer.y, layer.w, layer.h);
+        ctx.beginPath();
+        if (layer.radius && ctx.roundRect) ctx.roundRect(layer.x, layer.y, layer.w, layer.h, layer.radius); else ctx.rect(layer.x, layer.y, layer.w, layer.h);
+        if (layer.color !== 'none') ctx.fill();
+        if (layer.stroke) { ctx.save(); ctx.strokeStyle = layer.stroke; ctx.lineWidth = layer.strokeWidth || 2; if (layer.dash) ctx.setLineDash(layer.dash); ctx.stroke(); ctx.restore(); }
         boxes[layer.id] = layerBox(ctx, layer);
       } else if (layer.type === 'arrow') { // seta → desenhada (a fonte da marca não tem esse glifo)
         const s = layer.size; ctx.save(); ctx.strokeStyle = layer.color || BRAND.white; ctx.lineWidth = Math.max(2, s * 0.09); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -608,7 +632,6 @@
         const im = images[layer.ref]; ctx.drawImage(im, layer.x, layer.y, layer.w, layer.h); boxes[layer.id] = layerBox(ctx, layer);
       }
     }
-    return boxes;
   }
 
   // ---------------------------------------------------------------- conferência

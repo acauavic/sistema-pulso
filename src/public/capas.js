@@ -12,6 +12,18 @@
     const show = () => { const n = input.value.trim().split(/\s+/).filter(Boolean).length; el.textContent = `${n} de ${max} ${max === 1 ? 'palavra' : 'palavras'}`; el.classList.toggle('bad', n > max); };
     input.addEventListener('input', show); show();
   });
+  // Vídeo do convidado sendo gerado: pergunta de tempos em tempos e recarrega a aba quando ele fica pronto.
+  const waiting = document.querySelector('[data-video-wait]');
+  if (waiting) {
+    const ask = async () => {
+      try {
+        const json = await (await fetch(waiting.dataset.videoWait, { headers: { Accept: 'application/json' } })).json();
+        if (json.ok && !json.waiting) { const to = new URL(window.location.href); to.searchParams.set('capas', 'videos'); to.hash = 'capas'; window.location.assign(to.href); return; }
+      } catch { /* sem conexão: tenta de novo na próxima volta */ }
+      setTimeout(ask, 5000);
+    };
+    setTimeout(ask, 5000);
+  }
   if (!dlg || !E || !M) return;
 
   const $ = (sel) => dlg.querySelector(sel);

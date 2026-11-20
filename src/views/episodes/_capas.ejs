@@ -20,7 +20,8 @@
   var firstGood = !okYt.length ? (yt.find(clean) || null) : null;
   var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
   var img = function (c, w) { return '/episodios/' + ep.id + '/capas/' + c.id + '/imagem?v=' + new Date(c.updated_at).getTime() + (w ? '&w=640' : ''); };
-  var empty = !yt.length && !sp.length && !coverMissing.length;
+  var empty = !yt.length && !sp.length && !coverMissing.length; // sem nenhuma capa: o convite para gerar
+  var showTabs = !empty || Boolean(sheet); // com a ficha pronta, as abas aparecem mesmo sem capas (os vídeos saem dela)
 %>
 <% var card = function (c, kind) {
      var l = c.lint || {}; var issues = l.issues || []; var warns = l.warnings || []; var m = c.model ? M.MODELS[c.model] : null;
@@ -69,7 +70,8 @@
     <form method="post" action="/episodios/<%= ep.id %>/capas/gerar" class="inline" data-busy="Gerando as capas…"><%- csrfField %><input type="hidden" name="pecas" value="1"><button class="btn <%= locals.stepNext === false ? '' : 'primary' %>" type="submit"><%- icon('sparkles') %> Gerar capas</button></form>
     <% } else if (!frames.length) { %><p class="small muted m-0">As capas usam os quadros do vídeo: rode a análise por IA primeiro.</p><% } %>
   </div>
-  <% } else { %>
+  <% } %>
+  <% if (showTabs) { %>
 
   <div class="pieces-head">
     <dl class="pieces-sheet">
@@ -93,6 +95,7 @@
     <div class="seg seg-tabs" role="tablist" aria-label="Peças do episódio">
       <button type="button" role="tab" data-tab-btn="youtube">YouTube <span class="mono"><%= yt.length %></span></button>
       <button type="button" role="tab" data-tab-btn="spotify">Spotify <span class="mono"><%= sp.length %></span></button>
+      <button type="button" role="tab" data-tab-btn="videos">Vídeos <span class="mono"><%= guestVideos.filter(function (v) { return v.row && v.row.status === 'pronto'; }).length %></span></button>
     </div>
 
     <div class="pane" data-pane-id="youtube">
@@ -120,6 +123,44 @@
       </div>
       <% if (!sp.length) { %><p class="small muted">Sem capa do Spotify ainda. Use "Gerar as que faltam" no menu acima.</p><% } else { %>
       <p class="small muted">O arquivo sai em 3000×3000, abaixo de 512 KB. Foto de câmera fica melhor que quadro do vídeo: troque em Ajustar &gt; Foto.</p><% } %>
+    </div>
+
+    <div class="pane" data-pane-id="videos" hidden<%= guestVideos.some(function (v) { return v.row && (v.row.status === 'fila' || v.row.status === 'gerando'); }) ? ' data-video-wait="/episodios/' + ep.id + '/videos/status"' : '' %>>
+      <div class="piece-grid piece-grid-vd">
+        <% guestVideos.forEach(function (v) {
+             var r = v.row; var st = r ? r.status : 'novo'; var busy = st === 'fila' || st === 'gerando'; var ready = st === 'pronto';
+             var base = '/episodios/' + ep.id + '/videos/' + v.kind; var ver = r ? new Date(r.updated_at).getTime() : 0; %>
+        <div class="piece-card video-card">
+          <% if (ready) { %>
+          <%- include('../partials/video-poster', { src: base + '/arquivo?v=' + ver, id: 'video-' + v.kind, poster: r.poster_key ? base + '/capa?v=' + ver : null, duration: r.duration_ms, label: v.label }) %>
+          <% } else { %>
+          <div class="video-blank<%= busy ? ' is-busy' : '' %>" aria-hidden="true"><%- icon(busy ? 'clock' : 'play', 22) %></div>
+          <% } %>
+          <figcaption>
+            <p class="piece-kicker mono"><span><%= v.kind === 'story' ? 'STORY' : 'TEASER' %> · <%= v.seconds %> S</span><% if (ready) { %><span class="badge b-gray">pronto</span><% } else if (busy) { %><span class="badge b-amber">gerando</span><% } %></p>
+            <p class="piece-model"><strong><%= v.label %></strong></p>
+            <p class="small muted m-0"><%= v.hint %></p>
+            <% if (v.kind === 'teaser' && v.data.quote) { %><p class="small m-0"><span class="mono muted">FRASE</span> “<%= v.data.quote %>”<% if (v.data.quote_at !== null && v.data.quote_at !== undefined) { %> <span class="mono muted">· <%= fmt.formatClock(v.data.quote_at) %></span><% } %></p><% } %>
+            <% if (busy) { %>
+            <p class="small muted m-0" aria-live="polite">Montando o vídeo. Leva de 1 a 2 minutos; pode sair desta tela, ele fica aqui quando terminar.</p>
+            <% } else if (v.missing.length) { %>
+            <ul class="plain small muted video-missing"><% v.missing.forEach(function (m) { %><li><%= m %></li><% }) %></ul>
+            <% } else { %>
+              <% if (st === 'erro') { %><p class="small bad-text m-0">Não saiu: <%= r.error %></p><% } %>
+              <% if (ready && r.inputs && r.inputs.soft) { %><p class="small warn-text m-0">Foto ampliada <%= String(r.inputs.zoom).replace('.', ',') %>×: uma fotografia vertical da gravação fica melhor.</p><% } %>
+              <% if (ready && v.kind === 'teaser' && r.inputs && r.inputs.synced === false) { %><p class="small warn-text m-0">A legenda entrou num ritmo fixo (sem o tempo de cada palavra): confira se acompanha a fala.</p><% } %>
+              <div class="row piece-actions">
+                <% if (ready) { %><a class="btn sm" href="<%= base %>/arquivo?baixar=1" data-no-skeleton><%- icon('download', 14) %> Baixar</a><% } %>
+                <% if (canGen || designers) { %>
+                <form method="post" action="<%= base %>/gerar" class="inline" data-busy="Pedindo…"<%- ready ? ' data-confirm="Refazer este vídeo com os textos e a foto de agora?"' : '' %>><%- csrfField %><button class="btn sm <%= ready ? 'ghost' : '' %>" type="submit"><%- icon(ready ? 'refresh-cw' : 'sparkles', 14) %> <%= ready ? 'Refazer' : (st === 'erro' ? 'Gerar de novo' : 'Gerar vídeo') %></button></form>
+                <% } %>
+              </div>
+              <% if (ready) { %><p class="small muted m-0"><%= v.kind === 'teaser' ? 'Vai com a voz do convidado; a trilha entra na hora de postar.' : 'Sai sem som: a trilha entra na hora de postar.' %> <span class="mono"><%= fmt.formatBytes(r.size_bytes) %></span></p><% } %>
+            <% } %>
+          </figcaption>
+        </div>
+        <% }) %>
+      </div>
     </div>
   </div>
   <% } %>

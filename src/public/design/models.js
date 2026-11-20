@@ -266,8 +266,8 @@
 
   // ---------------------------------------------------------------- Spotify (base 1000; o arquivo sai em 3000×3000)
   const SW = 1000; const SP_EXTRA = { scale: 3 };
-  function epLabel(ctx, ep, rightX, rowY, rowH, color = BRAND.white) {
-    const size = 30; const y = rowY + (rowH - size * MONO_LH) / 2;
+  function epLabel(ctx, ep, rightX, rowY, rowH, color = BRAND.white, size = 30) {
+    const y = rowY + (rowH - size * MONO_LH) / 2;
     const num = mono('ep', ep3(ep), 0, y, 200, size, { color, tracking: 0.08, lh: MONO_LH });
     const nw = boxOf(ctx, num).w; num.x = Math.round(rightX - nw);
     const dotX = num.x - 14 - 12;
@@ -493,5 +493,7 @@
   }
   const modelsFor = (kind, angle = null) => Object.keys(MODELS).filter((id) => MODELS[id].kind === kind && (!angle || !MODELS[id].angles || MODELS[id].angles.includes(angle)));
 
-  return { MODELS, ANGLES, AXES, LIMITS, KIND_LIMITS, MAX_ZOOM, limitOf, fieldError, problems, build, crop, reads, modelsFor, countWords, wordsOf, tidy, ep3, hookMarks };
+  // As peças de desenho, para quem monta outras cenas com as mesmas medidas (os vídeos do convidado: services/videoScenes.js).
+  const parts = { text, mono, logo, rect, gradient, tarja, photoLayer, stack, heightOf, fitted, boxOf, wordmarkWidth, tarjaFit, epLabel, upper, MONO_LH, SHADE };
+  return { MODELS, ANGLES, AXES, LIMITS, KIND_LIMITS, MAX_ZOOM, limitOf, fieldError, problems, build, crop, reads, modelsFor, countWords, wordsOf, tidy, ep3, hookMarks, parts };
 }));

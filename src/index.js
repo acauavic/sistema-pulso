@@ -74,6 +74,7 @@ async function main() {
   require('./services/notify');
   require('./services/push'); // registra o trabalho 'push_notificacao'
   require('./services/videoViews'); // registra 'video_leve' (versão leve para assistir)
+  require('./services/guestVideos'); // registra 'video_convidado' (story de lançamento e teaser)
   const chat = require('./services/chat'); // registra 'chat_tarefa'
 
   let server = null;
