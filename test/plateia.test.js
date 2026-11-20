@@ -66,8 +66,8 @@ describe('Pulso Podcast com Plateia', () => {
     assert.match(t, /<meta name="description" content="Assista de perto/);
     assert.match(t, /<meta property="og:image" content="http[^"]+\/static\/og-plateia\.jpg/);
     assert.match(t, /twitter:card" content="summary_large_image"/);
-    assert.match(t, /rel="icon" href="\/static\/favicon\.svg/);
-    const ico = await anon.get('/favicon.ico');
+    assert.match(t, /rel="icon" href="\/static\/brand\/pulso\/favicon\.svg/, 'página pública leva o ícone do Pulso, não o do painel');
+    const ico = await anon.get('/static/brand/pulso/favicon.ico');
     assert.equal(ico.status, 200);
     assert.equal((await anon.get('/static/og-plateia.jpg')).status, 200);
     assert.equal((await anon.get('/apple-touch-icon.png')).status, 200);

@@ -68,3 +68,41 @@ describe('identidade: tokens do painel', () => {
     assert.match(css, /@font-face \{ font-family: "Inter"/);
   });
 });
+
+describe('identidade: ícones do painel e ícones do Pulso', () => {
+  const walk = (dir) => fs.readdirSync(path.join(root, dir), { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`])).filter((f) => !path.basename(f).startsWith('._'));
+
+  it('favicon do painel é o monograma "St" em contornos; o do Pulso fica guardado na pasta dele', () => {
+    const fav = read('src/public/favicon.svg');
+    assert.match(fav, /#0E0F0D/); assert.match(fav, /#9EDD55/); assert.match(fav, /<path/);
+    assert.doesNotMatch(fav, /<text|C8FF42/i, 'ícone não carrega fonte: as letras são contornos');
+    assert.match(read('src/public/brand/pulso/favicon.svg'), /C8FF42/i);
+    for (const f of ['favicon.ico', 'apple-touch-icon.png']) assert.ok(exists(`src/public/brand/pulso/${f}`), f);
+    for (const f of ['health-scale-logo.png', 'signal-bg.svg']) assert.ok(exists(`src/public/brand/studio/${f}`), f);
+  });
+
+  it('manifesto do app: Health Scale Studio, fundo da paleta nova', () => {
+    const mf = JSON.parse(read('src/public/manifest.webmanifest'));
+    assert.equal(mf.name, 'Health Scale Studio'); assert.equal(mf.short_name, 'Studio');
+    assert.equal(mf.theme_color, '#0E0F0D'); assert.equal(mf.background_color, '#0E0F0D');
+    assert.doesNotMatch(JSON.stringify(mf), /Pulso Gestão/);
+  });
+
+  it('service worker guarda a fonte nova e troca o nome do cache', () => {
+    const sw = read('src/public/sw.js');
+    assert.match(sw, /\/static\/fonts\/archivo-latin-wght-normal\.woff2/);
+    assert.match(sw, /const CACHE = `studio-\$\{VERSION\}`/);
+  });
+
+  it('página pública nunca aponta para o ícone do painel', () => {
+    const publicFiles = [...walk('src/views/plateia').filter((f) => !/admin|painel|_/.test(path.basename(f))), ...walk('src/views/portal'),
+      ...walk('src/views/sponsor-public').filter((f) => !path.basename(f).startsWith('_')), ...walk('src/templates')];
+    for (const f of publicFiles) {
+      const t = read(f);
+      if (!/<head|<title/.test(t)) continue;
+      assert.doesNotMatch(t, /href="\/static\/favicon\.svg|href="\/favicon\.ico"|href="\/apple-touch-icon\.png"/, `${f} usa o ícone do painel`);
+      assert.match(t, /rel="icon" href="\/static\/brand\/pulso\/favicon\.svg/, `${f} sem o ícone do Pulso`);
+    }
+  });
+});

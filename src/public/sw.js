@@ -5,12 +5,11 @@
 //   a navegação mostra a página "Sem conexão".
 // A versão abaixo é trocada pelo servidor (hash dos arquivos) a cada deploy: o cache antigo é apagado sozinho.
 const VERSION = '__ASSET_VERSION__';
-const CACHE = `pulso-${VERSION}`;
+const CACHE = `studio-${VERSION}`;
 const OFFLINE = '/static/offline.html';
 const PRECACHE = [
   OFFLINE, '/static/offline.js', '/static/app.css', '/static/theme.js', '/static/favicon.svg', '/static/icon-192.png', '/static/badge-72.png',
-  '/static/fonts/space-grotesk-latin-500-normal.woff2', '/static/fonts/space-grotesk-latin-600-normal.woff2', '/static/fonts/space-grotesk-latin-700-normal.woff2',
-  '/static/fonts/inter-latin-400-normal.woff2', '/static/fonts/inter-latin-500-normal.woff2', '/static/fonts/inter-latin-600-normal.woff2',
+  '/static/fonts/archivo-latin-wght-normal.woff2', '/static/brand/studio/health-scale-logo.png',
   '/static/fonts/jetbrains-mono-latin-400-normal.woff2', '/static/fonts/jetbrains-mono-latin-500-normal.woff2', '/static/fonts/instrument-serif-latin-400-italic.woff2',
 ];
 
