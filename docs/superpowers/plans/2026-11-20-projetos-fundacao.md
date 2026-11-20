@@ -313,6 +313,16 @@ não vê o seletor de projeto."
   conferir que nada mudou. Usuários e dados de teste só no banco local, apagados no fim.
 - [ ] **Step 4: commit** "Projetos: a fundação (v1.96.0)". **Não publicar**: só com a autorização do dono.
 
+## O que mudou na execução
+
+- A variável das telas é `projectScope` (e não `scope`): a tela de Tarefas já usa `scope` para o filtro Minhas | Hoje | Todas.
+- `invite_templates` não existe mais no banco; saiu da lista de raízes.
+- As opções dos filtros combináveis (episódio, patrocinador) também seguem o recorte (`filterFields.js` recebe `projectIds`).
+- Corte solto enviado em "Todos os projetos" nasce no projeto padrão (o envio é por JavaScript, sem formulário para perguntar);
+  ao ser atribuído a um episódio, vai para o projeto dele.
+- `audit_log.project_id` existe, mas a auditoria ainda não grava o projeto: fica para a fase 7, com o resto do isolamento.
+- A lixeira guarda o projeto do item (`trash_items.project_id`).
+
 ## Fora desta fase
 
 - **Início, Resumo do dia, Seu dia, Calendário, Busca e Notificações** seguindo o seletor: fase 3, quando o Projeto 100

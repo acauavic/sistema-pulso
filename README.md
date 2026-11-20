@@ -14,6 +14,7 @@ link curto no YOURLS + envio por e-mail via Brevo).
 ## Índice
 
 - [O que tem](#o-que-tem)
+- [Projetos](#projetos)
 - [Perfis e permissões](#perfis-e-permissões)
 - [Como o convite funciona](#como-o-convite-funciona)
 - [Rodando localmente](#rodando-localmente)
@@ -61,6 +62,25 @@ link curto no YOURLS + envio por e-mail via Brevo).
 - **Início com o Resumo do dia**: convites enviados, aceitos e perdidos, patrocinadores (entraram em prospecção, abordados, follow-ups, interessados, fechados), etapas, episódios, cortes, revisões, posts, Reels de teste, seguidores e tarefas atrasadas de qualquer dia. [Detalhes](#resumo-do-dia-no-início).
 - **Calendário**: tudo que tem data (tarefas, gravações, lembretes, publicações, contas, parcerias) com filtros e visualizações salvas. [Detalhes](#calendário).
 - **Auditoria** das ações sensíveis e tela de **Integrações** (status + testes seguros).
+
+## Projetos
+
+O sistema cuida de mais de um projeto (hoje: **Pulso** e **Projeto 100**). A regra: **cadastro é da casa, trabalho e
+dinheiro são sempre de um projeto**. Convidados, patrocinadores, episódios, cortes, pedidos de conteúdo e ideias têm
+`project_id` obrigatório; tarefa pode ser de um projeto ou geral (sem projeto).
+
+- **Quem participa de quê**: `project_members` (Gestão > Sistema > Projetos). Usuário novo entra no projeto padrão (o
+  ativo de menor `position`, hoje o Pulso). Toda pessoa participa de pelo menos um projeto.
+- **Seletor** (topo do menu, só para quem participa de mais de um): Todos os projetos, ou um deles. A escolha fica em
+  `users.last_project_id`. Convidados, Patrocinadores, Episódios, Conteúdo e Tarefas seguem o recorte; Início,
+  Calendário, Busca, Social, Plateia e Financeiro ainda mostram tudo (próximas fases).
+- **Criar**: o item nasce no projeto escolhido; em "Todos os projetos" o formulário pergunta. Item ligado a outro herda
+  o projeto dele (episódio do convidado, corte do episódio, tarefa do patrocinador).
+- **No código**: `services/projects.js` (lista em memória, membros, projeto padrão) e `services/scope.js` (o único
+  lugar que decide o recorte: `where` nas listas, `assert` nas páginas de detalhe, `target` na criação).
+- **Módulos** (`projects.modules`): o menu mostra só o que o projeto escolhido usa. O Projeto 100 começa só com
+  tarefas; a produção liga junto com a numeração por projeto.
+- Desenho completo e as fases: `docs/superpowers/specs/2026-11-20-multiprojetos-design.md`.
 
 ## Perfis e permissões
 

@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.96.0', date: '2026-11-20', title: 'O sistema agora tem projetos',
+    items: [
+      { kind: 'novo', text: 'O sistema passa a cuidar de mais de um projeto. Tudo o que já existia é do Pulso, e o Projeto 100 foi criado, ainda vazio. Para quem trabalha num projeto só, nada muda: as telas, os endereços e os números dos episódios são os mesmos.' },
+      { kind: 'novo', text: 'Quem trabalha em mais de um projeto ganhou o seletor no topo do menu: Todos os projetos, Pulso ou Projeto 100. A escolha fica guardada e a mesma tela recarrega com o outro recorte. Em "Todos os projetos", cada cartão mostra a sigla do projeto entre colchetes.' },
+      { kind: 'novo', text: 'Convidados, Patrocinadores, Episódios, Conteúdo e Tarefas seguem o projeto escolhido. O que você cria nasce nesse projeto; em "Todos os projetos", a janela pergunta o projeto primeiro. Item ligado a outro fica no projeto dele: o episódio de um convidado, o corte de um episódio, a tarefa de um patrocinador.' },
+      { kind: 'novo', text: 'Gestão > Sistema > Projetos: ajuste o nome, a sigla e como cada projeto chama os seus vídeos, e marque quem trabalha em cada um.' },
+      { kind: 'ajuste', text: 'Início, Calendário, Busca, Social, Plateia e Financeiro ainda mostram tudo junto. Eles passam a seguir o seletor nas próximas versões, quando o Projeto 100 começar a ter vídeos.' },
+    ],
+  },
+  {
     version: '1.95.0', date: '2026-11-20', title: 'O painel agora é Health Scale Studio',
     items: [
       { kind: 'novo', text: 'O painel da equipe ganhou nome e cara novos: Health Scale Studio. Mudam o nome, a marca no menu e no login, o ícone do app (o monograma "St"), as cores (o verde no lugar do lime) e a letra dos títulos e textos. Os botões, as telas e os caminhos continuam nos mesmos lugares.' },

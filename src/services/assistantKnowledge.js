@@ -4,6 +4,17 @@
 // Mantenha este arquivo junto das mudanças do sistema: assunto novo ou fluxo que mudou entra aqui.
 const TOPICS = [
   {
+    key: 'projetos', title: 'Projetos (Pulso, Projeto 100) e o seletor de projeto', words: ['projeto', 'projetos', 'projeto 100', 'pulso', 'seletor', 'trocar de projeto', 'todos os projetos', 'sigla', 'quem participa'],
+    where: 'Gestão > Sistema > Projetos', perm: 'projects.manage',
+    steps: [
+      'O sistema cuida de mais de um projeto. Tudo o que já existia é do Pulso; o Projeto 100 foi criado e ainda está vazio. Para quem trabalha num projeto só, nada muda.',
+      'Quem participa de mais de um projeto vê o seletor no topo do menu: Todos os projetos, ou um deles. A escolha fica guardada e a mesma tela recarrega com o outro recorte. Em "Todos os projetos", cada cartão mostra a sigla do projeto entre colchetes.',
+      'Convidados, Patrocinadores, Episódios, Conteúdo e Tarefas seguem o projeto escolhido. Início, Calendário, Busca, Social, Plateia e Financeiro ainda mostram tudo junto.',
+      'O que você cria nasce no projeto escolhido; em "Todos os projetos" o formulário pergunta o projeto primeiro. Item ligado a outro fica no projeto dele (o episódio de um convidado, o corte de um episódio). Tarefa pode ser geral, sem projeto.',
+      'Em Gestão > Sistema > Projetos a gestão ajusta o nome, a sigla e como o projeto chama os seus vídeos, e marca quem participa de cada um ("Pessoas"). Toda pessoa participa de pelo menos um projeto.',
+    ],
+  },
+  {
     key: 'categorias', title: 'Categorias de tarefa e tipos de vídeo', words: ['categoria', 'categorias', 'tipo de vídeo', 'tipos de vídeo', 'tipo de video', 'novo tipo', 'bastidor', 'vídeos entregues', 'videos entregues', 'desativar categoria'],
     where: 'Gestão > Sistema > Categorias', perm: 'catalog.manage',
     steps: [
