@@ -505,7 +505,15 @@
     try { data = JSON.parse(btn.dataset.fill || '{}'); } catch { /* sem dados */ }
     document.querySelectorAll('details.row-menu[open]').forEach((d) => { d.open = false; });
     form.action = btn.dataset.fillAction || '';
-    form.querySelectorAll('[name]').forEach((el) => { if (el.name !== '_csrf' && el.tagName !== 'BUTTON') el.value = data[el.name] ?? ''; });
+    form.querySelectorAll('[name]').forEach((el) => {
+      if (el.name === '_csrf' || el.tagName === 'BUTTON') return;
+      // escolha (radio/caixa) é marcar, não trocar o valor: sem dado para ela, fica como está
+      if (el.type === 'radio' || el.type === 'checkbox') {
+        if (el.name in data) el.checked = el.type === 'radio' ? String(el.value) === String(data[el.name] ?? '') : Boolean(data[el.name]);
+        return;
+      }
+      el.value = data[el.name] ?? '';
+    });
     const mode = btn.dataset.fillMode || 'edit';
     dlg.querySelectorAll('[data-mode]').forEach((n) => { n.hidden = n.dataset.mode !== mode; });
     dlg.querySelectorAll('[data-hide-section]').forEach((n) => { n.hidden = n.dataset.hideSection === data.section; });

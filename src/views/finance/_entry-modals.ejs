@@ -17,6 +17,7 @@
     </div>
     <label class="check" data-when="direction=saida"><input type="checkbox" name="paid" value="1"> Já foi pago</label>
     <label class="check" data-when="direction=entrada"><input type="checkbox" name="paid" value="1"> Já foi recebido</label>
+    <%- include('../partials/fin-owner') %>
     <details class="more">
       <summary>Mais detalhes</summary>
       <div class="stack top-gap">
@@ -31,7 +32,7 @@
         </div>
         <label>Fornecedor ou pessoa<input type="text" name="supplier" maxlength="120" list="fin-suppliers"></label>
         <div class="grid-2 tight">
-          <label>Episódio<select name="episode_id"><option value="">Nenhum</option><% episodes.forEach(function (ep) { %><option value="<%= ep.id %>" <%= typeof episodePre !== 'undefined' && String(episodePre) === String(ep.id) ? 'selected' : '' %>><%= ep.number ? 'EP.' + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %></option><% }) %></select></label>
+          <label>Episódio<select name="episode_id"><option value="">Nenhum</option><% episodes.forEach(function (ep) { %><option value="<%= ep.id %>" <%= typeof episodePre !== 'undefined' && String(episodePre) === String(ep.id) ? 'selected' : '' %>><%= ep.number ? prefixOf(ep.project_id) + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %></option><% }) %></select></label>
           <label>Patrocinador<select name="sponsor_id"><option value="">Nenhum</option><% sponsors.forEach(function (s) { %><option value="<%= s.id %>"><%= s.company %></option><% }) %></select></label>
         </div>
         <label>Observações<textarea name="notes" rows="2" maxlength="1000"></textarea></label>
@@ -42,7 +43,7 @@
 </dialog>
 
 <dialog class="modal modal-wide" id="modal-lanc" aria-labelledby="ml-h">
-  <form method="post" action="" class="stack" data-fill-form>
+  <form method="post" action="" class="stack" data-fill-form data-when-form>
     <%- csrfField %><input type="hidden" name="voltar" value="">
     <h2 id="ml-h">Editar lançamento</h2>
     <label>O que é<input type="text" name="description" maxlength="200" required></label>
@@ -50,6 +51,7 @@
       <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required></label>
       <label>Vence em<input type="date" name="due_on" required></label>
     </div>
+    <%- include('../partials/fin-owner') %>
     <details class="more">
       <summary>Mais detalhes</summary>
       <div class="stack top-gap">
@@ -61,7 +63,7 @@
         </label>
         <label>Fornecedor ou pessoa<input type="text" name="supplier" maxlength="120" list="fin-suppliers"></label>
         <div class="grid-2 tight">
-          <label>Episódio<select name="episode_id"><option value="">Nenhum</option><% episodes.forEach(function (ep) { %><option value="<%= ep.id %>"><%= ep.number ? 'EP.' + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %></option><% }) %></select></label>
+          <label>Episódio<select name="episode_id"><option value="">Nenhum</option><% episodes.forEach(function (ep) { %><option value="<%= ep.id %>"><%= ep.number ? prefixOf(ep.project_id) + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %></option><% }) %></select></label>
           <label>Patrocinador<select name="sponsor_id"><option value="">Nenhum</option><% sponsors.forEach(function (s) { %><option value="<%= s.id %>"><%= s.company %></option><% }) %></select></label>
         </div>
         <label>Observações<textarea name="notes" rows="2" maxlength="1000"></textarea></label>

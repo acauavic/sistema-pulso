@@ -17,6 +17,20 @@
   <a class="stat" href="/financeiro/lancamentos?escopo=historico"><span class="stat-label">Resultado do mês</span><span class="stat-n money <%= ov.month.result < 0 ? 'err' : '' %>"><%= money(ov.month.result) %></span></a>
 </section>
 
+<% if (ov.byProject && ov.byProject.length > 1) { %>
+<section class="card top-gap" aria-labelledby="fin-proj-h">
+  <div class="row spread"><h2 id="fin-proj-h">Resultado por projeto</h2><span class="small muted"><%= ov.month.label %> · o que é dele mais a parte dele nos compartilhados</span></div>
+  <ul class="plain plan-list">
+    <% ov.byProject.forEach(function (p) { %>
+    <li>
+      <div class="plan-list-main"><strong><%= p.name %></strong><span class="mono small muted">ENTROU <%= money(p.in_paid) %> · SAIU <%= money(p.out_paid) %><%= p.shared_out ? ' · COMPARTILHADO ' + money(p.shared_out) : '' %></span></div>
+      <span class="mono <%= p.result < 0 ? 'err' : '' %>"><%= money(p.result) %></span><span></span>
+    </li>
+    <% }) %>
+  </ul>
+</section>
+<% } %>
+
 <% if (firstRun) { %>
 <div class="empty card">
   <%- include('../partials/signal') %>
@@ -70,7 +84,7 @@
   <ul class="plain plan-list">
     <% ov.perEpisode.list.forEach(function (r) { %>
     <li>
-      <div class="plan-list-main"><a href="/episodios/<%= r.id %>#financeiro"><strong><%= r.number ? 'EP.' + String(r.number).padStart(3, '0') + ' · ' : '' %><%= r.title %></strong></a><span class="small muted">Contas <%= money(r.costs) %><%= r.stock ? ' · material usado ' + money(r.stock) : '' %></span></div>
+      <div class="plan-list-main"><a href="/episodios/<%= r.id %>#financeiro"><strong><%= r.number ? prefixOf(r.project_id) + String(r.number).padStart(3, '0') + ' · ' : '' %><%= r.title %></strong></a><span class="small muted">Contas <%= money(r.costs) %><%= r.stock ? ' · material usado ' + money(r.stock) : '' %><% if (projectTag(r.project_id)) { %> · <span class="mono">[ <%= projectTag(r.project_id) %> ]</span><% } %></span></div>
       <span class="mono"><%= money(r.total) %></span><span></span>
     </li>
     <% }) %>

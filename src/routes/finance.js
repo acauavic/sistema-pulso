@@ -4,6 +4,9 @@ const db = require('../db/pool');
 const C = require('../constants');
 const fin = require('../services/finance');
 const hourBank = require('../services/hourBank');
+const scope = require('../services/scope');
+const owner = require('../services/finOwner');
+const projects = require('../services/projects');
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
 const { can } = require('../permissions');
@@ -18,19 +21,28 @@ const num = (v) => { const raw = String(v ?? '').trim(); const n = Number(/,/.te
 const backTo = (req, fallback) => { const b = String(req.body.voltar || ''); return /^\/[A-Za-z0-9\-_/?=&%.#]*$/.test(b) && !b.startsWith('//') ? b : fallback; };
 const money = (c) => (Number(c) < 0 ? `−\u00a0${formatBRL(-Number(c))}` : formatBRL(c)); // negativo no mesmo formato das linhas: "− R$ 150,00"
 
+// Projetos cujo dinheiro a pessoa vê agora (recorte do menu ∩ "Vê o financeiro").
+const pidsOf = (req) => scope.financeIdsOf(req);
+// Projetos que ela pode escolher em "De quem é".
+const pickProjects = (req) => pidsOf(req).map((id) => projects.get(id)).filter(Boolean);
+
 // ---------------------------------------------------------------- resumo
 router.get('/financeiro', requirePerm('finance.read'), wrap(async (req, res) => {
+  const pids = pidsOf(req);
   await fin.ensureRecurring(3);
-  const [ov, counts, bank] = await Promise.all([fin.overview(), fin.counts(), hourBank.status()]);
-  res.render('finance/index', { title: 'Financeiro', ov, counts, bank, hourBank, fin, C, money, today: fin.todayISO(), here: req.originalUrl, ...(await pickers()) });
+  const [ov, counts, bank] = await Promise.all([fin.overview({ pids }), fin.counts({ pids }), hourBank.status({ pids })]);
+  res.render('finance/index', {
+    title: 'Financeiro', ov, counts, bank, hourBank, fin, C, money, today: fin.todayISO(), here: req.originalUrl,
+    finProjects: pickProjects(req), ...(await pickers(pids)),
+  });
 }));
 
-// Listas usadas nos modais (episódios recentes e patrocinadores).
-async function pickers() {
+// Listas usadas nos modais (episódios recentes e patrocinadores), sempre no recorte.
+async function pickers(pids) {
   const [episodes, sponsors, suppliers] = await Promise.all([
-    db.query('SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 80'),
-    db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)"),
-    db.query('SELECT DISTINCT supplier FROM fin_entries WHERE supplier IS NOT NULL ORDER BY supplier LIMIT 100'),
+    db.query('SELECT id, number, title, project_id FROM episodes WHERE project_id = ANY($1::int[]) ORDER BY number DESC NULLS LAST, id DESC LIMIT 80', [pids]),
+    db.query("SELECT id, company, project_id FROM sponsors WHERE stage <> 'perdido' AND project_id = ANY($1::int[]) ORDER BY lower(company)", [pids]),
+    db.query(`SELECT DISTINCT e.supplier FROM fin_entries e WHERE e.supplier IS NOT NULL AND ${owner.where('e', '$1')} ORDER BY e.supplier LIMIT 100`, [pids]),
   ]);
   return { episodes: episodes.rows, sponsors: sponsors.rows, suppliers: suppliers.rows.map((r) => r.supplier) };
 }
@@ -43,11 +55,16 @@ router.get('/financeiro/lancamentos', requirePerm('finance.read'), wrap(async (r
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(String(req.query.mes || '')) ? req.query.mes : fin.monthOf(fin.todayISO());
   const q = String(req.query.q || '').slice(0, 80);
   const category = C.FIN_CATEGORIES[req.query.cat] ? req.query.cat : '';
+  const pids = pidsOf(req);
   const [items, counts, pick] = await Promise.all([
-    fin.entries({ scope, month: scope === 'historico' ? month : null, q, category }), fin.counts(), pickers(),
+    fin.entries({ scope, month: scope === 'historico' ? month : null, q, category, pids }), fin.counts({ pids }), pickers(pids),
   ]);
-  const totals = items.reduce((a, e) => { if (e.status !== 'cancelado') a[e.direction === 'entrada' ? 'in' : 'out'] += e.amount_cents; return a; }, { in: 0, out: 0 });
-  res.render('finance/entries', { title: 'Contas a pagar e receber', here: req.originalUrl, scope, scopes: SCOPES, month, q, category, items, counts, totals, today: fin.todayISO(), fin, C, money, ...pick });
+  const splits = await owner.splitsOf(items.filter((e) => e.shared).map((e) => e.id));
+  const totals = items.reduce((a, e) => { if (e.status !== 'cancelado') a[e.direction === 'entrada' ? 'in' : 'out'] += e.share_cents; return a; }, { in: 0, out: 0 });
+  res.render('finance/entries', {
+    title: 'Contas a pagar e receber', here: req.originalUrl, scope, scopes: SCOPES, month, q, category, items, counts, totals,
+    today: fin.todayISO(), fin, C, money, splits, finProjects: pickProjects(req), ...pick,
+  });
 }));
 
 function parseEntry(body, { create = false } = {}) {
@@ -69,47 +86,71 @@ function parseEntry(body, { create = false } = {}) {
   return { v };
 }
 
+// De quem é o lançamento: o vínculo manda; sem vínculo, o que a tela escolheu. Vínculo de fora do recorte não passa.
+async function ownerOfBody(req, v, amount, { keepAs = null } = {}) {
+  const pids = pidsOf(req);
+  const sent = owner.parse(req.body, amount, { ids: pids, parseBRL });
+  if (sent.error) return sent;
+  // "compartilhado" sem valores: mantém a divisão que já existe; na criação, meio a meio
+  if (sent.keep) return keepAs === 'keep' ? { keep: true } : { projectId: null, weights: owner.halves(amount, pids) };
+  const own = await owner.ownerFor({ episodeId: v.episode_id, sponsorId: v.sponsor_id, projectId: sent.projectId, weights: sent.weights });
+  if (!own.weights && !pids.includes(own.projectId)) return { error: 'Esse episódio ou patrocinador é de outro projeto.' };
+  return own;
+}
+
 router.post('/financeiro/lancamentos', requirePerm('finance.write'), wrap(async (req, res) => {
   const { v, error } = parseEntry(req.body, { create: true });
   const to = backTo(req, '/financeiro/lancamentos');
   if (error) { await req.flash('error', error); return res.redirect(to); }
+  const own = await ownerOfBody(req, v, v.amount);
+  if (own.error) { await req.flash('error', own.error); return res.redirect(to); }
   const base = Math.floor(v.amount / v.installments);
   for (let i = 0; i < v.installments; i += 1) {
     const amount = i === v.installments - 1 ? v.amount - base * (v.installments - 1) : base;
     const paidNow = v.paid && i === 0;
-    await db.query(
-      `INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, paid_on, status, supplier, notes, episode_id, sponsor_id, installment_no, installments, source, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'manual',$14)`,
+    const { rows: [novo] } = await db.query(
+      `INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, paid_on, status, supplier, notes, episode_id, sponsor_id, installment_no, installments, source, created_by, project_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'manual',$14,$15) RETURNING id`,
       [v.direction, v.category, v.installments > 1 ? `${v.description} · parcela ${i + 1}/${v.installments}` : v.description, amount, fin.addMonths(v.due, i),
-        paidNow ? fin.todayISO() : null, paidNow ? 'pago' : 'previsto', v.supplier, v.notes, v.episode_id, v.sponsor_id, v.installments > 1 ? i + 1 : null, v.installments > 1 ? v.installments : null, req.user.id]);
+        paidNow ? fin.todayISO() : null, paidNow ? 'pago' : 'previsto', v.supplier, v.notes, v.episode_id, v.sponsor_id, v.installments > 1 ? i + 1 : null, v.installments > 1 ? v.installments : null, req.user.id,
+        own.weights ? null : own.projectId]);
+    if (own.weights) await owner.save(novo.id, { weights: own.weights, amount }); // cada parcela mantém a proporção
   }
   await audit(req, 'financeiro.lancado', 'fin_entry', null, { description: v.description, amount: v.amount, parcelas: v.installments });
   await req.flash('ok', v.installments > 1 ? `${v.installments} parcelas lançadas.` : 'Lançamento criado.');
   res.redirect(to);
 }));
 
-async function findEntry(id) {
+// Lançamento de projeto que a pessoa não alcança responde como se não existisse.
+async function findEntry(req, id) {
   if (!isIntId(id)) return null;
   const { rows: [e] } = await db.query('SELECT * FROM fin_entries WHERE id = $1', [id]);
-  return e || null;
+  if (!e || !(await owner.canSee(pidsOf(req), e))) return null;
+  return e;
 }
 
 router.post('/financeiro/lancamentos/:id', requirePerm('finance.write'), wrap(async (req, res) => {
-  const e = await findEntry(req.params.id);
+  const e = await findEntry(req, req.params.id);
   if (!e) return notFound(res, 'Lançamento');
   const { v, error } = parseEntry({ ...req.body, direction: e.direction });
   const to = backTo(req, '/financeiro/lancamentos');
   if (error) { await req.flash('error', error); return res.redirect(to); }
+  // "De quem é" só vem quando a tela mandou; sem isso, o lançamento continua de quem era (e o valor novo redivide o compartilhado)
+  const own = req.body.de_quem ? await ownerOfBody(req, v, v.amount, { keepAs: 'keep' }) : null;
+  if (own && own.error) { await req.flash('error', own.error); return res.redirect(to); }
   await db.query(
     `UPDATE fin_entries SET category=$2, description=$3, amount_cents=$4, due_on=$5, supplier=$6, notes=$7, episode_id=$8, sponsor_id=$9, updated_at=now() WHERE id=$1`,
     [e.id, v.category, v.description, v.amount, v.due, v.supplier, v.notes, v.episode_id, v.sponsor_id]);
+  if (own && !own.keep) await owner.save(e.id, { projectId: own.projectId, weights: own.weights, amount: v.amount });
+  else if (own && own.keep && e.project_id != null) await owner.save(e.id, { weights: owner.halves(v.amount, pidsOf(req)), amount: v.amount }); // virou compartilhado sem valores: meio a meio
+  else if (e.project_id == null) await owner.rescale(e.id, v.amount); // compartilhado que fica: a divisão acompanha o valor
   await audit(req, 'financeiro.editado', 'fin_entry', e.id, { description: v.description });
   await req.flash('ok', 'Lançamento atualizado.');
   res.redirect(to);
 }));
 
 router.post('/financeiro/lancamentos/:id/pagar', requirePerm('finance.write'), wrap(async (req, res) => {
-  const e = await findEntry(req.params.id);
+  const e = await findEntry(req, req.params.id);
   if (!e) return notFound(res, 'Lançamento');
   const to = backTo(req, '/financeiro/lancamentos');
   if (e.status === 'pago') { await req.flash('error', 'Este lançamento já está quitado.'); return res.redirect(to); }
@@ -119,6 +160,7 @@ router.post('/financeiro/lancamentos/:id/pagar', requirePerm('finance.write'), w
   if (amount == null) amount = Number(e.amount_cents);
   if (Number.isNaN(amount) || amount < 0) { await req.flash('error', 'Valor inválido.'); return res.redirect(to); }
   const { rows: [done] } = await db.query("UPDATE fin_entries SET status='pago', paid_on=$2, amount_cents=$3, cancel_reason=NULL, updated_at=now() WHERE id=$1 RETURNING *", [e.id, paidOn, amount]);
+  if (done.project_id == null) await owner.rescale(done.id, amount); // pagou outro valor: a divisão acompanha
   await fin.afterPaid(done, req.user.id);
   if (done.auto_key && /^estudio-saldo-e/.test(done.auto_key) && done.episode_id) await fin.recomputeStudio(done.episode_id); // pode ter sobrado hora extra
   await audit(req, e.direction === 'entrada' ? 'financeiro.recebido' : 'financeiro.pago', 'fin_entry', e.id, { amount });
@@ -127,7 +169,7 @@ router.post('/financeiro/lancamentos/:id/pagar', requirePerm('finance.write'), w
 }));
 
 router.post('/financeiro/lancamentos/:id/desfazer', requirePerm('finance.write'), wrap(async (req, res) => {
-  const e = await findEntry(req.params.id);
+  const e = await findEntry(req, req.params.id);
   if (!e) return notFound(res, 'Lançamento');
   await db.query("UPDATE fin_entries SET status='previsto', paid_on=NULL, cancel_reason=NULL, updated_at=now() WHERE id=$1", [e.id]);
   await audit(req, 'financeiro.reaberto', 'fin_entry', e.id);
@@ -136,7 +178,7 @@ router.post('/financeiro/lancamentos/:id/desfazer', requirePerm('finance.write')
 }));
 
 router.post('/financeiro/lancamentos/:id/cancelar', requirePerm('finance.write'), wrap(async (req, res) => {
-  const e = await findEntry(req.params.id);
+  const e = await findEntry(req, req.params.id);
   if (!e) return notFound(res, 'Lançamento');
   if (e.status === 'pago') { await req.flash('error', 'Desfaça o pagamento antes de cancelar.'); return res.redirect(backTo(req, '/financeiro/lancamentos')); }
   await db.query("UPDATE fin_entries SET status='cancelado', cancel_reason='usuario', updated_at=now() WHERE id=$1", [e.id]);
@@ -146,7 +188,7 @@ router.post('/financeiro/lancamentos/:id/cancelar', requirePerm('finance.write')
 }));
 
 router.post('/financeiro/lancamentos/:id/excluir', requirePerm('finance.write'), wrap(async (req, res) => {
-  const e = await findEntry(req.params.id);
+  const e = await findEntry(req, req.params.id);
   if (!e) return notFound(res, 'Lançamento');
   const to = backTo(req, '/financeiro/lancamentos');
   if (e.status === 'pago' || e.auto_key) { await req.flash('error', e.status === 'pago' ? 'Desfaça o pagamento antes de excluir.' : 'Lançamento automático não se exclui: cancele.'); return res.redirect(to); }
@@ -159,18 +201,23 @@ router.post('/financeiro/lancamentos/:id/excluir', requirePerm('finance.write'),
 // Planilha para o contador: UTF-8 com BOM e ";" (abre direto no Excel em português).
 router.get('/financeiro/exportar.csv', requirePerm('finance.read'), wrap(async (req, res) => {
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(String(req.query.mes || '')) ? req.query.mes : null;
+  const pids = pidsOf(req);
   const { rows } = await db.query(
-    `SELECT e.*, s.company AS sponsor_name, ep.number AS episode_number, ep.title AS episode_title FROM fin_entries e
+    `SELECT e.*, ${owner.share('e', '$2')} AS share_cents, s.company AS sponsor_name, ep.number AS episode_number, ep.title AS episode_title FROM fin_entries e
        LEFT JOIN sponsors s ON s.id = e.sponsor_id LEFT JOIN episodes ep ON ep.id = e.episode_id
-      WHERE e.status <> 'cancelado' AND ($1::text IS NULL OR to_char(coalesce(e.paid_on, e.due_on), 'YYYY-MM') = $1)
-      ORDER BY coalesce(e.paid_on, e.due_on), e.id`, [month]);
+      WHERE e.status <> 'cancelado' AND ($1::text IS NULL OR to_char(coalesce(e.paid_on, e.due_on), 'YYYY-MM') = $1) AND ${owner.where('e', '$2')}
+      ORDER BY coalesce(e.paid_on, e.due_on), e.id`, [month, pids]);
   const cell = (v) => { let s = String(v ?? ''); if (/^[=+\-@\t]/.test(s)) s = `'${s}`; return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const lines = [['Data', 'Vencimento', 'Situação', 'Tipo', 'Categoria', 'Descrição', 'Fornecedor', 'Valor (R$)', 'Episódio', 'Patrocinador'].join(';')];
+  const multi = req.scope.multi;
+  const lines = [['Data', 'Vencimento', 'Situação', 'Tipo', 'Categoria', 'Descrição', 'Fornecedor', 'Valor (R$)', ...(multi ? ['Projeto'] : []), 'Episódio', 'Patrocinador'].join(';')];
   for (const r of rows) {
     const e = fin.toEntry(r);
+    const p = e.project_id ? projects.get(e.project_id) : null;
     lines.push([formatDay(e.paid_on || e.due_on), formatDay(e.due_on), e.status === 'pago' ? (e.direction === 'entrada' ? 'Recebido' : 'Pago') : 'Em aberto',
       e.direction === 'entrada' ? 'Entrada' : 'Saída', C.FIN_CATEGORIES[e.category] || e.category, e.description, e.supplier || '',
-      ((e.direction === 'entrada' ? 1 : -1) * e.amount_cents / 100).toFixed(2).replace('.', ','), e.episode_number ? `EP.${String(e.episode_number).padStart(3, '0')}` : '', e.sponsor_name || ''].map(cell).join(';'));
+      ((e.direction === 'entrada' ? 1 : -1) * e.share_cents / 100).toFixed(2).replace('.', ','),
+      ...(multi ? [p ? p.name : 'Compartilhado (parte deste recorte)'] : []),
+      e.episode_number ? `EP.${String(e.episode_number).padStart(3, '0')}` : '', e.sponsor_name || ''].map(cell).join(';'));
   }
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="financeiro-${month || 'tudo'}.csv"` });
   res.send(`﻿${lines.join('\r\n')}\r\n`);
@@ -178,11 +225,15 @@ router.get('/financeiro/exportar.csv', requirePerm('finance.read'), wrap(async (
 
 // ---------------------------------------------------------------- estoque
 router.get('/financeiro/estoque', requirePerm('stock.read'), wrap(async (req, res) => {
-  const items = await fin.stockItems();
+  const items = await fin.stockItems(); // o estoque é da casa; só a compra tem "De quem é"
   const moves = await fin.stockMovesFor(items.map((i) => i.id), 6);
   for (const i of items) i.moves = moves[i.id] || [];
   const showItems = req.query.arquivados === '1' ? items : items.filter((i) => i.active);
-  res.render('finance/stock', { title: 'Estoque', items: showItems, archived: items.filter((i) => !i.active).length, showArchived: req.query.arquivados === '1', settings: await fin.settings(), fin, C, money, counts: can(req.user.role, 'finance.read') ? await fin.counts() : null });
+  res.render('finance/stock', {
+    title: 'Estoque', items: showItems, archived: items.filter((i) => !i.active).length, showArchived: req.query.arquivados === '1',
+    settings: await fin.settings(), fin, C, money, finProjects: pickProjects(req),
+    counts: can(req.user.role, 'finance.read') ? await fin.counts({ pids: pidsOf(req) }) : null,
+  });
 }));
 
 function parseItem(body) {
@@ -235,9 +286,12 @@ router.post('/financeiro/estoque/:id/comprar', requirePerm('finance.write'), wra
   const qty = num(req.body.qty); const total = parseBRL(req.body.total); let due = parseInputDate(req.body.due_on) || fin.todayISO();
   if (Number.isNaN(due)) due = fin.todayISO();
   if (!(qty > 0) || total == null || Number.isNaN(total) || total <= 0) { await req.flash('error', 'Informe a quantidade e o valor total da compra.'); return res.redirect('/financeiro/estoque'); }
+  const own = owner.parse(req.body, total, { ids: pidsOf(req), parseBRL });
+  if (own.error) { await req.flash('error', own.error); return res.redirect('/financeiro/estoque'); }
   await fin.buyStock({
     item: { ...it, unit_cost_cents: Number(it.unit_cost_cents) }, qty, totalCents: total, category: C.FIN_OUT[req.body.category] ? req.body.category : 'brindes',
     supplier: text(req.body.supplier, 120), firstDue: due, installments: req.body.installments, paidNow: req.body.paid === '1', userId: req.user.id,
+    projectId: own.projectId, weights: own.weights,
   });
   await audit(req, 'estoque.compra', 'fin_stock_item', it.id, { qty, total });
   await req.flash('ok', `Compra de ${qty} ${it.unit} de ${it.name} registrada: entrou no estoque e foi para as contas a pagar.`);
@@ -265,15 +319,26 @@ router.post('/financeiro/estoque/:id/ajustar', requirePerm('stock.write'), wrap(
 
 // ---------------------------------------------------------------- regras e custos mensais
 router.get('/financeiro/regras', requirePerm('finance.read'), wrap(async (req, res) => {
+  const pids = pidsOf(req);
   const [rules, recurring, settings, bankEpisodes] = await Promise.all([
-    db.query('SELECT * FROM fin_rules ORDER BY active DESC, trigger, id'),
-    db.query('SELECT * FROM fin_recurring ORDER BY active DESC, day_of_month, id'),
+    // regra sem projeto vale em todos; com projeto, só aparece para quem vê aquele projeto
+    db.query('SELECT * FROM fin_rules WHERE project_id IS NULL OR project_id = ANY($1::int[]) ORDER BY active DESC, trigger, id', [pids]),
+    db.query(
+      `SELECT * FROM fin_recurring r
+        WHERE r.project_id = ANY($1::int[])
+           OR (r.project_id IS NULL AND EXISTS (SELECT 1 FROM jsonb_object_keys(coalesce(r.split, '{}'::jsonb)) k WHERE k ~ '^[0-9]+$' AND k::int = ANY($1::int[])))
+        ORDER BY active DESC, day_of_month, id`, [pids]),
     fin.settings(),
     // episódio de início do banco de horas: os gravados, do mais novo para o mais antigo
-    db.query('SELECT id, number, title, recorded_on FROM episodes WHERE recorded_on IS NOT NULL ORDER BY recorded_on DESC, number DESC NULLS LAST LIMIT 200'),
+    db.query('SELECT id, number, title, recorded_on, project_id FROM episodes WHERE recorded_on IS NOT NULL AND project_id = ANY($1::int[]) ORDER BY recorded_on DESC, number DESC NULLS LAST LIMIT 200', [pids]),
   ]);
-  const startEp = settings.studio_bank_start_episode_id ? (await db.query('SELECT id, number, title FROM episodes WHERE id = $1', [settings.studio_bank_start_episode_id])).rows[0] || null : null;
-  res.render('finance/rules', { title: 'Custos automáticos', rules: rules.rows.map((r) => ({ ...r, amount_cents: Number(r.amount_cents) })), recurring: recurring.rows.map((r) => ({ ...r, amount_cents: Number(r.amount_cents), starts_on: fin.iso(r.starts_on), ends_on: fin.iso(r.ends_on) })), settings, bankEpisodes: bankEpisodes.rows.map((e) => ({ ...e, recorded_on: fin.iso(e.recorded_on) })), startEp, hourBank, fin, C, money, counts: await fin.counts() });
+  const startEp = settings.studio_bank_start_episode_id ? (await db.query('SELECT id, number, title, project_id FROM episodes WHERE id = $1', [settings.studio_bank_start_episode_id])).rows[0] || null : null;
+  res.render('finance/rules', {
+    title: 'Custos automáticos', rules: rules.rows.map((r) => ({ ...r, amount_cents: Number(r.amount_cents) })),
+    recurring: recurring.rows.map((r) => ({ ...r, amount_cents: Number(r.amount_cents), starts_on: fin.iso(r.starts_on), ends_on: fin.iso(r.ends_on) })),
+    settings, bankEpisodes: bankEpisodes.rows.map((e) => ({ ...e, recorded_on: fin.iso(e.recorded_on) })), startEp, hourBank, fin, C, money,
+    finProjects: pickProjects(req), counts: await fin.counts({ pids }),
+  });
 }));
 
 router.post('/financeiro/regras/ajustes', requirePerm('finance.write'), wrap(async (req, res) => {
@@ -296,13 +361,16 @@ router.post('/financeiro/regras/ajustes', requirePerm('finance.write'), wrap(asy
   res.redirect('/financeiro/regras');
 }));
 
-function parseRule(body) {
+// "Vale para": em todos os projetos (vazio) ou só em um. O lançamento que a regra gera é do projeto do episódio ou do convidado.
+function parseRule(body, pids) {
   const amount = parseBRL(body.amount);
   const offset = Number.parseInt(body.offset_days, 10);
+  const sent = Number(body.vale_para);
   const v = {
     name: clean(body.name, 120), category: C.FIN_OUT[body.category] ? body.category : 'outros', trigger: C.FIN_TRIGGERS[body.trigger] ? body.trigger : null,
     amount, anchor: C.FIN_ANCHORS[body.anchor] ? body.anchor : 'gatilho', offset_days: Number.isInteger(offset) ? Math.max(-365, Math.min(365, offset)) : 0,
     supplier: text(body.supplier, 120), active: body.active !== '0',
+    project_id: pids.includes(sent) ? sent : null,
   };
   if (v.name.length < 2) return { error: 'Dê um nome ao custo.' };
   if (!v.trigger) return { error: 'Escolha quando o custo nasce.' };
@@ -311,10 +379,10 @@ function parseRule(body) {
 }
 
 router.post('/financeiro/regras', requirePerm('finance.write'), wrap(async (req, res) => {
-  const { v, error } = parseRule(req.body);
+  const { v, error } = parseRule(req.body, pidsOf(req));
   if (error) { await req.flash('error', error); return res.redirect('/financeiro/regras'); }
-  await db.query('INSERT INTO fin_rules (name, category, trigger, amount_cents, anchor, offset_days, supplier, active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [v.name, v.category, v.trigger, v.amount, v.anchor, v.offset_days, v.supplier, v.active]);
+  await db.query('INSERT INTO fin_rules (name, category, trigger, amount_cents, anchor, offset_days, supplier, active, project_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [v.name, v.category, v.trigger, v.amount, v.anchor, v.offset_days, v.supplier, v.active, v.project_id]);
   await audit(req, 'financeiro.regra_criada', 'fin_rule', null, { name: v.name });
   await req.flash('ok', 'Custo automático criado. Vale para os próximos episódios.');
   res.redirect('/financeiro/regras');
@@ -322,10 +390,13 @@ router.post('/financeiro/regras', requirePerm('finance.write'), wrap(async (req,
 
 router.post('/financeiro/regras/:id', requirePerm('finance.write'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res, 'Regra');
-  const { v, error } = parseRule(req.body);
+  const pids = pidsOf(req);
+  const { v, error } = parseRule(req.body, pids);
   if (error) { await req.flash('error', error); return res.redirect('/financeiro/regras'); }
-  const { rowCount } = await db.query('UPDATE fin_rules SET name=$2, category=$3, trigger=$4, amount_cents=$5, anchor=$6, offset_days=$7, supplier=$8, active=$9 WHERE id=$1',
-    [req.params.id, v.name, v.category, v.trigger, v.amount, v.anchor, v.offset_days, v.supplier, v.active]);
+  const { rowCount } = await db.query(
+    `UPDATE fin_rules SET name=$2, category=$3, trigger=$4, amount_cents=$5, anchor=$6, offset_days=$7, supplier=$8, active=$9, project_id=$10
+      WHERE id=$1 AND (project_id IS NULL OR project_id = ANY($11::int[]))`,
+    [req.params.id, v.name, v.category, v.trigger, v.amount, v.anchor, v.offset_days, v.supplier, v.active, v.project_id, pids]);
   if (!rowCount) return notFound(res, 'Regra');
   await audit(req, 'financeiro.regra_editada', 'fin_rule', req.params.id, { name: v.name });
   await req.flash('ok', 'Custo automático salvo. Vale para os próximos episódios.');
@@ -341,13 +412,18 @@ router.post('/financeiro/regras/:id/excluir', requirePerm('finance.write'), wrap
   res.redirect('/financeiro/regras');
 }));
 
-function parseRecurring(body) {
+// O custo mensal não tem vínculo de onde herdar: guarda o dono (ou os pesos da divisão) e repassa a cada mês que nasce.
+function parseRecurring(body, pids) {
   const amount = parseBRL(body.amount); const day = Number.parseInt(body.day_of_month, 10);
   let starts = parseInputDate(body.starts_on) || fin.todayISO(); if (Number.isNaN(starts)) starts = fin.todayISO();
   let ends = parseInputDate(body.ends_on) || null; if (Number.isNaN(ends)) ends = null;
   const v = { name: clean(body.name, 120), category: C.FIN_OUT[body.category] ? body.category : 'outros', amount, day: day >= 1 && day <= 28 ? day : 5, starts, ends, supplier: text(body.supplier, 120), active: body.active !== '0' };
   if (v.name.length < 2) return { error: 'Dê um nome ao custo mensal.' };
   if (amount == null || Number.isNaN(amount) || amount <= 0) return { error: 'Valor inválido. Use algo como 2.500,00.' };
+  const own = owner.parse(body, amount, { ids: pids, parseBRL });
+  if (own.error) return { error: own.error };
+  v.project_id = own.weights ? null : (own.projectId || projects.defaultId());
+  v.split = own.weights || null;
   return { v };
 }
 
@@ -358,10 +434,11 @@ async function regenerate(id) {
 }
 
 router.post('/financeiro/mensais', requirePerm('finance.write'), wrap(async (req, res) => {
-  const { v, error } = parseRecurring(req.body);
+  const { v, error } = parseRecurring(req.body, pidsOf(req));
   if (error) { await req.flash('error', error); return res.redirect('/financeiro/regras#mensais'); }
-  const { rows: [r] } = await db.query('INSERT INTO fin_recurring (name, category, amount_cents, day_of_month, starts_on, ends_on, supplier, active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-    [v.name, v.category, v.amount, v.day, v.starts, v.ends, v.supplier, v.active]);
+  const { rows: [r] } = await db.query(
+    'INSERT INTO fin_recurring (name, category, amount_cents, day_of_month, starts_on, ends_on, supplier, active, project_id, split) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
+    [v.name, v.category, v.amount, v.day, v.starts, v.ends, v.supplier, v.active, v.project_id, v.split]);
   await fin.ensureRecurring(3);
   await audit(req, 'financeiro.mensal_criado', 'fin_recurring', r.id, { name: v.name });
   await req.flash('ok', 'Custo mensal criado; as próximas contas já estão em "A pagar".');
@@ -370,10 +447,11 @@ router.post('/financeiro/mensais', requirePerm('finance.write'), wrap(async (req
 
 router.post('/financeiro/mensais/:id', requirePerm('finance.write'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res, 'Custo mensal');
-  const { v, error } = parseRecurring(req.body);
+  const { v, error } = parseRecurring(req.body, pidsOf(req));
   if (error) { await req.flash('error', error); return res.redirect('/financeiro/regras#mensais'); }
-  const { rowCount } = await db.query('UPDATE fin_recurring SET name=$2, category=$3, amount_cents=$4, day_of_month=$5, starts_on=$6, ends_on=$7, supplier=$8, active=$9 WHERE id=$1',
-    [req.params.id, v.name, v.category, v.amount, v.day, v.starts, v.ends, v.supplier, v.active]);
+  const { rowCount } = await db.query(
+    'UPDATE fin_recurring SET name=$2, category=$3, amount_cents=$4, day_of_month=$5, starts_on=$6, ends_on=$7, supplier=$8, active=$9, project_id=$10, split=$11 WHERE id=$1',
+    [req.params.id, v.name, v.category, v.amount, v.day, v.starts, v.ends, v.supplier, v.active, v.project_id, v.split]);
   if (!rowCount) return notFound(res, 'Custo mensal');
   await regenerate(req.params.id);
   await audit(req, 'financeiro.mensal_editado', 'fin_recurring', req.params.id, { name: v.name });
@@ -419,18 +497,44 @@ router.post('/financeiro/banco/compras', requirePerm('finance.write'), wrap(asyn
   if (!(await hourBank.bankActive())) { await req.flash('error', 'Ligue o banco de horas antes de registrar uma compra.'); return res.redirect('/financeiro/regras'); }
   const { v, error } = parsePack(req.body);
   if (error) { await req.flash('error', error); return res.redirect('/financeiro'); }
-  const r = await hourBank.addPack({ ...v, userId: req.user.id });
+  const r = await hourBank.addPack({ ...v, userId: req.user.id, quotas: quotasFromBody(req) });
   if (r.error) { await req.flash('error', r.error); return res.redirect('/financeiro'); }
   await audit(req, 'financeiro.banco_compra', 'fin_hour_pack', r.pack.id, { horas: v.hours, valor: v.amountCents });
   await req.flash('ok', `Compra de ${hourBank.fmtHours(v.hours)} registrada e lançada como despesa paga.`);
   res.redirect('/financeiro');
 }));
 
+// Cotas de horas por projeto que a tela mandou: { projeto: horas }. Em branco = o sistema decide (proporção da compra anterior).
+function quotasFromBody(req) {
+  const out = {};
+  for (const id of pidsOf(req)) {
+    const raw = String(req.body[`cota_${id}`] ?? '').trim();
+    if (raw === '') continue;
+    const h = num(raw);
+    if (!(h >= 0)) return null;
+    out[id] = h;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// Ajustar cotas: orçamento e aviso por projeto numa compra de horas. Não mexe em dinheiro (a divisão da despesa segue o uso).
+router.post('/financeiro/banco/cotas', requirePerm('finance.write'), wrap(async (req, res) => {
+  const back = '/financeiro#banco-de-horas';
+  if (!isIntId(req.body.pack_id)) { await req.flash('error', 'Escolha a compra.'); return res.redirect(back); }
+  const quotas = quotasFromBody(req);
+  if (!quotas) { await req.flash('error', 'Confira as horas de cada projeto.'); return res.redirect(back); }
+  const r = await hourBank.setQuotas(Number(req.body.pack_id), quotas);
+  if (r.error) { await req.flash('error', r.error); return res.redirect(back); }
+  await audit(req, 'financeiro.banco_cotas', 'fin_hour_pack', Number(req.body.pack_id), { cotas: quotas });
+  await req.flash('ok', r.rest > 0 ? `Cotas salvas. Ficaram ${hourBank.fmtHours(r.rest)} sem cota.` : 'Cotas salvas.');
+  res.redirect(back);
+}));
+
 // ---------------------------------------------------------------- episódio e patrocinador
 router.post('/episodios/:id/duracao', requirePerm('episodes.write'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res, 'Episódio');
-  const { rows: [ep] } = await db.query('SELECT id FROM episodes WHERE id = $1', [req.params.id]);
-  if (!ep) return notFound(res, 'Episódio');
+  const { rows: [ep] } = await db.query('SELECT id, project_id FROM episodes WHERE id = $1', [req.params.id]);
+  if (!ep || !scope.canSee(req, ep.project_id)) return notFound(res, 'Episódio');
   const hours = Number.parseInt(req.body.hours, 10) || 0; const mins = Number.parseInt(req.body.minutes, 10) || 0;
   const total = hours * 60 + mins;
   if (!(total > 0 && total <= 1440)) { await req.flash('error', 'Informe a duração da gravação (horas e minutos).'); return res.redirect(`/episodios/${ep.id}#financeiro`); }
@@ -443,7 +547,7 @@ router.post('/episodios/:id/duracao', requirePerm('episodes.write'), wrap(async 
 router.post('/patrocinadores/:id/pagamento', requirePerm('finance.write'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res, 'Patrocinador');
   const { rows: [sp] } = await db.query('SELECT * FROM sponsors WHERE id = $1', [req.params.id]);
-  if (!sp) return notFound(res, 'Patrocinador');
+  if (!sp || !scope.canSee(req, sp.project_id)) return notFound(res, 'Patrocinador');
   const to = `/patrocinadores/${sp.id}#financeiro`;
   if (sp.value_cents == null) { await req.flash('error', 'Defina o valor do patrocínio antes de combinar o pagamento.'); return res.redirect(to); }
   let first = parseInputDate(req.body.first_due); if (!first || Number.isNaN(first)) first = fin.todayISO();

@@ -4,6 +4,8 @@
   var json = function (o) { return JSON.stringify(o).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '\\u003c'); };
   var brl = function (c) { return (Number(c) / 100).toFixed(2).replace('.', ','); };
   var canWrite = can('finance.write');
+  var finProjs = locals.finProjects || [];
+  var ownerName = function (id) { var p = finProjs.filter(function (x) { return x.id === Number(id); })[0]; return p ? p.name : ''; };
   var bankOn = settings.studio_mode === 'banco';
   var hourMin = settings.studio_minutes;
   var total = Math.round(hourMin / 60 * settings.studio_hour_cents);
@@ -28,7 +30,7 @@
         <% if (canWrite) { %><button class="btn" type="button" data-modal-open="modal-ajustes"><%- icon('pencil') %> Editar</button><% } %>
       </div>
       <% if (bankOn) { %>
-      <p class="small top-gap">Banco de horas ligado<%= startEp ? ' desde o ' + (startEp.number ? 'EP.' + String(startEp.number).padStart(3, '0') : startEp.title) : '' %>: as gravações a partir dele saem das horas compradas, sem sinal nem saldo por episódio. Avisa quando restarem <span class="mono"><%= hourBank.fmtHours(settings.studio_bank_alert_hours) %></span>. <a href="/financeiro#banco-de-horas">Ver o banco</a></p>
+      <p class="small top-gap">Banco de horas ligado<%= startEp ? ' desde o ' + (startEp.number ? prefixOf(startEp.project_id) + String(startEp.number).padStart(3, '0') : startEp.title) : '' %>: as gravações a partir dele saem das horas compradas, sem sinal nem saldo por episódio. Avisa quando restarem <span class="mono"><%= hourBank.fmtHours(settings.studio_bank_alert_hours) %></span>. <a href="/financeiro#banco-de-horas">Ver o banco</a></p>
       <p class="small muted">Os valores abaixo valem para as gravações antes do banco.</p>
       <% } else { %>
       <div class="bank-off">
@@ -62,9 +64,9 @@
       <ul class="plain plan-list">
         <% rules.forEach(function (r) { %>
         <li class="<%= r.active ? '' : 'is-off' %>">
-          <div class="plan-list-main"><strong><%= r.name %><% if (!r.active) { %> <span class="badge b-gray">Pausado</span><% } %></strong><span class="small muted"><%= C.FIN_TRIGGERS[r.trigger] %> · <%= anchorTxt(r) %> · <%= C.FIN_OUT[r.category] %><%= r.supplier ? ' · ' + r.supplier : '' %></span></div>
+          <div class="plan-list-main"><strong><%= r.name %><% if (!r.active) { %> <span class="badge b-gray">Pausado</span><% } %></strong><span class="small muted"><%= C.FIN_TRIGGERS[r.trigger] %> · <%= anchorTxt(r) %> · <%= C.FIN_OUT[r.category] %><%= r.supplier ? ' · ' + r.supplier : '' %><% if (finProjs.length > 1) { %> · <%= r.project_id ? ownerName(r.project_id) : 'todos os projetos' %><% } %></span></div>
           <span class="mono"><%= money(r.amount_cents) %></span>
-          <span class="plan-list-tools"><% if (canWrite) { %><button class="btn sm ghost" type="button" data-fill-modal="modal-regra" data-fill-mode="edit" data-fill-action="/financeiro/regras/<%= r.id %>" data-fill-remove="/financeiro/regras/<%= r.id %>/excluir" data-fill-remove-label="Excluir custo" data-fill-confirm="Excluir este custo automático? O que ainda não foi pago some junto." data-fill='<%- json({ name: r.name, category: r.category, trigger: r.trigger, amount: brl(r.amount_cents), anchor: r.anchor, offset_days: String(r.offset_days), supplier: r.supplier || '', active: r.active ? '1' : '0' }) %>'>Editar</button><% } %></span>
+          <span class="plan-list-tools"><% if (canWrite) { %><button class="btn sm ghost" type="button" data-fill-modal="modal-regra" data-fill-mode="edit" data-fill-action="/financeiro/regras/<%= r.id %>" data-fill-remove="/financeiro/regras/<%= r.id %>/excluir" data-fill-remove-label="Excluir custo" data-fill-confirm="Excluir este custo automático? O que ainda não foi pago some junto." data-fill='<%- json({ name: r.name, category: r.category, trigger: r.trigger, amount: brl(r.amount_cents), anchor: r.anchor, offset_days: String(r.offset_days), supplier: r.supplier || '', active: r.active ? '1' : '0', vale_para: r.project_id ? String(r.project_id) : '' }) %>'>Editar</button><% } %></span>
         </li>
         <% }) %>
       </ul>
@@ -81,9 +83,9 @@
       <ul class="plain plan-list">
         <% recurring.forEach(function (r) { %>
         <li class="<%= r.active ? '' : 'is-off' %>">
-          <div class="plan-list-main"><strong><%= r.name %><% if (!r.active) { %> <span class="badge b-gray">Pausado</span><% } %></strong><span class="small muted">Todo dia <span class="mono"><%= r.day_of_month %></span> · <%= C.FIN_OUT[r.category] %><%= r.supplier ? ' · ' + r.supplier : '' %><%= r.ends_on ? ' · até ' + fmt.formatDay(r.ends_on) : '' %></span></div>
+          <div class="plan-list-main"><strong><%= r.name %><% if (!r.active) { %> <span class="badge b-gray">Pausado</span><% } %></strong><span class="small muted">Todo dia <span class="mono"><%= r.day_of_month %></span> · <%= C.FIN_OUT[r.category] %><%= r.supplier ? ' · ' + r.supplier : '' %><%= r.ends_on ? ' · até ' + fmt.formatDay(r.ends_on) : '' %><% if (finProjs.length > 1) { %> · <%= r.project_id ? ownerName(r.project_id) : 'compartilhado' %><% } %></span></div>
           <span class="mono"><%= money(r.amount_cents) %></span>
-          <span class="plan-list-tools"><% if (canWrite) { %><button class="btn sm ghost" type="button" data-fill-modal="modal-mensal" data-fill-mode="edit" data-fill-action="/financeiro/mensais/<%= r.id %>" data-fill-remove="/financeiro/mensais/<%= r.id %>/excluir" data-fill-remove-label="Excluir custo mensal" data-fill-confirm="Excluir este custo mensal? As contas em aberto somem; o que já foi pago fica." data-fill='<%- json({ name: r.name, category: r.category, amount: brl(r.amount_cents), day_of_month: String(r.day_of_month), starts_on: r.starts_on, ends_on: r.ends_on || '', supplier: r.supplier || '', active: r.active ? '1' : '0' }) %>'>Editar</button><% } %></span>
+          <span class="plan-list-tools"><% if (canWrite) { %><button class="btn sm ghost" type="button" data-fill-modal="modal-mensal" data-fill-mode="edit" data-fill-action="/financeiro/mensais/<%= r.id %>" data-fill-remove="/financeiro/mensais/<%= r.id %>/excluir" data-fill-remove-label="Excluir custo mensal" data-fill-confirm="Excluir este custo mensal? As contas em aberto somem; o que já foi pago fica." data-fill='<%- json({ name: r.name, category: r.category, amount: brl(r.amount_cents), day_of_month: String(r.day_of_month), starts_on: r.starts_on, ends_on: r.ends_on || '', supplier: r.supplier || '', active: r.active ? '1' : '0', de_quem: r.project_id ? String(r.project_id) : 'compartilhado' }) %>'>Editar</button><% } %></span>
         </li>
         <% }) %>
       </ul>
@@ -126,7 +128,7 @@
     <label>Primeiro episódio do banco *
       <select name="start_episode_id" required data-search>
         <option value="">Escolha…</option>
-        <% bankEpisodes.forEach(function (ep) { %><option value="<%= ep.id %>"><%= ep.number ? 'EP.' + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %> · <%= fmt.formatDay(ep.recorded_on) %></option><% }) %>
+        <% bankEpisodes.forEach(function (ep) { %><option value="<%= ep.id %>"><%= ep.number ? prefixOf(ep.project_id) + String(ep.number).padStart(3, '0') + ' · ' : '' %><%= ep.title %> · <%= fmt.formatDay(ep.recorded_on) %></option><% }) %>
       </select>
     </label>
     <p class="small muted">Ele e as gravações do mesmo dia em diante saem do banco. As anteriores continuam por hora.</p>
@@ -152,6 +154,15 @@
       <label>Categoria<select name="category"><% Object.keys(C.FIN_OUT).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_OUT[k] %></option><% }) %></select></label>
     </div>
     <label>Quando nasce<select name="trigger"><% Object.keys(C.FIN_TRIGGERS).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_TRIGGERS[k] %></option><% }) %></select></label>
+    <% if (finProjs.length > 1) { %>
+    <label>Vale para
+      <select name="vale_para">
+        <option value="">Todos os projetos</option>
+        <% finProjs.forEach(function (p) { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+      </select>
+    </label>
+    <p class="small muted">O custo que nasce é do projeto do vídeo ou do convidado que disparou a regra.</p>
+    <% } %>
     <details class="more">
       <summary>Vencimento e fornecedor</summary>
       <div class="stack top-gap">
@@ -171,7 +182,7 @@
 </dialog>
 
 <dialog class="modal modal-wide" id="modal-mensal" aria-labelledby="mm-h">
-  <form method="post" action="" class="stack" data-fill-form>
+  <form method="post" action="" class="stack" data-fill-form data-when-form>
     <%- csrfField %>
     <h2 id="mm-h"><span data-mode="edit">Editar custo mensal</span><span data-mode="new" hidden>Novo custo mensal</span></h2>
     <label>Nome<input type="text" name="name" maxlength="120" required placeholder="Ex.: Salário da produtora"></label>
@@ -179,6 +190,7 @@
       <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="3.500,00"></label>
       <label>Todo dia<input type="number" name="day_of_month" min="1" max="28" required></label>
     </div>
+    <%- include('../partials/fin-owner', { ownerHint: 'A divisão precisa somar o valor e vale para cada mês lançado. Em branco no compartilhado, a divisão de hoje fica.' }) %>
     <details class="more">
       <summary>Categoria, período e fornecedor</summary>
       <div class="stack top-gap">

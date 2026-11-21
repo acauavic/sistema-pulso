@@ -58,7 +58,7 @@
       <summary>Últimos movimentos</summary>
       <ul class="plain plan-list">
         <% i.moves.forEach(function (m) { %>
-        <li><div class="plan-list-main"><span><%= REASONS[m.reason] %><%= m.ep_number ? ' · EP.' + String(m.ep_number).padStart(3, '0') : '' %></span><span class="small muted"><%= fmt.formatDate(m.created_at) %><%= m.note ? ' · ' + m.note : '' %><%= m.user_name ? ' · ' + m.user_name : '' %></span></div><span class="mono"><%= m.qty > 0 ? '+' : '' %><%= qtyTxt(m.qty) %></span><span></span></li>
+        <li><div class="plan-list-main"><span><%= REASONS[m.reason] %><%= m.ep_number ? ' · ' + prefixOf(m.ep_project_id) + String(m.ep_number).padStart(3, '0') : '' %></span><span class="small muted"><%= fmt.formatDate(m.created_at) %><%= m.note ? ' · ' + m.note : '' %><%= m.user_name ? ' · ' + m.user_name : '' %></span></div><span class="mono"><%= m.qty > 0 ? '+' : '' %><%= qtyTxt(m.qty) %></span><span></span></li>
         <% }) %>
       </ul>
     </details>
@@ -142,7 +142,7 @@
 
 <% if (canBuy) { %>
 <dialog class="modal modal-wide" id="modal-comprar" aria-labelledby="mc-h">
-  <form method="post" action="" class="stack" data-fill-form>
+  <form method="post" action="" class="stack" data-fill-form data-when-form>
     <%- csrfField %>
     <h2 id="mc-h">Registrar compra</h2>
     <label>Item<input type="text" name="_label" readonly></label>
@@ -155,6 +155,7 @@
       <label>Primeiro vencimento<input type="date" name="due_on" required></label>
     </div>
     <label>Pagamento<select name="paid"><option value="0">Vou pagar no vencimento</option><option value="1">Já paguei (a primeira parcela)</option></select></label>
+    <%- include('../partials/fin-owner', { ownerHint: 'O estoque é da casa; a despesa da compra é de um projeto ou dividida. A divisão precisa somar o valor total.' }) %>
     <details class="more">
       <summary>Mais detalhes</summary>
       <div class="stack top-gap">

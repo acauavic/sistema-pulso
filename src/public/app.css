@@ -1260,6 +1260,9 @@ html[data-sidebar="collapsed"] .version-link { text-align: center; padding: 0; f
 .bank-card { margin-bottom: 16px; display: grid; gap: 12px; }
 .bank-n { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; } .bank-n .stat-n { white-space: nowrap; }
 .bank-line { margin: 0; }
+/* uma linha por projeto no banco de horas: "Pulso · 6,5 de 10 h" (cota é orçamento, nunca lime) */
+.bank-projects { display: grid; gap: 4px; margin-top: 8px; }
+.bank-projects > li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
 .bank-bar.is-low .fg { fill: var(--st-edicao-fg); } .bank-bar.is-neg .fg { fill: var(--st-cancelado-fg); }
 .bank-use { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; } .bank-use h3 { margin-bottom: 4px; }
 .bank-use .plan-list > li { grid-template-columns: auto minmax(0, 1fr) auto; } .bank-use .plan-list > li > .mono { grid-column: auto; }

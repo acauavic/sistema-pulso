@@ -58,6 +58,9 @@ function target(req, body = {}) {
   return s.ids.length === 1 ? s.ids[0] : null;
 }
 
+// Recorte do dinheiro: dentro do recorte atual, só os projetos em que a pessoa vê o financeiro.
+const financeIdsOf = (req) => idsOf(req).filter((id) => req.scope.financeIds.includes(id));
+
 const canSee = (req, projectId) => projectId == null || req.scope.ids.includes(Number(projectId));
 
 // Página de detalhe: item de projeto de que a pessoa não participa responde 404 (como se não existisse).
@@ -76,4 +79,4 @@ const moduleOfPath = (p) => (PATH_MODULES.find(([re]) => re.test(String(p || '')
 // Só caminho do próprio painel (nunca um endereço de fora): para onde voltar depois de trocar o projeto.
 const localPath = (value) => (typeof value === 'string' && /^\/(?![/\\])/.test(value) && !/[\\\r\n]/.test(value) ? value.slice(0, 2000) : '/');
 
-module.exports = { attach, where, idsOf, target, assert, canSee, localPath, moduleOfPath };
+module.exports = { attach, where, idsOf, financeIdsOf, target, assert, canSee, localPath, moduleOfPath };

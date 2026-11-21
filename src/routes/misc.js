@@ -56,12 +56,15 @@ router.get('/', wrap(async (req, res) => {
   // painel: os três blocos (convidados, financeiro, cadência) começam juntos
   const fin = require('../services/finance');
   const outreach = require('../services/outreach');
-  const pMoney = can(req.user.role, 'finance.read') ? Promise.all([fin.counts(), fin.stockItems(), db.query(
+  const finPids = require('../services/scope').financeIdsOf(req); // dinheiro: só os projetos em que a pessoa vê o financeiro
+  const finOwner = require('../services/finOwner');
+  const pMoney = can(req.user.role, 'finance.read') && finPids.length ? Promise.all([fin.counts({ pids: finPids }), fin.stockItems(), db.query(
     // mesma conta do Financeiro ("A pagar em 7 dias"): de hoje até daqui a 7 dias; o atrasado aparece à parte
-    "SELECT coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7 FROM fin_entries WHERE status = 'previsto'",
-    [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())]),
+    `SELECT coalesce(sum(${finOwner.share('e', '$2')}) FILTER (WHERE e.direction = 'saida' AND e.due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7
+       FROM fin_entries e WHERE e.status = 'previsto' AND ${finOwner.where('e', '$2')}`,
+    [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()), finPids]),
     // o banco de horas nunca derruba o Início: se falhar, a faixa de aviso só não aparece
-    require('../services/hourBank').status().catch((err) => { console.error('Banco de horas (Início):', err.message); return null; })]) : null;
+    require('../services/hourBank').status({ pids: finPids }).catch((err) => { console.error('Banco de horas (Início):', err.message); return null; })]) : null;
   const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user, require('../services/scope').idsOf(req)) : null;
   // Resumo do dia: o dia vem do endereço (?dia=AAAA-MM-DD); sem ele, hoje. A produtora abre no "Seu dia" (os números dela) e vê o
   // resumo da equipe em ?visao=equipe; as outras pessoas abrem no resumo da equipe.

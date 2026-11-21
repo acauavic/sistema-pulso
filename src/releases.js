@@ -4,6 +4,19 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.102.0', date: '2026-11-21', title: 'Dinheiro por projeto',
+    items: [
+      { kind: 'novo', text: 'Todo lançamento agora tem dono: um projeto, ou compartilhado com a divisão entre eles. O que está ligado a um vídeo, convidado ou patrocinador herda o projeto dele — receita de patrocínio cai no projeto do contrato, sem escolha manual.' },
+      { kind: 'novo', text: 'No lançamento avulso, na compra de estoque e no custo mensal aparece "De quem é": Pulso, Projeto 100 ou Compartilhado (com os valores por projeto, começando meio a meio). No compartilhado em branco, a divisão de hoje fica, na mesma proporção.' },
+      { kind: 'novo', text: 'O Financeiro segue o projeto escolhido no menu: um projeto mostra só o que é dele mais a parte dele nos compartilhados; em "Todos os projetos", o consolidado, com a sigla na linha e "compartilhado · 50/50". A soma dos projetos é sempre o consolidado.' },
+      { kind: 'novo', text: 'No resumo, "Resultado por projeto" mostra o mês de cada um (entrou, saiu e a parte nos compartilhados).' },
+      { kind: 'novo', text: 'Banco de horas do estúdio: o pacote continua um só, da casa, com uma linha por projeto ("Pulso · 6,5 de 10 h"), aviso quando um passa da cota e o botão "Ajustar cotas". A despesa da compra é dividida pelo uso de cada projeto; o que ainda não foi usado segue a cota.' },
+      { kind: 'novo', text: 'O custo automático por episódio ganhou "Vale para": em todos os projetos ou só em um. O custo que ele gera é do projeto do vídeo ou do convidado que disparou.' },
+      { kind: 'ajuste', text: 'A planilha do contador (CSV) ganhou a coluna Projeto quando há mais de um, e exporta só o recorte que está à vista.' },
+      { kind: 'ajuste', text: 'O número do vídeo no financeiro agora usa o prefixo do projeto (EP.012 no Pulso, V.003 no Projeto 100).' },
+    ],
+  },
+  {
     version: '1.101.0', date: '2026-11-20', title: 'A mesma empresa nos dois projetos',
     items: [
       { kind: 'novo', text: 'O patrocinador agora tem um cadastro de empresa: nome, site, tipo e o contato valem em todos os projetos em que ela tem negociação. Cada projeto fica com o contrato dele (etapa, plano, valor, vigência).' },
