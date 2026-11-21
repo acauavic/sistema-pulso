@@ -107,6 +107,14 @@ async function getObject(key, { signal = null } = {}) {
   return res;
 }
 
+// Copia um objeto dentro do próprio bucket (o Backblaze faz a cópia no lado dele: nada sobe nem desce).
+// Usado ao trazer o material da marca de um projeto para outro: cada contrato fica com o arquivo dele.
+async function copyObject(fromKey, toKey) {
+  const source = `/${config.b2.bucket}/${String(fromKey).split('/').map(uriEncode).join('/')}`;
+  const res = await request('PUT', toKey, { headers: { 'x-amz-copy-source': source } });
+  if (!res.ok) throw b2Error('Backblaze recusou a cópia', res.status, await res.text());
+}
+
 async function deleteObject(key) {
   const res = await request('DELETE', key);
   if (!res.ok && res.status !== 404) throw new Error(`Backblaze recusou a exclusão (${res.status}).`);
@@ -215,4 +223,4 @@ async function headObject(key) {
   return { size: Number(res.headers.get('content-length')), contentType: res.headers.get('content-type') };
 }
 
-module.exports = { b2Error, presignUrl, presignGet, presignPart, corsRulesXml, corsStatus, putCors, deleteCors, createMultipart, uploadPart, completeMultipart, abortMultipart, headObject, signRequest, uriEncode, putObject, getObject, deleteObject, endpoint, keyFor };
+module.exports = { b2Error, presignUrl, presignGet, presignPart, corsRulesXml, corsStatus, putCors, deleteCors, createMultipart, uploadPart, completeMultipart, abortMultipart, headObject, signRequest, uriEncode, putObject, getObject, copyObject, deleteObject, endpoint, keyFor };

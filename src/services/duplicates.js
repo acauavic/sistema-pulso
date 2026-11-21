@@ -116,7 +116,7 @@ function compare(kind, a, b) {
 const LIST_SQL = {
   guest: `SELECT g.id, g.name, g.instagram, g.email, g.phone, g.status AS stage, g.created_at, g.person_id, g.project_id, u.name AS owner_name
             FROM guests g LEFT JOIN users u ON u.id = g.owner_id`,
-  sponsor: `SELECT s.id, s.company AS name, s.website, s.contact_email AS email, s.contact_phone AS phone, s.stage, s.created_at, u.name AS owner_name
+  sponsor: `SELECT s.id, s.company AS name, s.website, s.contact_email AS email, s.contact_phone AS phone, s.stage, s.created_at, s.company_id, s.project_id, u.name AS owner_name
               FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id`,
 };
 const stageLabel = (kind, key) => { const C = require('../constants'); return (kind === 'guest' ? C.STATUS_BY_KEY : C.SPONSOR_STAGE_BY_KEY)[key]?.label || key; };

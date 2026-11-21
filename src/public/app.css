@@ -1103,6 +1103,10 @@ h1 .project-tag { vertical-align: middle; font-weight: 500; }
 .other-proj .op-name { font-weight: 600; }
 .other-proj li .badge { flex: none; }
 #outros-projetos .row { flex-wrap: wrap; gap: 8px; }
+/* "Trazer do outro projeto": uma linha por arquivo, nome em cima e a pasta/projeto em mono embaixo. */
+.bring-list { display: grid; gap: 10px; margin: 4px 0 0; max-height: 50vh; overflow: auto; }
+.bring-list label.check { align-items: flex-start; padding-bottom: 0; }
+.bring-list label.check .mono { display: block; }
 .project-field { display: grid; gap: 6px; justify-items: start; } .project-field .seg-radio label { white-space: nowrap; } .project-field p { margin: 0; }
 .proj-list { margin-top: 0; } .proj-list .cat-row:first-child { border-top: 0; padding-top: 0; }
 .proj-mods { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; } .proj-note { margin: 16px 0 0; }

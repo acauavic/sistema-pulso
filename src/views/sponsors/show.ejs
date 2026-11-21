@@ -201,6 +201,7 @@
           <% if (!linkedTasks.length) { %><p class="muted small">Nenhuma tarefa ligada a este patrocinador.</p><% } %>
           <ul class="plain mini-tasks"><% linkedTasks.forEach(function (t) { %><li class="st-<%= t.status %>"><a href="/tarefas/<%= t.id %>"><%= t.title %></a><span class="handle muted"><%= C.TASK_STATUSES[t.status] %><%= t.due_on ? ' · ' + fmt.formatDueShort(t.due_on, t.due_time) : '' %><%= t.assignee_name ? ' · ' + t.assignee_name : '' %></span></li><% }) %></ul>
         </section>
+        <%- include('../partials/other-projects', { others: others, invitable: invitable, action: '/patrocinadores/' + sponsor.id + '/tambem', noun: 'patrocinador', canWrite: canWrite }) %>
         <%- include('../partials/comments', { type: 'sponsor', id: sponsor.id, items: comments, back: '/patrocinadores/' + sponsor.id }) %>
       </div>
     </div>

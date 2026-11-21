@@ -4,6 +4,7 @@ const express = require('express');
 const db = require('../db/pool');
 const config = require('../config');
 const sponsorsSvc = require('../services/sponsors');
+const companies = require('../services/companies'); // identidade da empresa: o contrato e os outros contratos dela ficam iguais
 const guestRules = require('../services/guestRules');
 const { audit } = require('../services/audit');
 const material = require('../services/sponsorMaterial');
@@ -134,12 +135,13 @@ router.post('/patrocinadores', requirePerm('sponsors.write'), wrap(async (req, r
   const error = parsed.error || (projectId ? null : 'Escolha o projeto.');
   if (error) return res.status(400).render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error, notice: null, values: echo(req.body, values), ...(await formOptions()) });
   if (req.body.confirmar_duplicata !== '1') {
-    const duplicates = await require('../services/duplicates').findFor('sponsor', values);
+    const duplicates = await require('../services/duplicates').findFor('sponsor', { ...values, project_id: projectId });
     if (duplicates.length) return res.render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error: null, notice: null, duplicates, dupKind: 'sponsor', values: echo(req.body, values), ...(await formOptions()) });
   }
   const { rows: [s] } = await db.query(
     `INSERT INTO sponsors (${COLUMNS.join(', ')}, created_by, project_id) VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}, $${COLUMNS.length + 2}) RETURNING id`,
     [...columnValues(values), req.user.id, projectId]);
+  await companies.sync(s.id); // a empresa nasce com o cadastro (ou passa a ter estes dados, se já existia)
   if (values.tier) await require('../services/plans').applyToSponsor(s.id);
   await sponsorsSvc.addEvent(s.id, req.user.id, 'criado', `Patrocinador cadastrado por ${req.user.name}`);
   await audit(req, 'patrocinador.criado', 'sponsor', s.id, { company: values.company });
@@ -182,9 +184,19 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
     pAgenda, pThread, pOut, can(req.user.role, 'finance.read') ? finSvc.sponsorSummary(sponsor.id) : null,
     meetingsSvc.listFor(sponsor.id), require('../services/team').activeUsers()]);
   const outSm = outEval.get(sponsor.id) || null;
+  // Em outros projetos: onde mais esta empresa está (todos os projetos de quem olha) e para onde ainda dá para abrir negociação.
+  const companyId = await companies.idOf(sponsor.id);
+  const others = await companies.participations(companyId, { pids: req.scope.ids, exceptSponsorId: sponsor.id });
+  // material que a empresa já tem em outro projeto (para o botão "Trazer do outro projeto" da aba Material)
+  const bringable = others.length && can(req.user.role, 'sponsors.write')
+    ? await require('../services/sponsorMaterial').otherProjectFiles(sponsor.id, { pids: req.scope.ids }) : [];
+  const projectsSvc2 = require('../services/projects');
+  const invitable = req.scope.projects.filter((p) => p.id !== sponsor.project_id && projectsSvc2.has(p, 'patrocinio')
+    && !others.some((o) => o.project_id === p.id)).map((p) => ({ id: p.id, name: p.name }));
   const finView = can(req.user.role, 'finance.read')
     ? { finSummary, fin: finSvc, money: fmtMoney, today: finSvc.todayISO(), here: req.originalUrl } : { finSummary: null };
   res.render('sponsors/show', {
+    others, invitable, bringable, materialTitle: require('../services/sponsorMaterial').TITLE,
     dupes: can(req.user.role, 'sponsors.write') ? await require('../services/duplicates').findFor('sponsor', sponsor, { excludeId: sponsor.id }) : [],
     outreachCtx: { kind: 'sponsor', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (sponsor.contact_phone ? 'whatsapp' : sponsor.contact_email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/patrocinadores', subjectId: sponsor.id },
     ...finView, openModal: ['ganho', 'ativo'].includes(req.query.abrir) ? req.query.abrir : null, agenda: agenda.rows, guestLinks: guestLinks.rows, guestStatuses: C.STATUS_BY_KEY,
@@ -220,6 +232,7 @@ router.post('/patrocinadores/:id', requirePerm('sponsors.write'), wrap(async (re
   if (error) return res.status(400).render('sponsors/form', { title: `Editar ${sponsor.company}`, sponsor, error, notice: null, values: echo(req.body, values), ...(await formOptions()) });
   const before = await recordChanges.snapshot('sponsor', sponsor.id);
   await db.query(`UPDATE sponsors SET ${COLUMNS.map((c, i) => `${c}=$${i + 2}`).join(', ')}, updated_at=now() WHERE id=$1`, [sponsor.id, ...columnValues(values)]);
+  await companies.sync(sponsor.id); // o que é identidade vale em todos os projetos da empresa
   if (values.stage !== sponsor.stage) {
     await sponsorsSvc.addEvent(sponsor.id, req.user.id, 'etapa', `Etapa: ${C.SPONSOR_STAGE_BY_KEY[sponsor.stage].label} → ${C.SPONSOR_STAGE_BY_KEY[values.stage].label}`);
   }
@@ -304,6 +317,41 @@ async function syncTier(sponsor, tier, user) {
     : `Sem cota: ${r.removed} entregável(is) do plano retirado(s)`);
 }
 
+// ---- a mesma empresa em outro projeto ----
+// "Abrir negociação também no Projeto 100": cria o contrato lá, em Prospecção, com os dados da empresa.
+router.post('/patrocinadores/:id/tambem', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const sponsor = await findSponsor(req.params.id);
+  if (!sponsor) return notFound(res);
+  const scope = require('../services/scope');
+  scope.assert(req, sponsor.project_id);
+  const projectId = Number(req.body.project_id);
+  if (!scope.canSee(req, projectId) || !projectId) return notFound(res); // projeto fora do recorte: como se não existisse
+  const projectsSvc = require('../services/projects');
+  const project = projectsSvc.get(projectId);
+  const backUrl = `/patrocinadores/${sponsor.id}#outros-projetos`;
+  if (!project || projectId === sponsor.project_id || !projectsSvc.has(project, 'patrocinio')) {
+    await req.flash('error', project ? `${project.name} não trabalha com patrocinadores.` : 'Projeto não encontrado.');
+    return res.redirect(backUrl);
+  }
+  const { companyId } = await companies.sync(sponsor.id); // garante a empresa (cadastro antigo pode não ter)
+  const ja = await companies.participations(companyId, { pids: [projectId] });
+  if (ja.length) {
+    await req.flash('error', `${sponsor.company} já está no ${project.name} (${ja[0].stage_label}).`);
+    return res.redirect(backUrl);
+  }
+  const cols = ['company_id', 'project_id', 'stage', 'owner_id', 'created_by', ...companies.COLUMNS];
+  const { rows: [novo] } = await db.query(
+    `INSERT INTO sponsors (${cols.join(', ')})
+     SELECT $1, $2, 'prospect', $3, $3, ${companies.PAIRS.map(([c]) => `e.${c}`).join(', ')} FROM companies e WHERE e.id = $1 RETURNING id`,
+    [companyId, projectId, req.user.id]);
+  const origem = (projectsSvc.get(sponsor.project_id) || {}).name || 'outro projeto';
+  await sponsorsSvc.addEvent(novo.id, req.user.id, 'criado', `Veio do cadastro do ${origem} por ${req.user.name}: a mesma empresa, agora no ${project.name}`);
+  await sponsorsSvc.addEvent(sponsor.id, req.user.id, 'nota', `Negociação aberta também no ${project.name} por ${req.user.name}`);
+  await audit(req, 'patrocinador.tambem_em_projeto', 'sponsor', novo.id, { de: sponsor.id, projeto: project.name });
+  await req.flash('ok', `${sponsor.company} entrou no ${project.name}, em Prospecção. Próximo passo: registrar a abordagem.`);
+  return res.redirect(`/patrocinadores/${novo.id}`);
+}));
+
 // ---- próximo passo guiado: a janela manda só os campos que faltam para a etapa; salva e, se der, muda a etapa ----
 router.post('/patrocinadores/:id/avancar', requirePerm('sponsors.write'), wrap(async (req, res) => {
   const sponsor = await findSponsor(req.params.id);
@@ -332,6 +380,7 @@ router.post('/patrocinadores/:id/avancar', requirePerm('sponsors.write'), wrap(a
   await db.query(
     `UPDATE sponsors SET tier=$2, value_cents=$3, contact_name=$4, contact_phone=$5, contact_email=$6, paid_at=$7, starts_on=$8, ends_on=$9, stage=$10, updated_at=now() WHERE id=$1`,
     [sponsor.id, next.tier, next.value_cents, next.contact_name, next.contact_phone, next.contact_email, next.paid_at, next.starts_on, next.ends_on, stage]);
+  if (companies.COLUMNS.some((c) => c in b)) await companies.sync(sponsor.id); // contato é da empresa
   if (next.tier !== sponsor.tier) await syncTier(sponsor, next.tier, req.user);
   if (stage !== sponsor.stage) {
     await sponsorsSvc.addEvent(sponsor.id, req.user.id, 'etapa', `Etapa: ${C.SPONSOR_STAGE_BY_KEY[sponsor.stage].label} → ${C.SPONSOR_STAGE_BY_KEY[stage].label}`);
@@ -548,6 +597,25 @@ router.post('/patrocinadores/:id/arquivo', requirePerm('sponsors.write'),
     await sponsorsSvc.addEvent(sponsor.id, req.user.id, 'arquivo', `Arquivo enviado: ${kind}${file.filename ? ` (${file.filename})` : ''}`);
     res.json({ ok: true, id: file.id });
   }));
+
+// Trazer do outro projeto: a mesma empresa já tem o material em outro contrato; copia os escolhidos para este.
+router.post('/patrocinadores/:id/material/trazer', requirePerm('sponsors.write'), wrap(async (req, res) => {
+  const sponsor = await findSponsor(req.params.id);
+  if (!sponsor) return notFound(res);
+  require('../services/scope').assert(req, sponsor.project_id);
+  const mat = require('../services/sponsorMaterial');
+  const ids = [].concat(req.body.arquivo || []);
+  const r = await mat.copyFrom(sponsor, ids, { pids: req.scope.ids, userId: req.user.id });
+  if (r.copied.length) {
+    await sponsorsSvc.addEvent(sponsor.id, req.user.id, 'arquivo', `Material trazido do outro projeto por ${req.user.name}: ${r.copied.map((f) => f.filename || f.kind).join(', ')}`);
+    await audit(req, 'patrocinador.material_trazido', 'sponsor', sponsor.id, { arquivos: r.copied.length });
+  }
+  const msg = r.copied.length
+    ? `${r.copied.length} arquivo${r.copied.length > 1 ? 's' : ''} trazido${r.copied.length > 1 ? 's' : ''} do outro projeto.`
+    : 'Nenhum arquivo foi trazido.';
+  await req.flash(r.errors.length ? 'error' : 'ok', r.errors.length ? `${msg} Não deu para copiar: ${r.errors.join('; ')}` : msg);
+  return res.redirect(back(sponsor.id, '#material'));
+}));
 
 router.get('/patrocinadores/:id/arquivos/:fid', requirePerm('sponsors.read'), wrap(async (req, res) => {
   if (!isIntId(req.params.id) || !isIntId(req.params.fid)) return notFound(res);

@@ -2,9 +2,11 @@
   Aviso de duplicata no formulário de cadastro (dentro do <form>): o que já existe e "Cadastrar mesmo assim".
   Variáveis: duplicates (de duplicates.findFor), dupKind ('guest' | 'sponsor').
 %>
-<% if (typeof duplicates !== 'undefined' && duplicates && duplicates.length) { var sure = duplicates.some(function (d) { return d.level === 'certa'; }); var base = dupKind === 'guest' ? '/convidados/' : '/patrocinadores/'; %>
+<% if (typeof duplicates !== 'undefined' && duplicates && duplicates.length) { var sure = duplicates.some(function (d) { return d.level === 'certa' && !d.cross; }); var base = dupKind === 'guest' ? '/convidados/' : '/patrocinadores/'; var cross = duplicates.every(function (d) { return d.cross; }); %>
 <div class="dup-notice <%= sure ? 'sure' : '' %>" role="alert">
-  <p><strong><%= sure ? (dupKind === 'guest' ? 'Este convidado já está cadastrado.' : 'Este patrocinador já está cadastrado.') : 'Pode já estar cadastrado.' %></strong> Confira antes de criar outro:</p>
+  <%# de outro projeto não é duplicata: é a mesma pessoa/empresa, e o caminho é abrir o cadastro e usar "Convidar também" -%>
+  <p><strong><%= cross ? (dupKind === 'guest' ? 'Esta pessoa já está em outro projeto.' : 'Esta empresa já está em outro projeto.') : sure ? (dupKind === 'guest' ? 'Este convidado já está cadastrado.' : 'Este patrocinador já está cadastrado.') : 'Pode já estar cadastrado.' %></strong>
+    <%= cross ? (dupKind === 'guest' ? 'Abra o cadastro e use “Convidar também para…”, para não digitar de novo:' : 'Abra o cadastro e use “Abrir negociação também no…”, para não digitar de novo:') : 'Confira antes de criar outro:' %></p>
   <ul class="plain dup-list">
     <% duplicates.slice(0, 5).forEach(function (d) { %>
     <li>

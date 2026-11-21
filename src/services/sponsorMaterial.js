@@ -111,6 +111,58 @@ async function cancelUpload(file) {
   await db.query('DELETE FROM sponsor_files WHERE id = $1', [file.id]);
 }
 
+// ---- trazer do outro projeto ----
+// A mesma empresa com contrato nos dois projetos: a logo, a moldura e o material da marca são os mesmos. Em vez de pedir
+// o envio de novo, o arquivo é copiado dentro do próprio armazenamento, e cada contrato fica com a chave dele (apagar num
+// lado não mexe no outro).
+async function otherProjectFiles(sponsorId, { pids = [] } = {}) {
+  if (!pids.length) return [];
+  const { rows } = await db.query(
+    `SELECT f.id, f.kind, f.filename, f.content_type, f.size_bytes, f.created_at, s.id AS sponsor_id, pr.name AS project_name
+       FROM sponsor_files f
+       JOIN sponsors s ON s.id = f.sponsor_id
+       JOIN projects pr ON pr.id = s.project_id
+      WHERE f.status = 'pronto' AND f.kind = ANY($3::text[]) AND s.id <> $1 AND s.project_id = ANY($2::int[])
+        AND s.company_id IS NOT NULL AND s.company_id = (SELECT company_id FROM sponsors WHERE id = $1)
+        -- o que já foi trazido (mesmo nome e tamanho na mesma pasta) não aparece de novo
+        AND NOT EXISTS (SELECT 1 FROM sponsor_files d WHERE d.sponsor_id = $1 AND d.kind = f.kind
+                          AND d.filename IS NOT DISTINCT FROM f.filename AND d.size_bytes IS NOT DISTINCT FROM f.size_bytes)
+      ORDER BY pr.position, array_position($3::text[], f.kind), f.filename`, [sponsorId, pids, KINDS]);
+  return rows;
+}
+
+// Copia os arquivos escolhidos para o contrato `to`. Devolve { copied, errors }.
+async function copyFrom(to, fileIds, { pids = [], userId = null } = {}) {
+  const ids = [...new Set((fileIds || []).map(Number).filter(Number.isInteger))].slice(0, 50);
+  const allowed = await otherProjectFiles(to.id, { pids });
+  const chosen = allowed.filter((f) => ids.includes(Number(f.id)));
+  const out = { copied: [], errors: [] };
+  for (const f of chosen) {
+    const { rows: [src] } = await db.query('SELECT * FROM sponsor_files WHERE id = $1', [f.id]);
+    if (!src) continue;
+    const ext = (prod.safeName(src.filename || '').match(/\.([A-Za-z0-9]{1,6})$/)?.[1] || 'bin').toLowerCase();
+    const key = await b2.keyFor('patrocinadores', to.id, `${src.kind}-${crypto.randomBytes(8).toString('hex')}.${ext}`);
+    try {
+      await b2.copyObject(src.storage_key, key);
+    } catch (err) {
+      out.errors.push(`${src.filename || src.kind}: ${err.message}`);
+      continue;
+    }
+    const { rows: [novo] } = await db.query(
+      `INSERT INTO sponsor_files (sponsor_id, kind, storage_key, filename, content_type, size_bytes, status, uploaded_by, completed_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pronto', $7, now()) RETURNING *`,
+      [to.id, src.kind, key, src.filename, src.content_type, src.size_bytes, userId]);
+    if (DELIVERABLE[novo.kind]) await db.query('UPDATE sponsor_deliverables SET file_id = $2 WHERE sponsor_id = $1 AND kind = $3', [to.id, novo.id, DELIVERABLE[novo.kind]]);
+    if (novo.kind === 'logo') {
+      await db.query(`UPDATE sponsor_files SET is_main = true WHERE id = $1
+        AND NOT EXISTS (SELECT 1 FROM sponsor_files x WHERE x.sponsor_id = $2 AND x.kind = 'logo' AND x.is_main AND x.status = 'pronto' AND x.id <> $1)`, [novo.id, to.id]);
+    }
+    out.copied.push(novo);
+  }
+  if (out.copied.length) await db.query('UPDATE sponsors SET updated_at = now() WHERE id = $1', [to.id]);
+  return out;
+}
+
 // A logo principal (a do media kit e do portal): só uma por patrocinador.
 async function setMain(sponsorId, fileId) {
   const { rows: [f] } = await db.query("SELECT id FROM sponsor_files WHERE id = $1 AND sponsor_id = $2 AND kind = 'logo' AND status = 'pronto'", [fileId, sponsorId]);
@@ -119,4 +171,4 @@ async function setMain(sponsorId, fileId) {
   return true;
 }
 
-module.exports = { FOLDERS, KINDS, TITLE, OPEN_STAGES, isOpen, MAX_FILE, list, folders, startUpload, receivePart, registerPart, parts, finishUpload, cancelUpload, deleteFile, setMain };
+module.exports = { FOLDERS, KINDS, TITLE, OPEN_STAGES, isOpen, MAX_FILE, list, folders, startUpload, receivePart, registerPart, parts, finishUpload, cancelUpload, deleteFile, setMain, otherProjectFiles, copyFrom };

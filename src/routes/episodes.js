@@ -195,21 +195,23 @@ router.post('/episodios/video', requirePerm('episodes.write'), wrap(async (req, 
 router.post('/episodios', requirePerm('episodes.write'), wrap(async (req, res) => {
   const { values: v, error } = await parseNew(req.body);
   if (error) return res.status(400).render('episodes/new', await formLocals({ title: 'Novo episódio', error, values: echo(req.body, {}) }, req));
-  // patrocinador ou convidado "novo" que já está cadastrado (duplicata certa): escolher o que existe em vez de criar outro
+  // De que projeto é: o do convidado já cadastrado; sem ele, o escolhido no menu ou no campo Projeto.
+  const projectId = v.guest ? (await db.query('SELECT project_id FROM guests WHERE id = $1', [v.guest.id])).rows[0]?.project_id : require('../services/scope').target(req, req.body);
+  if (!projectId) return res.status(400).render('episodes/new', await formLocals({ title: 'Novo episódio', error: 'Escolha o projeto.', values: echo(req.body, {}) }, req));
+  // patrocinador ou convidado "novo" que já está cadastrado (duplicata certa): escolher o que existe em vez de criar outro.
+  // Quem está só em outro projeto não conta: a lista desta tela é deste projeto, e o caminho é o botão do cadastro dele.
   const dupSvc = require('../services/duplicates');
-  const sureDup = async (kind, rec) => (await dupSvc.findFor(kind, rec)).find((d) => d.level === 'certa');
+  const sureDup = async (kind, rec) => (await dupSvc.findFor(kind, { ...rec, project_id: projectId })).find((d) => d.level === 'certa' && !d.cross);
   const dupSp = v.newSponsor && await sureDup('sponsor', { company: v.newSponsor.company });
   const dupGu = v.newGuest && await sureDup('guest', { name: v.newGuest.name, instagram: v.newGuest.instagram });
   if (dupSp || dupGu) {
     const msg = dupSp ? `${dupSp.name} já está cadastrado como patrocinador: escolha na lista em vez de criar outro.` : `${dupGu.name} já está cadastrado como convidado (${dupGu.reasons.join(', ')}): escolha na lista em vez de criar outro.`;
     return res.status(400).render('episodes/new', await formLocals({ title: 'Novo episódio', error: msg, values: echo(req.body, {}) }, req));
   }
-  // De que projeto é: o do convidado já cadastrado; sem ele, o escolhido no menu ou no campo Projeto.
-  const projectId = v.guest ? (await db.query('SELECT project_id FROM guests WHERE id = $1', [v.guest.id])).rows[0]?.project_id : require('../services/scope').target(req, req.body);
-  if (!projectId) return res.status(400).render('episodes/new', await formLocals({ title: 'Novo episódio', error: 'Escolha o projeto.', values: echo(req.body, {}) }, req));
   const sponsorsSvc2 = require('../services/sponsors');
   if (v.newSponsor) {
     const { rows: [sp] } = await db.query("INSERT INTO sponsors (company, kind, stage, owner_id, created_by, project_id) VALUES ($1, $2, 'negociacao', $3, $3, $4) RETURNING id, company", [v.newSponsor.company, v.newSponsor.kind, req.user.id, projectId]);
+    await require('../services/companies').sync(sp.id); // identidade da empresa, como em qualquer cadastro
     await sponsorsSvc2.addEvent(sp.id, req.user.id, 'criado', `Patrocinador cadastrado por ${req.user.name} ao registrar um episódio`);
     v.sponsor = { id: sp.id, company: sp.company, role: v.role };
   }

@@ -33,8 +33,8 @@ router.get('/duplicatas/:tipo/:a/:b', wrap(async (req, res) => {
   const [sA, sB] = await Promise.all([dup.summary(p.kind, A.id), dup.summary(p.kind, B.id)]);
   // De projetos diferentes: o que se resolve é "é a mesma pessoa" (as duas participações ficam, só a identidade se une),
   // e então só os campos da pessoa entram na escolha — o funil de cada projeto não se mistura.
-  const cross = dup.isCross(A, B) && p.kind === 'guest'; // o patrocinador entra na parte B (empresa e contrato)
-  const only = cross ? require('../services/people').COLUMNS : null;
+  const cross = dup.isCross(A, B);
+  const only = cross ? (p.kind === 'guest' ? require('../services/people') : require('../services/companies')).COLUMNS : null;
   const projectOf = (r) => (require('../services/projects').get(r.project_id) || {}).name || '';
   res.render('duplicates/compare', {
     title: cross ? 'Comparar e unir' : 'Comparar e juntar', kind: p.kind, slug: req.params.tipo, A, B, sA, sB, cross, projectOf,
@@ -68,11 +68,13 @@ router.post('/duplicatas/:tipo/:a/:b/mesma-pessoa', wrap(async (req, res) => {
   const dropId = keepId === p.a ? p.b : p.a;
   const choices = {};
   for (const f of Object.keys(dup.FIELDS[p.kind])) if (req.body[`campo_${f}`] != null) choices[f] = req.body[`campo_${f}`];
-  if (p.kind !== 'guest') { await req.flash('error', 'Ainda não dá para unir empresas: junte os cadastros.'); return res.redirect(back); }
-  const r = await require('../services/people').join(keepId, dropId, choices, req.user);
+  const svc = p.kind === 'guest' ? require('../services/people') : require('../services/companies');
+  const r = await svc.join(keepId, dropId, choices, req.user);
   if (r.error) { await req.flash('error', r.error); return res.redirect(back); }
-  await audit(req, 'convidado.mesma_pessoa', p.kind, keepId, { com: dropId, campos: choices });
-  await req.flash('ok', 'Certo: é a mesma pessoa. As duas participações seguem, cada uma no seu projeto.');
+  await audit(req, p.kind === 'guest' ? 'convidado.mesma_pessoa' : 'patrocinador.mesma_empresa', p.kind, keepId, { com: dropId, campos: choices });
+  await req.flash('ok', p.kind === 'guest'
+    ? 'Certo: é a mesma pessoa. As duas participações seguem, cada uma no seu projeto.'
+    : 'Certo: é a mesma empresa. Os dois contratos seguem, cada um no seu projeto.');
   return res.redirect(dup.URL[p.kind](keepId));
 }));
 

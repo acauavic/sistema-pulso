@@ -138,6 +138,7 @@ async function createSponsor(v) {
     `INSERT INTO sponsors (company, contact_name, contact_email, contact_phone, website, notes, stage, origin, utm, project_id)
      VALUES ($1, $2, $3, $4, $5, $6, 'prospect', 'site', $7::jsonb, $8) RETURNING id`,
     [v.company, v.name, v.email, v.phone, v.website, notes, v.utm ? JSON.stringify(v.utm) : null, require('./projects').defaultId()]);
+  await require('./companies').sync(id);
   await sponsorsSvc.addEvent(id, null, 'site', `Pediu para patrocinar pelo site: ${v.name}${v.role ? ` (${v.role})` : ''}${v.utm?.source ? ` · veio de ${v.utm.source}` : ''}`);
   await warn(`Nova marca quer patrocinar: ${v.company}`, [v.name, v.role, v.goal].filter(Boolean).join(' · ') || null, `/patrocinadores/${id}`);
   return { id };

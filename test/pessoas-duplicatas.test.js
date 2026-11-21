@@ -77,6 +77,19 @@ describe('pessoas: duplicatas', () => {
     assert.deepEqual(achados, []);
   });
 
+  it('cadastrar no outro projeto alguém que já existe: o aviso ensina o botão, e não fala de duplicata', async () => {
+    await criar('Dr. Davi Nunes', 1, { instagram: 'drdavinunes', status: 'gravado' });
+    const r = await dois.post('/convidados', {
+      _csrf: await dois.csrf('/convidados/novo'), name: 'Dr. Davi Nunes', instagram: 'drdavinunes',
+      profile: 'medico', status: 'prospect', gender: 'm', project_id: '2',
+    });
+    assert.equal(r.status, 200); // volta para o formulário com o aviso
+    assert.match(r.text, /já está em outro projeto/);
+    assert.match(r.text, /Convidar também/);
+    assert.doesNotMatch(r.text, /Este convidado já está cadastrado/);
+    assert.equal((await h.db.query("SELECT count(*)::int AS n FROM guests WHERE name = 'Dr. Davi Nunes'")).rows[0].n, 1);
+  });
+
   it('um par por pessoa na lista da gestão, mesmo com várias participações', async () => {
     const a = await criar('Dr. Caio Lima', 1, { instagram: 'drcaiolima' });
     await dois.act(`/convidados/${a}/tambem`, { project_id: '2' }, { from: `/convidados/${a}` });

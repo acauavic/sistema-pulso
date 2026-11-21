@@ -40,7 +40,10 @@
         <h2>Material</h2>
         <% if (mReady.length) { %><span class="handle muted"><%= mReady.length %> arquivo<%= mReady.length > 1 ? 's' : '' %> · <%= fmt.formatBytes(mTotal) %></span><% } %>
       </div>
-      <% if (canSend) { %><button class="btn" type="button" data-material-pick><%- icon('upload') %> Enviar material</button><% } %>
+      <div class="row">
+        <% if (bringable.length) { %><button class="btn ghost" type="button" data-modal-open="modal-trazer-material"><%- icon('copy') %> Trazer do outro projeto</button><% } %>
+        <% if (canSend) { %><button class="btn" type="button" data-material-pick><%- icon('upload') %> Enviar material</button><% } %>
+      </div>
     </div>
     <% if (!storageReady) { %><p class="flash flash-error">Armazenamento (Backblaze) não configurado neste servidor.</p><% } %>
     <% if (canSend) { %>
@@ -131,3 +134,37 @@
   </dialog>
   <% } %>
 </div>
+
+<% if (bringable.length) { %>
+<%# A mesma empresa já tem material em outro projeto: copiar é melhor do que pedir o envio de novo. -%>
+<dialog class="modal" id="modal-trazer-material" aria-labelledby="m-trazer-h">
+  <form method="post" action="<%= mBase %>trazer" class="stack" data-busy="Trazendo…">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="m-trazer-h">Trazer material do outro projeto</h2>
+    <p class="small muted">A mesma empresa já tem estes arquivos em outro projeto. O que você marcar entra neste contrato
+      como arquivo próprio: apagar aqui não mexe no outro.</p>
+    <% if (bringable.length > 8) { %>
+    <div class="row list-filter">
+      <input type="search" placeholder="Buscar pelo nome do arquivo" aria-label="Buscar arquivo" data-list-filter="#trazer-lista" data-list-item="li" autocomplete="off">
+      <span class="mono small muted list-filter-count" data-list-filter-count></span>
+    </div>
+    <% } %>
+    <ul class="plain bring-list" id="trazer-lista">
+      <% bringable.forEach(function (f) { %>
+      <li data-list-item>
+        <label class="check">
+          <input type="checkbox" name="arquivo" value="<%= f.id %>">
+          <span><strong><%= f.filename || materialTitle[f.kind] %></strong>
+            <span class="mono small muted"><%= materialTitle[f.kind] %> · <%= f.project_name %><%= f.size_bytes ? ' · ' + fmt.formatBytes(f.size_bytes) : '' %></span>
+          </span>
+        </label>
+      </li>
+      <% }) %>
+    </ul>
+    <div class="row modal-actions">
+      <button class="btn primary" type="submit"><%- icon('copy') %> Trazer os marcados</button>
+      <button class="btn ghost" type="button" data-modal-close>Cancelar</button>
+    </div>
+  </form>
+</dialog>
+<% } %>

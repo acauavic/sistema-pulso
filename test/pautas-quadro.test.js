@@ -8,7 +8,9 @@ const col = (html, label) => {
   assert.ok(i > 0, `coluna ${label}`);
   return html.slice(i, html.indexOf('</section>', i));
 };
-const ontem = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+// O prazo é um dia de Brasília: tirar 3 h antes de formatar, senão à noite o "ontem" em UTC cai no dia de hoje aqui
+// (o teste falhava só depois das 21 h).
+const ontem = new Date(Date.now() - 86_400_000 - 3 * 3600_000).toISOString().slice(0, 10);
 
 describe('pautas: quadro e Seu dia', () => {
   let app; let gestao; let paula; let ids = {};

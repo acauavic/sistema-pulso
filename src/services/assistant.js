@@ -269,7 +269,11 @@ const TOOLS = [
       if (email && !isEmail(email)) problems.push('e-mail inválido');
       if (gender === null) problems.push('gênero (m ou f)');
       if (problems.length) return { erro: `Faltam ou estão inválidos: ${problems.join(', ')}. Peça à pessoa e tente de novo.` };
-      const dups = await require('./duplicates').findFor('guest', { name, instagram, email, phone: clean(a.whatsapp, 40) });
+      const projectId = await require('./projects').currentFor(user.id); // o projeto em que a pessoa está trabalhando agora
+      const dups = await require('./duplicates').findFor('guest', { name, instagram, email, phone: clean(a.whatsapp, 40), project_id: projectId });
+      // quem está só em outro projeto não é duplicata: é a mesma pessoa, e o caminho é o botão "Convidar também" do cadastro dela
+      const outro = dups.find((d) => d.cross && d.level === 'certa');
+      if (outro) return { erro: `${outro.name} já está cadastrado em outro projeto. Abra o cadastro e use "Convidar também para…", para não digitar de novo.`, link: `/convidados/${outro.id}` };
       const sure = dups.find((d) => d.level === 'certa');
       if (sure) return { erro: `Já existe um convidado com esse ${sure.reasons[0].replace(/^mesmo /, '')}: ${sure.name} (${sure.stage_label}).`, link: `/convidados/${sure.id}` };
       if (dups.length && a.confirmado !== true) return { precisa_confirmar: true, aviso: `Pode ser alguém já cadastrado: ${dups.slice(0, 3).map((d) => `${d.name} (${d.stage_label}, ${d.reasons.join(', ')})`).join('; ')}. Pergunte se é outra pessoa; se for, chame de novo com confirmado=true.`, link: `/convidados/${dups[0].id}` };
@@ -278,7 +282,7 @@ const TOOLS = [
         `INSERT INTO guests (name, instagram, phone, profile, email, invite_reason, topic, gender, owner_id, created_by, status, project_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,'prospect',$10) RETURNING id`,
         [name, instagram, clean(a.whatsapp, 40) || null, profile, email || null, clean(a.motivo_do_convite, 1000) || null, clean(a.tema, 500) || null, gender || 'm', user.id,
-          await require('./projects').currentFor(user.id)]); // o projeto em que a pessoa está trabalhando agora
+          projectId]);
       await require('./people').sync(g.id); // identidade da pessoa, como em qualquer cadastro
       await require('./guests').addEvent(g.id, user.id, 'criado', `Cadastrado pelo assistente a pedido de ${user.name}`);
       await audit({ user, ip: 'assistente' }, 'convidado.criado', 'guest', g.id, { name, via: 'assistente' });

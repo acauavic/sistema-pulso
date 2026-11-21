@@ -112,6 +112,14 @@ global.fetch = async (url, opts = {}) => {
       return new Response('<CompleteMultipartUploadResult><Key>x</Key></CompleteMultipartUploadResult>', { status: 200 });
     }
     if (method === 'DELETE' && q.has('uploadId')) { b2Multipart.delete(q.get('uploadId')); return new Response('', { status: 204 }); }
+    // cópia dentro do bucket (x-amz-copy-source): o Backblaze copia no lado dele, sem corpo na requisição
+    if (method === 'PUT' && opts.headers['x-amz-copy-source']) {
+      const from = decodeURIComponent(String(opts.headers['x-amz-copy-source']).replace(new RegExp(`^/${config.b2.bucket}/`), ''));
+      const src = b2Store.get(from);
+      if (!src) return new Response('<Error><Code>NoSuchKey</Code></Error>', { status: 404 });
+      b2Store.set(key, { body: src.body, contentType: src.contentType });
+      return new Response('<CopyObjectResult><ETag>"x"</ETag></CopyObjectResult>', { status: 200 });
+    }
     if (method === 'PUT') { b2Store.set(key, { body: Buffer.from(opts.body), contentType: opts.headers['content-type'] }); return new Response('', { status: 200 }); }
     if (method === 'DELETE') { b2Store.delete(key); return new Response('', { status: 204 }); }
     const obj = b2Store.get(key);

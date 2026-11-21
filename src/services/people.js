@@ -48,10 +48,19 @@ async function sync(guestId, { client = null } = {}) {
       await q('UPDATE guests SET person_id = $2 WHERE id = $1', [g.id, p.id]);
       return { personId: p.id };
     }
-    await q(`UPDATE people SET ${SET(COLUMNS)}, updated_at = now() WHERE id = $1`, [g.person_id, ...vals]);
+    // só escreve se algo mudou: assim `sync` chamado por engano não suja o updated_at da pessoa
+    await q(`UPDATE people SET ${SET(COLUMNS)}, updated_at = now() WHERE id = $1
+               AND (${COLUMNS.map((c, i) => `${c} IS DISTINCT FROM $${i + 2}`).join(' OR ')})`, [g.person_id, ...vals]);
     await spread(q, g.person_id);
     return { personId: g.person_id };
   });
+}
+
+// Para leitura (página de detalhe): o id da pessoa, criando-a só se faltava. Não escreve quando já está ligada.
+async function idOf(guestId) {
+  const { rows: [g] } = await db.query('SELECT person_id FROM guests WHERE id = $1', [guestId]);
+  if (!g) return null;
+  return g.person_id || (await sync(guestId)).personId;
 }
 
 // Grava a pessoa (só os campos mandados) e leva para todas as participações dela.
@@ -128,4 +137,4 @@ async function join(keepGuestId, dropGuestId, choices = {}, user = null) {
   return { keep, drop, personId: keepPerson };
 }
 
-module.exports = { COLUMNS, sync, save, get, participations, link, join };
+module.exports = { COLUMNS, sync, idOf, save, get, participations, link, join };
