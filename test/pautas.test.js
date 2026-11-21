@@ -41,7 +41,7 @@ describe('pauta e roteiro', () => {
     assert.match(d.body, /Bloco 1: o problema/); assert.match(d.body_html, /<li>Quanto custa<\/li>/);
     assert.equal(String(d.owner_id), String(gil.id));
     const page = (await gestao.get(`/episodios/${video.id}`)).text;
-    assert.match(page, /Em elaboração/); assert.match(page, /Copiar para o WhatsApp/);
+    assert.match(page, /Em elaboração/); assert.match(page, /Gerar link de aprovação/); assert.match(page, /mandar só o texto, sem link/);
     assert.match(page, /Gil Gestão/);
   });
 
@@ -77,8 +77,8 @@ describe('pauta e roteiro', () => {
     const page = (await gestao.get(`/episodios/${video.id}`)).text;
     assert.match(page, /Enviada para aprovação/);
     assert.match(page, /enviada \d{2}\/\d{2} para Grupo Projeto 100/);
-    assert.match(page, /Aprovada<\/button>/); assert.match(page, /Pediram ajustes<\/button>/);
-    assert.doesNotMatch(page.slice(page.indexOf('pane-pauta'), page.indexOf('pane-material')), /Copiar para o WhatsApp/, 'já foi: o botão sai de cena');
+    assert.match(page, /Registrar aprovação<\/button>/); assert.match(page, /Registrar ajustes<\/button>/);
+    assert.doesNotMatch(page.slice(page.indexOf('pane-pauta'), page.indexOf('pane-material')), /mandar só o texto, sem link/, 'já foi: o envio manual sai de cena');
   });
 
   it('"Pediram ajustes" guarda o recado e devolve para quem escreve', async () => {
@@ -91,7 +91,7 @@ describe('pauta e roteiro', () => {
     assert.equal(ajustada.state, 'ajustes'); assert.equal(ajustada.review_note, 'tirar a pergunta 4');
     const page = (await gestao.get(`/episodios/${video.id}`)).text;
     assert.match(page, /Pediram ajustes: tirar a pergunta 4/);
-    assert.match(page, /Copiar para o WhatsApp/, 'volta a poder mandar de novo');
+    assert.match(page, /Gerar link de aprovação/, 'volta a poder mandar de novo');
   });
 
   it('reescrever volta para Em elaboração e depois a aprovação fica registrada', async () => {

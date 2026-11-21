@@ -1,0 +1,74 @@
+/* Aprovação por link (/aprovar/:token). Vem depois do portal.css e usa os tokens dele (tema claro: quem aprova está de fora).
+   A folha da marca do projeto, quando existe, vem depois desta e troca só os tokens. */
+
+.ap-wrap { padding-bottom: 48px; }
+.ap-hero { padding: 36px 0 20px; }
+.ap-hero h1 { font-size: clamp(30px, 7vw, 44px); text-wrap: balance; }
+.ap-meta { margin: 12px 0 0; }
+
+/* estados: respondido, substituído, vencido, cancelado */
+.ap-state { padding: 18px 20px; margin: 4px 0 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.ap-state h2 { margin: 10px 0 0; }
+.ap-state .pt-chip { margin-bottom: 2px; }
+.ap-missing { margin-top: 15vh; }
+.ap-chip-warn { background: var(--bone); color: var(--text); }
+.ap-note { margin: 12px 0 0; padding: 12px 14px; border-left: 3px solid var(--line-strong); background: var(--bg); border-radius: 2px; color: var(--text-2); }
+
+/* o documento (pauta ou roteiro) */
+.ap-doc { max-width: 68ch; font-size: 16px; line-height: 1.7; }
+.ap-doc h1, .ap-doc h2, .ap-doc h3 { margin: 24px 0 8px; }
+.ap-doc ul, .ap-doc ol { padding-left: 22px; }
+.ap-doc blockquote { margin: 12px 0; padding: 4px 14px; border-left: 3px solid var(--line-strong); color: var(--text-2); }
+.ap-doc img { max-width: 100%; height: auto; border-radius: 6px; }
+.ap-doc table { border-collapse: collapse; width: 100%; } .ap-doc td, .ap-doc th { border: 1px solid var(--line-strong); padding: 6px 8px; }
+
+/* o que mudou desde o pedido de ajustes */
+.ap-diff { margin: 0 0 24px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.ap-diff h2 { font-size: 17px; letter-spacing: -.02em; }
+.ap-diff-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.ap-diff-list li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; color: var(--text-2); }
+.ap-diff-list .pt-mono { padding-top: 3px; color: var(--muted); }
+.ap-add { color: var(--text); font-weight: 500; }
+.ap-del s { color: var(--muted); }
+
+/* vídeo */
+.ap-player { background: var(--text); border-radius: 6px; overflow: hidden; }
+.ap-player video { display: block; width: 100%; max-height: 70vh; background: var(--text); }
+.ap-player-meta { margin: 10px 0 0; }
+.ap-h { margin: 24px 0 0; font-size: 17px; }
+
+/* comentários na minutagem */
+.ap-comments { list-style: none; margin: 14px 0; padding: 0; display: grid; gap: 10px; }
+.ap-comments li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; align-items: start; }
+.ap-comments li p { margin: 0; color: var(--text-2); }
+.ap-comments .pt-mono { padding-top: 10px; }
+.ap-comments-edit:empty { display: none; }
+.ap-row textarea { width: 100%; }
+.ap-row-acts { grid-column: 2; display: flex; gap: 14px; margin-top: -4px; }
+
+/* capas */
+.ap-covers { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.ap-cover { display: grid; gap: 8px; margin: 0; cursor: pointer; position: relative; }
+.ap-cover img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; border: 2px solid transparent; transition: border-color 160ms var(--ease); }
+.ap-cover input { position: absolute; top: 10px; left: 10px; width: 22px; height: 22px; accent-color: var(--text); }
+.ap-cover input:checked ~ img, .ap-cover.is-approved img { border-color: var(--text); }
+.ap-cover input:focus-visible ~ img { outline: 2px solid var(--text); outline-offset: 3px; }
+
+/* resposta */
+.ap-form { display: grid; gap: 8px; max-width: 640px; }
+.ap-form label { margin: 10px 0 0; }
+.ap-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--text); font: 400 16px/1.5 "Inter", sans-serif; resize: vertical; }
+.ap-form textarea:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 3px rgba(10, 10, 10, .15); }
+.ap-form input[type="text"] { width: 100%; }
+.ap-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.ap-foot { font-size: 13px; margin: 8px 0 0; }
+
+/* o que depende de script (comentar na minutagem) só aparece com ele */
+.ap-js { display: none; }
+.js .ap-js { display: block; }
+
+@media (max-width: 560px) {
+  .ap-actions .pt-btn { flex: 1 1 100%; justify-content: center; }
+  .ap-comments li { grid-template-columns: 52px minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .ap-cover img { transition: none; } }

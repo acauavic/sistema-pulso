@@ -457,6 +457,13 @@
       <h2>Revisão</h2>
       <% if (!latestEdited) { %><p class="muted">Quando o editor enviar o vídeo, ele aparece aqui para a gestão assistir e comentar na minutagem.</p><% } else { %>
       <p class="small muted">Versão <strong>v<%= latestEdited.version %></strong> · <%= latestEdited.filename %></p>
+      <% if (can('production.review') && (ep.status === 'em_revisao' || videoLinks.length)) { %>
+      <div class="review-appr">
+        <p class="small muted m-0">Quem aprova está fora do sistema? Mande o link: a pessoa assiste no celular, comenta na minutagem e aprova ou pede ajustes. A resposta muda a etapa sozinha.</p>
+        <%- include('../partials/approval-links', { links: videoLinks, action: '/episodios/' + ep.id + '/aprovacao/video', canCreate: ep.status === 'em_revisao', idKey: 'video',
+              sentTo: 'Grupo ' + ((projectScope && projectScope.projects.find(function (p) { return p.id === ep.project_id; })) || {}).name, what: 'a versão v' + latestEdited.version + ' do vídeo', tone: '', voltar: '/episodios/' + ep.id + '#revisao' }) %>
+      </div>
+      <% } %>
       <div class="review" data-review data-csrf="<%= csrf %>" data-url="/episodios/<%= ep.id %>/comentarios" data-file="<%= latestEdited.id %>">
         <video controls preload="metadata" playsinline src="<%= fileBase + latestEdited.id %>/ver#t=0.1" data-video id="review-video"></video>
         <% if (reviewLight) { %><p class="video-quality small muted"><span class="mono" data-video-label>Versão leve · 720p</span> <button type="button" class="link small" data-video-swap="review-video">Ver no original</button></p><% } %>

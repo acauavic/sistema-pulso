@@ -4,6 +4,17 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.1.0', date: '2026-11-21', title: 'Aprovação por link',
+    items: [
+      { kind: 'novo', text: 'Quem aprova está fora do sistema? Na pauta, no roteiro, no vídeo em revisão e nas capas do YouTube, "Gerar link de aprovação" cria um link e a mensagem pronta para colar no grupo do WhatsApp. A pessoa abre no celular, sem login, escreve o nome e responde uma vez: aprovar ou pedir ajustes.' },
+      { kind: 'novo', text: 'No vídeo, quem aprova pausa no ponto e comenta na minutagem (ou num trecho), e também pode deixar só um recado geral. Os comentários entram na lista de ajustes do editor com o nome da pessoa, e a resposta muda a etapa sozinha: aprovado vai para a finalização; ajustes voltam para a edição.' },
+      { kind: 'novo', text: 'Cada link vale para uma versão: se a pauta mudou ou o editor subiu uma versão nova, o link antigo avisa que foi substituído e não aceita resposta. A pauta guarda uma cópia por envio, e o link novo mostra o que mudou desde o pedido de ajustes.' },
+      { kind: 'novo', text: 'A resposta chega como aviso (tipo novo "Respostas pelo link de aprovação") para quem gerou o link, quem escreve a pauta e o editor do vídeo, e fica no histórico. O link vale 30 dias e pode ser cancelado.' },
+      { kind: 'ajuste', text: 'A página pública abre no endereço e com a marca do projeto do item. Registrar a resposta à mão continua possível ("Registrar aprovação", "Registrar ajustes"), assim como mandar só o texto, sem link.' },
+      { kind: 'correcao', text: 'A lista de patrocinadores na página do episódio mostrava os de todos os projetos; agora mostra só os do projeto do episódio.' },
+    ],
+  },
+  {
     version: '2.0.0', date: '2026-11-21', title: 'Health Scale Studio: a casa com dois projetos',
     items: [
       { kind: 'novo', text: 'O sistema virou a casa de mais de um projeto. Fecham aqui as nove partes do trabalho: identidade da casa, projetos e seletor, vídeo e pauta, pessoas e empresas, dinheiro, endereços, acesso, redes e a marca do Projeto 100. Para quem trabalha num projeto só, nada muda: as telas são as mesmas, sem seletor, sem sigla e sem campo de projeto.' },

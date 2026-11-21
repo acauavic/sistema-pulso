@@ -8,7 +8,7 @@ const projects = require('./projects');
 // Caminhos que existem no domínio de um projeto. O resto é painel.
 const PUBLIC = [
   /^\/convite(\/|$)/, /^\/convidado(\/|$)/, /^\/patrocinador(\/|$)/, /^\/agenda\/foto\//, /^\/plateia(\/|$)/,
-  /^\/estudio(\/|$)/, /^\/pos-gravacao(\/|$)/, /^\/api\/site\//, /^\/webhooks(\/|$)/,
+  /^\/estudio(\/|$)/, /^\/pos-gravacao(\/|$)/, /^\/aprovar(\/|$)/, /^\/api\/site\//, /^\/webhooks(\/|$)/,
   /^\/static\//, /^\/favicon\.ico$/, /^\/apple-touch-icon\.png$/, /^\/healthz$/, /^\/robots\.txt$/,
 ];
 const isPublicPath = (p) => PUBLIC.some((re) => re.test(String(p || '')));

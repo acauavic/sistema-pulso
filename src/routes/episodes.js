@@ -321,7 +321,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     db.query('SELECT e.*, u.name AS user_name FROM episode_events e LEFT JOIN users u ON u.id = e.user_id WHERE e.episode_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT 100', [ep.id]),
     db.query('SELECT t.*, u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.episode_id = $1 ORDER BY t.id', [ep.id]),
     db.query('SELECT * FROM episode_checklist_items WHERE episode_id = $1 ORDER BY position, id', [ep.id]),
-    db.query('SELECT c.*, u.name AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.episode_id = $1 ORDER BY c.at_ms NULLS FIRST, c.id', [ep.id]),
+    db.query('SELECT c.*, coalesce(u.name, c.external_name || \' (pelo link)\') AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.episode_id = $1 ORDER BY c.at_ms NULLS FIRST, c.id', [ep.id]),
     prod.sponsorAssets(ep.id),
     db.query("SELECT id, name FROM users WHERE active AND role IN ('editor_video','gestao','superadmin') ORDER BY lower(name)"),
     prod.availableMoves(ep, req.user.role),
@@ -345,7 +345,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     can(req.user, 'finance.read') ? finSvc.settings() : null,
     commentsSvc.list('episode', ep.id),
     jobs.latest(ep.id, 'transcricao'),
-    db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY lower(company)"),
+    db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') AND project_id = $1 ORDER BY lower(company)", [ep.project_id]), // patrocinador do episódio é do mesmo projeto
     withReviewFiles(comments.rows),
   ]);
   const stageIndex = C.EPISODE_STAGES.findIndex((s) => s.key === ep.status);
@@ -356,7 +356,11 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   // Pauta e roteiro: o próximo passo em Pré-produção, e a referência do editor depois da gravação
   const pautaSvc = require('../services/pautas');
   const pautaDocs = await pautaSvc.forOwner({ episodeId: ep.id });
-  for (const d of pautaDocs) if (d.id) d.events = await pautaSvc.events(d.id);
+  const approvals = require('../services/approvals');
+  for (const d of pautaDocs) if (d.id) { d.events = await pautaSvc.events(d.id); d.links = await approvals.listFor({ pautaId: d.id }); }
+  // links de aprovação do vídeo e das capas (quem aprova está fora do sistema)
+  const videoLinks = await approvals.listFor({ episodeId: ep.id, kind: 'video' });
+  const coverLinks = await approvals.listFor({ episodeId: ep.id, kind: 'capas' });
   const pautaPendente = pautaDocs.some((d) => d.id && ['elaboracao', 'aprovacao', 'ajustes'].includes(d.state));
   // o copo fica na cozinha: a aba só existe antes da gravação (é o próximo passo) ou quando já há pauta escrita
   const showPauta = ep.status === 'pre_producao' || pautaDocs.some((d) => d.id);
@@ -382,7 +386,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   res.render('episodes/show', {
     // podcast leva Spotify, capa do Spotify e os vídeos do convidado; vídeo sem convidado não tem nada disso
     isPodcast: ep.format !== 'video',
-    pautaSvc, pautaDocs, pautaPendente, showPauta, today: require('../services/tasks').todayISO(),
+    pautaSvc, pautaDocs, pautaPendente, showPauta, videoLinks, coverLinks, today: require('../services/tasks').todayISO(),
     orderPos, studio, studioWa, kindLabels: C.EPISODE_FILE_KINDS,
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,
     title: ep.title, ep, files: files.rows, events: events.rows, tasks: tasks.rows, checklist: checklist.rows, comments: reviewComments,
@@ -959,7 +963,7 @@ const videoViews = require('../services/videoViews'); // versão leve para assis
 const reviewSvc = require('../services/review');
 // Um comentário já renderizado (para a tela trocar o item sem recarregar).
 async function commentHtml(res, epId, id, ep) {
-  const { rows: [c] } = await db.query('SELECT c.*, u.name AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.id = $1', [id]);
+  const { rows: [c] } = await db.query('SELECT c.*, coalesce(u.name, c.external_name || \' (pelo link)\') AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.id = $1', [id]);
   const latest = await reviewSvc.latestEdited(epId);
   const [full] = await withReviewFiles([c]);
   return renderPartial(res, 'episodes/_review_comment', { c: full, ep, tickable: true, latestVersion: latest?.version ?? null, perm: permsOf(res.locals.currentUser) });
@@ -992,7 +996,7 @@ router.post('/episodios/:id/comentarios/:cid/ainda-nao', requirePerm('episodes.r
 router.get('/episodios/:id/marcadores', requirePerm('episodes.read'), wrap(async (req, res) => {
   const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
-  const { rows: comments } = await db.query('SELECT c.*, u.name AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.episode_id = $1', [ep.id]);
+  const { rows: comments } = await db.query('SELECT c.*, coalesce(u.name, c.external_name || \' (pelo link)\') AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.episode_id = $1', [ep.id]);
   const latest = await reviewSvc.latestEdited(ep.id);
   const out = reviewSvc.markers({
     ep, comments, format: ['texto', 'premiere'].includes(req.query.formato) ? req.query.formato : 'davinci', which: req.query.quais === 'todos' ? 'todos' : 'abertos',

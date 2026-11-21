@@ -798,6 +798,13 @@ span.dot:not([data-dot]) { cursor: default; }
 .pauta-actions { gap: 8px; flex-wrap: wrap; align-items: center; }
 .pauta-hist summary { cursor: pointer; } .pauta-hist ul { margin: 8px 0 0; display: grid; gap: 4px; }
 .pauta-card .badge { vertical-align: middle; margin-left: 6px; }
+/* link de aprovação (pauta, vídeo em revisão, capas): o estado em uma linha, a mensagem para copiar e o histórico */
+.appr { display: grid; gap: 8px; justify-items: start; }
+.appr-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--text-2); }
+.appr-actions { gap: 12px; flex-wrap: wrap; align-items: center; }
+.appr-note { margin: 0; padding: 6px 10px; border-left: 3px solid var(--line-strong); background: var(--raised); border-radius: 0 var(--r-card) var(--r-card) 0; color: var(--text-2); white-space: pre-wrap; }
+.appr-hist summary { cursor: pointer; } .appr-hist ul { margin: 8px 0 0; display: grid; gap: 4px; }
+.review-appr { margin: 12px 0; padding: 12px 0 0; border-top: 1px solid var(--line); }
 .pauta-stuck { display: grid; gap: 6px; margin: 10px 0 0; } .pauta-stuck li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 @media (pointer: coarse) { .tc-move > summary { top: 4px; right: 4px; width: 36px; height: 36px; } .task-card .tc-top { padding-right: 34px; } .task-card { cursor: default; } }
 .cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; } .cal-title { margin: 0 6px; min-width: 200px; }

@@ -292,7 +292,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const pautaSvc = require('../services/pautas');
   const showPauta = !episode.rows.length && ['em_agendamento', 'agendado'].includes(guest.status);
   const pautaDocs = showPauta ? await pautaSvc.forOwner({ guestId: guest.id }) : [];
-  for (const d of pautaDocs) if (d.id) d.events = await pautaSvc.events(d.id);
+  for (const d of pautaDocs) if (d.id) { d.events = await pautaSvc.events(d.id); d.links = await require('../services/approvals').listFor({ pautaId: d.id }); }
   res.render('guests/show', {
     others, invitable,
     pautaSvc, showPauta, pautaDocs, today: require('../services/tasks').todayISO(),

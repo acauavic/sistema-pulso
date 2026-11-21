@@ -99,6 +99,12 @@
     </div>
 
     <div class="pane" data-pane-id="youtube">
+      <% if (approvers && (yt.length || coverLinks.length)) { %>
+      <div class="review-appr">
+        <%- include('../partials/approval-links', { links: coverLinks, action: '/episodios/' + ep.id + '/aprovacao/capas', canCreate: yt.length > 0, idKey: 'capas',
+              sentTo: 'Grupo ' + ((projectScope && projectScope.projects.find(function (p) { return p.id === ep.project_id; })) || {}).name, what: 'as capas do YouTube', tone: '', voltar: '/episodios/' + ep.id + '?capas=youtube#capas' }) %>
+      </div>
+      <% } %>
       <% if (okYt.length > 1) { %>
       <div class="pieces-note"><span class="small muted"><span class="mono"><%= okYt.length %></span> aprovadas: suba as <%= okYt.length %> no teste de miniatura do YouTube Studio. A principal é a que sai na publicação.</span>
         <a class="btn sm" href="/episodios/<%= ep.id %>/capas/teste.zip" data-no-skeleton><%- icon('download', 14) %> Baixar para o teste</a></div>

@@ -53,6 +53,7 @@ function createApp() {
   app.use(require('./routes/sponsorPublic')); // media kit, formulário e portal do patrocinador (idem)
   app.use(require('./routes/guestPortalPublic')); // portal do convidado: posts em collab, cortes exclusivos e fotos (token na URL)
   app.use(require('./routes/postRecording')); // página pós-gravação (QR Code do cartão do convidado): pública, a mesma para todos, fora dos buscadores
+  app.use(require('./routes/approvalPublic')); // aprovação por link: pauta, roteiro, vídeo e capas para quem está fora do sistema
   app.use(require('./routes/studioUpload')); // link do estúdio: envio do material da gravação (token na URL, sem login)
   app.use(require('./routes/siteApi')); // API pública do site (podcastpulso.com): imagens assinadas; dados e formulários entram aqui
   app.use(require('./routes/siteApi').formErrors); // erro nos formulários do site responde ao site (JSON ou 303), não com a página do painel
@@ -101,6 +102,7 @@ function createApp() {
   app.use(require('./routes/clips')); // cortes e publicação nas redes
   app.use(require('./routes/social')); // Social: publicações, novo post, ideias, insights e automações
   app.use(require('./routes/pautas')); // pauta e roteiro do vídeo (antes da gravação)
+  app.use(require('./routes/approvals')); // links de aprovação (pauta, vídeo, capas): gerar e cancelar
   app.use(require('./routes/episodes'));
 
   app.use((req, res) => {

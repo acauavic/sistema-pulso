@@ -96,6 +96,7 @@ const NOTIFICATION_TYPES = {
   integracao: { label: 'Contas das redes', hint: 'Uma conta do Instagram, TikTok, YouTube, X ou outra rede foi desconectada ou precisa ser reconectada no provedor (Upload-Post, Zernio ou Outstand). Enquanto isso, as publicações nessa rede falham.' },
   redes: { label: 'Comentários nas redes', hint: 'Comentário num post que a IA preferiu deixar para a equipe (pesado, delicado ou sem segurança) e respostas da IA esperando aprovação.' },
   site: { label: 'Pedidos pelo site', hint: 'Alguém pediu para ser convidado ou para patrocinar pelo site podcastpulso.com.' },
+  aprovacao: { label: 'Respostas pelo link de aprovação', hint: 'Quem recebeu o link aprovou ou pediu ajustes na pauta, no roteiro, no vídeo ou nas capas. Vai para quem gerou o link, quem escreve a pauta e o editor do vídeo.' },
   rotina: { label: 'Rotinas do sistema', hint: 'Análise por IA pronta ou com erro, corte lido, publicação concluída, patrocinador respondeu o formulário.' },
 };
 // Momentos que disparam rotinas de tarefas.

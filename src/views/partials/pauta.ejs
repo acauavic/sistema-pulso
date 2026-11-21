@@ -42,15 +42,21 @@
 
     <% if (canWrite && !d.novo) { %>
     <div class="row pauta-actions">
+      <%# o caminho principal é o link de aprovação: quem aprova responde pelo celular e a resposta chega sozinha %>
+      <% if (d.state !== 'aprovada') { %>
+      <%- include('approval-links', { links: d.links || [], action: '/pautas/' + d.id + '/link', canCreate: true, idKey: 'pauta-' + d.kind, sentTo: sentTo,
+            what: 'a ' + P.KINDS[d.kind].label.toLowerCase(), tone: ['elaboracao', 'ajustes'].includes(d.state) ? 'primary' : '', voltar: voltar }) %>
+      <% } %>
       <% if (['elaboracao', 'ajustes'].includes(d.state)) { %>
-        <button class="btn sm primary" type="button" data-modal-open="pauta-wa-<%= d.kind %>"><%- icon('whatsapp', 14) %> Copiar para o WhatsApp</button>
+        <button class="link small" type="button" data-modal-open="pauta-wa-<%= d.kind %>">mandar só o texto, sem link</button>
       <% } %>
       <% if (d.state === 'aprovacao') { %>
-        <button class="btn sm" type="button" data-modal-open="pauta-ok-<%= d.kind %>"><%- icon('check', 14) %> Aprovada</button>
-        <button class="btn sm ghost" type="button" data-modal-open="pauta-nok-<%= d.kind %>"><%- icon('message-square', 14) %> Pediram ajustes</button>
-        <button class="link small" type="button" data-copy="<%= P.whatsappText(d, { prefix: prefix }) %>">copiar de novo</button>
+        <button class="btn sm ghost" type="button" data-modal-open="pauta-ok-<%= d.kind %>"><%- icon('check', 14) %> Registrar aprovação</button>
+        <button class="btn sm ghost" type="button" data-modal-open="pauta-nok-<%= d.kind %>"><%- icon('message-square', 14) %> Registrar ajustes</button>
       <% } %>
       <% if (d.state === 'aprovada') { %>
+        <% var lastAnswer = (d.links || []).find(function (l) { return l.state === 'respondido'; }); %>
+        <% if (lastAnswer && lastAnswer.answer_note) { %><p class="appr-note small">Recado de <%= lastAnswer.answer_name %>: <%= lastAnswer.answer_note %></p><% } %>
         <button class="link small" type="button" data-copy="<%= P.whatsappText(d, { prefix: prefix }) %>">copiar o texto</button>
       <% } %>
     </div>

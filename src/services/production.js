@@ -189,10 +189,11 @@ async function notifyStage(ep, to, user) {
 }
 
 // Faz a mudança de etapa. Devolve { ok } ou { error, missing }.
-async function move(ep, to, user) {
+// `trusted`: a decisão veio de quem a equipe mandou o link de aprovação (não tem conta nem perfil); as pendências da etapa valem igual.
+async function move(ep, to, user, { trusted = false } = {}) {
   const t = TRANSITIONS.find((x) => x.from === ep.status && x.to === to);
   if (!t) return { error: 'Essa mudança de etapa não é permitida a partir da etapa atual.' };
-  if (!can(user, t.perm)) return { error: 'Seu perfil não pode fazer essa mudança de etapa.' };
+  if (!trusted && !can(user, t.perm)) return { error: 'Seu perfil não pode fazer essa mudança de etapa.' };
   const missing = t.gate ? await t.gate(ep) : [];
   if (missing.length) return { error: `Para "${t.label.toLowerCase()}" falta: ${missing.join(' · ')}.`, missing };
   const client = await db.getPool().connect();

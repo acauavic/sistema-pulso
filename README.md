@@ -143,6 +143,13 @@ do projeto). O que muda:
   aprovação → Ajustes pedidos → Aprovada. **A aprovação acontece no WhatsApp**: o sistema não manda nada sozinho;
   "Copiar para o WhatsApp" copia o texto e marca a pauta como enviada, e a resposta é registrada por gestão ou
   produtora. Quadro por estado em `/episodios?view=pautas`; as que travaram aparecem no "Seu dia".
+- **Aprovação por link** (`services/approvals.js`, `routes/approvals.js`, página pública `routes/approvalPublic.js` em
+  `/aprovar/:token`): na pauta/roteiro, no vídeo em revisão e nas capas do YouTube, "Gerar link de aprovação" cria um link
+  (30 dias) e a mensagem para o grupo. Quem aprova abre sem login, no endereço e com a marca do projeto, escreve o nome e
+  responde **uma vez**. Cada link vale para uma versão (`pauta_versions` guarda a cópia de cada envio; no vídeo, o
+  `episode_files.id` enviado): mudou depois, o link avisa "substituída". No vídeo, os comentários na minutagem entram em
+  `episode_comments` com `external_name`, e a resposta muda a etapa (`production.move(..., { trusted: true })`): aprovado
+  → Em finalização, ajustes → Em edição. Aviso novo `aprovacao`.
 
 ## Perfis e permissões
 
