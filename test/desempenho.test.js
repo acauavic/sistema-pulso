@@ -101,12 +101,22 @@ describe('desempenho: sem N+1, leitura repetida uma vez por página, índices e 
     }
   });
 
+  const css0 = () => fs.readFileSync(path.join(__dirname, '../src/public/app.css'), 'utf8');
   it('esqueleto: o painel carrega o script, que ignora downloads e respeita quem já tratou o clique', async () => {
     const html = (await as.admin.get('/')).text;
     const at = (s) => html.indexOf(s);
     assert.ok(at('/static/skeleton.js') > at('/static/uploads.js'), 'depois da bandeja de envios (que intercepta a navegação durante o envio)');
     const js = fs.readFileSync(path.join(__dirname, '../src/public/skeleton.js'), 'utf8');
     assert.match(js, /defaultPrevented/); assert.match(js, /pageshow/); assert.match(js, /baixar/);
+    // a página do esqueleto não pode levar o nome de uma peça dele ("skel-board" virava a grade de 4 colunas na página toda)
+    assert.match(js, /skel-page skel-shape-\$\{shape\}/);
+    const shapes = [...js.matchAll(/^\s{4}([a-z]+): \(\) =>/gm)].map((m) => m[1]);
+    for (const s of shapes) assert.doesNotMatch(css0(), new RegExp(`\\.skel-shape-${s}\\b[^{]*\\{[^}]*grid-template-columns`), s);
+    // espera de verdade (em produção metade das páginas chega em ~430 ms): abaixo disso, a tela piscava
+    assert.ok(Number((js.match(/DELAY = (\d+)/) || [])[1]) >= 400, 'o esqueleto só entra depois de ~0,4 s');
+    // formulário que baixa arquivo (marcadores) marca data-no-skeleton, e o envio respeita
+    assert.match(js, /f\.hasAttribute\('data-no-skeleton'\)/);
+    assert.match(js, /dialog\[open\]/, 'janela aberta sai da frente do esqueleto');
     assert.doesNotMatch(js, /--action|lime/i, 'carregar não é ação: sem lime');
     const css = fs.readFileSync(path.join(__dirname, '../src/public/app.css'), 'utf8');
     assert.match(css, /\.main\.is-loading > \.container \{ display: none; \}/);

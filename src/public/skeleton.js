@@ -1,15 +1,17 @@
 // Esqueleto de carregamento. Ao abrir outra página do painel, a área de conteúdo troca o que estava ali pelo contorno da
 // tela que vem (lista, cadastro, painel, quadro, calendário), para a pessoa ver que o clique pegou e o que vai aparecer.
 // Só aparece se a resposta demorar mais que DELAY (página rápida não pisca). Menu, barra de baixo e bandeja de envios ficam.
+// DELAY medido em produção (web_vitals, nov/2026): metade das páginas começa a chegar em até ~430 ms; com 160 ms o esqueleto
+// entrava e saía em seguida em quase metade das trocas (a tela piscava). Agora só aparece quando a espera é de verdade.
 (() => {
   const main = document.querySelector('main.main');
   const container = main && main.querySelector(':scope > .container');
   if (!container) return;
 
-  const DELAY = 160; // ms: abaixo disso a página nova chega antes de o esqueleto valer a pena
+  const DELAY = 450; // ms: abaixo disso a página nova chega antes de o esqueleto valer a pena
   const GIVE_UP = 12000; // download (Content-Disposition) não troca de página: o conteúdo volta sozinho
   // links que baixam arquivo ou abrem mídia (não trocam a página)
-  const FILE_PATH = /\/baixar$|\/(imagem|video|foto|audio)$|\/(arquivos|fotos|anexos|static)\/|\.(csv|zip|ics|pdf|jpe?g|png|webp|gif|mp4|mov|mp3|wav|m4a|json|xml|txt)$/i;
+  const FILE_PATH = /\/baixar$|\/(arquivo|marcadores)$|\/modelo\.csv$|\/(imagem|video|foto|audio)$|\/(arquivos|fotos|anexos|static)\/|\.(csv|zip|ics|pdf|jpe?g|png|webp|gif|mp4|mov|mp3|wav|m4a|json|xml|txt)$/i;
 
   let timer = null; let giveUp = null; let page = null; let scrollY = 0;
 
@@ -51,9 +53,13 @@
     if (page) return;
     scrollY = window.scrollY;
     page = document.createElement('div');
-    page.className = `skel-page skel-${shapeFor(u)}`;
+    const shape = shapeFor(u);
+    page.className = `skel-page skel-shape-${shape}`; // "skel-board" era também a grade do quadro: a página inteira virava 4 colunas
     page.setAttribute('aria-hidden', 'true');
-    page.innerHTML = SHAPES[shapeFor(u)]();
+    page.innerHTML = SHAPES[shape]();
+    // janela, menu da linha ou painel aberto ficava por cima do esqueleto até a página nova chegar: saem da frente
+    document.querySelectorAll('dialog[open]').forEach((d) => { try { d.close(); } catch { d.removeAttribute('open'); } });
+    document.querySelectorAll('details[open].row-menu, details[open].cal-filter, details[open].board-tools details').forEach((d) => { d.open = false; });
     main.insertBefore(page, container);
     main.classList.add('is-loading'); main.setAttribute('aria-busy', 'true');
     window.scrollTo(0, 0);
@@ -87,7 +93,7 @@
   // Filtros e buscas (formulário GET) também trocam a página. POST tem o próprio andamento (data-busy).
   window.addEventListener('submit', (e) => {
     const f = e.target;
-    if (e.defaultPrevented || !f || f.tagName !== 'FORM' || (f.method || 'get').toLowerCase() !== 'get' || (f.target && f.target !== '_self')) return;
+    if (e.defaultPrevented || !f || f.tagName !== 'FORM' || (f.method || 'get').toLowerCase() !== 'get' || (f.target && f.target !== '_self') || f.hasAttribute('data-no-skeleton')) return; // formulário que baixa arquivo (marcadores) não troca a página
     const u = new URL(f.action || location.href, location.href);
     u.search = new URLSearchParams(new FormData(f)).toString();
     show(u.href);

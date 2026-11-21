@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.5.1', date: '2026-11-21', title: 'Carregamento sem piscar',
+    items: [
+      { kind: 'correcao', text: 'O contorno de carregamento (esqueleto) entrava cedo demais e sumia logo em seguida em quase metade das trocas de página, e a tela piscava. Agora ele só aparece quando a página demora de verdade (mais de meio segundo).' },
+      { kind: 'correcao', text: 'O contorno dos quadros (Conteúdo, quadros de convidados, vídeos e patrocinadores) saía desmontado, com o título, os filtros e as colunas espalhados pela tela.' },
+      { kind: 'correcao', text: '"Baixar marcadores" e o modelo da importação de convidados deixavam a tela coberta pelo contorno por até 12 segundos (o download não troca a página).' },
+      { kind: 'correcao', text: 'Ao clicar num link dentro de uma janela ou de um menu, a janela ficava por cima do contorno até a página nova chegar; agora ela sai da frente.' },
+    ],
+  },
+  {
     version: '2.5.0', date: '2026-11-21', title: 'Boas-vindas ao novo Health Scale Studio',
     items: [
       { kind: 'novo', text: 'Na primeira vez depois da atualização, uma tela de boas-vindas apresenta a nova versão: o Sinal sobe barra a barra, e as novidades principais entram em sequência (projetos lado a lado, aprovação por link, sessões de gravação e o endereço novo). Aparece uma vez por pessoa; "Ver tudo o que mudou" leva às Novidades.' },
