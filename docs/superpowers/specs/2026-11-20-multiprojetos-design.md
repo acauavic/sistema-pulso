@@ -310,8 +310,9 @@ Cada fase é um lançamento que funciona sozinho.
    isolamento. Só depois entra a equipe do Dr. José Bento.
 8. **Redes por projeto.** Contas e provedores por projeto (`social_account_status` e os perfis da Zernio/Outstand),
    publicar, agenda da semana, comentários, automações, insights e contexto da IA (nome, tom, links) por projeto.
-9. **Marca do Projeto 100 nas páginas públicas.** Convite, portal, media kit e capas com a identidade dele (espera a
-   marca ficar pronta).
+9. **Marca do Projeto 100 nas páginas públicas.** Convite, portal, media kit e capas com a identidade dele. A marca
+   ficou pronta em 2026-11-20 (`docs/manual-de-marca-projeto-100.md`; originais e PNGs no SSD, em
+   `/Volumes/PortableSSD/Health Scale/Projeto 100/Id visual/`), então esta fase não espera mais nada.
 
 As fases 8 e 9 podem subir se o Projeto 100 precisar publicar pelo sistema antes; até lá ele publica por fora.
 
