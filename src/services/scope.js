@@ -72,7 +72,7 @@ function assert(req, projectId) {
 }
 
 // De que módulo é uma tela (projects.modules): ao trocar para um projeto que não usa o módulo da tela aberta, a pessoa vai para o Início.
-const PATH_MODULES = [[/^\/convidados/, 'convidados'], [/^\/patrocinadores/, 'patrocinio'], [/^\/(episodios|conteudo|cortes|capas)/, 'producao'],
+const PATH_MODULES = [[/^\/convidados/, 'convidados'], [/^\/patrocinadores/, 'patrocinio'], [/^\/(episodios|conteudo|cortes|capas|sessoes)/, 'producao'],
   [/^\/social/, 'redes'], [/^\/plateia/, 'plateia'], [/^\/financeiro/, 'financeiro'], [/^\/pautas/, 'producao'], [/^\/duplicatas/, 'convidados']];
 const moduleOfPath = (p) => (PATH_MODULES.find(([re]) => re.test(String(p || ''))) || [])[1] || null;
 

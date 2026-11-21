@@ -386,6 +386,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   res.render('episodes/show', {
     // podcast leva Spotify, capa do Spotify e os vídeos do convidado; vídeo sem convidado não tem nada disso
     isPodcast: ep.format !== 'video',
+    epSession: ep.session_id ? await require('../services/sessions').get(ep.session_id) : null,
     pautaSvc, pautaDocs, pautaPendente, showPauta, videoLinks, coverLinks, today: require('../services/tasks').todayISO(),
     orderPos, studio, studioWa, kindLabels: C.EPISODE_FILE_KINDS,
     mediaType: require('../services/previews').mediaType, hasPreview: require('../services/previews').hasPreview,

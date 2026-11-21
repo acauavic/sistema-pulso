@@ -33,7 +33,7 @@ async function bankEpisodes(c, qf = db.query) {
   const { rows } = await qf(
     `SELECT e.id, e.number, e.title, e.project_id, ${EP_DAY} AS day, coalesce(e.recording_minutes, $3)::int AS minutes, g.name AS guest_name
        FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
-      WHERE e.id = $1 OR ($2::date IS NOT NULL AND ${EP_DAY} >= $2::date)
+      WHERE e.status <> 'pre_producao' AND (e.id = $1 OR ($2::date IS NOT NULL AND ${EP_DAY} >= $2::date)) -- vídeo ainda não gravado não gastou estúdio
       ORDER BY ${EP_DAY}, e.number NULLS LAST, e.id`, [c.startId, c.startOn, c.minutes]);
   return rows.map((r) => ({ ...r, day: iso(r.day) }));
 }
@@ -45,7 +45,8 @@ async function reservations(c) {
     `SELECT g.id, g.name, g.project_id, g.proposed_at, (g.proposed_at AT TIME ZONE '${TZ}')::date AS proposed_on FROM guests g
       WHERE g.status = 'agendado' AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.guest_id = g.id)
       ORDER BY g.proposed_at NULLS LAST, g.id`);
-  return rows.map((r) => ({ ...r, proposed_on: iso(r.proposed_on), minutes: c.minutes }));
+  const sessions = await require('./sessions').reservations({ startOn: c.startOn }); // sessão planejada: a duração prevista que ainda falta
+  return [...rows.map((r) => ({ ...r, proposed_on: iso(r.proposed_on), minutes: c.minutes })), ...sessions.map((r) => ({ ...r, proposed_on: iso(r.proposed_on) }))];
 }
 
 async function isBankEpisode(epOrId) {

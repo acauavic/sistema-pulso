@@ -103,6 +103,7 @@ function createApp() {
   app.use(require('./routes/social')); // Social: publicações, novo post, ideias, insights e automações
   app.use(require('./routes/pautas')); // pauta e roteiro do vídeo (antes da gravação)
   app.use(require('./routes/approvals')); // links de aprovação (pauta, vídeo, capas): gerar e cancelar
+  app.use(require('./routes/sessions')); // sessão de gravação: vários vídeos numa ida ao estúdio
   app.use(require('./routes/episodes'));
 
   app.use((req, res) => {

@@ -70,6 +70,10 @@ async function byToken(token) {
        FROM episode_upload_links l JOIN episodes e ON e.id = l.episode_id LEFT JOIN guests g ON g.id = e.guest_id WHERE l.token = $1`, [token]);
   if (!l) return null;
   if (!isOpen(l)) { if (!l.finished_at && !l.closed_at) await expire(l); return null; }
+  if (l.session_id) { // link da sessão de gravação: a página fala da sessão, não de um vídeo
+    const { rows: [s] } = await db.query('SELECT starts_at, (SELECT count(*)::int FROM episodes WHERE session_id = $1) AS n FROM recording_sessions WHERE id = $1', [l.session_id]);
+    if (s) { l.episode_number = null; l.episode_title = `Sessão de gravação de ${new Date(s.starts_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`; l.guest_name = `${s.n} vídeo${s.n === 1 ? '' : 's'}`; }
+  }
   return l;
 }
 

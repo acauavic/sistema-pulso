@@ -531,5 +531,5 @@ module.exports = {
   syncGuest, onGuestDeleted, onEpisodeDeleted, onSponsorDeleted, onEpisodeCreated, onEpisodeStage, onEpisodeDates, recomputeStudio, setDuration, consumeStock,
   ensureRecurring, planSponsorPayment, sponsorSummary, afterPaid,
   stockItems, stockMoves, stockMovesFor, buyStock, forecast, STOCK_STATE,
-  entries, counts, overview, cashNow, costPerEpisode, episodeFinance, resultByProject, tick, toEntry,
+  entries, counts, overview, cashNow, costPerEpisode, episodeFinance, resultByProject, tick, toEntry, syncHourBank,
 };

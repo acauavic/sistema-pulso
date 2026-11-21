@@ -57,7 +57,7 @@
         <% if (!bank.reserved.length) { %><p class="small muted">Nenhuma gravação marcada.</p><% } %>
         <ul class="plain plan-list">
           <% bank.reserved.forEach(function (g) { %>
-          <li><span class="mono small"><%= g.proposed_on ? fmt.formatDay(g.proposed_on) : 'a definir' %></span><div class="plan-list-main"><a href="/convidados/<%= g.id %>"><%= g.name %></a></div><span class="mono small"><%= g.minutes %> min</span></li>
+          <li><span class="mono small"><%= g.proposed_on ? fmt.formatDay(g.proposed_on) : 'a definir' %></span><div class="plan-list-main"><a href="<%= String(g.id).charAt(0) === 's' ? '/sessoes/' + String(g.id).slice(1) : '/convidados/' + g.id %>"><%= g.name %></a></div><span class="mono small"><%= g.minutes %> min</span></li>
           <% }) %>
         </ul>
       </div>

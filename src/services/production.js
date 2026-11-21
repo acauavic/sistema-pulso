@@ -297,7 +297,8 @@ async function onRecorded(ep, userId, { actor = undefined, requests = null } = {
   const who = actor !== undefined ? actor : (userId ? (await db.query('SELECT id, name FROM users WHERE id = $1', [userId])).rows[0] || null : null);
   await createTasks(ep.id, who, requests);
   try { await require('./finance').onEpisodeCreated(ep.id); } catch (err) { console.error('Financeiro (episódio):', err.message); }
-  try { await require('./studioLinks').create(ep.id, userId); await addEvent(ep.id, userId, 'arquivo', 'Link do estúdio gerado para o envio do material'); } catch (err) { console.error('Link do estúdio:', err.message); }
+  // vídeo de sessão de gravação: o link do estúdio é um só, da sessão (nasce ao encerrar)
+  if (!ep.session_id) { try { await require('./studioLinks').create(ep.id, userId); await addEvent(ep.id, userId, 'arquivo', 'Link do estúdio gerado para o envio do material'); } catch (err) { console.error('Link do estúdio:', err.message); } }
 }
 
 // ---------------------------------------------------------------- arquivos (Backblaze, envio em partes)

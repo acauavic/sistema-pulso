@@ -10,6 +10,7 @@
     </div>
     <a class="btn <%= mine ? 'on' : '' %>" href="/episodios?view=<%= view %><%= mine ? '' : '&editor=eu' %><%= fq %>"><%- icon('user') %> <%= mine ? 'Todos' : 'Só os meus' %></a>
     <% if (can('production.checklists')) { %><a class="btn" href="/episodios/checklists"><%- icon('check') %> Checklists</a><% } %>
+    <a class="btn" href="/sessoes"><%- icon('calendar') %> Sessões de gravação</a>
     <% if (can('episodes.write') && videoFirst) { %><button class="btn primary" type="button" data-modal-open="modal-novo-video"><%- icon('plus') %> Novo <%= videoWord %></button><% } %>
     <% if (can('episodes.write')) { %><a class="btn <%= videoFirst ? '' : 'primary' %>" href="/episodios/novo"><%- icon('plus') %> Registrar <%= videoFirst ? 'gravado' : 'episódio gravado' %></a><% } %>
   </div>

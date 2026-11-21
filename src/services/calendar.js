@@ -127,6 +127,11 @@ const SOURCES = {
       const { rows: eps } = await db.query(
         `SELECT e.id, e.number, e.title, e.project_id, e.status, to_char(e.recorded_on, 'YYYY-MM-DD') AS day FROM episodes e WHERE e.guest_id IS NULL AND e.recorded_on BETWEEN $1::date AND $2::date${inProject(pids, 'e.project_id')} ORDER BY e.recorded_on LIMIT ${MAX_PER_TYPE}`, [from, to]);
       for (const e of eps) out.push({ type: 'gravacao', id: `gravacao-ep-${e.id}`, title: `Gravação: ${epNo(e.number, e.project_id)} ${e.title}`, sub: e.status === 'pre_producao' ? 'gravação prevista' : 'gravada', day: e.day, time: null, url: `/episodios/${e.id}`, done: true, late: false });
+      // sessão de gravação (vários vídeos numa ida ao estúdio)
+      const { rows: ss } = await db.query(
+        `SELECT s.id, s.status, s.place, ${dayOf('s.starts_at')} AS day, ${timeOf('s.starts_at')} AS time, (SELECT count(*)::int FROM episodes e WHERE e.session_id = s.id) AS n
+           FROM recording_sessions s WHERE s.status <> 'cancelada' AND ${inRange('s.starts_at')}${inProject(pids, 's.project_id')} ORDER BY s.starts_at LIMIT ${MAX_PER_TYPE}`, [from, to]);
+      for (const x of ss) out.push({ type: 'gravacao', id: `gravacao-sessao-${x.id}`, title: `Sessão de gravação · ${x.n} vídeo${x.n === 1 ? '' : 's'}`, sub: x.status === 'encerrada' ? 'encerrada' : (x.place || 'planejada'), day: x.day, time: x.status === 'encerrada' ? null : x.time, url: `/sessoes/${x.id}`, done: x.status === 'encerrada', late: false });
     }
     return out;
   },

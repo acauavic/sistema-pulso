@@ -54,7 +54,7 @@ router.get('/estudio/:token', turnstile.page, wrap(async (req, res) => {
   if (turnstile.passOk(req, link.id)) res.locals.turnstileKey = null; // já confirmou nas últimas 12 h: nada a mostrar
   const files = await links.files(link.id);
   res.set(HEADERS).render('studio/upload', {
-    icon: require('../utils/icons').icon, fmt: require('../utils/format'), title: 'Material da gravação', link, tag: links.epTag(link.episode_number), base: `/estudio/${link.token}/arquivos/`,
+    icon: require('../utils/icons').icon, fmt: require('../utils/format'), title: 'Material da gravação', link, tag: link.session_id ? link.episode_title : links.epTag(link.episode_number), base: `/estudio/${link.token}/arquivos/`,
     files: files.map((f) => ({ id: f.id, path: f.source_path || f.filename, size: Number(f.size_bytes), status: f.status })),
     storageReady: config.storageConfigured,
   });
@@ -87,7 +87,8 @@ router.post('/estudio/:token/arquivos/iniciar', wrap(async (req, res) => {
     const { file, partSize, totalParts } = await prod.startUpload({
       episode, kind: links.kindFor(split.filename), label: split.label, filename: split.filename, contentType: studioType(req.body.tipo), size, userId: null,
     });
-    await db.query('UPDATE episode_files SET upload_link_id = $2, source_path = $3 WHERE id = $1', [file.id, link.id, split.path]);
+    // link da sessão de gravação: o arquivo espera a equipe dizer de qual vídeo é
+    await db.query('UPDATE episode_files SET upload_link_id = $2, source_path = $3, session_id = $4::int, session_pending = ($4::int IS NOT NULL) WHERE id = $1', [file.id, link.id, split.path, link.session_id || null]);
     const first = !link.first_upload_at;
     await links.touch(link, { first: true });
     if (first) {
@@ -182,7 +183,7 @@ router.post('/estudio/:token/terminei', express.urlencoded({ extended: false }),
   if (s.sending && req.body.mesmo_assim !== '1') {
     const files = await links.files(link.id);
     return res.status(409).set(HEADERS).render('studio/upload', {
-      icon: require('../utils/icons').icon, fmt: require('../utils/format'), title: 'Material da gravação', link, tag: links.epTag(link.episode_number), base: `/estudio/${link.token}/arquivos/`, storageReady: config.storageConfigured,
+      icon: require('../utils/icons').icon, fmt: require('../utils/format'), title: 'Material da gravação', link, tag: link.session_id ? link.episode_title : links.epTag(link.episode_number), base: `/estudio/${link.token}/arquivos/`, storageReady: config.storageConfigured,
       files: files.map((f) => ({ id: f.id, path: f.source_path || f.filename, size: Number(f.size_bytes), status: f.status })),
       pending: s.sending,
     });
@@ -194,7 +195,7 @@ router.post('/estudio/:token/terminei', express.urlencoded({ extended: false }),
     await links.notifyTeam(link, 'fim').catch((err) => console.error('Aviso do link do estúdio:', err.message));
   }
   const files = (await links.files(link.id)).filter((f) => f.status === 'pronto');
-  res.set(HEADERS).render('studio/done', { icon: require('../utils/icons').icon, fmt: require('../utils/format'), title: 'Material recebido', tag: links.epTag(link.episode_number), link, files, bytes: s.bytes });
+  res.set(HEADERS).render('studio/done', { icon: require('../utils/icons').icon, fmt: require('../utils/format'), title: 'Material recebido', tag: link.session_id ? link.episode_title : links.epTag(link.episode_number), link, files, bytes: s.bytes });
 }));
 
 module.exports = router;

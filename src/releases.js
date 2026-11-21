@@ -4,6 +4,17 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.2.0', date: '2026-11-21', title: 'Sessão de gravação',
+    items: [
+      { kind: 'novo', text: 'Sessões de gravação (em Vídeos > Sessões de gravação): marque a ida ao estúdio com dia, hora, duração prevista e local, e escolha os vídeos em Pré-produção que vão ser gravados, na ordem da fila.' },
+      { kind: 'novo', text: 'No dia, a página da sessão é a fila de gravação no celular: cada vídeo com o roteiro aprovado para ler em letra grande, um campo de anotação ("take 3 é o bom") e o botão Gravado, que já tira o vídeo da pré-produção com a data da sessão.' },
+      { kind: 'novo', text: 'As horas do estúdio passam a ser da sessão: ao encerrar com a duração real, ela é dividida em partes iguais entre os vídeos gravados (minutos inteiros que somam a sessão). O custo de estúdio de cada vídeo e o banco de horas saem dessa conta; a sessão planejada reserva horas no banco.' },
+      { kind: 'novo', text: 'Um link do estúdio por sessão: o estúdio sobe todo o material de uma vez, e a página da sessão pergunta de qual vídeo é cada arquivo.' },
+      { kind: 'novo', text: 'A sessão avisa quando o estúdio já tem outra gravação no mesmo horário (de qualquer projeto) e quando um vídeo vai sem pauta ou roteiro aprovado. Ela aparece no calendário, e o vídeo mostra de que sessão ele é.' },
+      { kind: 'correcao', text: 'O banco de horas contava como usada a duração padrão dos vídeos ainda em Pré-produção; agora só conta o que foi gravado.' },
+    ],
+  },
+  {
     version: '2.1.0', date: '2026-11-21', title: 'Aprovação por link',
     items: [
       { kind: 'novo', text: 'Quem aprova está fora do sistema? Na pauta, no roteiro, no vídeo em revisão e nas capas do YouTube, "Gerar link de aprovação" cria um link e a mensagem pronta para colar no grupo do WhatsApp. A pessoa abre no celular, sem login, escreve o nome e responde uma vez: aprovar ou pedir ajustes.' },

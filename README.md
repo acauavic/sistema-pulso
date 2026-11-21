@@ -150,6 +150,15 @@ do projeto). O que muda:
   `episode_files.id` enviado): mudou depois, o link avisa "substituída". No vídeo, os comentários na minutagem entram em
   `episode_comments` com `external_name`, e a resposta muda a etapa (`production.move(..., { trusted: true })`): aprovado
   → Em finalização, ajustes → Em edição. Aviso novo `aprovacao`.
+- **Sessão de gravação** (`services/sessions.js`, `routes/sessions.js`, telas em `views/sessions/`; `/sessoes`): várias
+  gravações numa ida ao estúdio. A sessão tem dia e hora, duração prevista e local; os vídeos (em Pré-produção, do projeto
+  da sessão) entram com `episodes.session_id`/`session_position`. "Gravado" na fila leva o vídeo a Gravado com a data da
+  sessão. **As horas são da sessão**: a duração (prevista enquanto não encerra, real depois) é dividida em minutos inteiros
+  entre os vídeos gravados e vai para `episodes.recording_minutes` — o que o custo de estúdio (`finance.recomputeStudio`) e
+  o banco de horas já usam. Sessão planejada reserva horas (`sessions.reservations`). Encerrar devolve à pré-produção o que
+  não foi gravado e cria **um** link do estúdio para a sessão (fica no primeiro vídeo gravado, com `session_id`); o que
+  chega por ele fica `session_pending` até a equipe dizer de qual vídeo é. Aviso de estúdio ocupado (outra sessão ou
+  convidado agendado, de qualquer projeto; de outro projeto aparece só "Estúdio ocupado por outro projeto").
 
 ## Perfis e permissões
 
