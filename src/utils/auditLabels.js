@@ -11,6 +11,7 @@ const AREAS = {
 const WHOLE = {
   'login.ok': 'Entrou no sistema', 'login.falhou': 'Tentativa de entrar que falhou', 'senha.alterada': 'Trocou a senha',
   'convidado.etapa': 'Convidado mudou de etapa', 'patrocinador.etapa': 'Patrocinador mudou de etapa', 'episodio.etapa': 'Episódio mudou de etapa',
+  'convidado.tambem_em_projeto': 'Convidado também em outro projeto', 'patrocinador.tambem_em_projeto': 'Negociação aberta também em outro projeto',
   'convidados.edicao_em_massa': 'Convidados editados em massa', 'convidados.importados': 'Convidados importados (planilha)',
   'capas.em_lote': 'Capas trocadas em lote', 'tarefa.voz': 'Tarefa criada por voz', 'trabalho.repetido': 'Trabalho em segundo plano repetido',
   'automacao.links': 'Links do direct alterados', 'piloto_semana.ajustado': 'Agenda da semana ajustada', 'kit.galeria_edita': 'Galeria do media kit editada',

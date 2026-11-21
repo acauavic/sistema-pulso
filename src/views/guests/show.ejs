@@ -188,6 +188,7 @@
           <% var gaps = [!guest.phone && !guest.email && 'contato', !guest.positioning && 'posicionamento', !guest.topic && 'temas', !guest.bio && 'biografia'].filter(Boolean); %>
           <% if (canW && gaps.length) { %><p class="small muted top-gap">Sem <%= gaps.join(', ') %>. <a href="/convidados/<%= guest.id %>/editar#sobre">Completar cadastro</a></p><% } %>
         </section>
+        <%- include('../partials/other-projects', { others: others, invitable: invitable, action: '/convidados/' + guest.id + '/tambem', noun: 'convidado', canWrite: canW }) %>
         <%- include('../partials/comments', { type: 'guest', id: guest.id, items: comments, back: '/convidados/' + guest.id }) %>
       </div>
 

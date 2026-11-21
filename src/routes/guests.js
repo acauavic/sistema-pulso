@@ -276,6 +276,13 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
     channel: portalSvc.channelOf(pg), NOTIFY: portalSvc.NOTIFY, dayLabel: portalSvc.dayLabel, ytUrl: portalSvc.youtubeUrl(pg.portal_yt_channel),
     hasPhone: Boolean(require('../services/contacts').normalizeNumber(pg.phone)), hasEmail: isEmail(pg.email || ''),
   } : null;
+  // Em outros projetos: onde mais esta pessoa está (só nos projetos de quem olha) e para onde ainda dá para convidar.
+  const { personId } = await people.sync(guest.id);
+  // todos os projetos da pessoa que olha, não só o escolhido no menu: senão o bloco nunca mostraria o outro projeto
+  const others = await people.participations(personId, { pids: req.scope.ids, exceptGuestId: guest.id });
+  const projectsSvc = require('../services/projects');
+  const invitable = req.scope.projects.filter((p) => p.id !== guest.project_id && projectsSvc.has(p, 'convidados')
+    && !others.some((o) => o.project_id === p.id)).map((p) => ({ id: p.id, name: p.name }));
   const outSm = outEval.get(guest.id) || null;
   const epRow = episode.rows[0] || null;
   const studio = epRow && can(req.user.role, 'production.upload') ? await require('../services/studioLinks').panelState(epRow.id) : null;
@@ -285,6 +292,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const pautaDocs = showPauta ? await pautaSvc.forOwner({ guestId: guest.id }) : [];
   for (const d of pautaDocs) if (d.id) d.events = await pautaSvc.events(d.id);
   res.render('guests/show', {
+    others, invitable,
     pautaSvc, showPauta, pautaDocs, today: require('../services/tasks').todayISO(),
     studio: studio && studio.state === 'aguardando' ? studio : null,
     dupes: can(req.user.role, 'guests.write') ? await require('../services/duplicates').findFor('guest', guest, { excludeId: guest.id }) : [],
@@ -345,6 +353,42 @@ const STEP_MODAL = { em_agendamento: 'contato', agendado: 'agenda', perdido: 'pe
 const stepUrl = (id, target, missing) => (missing.length && missing.every((m) => m === rules.PHOTO)
   ? `/convidados/${id}?abrir=foto&para=${target}`
   : STEP_MODAL[target] ? `/convidados/${id}?abrir=${STEP_MODAL[target]}` : `/convidados/${id}/editar?para=${target}`);
+
+// ---- a mesma pessoa em outro projeto ----
+// "Convidar também para o Projeto 100": cria a participação lá, em Prospecção, com os dados da pessoa (ninguém digita de
+// novo). Só para projeto de que quem pede participa, que usa Convidados, e onde a pessoa ainda não tem participação.
+router.post('/convidados/:id/tambem', requirePerm('guests.write'), wrap(async (req, res) => {
+  const guest = await findGuest(req.params.id);
+  if (!guest) return notFound(res);
+  const scope = require('../services/scope');
+  scope.assert(req, guest.project_id);
+  const projectId = Number(req.body.project_id);
+  if (!scope.canSee(req, projectId) || !projectId) return notFound(res); // projeto fora do recorte: como se não existisse
+  const projects = require('../services/projects');
+  const project = projects.get(projectId);
+  const back = `/convidados/${guest.id}#outros-projetos`;
+  if (!project || projectId === guest.project_id || !projects.has(project, 'convidados')) {
+    await req.flash('error', project ? `${project.name} não trabalha com convidados.` : 'Projeto não encontrado.');
+    return res.redirect(back);
+  }
+  const { personId } = await people.sync(guest.id); // garante a pessoa (cadastro antigo pode não ter)
+  const ja = await people.participations(personId, { pids: [projectId] });
+  if (ja.length) {
+    await req.flash('error', `${guest.name} já está em ${project.name} (${ja[0].stage_label}).`);
+    return res.redirect(back);
+  }
+  const cols = ['person_id', 'project_id', 'status', 'owner_id', 'created_by', 'profile', ...people.COLUMNS];
+  const { rows: [novo] } = await db.query(
+    `INSERT INTO guests (${cols.join(', ')})
+     SELECT $1, $2, 'prospect', $3, $3, $4, ${people.COLUMNS.map((c) => `p.${c}`).join(', ')} FROM people p WHERE p.id = $1 RETURNING id`,
+    [personId, projectId, req.user.id, guest.profile]);
+  const origem = (projects.get(guest.project_id) || {}).name || 'outro projeto';
+  await guestsSvc.addEvent(novo.id, req.user.id, 'criado', `Veio do cadastro do ${origem} por ${req.user.name}: a mesma pessoa, agora em ${project.name}`);
+  await guestsSvc.addEvent(guest.id, req.user.id, 'nota', `Convidado também para ${project.name} por ${req.user.name}`);
+  await audit(req, 'convidado.tambem_em_projeto', 'guest', novo.id, { de: guest.id, projeto: project.name });
+  await req.flash('ok', `${guest.name} entrou em ${project.name}, em Prospecção. Próximo passo: registrar a abordagem.`);
+  return res.redirect(`/convidados/${novo.id}`);
+}));
 
 // ---- mudar etapa (formulário ou arrastar no quadro) ----
 router.post('/convidados/:id/status', requirePerm('guests.write'), wrap(async (req, res) => {

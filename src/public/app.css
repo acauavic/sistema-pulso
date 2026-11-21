@@ -1097,6 +1097,12 @@ ul.plain.card > li { padding-top: 16px; padding-bottom: 16px; }
 .project-now { display: none; }
 .project-tag { color: var(--muted); letter-spacing: .08em; white-space: nowrap; }
 h1 .project-tag { vertical-align: middle; font-weight: 500; }
+/* Em outros projetos (cadastro do convidado e do patrocinador): uma linha por participação, resumo e nada mais. */
+.other-proj { display: grid; gap: 8px; margin: 0; }
+.other-proj li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.other-proj .op-name { font-weight: 600; }
+.other-proj li .badge { flex: none; }
+#outros-projetos .row { flex-wrap: wrap; gap: 8px; }
 .project-field { display: grid; gap: 6px; justify-items: start; } .project-field .seg-radio label { white-space: nowrap; } .project-field p { margin: 0; }
 .proj-list { margin-top: 0; } .proj-list .cat-row:first-child { border-top: 0; padding-top: 0; }
 .proj-mods { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; } .proj-note { margin: 16px 0 0; }
