@@ -59,6 +59,7 @@ async function importGuests(text, user, projectId = null) {
         data.proposed_at && `gravação ${formatDateTime(data.proposed_at)}`].filter(Boolean);
       await client.query('INSERT INTO guest_events (guest_id, user_id, type, message) VALUES ($1,$2,$3,$4)',
         [g.id, user.id, 'criado', `Importado por CSV por ${user.name}${details.length ? ` (${details.join(', ')})` : ''}`]);
+      await require('./people').sync(g.id, { client });
       created.push(g.id);
       if (data.episode) { await createHistoryEpisode(client, g.id, data, user); episodes += 1; }
     }

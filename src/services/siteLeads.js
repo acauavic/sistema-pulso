@@ -110,6 +110,7 @@ async function createGuest(v) {
          VALUES ($1, $2, $3, $4, $5, $6, 'prospect', 'site', $7::jsonb, $8) RETURNING id`,
         [v.name, v.instagram, v.phone, v.email, v.profile, v.topic, v.utm ? JSON.stringify(v.utm) : null, require('./projects').defaultId()]));
     }
+    if (!found) await require('./people').sync(id, { client });
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});

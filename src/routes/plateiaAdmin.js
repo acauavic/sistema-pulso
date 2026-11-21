@@ -335,6 +335,7 @@ router.post('/convidados/:id/foto', requirePerm('guests.write'), express.raw({ t
   const key = await storeImage('convidados', g.id, req.body, 'foto');
   if (!key) return res.status(400).json({ ok: false, error: 'Envie uma imagem PNG, JPEG ou WebP (até 5 MB).' });
   await db.query('UPDATE guests SET photo_key = $2 WHERE id = $1', [g.id, key]);
+  await require('../services/people').sync(g.id); // a foto e da pessoa: vale nos dois projetos
   if (g.photo_key) await b2.deleteObject(g.photo_key).catch(() => {});
   await audit(req, 'convidado.foto', 'guest', g.id);
   res.json({ ok: true });

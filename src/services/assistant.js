@@ -274,10 +274,12 @@ const TOOLS = [
       if (sure) return { erro: `Já existe um convidado com esse ${sure.reasons[0].replace(/^mesmo /, '')}: ${sure.name} (${sure.stage_label}).`, link: `/convidados/${sure.id}` };
       if (dups.length && a.confirmado !== true) return { precisa_confirmar: true, aviso: `Pode ser alguém já cadastrado: ${dups.slice(0, 3).map((d) => `${d.name} (${d.stage_label}, ${d.reasons.join(', ')})`).join('; ')}. Pergunte se é outra pessoa; se for, chame de novo com confirmado=true.`, link: `/convidados/${dups[0].id}` };
       const { rows: [g] } = await db.query(
+        // (a pessoa e ligada logo depois, por people.sync)
         `INSERT INTO guests (name, instagram, phone, profile, email, invite_reason, topic, gender, owner_id, created_by, status, project_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,'prospect',$10) RETURNING id`,
         [name, instagram, clean(a.whatsapp, 40) || null, profile, email || null, clean(a.motivo_do_convite, 1000) || null, clean(a.tema, 500) || null, gender || 'm', user.id,
           await require('./projects').currentFor(user.id)]); // o projeto em que a pessoa está trabalhando agora
+      await require('./people').sync(g.id); // identidade da pessoa, como em qualquer cadastro
       await require('./guests').addEvent(g.id, user.id, 'criado', `Cadastrado pelo assistente a pedido de ${user.name}`);
       await audit({ user, ip: 'assistente' }, 'convidado.criado', 'guest', g.id, { name, via: 'assistente' });
       return {

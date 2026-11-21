@@ -4,6 +4,7 @@ const db = require('../db/pool');
 const config = require('../config');
 const mailer = require('../services/mailer');
 const guestsSvc = require('../services/guests');
+const people = require('../services/people'); // identidade do convidado: a pessoa e as participacoes dela ficam iguais
 const production = require('../services/production');
 const reminders = require('../services/reminders');
 const guestPhotos = require('../services/guestPhotos');
@@ -212,6 +213,7 @@ router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) =>
      VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}, $${COLUMNS.length + 2}) RETURNING id, photo_key`,
     [...columnValues(values), req.user.id, projectId]);
   // cadastro novo direto em Em agendamento/Agendado: sem foto, entra em Convite enviado e a janela da foto termina a mudança
+  await people.sync(guest.id); // a pessoa nasce com o cadastro (ou passa a ter estes dados, se ja existia)
   const pendingStage = rules.missingFor(values.status, { ...values, photo_key: guest.photo_key }).includes(rules.PHOTO) ? values.status : null;
   if (pendingStage) await db.query("UPDATE guests SET status = 'convite_enviado' WHERE id = $1", [guest.id]);
   await guestsSvc.addEvent(guest.id, req.user.id, 'criado', `Convidado cadastrado por ${req.user.name}`);
@@ -319,6 +321,7 @@ router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res
   await db.query(
     `UPDATE guests SET ${COLUMNS.map((c, i) => `${c}=$${i + 2}`).join(', ')}, updated_at=now() WHERE id=$1`,
     [guest.id, ...columnValues(values)]);
+  await people.sync(guest.id); // o que e identidade vale em todos os projetos da pessoa
   if (values.status !== guest.status) {
     await guestsSvc.addEvent(guest.id, req.user.id, 'status', stageMessage(guest.status, values.status, values));
   }
@@ -406,6 +409,7 @@ router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (
             loss_reason=$9, loss_note=$10, status=$8, updated_at=now() WHERE id=$1`,
     [guest.id, next.email, next.phone, next.proposed_at, next.scheduled_studio, next.scheduled_hosts, next.scheduled_guest, status,
       status === 'perdido' ? next.loss_reason : null, status === 'perdido' ? next.loss_note : null]);
+  if ('email' in b || 'phone' in b) await people.sync(guest.id); // contato e da pessoa
   if (status === guest.status) await require('../services/reminders').syncGuest(guest.id); // remarcou em Agendado: refaz os lembretes
   const moved = b.agenda === '1' && guest.proposed_at && next.proposed_at && guest.proposed_at.getTime() !== next.proposed_at.getTime();
   if (moved) await guestsSvc.addEvent(guest.id, req.user.id, 'agenda', `Gravação remarcada: ${fmtWhen(guest.proposed_at)} → ${fmtWhen(next.proposed_at)}`);

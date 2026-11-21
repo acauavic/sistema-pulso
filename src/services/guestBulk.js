@@ -98,6 +98,7 @@ async function apply({ ids, changes, user }) {
       if ('sponsor_id' in set && g.sponsor_id && g.sponsor_id !== set.sponsor_id) { // trocou/tirou o patrocinador: a reserva automática sai
         await client.query('DELETE FROM sponsor_bookings WHERE guest_id = $1 AND sponsor_id = $2', [g.id, g.sponsor_id]);
       }
+      if ('gender' in set) await require('./people').sync(g.id, { client }); // genero e da pessoa
       await client.query('INSERT INTO guest_events (guest_id, user_id, type, message) VALUES ($1,$2,$3,$4)',
         [g.id, user.id, 'status', `Edição em massa por ${user.name}: ${notes.join('; ')}`]);
       touched.push({ id: g.id, ownerChanged: 'owner_id' in set, statusChanged: 'status' in set, sponsorChanged: 'sponsor_id' in set });

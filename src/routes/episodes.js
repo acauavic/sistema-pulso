@@ -220,6 +220,7 @@ router.post('/episodios', requirePerm('episodes.write'), wrap(async (req, res) =
       `INSERT INTO guests (name, instagram, profile, status, owner_id, sponsor_id, sponsor_relation, created_by, project_id) VALUES ($1,$2,$3,'gravado',$4,$5,$6,$4,$7) RETURNING *`,
       [v.newGuest.name, v.newGuest.instagram, v.newGuest.profile, req.user.id, v.sponsor && v.relation ? v.sponsor.id : null, v.sponsor && v.relation ? v.relation : null, projectId]);
     guest = g;
+    await require('../services/people').sync(g.id); // identidade da pessoa, como em qualquer cadastro
     await guestsSvc.addEvent(g.id, req.user.id, 'criado', `Convidado cadastrado por ${req.user.name} ao registrar o episódio (já gravado)`);
   } else if (guest && guest.status !== 'gravado') {
     await db.query("UPDATE guests SET status = 'gravado', updated_at = now() WHERE id = $1", [guest.id]);
