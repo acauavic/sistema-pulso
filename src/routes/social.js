@@ -224,7 +224,7 @@ router.post('/ia/texto', wrap(async (req, res) => {
   const forInvite = String(req.body.campo || '') === 'convite_motivo';
   const forComment = String(req.body.campo || '') === 'resposta';
   const allowed = forInvite ? can(req.user, 'guests.write') : forComment ? can(req.user, 'social.comments') : (can(req.user, 'episodes.read') || can(req.user, 'social.read'));
-  if (!req.user || !allowed) return res.status(403).json({ ok: false, error: 'Seu perfil não usa a IA nos textos.' });
+  if (!req.user || !allowed) return res.status(403).json({ ok: false, error: 'Sua função não usa a IA nos textos.' });
   if (!await aiLimiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitos pedidos seguidos. Espere alguns minutos.' });
   const id = (v) => (isIntId(String(v || '')) ? Number(v) : null);
   const r = await require('../services/aiText').suggest({

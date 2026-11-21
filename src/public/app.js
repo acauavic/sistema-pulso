@@ -204,8 +204,39 @@
   // importação CSV: o arquivo escolhido vira o texto da caixa (o servidor sempre recebe texto)
   document.querySelector('[data-csv-file]')?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if (file) document.querySelector('[data-csv-text]').value = await file.text();
+    if (!file) return;
+    const buf = await file.arrayBuffer();
+    let text;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { text = new TextDecoder('windows-1252').decode(buf); } // Excel salva CSV em Windows-1252
+    document.querySelector('[data-csv-text]').value = text.replace(/^\uFEFF/, '');
   });
+
+  // Campo obrigatório: o rótulo ganha o "*" e o formulário com dois ou mais obrigatórios ganha a legenda "* obrigatório" no topo
+  // (a regra do design system, aplicada uma vez para todas as telas; quem já escreveu o "*" à mão fica como está).
+  const markRequired = (root) => {
+    root.querySelectorAll('label').forEach((label) => {
+      if (label.dataset.reqDone) return;
+      const ctl = label.querySelector('input[required], select[required], textarea[required]');
+      if (!ctl || ctl.type === 'radio' || ctl.type === 'checkbox' || ctl.type === 'hidden') return;
+      label.dataset.reqDone = '1';
+      const text = [...label.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!text || /\*/.test(label.textContent.split('\n')[0])) return;
+      text.textContent = `${text.textContent.replace(/\s+$/, '')} *`; // no próprio texto: o rótulo é uma grade e um elemento a mais desceria de linha
+      label.classList.add('req-label');
+    });
+    root.querySelectorAll('form').forEach((form) => {
+      if (form.dataset.reqLegend || form.querySelector('.req-legend') || /\* obrigatório/.test(form.textContent)) return;
+      if (form.querySelectorAll('.req-label').length < 2) return;
+      form.dataset.reqLegend = '1';
+      const p = document.createElement('p'); p.className = 'req-legend small muted m-0'; p.textContent = '* obrigatório';
+      const head = form.querySelector(':scope > h2, :scope > .modal-head, :scope > h3');
+      if (head) head.after(p); else form.prepend(p);
+    });
+  };
+  markRequired(document);
+
+  // página de erro: Voltar leva à página anterior (sem histórico, ao início)
+  document.querySelectorAll('[data-go-back]').forEach((b) => b.addEventListener('click', () => { if (history.length > 1) history.back(); else location.href = '/'; }));
 
   document.querySelectorAll('[data-select-on-focus]').forEach((el) => el.addEventListener('focus', () => el.select()));
 

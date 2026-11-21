@@ -52,7 +52,7 @@
       <p class="small muted"><%= mReady.length ? 'Arraste mais arquivos para cá ou use o botão.' : 'Logos, moldura, QR Code, manual da marca e vídeos de inserção: escolha tudo de uma vez ou arraste para cá.' %> Na próxima janela você diz a pasta de cada um.</p>
       <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
     </div>
-    <% } else if (!mFiles.length) { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
+    <% } else if (!mFiles.length) { %><p class="muted">Nenhum material ainda. Use Enviar material para guardar logos, moldura e o material da marca.</p><% } %>
     <% if (mStalled.length) { %>
     <div class="stalled-note" role="status">
       <p class="small m-0"><strong><%= mStalled.length %> arquivo<%= mStalled.length > 1 ? 's não terminaram' : ' não terminou' %> de subir</strong></p>

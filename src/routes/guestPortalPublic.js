@@ -39,7 +39,7 @@ const gone = (res) => res.status(404).set(tpl.publicHeaders()).type('html')
   .send(pages.messageHtml('Link não encontrado', 'Este link não é válido ou foi substituído por um mais recente. Fale com a produção do Pulso para receber o novo.'));
 
 async function load(req, res, token = req.params.token) {
-  if (!await viewLimiter.hit(req.ip)) { res.status(429).send('Muitas requisições.'); return null; }
+  if (!await viewLimiter.hit(req.ip)) { res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.'); return null; }
   const g = await portal.byToken(token);
   if (g) { const go = host.wrongHost(req, g.project_id); if (go) return res.redirect(302, go); }
   if (!g) { gone(res); return null; }
@@ -160,7 +160,7 @@ router.get('/convidado/:token/producao', wrap(async (req, res) => {
 router.post('/convidado/:token/youtube', wrap(async (req, res) => {
   const g = await load(req, res); if (!g) return;
   const back = `/convidado/${g.portal_token}`;
-  if (!await writeLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições. Tente de novo em alguns minutos.');
+  if (!await writeLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const channel = portal.parseChannel(req.body.canal);
   if (!channel) return res.redirect(303, `${back}?youtube=erro#youtube`);
   await portal.requestYoutube(g, channel);

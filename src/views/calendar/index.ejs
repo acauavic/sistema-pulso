@@ -104,7 +104,7 @@
 <% } %>
 
 <% if (deletable) { %>
-<form method="post" action="/calendario/visualizacoes/<%= deletable.id %>/excluir" class="top-gap" data-confirm="Excluir a visualização “<%= deletable.name %>”?">
+<form method="post" action="/calendario/visualizacoes/<%= deletable.id %>/excluir" class="top-gap" data-confirm="Apagar a visualização “<%= deletable.name %>”? Os eventos continuam; só o filtro salvo sai.">
   <%- csrfField %><button class="link small" type="submit">Excluir a visualização “<%= deletable.name %>”</button>
 </form>
 <% } %>
@@ -116,7 +116,7 @@
     <% cfg.tipos.forEach(function (k) { %><input type="hidden" name="tipos" value="<%= k %>"><% }) %>
     <h2 id="m-visao-h">Salvar esta visualização</h2>
     <p class="small muted">Guarda o modo (<%= modes[cfg.visao].toLowerCase() %>), os tipos marcados<%= cfg.resp === 'eu' ? ', “só os meus”' : '' %><%= cfg.ocultar ? ' e “ocultar concluídos”' : '' %>. Depois é só clicar no nome lá em cima.</p>
-    <label>Nome<input type="text" name="nome" maxlength="40" required placeholder="Ex.: Minha semana"></label>
+    <label>Nome<input type="text" name="nome" maxlength="40" required placeholder="ex.: Minha semana"></label>
     <% if (canShare) { %><label class="check"><input type="checkbox" name="compartilhar" value="1"> Compartilhar com a equipe</label><% } %>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>

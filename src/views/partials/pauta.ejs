@@ -111,7 +111,7 @@
     <form method="post" action="/pautas/<%= d.id %>/resposta" class="stack">
       <%- csrfField %><input type="hidden" name="resposta" value="aprovada">
       <h2 id="pauta-ok-<%= d.kind %>-h">Aprovada</h2>
-      <label>Quem aprovou <small class="muted">(opcional)</small><input type="text" name="by" maxlength="120" placeholder="ex.: Dr. José, no grupo"></label>
+      <label>Quem aprovou<input type="text" name="by" maxlength="120" placeholder="ex.: Dr. José, no grupo"></label>
       <div class="row modal-actions"><button class="btn primary" type="submit">Registrar aprovação</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
     </form>
   </dialog>

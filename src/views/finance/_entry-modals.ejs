@@ -10,9 +10,9 @@
       <label><input type="radio" name="direction" value="saida" checked> A pagar</label>
       <label><input type="radio" name="direction" value="entrada"> A receber</label>
     </div>
-    <label>O que é<input type="text" name="description" maxlength="200" required placeholder="Ex.: Uber dos hosts, caixas de presente"></label>
+    <label>O que é<input type="text" name="description" maxlength="200" required placeholder="ex.: Uber dos hosts, caixas de presente"></label>
     <div class="grid-2 tight">
-      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="150,00"></label>
+      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="ex.: 150,00"></label>
       <label>Vence em<input type="date" name="due_on" value="<%= today %>" required></label>
     </div>
     <label class="check" data-when="direction=saida"><input type="checkbox" name="paid" value="1"> Já foi pago</label>

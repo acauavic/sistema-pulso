@@ -11,7 +11,7 @@
     <a class="btn primary" href="/convidados/novo"><%- icon('plus') %> Novo convidado</a>
     <details class="row-menu">
       <summary class="btn icon-only" aria-label="Mais ações" title="Mais ações"><%- icon('ellipsis') %></summary>
-      <div class="row-menu-list"><a class="link" href="/convidados/importar"><%- icon('file-text', 14) %> Importar uma planilha (CSV)</a></div>
+      <div class="row-menu-list"><a class="link" href="/convidados/importar"><%- icon('upload', 14) %> Importar uma planilha (CSV)</a><a class="link" href="/convidados/exportar.csv<%= typeof exportQuery !== 'undefined' && exportQuery ? '?' + exportQuery : '' %>" data-no-skeleton><%- icon('download', 14) %> Baixar planilha (com os filtros da tela)</a></div>
     </details>
     <% } %>
   </div>

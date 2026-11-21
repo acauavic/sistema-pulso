@@ -148,9 +148,9 @@
   <form method="post" action="" class="stack" data-fill-form>
     <%- csrfField %>
     <h2 id="mr-h"><span data-mode="edit">Editar custo</span><span data-mode="new" hidden>Novo custo por episódio</span></h2>
-    <label>Nome<input type="text" name="name" maxlength="120" required placeholder="Ex.: Edição do episódio"></label>
+    <label>Nome<input type="text" name="name" maxlength="120" required placeholder="ex.: Edição do episódio"></label>
     <div class="grid-2 tight">
-      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="400,00"></label>
+      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="ex.: 400,00"></label>
       <label>Categoria<select name="category"><% Object.keys(C.FIN_OUT).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_OUT[k] %></option><% }) %></select></label>
     </div>
     <label>Quando nasce<select name="trigger"><% Object.keys(C.FIN_TRIGGERS).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_TRIGGERS[k] %></option><% }) %></select></label>
@@ -185,9 +185,9 @@
   <form method="post" action="" class="stack" data-fill-form data-when-form>
     <%- csrfField %>
     <h2 id="mm-h"><span data-mode="edit">Editar custo mensal</span><span data-mode="new" hidden>Novo custo mensal</span></h2>
-    <label>Nome<input type="text" name="name" maxlength="120" required placeholder="Ex.: Salário da produtora"></label>
+    <label>Nome<input type="text" name="name" maxlength="120" required placeholder="ex.: Salário da produtora"></label>
     <div class="grid-2 tight">
-      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="3.500,00"></label>
+      <label>Valor (R$)<input type="text" name="amount" inputmode="decimal" required placeholder="ex.: 3.500,00"></label>
       <label>Todo dia<input type="number" name="day_of_month" min="1" max="28" required></label>
     </div>
     <%- include('../partials/fin-owner', { ownerHint: 'A divisão precisa somar o valor e vale para cada mês lançado. Em branco no compartilhado, a divisão de hoje fica.' }) %>
@@ -198,7 +198,7 @@
         <label>Categoria<select name="category"><% Object.keys(C.FIN_OUT).forEach(function (k) { %><option value="<%= k %>"><%= C.FIN_OUT[k] %></option><% }) %></select></label>
         <div class="grid-2 tight">
           <label>Começa em<input type="date" name="starts_on"></label>
-          <label>Termina em <small class="muted">(opcional)</small><input type="date" name="ends_on"></label>
+          <label>Termina em<input type="date" name="ends_on"></label>
         </div>
         <label>Fornecedor ou pessoa<input type="text" name="supplier" maxlength="120"></label>
         <label>Situação<select name="active"><option value="1">Ativo</option><option value="0">Pausado</option></select></label>

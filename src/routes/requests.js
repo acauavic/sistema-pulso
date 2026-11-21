@@ -15,7 +15,7 @@ const { wrap, isIntId } = require('../utils/wrap');
 const router = express.Router();
 const wantsJson = (req) => /json/.test(req.get('accept') || '');
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Pedido não encontrado.' });
-const deny = (req, res, msg = 'Seu perfil não faz isso neste pedido.') => (wantsJson(req) ? res.status(403).json({ ok: false, error: msg }) : res.status(403).render('error', { title: 'Sem permissão', message: msg }));
+const deny = (req, res, msg = 'Sua função não faz isso neste pedido.') => (wantsJson(req) ? res.status(403).json({ ok: false, error: msg }) : res.status(403).render('error', { title: 'Sem permissão', message: msg }));
 const extOf = (name) => String(name).match(/\.([A-Za-z0-9]{1,6})$/)?.[1]?.toLowerCase() || '';
 const canEdit = (user, r) => R.canReview(user.role) || String(r.created_by || '') === String(user.id);
 
@@ -26,7 +26,7 @@ const people = () => db.query("SELECT id, name, role FROM users WHERE active AND
 const episodeOptions = () => db.query("SELECT id, number, title FROM episodes ORDER BY number DESC NULLS LAST, id DESC LIMIT 80").then((r) => r.rows);
 
 router.post('/conteudo/pedidos', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!R.canRequest(req.user.role)) return deny(req, res, 'Seu perfil não pede conteúdo.');
+  if (!R.canRequest(req.user.role)) return deny(req, res, 'Sua função não pede conteúdo.');
   const parsed = R.parse(req.body);
   const { values } = parsed;
   values.project_id = require('../services/scope').target(req, req.body); // pedido sem episódio: o projeto do menu ou do campo Projeto

@@ -11,15 +11,15 @@
     <div class="row">
       <label>Repete<select name="repeat"><% Object.keys(REPEATS).forEach(function (k) { %><option value="<%= k %>" <%= r.repeat === k ? 'selected' : '' %>><%= REPEATS[k] %></option><% }) %></select></label>
       <label data-when="repeat=mes">Dia do mês<input type="number" name="month_day" min="1" max="31" step="1" value="<%= r.month_day || '' %>" placeholder="ex.: 5"></label>
-      <label>Até que horas <small class="muted">(opcional)</small><input type="time" name="due_time" value="<%= r.due_time ? String(r.due_time).slice(0, 5) : '' %>"></label>
+      <label>Até que horas<input type="time" name="due_time" value="<%= r.due_time ? String(r.due_time).slice(0, 5) : '' %>"></label>
     </div>
     <fieldset class="weekday-pick" data-when="repeat=semana"><legend class="field-label">Em que dias</legend>
       <div class="chips-radio"><% Object.keys(WEEKDAYS).forEach(function (d) { %><label class="chip-radio"><input type="checkbox" name="weekdays" value="<%= d %>" <%= (r.weekdays || []).map(Number).indexOf(Number(d)) >= 0 ? 'checked' : '' %>><span><%= WEEKDAYS[d] %></span></label><% }) %></div>
     </fieldset>
     <p class="small muted">No dia, a tarefa (ou o pedido) aparece logo cedo, com vencimento no próprio dia. Num mês mais curto, o dia 31 vira o último dia.</p>
   </div>
-  <label>Tarefa<input type="text" name="title" value="<%= r.title || '' %>" maxlength="200" required placeholder="Ex.: Revisar o vídeo editado"></label>
-  <label>Detalhes <small class="muted">(opcional)</small><textarea name="description" rows="2" maxlength="2000"><%= r.description || '' %></textarea></label>
+  <label>Tarefa<input type="text" name="title" value="<%= r.title || '' %>" maxlength="200" required placeholder="ex.: Revisar o vídeo editado"></label>
+  <label>Detalhes<textarea name="description" rows="2" maxlength="2000"><%= r.description || '' %></textarea></label>
   <div class="row" data-when="trigger!=recorrente">
     <label>Vence em (dias)<input type="number" name="offset_days" value="<%= r.offset_days %>" min="-365" max="365" step="1"></label>
     <label>Contando<select name="anchor"><% Object.keys(C.ROUTINE_ANCHORS).forEach(function (k) { %><option value="<%= k %>" <%= r.anchor === k ? 'selected' : '' %>><%= C.ROUTINE_ANCHORS[k] %></option><% }) %></select></label>
@@ -42,7 +42,7 @@
   <div class="row"><button class="btn primary" type="button" data-modal-open="modal-routine-new"><%- icon('plus') %> Nova rotina</button></div></div>
 <%- include('../partials/gestao-nav', { active: 'rotinas' }) %>
 <p class="lead">Tarefas e pedidos de conteúdo que nascem sozinhos: em momentos da produção ou repetindo (todo dia útil, toda semana, todo mês), já com responsável e vencimento. O vencimento de cada tarefa continua editável na própria tarefa; mudar a rotina vale para os próximos episódios.</p>
-<% if (!routines.length) { %><div class="empty card"><%- include('../partials/signal') %><p><strong>Nenhuma rotina.</strong></p></div><% } %>
+<% if (!routines.length) { %><div class="empty card"><%- include('../partials/signal') %><p><strong>Nenhuma rotina</strong></p><p class="muted small">Rotina cria tarefas ou pedidos sozinha, quando algo acontece ou numa data que se repete. Comece em Nova rotina.</p></div><% } %>
 <% Object.keys(C.ROUTINE_TRIGGERS).forEach(function (trig) { var list = byTrigger[trig]; if (!list) return; %>
 <section class="card top-gap">
   <h2><%= C.ROUTINE_TRIGGERS[trig] %></h2>

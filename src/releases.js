@@ -4,6 +4,21 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.7.0', date: '2026-11-21', title: 'Telas mais alinhadas, mensagens mais claras e planilhas que abrem certo',
+    items: [
+      { kind: 'novo', text: 'Planilha dos convidados: no menu "⋯" de Convidados, "Baixar planilha" traz a lista com os filtros que estão na tela (etapa, responsável, busca, filtros e projeto).' },
+      { kind: 'novo', text: 'Financeiro: além do mês, a planilha do ano inteiro (o que o contador costuma pedir), e as duas seguem a busca e a categoria da tela.' },
+      { kind: 'correcao', text: 'Na planilha do financeiro, as saídas vinham como texto e o Excel não somava. Agora são números.' },
+      { kind: 'correcao', text: 'Importar convidados de um arquivo salvo pelo Excel embaralhava os acentos ("Jo�o"). Agora o arquivo é lido certo, e em "Todos os projetos" a importação pergunta em que projeto os convidados entram (antes caíam no Pulso sem aviso). A mesma pessoa em outro projeto não aparece mais como duplicada.' },
+      { kind: 'correcao', text: 'A planilha da plateia trazia a data no fuso de Londres (3 horas a mais) e ignorava os filtros da tela. Agora sai no horário de Brasília e com os filtros.' },
+      { kind: 'correcao', text: 'Nos comentários das tarefas e da revisão do vídeo, a linha de reagir, editar e apagar aparecia desalinhada (as regras da tela de Comentários do Social vazavam para eles).' },
+      { kind: 'ajuste', text: 'Todo campo obrigatório mostra o "*" e o formulário tem a legenda "* obrigatório". O exemplo dentro do campo começa com "ex.:" para não parecer já preenchido, e o "(opcional)" saiu.' },
+      { kind: 'ajuste', text: 'Mensagens: o erro técnico de um serviço de fora (e-mail, IA, pagamento) não aparece mais cru; a mensagem diz o que aconteceu e o que fazer. As confirmações dizem se dá para desfazer (lixeira ou de vez), a página de erro ganhou "Voltar", e a sessão que terminou leva ao login com o aviso.' },
+      { kind: 'ajuste', text: 'Página da tarefa: o resumo fica à vista e "Editar tarefa" abre uma janela, em vez do formulário inteiro aberto. Checklists padrão viram uma lista com "Editar" em janela. Em Episódios, ações raras foram para o menu "⋯".' },
+      { kind: 'ajuste', text: 'Acabamento: a sigla do projeto ao lado do título voltou a ser uma etiqueta pequena, selecionado é marcado na cor do texto (o verde fica só para a ação), sem sombras no tema escuro, arredondamentos e espaçamentos no padrão, avisos com a mesma moldura e botões com área de toque de 44 px no celular.' },
+    ],
+  },
+  {
     version: '2.6.0', date: '2026-11-21', title: 'Estoque de cada projeto e comprovante nas contas',
     items: [
       { kind: 'novo', text: 'Comprovante nas contas: ao lançar um custo dá para anexar a nota, o boleto ou o recibo (PDF ou foto), e ao marcar como pago, o comprovante do pagamento. O clipe na linha mostra os arquivos, anexa mais depois (mesmo já pago) e tira o que entrou errado.' },

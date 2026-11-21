@@ -298,7 +298,7 @@
               <a class="btn" href="/convidados/<%= guest.id %>/previa" target="_blank" rel="noopener"><%- icon('eye') %> Ver convite</a>
               <% if (canEmail) { %><button class="btn" type="button" data-modal-open="modal-email"><%- icon('mail') %> <%= guest.invite_sent_at ? 'Reenviar' : 'Enviar' %> por e-mail</button><% } %>
               <% if (canInv) { %>
-              <form method="post" action="/convidados/<%= guest.id %>/convite" class="inline" data-confirm="Gerar um novo link? O link atual deixará de funcionar.">
+              <form method="post" action="/convidados/<%= guest.id %>/convite" class="inline" data-confirm="Gerar um link novo? O atual para de funcionar e é preciso mandar o novo.">
                 <%- csrfField %><input type="hidden" name="regenerar" value="1"><button class="btn ghost" type="submit">Gerar novo link</button>
               </form>
               <% } %>
@@ -413,11 +413,11 @@
         <%- csrfF %>
         <h2 id="mpg-h">Editar página</h2>
         <p class="small muted">O que ficar vazio não aparece na página.</p>
-        <label>Como será a gravação<textarea name="intro" rows="5" maxlength="1200" placeholder="Ex.: uma conversa sobre gestão de clínicas, com abertura para perguntas da plateia no fim."><%= guest.audience_intro || '' %></textarea></label>
+        <label>Como será a gravação<textarea name="intro" rows="5" maxlength="1200" placeholder="ex.: uma conversa sobre gestão de clínicas, com abertura para perguntas da plateia no fim."><%= guest.audience_intro || '' %></textarea></label>
         <label>Horário de chegada da plateia <small class="muted">(a gravação está marcada para <%= guest.proposed_at ? fmt.formatDateTime(guest.proposed_at) : 'data a definir' %>)</small><input type="time" name="arrival" value="<%= P.arrivalInput %>"></label>
         <fieldset class="stack">
-          <legend class="small muted">Bloco extra (opcional)</legend>
-          <label>Título<input type="text" name="extra_title" maxlength="80" value="<%= guest.audience_extra_title || '' %>" placeholder="Ex.: O que levar"></label>
+          <legend class="small muted">Bloco extra</legend>
+          <label>Título<input type="text" name="extra_title" maxlength="80" value="<%= guest.audience_extra_title || '' %>" placeholder="ex.: O que levar"></label>
           <label>Texto<textarea name="extra" rows="4" maxlength="1500"><%= guest.audience_extra || '' %></textarea></label>
         </fieldset>
         <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
@@ -428,8 +428,8 @@
         <%- csrfF %>
         <h2 id="mpa-h"><span data-mode="new">Novo link de parceiro</span><span data-mode="edit">Editar link de parceiro</span></h2>
         <p class="small muted" data-mode="new">Quem pedir pelo link vê "participação isenta, convite de [parceiro]" e, se for selecionado, entra como isento. A seleção continua com vocês.</p>
-        <label>Nome do parceiro <small class="muted">(aparece na página)</small><input type="text" name="name" maxlength="80" required placeholder="Ex.: Clínica Vida"></label>
-        <label>Vagas isentas <small class="muted">(vazio = sem limite)</small><input type="number" name="slots" min="1" max="500" inputmode="numeric" placeholder="Ex.: 5"></label>
+        <label>Nome do parceiro <small class="muted">(aparece na página)</small><input type="text" name="name" maxlength="80" required placeholder="ex.: Clínica Vida"></label>
+        <label>Vagas isentas <small class="muted">(vazio = sem limite)</small><input type="number" name="slots" min="1" max="500" inputmode="numeric" placeholder="ex.: 5"></label>
         <p class="small muted">Contam as vagas os pedidos em andamento e os selecionados. Quem não for selecionado ou desistir devolve a vaga.</p>
         <div class="row modal-actions"><button class="btn primary" type="submit"><span data-mode="new">Criar link</span><span data-mode="edit">Salvar</span></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
       </form>
@@ -576,7 +576,7 @@
           <div class="plan-row" data-plan-line>
             <label>Data<input type="date" name="plano_data" value="<%= it.on_date || '' %>"></label>
             <label>Horário provável<input type="time" name="plano_hora" value="<%= it.at_time || '' %>"></label>
-            <label>O que sai<input type="text" name="plano_texto" maxlength="80" value="<%= it.label || '' %>" placeholder="Ex.: Corte sobre gestão"></label>
+            <label>O que sai<input type="text" name="plano_texto" maxlength="80" value="<%= it.label || '' %>" placeholder="ex.: Corte sobre gestão"></label>
             <button class="icon-btn" type="button" data-plan-remove aria-label="Tirar esta linha" title="Tirar esta linha"><%- icon('x', 16) %></button>
           </div>
           <% }) %>
@@ -585,7 +585,7 @@
           <div class="plan-row" data-plan-line>
             <label>Data<input type="date" name="plano_data"></label>
             <label>Horário provável<input type="time" name="plano_hora"></label>
-            <label>O que sai<input type="text" name="plano_texto" maxlength="80" placeholder="Ex.: Corte sobre gestão"></label>
+            <label>O que sai<input type="text" name="plano_texto" maxlength="80" placeholder="ex.: Corte sobre gestão"></label>
             <button class="icon-btn" type="button" data-plan-remove aria-label="Tirar esta linha" title="Tirar esta linha"><%- icon('x', 16) %></button>
           </div>
         </template>
@@ -742,7 +742,7 @@
       <label><input type="radio" name="invite_format" value="plateia" <%= guest.invite_format === 'plateia' ? 'checked' : '' %>>Com plateia</label>
     </div>
     <p class="small muted">Com plateia, o convite mostra como é a gravação com público, as fotos e o vídeo da plateia.</p>
-    <label>Por que você<textarea name="invite_why" rows="4" maxlength="600" data-ai="convite_motivo" data-ai-guest="<%= guest.id %>" placeholder="Ex.: Sua forma de falar de obesidade sem culpa conversa com quem atende e com quem quer cuidar da saúde."><%= guest.invite_why || '' %></textarea></label>
+    <label>Por que você<textarea name="invite_why" rows="4" maxlength="600" data-ai="convite_motivo" data-ai-guest="<%= guest.id %>" placeholder="ex.: Sua forma de falar de obesidade sem culpa conversa com quem atende e com quem quer cuidar da saúde."><%= guest.invite_why || '' %></textarea></label>
     <p class="small muted">Aparece no topo do convite, logo abaixo do nome. Fale com a pessoa (você), em duas ou três frases. Vazio: o convite usa a frase padrão.</p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>

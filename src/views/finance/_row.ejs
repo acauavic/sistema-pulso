@@ -20,7 +20,7 @@
 <li class="fin-row<%= e.status === 'cancelado' ? ' is-off' : '' %>">
   <div class="plan-list-main">
     <strong><%= e.description %></strong>
-    <span class="small muted"><%= C.FIN_CATEGORIES[e.category] || e.category %><%= e.supplier ? ' · ' + e.supplier : '' %><% if (links.length) { %> · <%- links.join(' · ') %><% } %><%= e.auto_key ? ' · automático' : '' %><% if (tag) { %> · <span class="mono">[ <%= tag %> ]</span><% } %><% if (sharedNote) { %> · <%= sharedNote %><% } %><% if (e.account === 'parceiro') { %> · <span class="mono"><%= isIn ? 'recebido por' : 'pago por' %> <%= e.account_person || 'parceiro' %></span><% } %></span>
+    <span class="small muted"><%= C.FIN_CATEGORIES[e.category] || e.category %><%= e.supplier ? ' · ' + e.supplier : '' %><% if (links.length) { %> · <%- links.join(' · ') %><% } %><%= e.auto_key ? ' · automático' : '' %><% if (tag) { %> · <span class="mono project-tag">[ <%= tag %> ]</span><% } %><% if (sharedNote) { %> · <%= sharedNote %><% } %><% if (e.account === 'parceiro') { %> · <span class="mono"><%= isIn ? 'recebido por' : 'pago por' %> <%= e.account_person || 'parceiro' %></span><% } %></span>
   </div>
   <span class="fin-when mono small <%= late ? 'err' : 'muted' %>">
     <% if (e.status === 'pago') { %><%= fmt.formatDayShort(e.paid_on) %> · <%= isIn ? 'recebido' : 'pago' %><% } else if (e.status === 'cancelado') { %>cancelado<% } else { %><%= fmt.formatDayShort(e.due_on) %><%= late ? ' · atrasado' : '' %><% } %>

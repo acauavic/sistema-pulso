@@ -41,7 +41,7 @@ router.post('/abordagens/:id/excluir', wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return res.redirect('/');
   const { rows: [a] } = await db.query('SELECT * FROM outreach_attempts WHERE id = $1', [req.params.id]);
   if (!a) return res.redirect('/');
-  if (!can(req.user, PERM[a.subject_type])) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não tem acesso a esta área.' });
+  if (!can(req.user, PERM[a.subject_type])) return res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não tem acesso a esta área.' });
   await outreach.remove(a.id);
   await audit(req, 'abordagem.excluida', a.subject_type, a.subject_id, { canal: a.channel, resultado: a.result, em: formatDateTime(a.at) });
   await req.flash('ok', 'Registro apagado.');

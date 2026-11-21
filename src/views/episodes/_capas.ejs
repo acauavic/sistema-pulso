@@ -54,7 +54,7 @@
             <a href="<%= img(c) %>&baixar=1" data-no-skeleton><%- icon('download', 14) %> Baixar</a>
             <% if (approvers && c.approved && kind === 'yt' && !isMain) { %><form method="post" action="/capas/<%= c.id %>/principal"><%- csrfField %><button type="submit"><%- icon('star', 14) %> Usar como principal</button></form><% } %>
             <% if (approvers && c.approved) { %><form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/aprovar"><%- csrfField %><input type="hidden" name="aprovar" value="0"><button type="submit"><%- icon('x', 14) %> Tirar a aprovação</button></form><% } %>
-            <% if (designers) { %><form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/excluir" data-confirm="Mandar esta capa para a lixeira?"><%- csrfField %><button type="submit" class="danger"><%- icon('trash-2', 14) %> Excluir</button></form><% } %>
+            <% if (designers) { %><form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/excluir" data-confirm="Mandar esta capa para a lixeira? Ela fica 15 dias lá e dá para restaurar."><%- csrfField %><button type="submit" class="danger"><%- icon('trash-2', 14) %> Excluir</button></form><% } %>
           </div>
         </details>
       </div>

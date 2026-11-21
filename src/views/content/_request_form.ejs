@@ -28,7 +28,7 @@
         <% }) %>
       </div>
     </fieldset>
-    <label>Nome do pedido<input type="text" name="title" maxlength="160" required value="<%= cur.title || '' %>" placeholder="Ex.: trailer da temporada para o canal"></label>
+    <label>Nome do pedido<input type="text" name="title" maxlength="160" required value="<%= cur.title || '' %>" placeholder="ex.: trailer da temporada para o canal"></label>
     <div class="field"><span class="field-label">Briefing <small class="muted">(o que você quer, referências, tom, duração)</small></span>
       <%- include('../partials/rich-editor', { name: 'briefing_html', attach: 'attachment_ids', html: r ? fmt.richHtml(r.briefing_html, r.briefing) : '', placeholder: 'Descreva o que precisa. Cole imagens de referência, anexe arquivos, links com miniatura…', label: 'Briefing', size: 'sm' }) %>
     </div>

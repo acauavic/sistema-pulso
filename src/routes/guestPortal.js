@@ -1,6 +1,7 @@
 // Portal do convidado, lado da equipe: a aba "Portal" no cadastro do convidado (ligar, datas, aviso, fotos, collab no YouTube,
 // envio do link) e a marcação de um corte como exclusivo do convidado.
 const express = require('express');
+const { userMessage } = require('../utils/userMessage');
 const db = require('../db/pool');
 const portal = require('../services/guestPortal');
 const { audit } = require('../services/audit');
@@ -120,7 +121,7 @@ router.post('/convidados/:id/portal/enviar', requirePerm('guests.invite'), wrap(
     if (r.error) await req.flash('error', r.error);
     else { await audit(req, 'portal.link_email', 'guest', g.id); await req.flash('ok', `Link do portal enviado para ${g.email}.`); }
   } catch (err) {
-    await req.flash('error', `O e-mail não saiu: ${err.message}`);
+    await req.flash('error', userMessage(err, 'O link não saiu por e-mail. Copie o link e mande pelo WhatsApp.', { log: 'Portal: e-mail do link' }));
   }
   res.redirect(back(g.id));
 }));

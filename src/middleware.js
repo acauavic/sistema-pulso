@@ -38,9 +38,9 @@ function originCheck(req, res, next) {
   if (origin && origin !== 'null') {
     let host;
     try { host = new URL(origin).host; } catch { host = null; }
-    if (host !== req.get('host') && origin !== config.appBaseUrl) return res.status(403).send('Origem não permitida.');
+    if (host !== req.get('host') && origin !== config.appBaseUrl) return res.status(403).type('text/plain; charset=utf-8').send('Este envio veio de outro endereço. Abra o painel pelo endereço oficial e tente de novo.');
   } else if (origin === 'null' && !allowNull) {
-    return res.status(403).send('Origem não permitida.');
+    return res.status(403).type('text/plain; charset=utf-8').send('Este envio veio de outro endereço. Abra o painel pelo endereço oficial e tente de novo.');
   }
   return next();
 }
@@ -121,10 +121,16 @@ async function attachSession(req, res, next) {
   }
 }
 
-function requireAuth(req, res, next) {
+// Sem sessão: a página manda para o login; o envio de formulário também (com aviso); o fetch recebe JSON com a frase.
+const SESSION_ENDED = 'Sua sessão terminou. Entre de novo para continuar.';
+async function requireAuth(req, res, next) {
   if (req.user) return next();
   if (req.method === 'GET') return res.redirect('/login');
-  return res.status(401).send('Sessão expirada. Faça login novamente.');
+  const isForm = req.is('application/x-www-form-urlencoded') || req.is('multipart/form-data');
+  const wantsJson = !isForm || /json/.test(req.get('accept') || '') || Boolean(req.get('x-csrf-token')); // envio de arquivo, fetch: JSON
+  if (wantsJson) return res.status(401).json({ ok: false, error: SESSION_ENDED });
+  if (typeof req.flash === 'function') await req.flash('error', SESSION_ENDED).catch(() => {});
+  return res.redirect(303, '/login');
 }
 
 function requirePerm(permission) {
@@ -135,7 +141,7 @@ function requirePerm(permission) {
       scope.narrow(req, permission); // daqui em diante, só os projetos em que a função dela dá esta permissão
       return scope.guardNarrowed(req).then((ok) => (ok ? next() : next(Object.assign(new Error('Fora da função neste projeto'), { status: 404 }))), next);
     }
-    return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não tem acesso a esta área.' });
+    return res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não dá acesso a esta área. Se precisar, peça acesso à gestão.' });
   };
 }
 
@@ -152,7 +158,7 @@ function verifyCsrf(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || !req.session || CSRF_EXEMPT.test(req.path)) return next();
   const sent = (req.body && req.body._csrf) || req.get('x-csrf-token');
   if (typeof sent === 'string' && sameSecret(sent, req.session.csrf)) return next();
-  return res.status(403).render('error', { title: 'Requisição inválida', message: 'Token de segurança inválido ou expirado. Volte, recarregue a página e tente de novo.' });
+  return res.status(403).render('error', { title: 'Página desatualizada', message: 'Esta página ficou aberta tempo demais. Volte, recarregue a página e envie de novo.' });
 }
 
 const staticDir = path.join(__dirname, 'public');

@@ -15,7 +15,7 @@ const view = (a) => ({ id: a.id, kind: a.kind, name: a.filename, type: a.content
 
 // Envio: o corpo é o arquivo cru; o nome vai em X-Filename (codificado) e, para áudio, a duração em X-Duration-Ms.
 router.post('/anexos', express.raw({ type: () => true, limit: attachments.MAX_BODY }), wrap(async (req, res) => {
-  if (!canUpload(req.user)) return fail(res, 403, 'Seu perfil não envia anexos.');
+  if (!canUpload(req.user)) return fail(res, 403, 'Sua função não envia anexos.');
   if (!await uploadLimiter.hit(req.user.id)) return fail(res, 429, 'Muitos envios seguidos. Espere alguns minutos.');
   let filename = '';
   try { filename = decodeURIComponent(String(req.get('x-filename') || '')); } catch { filename = ''; }

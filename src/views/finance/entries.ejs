@@ -32,7 +32,9 @@
 <% if (scope === 'historico') { %>
 <div class="row spread month-nav">
   <div class="row"><a class="icon-btn" href="<%= url({ mes: prevMonth }) %>" aria-label="Mês anterior"><%- icon('chevron-left') %></a><strong class="mono"><%= fin.monthLabel(month) %></strong><a class="icon-btn" href="<%= url({ mes: nextMonth }) %>" aria-label="Próximo mês"><%- icon('chevron-right') %></a></div>
-  <span class="small muted">Entrou <span class="mono"><%= money(totals.in) %></span> · saiu <span class="mono"><%= money(totals.out) %></span> · <a href="/financeiro/exportar.csv?mes=<%= month %>"><%- icon('download', 14) %> Exportar planilha</a></span>
+  <span class="small muted">Entrou <span class="mono"><%= money(totals.in) %></span> · saiu <span class="mono"><%= money(totals.out) %></span> <% var csvQs = (q ? '&q=' + encodeURIComponent(q) : '') + (category ? '&cat=' + category : ''); %>
+    · <a href="/financeiro/exportar.csv?mes=<%= month %><%= csvQs %>" data-no-skeleton><%- icon('download', 14) %> Baixar planilha do mês</a>
+    · <a href="/financeiro/exportar.csv?ano=<%= month.slice(0, 4) %><%= csvQs %>" data-no-skeleton>do ano <%= month.slice(0, 4) %></a></span>
 </div>
 <% } else if (items.length) { %>
 <p class="small muted">Em aberto: <span class="mono"><%= money(total) %></span> · <%= items.length %> lançamento<%= items.length === 1 ? '' : 's' %></p>

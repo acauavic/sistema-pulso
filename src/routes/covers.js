@@ -1,5 +1,6 @@
 // Capas e posts do episódio: lista, imagem (link assinado), editor visual, aprovação e geração.
 const express = require('express');
+const { userMessage } = require('../utils/userMessage');
 const db = require('../db/pool');
 const config = require('../config');
 const b2 = require('../services/b2');
@@ -24,7 +25,7 @@ const canDesign = (role) => can(role, 'covers.edit'); // gestão, editor e produ
 const canGenerate = (role) => can(role, 'production.review') || can(role, 'production.edit'); // gerar com a IA é passo da finalização
 // Volta para o post de onde a pessoa veio (Novo post ou a publicação): só endereços nossos, nunca um link de fora.
 const safeBack = (v) => (typeof v === 'string' && /^\/social\/(novo\?[\w=&,%-]*|publicacoes\/\d+)$/.test(v) ? v : null);
-const deny = (res) => res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita capas e posts.' });
+const deny = (res) => res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não edita capas e posts.' });
 
 // As capas respondem em dois endereços: /episodios/:id/capas/:cid/… (do episódio) e /capas/:cid/… (genérico: cortes ainda sem episódio).
 const both = (suffix = '') => [`/episodios/:id/capas/:cid${suffix}`, `/capas/:cid${suffix}`];
@@ -93,7 +94,7 @@ router.post('/episodios/:id/capas/gerar', requirePerm('episodes.read'), wrap(asy
         ? `${out.created.length === 1 ? '1 capa pronta' : `${out.created.length} capas prontas`}.${out.fails.length ? ` ${out.fails.map((f) => f.what).join(' e ')} ${out.fails.length === 1 ? 'ficou' : 'ficaram'} de fora: veja o motivo no cartão.` : ''}`
         : (out.fails.length ? 'Nenhuma capa saiu: os textos passam do limite. Ajuste cada uma no cartão.' : 'Nada novo para gerar: as capas aprovadas ou ajustadas ficam como estão.'));
     } catch (err) {
-      await req.flash('error', `Não foi possível gerar: ${err.message}`);
+      await req.flash('error', userMessage(err, 'As capas não saíram desta vez. Tente de novo em alguns minutos.', { log: 'Capas pela ficha' }));
     }
     return res.redirect(`/episodios/${req.params.id}?capas=youtube#capas`);
   }
@@ -102,7 +103,7 @@ router.post('/episodios/:id/capas/gerar', requirePerm('episodes.read'), wrap(asy
     await prod.addEvent(req.params.id, req.user.id, 'capas', `${made.length} capas e posts gerados`);
     await req.flash('ok', `${made.length} imagens geradas.`);
   } catch (err) {
-    await req.flash('error', `Não foi possível gerar: ${err.message}`);
+    await req.flash('error', userMessage(err, 'As imagens não saíram desta vez. Tente de novo em alguns minutos.', { log: 'Capas e posts' }));
   }
   res.redirect(req.body.voltar === 'conteudo' ? `/conteudo?episodio=${req.params.id}#posts` : `/episodios/${req.params.id}#capas`);
 }));
@@ -132,7 +133,7 @@ router.get(both('/editar'), requirePerm('episodes.read'), wrap(async (req, res) 
 
 // Imagem própria como fundo (no lugar de um quadro do vídeo). Vira um "quadro" do episódio (ou do corte), marcado como enviado.
 router.post(['/episodios/:id/capas/imagem', '/capas/imagem'], requirePerm('episodes.read'), express.raw({ type: () => true, limit: MAX_IMAGE }), wrap(async (req, res) => {
-  if (!canDesign(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não edita capas.' });
+  if (!canDesign(req.user.role)) return res.status(403).json({ ok: false, error: 'Sua função não edita capas.' });
   const clipId = isIntId(req.query.corte) ? Number(req.query.corte) : null;
   const episodeId = req.params.id ?? (isIntId(req.query.episodio) ? req.query.episodio : null);
   if (clipId) {
@@ -154,7 +155,7 @@ router.post(['/episodios/:id/capas/imagem', '/capas/imagem'], requirePerm('episo
 // Fotografia do episódio (material bruto) como fundo: vira um "quadro" da capa (em pé, rostos conferidos pela IA).
 // A mesma foto usada de novo é reaproveitada, sem baixar e analisar outra vez.
 router.post(both('/foto'), requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canDesign(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não edita capas.' });
+  if (!canDesign(req.user.role)) return res.status(403).json({ ok: false, error: 'Sua função não edita capas.' });
   const c = await findCover(req);
   if (!c) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
   const episodeId = await episodeOfCover(c);
@@ -178,7 +179,7 @@ router.post(both('/foto'), requirePerm('episodes.read'), wrap(async (req, res) =
 }));
 
 router.post(both(), requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canDesign(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não edita capas.' });
+  if (!canDesign(req.user.role)) return res.status(403).json({ ok: false, error: 'Sua função não edita capas.' });
   const c = await findCover(req);
   if (!c) return res.status(404).json({ ok: false });
   const frames = await store.loadFrames(c.episode_id, { clipId: c.clip_id ?? null, custom: true });
@@ -263,7 +264,7 @@ const adjustTarget = (req) => (req.params.angle ? angleCover(req) : findCover(re
 
 // O que a janela precisa: os campos da ficha desta peça, os quadros e as fotografias que podem virar foto.
 router.get(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não ajusta capas.' });
+  if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return res.status(403).json({ ok: false, error: 'Sua função não ajusta capas.' });
   const c = await adjustTarget(req);
   if (!c || !c.model) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
   if (c.clip_id) { // capa de corte: os campos vêm da própria capa; os quadros são os do corte
@@ -294,7 +295,7 @@ router.get(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
 }));
 
 router.post(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não ajusta capas.' });
+  if (!canDesign(req.user.role) && !canGenerate(req.user.role)) return res.status(403).json({ ok: false, error: 'Sua função não ajusta capas.' });
   const c = await adjustTarget(req);
   if (!c || !c.model) return res.status(404).json({ ok: false, error: 'Capa não encontrada.' });
   const b = req.body || {};
@@ -358,7 +359,7 @@ router.get('/episodios/:id/capas/teste.zip', requirePerm('episodes.read'), wrap(
   const files = (await Promise.all(rows.map((c) => pieces.download(c, ep)))).filter(Boolean);
   const { zipStream, uniqueNames } = require('../utils/zipStream');
   const names = uniqueNames(files.map((f) => f.name));
-  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="pulso_${ep.number ? `ep${String(ep.number).padStart(3, '0')}` : `episodio${ep.id}`}_youtube_teste.zip"`, 'Cache-Control': 'no-store' });
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${(require('../services/projects').get(ep.project_id)?.slug || 'pulso').replace(/-/g, '')}_${ep.number ? `ep${String(ep.number).padStart(3, '0')}` : `episodio${ep.id}`}_youtube_teste.zip"`, 'Cache-Control': 'no-store' });
   const zip = zipStream(res);
   for (const [i, f] of files.entries()) await zip.add(names[i], f.buffer);
   await zip.end();

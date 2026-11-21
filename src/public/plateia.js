@@ -126,7 +126,7 @@
       });
       const json = await res.json().catch(() => ({}));
       if (tsBox && window.PulsoTurnstile) window.PulsoTurnstile.reset(tsBox); // o token vale uma vez
-      if (!res.ok || !json.ok) { err(json.field || 'form', json.error || 'Não foi possível enviar agora. Tente novamente.'); return; }
+      if (!res.ok || !json.ok) { err(json.field || 'form', json.error || 'Não deu para enviar agora. Tente de novo em instantes.'); return; }
       ref = json.ref;
       fire('Lead', 'generate_lead', { content_name: current.name });
       const r = (k, v) => { dlg.querySelector(`[data-r="${k}"]`).textContent = v; };

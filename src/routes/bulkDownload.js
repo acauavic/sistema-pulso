@@ -29,14 +29,18 @@ function parseItems(raw) {
 }
 
 // Itens pedidos que existem e estão prontos, na ordem do pedido: { name, key, when }.
-async function resolve(items) {
+// `canSee(projectId)`: item de projeto que a pessoa não participa fica de fora (como se não existisse).
+async function resolve(items, canSee = () => true) {
   const ids = (type) => items.filter((i) => i.type === type).map((i) => i.id);
   const [files, clips, covers, sponsorFiles] = await Promise.all([
-    db.query("SELECT id, filename, storage_key, created_at FROM episode_files WHERE id = ANY($1::int[]) AND status = 'pronto'", [ids('f')]),
-    db.query("SELECT id, title, storage_key, created_at FROM episode_clips WHERE id = ANY($1::int[]) AND storage_key IS NOT NULL AND status <> 'enviando'", [ids('c')]),
-    db.query('SELECT c.id, c.kind, c.position, c.clip_id, c.storage_key, c.updated_at, e.number FROM episode_covers c LEFT JOIN episodes e ON e.id = c.episode_id WHERE c.id = ANY($1::int[]) AND c.storage_key IS NOT NULL', [ids('k')]),
-    db.query("SELECT id, filename, storage_key, created_at FROM sponsor_files WHERE id = ANY($1::int[]) AND status = 'pronto' AND kind <> 'audio'", [ids('s')]),
+    db.query("SELECT f.id, f.filename, f.storage_key, f.created_at, e.project_id FROM episode_files f LEFT JOIN episodes e ON e.id = f.episode_id WHERE f.id = ANY($1::int[]) AND f.status = 'pronto'", [ids('f')]),
+    db.query("SELECT id, title, storage_key, created_at, project_id FROM episode_clips WHERE id = ANY($1::int[]) AND storage_key IS NOT NULL AND status <> 'enviando'", [ids('c')]),
+    db.query(`SELECT c.id, c.kind, c.position, c.clip_id, c.storage_key, c.updated_at, e.number,
+                     coalesce(e.project_id, (SELECT project_id FROM episode_clips WHERE id = c.clip_id), (SELECT project_id FROM content_requests WHERE id = c.request_id)) AS project_id
+                FROM episode_covers c LEFT JOIN episodes e ON e.id = c.episode_id WHERE c.id = ANY($1::int[]) AND c.storage_key IS NOT NULL`, [ids('k')]),
+    db.query("SELECT f.id, f.filename, f.storage_key, f.created_at, s.project_id FROM sponsor_files f LEFT JOIN sponsors s ON s.id = f.sponsor_id WHERE f.id = ANY($1::int[]) AND f.status = 'pronto' AND f.kind <> 'audio'", [ids('s')]),
   ]);
+  for (const q of [files, clips, covers, sponsorFiles]) q.rows = q.rows.filter((r) => canSee(r.project_id));
   const by = {
     f: new Map(files.rows.map((r) => [r.id, { name: r.filename, key: r.storage_key, when: r.created_at }])),
     c: new Map(clips.rows.map((r) => [r.id, { name: `${fmt.slugify(r.title) || `corte-${r.id}`}.mp4`, key: r.storage_key, when: r.created_at }])),
@@ -61,11 +65,12 @@ async function withSizes(list) {
 
 router.get('/baixar.zip', requirePerm('episodes.read'), wrap(async (req, res) => {
   const items = parseItems(req.query.itens).filter((i) => i.type !== 's' || can(req.user, 'sponsors.read'));
-  const list = items.length ? await withSizes(await resolve(items)) : [];
+  const scope = require('../services/scope');
+  const list = items.length ? await withSizes(await resolve(items, (pid) => scope.canSee(req, pid))) : [];
   if (!list.length) return res.status(404).render('error', { title: 'Nada para baixar', message: 'Os arquivos marcados não estão mais disponíveis.' });
   const names = uniqueNames(list.map((f) => f.name));
   list.forEach((f, i) => { f.name = names[i]; });
-  const zipName = `${fmt.slugify(String(req.query.nome || '')).slice(0, 80) || 'pulso-arquivos'}.zip`;
+  const zipName = `${fmt.slugify(String(req.query.nome || '')).slice(0, 80) || `${req.scope?.current?.slug || 'studio'}-arquivos`}.zip`;
   res.set({
     'Content-Type': 'application/zip',
     'Content-Disposition': `attachment; filename="${zipName}"`,

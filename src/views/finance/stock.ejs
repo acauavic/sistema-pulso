@@ -82,9 +82,9 @@
     <%- csrfField %>
     <h2 id="min-h">Novo item de estoque</h2>
     <% if (sps.length && !projectScope.current) { %><div class="project-field"><%- ownerField(true) %></div><% } %>
-    <label>Nome<input type="text" name="name" maxlength="80" required placeholder="Ex.: Caneca da marca"></label>
+    <label>Nome<input type="text" name="name" maxlength="80" required placeholder="ex.: Caneca da marca"></label>
     <div class="grid-2 tight">
-      <label>Quanto tem agora<input type="text" name="qty" inputmode="decimal" placeholder="0"></label>
+      <label>Quanto tem agora<input type="text" name="qty" inputmode="decimal" placeholder="ex.: 10"></label>
       <label>Sai por episódio <small class="muted">(0 se não é fixo)</small><input type="text" name="per_episode" inputmode="decimal" value="0"></label>
     </div>
     <details class="more">
@@ -96,7 +96,7 @@
         </div>
         <div class="grid-2 tight">
           <label>Avisar quando restar<input type="text" name="min_qty" inputmode="decimal" value="0"></label>
-          <% if (seeMoney) { %><label>Custo por unidade (R$)<input type="text" name="unit_cost" inputmode="decimal" placeholder="35,00"></label><% } %>
+          <% if (seeMoney) { %><label>Custo por unidade (R$)<input type="text" name="unit_cost" inputmode="decimal" placeholder="ex.: 35,00"></label><% } %>
         </div>
         <label>Fornecedor<input type="text" name="supplier" maxlength="120"></label>
       </div>
@@ -144,7 +144,7 @@
       </label>
       <label>Quantidade<input type="text" name="qty" inputmode="decimal" required autofocus></label>
     </div>
-    <label>Anotação <small class="muted">(opcional)</small><input type="text" name="note" maxlength="200"></label>
+    <label>Anotação<input type="text" name="note" maxlength="200"></label>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>
@@ -158,7 +158,7 @@
     <label>Item<input type="text" name="_label" readonly></label>
     <div class="grid-2 tight">
       <label>Quantidade comprada<input type="text" name="qty" inputmode="decimal" required autofocus></label>
-      <label>Valor total (R$)<input type="text" name="total" inputmode="decimal" required placeholder="1.200,00"></label>
+      <label>Valor total (R$)<input type="text" name="total" inputmode="decimal" required placeholder="ex.: 1.200,00"></label>
     </div>
     <div class="grid-2 tight">
       <label>Parcelas<input type="number" name="installments" min="1" max="24"></label>

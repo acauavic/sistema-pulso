@@ -45,7 +45,7 @@ async function toTrash(kind, ids, user, onEach = null) {
 
 // ---------------------------------------------------------------- cortes: atribuir ao episódio, lixeira
 router.post('/conteudo/em-massa/cortes', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canCut(req.user.role)) return deny(res, 'Seu perfil não mexe nos cortes.');
+  if (!canCut(req.user.role)) return deny(res, 'Sua função não mexe nos cortes.');
   const ids = idsOf(req.body); const to = back(req, 'cortes');
   if (!ids.length) { await req.flash('error', 'Marque pelo menos um corte.'); return res.redirect(to); }
   const { rows: list } = await db.query('SELECT id, title, status, episode_id FROM episode_clips WHERE id = ANY($1)', [ids]);
@@ -88,7 +88,7 @@ router.post('/conteudo/em-massa/posts', requirePerm('episodes.read'), wrap(async
   if (!ids.length) { await req.flash('error', 'Marque pelo menos um post.'); return res.redirect(to); }
   const { rows: list } = await db.query('SELECT id, episode_id, kind, label FROM episode_covers WHERE id = ANY($1) AND kind = ANY($2) AND clip_id IS NULL', [ids, POST_KINDS]);
   if (['aprovar', 'desaprovar'].includes(req.body.acao)) {
-    if (!canApprove(req.user.role)) return deny(res, 'Seu perfil não aprova posts.');
+    if (!canApprove(req.user.role)) return deny(res, 'Sua função não aprova posts.');
     const approve = req.body.acao === 'aprovar';
     await db.query('UPDATE episode_covers SET approved = $2 WHERE id = ANY($1)', [list.map((c) => c.id), approve]);
     for (const epId of [...new Set(list.map((c) => c.episode_id).filter(Boolean))]) {
@@ -99,7 +99,7 @@ router.post('/conteudo/em-massa/posts', requirePerm('episodes.read'), wrap(async
     return res.redirect(to);
   }
   if (req.body.acao === 'excluir') {
-    if (!canCut(req.user.role)) return deny(res, 'Seu perfil não apaga posts.');
+    if (!canCut(req.user.role)) return deny(res, 'Sua função não apaga posts.');
     const { batch, n } = await toTrash('cover', list.map((c) => c.id), req.user);
     await req.flash('ok', `${plural(n, 'post foi', 'posts foram')} para a lixeira.`, n ? { undo: batch } : null);
     return res.redirect(to);
@@ -175,7 +175,7 @@ const coverList = (ids) => db.query('SELECT id, clip_id, label, spec, updated_at
 
 // 1) Agenda para conferir: horários distribuídos, quais vão como Reel de teste e o que ficou de fora (e por quê).
 router.post('/conteudo/em-massa/publicar/previa', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
+  if (!canAskPublish(req.user.role)) return deny(res, 'Sua função não publica nas redes.');
   const ids = idsOf(req.body); const to = back(req, 'cortes');
   if (!ids.length) { await req.flash('error', 'Marque pelo menos um corte.'); return res.redirect(to); }
   const platforms = platformsOf(req.body);
@@ -198,7 +198,7 @@ router.post('/conteudo/em-massa/publicar/previa', requirePerm('episodes.read'), 
 
 // 2) Confirmado: uma publicação agendada por corte (a produtora manda para a revisão da gestão).
 router.post('/conteudo/em-massa/publicar', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
+  if (!canAskPublish(req.user.role)) return deny(res, 'Sua função não publica nas redes.');
   const review = !canPublishNow(req.user.role);
   const to = back(req, 'cortes');
   if (!review && req.body.confirmar !== '1') { await req.flash('error', 'Confirme marcando "Entendi que isto agenda as publicações nas redes escolhidas".'); return res.redirect(to); }
@@ -223,7 +223,7 @@ router.post('/conteudo/em-massa/publicar', requirePerm('episodes.read'), wrap(as
 // Piloto automático da semana: a agenda montada com os prontos para postar (mistura os episódios), para conferir e agendar.
 // Mesma página e mesma confirmação de "Publicar em massa". ?ajustar=1 abre as escolhas (redes, por dia, horários, Reel de teste).
 router.get('/conteudo/semana', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
+  if (!canAskPublish(req.user.role)) return deny(res, 'Sua função não publica nas redes.');
   const st = await bulk.pilotSettings();
   const opts = bulk.readOptions({ inicio: bulk.nextMonday(), de: st.from, ate: st.to, por_dia: String(st.perDay), teste_por_dia: String(st.trialPerDay), teste_modo: st.trialMode });
   const picks = await bulk.weekPicks(opts.perDay * 7, require('../services/scope').idsOf(req));
@@ -244,7 +244,7 @@ router.get('/conteudo/semana', requirePerm('episodes.read'), wrap(async (req, re
   });
 }));
 router.post('/conteudo/semana/ajustes', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
+  if (!canAskPublish(req.user.role)) return deny(res, 'Sua função não publica nas redes.');
   const r = await bulk.savePilot(req.body);
   if (r.error) { await req.flash('error', r.error); return res.redirect('/conteudo/semana?ajustar=1'); }
   await audit(req, 'piloto_semana.ajustado', 'settings', null, r.settings);
@@ -254,7 +254,7 @@ router.post('/conteudo/semana/ajustes', requirePerm('episodes.read'), wrap(async
 
 // Capas em lote: escolher a capa de cada corte e reescrever o texto (a IA sugere). Uma linha por corte.
 router.get('/conteudo/capas-em-lote', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canCover(req.user.role)) return deny(res, 'Seu perfil não mexe nas capas.');
+  if (!canCover(req.user.role)) return deny(res, 'Sua função não mexe nas capas.');
   const ids = idsOf({ ids: req.query.ids });
   if (!ids.length) return res.redirect('/conteudo?vista=cortes');
   const { rows: list } = await db.query(
@@ -274,7 +274,7 @@ router.get('/conteudo/capas-em-lote', requirePerm('episodes.read'), wrap(async (
 // IA para todos de uma vez: 3 textos de capa por corte, 5 cortes em paralelo (um pedido só conta no limite de uso da IA).
 const coverAiLimiter = require('../auth/rateLimit').createLimiter({ name: 'ia-capas-lote', max: 10, windowMs: 10 * 60_000 });
 router.post('/conteudo/capas-em-lote/sugerir', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canCover(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não mexe nas capas.' });
+  if (!canCover(req.user.role)) return res.status(403).json({ ok: false, error: 'Sua função não mexe nas capas.' });
   if (!await coverAiLimiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitos pedidos seguidos. Espere alguns minutos.' });
   const ids = idsOf(req.body).slice(0, 60);
   const aiText = require('../services/aiText');
@@ -290,7 +290,7 @@ router.post('/conteudo/capas-em-lote/sugerir', requirePerm('episodes.read'), wra
 }));
 
 router.post('/conteudo/capas-em-lote', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canCover(req.user.role)) return deny(res, 'Seu perfil não mexe nas capas.');
+  if (!canCover(req.user.role)) return deny(res, 'Sua função não mexe nas capas.');
   const ids = idsOf(req.body);
   const covers = await coverList(ids);
   let chosen = 0; let made = 0; const errors = [];

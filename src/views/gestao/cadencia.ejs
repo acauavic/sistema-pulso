@@ -118,10 +118,10 @@
     <%- csrfField %>
     <h2 id="mcd-h">Cadência de follow-up</h2>
     <label>Convidados: dias de espera entre as abordagens
-      <input type="text" name="guest" value="<%= r.cfg.guest.join(', ') %>" inputmode="numeric" placeholder="3, 4, 7, 7">
+      <input type="text" name="guest" value="<%= r.cfg.guest.join(', ') %>" inputmode="numeric" placeholder="ex.: 3, 4, 7, 7">
     </label>
     <label>Patrocinadores: dias de espera entre as abordagens
-      <input type="text" name="sponsor" value="<%= r.cfg.sponsor.join(', ') %>" inputmode="numeric" placeholder="3, 5, 7, 14">
+      <input type="text" name="sponsor" value="<%= r.cfg.sponsor.join(', ') %>" inputmode="numeric" placeholder="ex.: 3, 5, 7, 14">
     </label>
     <p class="small muted">Cada número é a espera depois de uma abordagem, até o próximo follow-up. Se o follow-up cair num sábado ou domingo, ele passa para a segunda. O último número vale também como espera final: se ninguém responder depois dele, o card é indicado como possível perdido (a pessoa decide). Hoje: convidados <strong><%= r.cfg.guest.length %></strong> follow-ups, patrocinadores <strong><%= r.cfg.sponsor.length %></strong>.</p>
     <p class="small muted">A meta diária de abordagens novas fica em <a href="/gestao/metas">Gestão &gt; Metas</a>, junto com as outras metas de cada pessoa.</p>

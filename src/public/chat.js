@@ -29,7 +29,7 @@
     const opts = body === undefined ? { headers: { Accept: 'application/json' } } : { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrf }, body: JSON.stringify(body) };
     const res = await fetch(url, opts);
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || !json.ok) { const e = new Error(json.error || (res.status === 403 ? 'Sua sessão expirou. Recarregue a página.' : `Erro ${res.status}`)); e.status = res.status; throw e; }
+    if (!res.ok || !json.ok) { const e = new Error(json.error || (res.status === 401 ? 'Sua sessão terminou. Recarregue a página.' : 'Não deu certo agora. Recarregue a página e tente de novo.')); e.status = res.status; throw e; }
     return json;
   }
 

@@ -117,7 +117,7 @@
   <div class="studio-link">
     <p class="m-0"><strong>Link do estúdio da sessão</strong> <span class="mono small muted">um link para todo o material</span></p>
     <p class="mono small m-0"><%= link.url %></p>
-    <div class="row"><button class="btn sm primary" type="button" data-copy="<%= link.url %>"><%- icon('copy', 14) %> Copiar link</button></div>
+    <div class="row"><button class="btn sm<%= pending.length ? '' : ' primary' %>" type="button" data-copy="<%= link.url %>"><%- icon('copy', 14) %> Copiar link</button></div>
   </div>
   <% } else if (manage) { %>
   <form method="post" action="/sessoes/<%= s.id %>/link"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('link', 14) %> Gerar link do estúdio</button></form>

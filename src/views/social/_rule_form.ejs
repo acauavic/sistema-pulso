@@ -4,7 +4,7 @@
    var btn = function (n, k) { return (r.buttons && r.buttons[n] && r.buttons[n][k]) || ''; }; %>
 <form method="post" action="<%= action %>" class="stack" data-when-form>
   <input type="hidden" name="_csrf" value="<%= csrf %>">
-  <label>Nome<input type="text" name="name" value="<%= r.name || '' %>" maxlength="120" placeholder="Ex.: Link do episódio para quem comentar EPISODIO" required></label>
+  <label>Nome<input type="text" name="name" value="<%= r.name || '' %>" maxlength="120" placeholder="ex.: Link do episódio para quem comentar EPISODIO" required></label>
   <% var fixedPost = r.scope === 'publicacao'; %>
   <% if (fixedPost) { %><p class="small muted">Comentário no post desta publicação, no Instagram.</p><% } else { %>
   <div class="choice-row" role="radiogroup" aria-label="Quando disparar">

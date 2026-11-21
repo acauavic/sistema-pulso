@@ -143,17 +143,19 @@ function parseGuests(input) {
 }
 
 // Marca como duplicadas as linhas cujo Instagram/e-mail já existe no banco ou aparece antes no próprio arquivo.
-async function markDuplicates(rows) {
+// Com projectId, o número do episódio é conferido no projeto (a numeração é por projeto) e a mesma pessoa noutro projeto
+// não é duplicata: é "já está em outro projeto" (vira um aviso, não bloqueia).
+async function markDuplicates(rows, projectId = null) {
   const valid = rows.filter((r) => !r.errors.length);
   const igs = valid.map((r) => r.data.instagram);
   const emails = valid.map((r) => r.data.email).filter(Boolean);
   const { rows: found } = await db.query(
-    'SELECT lower(instagram) AS ig, lower(email) AS email, name FROM guests WHERE lower(instagram) = ANY($1) OR lower(email) = ANY($2)',
-    [igs, emails]);
+    `SELECT lower(instagram) AS ig, lower(email) AS email, name FROM guests WHERE (lower(instagram) = ANY($1) OR lower(email) = ANY($2))
+        AND ($3::int IS NULL OR project_id = $3)`, [igs, emails, projectId]);
   const byIg = new Map(found.filter((f) => f.ig).map((f) => [f.ig, f.name]));
   const byEmail = new Map(found.filter((f) => f.email).map((f) => [f.email, f.name]));
   const nums = valid.map((r) => r.data.episode?.number).filter(Boolean);
-  const { rows: eps } = nums.length ? await db.query('SELECT number, title FROM episodes WHERE number = ANY($1)', [nums]) : { rows: [] };
+  const { rows: eps } = nums.length ? await db.query('SELECT number, title FROM episodes WHERE number = ANY($1) AND ($2::int IS NULL OR project_id = $2)', [nums, projectId]) : { rows: [] };
   const epTaken = new Map(eps.map((e) => [e.number, e.title]));
   const seenEp = new Set();
   const seenIg = new Set();

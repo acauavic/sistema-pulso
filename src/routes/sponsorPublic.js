@@ -79,7 +79,7 @@ function withSession({ write = false, json = false } = {}) {
 // Entrada pelo link: cria a sessão (ou reaproveita a que já é deste patrocinador) e vai para a URL limpa.
 // Robôs de pré-visualização não ganham sessão: recebem uma página simples com o nome da marca.
 async function enter(req, res, page) {
-  if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
+  if (!await viewLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const sponsor = await sponsorByToken(req.params.token);
   if (!sponsor) return gone(res);
   const go = host.wrongHost(req, sponsor.project_id); // link do contrato aberto em outro domínio: leva para o certo
@@ -166,7 +166,7 @@ router.get('/patrocinador/cadastro', withSession(), wrap(async (req, res) => {
 }));
 
 router.post('/patrocinador/cadastro', withSession({ write: true }), wrap(async (req, res) => {
-  if (!await writeLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições. Tente novamente em instantes.');
+  if (!await writeLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const sponsor = req.sp.sponsor;
   if (!FORM_STAGES.includes(sponsor.stage)) return formClosed(res);
   const { values, error } = sponsorsSvc.parseBrief(req.body);

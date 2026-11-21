@@ -278,7 +278,8 @@ async function adjustClip(cover, input, userId = null) {
 const pieceName = (episode, cover, ext) => {
   const ep = episode?.number ? `ep${String(episode.number).padStart(3, '0')}` : `episodio${cover.episode_id}`;
   const part = cover.kind === 'spotify_cover' ? 'spotify' : `yt_${LETTERS[cover.angle] || cover.position + 1}`;
-  return `pulso_${ep}_${part}.${ext}`;
+  const slug = require('./projects').get(episode?.project_id)?.slug || 'pulso'; // o nome do arquivo leva o projeto
+  return `${slug.replace(/-/g, '')}_${ep}_${part}.${ext}`;
 };
 async function download(cover, episode) {
   if (cover.kind === 'youtube_thumb' && cover.model && cover.spec) {

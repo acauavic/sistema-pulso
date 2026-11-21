@@ -612,7 +612,7 @@ async function loadOwnFile(req) {
 // Material bruto é da produção (production.upload); o vídeo editado é de quem edita (production.edit). A rota deixa entrar os dois
 // e cada arquivo é conferido pelo tipo (fileAccess).
 const uploadAccess = (req, res, next) => (req.user && (can(req.user, 'production.upload') || can(req.user, 'production.edit'))
-  ? next() : res.status(403).json({ ok: false, error: 'Seu perfil não envia arquivos.' }));
+  ? next() : res.status(403).json({ ok: false, error: 'Sua função não envia arquivos.' }));
 const fileAccess = (user, kind) => can(user, kind === 'editado' ? 'production.edit' : 'production.upload');
 
 router.post('/episodios/:id/arquivos/iniciar', uploadAccess, wrap(async (req, res) => {
@@ -809,7 +809,7 @@ router.get('/episodios/:id/ia/status', requirePerm('episodes.read'), wrap(async 
 }));
 
 router.post('/episodios/:id/ia/gerar', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!can(req.user, 'production.manage') && !can(req.user, 'production.review')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não pede análise por IA.' });
+  if (!can(req.user, 'production.manage') && !can(req.user, 'production.review')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não pede análise por IA.' });
   const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   if (!(config.groqConfigured && config.geminiConfigured && config.storageConfigured)) {
@@ -824,7 +824,7 @@ router.post('/episodios/:id/ia/gerar', requirePerm('episodes.read'), wrap(async 
 }));
 
 router.post('/episodios/:id/metadados', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!can(req.user, 'production.review') && !can(req.user, 'production.manage')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita os textos de publicação.' });
+  if (!can(req.user, 'production.review') && !can(req.user, 'production.manage')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não edita os textos de publicação.' });
   const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const b = req.body;
@@ -902,7 +902,7 @@ router.post('/episodios/:id/checklist/:iid/marcar', requirePerm('episodes.read')
 }));
 
 router.post('/episodios/:id/checklist', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canTick(req.user.role)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita checklists.' });
+  if (!canTick(req.user.role)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não edita checklists.' });
   const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const text = clean(req.body.text, 300);
@@ -917,7 +917,7 @@ router.post('/episodios/:id/checklist', requirePerm('episodes.read'), wrap(async
 }));
 
 router.post('/episodios/:id/checklist/:iid/excluir', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canTick(req.user.role)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita checklists.' });
+  if (!canTick(req.user.role)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não edita checklists.' });
   if (!isIntId(req.params.id) || !isIntId(req.params.iid)) return notFound(res);
   await db.query('DELETE FROM episode_checklist_items WHERE id = $1 AND episode_id = $2 AND template_id IS NULL', [req.params.iid, req.params.id]); // só itens avulsos
   res.redirect(back(req.params.id, '#checklists'));
@@ -936,7 +936,7 @@ router.post('/episodios/:id/tarefas', requirePerm('production.manage'), wrap(asy
 
 // Quem produz (editor, produtora, gestão) pode mudar o andamento; só quem gerencia reatribui e muda o prazo.
 router.post('/episodios/:id/tarefas/:tid', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canTick(req.user.role)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não altera tarefas.' });
+  if (!canTick(req.user.role)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não altera tarefas.' });
   if (!isIntId(req.params.id) || !isIntId(req.params.tid)) return notFound(res);
   const { rows: [cur] } = await db.query('SELECT * FROM tasks WHERE id = $1 AND episode_id = $2', [req.params.tid, req.params.id]);
   if (!cur) return notFound(res);
@@ -1000,7 +1000,7 @@ router.get('/episodios/:id/marcadores', requirePerm('episodes.read'), wrap(async
   const { rows: comments } = await db.query('SELECT c.*, coalesce(u.name, c.external_name || \' (pelo link)\') AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.episode_id = $1', [ep.id]);
   const latest = await reviewSvc.latestEdited(ep.id);
   const out = reviewSvc.markers({
-    ep, comments, format: ['texto', 'premiere'].includes(req.query.formato) ? req.query.formato : 'davinci', which: req.query.quais === 'todos' ? 'todos' : 'abertos',
+    ep, comments, format: ['texto', 'davinci'].includes(req.query.formato) ? req.query.formato : 'premiere', /* Premiere é o padrão, o da janela */ which: req.query.quais === 'todos' ? 'todos' : 'abertos',
     width: latest?.width, height: latest?.height,
     fps: reviewSvc.pickFps(req.query.fps, reviewSvc.pickFps(latest?.fps)), startHour: req.query.inicio === '00' ? 0 : 1, latestVersion: latest?.version ?? null,
   });
@@ -1009,7 +1009,7 @@ router.get('/episodios/:id/marcadores', requirePerm('episodes.read'), wrap(async
 // Renderiza um pedaço de página (o comentário recém-criado) com as variáveis do layout, para o navegador só inserir.
 const renderPartial = (res, view, data) => new Promise((resolve, reject) => res.render(view, data, (err, html) => (err ? reject(err) : resolve(html))));
 router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!canTick(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não comenta.' });
+  if (!canTick(req.user.role)) return res.status(403).json({ ok: false, error: 'Sua função não comenta.' });
   const ep = await findEpisode(req, req.params.id);
   if (!ep) return res.status(404).json({ ok: false });
   const rich = req.body.body_html != null && String(req.body.body_html).trim() ? richText.sanitize(req.body.body_html) : null;
@@ -1040,7 +1040,7 @@ router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(asy
 
 router.post('/episodios/:id/comentarios/:cid/editar', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return res.status(404).json({ ok: false });
-  if (!canTick(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não comenta.' });
+  if (!canTick(req.user.role)) return res.status(403).json({ ok: false, error: 'Sua função não comenta.' });
   const ep = await findEpisode(req, req.params.id);
   const { rows: [c] } = await db.query('SELECT * FROM episode_comments WHERE id = $1 AND episode_id = $2', [req.params.cid, req.params.id]);
   if (!ep || !c) return res.status(404).json({ ok: false, error: 'Comentário não encontrado.' });

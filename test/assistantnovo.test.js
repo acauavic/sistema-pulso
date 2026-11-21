@@ -137,7 +137,7 @@ describe('assistente de IA: conhece o sistema novo e age com segurança', () => 
     let r = await tool(as.gestao, 'definir_responsavel', { tipo: 'convidado', referencia: 'Dr. Cadência', responsavel: 'Gil' });
     assert.equal(r.feito, true); assert.equal(r.responsavel, 'Gil Gestão');
     assert.equal(String((await q("SELECT owner_id FROM guests WHERE name = 'Dr. Cadência'"))[0].owner_id), String(u.gestao.id));
-    r = await tool(as.editor, 'definir_responsavel', { tipo: 'convidado', referencia: 'Dr. Cadência', responsavel: 'Paula' }); assert.match(r.erro, /perfil não troca|Seu perfil/);
+    r = await tool(as.editor, 'definir_responsavel', { tipo: 'convidado', referencia: 'Dr. Cadência', responsavel: 'Paula' }); assert.match(r.erro, /função não troca|Sua função/);
     r = await tool(as.gestao, 'definir_responsavel', { tipo: 'convidado', referencia: 'Dr. Cadência', responsavel: 'ninguém' }); assert.equal(r.responsavel, 'ninguém');
   });
 

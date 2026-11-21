@@ -72,7 +72,7 @@
     <section class="card">
       <% if (canAutomate) { %>
         <%- include('_rule_form', { r: rule, action: '/social/automacoes/' + rule.id, submit: 'Salvar', cancel: false }) %>
-        <form method="post" action="/social/automacoes/<%= rule.id %>/excluir" class="top-gap" data-confirm="Excluir esta automação e o histórico dela?"><%- csrfField %><button class="btn sm danger" type="submit"><%- icon('trash-2') %> Excluir automação</button></form>
+        <form method="post" action="/social/automacoes/<%= rule.id %>/excluir" class="danger-zone" data-confirm="Apagar esta automação de vez? O histórico some junto e não dá para desfazer."><%- csrfField %><button class="link small err" type="submit">Apagar esta automação</button></form>
       <% } else { %>
         <dl class="kv"><dt>Palavras</dt><dd><%= rule.keywords.join(', ') || 'qualquer mensagem' %></dd><dt>Direct</dt><dd class="pre"><%= rule.message %></dd><% if (rule.reply_text) { %><dt>Resposta</dt><dd class="pre"><%= rule.reply_text %></dd><% } %></dl>
       <% } %>

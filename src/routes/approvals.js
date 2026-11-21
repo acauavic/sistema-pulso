@@ -53,7 +53,7 @@ router.post('/aprovacoes/:id/revogar', requirePerm('episodes.read'), wrap(async 
   const l = await approvals.byId(req.params.id);
   if (!l) return notFound(res);
   scope.assert(req, l.project_id);
-  if (!can(req.user, l.kind === 'pauta' ? 'pautas.write' : 'production.review')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não pode cancelar este link.' });
+  if (!can(req.user, l.kind === 'pauta' ? 'pautas.write' : 'production.review')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não pode cancelar este link.' });
   const done = await approvals.revoke(l.id, req.user);
   if (done) { await audit(req, 'aprovacao.cancelada', l.kind === 'pauta' ? 'pauta' : 'episode', l.pauta_id || l.episode_id, { link: l.id }); await req.flash('ok', 'Link cancelado.'); }
   else await req.flash('error', 'Este link já foi respondido ou cancelado.');

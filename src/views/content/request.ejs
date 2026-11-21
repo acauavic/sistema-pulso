@@ -163,7 +163,7 @@
   <form method="post" action="/conteudo/pedidos/<%= r.id %>/ajustes" class="stack">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h2 id="ma-h">Pedir ajustes</h2>
-    <label>O que mudar<textarea name="nota" rows="4" maxlength="1000" required placeholder="Ex.: encurtar para 45 s e trocar a música do final"></textarea></label>
+    <label>O que mudar<textarea name="nota" rows="4" maxlength="1000" required placeholder="ex.: encurtar para 45 s e trocar a música do final"></textarea></label>
     <p class="small muted">O pedido volta para <%= r.assignee_name || 'o editor' %>, com o seu recado no topo. Para comentar um ponto específico, use também os comentários do vídeo.</p>
     <div class="row modal-actions"><button class="btn primary" type="submit">Pedir ajustes</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>

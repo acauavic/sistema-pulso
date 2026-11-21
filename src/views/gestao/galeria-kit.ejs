@@ -75,7 +75,7 @@
   <form method="post" action="/gestao/galeria-kit/<%= r.id %>" class="stack"><%- csrfField %>
     <h2 id="m-ep-<%= r.id %>-h"><%= r.guest_name %></h2>
     <label>Alcance
-      <input type="text" name="audience" maxlength="20" value="<%= r.kit_audience || '' %>" placeholder="+3,6M">
+      <input type="text" name="audience" maxlength="20" value="<%= r.kit_audience || '' %>" placeholder="ex.: +3,6M">
     </label>
     <p class="small muted">Seguidores somados, como quer que apareça. Em branco, o kit mostra um traço.</p>
     <label>Frase de apresentação

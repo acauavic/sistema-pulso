@@ -18,7 +18,7 @@ const HEADERS = {
 const money = (c) => (Number(c) < 0 ? `− ${fmt.formatBRL(-Number(c))}` : fmt.formatBRL(c));
 
 router.get('/extrato/:token', wrap(async (req, res) => {
-  if (!await limiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
+  if (!await limiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const l = await partnership.byToken(req.params.token);
   if (!l) return res.status(404).set(HEADERS).render('approval/missing', { title: 'Link não encontrado', icon, assetV: res.locals.assetV });
   const go = host.wrongHost(req, l.project_id);

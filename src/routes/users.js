@@ -1,4 +1,5 @@
 const express = require('express');
+const { userMessage } = require('../utils/userMessage');
 const db = require('../db/pool');
 const config = require('../config');
 const sessions = require('../auth/sessions');
@@ -124,7 +125,7 @@ router.post('/usuarios', requirePerm('users.write'), wrap(async (req, res) => {
     await req.flash('ok', `Usuário criado. Enviamos o link para ${user.email} definir a senha.`);
   } catch (err) {
     console.error('Falha ao enviar convite de usuário:', err.message);
-    await req.flash('error', `Usuário criado, mas o e-mail NÃO foi enviado (${err.message}). Use "Reenviar acesso" quando o e-mail estiver funcionando.`);
+    await req.flash('error', 'Usuário criado, mas o e-mail de acesso não saiu. Use "Reenviar acesso" no menu da linha daqui a pouco.');
   }
   return res.redirect('/usuarios');
 }));
@@ -226,7 +227,7 @@ router.post('/usuarios/:id/reenviar', requirePerm('users.write'), wrap(async (re
     await req.flash('ok', `Link de acesso enviado para ${target.email}.`);
   } catch (err) {
     console.error('Falha ao reenviar acesso:', err.message);
-    await req.flash('error', `Não foi possível enviar o e-mail: ${err.message}`);
+    await req.flash('error', 'O e-mail de acesso não saiu. Confira o endereço e tente de novo daqui a pouco.');
   }
   return res.redirect('/usuarios');
 }));

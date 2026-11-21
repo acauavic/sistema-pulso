@@ -17,8 +17,9 @@
 
 <div class="card form-card wide">
   <% if (headerError) { %><div class="flash flash-error"><%= headerError %></div><% } %>
-  <form method="post" action="/convidados/importar/previa" class="stack" data-csv-form>
+  <form method="post" action="/convidados/importar/previa#previa" class="stack" data-csv-form>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <%- include('../partials/project-field', { value: projectId, hint: 'Os convidados da planilha entram neste projeto.' }) %>
     <label>Arquivo CSV <small class="muted">(Excel ou Google Planilhas: Salvar como CSV; separador vírgula ou ponto e vírgula)</small>
       <input type="file" accept=".csv,text/csv,text/plain" data-csv-file>
     </label>
@@ -26,7 +27,7 @@
       <textarea name="csv" rows="8" class="code" spellcheck="false" data-csv-text placeholder="nome;instagram;whatsapp;perfil;email;motivo do convite;status;data da gravação"><%= csvText %></textarea>
     </label>
     <div class="row">
-      <button class="btn primary" type="submit">Ver prévia</button>
+      <button class="btn<%= result && result.ok ? '' : ' primary' %>" type="submit"><%= result ? 'Gerar a prévia de novo' : 'Ver prévia' %></button>
       <a class="btn" href="/convidados/importar/modelo.csv"><%- icon('file-text') %> Baixar modelo</a>
     </div>
   </form>
@@ -59,8 +60,8 @@
   </table>
   </div>
   <% if (result.ok) { %>
-  <form method="post" action="/convidados/importar" class="row top-gap">
-    <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <form method="post" action="/convidados/importar" class="row top-gap" data-busy="Importando…">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><% if (projectId) { %><input type="hidden" name="project_id" value="<%= projectId %>"><% } %>
     <input type="hidden" name="csv" value="<%= csvText %>">
     <button class="btn primary" type="submit">Importar <%= fmt.plural(result.ok, 'convidado', 'convidados') %></button>
     <span class="small muted">Linhas com erro ou duplicadas ficam de fora.</span>

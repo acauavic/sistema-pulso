@@ -26,7 +26,7 @@ const canPublish = (role) => can(role, 'production.review');
 const canCover = (role) => can(role, 'covers.edit'); // escolher e editar a capa (a produtora também)
 const wantsJson = (req) => /json/.test(req.get('accept') || '');
 const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Não encontrado.' });
-const deny = (req, res, msg = 'Seu perfil não faz isso.') => (wantsJson(req) ? res.status(403).json({ ok: false, error: msg }) : res.status(403).render('error', { title: 'Sem permissão', message: msg }));
+const deny = (req, res, msg = 'Sua função não faz isso.') => (wantsJson(req) ? res.status(403).json({ ok: false, error: msg }) : res.status(403).render('error', { title: 'Sem permissão', message: msg }));
 const uploadError = (res, status, error) => res.status(status).json({ ok: false, error });
 const extOf = (name) => String(name).match(/\.([A-Za-z0-9]{1,6})$/)?.[1]?.toLowerCase() || '';
 const clockMs = (s) => L.parseClock(String(s || '').trim());

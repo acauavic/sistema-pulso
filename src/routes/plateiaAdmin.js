@@ -1,5 +1,6 @@
 // Pulso Podcast com Plateia — lado interno: inscrições, resultados, ajustes da página e controles no card do convidado.
 const express = require('express');
+const { userMessage } = require('../utils/userMessage');
 const crypto = require('crypto');
 const db = require('../db/pool');
 const config = require('../config');
@@ -35,9 +36,8 @@ async function storeImage(prefix, id, buf, kind) {
   return key;
 }
 
-// ---------------------------------------------------------------- painel
-router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res) => {
-  const days = [7, 30, 90].includes(Number(req.query.dias)) ? Number(req.query.dias) : 30;
+// Filtros da lista de inscrições (convidado, situação, busca, origem, gravações passadas): a lista e a planilha usam os mesmos.
+function leadFilters(req) {
   const guestFilter = isIntId(String(req.query.convidado || '')) ? Number(req.query.convidado) : null;
   const view = req.query.vista === 'quadro' ? 'quadro' : 'lista';
   const statusFilter = view === 'lista' && STATUS[req.query.status] ? req.query.status : ''; // no quadro, cada coluna já é uma situação
@@ -59,6 +59,13 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
     if (digits.length >= 3) { p.push(`%${digits}%`); phone = ` OR regexp_replace(l.phone, '\\D', '', 'g') LIKE $${p.length}`; }
     where.push(`(l.name ILIKE ${like} OR l.guest_name ILIKE ${like}${phone})`);
   }
+  return { guestFilter, view, statusFilter, q, origin, where, p, showPast, PAST };
+}
+
+// ---------------------------------------------------------------- painel
+router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res) => {
+  const days = [7, 30, 90].includes(Number(req.query.dias)) ? Number(req.query.dias) : 30;
+  const { guestFilter, view, statusFilter, q, origin, where, p, showPast, PAST } = leadFilters(req);
   const [leads, results, s, upcoming, agenda] = await Promise.all([
     db.query(`SELECT l.*, e.status AS pay_status, e.due_on AS pay_due, e.paid_on AS pay_paid, k.url AS link_url, k.amount_cents AS link_amount, k.status AS link_status, k.capture_method AS link_method, k.installments AS link_installments
        FROM plateia_leads l LEFT JOIN fin_entries e ON e.id = l.entry_id AND e.status <> 'cancelado'
@@ -71,7 +78,7 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
   const { rows: [past] } = await db.query(`SELECT count(*)::int AS n, string_agg(DISTINCT l.guest_name, ', ') AS names FROM plateia_leads l WHERE l.guest_id IS NOT NULL AND ${PAST}`);
   const { rows: recordings } = await db.query("SELECT id, name, proposed_at FROM guests WHERE status = 'agendado' AND proposed_at IS NOT NULL AND proposed_at > now() - interval '1 day' ORDER BY proposed_at, id");
   res.render('plateia/admin', {
-    title: 'Plateia', view, q, origin, past, showPast, pastToggle: req.query.anteriores === '1', recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
+    title: 'Plateia', exportQuery: new URLSearchParams(Object.entries(req.query).filter(([k, v]) => ['convidado', 'status', 'q', 'origem', 'anteriores'].includes(k) && typeof v === 'string' && v)).toString(), view, q, origin, past, showPast, pastToggle: req.query.anteriores === '1', recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
     canManage: can(req.user, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: require('../services/publicUrl').publicUrl(null, '/plateia'), fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, COUNTRY_BY_CODE: audience.COUNTRY_BY_CODE, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
   });
 }));
@@ -174,7 +181,7 @@ router.post('/plateia/painel/leads/:id/link', requirePerm('audience.read'), wrap
     const link = await infinitePay.createLink({ lead, amountCents: amount, userId: req.user.id });
     await audit(req, 'plateia.link_criado', 'plateia_lead', lead.id, { valor: amount });
     await req.flash('ok', `Link de ${formatBRL(link.amount_cents)} criado. Envie pelo WhatsApp ou copie.`);
-  } catch (err) { await req.flash('error', `Não consegui gerar o link: ${err.message}`); }
+  } catch (err) { await req.flash('error', userMessage(err, 'A InfinitePay não respondeu. Tente de novo daqui a pouco ou combine o pagamento por fora.', { log: 'Plateia: link de pagamento' })); }
   res.redirect(to);
 }));
 
@@ -240,15 +247,17 @@ router.post('/plateia/painel/leads/:id/recebido', requirePerm('audience.read'), 
 
 // Planilha das inscrições (UTM incluídas) para cruzar com as campanhas.
 router.get('/plateia/painel/inscricoes.csv', requirePerm('audience.read'), wrap(async (req, res) => {
-  const { rows } = await db.query('SELECT * FROM plateia_leads ORDER BY created_at DESC');
-  const cell = (v) => { let t = String(v ?? ''); if (/^[=+\-@\t]/.test(t)) t = `'${t}`; return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const { where, p } = leadFilters(req); // o que está na tela (filtros) é o que vai para a planilha
+  const { rows } = await db.query(`SELECT l.* FROM plateia_leads l ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY l.created_at DESC`, p);
+  const cell = (v) => { let t = String(v ?? ''); if (/^[=+\-@\t\r]/.test(t) && !/^-?\d+(,\d+)?$/.test(t)) t = `'${t}`; return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const when = (d) => (d ? require('../utils/format').formatDateTime(d) : ''); // dd/mm/aaaa hh:mm, horário de Brasília
   const head = ['Data', 'Nome', 'WhatsApp', 'Convidado', 'Gravação', 'Situação', 'Valor combinado (R$)', 'Abriu o WhatsApp', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'Origem (referrer)'];
   const out = [head.join(';')];
   for (const r of rows) {
-    out.push([r.created_at.toISOString(), r.name, r.phone.replace(/\D/g, ''), r.guest_name, r.recording_at ? r.recording_at.toISOString() : '', STATUS[r.status], r.amount_cents != null ? (Number(r.amount_cents) / 100).toFixed(2).replace('.', ',') : '', r.whatsapp_opened_at ? 'sim' : 'não',
+    out.push([when(r.created_at), r.name, r.phone.replace(/\D/g, ''), r.guest_name, when(r.recording_at), STATUS[r.status], r.amount_cents != null ? (Number(r.amount_cents) / 100).toFixed(2).replace('.', ',') : '', r.whatsapp_opened_at ? 'sim' : 'não',
       r.utm_source, r.utm_medium, r.utm_campaign, r.utm_term, r.utm_content, r.referrer].map(cell).join(';'));
   }
-  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="plateia-inscricoes.csv"' });
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="plateia-inscricoes-${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())}.csv"` });
   res.send(`﻿${out.join('\r\n')}\r\n`);
 }));
 

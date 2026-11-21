@@ -13,7 +13,7 @@
       <button class="btn sm" type="button" data-modal-open="metas-<%= p.id %>-janela"><%= p.goals.length ? 'Editar metas' : 'Definir metas' %></button>
     </div>
     <% if (!p.progress.length) { %>
-      <p class="small muted">Sem metas ainda.</p>
+      <p class="small muted">Sem metas ainda. Use Editar metas para dar a primeira.</p>
     <% } else { %>
       <%- include('../partials/goals-list', { list: p.progress }) %>
     <% } %>

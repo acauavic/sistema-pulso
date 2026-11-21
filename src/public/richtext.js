@@ -447,6 +447,7 @@
     const b = e.target.closest('[data-desc-edit]'); if (!b) return;
     const box = b.closest('[data-desc]'); box.querySelector('[data-desc-view]').hidden = true; b.hidden = true;
     const ed = box.querySelector('[data-desc-editor]'); ed.hidden = false; ed.querySelector('.rte-area').focus();
+    const save = box.parentElement && box.parentElement.querySelector('[data-desc-save]'); if (save) save.hidden = false;
   });
 
   window.PulsoRich = { hydrate, init, plainToHtml };

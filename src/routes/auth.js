@@ -23,7 +23,7 @@ const emailIpKey = (email, ip) => `${email}|${ip}`;
 const forgotLimiter = createLimiter({ name: 'esqueci', max: 5, windowMs: 15 * 60_000 });
 
 const NOTICES = {
-  senha: 'Senha definida! Entre com seu e-mail e a nova senha.',
+  senha: 'Senha definida. Entre com seu e-mail e a nova senha.',
   saiu: 'Você saiu da sua conta.',
 };
 

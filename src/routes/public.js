@@ -48,7 +48,7 @@ router.get('/convite/abrir', wrap(async (req, res) => {
 }));
 
 router.get('/convite/:token', wrap(async (req, res) => {
-  if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
+  if (!await viewLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   if (TOKEN_RE.test(req.params.token) && !isBot(req) && pixel.on()
     && pixel.cleanUrl(req, res, { cookie: INVITE_COOKIE, path: '/convite', to: '/convite/abrir', token: req.params.token })) return;
   return showInvite(req, res, req.params.token);
@@ -101,7 +101,7 @@ async function notifyOwner(guest, accepted, message) {
 // Botões "Aceitar o convite" / "Confirmar presença": registra o clique, move para "Em agendamento"
 // e leva ao WhatsApp da produção. Robôs de pré-visualização só são redirecionados (não contam).
 router.get('/convite/:token/aceitar', wrap(async (req, res) => {
-  if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
+  if (!await viewLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const guest = await guestByToken(req.params.token);
   if (!guest) return gone(res);
   const target = await guestsSvc.whatsappUrl('aceitar', guest);
@@ -123,7 +123,7 @@ router.get('/convite/:token/aceitar', wrap(async (req, res) => {
 
 // Botão "Falar com a produção": só conta o clique e redireciona.
 router.get('/convite/:token/producao', wrap(async (req, res) => {
-  if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
+  if (!await viewLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const guest = await guestByToken(req.params.token);
   if (!guest) return gone(res);
   const target = await guestsSvc.whatsappUrl('producao', guest);
@@ -137,7 +137,7 @@ router.get('/convite/:token/producao', wrap(async (req, res) => {
 
 // Recusa (com recado opcional). Aceitar é o botão do WhatsApp.
 router.post('/convite/:token/responder', wrap(async (req, res) => {
-  if (!await rsvpLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições. Tente novamente em instantes.');
+  if (!await rsvpLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const guest = await guestByToken(req.params.token);
   if (!guest) return gone(res);
   const back = `/convite/${req.params.token}`;

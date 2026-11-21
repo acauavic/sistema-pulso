@@ -145,7 +145,7 @@
           <h2>Tarefas<%= tasks.length ? ' (' + tasks.filter(function (t) { return t.status === 'feito'; }).length + '/' + tasks.length + ')' : '' %></h2>
           <% if (perm.manage) { %><button class="btn sm" type="button" data-modal-open="modal-task-new"><%- icon('plus') %> Nova tarefa</button><% } %>
         </div>
-        <% if (!tasks.length) { %><p class="muted">Sem tarefas.</p><% } %>
+        <% if (!tasks.length) { %><p class="muted">Nenhuma tarefa deste vídeo ainda. Use Nova tarefa para combinar quem faz o quê.</p><% } %>
         <ul class="plain task-list">
           <% tasks.forEach(function (t) { %>
           <li class="task-row <%= t.status === 'feito' ? 'done' : '' %>">
@@ -193,7 +193,7 @@
               <span class="row">
                 <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
                 <% if (perm.upload && f.status === 'pronto' && f.kind !== 'editado') { %><button class="icon-btn" type="button" data-fill-modal="modal-organizar" data-fill-action="<%= fileBase + f.id %>/organizar" data-fill="<%= JSON.stringify({ kind: f.kind, rotulo: f.label || '' }) %>" aria-label="Organizar: tipo e rótulo de <%= f.filename %>" title="Organizar"><%- icon('pencil', 14) %></button><% } %>
-                <% if (perm.upload) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover este arquivo do armazenamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover o arquivo" title="Remover"><%- icon('trash-2', 14) %></button></form><% } %>
+                <% if (perm.upload) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Mandar este arquivo para a lixeira? Ele fica 15 dias lá e dá para restaurar."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover o arquivo" title="Remover"><%- icon('trash-2', 14) %></button></form><% } %>
               </span>
             </li>
         <% };
@@ -233,7 +233,7 @@
           <p class="small muted"><%= rawFiles.length ? 'Arraste mais arquivos para cá ou use o botão.' : 'Vídeos de cada câmera, áudios, bastidores e fotografias: escolha tudo de uma vez ou arraste para cá.' %> Na próxima janela você diz o que é cada um. O envio segue em segundo plano: pode continuar usando o sistema.</p>
           <p class="flash flash-ok small" data-refresh-note hidden>Envio concluído. <button class="link" type="button" data-refresh>Atualizar a página</button></p>
         </div>
-        <% } else if (!rawFiles.length) { %><p class="muted">Nenhum material enviado ainda.</p><% } %>
+        <% } else if (!rawFiles.length) { %><p class="muted">Nenhum material ainda. Use Enviar material para subir vídeos, áudios e fotos da gravação.</p><% } %>
         <% var stalledAll = rawFiles.filter(function (f) { return f.stalled; }); %>
         <% if (stalledAll.length) { %>
         <div class="stalled-note" role="status">
@@ -300,7 +300,7 @@
               <% ['bruto_video', 'bruto_audio', 'bastidor', 'foto', 'outro'].forEach(function (k) { %><option value="<%= k %>"><%= kindLabels[k] %></option><% }) %>
             </select>
           </label>
-          <label>Rótulo<input type="text" name="rotulo" maxlength="80" placeholder="Ex.: Câmera 2, Áudio do host"></label>
+          <label>Rótulo<input type="text" name="rotulo" maxlength="80" placeholder="ex.: Câmera 2, Áudio do host"></label>
           <p class="small muted">Os vídeos e áudios são agrupados pelo rótulo dentro da pasta.</p>
           <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
         </form>
@@ -397,7 +397,7 @@
                   <span><span class="mono small"><%= f.filename %></span> <span class="handle muted">· <%= fmt.formatBytes(f.size_bytes) %> · <%= fmt.formatDateTime(f.created_at) %><%= f.uploader ? ' · ' + f.uploader : '' %></span><% if (f.status === 'enviando') { %> <span class="badge b-amber">enviando</span><% } %></span>
                   <span class="row">
                     <% if (f.status === 'pronto') { %><a class="btn sm" href="<%= fileBase + f.id %>/baixar"><%- icon('download', 14) %> Baixar</a><% } %>
-                    <% if (perm.edit && !cm.length) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Remover esta versão?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover a versão" title="Remover"><%- icon('trash-2', 14) %></button></form><% } else if (perm.edit) { %><span class="icon-btn is-locked" title="Tem comentários da revisão: envie a correção como nova versão" aria-label="Versão com comentários da revisão: não pode ser removida"><%- icon('lock', 14) %></span><% } %>
+                    <% if (perm.edit && !cm.length) { %><form method="post" action="<%= fileBase + f.id %>/excluir" class="inline" data-confirm="Mandar esta versão para a lixeira? Ela fica 15 dias lá e dá para restaurar."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-btn danger-ic" type="submit" aria-label="Remover a versão" title="Remover"><%- icon('trash-2', 14) %></button></form><% } else if (perm.edit) { %><span class="icon-btn is-locked" title="Tem comentários da revisão: envie a correção como nova versão" aria-label="Versão com comentários da revisão: não pode ser removida"><%- icon('lock', 14) %></span><% } %>
                   </span>
                 </li>
               </ul>
@@ -510,7 +510,7 @@
       <% } %>
       <ul class="plain comment-list top-gap" data-comment-list>
         <% comments.forEach(function (c) { %><%- include('_review_comment', { c: c, ep: ep, tickable: tickable, latestVersion: latestEdited ? latestEdited.version : null }) %><% }) %>
-        <li class="muted" data-no-comments <%= comments.length ? 'hidden' : '' %>>Sem comentários.</li>
+        <li class="muted" data-no-comments <%= comments.length ? 'hidden' : '' %>>Nenhum comentário ainda. Escreva abaixo para falar com a equipe.</li>
       </ul>
     </section>
   </div>
@@ -613,7 +613,7 @@
   <form method="post" action="/episodios/<%= ep.id %>/tarefas" class="stack">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h2 id="mt-new-h">Nova tarefa</h2>
-    <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="Ex.: conteúdo extra: reação do convidado"></label>
+    <label>O que fazer<input type="text" name="title" maxlength="200" required placeholder="ex.: conteúdo extra: reação do convidado"></label>
     <div class="row">
       <label>Tipo<select name="kind"><% Object.keys(C.TASK_KINDS).filter(function (k) { return !C.TASK_KINDS_OFF || !C.TASK_KINDS_OFF.has(k); }).forEach(function (k) { %><option value="<%= k %>"><%= C.TASK_KINDS[k] %></option><% }) %></select></label>
       <label>Responsável<select name="assignee_id"><option value="">— ninguém —</option><% users.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></label>

@@ -34,7 +34,7 @@
           <% profiles.forEach(function (p) { %><option value="<%= p.key %>" <%= values.profile === p.key ? 'selected' : '' %>><%= p.label %></option><% }) %>
         </select>
       </label>
-      <label>WhatsApp<input type="tel" name="phone" value="<%= values.phone || '' %>" maxlength="40" placeholder="(48) 99999-0000" autocomplete="off"></label>
+      <label>WhatsApp<input type="tel" name="phone" value="<%= values.phone || '' %>" maxlength="40" placeholder="ex.: (48) 99999-0000" autocomplete="off"></label>
       <label>E-mail<input type="email" name="email" value="<%= values.email || '' %>" maxlength="254"></label>
       <label>Responsável
         <select name="owner_id">
@@ -145,7 +145,7 @@
       </div>
     </details>
 
-    <div class="row">
+    <div class="row sticky-actions">
       <button class="btn primary" type="submit">Salvar</button>
       <a class="btn ghost" href="<%= guest ? '/convidados/' + guest.id : '/convidados' %>">Cancelar</a>
     </div>

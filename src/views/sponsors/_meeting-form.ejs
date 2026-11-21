@@ -51,7 +51,7 @@
         <% meetingCtx.team.forEach(function (u) { %><label class="chip-radio"><input type="checkbox" name="equipe" value="<%= u.id %>" <%= team.indexOf(u.id) >= 0 ? 'checked' : '' %>><span><%= u.name %></span></label><% }) %>
       </div>
     </details>
-    <label>Pauta (opcional)<textarea name="pauta" rows="3" maxlength="2000" placeholder="O que vamos conversar. Vai junto no convite."><%= m && m.agenda || '' %></textarea></label>
+    <label>Pauta<textarea name="pauta" rows="3" maxlength="2000" placeholder="O que vamos conversar. Vai junto no convite."><%= m && m.agenda || '' %></textarea></label>
     <% if (!meetingCtx.ready) { %><p class="notice small">A conta do Pulso ainda não autorizou convites e Meet no Google: a reunião fica guardada aqui e vai para o Google quando a autorização estiver feita.</p><% } %>
     <div class="row modal-actions">
       <button class="btn primary" type="submit"><%= isNew ? 'Marcar e enviar convite' : 'Salvar e avisar os convidados' %></button>

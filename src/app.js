@@ -111,16 +111,16 @@ function createApp() {
   app.use(require('./routes/episodes'));
 
   app.use((req, res) => {
-    res.status(404).render('error', { title: 'Página não encontrada', message: 'Não encontramos o que você procurava.' });
+    res.status(404).render('error', { title: 'Página não encontrada', message: 'Não encontramos o que você procurava. Pode estar na lixeira ou em outro projeto: confira o projeto escolhido no topo do menu.' });
   });
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     // item de um projeto de que a pessoa não participa (scope.assert): responde como página que não existe
-    if (err && err.status === 404 && !res.headersSent) return res.status(404).render('error', { title: 'Página não encontrada', message: 'Não encontramos o que você procurava.' });
+    if (err && err.status === 404 && !res.headersSent) return res.status(404).render('error', { title: 'Página não encontrada', message: 'Não encontramos o que você procurava. Pode estar na lixeira ou em outro projeto: confira o projeto escolhido no topo do menu.' });
     console.error(`[erro] ${req.method} ${req.originalUrl}:`, err);
     if (res.headersSent) return;
-    const locals = { title: 'Algo deu errado', message: 'Ocorreu um erro inesperado. Tente novamente em instantes.' };
+    const locals = { title: 'Não deu certo desta vez', message: 'O painel não conseguiu abrir esta página. Volte e tente de novo; se repetir, avise a gestão.' };
     // attachSession pode ter falhado antes de definir os locals do layout
     res.status(500).render('error', { currentUser: null, flash: null, can: () => false, csrf: '', podcastName: '', appName: require('./config').appName, currentPath: '', ...locals });
   });

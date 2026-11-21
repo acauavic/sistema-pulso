@@ -6,9 +6,9 @@
 <%- include('../partials/gestao-nav', { active: 'usuarios' }) %>
 
 <form method="get" action="/usuarios" class="filters">
-  <input type="search" name="q" value="<%= q %>" placeholder="Buscar por nome ou e-mail">
-  <select name="role" aria-label="Perfil" data-autosubmit>
-    <option value="">Todos os perfis</option>
+  <input type="search" name="q" value="<%= q %>" placeholder="Buscar por nome ou e-mail" aria-label="Buscar usuário">
+  <select name="role" aria-label="Função" data-autosubmit>
+    <option value="">Todas as funções</option>
     <% Object.keys(ROLES).forEach(function (k) { %><option value="<%= k %>" <%= role === k ? 'selected' : '' %>><%= ROLES[k].label %></option><% }) %>
   </select>
   <select name="status" aria-label="Status" data-autosubmit>
@@ -22,9 +22,9 @@
 
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Último acesso</th><th></th></tr></thead>
+  <thead><tr><th>Nome</th><th>E-mail</th><th>Função</th><th>Status</th><th>Último acesso</th><th></th></tr></thead>
   <tbody>
-    <% if (!users.length) { %><tr><td colspan="6"><div class="empty"><strong>Nenhum usuário encontrado</strong><span>Ajuste a busca ou os filtros.</span></div></td></tr><% } %>
+    <% if (!users.length) { %><tr><td colspan="6"><div class="empty"><%- include('../partials/signal') %><strong>Nenhum usuário encontrado</strong><span>Ajuste a busca ou os filtros.</span></div></td></tr><% } %>
     <% users.forEach(function (u) {
          const manageable = canManageUser(myRole, u.role);
          const isSelf = u.id === currentUser.id; %>

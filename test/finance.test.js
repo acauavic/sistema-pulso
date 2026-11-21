@@ -221,8 +221,10 @@ describe('financeiro', () => {
     await as.gestao.act('/financeiro/lancamentos', { direction: 'saida', description: '=SOMA(A1)', amount: '1,00', due_on: '2020-03-03' }, { from: '/financeiro' });
     const csv = await as.gestao.get('/financeiro/exportar.csv');
     assert.equal(csv.status, 200); assert.match(csv.headers.get('content-type'), /text\/csv/);
-    assert.ok(csv.text.replace(/^\uFEFF/, '').startsWith('Data;Vencimento'), 'cabeçalho');
+    assert.ok(csv.text.replace(/^\uFEFF/, '').startsWith('Data (pagamento ou vencimento);Vencimento'), 'cabeçalho');
     assert.match(csv.text, /'=SOMA\(A1\)/, 'fórmulas não executam na planilha');
+    assert.match(csv.text, /;-\d+,\d{2};/, 'saída é número negativo (o Excel soma), não texto');
+    assert.doesNotMatch(csv.text, /;'-\d/, 'valor nunca vira texto');
     assert.equal((await as.prod.get('/financeiro/exportar.csv')).status, 403);
   });
 

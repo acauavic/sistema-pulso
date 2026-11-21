@@ -299,7 +299,7 @@
         <% if (!booked.length && !linkedEps.length) { %><p class="muted small">Nenhuma gravação reservada nem episódio ligado a este patrocinador.</p><% } %>
         <ul class="plain plan-list">
           <% booked.forEach(function (g) { %><li><div class="plan-list-main"><strong><%= g.name %></strong><span class="small muted mono"><%= g.proposed_at ? fmt.formatDateTime(g.proposed_at) : 'DATA A DEFINIR' %> · GRAVAÇÃO RESERVADA</span></div><span class="badge b-gray"><%= g.role === 'exclusivo' ? 'Exclusivo' : 'Inserção' %></span><span></span></li><% }) %>
-          <% linkedEps.forEach(function (e) { %><li><div class="plan-list-main"><a href="/episodios/<%= e.id %>"><strong><%= e.title %></strong></a><span class="small muted mono"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') + ' · ' : '' %><%= C.EPISODE_STATUSES[e.status].toUpperCase() %></span></div><span class="badge b-gray"><%= roleByEpisode[e.id] === 'exclusivo' ? 'Exclusivo' : 'Inserção' %></span><span></span></li><% }) %>
+          <% linkedEps.forEach(function (e) { %><li><div class="plan-list-main"><a href="/episodios/<%= e.id %>"><strong><%= e.title %></strong></a><span class="small muted mono"><%= e.number ? videoNo(e.number, e.project_id || sponsor.project_id) + ' · ' : '' %><%= C.EPISODE_STATUSES[e.status].toUpperCase() %></span></div><span class="badge b-gray"><%= roleByEpisode[e.id] === 'exclusivo' ? 'Exclusivo' : 'Inserção' %></span><span></span></li><% }) %>
         </ul>
         <% if (can('episodes.write')) { %><p class="small top-gap"><a href="/episodios/novo?patrocinador=<%= sponsor.id %>">Registrar episódio gravado só com os hosts</a></p><% } %>
       </section>
@@ -349,7 +349,7 @@
         <% if (episodes.length) { %><h3>Episódios gravados</h3>
         <ul class="plain ep-pick">
           <% episodes.forEach(function (e) { %>
-          <li><span><span class="handle muted"><%= e.number ? 'EP.' + String(e.number).padStart(3, '0') : '—' %></span> <%= e.title %></span>
+          <li><span><span class="handle muted"><%= e.number ? videoNo(e.number, e.project_id || sponsor.project_id) : '—' %></span> <%= e.title %></span>
             <select name="role_<%= e.id %>" aria-label="Papel no episódio <%= e.title %>"><option value="">Fora</option><option value="insercao" <%= roleByEpisode[e.id] === 'insercao' ? 'selected' : '' %>>Inserção</option><option value="exclusivo" <%= roleByEpisode[e.id] === 'exclusivo' ? 'selected' : '' %>>Exclusivo</option></select></li>
           <% }) %>
         </ul><% } %>
@@ -461,7 +461,7 @@
           <% Object.keys(C.SPONSOR_TIERS).forEach(function (k) { %><option value="<%= k %>" <%= sponsor.tier === k ? 'selected' : '' %>><%= C.SPONSOR_TIERS[k] %></option><% }) %>
         </select>
       </label>
-      <label>Valor (R$)<input type="text" name="value" value="<%= moneyVal %>" inputmode="decimal" placeholder="15.000,00" required></label>
+      <label>Valor (R$)<input type="text" name="value" value="<%= moneyVal %>" inputmode="decimal" placeholder="ex.: 15.000,00" required></label>
       <label>Responsável na empresa<input type="text" name="contact_name" value="<%= sponsor.contact_name || '' %>" maxlength="150" required></label>
       <label>WhatsApp<input type="text" name="contact_phone" value="<%= sponsor.contact_phone || '' %>" maxlength="40"></label>
       <label>E-mail<input type="email" name="contact_email" value="<%= sponsor.contact_email || '' %>" maxlength="254"></label>
@@ -482,7 +482,7 @@
       <label>Vigência: início<input type="date" name="starts_on" value="<%= fmt.toInputDate(sponsor.starts_on) %>"></label>
       <label>Vigência: fim<input type="date" name="ends_on" value="<%= fmt.toInputDate(sponsor.ends_on) %>"></label>
       <% if (!sponsor.tier) { %><label>Cota<select name="tier" required><option value="">Escolha…</option><% Object.keys(C.SPONSOR_TIERS).forEach(function (k) { %><option value="<%= k %>"><%= C.SPONSOR_TIERS[k] %></option><% }) %></select></label><% } %>
-      <% if (sponsor.value_cents == null) { %><label>Valor (R$)<input type="text" name="value" inputmode="decimal" placeholder="15.000,00" required></label><% } %>
+      <% if (sponsor.value_cents == null) { %><label>Valor (R$)<input type="text" name="value" inputmode="decimal" placeholder="ex.: 15.000,00" required></label><% } %>
     </div>
     <div class="row modal-actions"><button class="btn primary" type="submit">Ativar patrocínio</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>

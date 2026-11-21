@@ -55,13 +55,13 @@ async function load(req, res) {
 }
 
 router.get('/aprovar/:token', wrap(async (req, res) => {
-  if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
+  if (!await viewLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const l = await load(req, res); if (!l) return;
   return render(req, res, l);
 }));
 
 router.post('/aprovar/:token', wrap(async (req, res) => {
-  if (!await answerLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições. Tente de novo em instantes.');
+  if (!await answerLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const l = await load(req, res); if (!l) return;
   const approved = req.body.resposta === 'aprovar';
   const covers = list(req.body.capa);
@@ -74,7 +74,7 @@ router.post('/aprovar/:token', wrap(async (req, res) => {
 
 // O vídeo da versão enviada: a versão leve quando existe (abre rápido no celular), ou o original. ?original=1 força o original.
 router.get('/aprovar/:token/video', wrap(async (req, res) => {
-  if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
+  if (!await viewLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const l = await approvals.byToken(req.params.token);
   if (!l || l.kind !== 'video' || l.revoked_at || new Date(l.expires_at) < new Date()) return res.status(404).end();
   const { rows: [file] } = await require('../db/pool').query('SELECT storage_key FROM episode_files WHERE id = $1', [l.file_id]);
@@ -88,7 +88,7 @@ router.get('/aprovar/:token/video', wrap(async (req, res) => {
 
 // Imagem de uma capa do link (só as do episódio dele).
 router.get('/aprovar/:token/capa/:cid', wrap(async (req, res) => {
-  if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
+  if (!await viewLimiter.hit(req.ip)) return res.status(429).type('text/plain; charset=utf-8').send('Muitos acessos seguidos. Espere um minuto e recarregue a página.');
   const l = await approvals.byToken(req.params.token);
   if (!l || l.kind !== 'capas' || l.revoked_at || new Date(l.expires_at) < new Date() || !isIntId(req.params.cid)) return res.status(404).end();
   const { rows: [c] } = await require('../db/pool').query(

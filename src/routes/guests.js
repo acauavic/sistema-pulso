@@ -1,4 +1,5 @@
 const express = require('express');
+const { userMessage } = require('../utils/userMessage');
 const { can } = require('../permissions');
 const db = require('../db/pool');
 const config = require('../config');
@@ -118,8 +119,9 @@ const NULLABLE = new Set(['email', 'phone', 'invite_reason', 'reach', 'company',
 const columnValues = (values) => COLUMNS.map((c) => (NULLABLE.has(c) ? values[c] || null : values[c]));
 
 // ---- quadro / lista ----
-router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
-  const view = req.query.view === 'lista' ? 'lista' : 'quadro';
+// Os filtros da lista de convidados (busca, responsável, etapa, filtros combináveis e o recorte do projeto), em SQL.
+// A lista e a planilha usam os mesmos: o que se baixa é o que se vê.
+async function guestFilters(req, { view }) {
   const q = clean(req.query.q, 100);
   const owner = req.query.owner === 'eu' ? req.user.id : (isUuid(req.query.owner) ? req.query.owner : '');
   const status = isStatus(req.query.status) ? req.query.status : '';
@@ -138,8 +140,32 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
   const fstate = ff.parse(req.query, fields, fctx);
   const fsql = ff.toSql(fstate, fields, params);
   if (fsql) where.push(fsql);
+  require('../services/scope').where(req, where, params, 'g'); // só os projetos da pessoa, ou o escolhido no menu
+  return { where, params, q, owner, status, fields, fstate };
+}
+
+// Planilha dos convidados com os filtros da tela (etapa, responsável, busca, filtros combináveis e projeto).
+router.get('/convidados/exportar.csv', requirePerm('guests.write'), wrap(async (req, res) => {
+  const { where, params } = await guestFilters(req, { view: 'lista' });
+  const { rows } = await db.query(
+    `SELECT g.*, u.name AS owner_name FROM guests g LEFT JOIN users u ON u.id = g.owner_id
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY lower(g.name) LIMIT 5000`, params);
+  const multi = req.scope.multi;
+  const projects = require('../services/projects');
+  const header = ['Nome', 'Instagram', 'WhatsApp', 'E-mail', 'Perfil', 'Empresa', 'Cargo', 'Tema', 'Etapa', 'Responsável', 'Data da gravação', 'Motivo da perda', ...(multi ? ['Projeto'] : []), 'Cadastrado em'];
+  const out = rows.map((g) => [g.name, g.instagram ? `@${g.instagram}` : '', fmt.phone(g.phone) || '', g.email || '', PROFILE_BY_KEY[g.profile]?.label || '', g.company || '', g.job_title || '', g.topic || '',
+    STATUS_BY_KEY[g.status]?.label || g.status, g.owner_name || '', g.proposed_at ? fmt.formatDateTime(g.proposed_at) : '', g.loss_reason ? (LOSS_REASONS[g.loss_reason] || g.loss_reason) : '',
+    ...(multi ? [projects.get(g.project_id)?.name || ''] : []), g.created_at ? fmt.formatDate(g.created_at) : '']);
+  await audit(req, 'convidados.exportados', 'guest', null, { linhas: rows.length });
+  const slug = req.scope.current ? `-${req.scope.current.slug}` : '';
+  require('../utils/csv').send(res, `convidados${slug}-${require('../utils/csv').today()}.csv`, header, out);
+}));
+
+router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
+  const view = req.query.view === 'lista' ? 'lista' : 'quadro';
+  const { where, params, q, owner, status, fields, fstate } = await guestFilters(req, { view });
+  const ff = require('../services/filters'); const fieldsDef = require('../services/filterFields'); const fctx = { userId: req.user.id };
   const scope = require('../services/scope');
-  scope.where(req, where, params, 'g'); // só os projetos da pessoa, ou o escolhido no menu
   const [{ rows: guests }, { rows: owners }, { rows: sponsors }] = await Promise.all([
     db.query(
       `SELECT g.id, g.name, g.instagram, g.profile, g.company, g.job_title, g.topic, g.status, g.proposed_at, g.invite_sent_at, g.invite_viewed_at,
@@ -170,7 +196,8 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
     query: ff.toQuery(fstate, fctx), views: await fieldsDef.savedViews('guest', req.user.id),
     current: require('./savedFilters').cleanQuery('guest', req.originalUrl.split('?')[1] || ''), open: req.query.fa === '1',
   };
-  res.render('guests/index', { filterUi, cardUi: require('../services/cardFields').forList('convidados'), pager, total: shown.length, followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: listed, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
+  const exportQuery = new URLSearchParams(Object.entries(req.query).filter(([k, v]) => !['view', 'pagina', 'page'].includes(k) && typeof v === 'string' && v)).toString();
+  res.render('guests/index', { exportQuery, filterUi, cardUi: require('../services/cardFields').forList('convidados'), pager, total: shown.length, followupOnly, followupCount, lossReasons: LOSS_REASONS, sponsors, bulkStatuses: bulk.BULK_STATUSES, genders: [['m', 'Masculino'], ['f', 'Feminino']], profiles: PROFILES, title: 'Convidados', view, q, ownerFilter: req.query.owner || '', status, guests: listed, columns, owners, statuses: GUEST_STATUSES, profileLabels: PROFILE_BY_KEY });
 }));
 
 // ---- criar ----
@@ -420,6 +447,7 @@ router.post('/convidados/:id/status', requirePerm('guests.write'), wrap(async (r
 // ---- próximo passo guiado: salva só os campos da janela e, se der, muda a etapa ----
 // Campos aceitos: contato (email/phone), agenda (proposed_at + confirmações, com agenda=1) e perda (loss_reason/loss_note, com perda=1).
 // Remarcar (nova data) exige confirmar de novo; sem as três confirmações o convidado volta para Em agendamento.
+const fmt = require('../utils/format');
 const fmtWhen = (d) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(d);
 
 router.post('/convidados/:id/avancar', requirePerm('guests.write'), wrap(async (req, res) => {
@@ -537,7 +565,7 @@ router.post('/convidados/:id/convite', requirePerm('guests.invite'), wrap(async 
   const result = await guestsSvc.generateInvite(guest, req.user.id, { regenerate });
   await audit(req, regenerate ? 'convite.regenerado' : 'convite.gerado', 'guest', guest.id, { short: result.shortUrl });
   if (result.warning) await req.flash('error', `Link do convite criado, mas o encurtador falhou: ${result.warning}. Você pode usar o link completo ou tentar de novo.`);
-  else await req.flash('ok', regenerate ? 'Novo link gerado. O link anterior deixou de funcionar.' : 'Link do convite gerado!');
+  else await req.flash('ok', regenerate ? 'Novo link gerado. O link anterior deixou de funcionar.' : 'Link do convite gerado.');
   res.redirect(`/convidados/${guest.id}#convite`);
 }));
 
@@ -587,8 +615,7 @@ router.post('/convidados/:id/enviar', requirePerm('guests.invite'), wrap(async (
       url: invite.shortUrl || invite.longUrl, replyTo: req.user.email,
     });
   } catch (err) {
-    console.error('Falha ao enviar convite:', err.message);
-    await req.flash('error', `Não foi possível enviar o e-mail: ${err.message}`);
+    await req.flash('error', userMessage(err, 'O e-mail não saiu. Confira o endereço e tente de novo; se continuar, copie o link e mande pelo WhatsApp.', { log: 'Falha ao enviar convite' }));
     return res.redirect(back);
   }
   await db.query(

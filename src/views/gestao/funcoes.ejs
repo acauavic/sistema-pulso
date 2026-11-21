@@ -63,8 +63,8 @@
           <summary class="icon-btn" aria-label="Mais ações de <%= r.name %>"><%- icon('ellipsis') %></summary>
           <div class="row-menu-list">
             <form method="post" action="/gestao/funcoes/<%= r.id %>/duplicar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">duplicar</button></form>
-            <% if (edited) { %><form method="post" action="/gestao/funcoes/<%= r.id %>/padrao" data-confirm="Voltar <%= r.name %> ao padrão de fábrica?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">voltar ao padrão</button></form><% } %>
-            <% if (!r.builtin) { %><form method="post" action="/gestao/funcoes/<%= r.id %>/excluir" data-confirm="Excluir a função <%= r.name %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">excluir</button></form><% } %>
+            <% if (edited) { %><form method="post" action="/gestao/funcoes/<%= r.id %>/padrao" data-confirm="Voltar <%= r.name %> ao padrão de fábrica? As mudanças feitas nela se perdem."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">voltar ao padrão</button></form><% } %>
+            <% if (!r.builtin) { %><form method="post" action="/gestao/funcoes/<%= r.id %>/excluir" data-confirm="Apagar a função <%= r.name %> de vez? Não dá para desfazer."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">excluir</button></form><% } %>
           </div>
         </details>
       </span>

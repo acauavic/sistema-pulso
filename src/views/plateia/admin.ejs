@@ -89,7 +89,7 @@
           <a class="<%= view === 'lista' ? 'on' : '' %>" href="<%= qs({ vista: 'lista' }) %>" title="Lista" aria-label="Ver em lista"><%- icon('list', 16) %></a>
         </div>
         <button class="btn sm" type="button" data-modal-open="modal-adicionar"><%- icon('plus', 14) %> Adicionar pessoa</button>
-        <a class="icon-btn" href="/plateia/painel/inscricoes.csv" title="Exportar planilha" aria-label="Exportar planilha"><%- icon('download', 16) %></a>
+        <a class="btn sm ghost" href="/plateia/painel/inscricoes.csv<%= exportQuery ? '?' + exportQuery : '' %>" title="As inscrições da lista, com os filtros da tela" data-no-skeleton><%- icon('download', 14) %> Baixar planilha</a>
       </div>
     </div>
 
@@ -282,14 +282,14 @@
       <label>País
         <select name="country"><% countries.forEach(function (c) { %><option value="<%= c.code %>" <%= c.code === 'BR' ? 'selected' : '' %>><%= c.name %> (+<%= c.dial %>)</option><% }) %></select>
       </label>
-      <label>WhatsApp<input type="tel" name="phone" inputmode="tel" required autocomplete="off" placeholder="(11) 91234-5678"></label>
+      <label>WhatsApp<input type="tel" name="phone" inputmode="tel" required autocomplete="off" placeholder="ex.: (11) 91234-5678"></label>
     </div>
     <label>Situação
       <select name="status"><option value="novo">Novo pedido (ainda vou avaliar)</option><option value="confirmado">Selecionada: já combinei</option></select>
     </label>
     <div class="stack" data-when="status=confirmado">
       <div class="grid-2 tight">
-        <label data-when="paid!=isento">Valor combinado (R$)<input type="text" name="amount" inputmode="decimal" placeholder="197,00"></label>
+        <label data-when="paid!=isento">Valor combinado (R$)<input type="text" name="amount" inputmode="decimal" placeholder="ex.: 197,00"></label>
         <label>Pagamento
           <select name="paid"><option value="0">Ainda vai pagar</option><option value="1">Já recebi</option><option value="isento">Isento (sem cobrança)</option></select>
         </label>
@@ -365,7 +365,7 @@
       <label>Duração estimada<input type="text" name="duration" maxlength="40" value="<%= s.duration %>" required></label>
     </div>
     <label>Local<input type="text" name="location" maxlength="160" value="<%= s.location %>" required></label>
-    <label>WhatsApp da produtora <small class="muted">(com código do país, só números)</small><input type="text" name="whatsapp" inputmode="numeric" value="<%= s.whatsapp %>" placeholder="5511912345678"></label>
+    <label>WhatsApp da produtora <small class="muted">(com código do país, só números)</small><input type="text" name="whatsapp" inputmode="numeric" value="<%= s.whatsapp %>" placeholder="ex.: 5511912345678"></label>
     <details class="more">
       <summary>Rastreamento de campanhas</summary>
       <div class="stack top-gap">

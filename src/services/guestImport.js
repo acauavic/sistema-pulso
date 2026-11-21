@@ -6,9 +6,9 @@ const production = require('./production');
 const { formatDateTime } = require('../utils/format');
 const { STATUS_BY_KEY, LOSS_REASONS } = require('../constants');
 
-async function analyse(text) {
+async function analyse(text, projectId = null) {
   const parsed = csv.parseGuests(text);
-  if (!parsed.headerError) await csv.markDuplicates(parsed.rows);
+  if (!parsed.headerError) await csv.markDuplicates(parsed.rows, projectId);
   return parsed;
 }
 
@@ -30,7 +30,8 @@ async function createHistoryEpisode(client, guestId, data, user) {
 // Grava as linhas prontas. Devolve { rows, headerError, created: [ids], episodes, skipped }.
 // projectId: em que projeto os convidados entram (o escolhido no menu de quem importa)
 async function importGuests(text, user, projectId = null) {
-  const { rows, headerError } = await analyse(text); // reavalia: nada do que veio da prévia é confiável
+  if (!projectId) return { rows: [], headerError: 'Escolha em que projeto os convidados entram.', created: [], episodes: 0, skipped: 0 };
+  const { rows, headerError } = await analyse(text, projectId); // reavalia: nada do que veio da prévia é confiável
   if (headerError) return { rows, headerError, created: [], episodes: 0, skipped: 0 };
   const toImport = rows.filter((r) => !r.errors.length && !r.duplicate);
   if (!toImport.length) return { rows, headerError: 'Nenhuma linha válida para importar.', created: [], episodes: 0, skipped: rows.length };
@@ -44,7 +45,7 @@ async function importGuests(text, user, projectId = null) {
     const history = toImport.filter((r) => r.data.episode);
     if (history.length) {
       await client.query('LOCK TABLE episodes IN SHARE ROW EXCLUSIVE MODE'); // ninguém numera ao mesmo tempo
-      const { rows: [{ max }] } = await client.query('SELECT coalesce(max(number), 0) AS max FROM episodes WHERE project_id = $1', [projectId || require('./projects').defaultId()]);
+      const { rows: [{ max }] } = await client.query('SELECT coalesce(max(number), 0) AS max FROM episodes WHERE project_id = $1', [projectId]);
       let next = Math.max(Number(max), ...history.map((r) => r.data.episode.number || 0)) + 1;
       for (const r of history.filter((x) => !x.data.episode.number).sort((a, b) => a.data.proposed_at - b.data.proposed_at)) r.data.episode.number = next++;
     }
@@ -54,7 +55,7 @@ async function importGuests(text, user, projectId = null) {
                             proposed_at, scheduled_studio, scheduled_hosts, scheduled_guest, loss_reason, loss_note, notes, project_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$11,$11,$12,$13,$14,$15) RETURNING id`,
         [data.name, data.instagram, data.phone || null, data.profile, data.email || null, data.invite_reason || null, data.gender, user.id,
-          data.status, data.proposed_at, data.status === 'agendado', data.loss_reason, data.loss_note, data.notes || null, projectId || require('./projects').defaultId()]);
+          data.status, data.proposed_at, data.status === 'agendado', data.loss_reason, data.loss_note, data.notes || null, projectId]);
       const details = [data.status !== 'prospect' && `etapa: ${STATUS_BY_KEY[data.status].label}`, data.loss_reason && `motivo: ${LOSS_REASONS[data.loss_reason]}`,
         data.proposed_at && `gravação ${formatDateTime(data.proposed_at)}`].filter(Boolean);
       await client.query('INSERT INTO guest_events (guest_id, user_id, type, message) VALUES ($1,$2,$3,$4)',

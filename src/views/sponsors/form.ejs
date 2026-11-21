@@ -31,7 +31,7 @@
           <% Object.keys(tiers).forEach(function (k) { %><option value="<%= k %>" <%= values.tier === k ? 'selected' : '' %>><%= tiers[k] %></option><% }) %>
         </select>
       </label>
-      <label>Valor (R$)<input type="text" name="value" value="<%= moneyVal() %>" inputmode="decimal" placeholder="15.000,00"></label>
+      <label>Valor (R$)<input type="text" name="value" value="<%= moneyVal() %>" inputmode="decimal" placeholder="ex.: 15.000,00"></label>
     </div>
 
     <h2 class="form-section">Responsável na empresa</h2>
@@ -65,9 +65,9 @@
     <p class="stage-hint small" data-hint-for="<%= key %>" <%= values.stage === key ? '' : 'hidden' %>><%- icon('info', 14) %> <%= stageHints[key] %></p>
     <% }) %>
     <label>Observações internas<textarea name="notes" rows="3" maxlength="4000"><%= values.notes || '' %></textarea></label>
-    <div class="row">
+    <div class="row sticky-actions">
       <button class="btn primary" type="submit">Salvar</button>
-      <a class="btn" href="<%= sponsor ? '/patrocinadores/' + sponsor.id : '/patrocinadores' %>">Cancelar</a>
+      <a class="btn ghost" href="<%= sponsor ? '/patrocinadores/' + sponsor.id : '/patrocinadores' %>">Cancelar</a>
     </div>
   </form>
 </div>

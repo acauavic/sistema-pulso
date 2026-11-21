@@ -9,6 +9,10 @@ const owner = require('../services/finOwner');
 const projects = require('../services/projects');
 const attachments = require('../services/attachments');
 // Os comprovantes que a janela enviou (ids dos anexos, um campo por arquivo).
+// Célula de planilha: texto que começa com = + - @ vira texto (não roda fórmula no Excel); número (-150,00) continua número.
+// Número do vídeo pelo prefixo do projeto (EP.012 no Pulso, V.003 no Projeto 100).
+const fmtEpNo = (n, projectId) => require('../utils/format').epNo(n, (projects.get(projectId) || projects.get(projects.defaultId()) || {}).number_prefix || 'EP.');
+const csvCell = (v) => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(,\d+)?$/.test(s)) s = `'${s}`; return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 const receiptIds = (body) => [].concat(body.comprovante || []).map(Number).filter(Number.isInteger);
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
@@ -339,16 +343,21 @@ router.post('/financeiro/lancamentos/:id/excluir', requirePerm('finance.write'),
 
 // Planilha para o contador: UTF-8 com BOM e ";" (abre direto no Excel em português).
 router.get('/financeiro/exportar.csv', requirePerm('finance.read'), wrap(async (req, res) => {
+  // período: o mês (?mes=AAAA-MM) ou o ano todo (?ano=AAAA), que é o que o contador costuma pedir; mais a busca e a categoria da tela
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(String(req.query.mes || '')) ? req.query.mes : null;
+  const year = !month && /^\d{4}$/.test(String(req.query.ano || '')) ? req.query.ano : null;
+  const term = clean(req.query.q, 80);
+  const category = C.FIN_CATEGORIES[req.query.cat] ? req.query.cat : null;
   const pids = pidsOf(req);
   const { rows } = await db.query(
-    `SELECT e.*, ${owner.share('e', '$2')} AS share_cents, s.company AS sponsor_name, ep.number AS episode_number, ep.title AS episode_title FROM fin_entries e
+    `SELECT e.*, ${owner.share('e', '$2')} AS share_cents, s.company AS sponsor_name, ep.number AS episode_number, ep.title AS episode_title, ep.project_id AS episode_project FROM fin_entries e
        LEFT JOIN sponsors s ON s.id = e.sponsor_id LEFT JOIN episodes ep ON ep.id = e.episode_id
       WHERE e.status <> 'cancelado' AND ($1::text IS NULL OR to_char(coalesce(e.paid_on, e.due_on), 'YYYY-MM') = $1) AND ${owner.where('e', '$2')}
-      ORDER BY coalesce(e.paid_on, e.due_on), e.id`, [month, pids]);
-  const cell = (v) => { let s = String(v ?? ''); if (/^[=+\-@\t]/.test(s)) s = `'${s}`; return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+        AND ($3::text IS NULL OR to_char(coalesce(e.paid_on, e.due_on), 'YYYY') = $3)
+        AND ($4::text IS NULL OR e.description ILIKE $4 OR e.supplier ILIKE $4 OR s.company ILIKE $4) AND ($5::text IS NULL OR e.category = $5)
+      ORDER BY coalesce(e.paid_on, e.due_on), e.id`, [month, pids, year, term ? `%${term.replace(/[\\%_]/g, '\\$&')}%` : null, category]);
   const multi = req.scope.multi;
-  const lines = [['Data', 'Vencimento', 'Situação', 'Tipo', 'Categoria', 'Descrição', 'Fornecedor', 'Valor (R$)', ...(multi ? ['Projeto'] : []), 'Episódio', 'Patrocinador'].join(';')];
+  const lines = [['Data (pagamento ou vencimento)', 'Vencimento', 'Situação', 'Tipo', 'Categoria', 'Descrição', 'Fornecedor', 'Valor (R$)', ...(multi ? ['Projeto'] : []), 'Episódio', 'Patrocinador'].join(';')];
   for (const r of rows) {
     const e = fin.toEntry(r);
     const p = e.project_id ? projects.get(e.project_id) : null;
@@ -356,9 +365,10 @@ router.get('/financeiro/exportar.csv', requirePerm('finance.read'), wrap(async (
       e.direction === 'entrada' ? 'Entrada' : 'Saída', C.FIN_CATEGORIES[e.category] || e.category, e.description, e.supplier || '',
       ((e.direction === 'entrada' ? 1 : -1) * e.share_cents / 100).toFixed(2).replace('.', ','),
       ...(multi ? [p ? p.name : 'Compartilhado (parte deste recorte)'] : []),
-      e.episode_number ? `EP.${String(e.episode_number).padStart(3, '0')}` : '', e.sponsor_name || ''].map(cell).join(';'));
+      e.episode_number ? fmtEpNo(e.episode_number, e.episode_project) : '', e.sponsor_name || ''].map(csvCell).join(';'));
   }
-  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="financeiro-${month || 'tudo'}.csv"` });
+  const slug = req.scope.current ? `-${req.scope.current.slug}` : '';
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="financeiro${slug}-${month || year || 'tudo'}.csv"` });
   res.send(`﻿${lines.join('\r\n')}\r\n`);
 }));
 

@@ -46,7 +46,7 @@
       <ul class="plain shortcut-list top-gap">
         <% shortcuts.forEach(function (s) { %>
         <li><div><strong><%= s.label %></strong> <span class="mono small"><%= s.url %></span><p class="small muted"><%= s.keywords || 'sem palavras-chave' %><%= s.perm ? ' · ' + s.perm : '' %><%= s.author ? ' · ' + s.author : '' %></p></div>
-          <form method="post" action="/gestao/busca/atalhos/<%= s.id %>/excluir" class="inline" data-confirm="Excluir este atalho?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger" type="submit">excluir</button></form></li>
+          <form method="post" action="/gestao/busca/atalhos/<%= s.id %>/excluir" class="inline" data-confirm="Apagar este atalho da busca? Não dá para desfazer."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger" type="submit">excluir</button></form></li>
         <% }) %>
         <% if (!shortcuts.length) { %><li class="muted small">Nenhum atalho criado pela equipe ainda.</li><% } %>
       </ul>
@@ -71,8 +71,8 @@
       <form method="post" action="/gestao/busca/atalhos" class="stack">
         <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="sugestao" value="<%= prefill.sugestao || '' %>">
         <div class="grid-2 tight">
-          <label>Nome<input type="text" name="label" value="<%= prefill.label %>" maxlength="80" required placeholder="Ex.: Contratos de patrocínio"></label>
-          <label>Endereço<input type="text" name="url" value="<%= prefill.url %>" maxlength="300" required placeholder="/patrocinadores?etapa=ativo"></label>
+          <label>Nome<input type="text" name="label" value="<%= prefill.label %>" maxlength="80" required placeholder="ex.: Contratos de patrocínio"></label>
+          <label>Endereço<input type="text" name="url" value="<%= prefill.url %>" maxlength="300" required placeholder="ex.: /patrocinadores?etapa=ativo"></label>
         </div>
         <div class="grid-2 tight">
           <label>Palavras-chave<input type="text" name="keywords" value="<%= prefill.keywords %>" maxlength="300" placeholder="contrato assinatura documento"></label>

@@ -1,46 +1,72 @@
 <%- include('../partials/head') %>
+<% var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">'; %>
 <div class="page-head">
   <div><span class="kicker">Produção · Padrões</span><h1>Checklists padrão</h1></div>
-  <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
+  <div class="row">
+    <a class="btn ghost" href="/episodios"><%- icon('arrow-left') %> Voltar</a>
+    <button class="btn primary" type="button" data-modal-open="modal-ck-novo"><%- icon('plus') %> Novo checklist</button>
+  </div>
 </div>
 <p class="lead">Modelos que o editor e a gestão mantêm juntos. Cada episódio recebe uma cópia quando chega em <strong>Disponível para edição</strong>. Os marcados como <strong>obrigatórios</strong> travam a passagem: <em>antes da revisão</em> impede enviar para revisão; <em>antes de finalizar</em> impede marcar como pronto para publicar.</p>
 
-<div class="stack-lg">
-  <% templates.forEach(function (t) { %>
-  <form method="post" action="/episodios/checklists/<%= t.id %>" class="card stack">
-    <input type="hidden" name="_csrf" value="<%= csrf %>">
+<% if (!templates.length) { %>
+<div class="empty card"><%- include('../partials/signal') %>
+  <p><strong>Nenhum checklist ainda</strong></p>
+  <p class="muted small">Crie o primeiro em Novo checklist: um item por linha, e se ele trava a passagem do episódio.</p></div>
+<% } else { %>
+<section class="card">
+  <ul class="plain cat-list proj-list">
+    <% templates.forEach(function (t) { %>
+    <li class="cat-row <%= t.active ? '' : 'off' %>">
+      <span class="cat-name"><strong><%= t.name %></strong>
+        <% if (t.required) { %><span class="badge b-gray">obrigatório</span><% } %>
+        <% if (!t.active) { %><span class="badge b-gray">desativado</span><% } %></span>
+      <span class="mono small muted"><%= gates[t.gate] %> · <%= t.items.length %> <%= t.items.length === 1 ? 'item' : 'itens' %></span>
+      <span class="row cat-actions">
+        <button class="btn sm ghost" type="button" data-modal-open="modal-ck-<%= t.id %>"><%- icon('pencil', 14) %> Editar</button>
+        <details class="row-menu">
+          <summary class="btn sm ghost icon-only" aria-label="Mais ações para <%= t.name %>"><%- icon('ellipsis', 16) %></summary>
+          <div class="row-menu-list">
+            <form method="post" action="/episodios/checklists/<%= t.id %>/excluir" data-confirm="Apagar o checklist “<%= t.name %>” de vez? Os episódios que já têm a cópia continuam com ela."><%- csrfField %><button class="link err" type="submit">Apagar checklist</button></form>
+          </div>
+        </details>
+      </span>
+    </li>
+    <% }) %>
+  </ul>
+</section>
+<% } %>
+
+<% templates.forEach(function (t) { %>
+<dialog class="modal modal-wide" id="modal-ck-<%= t.id %>" aria-labelledby="modal-ck-<%= t.id %>-h">
+  <form method="post" action="/episodios/checklists/<%= t.id %>" class="stack"><%- csrfField %>
+    <h2 id="modal-ck-<%= t.id %>-h">Editar checklist</h2>
     <div class="grid-2 tight">
       <label>Nome<input type="text" name="name" value="<%= t.name %>" maxlength="120" required></label>
       <label>Porta
         <select name="gate"><% Object.keys(gates).forEach(function (g) { %><option value="<%= g %>" <%= t.gate === g ? 'selected' : '' %>><%= gates[g] %></option><% }) %></select>
       </label>
     </div>
-    <div class="row">
-      <label class="check"><input type="checkbox" name="required" value="1" <%= t.required ? 'checked' : '' %>> Obrigatório (trava a passagem)</label>
-      <label class="check"><input type="checkbox" name="active" value="1" <%= t.active ? 'checked' : '' %>> Ativo (vale para os próximos episódios)</label>
-    </div>
-    <label>Itens <small class="muted">(um por linha)</small>
-      <textarea name="items" rows="<%= Math.min(14, t.items.length + 2) %>"><%= t.items.join('\n') %></textarea>
-    </label>
-    <div class="row">
-      <button class="btn primary" type="submit">Salvar</button>
-      <button class="btn danger" type="submit" formaction="/episodios/checklists/<%= t.id %>/excluir" data-confirm-click="Excluir este checklist?">Excluir</button>
-    </div>
+    <label>Itens<textarea name="items" rows="<%= Math.min(14, t.items.length + 2) %>"><%= t.items.join('\n') %></textarea><span class="field-help">Um item por linha.</span></label>
+    <label class="check"><input type="checkbox" name="required" value="1" <%= t.required ? 'checked' : '' %>> Obrigatório: trava a passagem do episódio</label>
+    <label class="check"><input type="checkbox" name="active" value="1" <%= t.active ? 'checked' : '' %>> Ativo: vale para os próximos episódios</label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Fechar</button></div>
   </form>
-  <% }) %>
+</dialog>
+<% }) %>
 
-  <form method="post" action="/episodios/checklists" class="card stack">
-    <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <h2>Novo checklist</h2>
+<dialog class="modal modal-wide" id="modal-ck-novo" aria-labelledby="modal-ck-novo-h">
+  <form method="post" action="/episodios/checklists" class="stack"><%- csrfField %>
+    <h2 id="modal-ck-novo-h">Novo checklist</h2>
     <div class="grid-2 tight">
-      <label>Nome<input type="text" name="name" maxlength="120" required placeholder="Ex.: Cortes — antes de liberar"></label>
+      <label>Nome<input type="text" name="name" maxlength="120" required placeholder="ex.: Cortes, antes de liberar"></label>
       <label>Porta
         <select name="gate"><% Object.keys(gates).forEach(function (g) { %><option value="<%= g %>"><%= gates[g] %></option><% }) %></select>
       </label>
     </div>
-    <label class="check"><input type="checkbox" name="required" value="1" checked> Obrigatório (trava a passagem)</label>
-    <label>Itens <small class="muted">(um por linha)</small><textarea name="items" rows="5" required></textarea></label>
-    <div><button class="btn primary" type="submit"><%- icon('plus') %> Criar checklist</button></div>
+    <label>Itens<textarea name="items" rows="5" required></textarea><span class="field-help">Um item por linha.</span></label>
+    <label class="check"><input type="checkbox" name="required" value="1" checked> Obrigatório: trava a passagem do episódio</label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar checklist</button><button class="btn ghost" type="button" data-modal-close>Fechar</button></div>
   </form>
-</div>
+</dialog>
 <%- include('../partials/foot') %>
