@@ -70,8 +70,17 @@ O sistema cuida de mais de um projeto (hoje: **Pulso** e **Projeto 100**). A reg
 dinheiro são sempre de um projeto**. Convidados, patrocinadores, episódios, cortes, pedidos de conteúdo e ideias têm
 `project_id` obrigatório; tarefa pode ser de um projeto ou geral (sem projeto).
 
-- **Quem participa de quê**: `project_members` (Gestão > Sistema > Projetos). Usuário novo entra no projeto padrão (o
-  ativo de menor `position`, hoje o Pulso). Toda pessoa participa de pelo menos um projeto.
+- **Quem participa de quê**: `project_members` (no cadastro do usuário, "Onde essa pessoa trabalha", e em Gestão >
+  Sistema > Projetos). Usuário novo entra no projeto padrão (o ativo de menor `position`, hoje o Pulso). Toda pessoa
+  participa de pelo menos um projeto.
+- **Três perguntas separadas**: **o que a pessoa faz** (o perfil, `src/permissions.js`), **onde ela faz** (os projetos
+  marcados) e **se ela é da equipe da casa** (`users.house`). A equipe da casa alcança o que é geral: usuários,
+  projetos, integrações, categorias, rotinas, notificações, lembretes, busca, contatos, cadência, estoque, auditoria e
+  lixeira completa (`HOUSE_PERMISSIONS`); quem não é perde isso mesmo com perfil de Gestão, e o superadmin é sempre da
+  casa. O **financeiro** pede o perfil (`finance.read`) **e** o interruptor "Vê o financeiro" naquele projeto.
+- **Isolamento**: página, ação ou arquivo de projeto que a pessoa não participa responde 404. O teste
+  `test/project-isolation.test.js` percorre **todas** as rotas GET registradas no Express com ids do outro projeto e
+  falha se algum marcador aparecer — rota nova entra na conferência sozinha.
 - **Seletor** (topo do menu, só para quem participa de mais de um): Todos os projetos, ou um deles. A escolha fica em
   `users.last_project_id`. Seguem o recorte: Convidados, Patrocinadores, Episódios/Vídeos, Conteúdo, Tarefas, Pautas,
   Início, Resumo do dia, Seu dia, Calendário, Busca, Avisos e Financeiro. Ainda mostram tudo: Social e Plateia

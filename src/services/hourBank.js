@@ -263,7 +263,7 @@ async function tick() {
   const st = await status();
   if (!st.active || !st.low) return false;
   const band = isOut(st) ? 'acabou' : 'baixo';
-  await require('./notify').notify({ type: 'financeiro', broadcast: true, title: alertText(st), url: '/financeiro', dedupe: `fin-banco-${todayISO()}-${band}` });
+  await require('./notify').notify({ type: 'financeiro', broadcast: true, house: true, title: alertText(st), url: '/financeiro', dedupe: `fin-banco-${todayISO()}-${band}` });
   return true;
 }
 

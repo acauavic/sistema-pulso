@@ -96,15 +96,15 @@ async function forComments(commentIds) {
 // Quem vê: solto = só quem enviou; de tarefa = quem lê tarefas; de comentário = quem lê o item do comentário.
 async function canView(user, att) {
   if (!att.entity_id) return String(att.uploaded_by) === String(user.id);
-  if (att.entity_type === 'task') return can(user.role, 'tasks.read');
+  if (att.entity_type === 'task') return can(user, 'tasks.read');
   if (att.entity_type === 'chat') return require('./chat').canSeeMessage(user.id, att.entity_id);
-  if (att.entity_type === 'review' || att.entity_type === 'content_request') return can(user.role, 'episodes.read');
+  if (att.entity_type === 'review' || att.entity_type === 'content_request') return can(user, 'episodes.read');
   const { rows: [c] } = await db.query('SELECT entity_type FROM comments WHERE id = $1', [att.entity_id]);
   return Boolean(c) && require('./comments').canSee(user.role, c.entity_type);
 }
 
 // Quem enviou sempre apaga. Anexo de conversa (mensagens privadas) só quem enviou; nos demais, a gestão das tarefas também.
-const canRemove = (user, att) => String(att.uploaded_by) === String(user.id) || (att.entity_type !== 'chat' && can(user.role, 'tasks.manage'));
+const canRemove = (user, att) => String(att.uploaded_by) === String(user.id) || (att.entity_type !== 'chat' && can(user, 'tasks.manage'));
 
 async function remove(att) {
   await b2.deleteObject(att.storage_key).catch((err) => console.error('[anexos] apagar do bucket:', err.message));

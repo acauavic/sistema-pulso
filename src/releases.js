@@ -4,6 +4,17 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.104.0', date: '2026-11-21', title: 'Acesso por projeto',
+    items: [
+      { kind: 'novo', text: 'Cada pessoa agora tem três coisas separadas: o perfil (o que ela faz), os projetos em que trabalha (onde ela faz) e o interruptor "Equipe da casa" (se ela alcança o que é geral do sistema).' },
+      { kind: 'novo', text: 'No cadastro do usuário, "Onde essa pessoa trabalha" lista os projetos com duas marcações: participa e vê o financeiro. Quem participa de um projeto só não vê seletor, sigla nem campo de projeto em lugar nenhum.' },
+      { kind: 'novo', text: 'Quem não é da equipe da casa não alcança usuários, integrações, categorias, rotinas, estoque, auditoria, lixeira completa nem a criação de projetos — mesmo com perfil de Gestão. O superadmin é sempre da casa.' },
+      { kind: 'ajuste', text: 'Página, ação ou arquivo de um projeto que a pessoa não participa responde como se não existisse (404). Isso agora é conferido por um teste que percorre todas as rotas do sistema: rota nova entra na conferência sozinha.' },
+      { kind: 'ajuste', text: 'Busca, avisos, calendário, chat, listas de vínculo, agenda da semana, galeria do media kit, ideias e sugestões de @ passaram a seguir o projeto. No chat, a pessoa só encontra quem divide um projeto com ela.' },
+      { kind: 'ajuste', text: 'Os avisos do financeiro agora são por projeto (quem vê o dinheiro daquele projeto recebe); estoque, banco de horas e integrações avisam só a equipe da casa.' },
+    ],
+  },
+  {
     version: '1.103.0', date: '2026-11-21', title: 'Cada projeto com o seu endereço',
     items: [
       { kind: 'novo', text: 'O painel passa a ter o endereço da casa e cada projeto ganha o endereço das páginas públicas dele (convite, portal, media kit, plateia, link do estúdio, pós-gravação). O do Pulso continua o de hoje: nenhum link já enviado muda ou quebra.' },

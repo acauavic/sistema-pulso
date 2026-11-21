@@ -37,7 +37,7 @@ const canRequest = (role) => can(role, 'production.manage') || can(role, 'produc
 const canReview = (role) => can(role, 'production.review');
 const isMine = (user, r) => String(r.assignee_id || '') === String(user.id);
 // quem produz: o responsável, ou qualquer editor/gestão quando o pedido ainda não tem responsável
-const canWork = (user, r) => isMine(user, r) || canReview(user.role) || (!r.assignee_id && can(user.role, 'production.edit'));
+const canWork = (user, r) => isMine(user, r) || canReview(user.role) || (!r.assignee_id && can(user, 'production.edit'));
 
 const SELECT = `SELECT r.*, a.name AS assignee_name, cb.name AS creator_name, e.number AS episode_number, e.title AS episode_title,
     (SELECT count(*)::int FROM episode_clips c WHERE c.request_id = r.id) AS videos,

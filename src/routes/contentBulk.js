@@ -226,7 +226,7 @@ router.get('/conteudo/semana', requirePerm('episodes.read'), wrap(async (req, re
   if (!canAskPublish(req.user.role)) return deny(res, 'Seu perfil não publica nas redes.');
   const st = await bulk.pilotSettings();
   const opts = bulk.readOptions({ inicio: bulk.nextMonday(), de: st.from, ate: st.to, por_dia: String(st.perDay), teste_por_dia: String(st.trialPerDay), teste_modo: st.trialMode });
-  const picks = await bulk.weekPicks(opts.perDay * 7);
+  const picks = await bulk.weekPicks(opts.perDay * 7, require('../services/scope').idsOf(req));
   const { ok, skipped } = await bulk.eligible(picks);
   const slots = bulk.plan(ok.map((c) => c.id), opts);
   const byId = new Map(ok.map((c) => [c.id, c]));

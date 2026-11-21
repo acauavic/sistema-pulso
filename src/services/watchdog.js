@@ -27,7 +27,7 @@ async function check({ now = Date.now() } = {}) {
   const notify = require('./notify').notify;
   for (const p of problems) {
     console.warn(`[vigia] ${p.title}: ${p.body}`);
-    await notify({ type: 'integracao', broadcast: true, title: p.title, body: p.body, url: '/gestao/sistema', dedupe: `vigia-${p.key}-${dayKey(now)}` }).catch((err) => console.error('vigia:', err.message));
+    await notify({ type: 'integracao', broadcast: true, house: true, title: p.title, body: p.body, url: '/gestao/sistema', dedupe: `vigia-${p.key}-${dayKey(now)}` }).catch((err) => console.error('vigia:', err.message));
   }
   return problems;
 }

@@ -197,10 +197,12 @@ async function createUser({ name, email, role, password = 'SenhaForte-123', acti
 }
 
 async function startServer() {
-  const server = http.createServer(createApp());
+  const app = createApp();
+  const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  return { server, base, close: () => new Promise((r) => server.close(r)) };
+  // `app` sai daqui para o teste de isolamento percorrer a tabela de rotas do Express
+  return { server, app, base, close: () => new Promise((r) => server.close(r)) };
 }
 
 // Cliente HTTP mínimo com cookie jar, sem seguir redirects.
@@ -208,12 +210,12 @@ function client(base) {
   const jar = {};
   const api = {
     cookie: () => Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; '),
-    async req(method, path, { form, headers = {}, ua } = {}) {
+    async req(method, path, { form, headers = {}, ua, signal } = {}) {
       const h = { ...headers, cookie: Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; '), 'user-agent': ua || 'Mozilla/5.0 (test)' };
       let body;
       // listas viram campos repetidos (como checkboxes com o mesmo nome)
       if (form) { body = new URLSearchParams(Object.entries(form).flatMap(([k, v]) => (Array.isArray(v) ? v.map((x) => [k, x]) : [[k, v]]))).toString(); h['content-type'] = 'application/x-www-form-urlencoded'; }
-      const res = await fetch(base + path, { method, headers: h, body, redirect: 'manual' });
+      const res = await fetch(base + path, { method, headers: h, body, redirect: 'manual', signal });
       for (const c of res.headers.getSetCookie?.() || []) {
         const [pair] = c.split(';');
         const idx = pair.indexOf('=');

@@ -198,7 +198,7 @@ router.post(both(), requirePerm('episodes.read'), wrap(async (req, res) => {
 }));
 
 router.post(both('/aprovar'), requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!can(req.user.role, 'production.review') && !can(req.user.role, 'production.manage')) return deny(res);
+  if (!can(req.user, 'production.review') && !can(req.user, 'production.manage')) return deny(res);
   const c = await findCover(req);
   if (!c) return notFound(res);
   const approve = req.body.aprovar !== '0';
@@ -226,7 +226,7 @@ router.post(both('/aprovar'), requirePerm('episodes.read'), wrap(async (req, res
 
 // A principal das aprovadas: é a que vai para o YouTube quando o episódio é publicado.
 router.post(both('/principal'), requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!can(req.user.role, 'production.review') && !can(req.user.role, 'production.manage')) return deny(res);
+  if (!can(req.user, 'production.review') && !can(req.user, 'production.manage')) return deny(res);
   const c = await findCover(req);
   if (!c || c.kind !== 'youtube_thumb' || c.clip_id) return notFound(res);
   await db.query('UPDATE episode_covers SET approved = true WHERE id = $1', [c.id]);

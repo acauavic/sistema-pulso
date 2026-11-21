@@ -35,9 +35,11 @@ async function findGuest(id) {
   return rows[0] || null;
 }
 
-async function formOptions() {
-  const users = await require('../services/team').activeUsers();
-  const sponsors = await db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)");
+// As listas do formulário seguem o recorte: a equipe que divide projeto com ela e os patrocinadores dos projetos dela.
+async function formOptions(req) {
+  const pids = require('../services/scope').idsOf(req);
+  const users = await require('../services/team').activeUsers(req.scope.ids);
+  const sponsors = await db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' AND project_id = ANY($1::int[]) ORDER BY lower(company)", [pids]);
   return { owners: users.rows, sponsors: sponsors.rows, statuses: GUEST_STATUSES, profiles: PROFILES, stageHints: rules.STAGE_HINTS, lossReasons: LOSS_REASONS };
 }
 
@@ -146,8 +148,8 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
          FROM guests g LEFT JOIN users u ON u.id = g.owner_id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY g.updated_at DESC LIMIT 500`, params),
-    require('../services/team').activeUsers(),
-    can(req.user.role, 'guests.write') && view === 'lista' ? db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' AND project_id = ANY($1::int[]) ORDER BY lower(company)", [scope.idsOf(req)]) : { rows: [] },
+    require('../services/team').activeUsers(req.scope.ids),
+    can(req.user, 'guests.write') && view === 'lista' ? db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' AND project_id = ANY($1::int[]) ORDER BY lower(company)", [scope.idsOf(req)]) : { rows: [] },
   ]);
   const outreach = require('../services/outreach');
   const outEval = await outreach.evaluateAll('guest', { ids: guests.filter((g) => g.status === outreach.KINDS.guest.stage).map((g) => g.id) });
@@ -174,7 +176,7 @@ router.get('/convidados', requirePerm('guests.read'), wrap(async (req, res) => {
 // ---- criar ----
 router.get('/convidados/novo', requirePerm('guests.write'), wrap(async (req, res) => {
   formView(res, 200, {
-    title: 'Novo convidado', guest: null, error: null, ...(await formOptions()),
+    title: 'Novo convidado', guest: null, error: null, ...(await formOptions(req)),
     values: { owner_id: req.user.id, status: 'prospect', gender: 'm', is_plural: false, sponsor_id: isIntId(req.query.patrocinador) ? Number(req.query.patrocinador) : null, sponsor_relation: 'indicado' },
   });
 }));
@@ -202,11 +204,11 @@ router.post('/convidados', requirePerm('guests.write'), wrap(async (req, res) =>
   const projectId = require('../services/scope').target(req, req.body); // o projeto escolhido no menu, ou o do campo Projeto
   const error = parsed.error || (projectId ? null : 'Escolha o projeto.');
   if (error) {
-    return formView(res, 400, { title: 'Novo convidado', guest: null, error, values: echoValues(req.body, values), ...(await formOptions()) });
+    return formView(res, 400, { title: 'Novo convidado', guest: null, error, values: echoValues(req.body, values), ...(await formOptions(req)) });
   }
   if (req.body.confirmar_duplicata !== '1') {
     const duplicates = await require('../services/duplicates').findFor('guest', { ...values, project_id: projectId });
-    if (duplicates.length) return formView(res, 200, { title: 'Novo convidado', guest: null, error: null, duplicates, dupKind: 'guest', values: echoValues(req.body, values), ...(await formOptions()) });
+    if (duplicates.length) return formView(res, 200, { title: 'Novo convidado', guest: null, error: null, duplicates, dupKind: 'guest', values: echoValues(req.body, values), ...(await formOptions(req)) });
   }
   const { rows: [guest] } = await db.query(
     `INSERT INTO guests (${COLUMNS.join(', ')}, created_by, project_id)
@@ -285,7 +287,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
     && !others.some((o) => o.project_id === p.id)).map((p) => ({ id: p.id, name: p.name }));
   const outSm = outEval.get(guest.id) || null;
   const epRow = episode.rows[0] || null;
-  const studio = epRow && can(req.user.role, 'production.upload') ? await require('../services/studioLinks').panelState(epRow.id) : null;
+  const studio = epRow && can(req.user, 'production.upload') ? await require('../services/studioLinks').panelState(epRow.id) : null;
   // Pauta: a partir de "Em agendamento" (a conversa já vai acontecer). Sem episódio ainda, ela mora no convidado.
   const pautaSvc = require('../services/pautas');
   const showPauta = !episode.rows.length && ['em_agendamento', 'agendado'].includes(guest.status);
@@ -295,10 +297,10 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
     others, invitable,
     pautaSvc, showPauta, pautaDocs, today: require('../services/tasks').todayISO(),
     studio: studio && studio.state === 'aguardando' ? studio : null,
-    dupes: can(req.user.role, 'guests.write') ? await require('../services/duplicates').findFor('guest', guest, { excludeId: guest.id }) : [],
+    dupes: can(req.user, 'guests.write') ? await require('../services/duplicates').findFor('guest', guest, { excludeId: guest.id }) : [],
     outreachCtx: { kind: 'guest', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (guest.instagram ? 'instagram' : guest.phone ? 'whatsapp' : guest.email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/convidados', subjectId: guest.id },
     reminderList, photoFrame: guestPhotos.FRAME,
-    pagePlateia, portalTab, plateia: { ...pl, price: guest.audience_enabled ? audience.money(audience.priceOf(guest, audSettings)) : null, generalPrice: guest.audience_enabled ? audience.money(audSettings.priceCents) : null, storageReady: config.storageConfigured, canSeeLeads: can(req.user.role, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
+    pagePlateia, portalTab, plateia: { ...pl, price: guest.audience_enabled ? audience.money(audience.priceOf(guest, audSettings)) : null, generalPrice: guest.audience_enabled ? audience.money(audSettings.priceCents) : null, storageReady: config.storageConfigured, canSeeLeads: can(req.user, 'audience.read') }, bookings, linkedSponsor: linkedSponsor || null, episodeStages: require('../constants').EPISODE_STATUSES,
     episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, pendingStage: isStatus(req.query.para) ? req.query.para : null, storageReady: config.storageConfigured, openModal: ['contato', 'agenda', 'email', 'perda', 'foto'].includes(req.query.abrir) ? req.query.abrir : null,
     title: guest.name, guest, events, clicks, comments: thread, linkedTasks: linkedTasks.rows, clickKinds: CLICK_KINDS, profileLabels: PROFILE_BY_KEY,
     statuses: GUEST_STATUSES, statusInfo: STATUS_BY_KEY[guest.status],
@@ -315,7 +317,7 @@ router.get('/convidados/:id/editar', requirePerm('guests.write'), wrap(async (re
   const target = isStatus(req.query.para) ? req.query.para : guest.status;
   const missing = rules.missingFor(target, guest);
   const notice = target !== guest.status && missing.length ? rules.missingMessage(STATUS_BY_KEY[target].label, missing) : null;
-  formView(res, 200, { title: `Editar ${guest.name}`, guest, error: null, notice, values: { ...guest, status: target }, ...(await formOptions()) });
+  formView(res, 200, { title: `Editar ${guest.name}`, guest, error: null, notice, values: { ...guest, status: target }, ...(await formOptions(req)) });
 }));
 
 router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res) => {
@@ -323,7 +325,7 @@ router.post('/convidados/:id', requirePerm('guests.write'), wrap(async (req, res
   if (!guest) return notFound(res);
   const { values, error, pendingStage } = await parseGuestForm(req.body, guest);
   if (error) {
-    return formView(res, 400, { title: `Editar ${guest.name}`, guest, error, values: echoValues(req.body, values), ...(await formOptions()) });
+    return formView(res, 400, { title: `Editar ${guest.name}`, guest, error, values: echoValues(req.body, values), ...(await formOptions(req)) });
   }
   const before = await recordChanges.snapshot('guest', guest.id);
   await db.query(

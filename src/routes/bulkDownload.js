@@ -60,7 +60,7 @@ async function withSizes(list) {
 }
 
 router.get('/baixar.zip', requirePerm('episodes.read'), wrap(async (req, res) => {
-  const items = parseItems(req.query.itens).filter((i) => i.type !== 's' || can(req.user.role, 'sponsors.read'));
+  const items = parseItems(req.query.itens).filter((i) => i.type !== 's' || can(req.user, 'sponsors.read'));
   const list = items.length ? await withSizes(await resolve(items)) : [];
   if (!list.length) return res.status(404).render('error', { title: 'Nada para baixar', message: 'Os arquivos marcados não estão mais disponíveis.' });
   const names = uniqueNames(list.map((f) => f.name));

@@ -14,10 +14,10 @@ const TYPES = {
 async function setResponsible({ type, id, userId, actor }) {
   const def = TYPES[type];
   if (!def) return { error: 'Tipo inválido.', status: 400 };
-  if (!can(actor.role, def.perm)) return { error: 'Seu perfil não troca o responsável deste item.', status: 403 };
+  if (!can(actor, def.perm)) return { error: 'Seu perfil não troca o responsável deste item.', status: 403 };
   const { rows: [item] } = await db.query(`SELECT * FROM ${def.table} WHERE id = $1`, [id]);
   if (!item) return { error: 'Item não encontrado.', status: 404 };
-  if (type === 'task' && !can(actor.role, 'tasks.manage') && ![item.created_by, item.assignee_id].map(String).includes(String(actor.id))) {
+  if (type === 'task' && !can(actor, 'tasks.manage') && ![item.created_by, item.assignee_id].map(String).includes(String(actor.id))) {
     return { error: 'Você só reatribui tarefas que criou ou que são suas.', status: 403 };
   }
   let user = null;

@@ -42,6 +42,25 @@ async function addMember(userId, projectId, { finance = false } = {}) {
   await db.query('INSERT INTO project_members (project_id, user_id, finance) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [projectId, userId, finance]);
 }
 
+// Troca os projetos DE UMA PESSOA (tela do usuário): lista de { id, finance }. Ninguém fica sem projeto.
+// Quem continua mantém o que era, só o "vê o financeiro" acompanha a escolha.
+async function setUserProjects(userId, chosen) {
+  const list = [...new Map((chosen || []).filter((c) => get(c.id)).map((c) => [Number(c.id), Boolean(c.finance)])).entries()];
+  if (!list.length) return { error: 'Toda pessoa participa de pelo menos um projeto.' };
+  const client = await db.getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM project_members WHERE user_id = $1 AND NOT (project_id = ANY($2::int[]))', [userId, list.map(([id]) => id)]);
+    for (const [id, finance] of list) {
+      await client.query(
+        `INSERT INTO project_members (project_id, user_id, finance) VALUES ($1, $2, $3)
+         ON CONFLICT (project_id, user_id) DO UPDATE SET finance = EXCLUDED.finance`, [id, userId, finance]);
+    }
+    await client.query('COMMIT');
+    return { ok: true, projects: list.length };
+  } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }
+}
+
 // Troca a lista de quem participa. Quem fica continua como está (inclusive o "vê o financeiro"); quem entra nasce sem o financeiro.
 // Ninguém fica sem projeto: devolve { error } e não muda nada se alguém sairia do único projeto dele.
 async function setMembers(projectId, userIds) {
@@ -122,4 +141,4 @@ async function update(id, body) {
   }
 }
 
-module.exports = { refresh, all, get, defaultId, has, label, publicName, currentFor, membershipsOf, members, addMember, setMembers, setLast, update };
+module.exports = { refresh, all, get, defaultId, has, label, publicName, currentFor, membershipsOf, members, addMember, setMembers, setUserProjects, setLast, update };

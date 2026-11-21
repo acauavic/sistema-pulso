@@ -167,7 +167,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     pedir, today: new Date().toISOString().slice(0, 10), isLate: R.isLate, stageLabel: board.STAGE_LABEL,
     title: 'Conteúdo', clips: list, episodes: episodes.rows, postGroups, only, onlyEpisode: only ? byEpisode[only] || null : null,
     moments, running, storageReady: config.storageConfigured, aiReady: config.groqConfigured && config.geminiConfigured && config.storageConfigured,
-    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role), request: R.canRequest(req.user.role), review: R.canReview(req.user.role), approve: can(req.user.role, 'production.review') || can(req.user.role, 'production.manage'), cover: canCover(req.user.role) }, C,
+    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user, 'social.request'), direct: canPublish(req.user.role), request: R.canRequest(req.user.role), review: R.canReview(req.user.role), approve: can(req.user, 'production.review') || can(req.user, 'production.manage'), cover: canCover(req.user.role) }, C,
   });
 }));
 
@@ -351,7 +351,7 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
     title: c.title, clip: c, covers: covers.rows, publications: pubs.rows, episodes: episodes.rows, episode: ep.rows[0] || null, social,
     uploadPost: up, uploadLive: ls.live, testAt: ls.testAt, provider, L, C, videoTags: await socialApi.videoTags(),
     running: ['enviando', 'processando'].includes(c.status) || pubs.rows.some((p) => p.status === 'enviando'),
-    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user.role, 'social.request'), direct: canPublish(req.user.role), guest: can(req.user.role, 'guests.write'), cover: canCover(req.user.role) },
+    perm: { cut: canCut(req.user.role), publish: canPublish(req.user.role) || can(req.user, 'social.request'), direct: canPublish(req.user.role), guest: can(req.user, 'guests.write'), cover: canCover(req.user.role) },
   });
 }));
 
@@ -467,7 +467,7 @@ function readPublishForm(req) {
 async function publish(req, res, { episodeId, clipId }) {
   const home = clipId ? `/cortes/${clipId}` : `/episodios/${episodeId}#publicacao`;
   // corte: a produtora pode pedir (vai para a revisão da gestão); o episódio inteiro só a gestão publica
-  const review = !canPublish(req.user.role) && Boolean(clipId) && can(req.user.role, 'social.request');
+  const review = !canPublish(req.user.role) && Boolean(clipId) && can(req.user, 'social.request');
   if (!canPublish(req.user.role) && !review) return deny(req, res, 'Só a gestão publica nas redes.');
   const form = readPublishForm(req);
   const fail = async (msg) => { if (wantsJson(req)) return res.status(422).json({ ok: false, error: msg }); await req.flash('error', msg); return res.redirect(home); };

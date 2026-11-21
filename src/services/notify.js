@@ -32,21 +32,26 @@ const settings = () => memo('notificacoes:config', async () => {
 });
 
 // Pessoas ativas com estes papéis (para os avisos gerais: agendamento, rotinas).
-async function usersWithRoles(roles) {
+// `house`: aviso do que é geral (estoque, banco de horas, sistema) só vai para a equipe da casa.
+// `pid`: aviso de um projeto vai para quem participa dele.
+async function usersWithRoles(roles, { house = false, pid = null } = {}) {
   if (!roles?.length) return [];
-  const { rows } = await db.query('SELECT id FROM users WHERE active AND role = ANY($1)', [roles]);
+  const { rows } = await db.query(
+    `SELECT u.id FROM users u WHERE u.active AND u.role = ANY($1)${house ? ' AND u.house' : ''}
+      ${pid ? 'AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.user_id = u.id AND pm.project_id = $2)' : ''}`,
+    pid ? [roles, pid] : [roles]);
   return rows.map((r) => r.id);
 }
 
 // Cria as notificações. users: ids (repetidos e nulos são ignorados). broadcast: soma quem tem os papéis configurados para o tipo.
 // dedupe: mesma chave para a mesma pessoa não duplica (ex.: "tarefa vence hoje" uma vez por dia).
 // topic: assunto do aviso dentro da entidade ('prazo', 'bloqueada'), para clearTopics marcar como lido quando deixa de valer.
-async function notify({ type, users = [], broadcast = false, title, body = null, url = null, actorId = null, entity = null, dedupe = null, topic = null }) {
+async function notify({ type, users = [], broadcast = false, title, body = null, url = null, actorId = null, entity = null, dedupe = null, topic = null, projectId = null, house = false }) {
   if (!TYPES.includes(type)) throw new Error(`Tipo de notificação desconhecido: ${type}`);
   const cfg = (await settings())[type];
   if (!cfg.in_app && !cfg.email) return [];
   let ids = [...users];
-  if (broadcast) ids.push(...(await usersWithRoles(cfg.roles)));
+  if (broadcast) ids.push(...(await usersWithRoles(cfg.roles, { house, pid: projectId })));
   ids = [...new Set(ids.filter(Boolean).map(String))].filter((id) => id !== String(actorId || ''));
   if (!ids.length) return [];
   const { rows: active } = await db.query(
@@ -57,9 +62,9 @@ async function notify({ type, users = [], broadcast = false, title, body = null,
   const { rows: inserted } = await db.query(
     // project_id: o projeto do item que o aviso aponta (quem não participa dele não vê o aviso)
     `INSERT INTO notifications (user_id, type, title, body, url, actor_id, entity_type, entity_id, dedupe_key, read_at, topic, project_id)
-     SELECT u, $2::text, $3::text, $4::text, $5::text, $6::uuid, $7::text, $8::int, $9::text, CASE WHEN $10::boolean THEN NULL ELSE now() END, $11::text, ${PROJECT_OF} FROM unnest($1::uuid[]) AS u
+     SELECT u, $2::text, $3::text, $4::text, $5::text, $6::uuid, $7::text, $8::int, $9::text, CASE WHEN $10::boolean THEN NULL ELSE now() END, $11::text, coalesce($12::int, ${PROJECT_OF}) FROM unnest($1::uuid[]) AS u
      ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING *`,
-    [active.map((u) => u.id), type, String(title).slice(0, 300), body ? String(body).slice(0, 1000) : null, url, actorId, entity?.type || null, entity?.id || null, dedupe, cfg.in_app, topic]);
+    [active.map((u) => u.id), type, String(title).slice(0, 300), body ? String(body).slice(0, 1000) : null, url, actorId, entity?.type || null, entity?.id || null, dedupe, cfg.in_app, topic, projectId]);
   const byUser = new Map(inserted.map((n) => [String(n.user_id), n]));
   const created = active.map((u) => byUser.get(String(u.id))).filter(Boolean); // mesma ordem de antes
   // e-mail vai pela fila (com novas tentativas), fora da requisição

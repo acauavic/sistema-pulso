@@ -10,7 +10,7 @@ const { clean } = require('../utils/format');
 const { wrap, isIntId, isUuid } = require('../utils/wrap');
 
 const router = express.Router();
-const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage'].some((p) => can(req.user.role, p))
+const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage'].some((p) => can(req.user, p))
   ? next() : res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não acessa o painel de gestão.' }));
 
 router.get('/gestao', anyGestao, wrap(async (req, res) => {
@@ -19,7 +19,7 @@ router.get('/gestao', anyGestao, wrap(async (req, res) => {
     db.query("SELECT count(*)::int AS n FROM audit_log WHERE created_at > now() - interval '24 hours'"),
     db.query('SELECT count(*) FILTER (WHERE active)::int AS n FROM task_routines'),
     db.query('SELECT count(*)::int AS n FROM search_shortcuts'),
-    can(req.user.role, 'search.manage') ? search.suggestions(req.app) : [],
+    can(req.user, 'search.manage') ? search.suggestions(req.app) : [],
   ]);
   res.render('gestao/index', { title: 'Gestão', stats: { users: users.rows[0], audit: audit24.rows[0].n, routines: routines.rows[0].n, shortcuts: shortcuts.rows[0].n, tips: tips.length } });
 }));
@@ -102,7 +102,7 @@ router.post('/gestao/whatsapp', requirePerm('contacts.manage'), wrap(async (req,
 // ---------------------------------------------------------------- galeria do media kit
 router.get('/gestao/galeria-kit', requirePerm('plans.manage'), wrap(async (req, res) => {
   const kit = require('../services/kitGallery');
-  const rows = await kit.candidates();
+  const rows = await kit.candidates(require('../services/scope').idsOf(req));
   const clipChoices = await require('../services/inviteShowcase').pickCandidates();
   res.render('gestao/galeria-kit', { title: 'Galeria do media kit', rows, kit, clipChoices, maxPicks: require('../services/inviteShowcase').MAX_PICKS, statuses: require('../constants').EPISODE_STATUSES, photoUrl: require('../services/guestPhotos').signedUrl, openId: Number(req.query.editar) || null });
 }));
@@ -173,7 +173,7 @@ router.get('/gestao/rotinas', requirePerm('routines.manage'), wrap(async (req, r
   const [routines, users] = await Promise.all([
     db.query(`SELECT r.*, u.name AS assignee_name, (SELECT count(*)::int FROM tasks t WHERE t.routine_id = r.id) + (SELECT count(*)::int FROM content_requests q WHERE q.routine_id = r.id) AS created FROM task_routines r
                LEFT JOIN users u ON u.id = r.assignee_id ORDER BY r.trigger, r.position, r.id`),
-    require('../services/team').activeUsers(),
+    require('../services/team').activeUsers(req.scope.ids),
   ]);
   const recurring = require('../services/recurring');
   res.render('gestao/routines', {

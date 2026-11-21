@@ -2350,3 +2350,10 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
   .cmt-post-filter, .cmt-post-filter select, .cmt-post-filter .combo-btn { width: 100%; min-width: 0; }
   .cmt-bulk .btn { width: 100%; justify-content: center; }
 }
+
+/* Acesso da pessoa (cadastro de usuário): onde ela trabalha e se vê o financeiro de cada projeto */
+.user-access { border: 1px solid var(--line); border-radius: 6px; padding: 16px; }
+.user-access legend { padding: 0 6px; }
+.access-list { display: grid; gap: 8px; }
+.access-list > li { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 8px; }
+.access-list > li:first-child { border-top: 0; padding-top: 0; }

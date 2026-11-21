@@ -30,7 +30,7 @@ const hrefOf = (entity, query) => `${ENTITIES[entity].base}${query ? `?${query}`
 
 router.post('/filtros/visualizacoes', wrap(async (req, res) => {
   const entity = Object.prototype.hasOwnProperty.call(ENTITIES, req.body.entidade) ? req.body.entidade : null;
-  if (!entity || !can(req.user.role, ENTITIES[entity].perm)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Você não vê esta lista.' });
+  if (!entity || !can(req.user, ENTITIES[entity].perm)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Você não vê esta lista.' });
   const query = cleanQuery(entity, req.body.query);
   const name = String(req.body.nome || '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if (!name) { await req.flash('error', 'Dê um nome para a visualização.'); return res.redirect(hrefOf(entity, query)); }

@@ -7,12 +7,12 @@ const guestPhotos = require('./guestPhotos');
 const clean = (v, max) => String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, max) || null;
 
 // Todos os episódios (ordem do primeiro ao mais recente), com a etapa e o que a tela de seleção precisa.
-async function candidates() {
+async function candidates(pids = null) {
   const { rows } = await db.query(
     `SELECT e.id, e.number, e.title, e.status, e.kit_featured, e.kit_audience, e.kit_credential,
             g.id AS guest_id, g.name AS guest_name, g.instagram, g.job_title, g.company, g.bio, g.reach AS guest_reach, (g.photo_key IS NOT NULL) AS has_photo
        FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id
-      ORDER BY e.number NULLS LAST, e.id`);
+      ${pids ? 'WHERE e.project_id = ANY($1::int[])' : ''} ORDER BY e.number NULLS LAST, e.id`, pids ? [pids] : []);
   return rows;
 }
 

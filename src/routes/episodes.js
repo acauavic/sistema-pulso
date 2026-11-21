@@ -2,6 +2,7 @@
 // e segue até Publicado.
 const express = require('express');
 const db = require('../db/pool');
+const scope = require('../services/scope');
 const config = require('../config');
 const uploadPost = require('../services/uploadPost');
 const socialApi = require('../services/socialApi');
@@ -32,12 +33,14 @@ const back = (id, hash = '') => `/episodios/${id}${hash}`;
 const MAX_PART = 70 * prod.MB;
 const MAX_FILE = 200 * 1024 * prod.MB * 1; // 200 GB
 
-async function findEpisode(id) {
+// Episódio de projeto que a pessoa não alcança responde como se não existisse (o recorte entra aqui, não em cada rota).
+async function findEpisode(req, id) {
   if (!isIntId(id)) return null;
   const { rows } = await db.query(
     `SELECT e.*, g.name AS guest_name, g.instagram AS guest_instagram, g.positioning AS guest_positioning, g.bio AS guest_bio, u.name AS editor_name
        FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.editor_id WHERE e.id = $1`, [id]);
-  return rows[0] || null;
+  const ep = rows[0] || null;
+  return ep && scope.canSee(req, ep.project_id) ? ep : null;
 }
 
 
@@ -71,10 +74,12 @@ const echo = (body, v) => ({ ...body, ...v, number: body.number || '', aired_on:
 const ORIGINS = ['convidado', 'novo_convidado', 'hosts'];
 // numberPrefix: o prefixo do projeto escolhido (EP., V.); em "Todos os projetos", o do padrão
 const formLocals = async (extra, req = null) => {
+  const pids = req ? scope.idsOf(req) : null; // convidados e patrocinadores que a pessoa alcança
+  const only = pids ? ' AND $1::int[] @> ARRAY[g.project_id]' : '';
   const [guests, sponsors, pedidos] = await Promise.all([
     db.query(`SELECT g.id, g.name, g.status, g.sponsor_id FROM guests g WHERE NOT EXISTS (SELECT 1 FROM episodes e WHERE e.guest_id = g.id)
-               AND g.status NOT IN ('perdido', 'cancelado') ORDER BY (g.status = 'agendado') DESC, lower(g.name) LIMIT 1000`),
-    db.query("SELECT id, company FROM sponsors WHERE stage <> 'perdido' ORDER BY lower(company)"),
+               AND g.status NOT IN ('perdido', 'cancelado')${only} ORDER BY (g.status = 'agendado') DESC, lower(g.name) LIMIT 1000`, pids ? [pids] : []),
+    db.query(`SELECT id, company FROM sponsors WHERE stage <> 'perdido'${pids ? ' AND project_id = ANY($1::int[])' : ''} ORDER BY lower(company)`, pids ? [pids] : []),
     // conteúdos que o episódio pode pedir ao editor (Gestão > Rotinas, as que viram pedido)
     db.query("SELECT id, title, kind, default_on, priority FROM task_routines WHERE active AND trigger = 'episodio_criado' AND target = 'pedido' ORDER BY position, id"),
   ]);
@@ -178,7 +183,6 @@ router.get('/episodios/novo', requirePerm('episodes.write'), wrap(async (req, re
 // Novo vídeo (projeto que grava vídeo, não episódio de podcast): nasce em Pré-produção, antes da gravação.
 // Janela curta: título e a data prevista da gravação. O resto vem depois, na pauta.
 router.post('/episodios/video', requirePerm('episodes.write'), wrap(async (req, res) => {
-  const scope = require('../services/scope');
   const title = String(req.body.title || '').replace(/\s+/g, ' ').trim().slice(0, 200);
   const projectId = scope.target(req, req.body);
   const plannedOn = require('../services/calendar').isISO(String(req.body.recorded_on || '')) ? String(req.body.recorded_on) : null;
@@ -309,7 +313,7 @@ router.post('/episodios/checklists/:tid/excluir', requirePerm('production.checkl
 
 // ---- detalhe do episódio ----
 router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   require('../services/scope').assert(req, ep.project_id); // de outro projeto de que a pessoa não participa: 404
   const [files, events, tasks, checklist, comments, sponsors, users, moves, meta, frames, job, transcript, coverRows, contentRows, pubRows] = await Promise.all([
@@ -336,9 +340,9 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   // o resto da página, também em paralelo (antes: uma consulta depois da outra)
   const [provider, ls, social, finRaw, finSettings, epComments, trJob, allSponsors, reviewComments] = await Promise.all([
     socialApi.active(), socialApi.liveState(),
-    can(req.user.role, 'production.review') && ['pronto_publicar', 'publicado'].includes(ep.status) ? socialApi.connectedAll() : null,
-    can(req.user.role, 'finance.read') ? finSvc.episodeFinance(ep.id) : null,
-    can(req.user.role, 'finance.read') ? finSvc.settings() : null,
+    can(req.user, 'production.review') && ['pronto_publicar', 'publicado'].includes(ep.status) ? socialApi.connectedAll() : null,
+    can(req.user, 'finance.read') ? finSvc.episodeFinance(ep.id) : null,
+    can(req.user, 'finance.read') ? finSvc.settings() : null,
     commentsSvc.list('episode', ep.id),
     jobs.latest(ep.id, 'transcricao'),
     db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY lower(company)"),
@@ -371,7 +375,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   const edited = files.rows.filter((f) => f.kind === 'editado' && f.status === 'pronto');
   const latestEdited = edited[0] || null; // a mais nova primeiro
   const studioLinks = require('../services/studioLinks');
-  const studio = can(req.user.role, 'production.upload') ? await studioLinks.panelState(ep.id) : null;
+  const studio = can(req.user, 'production.upload') ? await studioLinks.panelState(ep.id) : null;
   const studioWa = studio && ['aguardando', 'enviando'].includes(studio.state) ? await require('../services/contacts').studioWaUrl(ep.guest_name || ep.title, studio.url) : null;
   const editOrder = require('../services/editOrder');
   const orderPos = editOrder.STAGES.includes(ep.status) ? await editOrder.positionOf(ep.id) : null; // "1º na ordem de edição"
@@ -396,16 +400,16 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
     stageIndex, allSponsors: allSponsors.rows,
     partSizeMb: Math.round(prod.partSizeFor(0) / prod.MB), storageReady: config.storageConfigured,
     perm: {
-      manage: can(req.user.role, 'production.manage'), upload: can(req.user.role, 'production.upload'),
-      edit: can(req.user.role, 'production.edit'), review: can(req.user.role, 'production.review'), write: can(req.user.role, 'episodes.write'),
-      cover: can(req.user.role, 'covers.edit'),
+      manage: can(req.user, 'production.manage'), upload: can(req.user, 'production.upload'),
+      edit: can(req.user, 'production.edit'), review: can(req.user, 'production.review'), write: can(req.user, 'episodes.write'),
+      cover: can(req.user, 'covers.edit'),
     },
   });
 }));
 
 // ---- link do estúdio (o estúdio sobe o material da gravação por um link público) ----
 const studioRoute = (action) => wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const studioLinks = require('../services/studioLinks');
   const cur = await studioLinks.current(ep.id);
@@ -442,13 +446,13 @@ router.post('/episodios/:id/arquivos/:fid/organizar', requirePerm('production.up
 }));
 
 router.get('/episodios/:id/editar', requirePerm('episodes.write'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   res.render('episodes/form', { title: `Editar ${ep.title}`, episode: ep, error: null, values: ep, statuses: C.EPISODE_STATUSES });
 }));
 
 router.post('/episodios/:id', requirePerm('episodes.write'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const { values, error } = await parseForm(req.body, ep.id);
   if (error) return res.status(400).render('episodes/form', { title: `Editar ${ep.title}`, episode: ep, error, values: echo(req.body, values), statuses: C.EPISODE_STATUSES });
@@ -463,7 +467,7 @@ router.post('/episodios/:id', requirePerm('episodes.write'), wrap(async (req, re
 }));
 
 router.post('/episodios/:id/excluir', requirePerm('episodes.delete'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   await audit(req, 'episodio.excluido', 'episode', ep.id, { title: ep.title });
   const gone = await recordChanges.snapshot('episode', ep.id);
@@ -484,7 +488,7 @@ router.post('/episodios/:id/excluir', requirePerm('episodes.delete'), wrap(async
 
 // ---- mudar de etapa ----
 router.post('/episodios/:id/etapa', requirePerm('episodes.read'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return wantsJson(req) ? res.status(404).json({ ok: false }) : notFound(res);
   // "Liberar para edição" de um episódio sem data de veiculação pergunta a data (opcional): ela decide a ordem de edição.
   // Grava antes da mudança (o aviso ao editor já diz a posição) e desfaz se a mudança não acontecer.
@@ -508,7 +512,7 @@ router.post('/episodios/:id/etapa', requirePerm('episodes.read'), wrap(async (re
 // ---- observações para o editor e links de publicação ----
 // Patrocínio do episódio, direto da Visão geral: cada patrocinador com papel (inserção, exclusivo) ou fora.
 router.post('/episodios/:id/patrocinadores', requirePerm('production.manage'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const picks = [];
   for (const [key, role] of Object.entries(req.body)) {
@@ -535,7 +539,7 @@ router.post('/episodios/:id/patrocinadores', requirePerm('production.manage'), w
 }));
 
 router.post('/episodios/:id/observacoes', requirePerm('production.manage'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   await db.query('UPDATE episodes SET editor_notes = $2, updated_at = now() WHERE id = $1', [ep.id, clean(req.body.editor_notes, 5000) || null]);
   await prod.addEvent(ep.id, req.user.id, 'observacoes', 'Observações para o editor atualizadas');
@@ -544,7 +548,7 @@ router.post('/episodios/:id/observacoes', requirePerm('production.manage'), wrap
 }));
 
 router.post('/episodios/:id/editor', requirePerm('production.manage'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const editorId = isUuid(req.body.editor_id) ? req.body.editor_id : null;
   const result = await require('../services/responsible').setResponsible({ type: 'episode', id: ep.id, userId: editorId, actor: req.user });
@@ -554,7 +558,7 @@ router.post('/episodios/:id/editor', requirePerm('production.manage'), wrap(asyn
 }));
 
 router.post('/episodios/:id/links', requirePerm('production.review'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const yt = guestRules.normalizeUrl(req.body.youtube_url, guestRules.YOUTUBE_HOSTS);
   const sp = guestRules.normalizeUrl(req.body.spotify_url, guestRules.SPOTIFY_HOSTS);
@@ -602,13 +606,13 @@ async function loadOwnFile(req) {
 
 // Material bruto é da produção (production.upload); o vídeo editado é de quem edita (production.edit). A rota deixa entrar os dois
 // e cada arquivo é conferido pelo tipo (fileAccess).
-const uploadAccess = (req, res, next) => (req.user && (can(req.user.role, 'production.upload') || can(req.user.role, 'production.edit'))
+const uploadAccess = (req, res, next) => (req.user && (can(req.user, 'production.upload') || can(req.user, 'production.edit'))
   ? next() : res.status(403).json({ ok: false, error: 'Seu perfil não envia arquivos.' }));
-const fileAccess = (user, kind) => can(user.role, kind === 'editado' ? 'production.edit' : 'production.upload');
+const fileAccess = (user, kind) => can(user, kind === 'editado' ? 'production.edit' : 'production.upload');
 
 router.post('/episodios/:id/arquivos/iniciar', uploadAccess, wrap(async (req, res) => {
   if (!config.storageConfigured) return uploadError(res, 503, 'Armazenamento (Backblaze) não configurado.');
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return uploadError(res, 404, 'Episódio não encontrado.');
   const kind = String(req.body.kind || '');
   if (!Object.prototype.hasOwnProperty.call(C.EPISODE_FILE_KINDS, kind)) return uploadError(res, 400, 'Tipo de arquivo inválido.');
@@ -638,7 +642,7 @@ router.post('/episodios/:id/arquivos/iniciar', uploadAccess, wrap(async (req, re
 
 // Descartar os envios que pararam no meio (libera o espaço que as partes ocupam no Backblaze).
 router.post('/episodios/:id/arquivos/descartar-parados', requirePerm('production.upload'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const { rows } = await db.query("SELECT * FROM episode_files WHERE episode_id = $1 AND kind <> 'editado' AND status = 'enviando'", [ep.id]);
   const stalled = rows.filter((f) => prod.isStalled(f));
@@ -651,6 +655,7 @@ router.post('/episodios/:id/arquivos/descartar-parados', requirePerm('production
 // O que já existe no material bruto (para a janela de envio reconhecer arquivos repetidos e envios que pararam no meio).
 router.get('/episodios/:id/arquivos/existentes', uploadAccess, wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return uploadError(res, 404, 'Episódio não encontrado.');
+  if (!await findEpisode(req, req.params.id)) return uploadError(res, 404, 'Episódio não encontrado.'); // de outro projeto: como se não existisse
   const { rows } = await db.query("SELECT id, kind, label, filename, size_bytes, status, part_size, created_at, last_part_at FROM episode_files WHERE episode_id = $1 AND kind <> 'editado' ORDER BY id", [req.params.id]);
   const { rows: parts } = await db.query('SELECT p.file_id, count(*)::int AS n FROM episode_file_parts p JOIN episode_files f ON f.id = p.file_id WHERE f.episode_id = $1 GROUP BY p.file_id', [req.params.id]);
   const got = Object.fromEntries(parts.map((p) => [p.file_id, p.n]));
@@ -799,8 +804,8 @@ router.get('/episodios/:id/ia/status', requirePerm('episodes.read'), wrap(async 
 }));
 
 router.post('/episodios/:id/ia/gerar', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!can(req.user.role, 'production.manage') && !can(req.user.role, 'production.review')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não pede análise por IA.' });
-  const ep = await findEpisode(req.params.id);
+  if (!can(req.user, 'production.manage') && !can(req.user, 'production.review')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não pede análise por IA.' });
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   if (!(config.groqConfigured && config.geminiConfigured && config.storageConfigured)) {
     await req.flash('error', 'A IA não está configurada neste servidor (GROQ_APIKEY, GEMINI_KEY e Backblaze).');
@@ -814,8 +819,8 @@ router.post('/episodios/:id/ia/gerar', requirePerm('episodes.read'), wrap(async 
 }));
 
 router.post('/episodios/:id/metadados', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!can(req.user.role, 'production.review') && !can(req.user.role, 'production.manage')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita os textos de publicação.' });
-  const ep = await findEpisode(req.params.id);
+  if (!can(req.user, 'production.review') && !can(req.user, 'production.manage')) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita os textos de publicação.' });
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const b = req.body;
   const v = {
@@ -893,7 +898,7 @@ router.post('/episodios/:id/checklist/:iid/marcar', requirePerm('episodes.read')
 
 router.post('/episodios/:id/checklist', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!canTick(req.user.role)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não edita checklists.' });
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const text = clean(req.body.text, 300);
   const gate = Object.prototype.hasOwnProperty.call(C.CHECKLIST_GATES, req.body.gate) ? req.body.gate : 'revisao';
@@ -915,7 +920,7 @@ router.post('/episodios/:id/checklist/:iid/excluir', requirePerm('episodes.read'
 
 // ---- tarefas do episódio (as mesmas da área Tarefas; aqui já ficam ligadas ao episódio) ----
 router.post('/episodios/:id/tarefas', requirePerm('production.manage'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const { values, error } = tasksSvc.parse({ ...req.body, status: req.body.status || 'a_fazer' });
   if (error) { await req.flash('error', error); return res.redirect(back(ep.id, '#tarefas')); }
@@ -930,7 +935,7 @@ router.post('/episodios/:id/tarefas/:tid', requirePerm('episodes.read'), wrap(as
   if (!isIntId(req.params.id) || !isIntId(req.params.tid)) return notFound(res);
   const { rows: [cur] } = await db.query('SELECT * FROM tasks WHERE id = $1 AND episode_id = $2', [req.params.tid, req.params.id]);
   if (!cur) return notFound(res);
-  const manage = can(req.user.role, 'production.manage');
+  const manage = can(req.user, 'production.manage');
   const body = { ...req.body };
   if (!manage) { delete body.due_on; delete body.due_time; }
   const { values, error } = tasksSvc.parse({ title: cur.title, kind: cur.kind, ...body }, { partial: true });
@@ -959,33 +964,33 @@ async function commentHtml(res, epId, id, ep) {
   const [full] = await withReviewFiles([c]);
   return renderPartial(res, 'episodes/_review_comment', { c: full, ep, tickable: true, latestVersion: latest?.version ?? null, perm: permsOf(res.locals.currentUser) });
 }
-const permsOf = (user) => ({ edit: can(user.role, 'production.edit'), review: can(user.role, 'production.review') });
+const permsOf = (user) => ({ edit: can(user, 'production.edit'), review: can(user, 'production.review') });
 
 // O editor marca "feito" (ou desfaz). Só quem edita.
 router.post('/episodios/:id/comentarios/:cid/feito', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!can(req.user.role, 'production.edit')) return res.status(403).json({ ok: false, error: 'Só quem edita marca o ajuste como feito.' });
+  if (!can(req.user, 'production.edit')) return res.status(403).json({ ok: false, error: 'Só quem edita marca o ajuste como feito.' });
   if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return res.status(404).json({ ok: false });
   const done = req.body.feito === '1' || req.body.feito === true || req.body.feito === 'true';
   const c = await reviewSvc.markFixed(Number(req.params.id), Number(req.params.cid), done, req.user);
   if (!c) return res.status(404).json({ ok: false, error: 'Comentário não encontrado.' });
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (wantsJson(req)) return res.json({ ok: true, fixed: Boolean(c.fixed_at), fixedVersion: c.fixed_version, html: await commentHtml(res, ep.id, c.id, ep), summary: await reviewSvc.summary(ep.id), counts: await commentCounts(ep.id) });
   res.redirect(back(req.params.id, '#ajustes'));
 }));
 
 // Quem revisa devolve um ajuste marcado como feito: volta para o editor como "em aberto".
 router.post('/episodios/:id/comentarios/:cid/ainda-nao', requirePerm('episodes.read'), wrap(async (req, res) => {
-  if (!can(req.user.role, 'production.review')) return res.status(403).json({ ok: false, error: 'Só quem revisa devolve o ajuste.' });
+  if (!can(req.user, 'production.review')) return res.status(403).json({ ok: false, error: 'Só quem revisa devolve o ajuste.' });
   if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return res.status(404).json({ ok: false });
   const c = await reviewSvc.reopenFix(Number(req.params.id), Number(req.params.cid));
   if (!c) return res.status(404).json({ ok: false, error: 'Comentário não encontrado.' });
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   res.json({ ok: true, html: await commentHtml(res, ep.id, c.id, ep), summary: await reviewSvc.summary(ep.id), counts: await commentCounts(ep.id) });
 }));
 
 // Marcadores para o programa de edição (Premiere: XML com uma sequência; DaVinci: EDL de marcadores) ou lista em texto. Minutagens são orientação, e o arquivo diz isso.
 router.get('/episodios/:id/marcadores', requirePerm('episodes.read'), wrap(async (req, res) => {
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return notFound(res);
   const { rows: comments } = await db.query('SELECT c.*, u.name AS author_name FROM episode_comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.episode_id = $1', [ep.id]);
   const latest = await reviewSvc.latestEdited(ep.id);
@@ -1000,7 +1005,7 @@ router.get('/episodios/:id/marcadores', requirePerm('episodes.read'), wrap(async
 const renderPartial = (res, view, data) => new Promise((resolve, reject) => res.render(view, data, (err, html) => (err ? reject(err) : resolve(html))));
 router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!canTick(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não comenta.' });
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   if (!ep) return res.status(404).json({ ok: false });
   const rich = req.body.body_html != null && String(req.body.body_html).trim() ? richText.sanitize(req.body.body_html) : null;
   const ids = [...(rich ? rich.attachmentIds : []), ...[].concat(req.body.anexos || [])];
@@ -1031,7 +1036,7 @@ router.post('/episodios/:id/comentarios', requirePerm('episodes.read'), wrap(asy
 router.post('/episodios/:id/comentarios/:cid/editar', requirePerm('episodes.read'), wrap(async (req, res) => {
   if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return res.status(404).json({ ok: false });
   if (!canTick(req.user.role)) return res.status(403).json({ ok: false, error: 'Seu perfil não comenta.' });
-  const ep = await findEpisode(req.params.id);
+  const ep = await findEpisode(req, req.params.id);
   const { rows: [c] } = await db.query('SELECT * FROM episode_comments WHERE id = $1 AND episode_id = $2', [req.params.cid, req.params.id]);
   if (!ep || !c) return res.status(404).json({ ok: false, error: 'Comentário não encontrado.' });
   if (String(c.author_id) !== String(req.user.id)) return res.status(403).json({ ok: false, error: 'Só quem escreveu pode editar.' });
@@ -1052,7 +1057,7 @@ router.post('/episodios/:id/comentarios/:cid/resolver', requirePerm('episodes.re
     [req.params.cid, req.params.id, resolved, resolved ? req.user.id : null]);
   if (!rowCount) return res.status(404).json({ ok: false });
   if (wantsJson(req)) {
-    const ep = await findEpisode(req.params.id);
+    const ep = await findEpisode(req, req.params.id);
     return res.json({ ok: true, resolved, html: await commentHtml(res, ep.id, Number(req.params.cid), ep), summary: await reviewSvc.summary(ep.id), counts: await commentCounts(req.params.id) });
   }
   res.redirect(back(req.params.id, '#revisao'));
@@ -1062,7 +1067,7 @@ router.post('/episodios/:id/comentarios/:cid/excluir', requirePerm('episodes.rea
   if (!isIntId(req.params.id) || !isIntId(req.params.cid)) return notFound(res);
   const { rows: [c] } = await db.query('SELECT * FROM episode_comments WHERE id = $1 AND episode_id = $2', [req.params.cid, req.params.id]);
   if (!c) return notFound(res);
-  if (c.author_id !== req.user.id && !can(req.user.role, 'production.review')) {
+  if (c.author_id !== req.user.id && !can(req.user, 'production.review')) {
     if (wantsJson(req)) return res.status(403).json({ ok: false, error: 'Só quem escreveu (ou a gestão) apaga o comentário.' });
     return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem escreveu (ou a gestão) apaga o comentário.' });
   }

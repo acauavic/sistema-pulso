@@ -60,7 +60,12 @@ function boardOf(items, allDone = false) {
   return { columns, hiddenDone: allDone ? 0 : done.length - recent.length, allDone, days: DONE_DAYS };
 }
 
-const linkOptions = () => tasks.linkOptions();
+const linkOptions = (req) => tasks.linkOptions(require('../services/scope').idsOf(req));
+// Tarefa que a pessoa alcança: do projeto dela ou geral (sem projeto). De outro projeto, como se não existisse.
+const taskFor = async (req) => {
+  const task = await tasks.get(req.params.id);
+  return task && require('../services/scope').canSee(req, task.project_id) ? task : null;
+};
 
 // Liga a tarefa a um item (episódio, convidado, patrocinador), se existir.
 async function readLinks(body) {
@@ -83,7 +88,7 @@ router.get('/tarefas', requirePerm('tasks.read'), wrap(async (req, res) => {
   const pids = require('../services/scope').idsOf(req); // os projetos da pessoa, ou o escolhido no menu (tarefa geral aparece sempre)
   const items = await tasks.list({ user: req.user, scope, q, projectIds: pids, ...(cal ? { from: cal.from, to: cal.to } : {}) });
   const [opts, counts] = await Promise.all([
-    linkOptions(),
+    linkOptions(req),
     db.query(`SELECT count(*) FILTER (WHERE assignee_id = $1 AND status <> 'feito')::int AS minhas,
                      count(*) FILTER (WHERE assignee_id = $1 AND status <> 'feito' AND due_on <= $2)::int AS hoje,
                      count(*) FILTER (WHERE status <> 'feito')::int AS todas FROM tasks
@@ -124,7 +129,7 @@ router.post('/tarefas', requirePerm('tasks.write'), wrap(async (req, res) => {
   const { values, error } = tasks.parse(req.body);
   if (error) { if (wantsJson(req)) return res.status(422).json({ ok: false, error }); await req.flash('error', error); return res.redirect(backTo(req, '/tarefas')); }
   let assignee = isUuid(req.body.assignee_id) ? req.body.assignee_id : null;
-  if (assignee && assignee !== req.user.id && !can(req.user.role, 'tasks.write')) assignee = null;
+  if (assignee && assignee !== req.user.id && !can(req.user, 'tasks.write')) assignee = null;
   // tarefa solta: do projeto escolhido no menu; em "Todos os projetos", a do campo Projeto, que começa em Geral (sem projeto)
   values.project_id = require('../services/scope').target(req, req.body);
   if (req.scope.multi && !req.scope.current && !req.scope.ids.includes(Number(req.body.project_id))) values.project_id = null;
@@ -146,10 +151,9 @@ router.post('/tarefas', requirePerm('tasks.write'), wrap(async (req, res) => {
 
 router.get('/tarefas/:id', requirePerm('tasks.read'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);
-  const task = await tasks.get(req.params.id);
+  const task = await taskFor(req);
   if (!task) return notFound(res);
-  require('../services/scope').assert(req, task.project_id); // de outro projeto de que a pessoa não participa: 404 (tarefa geral abre para todos)
-  const [opts, thread, files] = await Promise.all([linkOptions(), comments.list('task', task.id), attachments.forEntity('task', task.id)]);
+  const [opts, thread, files] = await Promise.all([linkOptions(req), comments.list('task', task.id), attachments.forEntity('task', task.id)]);
   const origin = task.source_message_id ? await require('../services/chat').taskOrigin(task.source_message_id, req.user.id) : null;
   res.render('tasks/show', { title: task.title, task, origin, ...opts, comments: thread, docs: files.filter((a) => a.kind === 'file'), C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), repeat: await repeatOf(task, req.user) });
 }));
@@ -159,12 +163,12 @@ async function repeatOf(task, user) {
   if (!task.routine_id) return null;
   const { rows: [r] } = await db.query("SELECT * FROM task_routines WHERE id = $1 AND trigger = 'recorrente' AND active", [task.routine_id]);
   if (!r) return null;
-  return { text: require('../services/recurring').describe(r), canStop: can(user.role, 'routines.manage') || String(r.created_by || '') === String(user.id) };
+  return { text: require('../services/recurring').describe(r), canStop: can(user, 'routines.manage') || String(r.created_by || '') === String(user.id) };
 }
 
 router.post('/tarefas/:id/parar-de-repetir', requirePerm('tasks.write'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);
-  const task = await tasks.get(req.params.id);
+  const task = await taskFor(req);
   if (!task) return notFound(res);
   const rep = await repeatOf(task, req.user);
   if (!rep || !rep.canStop) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem criou a repetição ou a gestão das rotinas pode parar.' });
@@ -176,7 +180,7 @@ router.post('/tarefas/:id/parar-de-repetir', requirePerm('tasks.write'), wrap(as
 
 router.post('/tarefas/:id', requirePerm('tasks.write'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);
-  const task = await tasks.get(req.params.id);
+  const task = await taskFor(req);
   if (!task) return notFound(res);
   if (!tasks.canEdit(req.user, task)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Você só altera tarefas que criou ou que são suas.' });
   const { values, error } = tasks.parse({ ...task, due_on: isoOf(task.due_on) || '', due_time: task.due_time || '', ...req.body });
@@ -211,9 +215,9 @@ router.post('/tarefas/:id/status', requirePerm('tasks.write'), wrap(async (req, 
 
 router.post('/tarefas/:id/excluir', requirePerm('tasks.write'), wrap(async (req, res) => {
   if (!isIntId(req.params.id)) return notFound(res);
-  const task = await tasks.get(req.params.id);
+  const task = await taskFor(req);
   if (!task) return notFound(res);
-  if (!can(req.user.role, 'tasks.manage') && String(task.created_by) !== String(req.user.id)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem criou (ou a gestão) apaga a tarefa.' });
+  if (!can(req.user, 'tasks.manage') && String(task.created_by) !== String(req.user.id)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem criou (ou a gestão) apaga a tarefa.' });
   const gone = await recordChanges.snapshot('task', task.id);
   const t = await require('../services/trash').remove('task', task.id, { user: req.user }); // leva os comentários e anexos junto
   await recordChanges.deleted({ type: 'task', row: gone, actor: req.user });

@@ -73,7 +73,7 @@ async function add({ type, id, author, body, html = null, attachmentIds = [] }) 
 async function remove(commentId, user) {
   const { rows: [c] } = await db.query('SELECT * FROM comments WHERE id = $1', [commentId]);
   if (!c) return { error: 'Comentário não encontrado.', status: 404 };
-  if (String(c.author_id) !== String(user.id) && !can(user.role, 'tasks.manage')) return { error: 'Só quem escreveu pode apagar.', status: 403 };
+  if (String(c.author_id) !== String(user.id) && !can(user, 'tasks.manage')) return { error: 'Só quem escreveu pode apagar.', status: 403 };
   await db.query('DELETE FROM comments WHERE id = $1', [c.id]);
   return { ok: true, comment: c };
 }

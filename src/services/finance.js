@@ -502,21 +502,27 @@ async function episodeFinance(episodeId) {
 }
 
 // ---------------------------------------------------------------- avisos (rotina)
+// Um aviso por projeto (quem vê o financeiro dele recebe), mais os da casa: estoque e banco de horas.
 async function tick() {
   const today = todayISO();
   await ensureRecurring(3);
-  const { rows: due } = await db.query(
-    "SELECT direction, count(*)::int AS n, coalesce(sum(amount_cents),0)::bigint AS total, count(*) FILTER (WHERE due_on < $1)::int AS late FROM fin_entries WHERE status = 'previsto' AND due_on <= ($1::date + 3) GROUP BY direction", [today]);
-  const out = due.find((d) => d.direction === 'saida');
-  if (out && out.n) {
-    const late = out.late ? `${out.late} atrasada${out.late > 1 ? 's' : ''} · ` : '';
-    await require('./notify').notify({ type: 'financeiro', broadcast: true, title: `${out.n} conta${out.n > 1 ? 's' : ''} a pagar até 3 dias`, body: `${late}${(Number(out.total) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, url: '/financeiro/lancamentos', dedupe: `fin-pagar-${today}` });
+  const notify = require('./notify').notify;
+  for (const p of projects.all()) {
+    const { rows: due } = await db.query(
+      `SELECT e.direction, count(*)::int AS n, coalesce(sum(${owner.share('e', '$2')}),0)::bigint AS total, count(*) FILTER (WHERE e.due_on < $1)::int AS late
+         FROM fin_entries e WHERE e.status = 'previsto' AND e.due_on <= ($1::date + 3) AND ${owner.where('e', '$2')} GROUP BY e.direction`, [today, [p.id]]);
+    const sigla = projects.all().length > 1 ? ` · ${p.sigla}` : '';
+    const out = due.find((d) => d.direction === 'saida');
+    if (out && out.n) {
+      const late = out.late ? `${out.late} atrasada${out.late > 1 ? 's' : ''} · ` : '';
+      await notify({ type: 'financeiro', broadcast: true, projectId: p.id, title: `${out.n} conta${out.n > 1 ? 's' : ''} a pagar até 3 dias${sigla}`, body: `${late}${(Number(out.total) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, url: '/financeiro/lancamentos', dedupe: `fin-pagar-${p.id}-${today}` });
+    }
+    const inn = due.find((d) => d.direction === 'entrada' && d.late > 0);
+    if (inn) await notify({ type: 'financeiro', broadcast: true, projectId: p.id, title: `${inn.late} recebimento${inn.late > 1 ? 's' : ''} em atraso${sigla}`, body: 'Confira os patrocínios com parcela vencida.', url: '/financeiro/lancamentos?escopo=receber', dedupe: `fin-receber-${p.id}-${today}` });
   }
-  const inn = due.find((d) => d.direction === 'entrada' && d.late > 0);
-  if (inn) await require('./notify').notify({ type: 'financeiro', broadcast: true, title: `${inn.late} recebimento${inn.late > 1 ? 's' : ''} em atraso`, body: 'Confira os patrocínios com parcela vencida.', url: '/financeiro/lancamentos?escopo=receber', dedupe: `fin-receber-${today}` });
   try { await require('./hourBank').tick(); } catch (err) { console.error('Banco de horas (aviso):', err.message); }
   for (const i of (await stockItems()).filter((x) => x.active && ['comprar', 'acabou'].includes(x.state))) {
-    await require('./notify').notify({ type: 'financeiro', broadcast: true, title: `Estoque: ${i.name} ${i.state === 'acabou' ? 'acabou' : 'precisa ser reposto'}`, body: i.runs_out ? `Dura até ~${i.runs_out.split('-').reverse().join('/')} (${i.qty} ${i.unit}).` : `Restam ${i.qty} ${i.unit}.`, url: '/financeiro/estoque', dedupe: `fin-estoque-${i.id}-${monthOf(today)}` });
+    await require('./notify').notify({ type: 'financeiro', broadcast: true, house: true, title: `Estoque: ${i.name} ${i.state === 'acabou' ? 'acabou' : 'precisa ser reposto'}`, body: i.runs_out ? `Dura até ~${i.runs_out.split('-').reverse().join('/')} (${i.qty} ${i.unit}).` : `Restam ${i.qty} ${i.unit}.`, url: '/financeiro/estoque', dedupe: `fin-estoque-${i.id}-${monthOf(today)}` });
   }
 }
 

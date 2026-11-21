@@ -75,9 +75,22 @@ const PERMISSIONS = {
   'integrations.manage': ['superadmin', 'gestao'], // ver status e testar Brevo/YOURLS
 };
 
-function can(role, permission) {
+// Permissões DA CASA: alcançam o que não é de projeto nenhum (a casa inteira). Quem não é da equipe da casa não tem,
+// mesmo com perfil de gestão: o gestor de um projeto cuida do projeto dele, não do sistema.
+const HOUSE_PERMISSIONS = new Set([
+  'users.read', 'users.write', 'users.delete', 'projects.manage', 'integrations.manage', 'catalog.manage',
+  'routines.manage', 'notifications.manage', 'reminders.manage', 'search.manage', 'contacts.manage',
+  'outreach.manage', 'stock.read', 'stock.write', 'audit.read', 'trash.manage',
+]);
+
+// `who` é a PESSOA (req.user). O perfil sozinho (texto) ainda vale para as contas antigas, mas quem decide permissão
+// da casa é a pessoa: sem `house`, a permissão da casa cai.
+function can(who, permission) {
+  const role = typeof who === 'string' ? who : (who && who.role);
   const allowed = PERMISSIONS[permission];
-  return Boolean(allowed && allowed.includes(role));
+  if (!allowed || !allowed.includes(role)) return false;
+  if (!HOUSE_PERMISSIONS.has(permission)) return true;
+  return typeof who === 'string' ? true : who.house !== false;
 }
 
 // Quem pode criar/editar/desativar/excluir o usuário `target`?
@@ -96,4 +109,4 @@ function assignableRoles(actorRole) {
 
 const isRole = (value) => Object.prototype.hasOwnProperty.call(ROLES, value);
 
-module.exports = { ROLES, PERMISSIONS, can, canManageUser, assignableRoles, isRole };
+module.exports = { ROLES, PERMISSIONS, HOUSE_PERMISSIONS, can, canManageUser, assignableRoles, isRole };

@@ -27,8 +27,8 @@ const page = wrap(async (req, res) => {
   // conversa individual que acabou de ser aberta ainda pode não estar na lista
   if (open && !conversations.some((c) => c.id === open)) conversations.unshift(await chat.detail(open, req.user.id));
   // "Criar tarefa" na mensagem abre a mesma janela Nova tarefa, aqui mesmo (sem a parte de voz: quem preenche é a IA lendo a mensagem)
-  const taskOn = require('../permissions').can(req.user.role, 'tasks.write');
-  const taskOpts = taskOn ? await require('../services/tasks').linkOptions() : null;
+  const taskOn = require('../permissions').can(req.user, 'tasks.write');
+  const taskOpts = taskOn ? await require('../services/tasks').linkOptions(require('../services/scope').idsOf(req)) : null;
   return res.render('messages/index', {
     title: 'Mensagens', conversations, openId: open, reactionEmojis: chat.EMOJIS, aiOn: require('../config').geminiConfigured,
     taskOn, ...(taskOpts || {}), C: require('../constants'), prefill: {}, openNew: false, voiceReady: false, back: open ? `/mensagens/${open}` : '/mensagens',
@@ -39,19 +39,20 @@ router.get('/mensagens/nao-lidas', use, wrap(async (req, res) => res.json({ ok: 
 router.get('/mensagens/conversas', use, wrap(async (req, res) => res.json({ ok: true, conversations: await chat.listConversations(req.user.id) })));
 router.get('/mensagens/:id(\\d+)', use, page);
 // # numa mensagem: episódios, cortes, convidados, patrocinadores, publicações e tarefas que a pessoa pode ver
-router.get('/mensagens/referencias', use, wrap(async (req, res) => res.set('Cache-Control', 'no-store').json({ ok: true, items: await require('../services/search').references(req.query.q, req.user) })));
+router.get('/mensagens/referencias', use, wrap(async (req, res) => res.set('Cache-Control', 'no-store').json({ ok: true, items: await require('../services/search').references(req.query.q, req.user, require('../services/scope').idsOf(req)) })));
 // minha preferência para grupos (tudo | mencoes)
 router.post('/mensagens/avisos', use, wrap(async (req, res) => out(res, await chat.setDefaultNotify(req.user, req.body.modo))));
 
 router.post('/mensagens/conversas', use, wrap(async (req, res) => {
-  if (req.body.tipo === 'grupo') return out(res, await chat.createGroup(req.user, req.body.nome, req.body.pessoas));
+  const pids = require('../services/scope').idsOf(req); // só conversa com quem divide um projeto com ela
+  if (req.body.tipo === 'grupo') return out(res, await chat.createGroup(req.user, req.body.nome, req.body.pessoas, pids));
   if (!isUuid(String(req.body.pessoa || ''))) return out(res, { error: 'Escolha uma pessoa.', status: 400 });
-  return out(res, await chat.openDirect(req.user, req.body.pessoa));
+  return out(res, await chat.openDirect(req.user, req.body.pessoa, pids));
 }));
 
 router.get('/mensagens/conversas/:id', use, member, wrap(async (req, res) => res.json({ ok: true, conversation: await chat.detail(req.params.id, req.user.id) })));
 router.post('/mensagens/conversas/:id/nome', use, member, wrap(async (req, res) => out(res, await chat.renameGroup(req.params.id, req.user, req.body.nome))));
-router.post('/mensagens/conversas/:id/pessoas', use, member, wrap(async (req, res) => out(res, await chat.addMembers(req.params.id, req.user, req.body.pessoas))));
+router.post('/mensagens/conversas/:id/pessoas', use, member, wrap(async (req, res) => out(res, await chat.addMembers(req.params.id, req.user, req.body.pessoas, require('../services/scope').idsOf(req)))));
 router.post('/mensagens/conversas/:id/pessoas/:uid/remover', use, member, wrap(async (req, res) => (isUuid(req.params.uid) ? out(res, await chat.removeMember(req.params.id, req.user, req.params.uid)) : nope(res))));
 router.post('/mensagens/conversas/:id/pessoas/:uid/papel', use, member, wrap(async (req, res) => (isUuid(req.params.uid) ? out(res, await chat.setRole(req.params.id, req.user, req.params.uid, req.body.papel)) : nope(res))));
 router.post('/mensagens/conversas/:id/avisos', use, member, wrap(async (req, res) => out(res, await chat.setNotify(req.params.id, req.user, req.body.modo))));

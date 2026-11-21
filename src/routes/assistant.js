@@ -30,7 +30,7 @@ async function answer(req, res, text, extra = {}) {
   if (!await limiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitas perguntas seguidas. Espere alguns minutos.' });
   if (!config.geminiConfigured) return res.status(503).json({ ok: false, error: 'A IA não está configurada neste servidor.' });
   const conversationId = isIntId(String(req.body?.conversation_id ?? req.query.conversa ?? '')) ? Number(req.body?.conversation_id ?? req.query.conversa) : null;
-  const args = { user: req.user, conversationId, text, page: page(req.body?.page ?? req.query.pagina), audio: Boolean(extra.transcript) };
+  const args = { user: req.user, conversationId, text, page: page(req.body?.page ?? req.query.pagina), audio: Boolean(extra.transcript), pids: require('../services/scope').idsOf(req) };
   // A tela pede em tempo real (Accept: text/event-stream): a resposta vai saindo pedaço por pedaço, como a IA escreve.
   if (/text\/event-stream/.test(req.get('accept') || '')) {
     res.set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });

@@ -23,7 +23,7 @@ const pubLive = () => socialApi.liveState(); // publicar: algum provedor em uso 
 
 // contador da aba Comentários (o que precisa de alguém)
 router.use('/social', (req, res, next) => {
-  if (req.method !== 'GET' || !req.user || !can(req.user.role, 'social.comments')) return next();
+  if (req.method !== 'GET' || !req.user || !can(req.user, 'social.comments')) return next();
   require('../services/commentReplies').pendingCount().then((n) => { res.locals.commentsPending = n; next(); }, next);
 });
 router.get('/social', requirePerm('social.read'), (req, res) => res.redirect('/social/publicacoes'));
@@ -101,20 +101,20 @@ router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (re
   const providers = socialApi.providersOf(pub); // um, ou vários quando as redes foram divididas entre provedores
   const viaOf = (p) => socialApi.get((pub.results || []).find((r) => r.platform === p)?.provider || pub.options?.routes?.[p] || pub.provider);
   const canEditNet = (p) => !(pub.results || []).some((r) => r.platform === p && r.manual) && viaOf(p).canEdit && up.EDITABLE[p];
-  const canResend = can(req.user.role, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
+  const canResend = can(req.user, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
   const resend = canResend ? await resendChoices(pub) : null;
   res.render('social/publication', {
-    resend, videoTags: await socialApi.videoTags(), auto: await automation.ofPublication(pub.id), aiReplies: await require('../services/commentReplies').ofPublication(pub.id), canAutomate: can(req.user.role, 'social.automate'), canComments: can(req.user.role, 'social.comments'), nums: await require('../services/postMetrics').forPublication(pub.id),
+    resend, videoTags: await socialApi.videoTags(), auto: await automation.ofPublication(pub.id), aiReplies: await require('../services/commentReplies').ofPublication(pub.id), canAutomate: can(req.user, 'social.automate'), canComments: can(req.user, 'social.comments'), nums: await require('../services/postMetrics').forPublication(pub.id),
     title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: providers.every((p) => p.live()), provider: providers[0], providers,
     providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
     testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
     editable: okPlatforms.filter(canEditNet), notEditable: okPlatforms.filter((p) => !canEditNet(p)),
-    canPublish: can(req.user.role, 'social.publish'), canCover: can(req.user.role, 'covers.edit'), mine: String(pub.created_by) === String(req.user.id), attempts, warningText,
+    canPublish: can(req.user, 'social.publish'), canCover: can(req.user, 'covers.edit'), mine: String(pub.created_by) === String(req.user.id), attempts, warningText,
   });
 }));
 
 // Quem pode mexer: a gestão em tudo; quem pediu, no próprio pedido enquanto ele não saiu (em revisão ou devolvido).
-const canTouch = (req, pub) => can(req.user.role, 'social.publish') || (String(pub.created_by) === String(req.user.id) && ['revisao', 'recusado'].includes(pub.status));
+const canTouch = (req, pub) => can(req.user, 'social.publish') || (String(pub.created_by) === String(req.user.id) && ['revisao', 'recusado'].includes(pub.status));
 const forbidden = (res) => res.status(403).render('error', { title: 'Sem permissão', message: 'Só a gestão mexe nesta publicação.' });
 
 router.post('/social/publicacoes/:id', requirePerm('social.request'), wrap(async (req, res) => {
@@ -185,7 +185,7 @@ router.post('/social/publicacoes/:id/recusar', requirePerm('social.publish'), wr
 router.post('/social/publicacoes/:id/:acao(atualizar|repetir|parar|cancelar)', requirePerm('social.read'), wrap(async (req, res) => {
   const pub = await findPub(req.params.id);
   if (!pub) return notFound(res);
-  if (['repetir', 'parar'].includes(req.params.acao) && !can(req.user.role, 'social.publish')) return forbidden(res);
+  if (['repetir', 'parar'].includes(req.params.acao) && !can(req.user, 'social.publish')) return forbidden(res);
   if (req.params.acao === 'cancelar' && !canTouch(req, pub)) return forbidden(res);
   if (req.params.acao === 'atualizar') await publishing.refresh(pub.id);
   if (req.params.acao === 'repetir') { // só registra o reenvio que aconteceu (clique repetido no meio de um envio não faz nada)
@@ -206,7 +206,7 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
   res.render('social/new', {
     defaultCtas: require('../services/socialCopy').forClip(null), autoDefaults: await require('../services/commentAutomation').formDefaults({}),
     videoTags: await socialApi.videoTags(), title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
-    connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user.role, 'social.request'), direct: can(req.user.role, 'social.publish'), canCover: can(req.user.role, 'covers.edit'), pick: req.query.item || '',
+    connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user, 'social.request'), direct: can(req.user, 'social.publish'), canCover: can(req.user, 'covers.edit'), pick: req.query.item || '',
   });
 }));
 
@@ -215,7 +215,7 @@ const aiLimiter = require('../auth/rateLimit').createLimiter({ name: 'ia-texto',
 router.post('/ia/texto', wrap(async (req, res) => {
   const forInvite = String(req.body.campo || '') === 'convite_motivo';
   const forComment = String(req.body.campo || '') === 'resposta';
-  const allowed = forInvite ? can(req.user?.role, 'guests.write') : forComment ? can(req.user?.role, 'social.comments') : (can(req.user?.role, 'episodes.read') || can(req.user?.role, 'social.read'));
+  const allowed = forInvite ? can(req.user, 'guests.write') : forComment ? can(req.user, 'social.comments') : (can(req.user, 'episodes.read') || can(req.user, 'social.read'));
   if (!req.user || !allowed) return res.status(403).json({ ok: false, error: 'Seu perfil não usa a IA nos textos.' });
   if (!await aiLimiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitos pedidos seguidos. Espere alguns minutos.' });
   const id = (v) => (isIntId(String(v || '')) ? Number(v) : null);
@@ -230,11 +230,12 @@ router.post('/ia/texto', wrap(async (req, res) => {
 // Instagram: alternativas para collab e marcação (convidado do episódio primeiro, convidados com @ e perfis já usados).
 router.get('/social/instagram/sugestoes', requirePerm('social.read'), wrap(async (req, res) => {
   const episodeId = isIntId(String(req.query.episodio || '')) ? Number(req.query.episodio) : null;
-  res.set('Cache-Control', 'private, max-age=30').json({ ok: true, items: await require('../services/igPeople').suggest({ q: req.query.q, episodeId }) });
+  const pids = require('../services/scope').idsOf(req); // só sugere @ de quem é dos projetos dela
+  res.set('Cache-Control', 'private, max-age=30').json({ ok: true, items: await require('../services/igPeople').suggest({ q: req.query.q, episodeId, pids }) });
 }));
 
 router.post('/social/publicar', requirePerm('social.request'), wrap(async (req, res) => {
-  const review = !can(req.user.role, 'social.publish'); // produtora: vai para a revisão da gestão
+  const review = !can(req.user, 'social.publish'); // produtora: vai para a revisão da gestão
   const media = MEDIA[req.body.tipo] ? req.body.tipo : 'video';
   const back = `/social/novo?tipo=${media}`;
   const fail = async (msg) => { await req.flash('error', msg); return res.redirect(back); };
@@ -273,21 +274,22 @@ router.post('/social/publicar', requirePerm('social.request'), wrap(async (req, 
 // ---------------------------------------------------------------- ideias
 router.get('/social/ideias', requirePerm('social.read'), wrap(async (req, res) => {
   const status = ['sugerida', 'aprovada', 'feita', 'descartada'].includes(req.query.status) ? req.query.status : 'sugerida';
+  const pids = require('../services/scope').idsOf(req); // ideias e episódios do projeto escolhido
   const [episodes, ideas, counts, pending] = await Promise.all([
-    db.query(`SELECT e.id, e.number, e.title, e.status, g.name AS guest_name,
+    db.query(`SELECT e.id, e.number, e.title, e.status, e.project_id, g.name AS guest_name,
                      EXISTS (SELECT 1 FROM episode_transcripts t WHERE t.episode_id = e.id) OR EXISTS (SELECT 1 FROM episode_clips c WHERE c.episode_id = e.id AND coalesce(c.transcript, '') <> '') AS has_text,
                      (SELECT count(*)::int FROM social_ideas i WHERE i.episode_id = e.id) AS ideas
-                FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id ORDER BY e.number DESC NULLS LAST, e.id DESC LIMIT 200`),
-    db.query(`SELECT i.*, e.number AS episode_number, e.title AS episode_title, t.status AS task_status
+                FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.project_id = ANY($1::int[]) ORDER BY e.number DESC NULLS LAST, e.id DESC LIMIT 200`, [pids]),
+    db.query(`SELECT i.*, e.number AS episode_number, e.title AS episode_title, e.project_id, t.status AS task_status
                 FROM social_ideas i JOIN episodes e ON e.id = i.episode_id LEFT JOIN tasks t ON t.id = i.task_id
-               WHERE i.status = $1 ORDER BY e.number DESC NULLS LAST, i.kind, i.id`, [status]),
-    db.query('SELECT status, count(*)::int AS n FROM social_ideas GROUP BY status'),
+               WHERE i.status = $1 AND i.project_id = ANY($2::int[]) ORDER BY e.number DESC NULLS LAST, i.kind, i.id`, [status, pids]),
+    db.query('SELECT status, count(*)::int AS n FROM social_ideas WHERE project_id = ANY($1::int[]) GROUP BY status', [pids]),
     db.query("SELECT 1 FROM jobs WHERE kind = 'social_ideias' AND status IN ('queued','running') LIMIT 1"),
   ]);
   res.render('social/ideas', {
     title: 'Ideias', tab: 'ideias', episodes: episodes.rows, ideas: ideas.rows, status, kinds: social.IDEA_KINDS,
     counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])), running: pending.rowCount > 0,
-    aiReady: config.geminiConfigured, canIdeas: can(req.user.role, 'social.ideas'),
+    aiReady: config.geminiConfigured, canIdeas: can(req.user, 'social.ideas'),
   });
 }));
 
@@ -373,8 +375,8 @@ router.get('/social/automacoes', requirePerm('social.read'), wrap(async (req, re
       WHERE r->>'platform' = 'instagram' AND (r->>'ok')::boolean AND coalesce(r->>'url', '') <> '' ORDER BY r->>'url', p.created_at DESC LIMIT 30`);
   res.render('social/automations', {
     title: 'Automações', tab: 'automacoes', rules, triggers: TRIGGERS, actions: ACTIONS, commentPlatforms: COMMENT_PLATFORMS, platforms: up.PLATFORMS, igPosts,
-    live: live(), configured: config.uploadPostConfigured, canAutomate: can(req.user.role, 'social.automate'), openNew: req.query.nova === '1',
-    links: await automation.links(), inbox: await automation.state(), outstandLive: config.outstand.live, canIntegrate: can(req.user.role, 'integrations.manage'),
+    live: live(), configured: config.uploadPostConfigured, canAutomate: can(req.user, 'social.automate'), openNew: req.query.nova === '1',
+    links: await automation.links(), inbox: await automation.state(), outstandLive: config.outstand.live, canIntegrate: can(req.user, 'integrations.manage'),
   });
 }));
 
@@ -413,7 +415,7 @@ router.get('/social/automacoes/:id', requirePerm('social.read'), wrap(async (req
   const { rows: events } = await db.query('SELECT * FROM social_events WHERE rule_id = $1 ORDER BY created_at DESC, id DESC LIMIT 100', [rule.id]);
   res.render('social/automation', {
     title: rule.name, tab: 'automacoes', rule, events, triggers: TRIGGERS, actions: ACTIONS, commentPlatforms: COMMENT_PLATFORMS, platforms: up.PLATFORMS,
-    live: live(), configured: config.uploadPostConfigured, canAutomate: can(req.user.role, 'social.automate'),
+    live: live(), configured: config.uploadPostConfigured, canAutomate: can(req.user, 'social.automate'),
   });
 }));
 
@@ -476,7 +478,7 @@ router.get('/social/comentarios', requirePerm('social.comments'), wrap(async (re
   const eta = vista === 'fila' ? replies.estimate(rows, cfg, { nextAt: parse(sendState).next_at }) : new Map();
   res.render('social/comments', {
     title: 'Comentários', tab: 'comentarios', cfg, counts, rows, more, vista, pubId, posts, eta, VIEWS: replies.VIEWS, MODES: replies.MODES, NETWORK_LABEL: replies.NETWORK_LABEL,
-    summary: replies.summary(cfg), lastSweep: parse(sweepState), canSetup: can(req.user.role, 'social.automate'), outstandLive: config.outstand.live,
+    summary: replies.summary(cfg), lastSweep: parse(sweepState), canSetup: can(req.user, 'social.automate'), outstandLive: config.outstand.live,
     aiReady: config.geminiConfigured, outstandReady: config.outstandConfigured, showAll, REPLY_MAX: replies.REPLY_MAX,
     dmToday: await replies.dmToday(), communityOk: Boolean((await require('../services/commentAutomation').links()).whatsapp_community), DM_DAYS: replies.DM_PER_PERSON_DAYS,
   });

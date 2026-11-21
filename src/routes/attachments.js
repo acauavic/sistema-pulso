@@ -10,7 +10,7 @@ const router = express.Router();
 const uploadLimiter = createLimiter({ name: 'anexos', max: 80, windowMs: 10 * 60_000 });
 const previewLimiter = createLimiter({ name: 'previa-link', max: 240, windowMs: 10 * 60_000 });
 const fail = (res, status, error) => res.status(status).json({ ok: false, error });
-const canUpload = (user) => can(user.role, 'tasks.write') || can(user.role, 'comments.write');
+const canUpload = (user) => can(user, 'tasks.write') || can(user, 'comments.write');
 const view = (a) => ({ id: a.id, kind: a.kind, name: a.filename, type: a.content_type, size: Number(a.size_bytes), url: `/anexos/${a.id}`, transcript: a.transcript || null, duration_ms: a.duration_ms || null });
 
 // Envio: o corpo é o arquivo cru; o nome vai em X-Filename (codificado) e, para áudio, a duração em X-Duration-Ms.

@@ -131,12 +131,12 @@ async function savePilot(body) {
 }
 
 // Ordem de publicação da semana: round-robin entre episódios. Devolve ids de corte (até `limit`).
-async function weekPicks(limit) {
+async function weekPicks(limit, pids = null) {
   const { rows } = await db.query(
     `SELECT c.id, c.episode_id, (c.cover_id IS NOT NULL) AS has_cover, c.created_at, e.number, e.aired_on
        FROM episode_clips c JOIN episodes e ON e.id = c.episode_id
-      WHERE c.status = 'pronto' AND NOT EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status = ANY($1))
-      ORDER BY e.aired_on DESC NULLS LAST, e.number DESC NULLS LAST, (c.cover_id IS NOT NULL) DESC, c.created_at, c.id`, [QUEUED]);
+      WHERE c.status = 'pronto'${pids ? ' AND c.project_id = ANY($2::int[])' : ''} AND NOT EXISTS (SELECT 1 FROM episode_publications p WHERE p.clip_id = c.id AND p.status = ANY($1))
+      ORDER BY e.aired_on DESC NULLS LAST, e.number DESC NULLS LAST, (c.cover_id IS NOT NULL) DESC, c.created_at, c.id`, pids ? [QUEUED, pids] : [QUEUED]);
   const byEp = new Map();
   for (const r of rows) { if (!byEp.has(r.episode_id)) byEp.set(r.episode_id, []); byEp.get(r.episode_id).push(r.id); }
   const queues = [...byEp.values()]; const out = [];

@@ -20,7 +20,7 @@ const isIntId = (v) => /^[1-9]\d{0,9}$/.test(String(v));
 const uploadError = (res, status, error) => res.status(status).json({ ok: false, error });
 const back = (id) => `/patrocinadores/${id}#material`;
 // As rotas da fila respondem em JSON (a fila mostra a frase); o editor só vê e baixa.
-const writer = (req, res, next) => (req.user && can(req.user.role, 'sponsors.write') ? next() : uploadError(res, 403, 'Seu perfil não envia material de patrocinador.'));
+const writer = (req, res, next) => (req.user && can(req.user, 'sponsors.write') ? next() : uploadError(res, 403, 'Seu perfil não envia material de patrocinador.'));
 
 async function storageGuard(res, fn) {
   try { return await fn(); } catch (err) {

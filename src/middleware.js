@@ -59,13 +59,13 @@ async function navData(req, res, next) {
                        (SELECT count(*)::int FROM chat_members cm JOIN chat_messages cx ON cx.conversation_id = cm.conversation_id AND cx.id > cm.last_read_id AND cx.deleted_at IS NULL AND cx.author_id IS DISTINCT FROM cm.user_id WHERE cm.user_id = $1 AND cm.left_at IS NULL) AS chat_unread,
                        CASE WHEN $2 THEN (SELECT count(*)::int FROM episode_publications p WHERE p.status = 'revisao'
                           AND coalesce((SELECT c.project_id FROM episode_clips c WHERE c.id = p.clip_id), (SELECT e.project_id FROM episodes e WHERE e.id = p.episode_id)) = ANY($3::int[])) ELSE 0 END AS reviews`,
-        [req.user.id, can(req.user.role, 'social.publish'), (req.scope && req.scope.ids) || null]),
-      require('./services/team').activeUsers(),
+        [req.user.id, can(req.user, 'social.publish'), (req.scope && req.scope.ids) || null]),
+      require('./services/team').activeUsers(req.scope && req.scope.ids),
     ]);
     res.locals.navCounts = counts.rows[0];
     res.locals.teamUsers = users.rows;
     // contas de redes que caíram (só para quem mexe com social ou integrações): a faixa de alerta nas telas
-    if (can(req.user.role, 'social.read') || can(req.user.role, 'integrations.manage')) res.locals.socialProblems = await require('./services/socialHealth').problemsCached();
+    if (can(req.user, 'social.read') || can(req.user, 'integrations.manage')) res.locals.socialProblems = await require('./services/socialHealth').problemsCached();
   } catch (err) {
     console.error('menu:', err.message);
   }
@@ -84,7 +84,7 @@ async function attachSession(req, res, next) {
     res.locals.currentUser = req.user;
     res.locals.csrf = session ? session.csrf : '';
     res.locals.flash = flash || null;
-    res.locals.can = (perm) => Boolean(req.user && can(req.user.role, perm));
+    res.locals.can = (perm) => Boolean(req.user && can(req.user, perm));
     res.locals.ROLES = ROLES;
     res.locals.fmt = fmt;
     // número do vídeo com o prefixo do projeto dele (EP.012 no Pulso, V.003 no Projeto 100)
@@ -130,7 +130,7 @@ function requireAuth(req, res, next) {
 function requirePerm(permission) {
   return (req, res, next) => {
     if (!req.user) return requireAuth(req, res, next);
-    if (can(req.user.role, permission)) return next();
+    if (can(req.user, permission)) return next();
     return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não tem acesso a esta área.' });
   };
 }

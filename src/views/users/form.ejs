@@ -14,6 +14,32 @@
       </select>
       <% if (typeof isSelf !== 'undefined' && isSelf) { %><small class="muted">Você não pode alterar o seu próprio perfil.</small><% } %>
     </label>
+    <% var self = typeof isSelf !== 'undefined' && isSelf; var house = values.house !== false; var sudo = values.role === 'superadmin'; %>
+    <fieldset class="stack user-access">
+      <legend class="label-text">Onde essa pessoa trabalha</legend>
+      <input type="hidden" name="acesso" value="1">
+      <% if (projectRows.length > 1) { %>
+      <ul class="plain access-list" id="user-projetos">
+        <% projectRows.forEach(function (p) { %>
+        <li>
+          <label class="check"><input type="checkbox" name="projetos" value="<%= p.id %>"<%= p.member ? ' checked' : '' %>> <%= p.name %></label>
+          <label class="check small muted"><input type="checkbox" name="financeiro" value="<%= p.id %>"<%= p.finance ? ' checked' : '' %>> Vê o financeiro</label>
+        </li>
+        <% }) %>
+      </ul>
+      <p class="muted small m-0">A pessoa só encontra convidados, vídeos, tarefas e números dos projetos marcados. O financeiro também precisa do perfil (Gestão ou Superadmin).</p>
+      <% } else { %>
+      <input type="hidden" name="projetos" value="<%= projectRows[0] ? projectRows[0].id : '' %>">
+      <input type="hidden" name="financeiro" value="<%= projectRows[0] ? projectRows[0].id : '' %>">
+      <% } %>
+      <label class="switch">
+        <input type="checkbox" role="switch" name="house" value="1"<%= house ? ' checked' : '' %><%= (self || sudo) ? ' disabled' : '' %> aria-label="Equipe da casa">
+        <span class="switch-track" aria-hidden="true"></span>
+        <span class="mono small switch-state"><%= house ? 'EQUIPE DA CASA' : 'SÓ DOS PROJETOS MARCADOS' %></span>
+      </label>
+      <% if (self || sudo) { %><input type="hidden" name="house" value="<%= house ? '1' : '0' %>"><% } %>
+      <p class="muted small m-0">A equipe da casa alcança o que é geral: usuários, integrações, categorias, rotinas, estoque, auditoria e lixeira completas, e criar projetos.<% if (self) { %> Você não pode mudar a sua.<% } else if (sudo) { %> O superadmin é sempre da casa.<% } %></p>
+    </fieldset>
     <% if (!target) { %><p class="muted small">Enviaremos um e-mail com um link (válido por 72h) para a pessoa definir a própria senha.</p><% } %>
     <div class="row">
       <button class="btn primary" type="submit"><%= target ? 'Salvar' : 'Criar e enviar acesso' %></button>

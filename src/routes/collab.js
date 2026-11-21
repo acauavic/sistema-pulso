@@ -90,7 +90,7 @@ router.get('/notificacoes', wrap(async (req, res) => {
 // ---- aba Lembretes da gravação: a fila de quem a produtora precisa avisar ----
 router.get('/notificacoes/lembretes', requirePerm('guests.read'), wrap(async (req, res) => {
   const q = await reminders.queue();
-  res.render('notifications/reminders', { title: 'Lembretes da gravação', q, tab: 'lembretes', dueNow: q.now.length, canSend: can(req.user.role, 'guests.write'), canConfig: can(req.user.role, 'reminders.manage') });
+  res.render('notifications/reminders', { title: 'Lembretes da gravação', q, tab: 'lembretes', dueNow: q.now.length, canSend: can(req.user, 'guests.write'), canConfig: can(req.user, 'reminders.manage') });
 }));
 
 // ---- alertas neste aparelho (Web Push) ----
@@ -167,7 +167,7 @@ router.get('/busca', wrap(async (req, res) => {
   const result = await search.search(req.query.q, req.user, require('../services/scope').idsOf(req));
   if (result.q.length >= 2 && req.query.registrar !== '0') await search.log(req.user, result.q, result.total);
   let tips = 0;
-  if (!result.q && require('../permissions').can(req.user.role, 'search.manage')) tips = await tipsCount(req.app);
+  if (!result.q && require('../permissions').can(req.user, 'search.manage')) tips = await tipsCount(req.app);
   res.set('Cache-Control', 'no-store').json({ ok: true, ...result, tips });
 }));
 

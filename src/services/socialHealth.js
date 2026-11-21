@@ -52,7 +52,7 @@ async function apply(provider, platforms) {
   return recovered;
 }
 
-const notifyTeam = (args) => require('./notify').notify({ type: 'integracao', broadcast: true, url: '/integracoes#redes', ...args }).catch((err) => console.error('[contas das redes] aviso:', err.message));
+const notifyTeam = (args) => require('./notify').notify({ type: 'integracao', broadcast: true, house: true, url: '/integracoes#redes', ...args }).catch((err) => console.error('[contas das redes] aviso:', err.message));
 
 // Avisa as quedas que ainda não foram avisadas (ou que merecem um lembrete) e as que voltaram.
 async function remind(recovered = []) {

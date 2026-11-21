@@ -28,8 +28,9 @@ async function findSponsor(id) {
   return rows[0] || null;
 }
 
-async function formOptions() {
-  const users = await require('../services/team').activeUsers();
+// A lista de responsáveis é a equipe que divide projeto com ela.
+async function formOptions(req) {
+  const users = await require('../services/team').activeUsers(req.scope.ids);
   return {
     owners: users.rows, stages: C.SPONSOR_STAGES, kinds: C.SPONSOR_KINDS, tiers: C.SPONSOR_TIERS, stageHints: sponsorsSvc.STAGE_HINTS,
   };
@@ -111,7 +112,7 @@ router.get('/patrocinadores', requirePerm('sponsors.read'), wrap(async (req, res
          FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id LEFT JOIN sponsor_briefs b ON b.sponsor_id = s.id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY s.updated_at DESC LIMIT 500`, params),
-    require('../services/team').activeUsers(),
+    require('../services/team').activeUsers(req.scope.ids),
     db.query('SELECT stage, count(*)::int AS n, coalesce(sum(value_cents),0)::bigint AS total FROM sponsors WHERE project_id = ANY($1::int[]) GROUP BY stage', [scope.idsOf(req)]),
   ]);
   for (const s of sponsors) { // andamento do formulário (só depois de Ganho)
@@ -125,7 +126,7 @@ router.get('/patrocinadores', requirePerm('sponsors.read'), wrap(async (req, res
 
 // ---- criar ----
 router.get('/patrocinadores/novo', requirePerm('sponsors.write'), wrap(async (req, res) => {
-  res.render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error: null, notice: null, ...(await formOptions()), values: { owner_id: req.user.id, stage: 'prospect' } });
+  res.render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error: null, notice: null, ...(await formOptions(req)), values: { owner_id: req.user.id, stage: 'prospect' } });
 }));
 
 router.post('/patrocinadores', requirePerm('sponsors.write'), wrap(async (req, res) => {
@@ -133,10 +134,10 @@ router.post('/patrocinadores', requirePerm('sponsors.write'), wrap(async (req, r
   const { values } = parsed;
   const projectId = require('../services/scope').target(req, req.body); // o projeto escolhido no menu, ou o do campo Projeto
   const error = parsed.error || (projectId ? null : 'Escolha o projeto.');
-  if (error) return res.status(400).render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error, notice: null, values: echo(req.body, values), ...(await formOptions()) });
+  if (error) return res.status(400).render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error, notice: null, values: echo(req.body, values), ...(await formOptions(req)) });
   if (req.body.confirmar_duplicata !== '1') {
     const duplicates = await require('../services/duplicates').findFor('sponsor', { ...values, project_id: projectId });
-    if (duplicates.length) return res.render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error: null, notice: null, duplicates, dupKind: 'sponsor', values: echo(req.body, values), ...(await formOptions()) });
+    if (duplicates.length) return res.render('sponsors/form', { title: 'Novo patrocinador', sponsor: null, error: null, notice: null, duplicates, dupKind: 'sponsor', values: echo(req.body, values), ...(await formOptions(req)) });
   }
   const { rows: [s] } = await db.query(
     `INSERT INTO sponsors (${COLUMNS.join(', ')}, created_by, project_id) VALUES (${COLUMNS.map((_, i) => `$${i + 1}`).join(',')}, $${COLUMNS.length + 1}, $${COLUMNS.length + 2}) RETURNING id`,
@@ -181,23 +182,23 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
   const finSvc = require('../services/finance');
   const meetingsSvc = require('../services/sponsorMeetings');
   const [[agenda, guestLinks], [thread, linkedTasks], [outHist, outKnown, outEval], finSummary, meetings, team] = await Promise.all([
-    pAgenda, pThread, pOut, can(req.user.role, 'finance.read') ? finSvc.sponsorSummary(sponsor.id) : null,
-    meetingsSvc.listFor(sponsor.id), require('../services/team').activeUsers()]);
+    pAgenda, pThread, pOut, can(req.user, 'finance.read') ? finSvc.sponsorSummary(sponsor.id) : null,
+    meetingsSvc.listFor(sponsor.id), require('../services/team').activeUsers(req.scope.ids)]);
   const outSm = outEval.get(sponsor.id) || null;
   // Em outros projetos: onde mais esta empresa está (todos os projetos de quem olha) e para onde ainda dá para abrir negociação.
   const companyId = await companies.idOf(sponsor.id);
   const others = await companies.participations(companyId, { pids: req.scope.ids, exceptSponsorId: sponsor.id });
   // material que a empresa já tem em outro projeto (para o botão "Trazer do outro projeto" da aba Material)
-  const bringable = others.length && can(req.user.role, 'sponsors.write')
+  const bringable = others.length && can(req.user, 'sponsors.write')
     ? await require('../services/sponsorMaterial').otherProjectFiles(sponsor.id, { pids: req.scope.ids }) : [];
   const projectsSvc2 = require('../services/projects');
   const invitable = req.scope.projects.filter((p) => p.id !== sponsor.project_id && projectsSvc2.has(p, 'patrocinio')
     && !others.some((o) => o.project_id === p.id)).map((p) => ({ id: p.id, name: p.name }));
-  const finView = can(req.user.role, 'finance.read')
+  const finView = can(req.user, 'finance.read')
     ? { finSummary, fin: finSvc, money: fmtMoney, today: finSvc.todayISO(), here: req.originalUrl } : { finSummary: null };
   res.render('sponsors/show', {
     others, invitable, bringable, materialTitle: require('../services/sponsorMaterial').TITLE,
-    dupes: can(req.user.role, 'sponsors.write') ? await require('../services/duplicates').findFor('sponsor', sponsor, { excludeId: sponsor.id }) : [],
+    dupes: can(req.user, 'sponsors.write') ? await require('../services/duplicates').findFor('sponsor', sponsor, { excludeId: sponsor.id }) : [],
     outreachCtx: { kind: 'sponsor', sm: outSm, d: outSm ? outreach.describe(outSm) : null, hist: outHist, known: outKnown, firstChannel: (outSm && outSm.lastChannel) || (sponsor.contact_phone ? 'whatsapp' : sponsor.contact_email ? 'email' : 'instagram'), today: require('../services/calendar').todayISO(), CHANNELS: outreach.CHANNELS, RESULTS: outreach.RESULTS, base: '/patrocinadores', subjectId: sponsor.id },
     ...finView, openModal: ['ganho', 'ativo'].includes(req.query.abrir) ? req.query.abrir : null, agenda: agenda.rows, guestLinks: guestLinks.rows, guestStatuses: C.STATUS_BY_KEY,
     comments: thread, linkedTasks: linkedTasks.rows,
@@ -222,14 +223,14 @@ router.get('/patrocinadores/:id/editar', requirePerm('sponsors.write'), wrap(asy
   const target = C.isSponsorStage(req.query.para) ? req.query.para : sponsor.stage;
   const missing = sponsorsSvc.missingFor(target, sponsor);
   const notice = target !== sponsor.stage && missing.length ? `Para mover para ${C.SPONSOR_STAGE_BY_KEY[target].label} falta: ${listJoin(missing)}.` : null;
-  res.render('sponsors/form', { title: `Editar ${sponsor.company}`, sponsor, error: null, notice, ...(await formOptions()), values: { ...sponsor, stage: target } });
+  res.render('sponsors/form', { title: `Editar ${sponsor.company}`, sponsor, error: null, notice, ...(await formOptions(req)), values: { ...sponsor, stage: target } });
 }));
 
 router.post('/patrocinadores/:id', requirePerm('sponsors.write'), wrap(async (req, res) => {
   const sponsor = await findSponsor(req.params.id);
   if (!sponsor) return notFound(res);
   const { values, error } = await parseSponsorForm(req.body);
-  if (error) return res.status(400).render('sponsors/form', { title: `Editar ${sponsor.company}`, sponsor, error, notice: null, values: echo(req.body, values), ...(await formOptions()) });
+  if (error) return res.status(400).render('sponsors/form', { title: `Editar ${sponsor.company}`, sponsor, error, notice: null, values: echo(req.body, values), ...(await formOptions(req)) });
   const before = await recordChanges.snapshot('sponsor', sponsor.id);
   await db.query(`UPDATE sponsors SET ${COLUMNS.map((c, i) => `${c}=$${i + 2}`).join(', ')}, updated_at=now() WHERE id=$1`, [sponsor.id, ...columnValues(values)]);
   await companies.sync(sponsor.id); // o que é identidade vale em todos os projetos da empresa

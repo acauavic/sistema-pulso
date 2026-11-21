@@ -29,7 +29,7 @@ const SELECT = `SELECT t.*, a.name AS assignee_name, cb.name AS creator_name,
 const get = (id) => db.query(`${SELECT} WHERE t.id = $1`, [id]).then((r) => r.rows[0] || null);
 
 // Pode mexer: quem gerencia tarefas, quem criou ou quem é o responsável.
-const canEdit = (user, task) => can(user.role, 'tasks.manage') || [task.created_by, task.assignee_id].map(String).includes(String(user.id));
+const canEdit = (user, task) => can(user, 'tasks.manage') || [task.created_by, task.assignee_id].map(String).includes(String(user.id));
 
 // escopo: 'minhas' (sou o responsável), 'hoje' (minhas que vencem hoje ou estão atrasadas), 'todas'.
 // projectIds: o recorte de projetos (scope.idsOf); tarefa geral (sem projeto) aparece em qualquer recorte.
@@ -104,7 +104,7 @@ async function update(task, values, user, { assigneeId } = {}) {
   if (next.status === 'bloqueada' && !next.block_reason) return { error: 'Diga o motivo do bloqueio.' };
   if (next.status !== 'bloqueada') next.block_reason = null;
   const reassign = assigneeId !== undefined && String(assigneeId || '') !== String(task.assignee_id || '');
-  if (reassign && !can(user.role, 'tasks.manage') && ![task.created_by, task.assignee_id].map(String).includes(String(user.id))) return { error: 'Você não pode reatribuir esta tarefa.', status: 403 };
+  if (reassign && !can(user, 'tasks.manage') && ![task.created_by, task.assignee_id].map(String).includes(String(user.id))) return { error: 'Você não pode reatribuir esta tarefa.', status: 403 };
   const { rows: [t] } = await db.query(
     `UPDATE tasks SET title = $2, description = $3, kind = $4, status = $5, block_reason = $6, due_on = $7, due_time = $10, description_html = $11, notes = $8, assignee_id = $9,
        completed_at = CASE WHEN $5 = 'feito' THEN coalesce(completed_at, now()) ELSE NULL END, updated_at = now() WHERE id = $1 RETURNING *`,
@@ -131,12 +131,15 @@ async function update(task, values, user, { assigneeId } = {}) {
 }
 
 // O que a janela "Nova tarefa" oferece para escolher: pessoas e os itens a que a tarefa pode se ligar (Tarefas e Mensagens).
-async function linkOptions() {
+// `pids`: projetos do recorte de quem está olhando (o que ela pode ligar a uma tarefa).
+async function linkOptions(pids = null) {
+  const only = pids ? ' AND project_id = ANY($1::int[])' : '';
+  const p = pids ? [pids] : [];
   const [eps, guests, sponsors, users] = await Promise.all([
-    db.query("SELECT id, number, title, project_id FROM episodes WHERE status <> 'publicado' ORDER BY number DESC NULLS LAST, id DESC LIMIT 100"),
-    db.query("SELECT id, name FROM guests WHERE status NOT IN ('perdido','cancelado') ORDER BY updated_at DESC LIMIT 200"),
-    db.query("SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido') ORDER BY company LIMIT 200"),
-    require('./team').activeUsers(),
+    db.query(`SELECT id, number, title, project_id FROM episodes WHERE status <> 'publicado'${only} ORDER BY number DESC NULLS LAST, id DESC LIMIT 100`, p),
+    db.query(`SELECT id, name FROM guests WHERE status NOT IN ('perdido','cancelado')${only} ORDER BY updated_at DESC LIMIT 200`, p),
+    db.query(`SELECT id, company FROM sponsors WHERE stage NOT IN ('perdido')${only} ORDER BY company LIMIT 200`, p),
+    require('./team').activeUsers(pids),
   ]);
   return { episodes: eps.rows, guests: guests.rows, sponsors: sponsors.rows, users: users.rows };
 }

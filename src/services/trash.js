@@ -259,13 +259,16 @@ async function restoreBatch(batch, canRestore = () => true) {
 }
 
 // Lista da lixeira (sem o conteúdo guardado). mine: só o que a pessoa apagou.
-async function list({ userId = null, kind = null } = {}) {
+// `pids`: o recorte de quem está olhando. Item de projeto que ela não alcança não aparece; o que é geral (sem
+// projeto) aparece para quem apagou e para a equipe da casa.
+async function list({ userId = null, kind = null, pids = null } = {}) {
   const { rows } = await db.query(
     `SELECT t.id, t.kind, t.ref_id, t.title, t.context, t.batch, t.deleted_by, t.deleted_at, t.purge_after, u.name AS deleted_by_name,
             cardinality(t.storage_keys) AS files
        FROM trash_items t LEFT JOIN users u ON u.id = t.deleted_by
       WHERE ($1::uuid IS NULL OR t.deleted_by = $1) AND ($2::text IS NULL OR t.kind = $2)
-      ORDER BY t.deleted_at DESC, t.id DESC LIMIT 300`, [userId, kind]);
+        AND ($3::int[] IS NULL OR t.project_id IS NULL OR t.project_id = ANY($3::int[]))
+      ORDER BY t.deleted_at DESC, t.id DESC LIMIT 300`, [userId, kind, pids]);
   return rows;
 }
 
@@ -293,7 +296,7 @@ async function purge({ id = null } = {}) {
   return rows.length;
 }
 
-const get = (id) => db.query('SELECT id, kind, ref_id, title, context, batch, deleted_by, deleted_at, purge_after FROM trash_items WHERE id = $1', [id]).then((r) => r.rows[0] || null);
+const get = (id) => db.query('SELECT id, kind, ref_id, title, context, batch, deleted_by, deleted_at, purge_after, project_id FROM trash_items WHERE id = $1', [id]).then((r) => r.rows[0] || null);
 const daysLeft = (t, now = Date.now()) => Math.max(0, Math.ceil((new Date(t.purge_after).getTime() - now) / 86400_000));
 
 module.exports = { DAYS, KINDS, remove, restore, restoreBatch, list, purge, get, daysLeft, capture };

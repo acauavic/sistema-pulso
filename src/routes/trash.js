@@ -8,8 +8,10 @@ const { wrap, isIntId } = require('../utils/wrap');
 const router = express.Router();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const backTo = (req, fallback) => { const v = String(req.body.voltar || ''); return /^\/(?!\/)[\w\-/?=&#.%]*$/.test(v) ? v : fallback; };
-const manager = (user) => can(user.role, 'trash.manage');
+const manager = (user) => can(user, 'trash.manage');
 const mayRestore = (user, t) => manager(user) || String(t.deleted_by || '') === String(user.id);
+// Item da lixeira que a pessoa alcança: do projeto dela, ou geral (sem projeto).
+const reach = (req, t) => Boolean(t) && require('../services/scope').canSee(req, t.project_id);
 // Grupos do filtro (o tipo de cada item fica no rótulo da linha).
 const GROUPS = {
   conteudo: { label: 'Conteúdo', kinds: ['clip', 'cover', 'request'] },
@@ -21,7 +23,7 @@ const GROUPS = {
 router.get('/lixeira', wrap(async (req, res) => {
   const all = manager(req.user);
   const mine = !all || req.query.de === 'mim';
-  const items = await trash.list({ userId: mine ? req.user.id : null });
+  const items = await trash.list({ userId: mine ? req.user.id : null, pids: require('../services/scope').idsOf(req) });
   const group = GROUPS[req.query.tipo] ? req.query.tipo : '';
   const counts = Object.fromEntries(Object.entries(GROUPS).map(([k, g]) => [k, items.filter((i) => g.kinds.includes(i.kind)).length]));
   res.render('trash/index', {
@@ -33,7 +35,7 @@ router.get('/lixeira', wrap(async (req, res) => {
 
 router.post('/lixeira/:id/restaurar', wrap(async (req, res) => {
   const t = isIntId(req.params.id) ? await trash.get(req.params.id) : null;
-  if (!t) { await req.flash('error', 'Este item não está mais na lixeira.'); return res.redirect('/lixeira'); }
+  if (!t || !reach(req, t)) { await req.flash('error', 'Este item não está mais na lixeira.'); return res.redirect('/lixeira'); }
   if (!mayRestore(req.user, t)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem apagou (ou a gestão) restaura este item.' });
   const out = await trash.restore(t.id);
   if (out.error) { await req.flash('error', out.error); return res.redirect(backTo(req, '/lixeira')); }
@@ -57,7 +59,7 @@ router.post('/lixeira/lote/:batch/restaurar', wrap(async (req, res) => {
 router.post('/lixeira/:id/apagar', wrap(async (req, res) => {
   if (!manager(req.user)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só a gestão apaga de vez.' });
   const t = isIntId(req.params.id) ? await trash.get(req.params.id) : null;
-  if (!t) return res.redirect('/lixeira');
+  if (!t || !reach(req, t)) return res.redirect('/lixeira');
   await trash.purge({ id: t.id });
   await audit(req, 'lixeira.apagado', t.kind, t.ref_id, { titulo: t.title });
   await req.flash('ok', `Apagado de vez: ${t.title}.`);

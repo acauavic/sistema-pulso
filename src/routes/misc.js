@@ -52,20 +52,20 @@ async function editorHome(req, res) {
 }
 
 router.get('/', wrap(async (req, res) => {
-  if (can(req.user.role, 'production.edit') && !can(req.user.role, 'production.manage')) return editorHome(req, res);
+  if (can(req.user, 'production.edit') && !can(req.user, 'production.manage')) return editorHome(req, res);
   // painel: os três blocos (convidados, financeiro, cadência) começam juntos
   const fin = require('../services/finance');
   const outreach = require('../services/outreach');
   const finPids = require('../services/scope').financeIdsOf(req); // dinheiro: só os projetos em que a pessoa vê o financeiro
   const finOwner = require('../services/finOwner');
-  const pMoney = can(req.user.role, 'finance.read') && finPids.length ? Promise.all([fin.counts({ pids: finPids }), fin.stockItems(), db.query(
+  const pMoney = can(req.user, 'finance.read') && finPids.length ? Promise.all([fin.counts({ pids: finPids }), fin.stockItems(), db.query(
     // mesma conta do Financeiro ("A pagar em 7 dias"): de hoje até daqui a 7 dias; o atrasado aparece à parte
     `SELECT coalesce(sum(${finOwner.share('e', '$2')}) FILTER (WHERE e.direction = 'saida' AND e.due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7
        FROM fin_entries e WHERE e.status = 'previsto' AND ${finOwner.where('e', '$2')}`,
     [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()), finPids]),
     // o banco de horas nunca derruba o Início: se falhar, a faixa de aviso só não aparece
     require('../services/hourBank').status({ pids: finPids }).catch((err) => { console.error('Banco de horas (Início):', err.message); return null; })]) : null;
-  const pOut = can(req.user.role, 'guests.write') || can(req.user.role, 'sponsors.write') ? outreach.todayFor(req.user, require('../services/scope').idsOf(req)) : null;
+  const pOut = can(req.user, 'guests.write') || can(req.user, 'sponsors.write') ? outreach.todayFor(req.user, require('../services/scope').idsOf(req)) : null;
   // Resumo do dia: o dia vem do endereço (?dia=AAAA-MM-DD); sem ele, hoje. A produtora abre no "Seu dia" (os números dela) e vê o
   // resumo da equipe em ?visao=equipe; as outras pessoas abrem no resumo da equipe.
   const daySummary = require('../services/daySummary');
@@ -80,7 +80,7 @@ router.get('/', wrap(async (req, res) => {
   const pNow = quiet(isProducer ? myDay.now(req.user, day.today, pids) : null);
   const pGoals = quiet(require('../services/goals').progressFor(req.user.id)); // Minhas metas (Gestão > Metas), no cartão Hoje
   // faixa "Comentários nas redes" (respostas por IA) para quem cuida dos comentários; se falhar, a faixa só não aparece
-  const pCmt = can(req.user.role, 'social.comments') ? require('../services/commentStats').brief(day.day, { isToday: day.isToday })
+  const pCmt = can(req.user, 'social.comments') ? require('../services/commentStats').brief(day.day, { isToday: day.isToday })
     .catch((err) => { console.error('Comentários (Início):', err.message); return null; }) : null;
   const [upcoming, recent, mine] = await Promise.all([
     isProducer ? { rows: [] } : db.query(`SELECT id, name, topic, proposed_at, project_id FROM guests
@@ -103,7 +103,7 @@ router.get('/', wrap(async (req, res) => {
   const myGoals = await pGoals;
   // "Pautas que travaram": atrasadas ou com ajustes pedidos, no recorte de projeto da pessoa (só para quem escreve pauta)
   const pautaSvc = require('../services/pautas');
-  const pautasTravadas = visao === 'meu' && can(req.user.role, 'pautas.write')
+  const pautasTravadas = visao === 'meu' && can(req.user, 'pautas.write')
     ? await pautaSvc.stuck({ projectIds: pids }).catch((err) => { console.error('Pautas (Início):', err.message); return []; })
     : [];
   res.render('dashboard', {

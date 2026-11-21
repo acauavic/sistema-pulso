@@ -27,8 +27,8 @@ router.get('/calendario', requirePerm('calendar.read'), wrap(async (req, res) =>
   const cfg = cal.resolve(req.query, picked && picked.config, user);
   const win = cal.range(cfg.visao, cfg.data);
   const [list, { rows: people }] = await Promise.all([
-    cal.events({ user, from: win.from, to: win.to, types: cfg.tipos, owner: cfg.owner, hideDone: cfg.ocultar, pids: require('../services/scope').idsOf(req) }),
-    require('../services/team').activeUsers(),
+    cal.events({ user, from: win.from, to: win.to, types: cfg.tipos, owner: cfg.owner, hideDone: cfg.ocultar, pids: require('../services/scope').idsOf(req), finPids: require('../services/scope').financeIdsOf(req) }),
+    require('../services/team').activeUsers(req.scope.ids),
   ]);
   const byDay = {};
   for (const e of list) (byDay[e.day] = byDay[e.day] || []).push(e);
@@ -48,8 +48,8 @@ router.get('/calendario', requirePerm('calendar.read'), wrap(async (req, res) =>
     myDuties: duties(user.role), myRoleLabel: ROLES[user.role].label,
     ownerInfo: cfg.owner && cfg.owner !== user.id && ownerRole ? { name: person ? person.name : 'essa pessoa', roleLabel: ROLES[ownerRole].label, duties: duties(ownerRole) } : null,
     title: 'Calendário', cfg, win, byDay, list, views, active, people, types, modes: cal.MODES, today: cal.todayISO(),
-    href: hrefFor(cfg), viewHref: (v) => `/calendario?v=${v.key}&data=${cfg.data}`, dayLabel: cal.dayLabel, dayShort: cal.dayShort, canShare: can(user.role, 'calendar.share'),
-    deletable: active && active.kind !== 'casa' && (active.ownerId === user.id || can(user.role, 'calendar.share')) ? active : null,
+    href: hrefFor(cfg), viewHref: (v) => `/calendario?v=${v.key}&data=${cfg.data}`, dayLabel: cal.dayLabel, dayShort: cal.dayShort, canShare: can(user, 'calendar.share'),
+    deletable: active && active.kind !== 'casa' && (active.ownerId === user.id || can(user, 'calendar.share')) ? active : null,
   });
 }));
 

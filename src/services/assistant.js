@@ -11,6 +11,8 @@ const rules = require('./guestRules');
 const guide = require('./assistantGuide');
 const { audit } = require('./audit');
 const { can, ROLES } = require('../permissions');
+// Recorte do assistente: só os projetos de quem pergunta (user.pids). Sem recorte, não filtra.
+const only = (user, col) => require('./assistantLookup').only(user && user.pids, col);
 const fmt = require('../utils/format');
 const { clean, isEmail } = fmt;
 
@@ -48,7 +50,7 @@ const TOOLS = [
     async run({ dias = 30 }) {
       const { rows } = await db.query(
         `SELECT g.id, g.name, g.status, g.proposed_at, (SELECT string_agg(s.company, ', ') FROM sponsor_bookings b JOIN sponsors s ON s.id = b.sponsor_id WHERE b.guest_id = g.id) AS sponsors
-           FROM guests g WHERE g.status IN ('agendado', 'em_agendamento') AND (g.proposed_at IS NULL OR g.proposed_at BETWEEN now() - interval '1 day' AND now() + ($1 || ' days')::interval)
+           FROM guests g WHERE g.status IN ('agendado', 'em_agendamento')${only(user, 'g.project_id')} AND (g.proposed_at IS NULL OR g.proposed_at BETWEEN now() - interval '1 day' AND now() + ($1 || ' days')::interval)
           ORDER BY g.proposed_at NULLS LAST LIMIT 30`, [String(Math.min(180, Math.max(1, Number(dias) || 30)))]);
       return rows.map((g) => ({ convidado: g.name, etapa: C.STATUS_BY_KEY[g.status].label, gravacao: when(g.proposed_at) || 'data a definir', patrocinio: g.sponsors || null, link: `/convidados/${g.id}` }));
     },
@@ -61,7 +63,7 @@ const TOOLS = [
       if (numero || texto) {
         const { rows: [ep] } = await db.query(
           `SELECT e.*, g.name AS guest_name, u.name AS editor_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.editor_id
-            WHERE ($1::int IS NOT NULL AND e.number = $1) OR ($2::text IS NOT NULL AND (e.title ILIKE $2 OR g.name ILIKE $2)) ORDER BY e.number DESC NULLS LAST LIMIT 1`,
+            WHERE (($1::int IS NOT NULL AND e.number = $1) OR ($2::text IS NOT NULL AND (e.title ILIKE $2 OR g.name ILIKE $2)))${only(user, 'e.project_id')} ORDER BY e.number DESC NULLS LAST LIMIT 1`,
           [numero ? Number(numero) : null, texto ? like(texto) : null]);
         if (!ep) return { erro: 'Episódio não encontrado.' };
         const [moves, tasks, clips, material, review] = await Promise.all([
@@ -82,7 +84,7 @@ const TOOLS = [
       }
       const { rows } = await db.query(
         `SELECT e.id, e.number, e.title, e.status, u.name AS editor_name FROM episodes e LEFT JOIN users u ON u.id = e.editor_id
-          WHERE e.status <> 'publicado' ORDER BY e.number DESC NULLS LAST LIMIT 30`);
+          WHERE e.status <> 'publicado'${only(user, 'e.project_id')} ORDER BY e.number DESC NULLS LAST LIMIT 30`);
       return rows.map((e) => ({ episodio: `${epNo(e.number)} ${e.title}`, etapa: C.EPISODE_STATUSES[e.status], editor: e.editor_name || null, link: `/episodios/${e.id}` }));
     },
   },
@@ -90,7 +92,7 @@ const TOOLS = [
     perm: 'guests.read',
     decl: { name: 'convidado', description: 'Situação de um convidado pelo nome: etapa, contato, gravação, convite e o próximo passo.', parameters: { type: 'OBJECT', properties: { nome: { type: 'STRING' } }, required: ['nome'] } },
     async run({ nome }) {
-      const { rows: [g] } = await db.query('SELECT g.*, u.name AS owner_name FROM guests g LEFT JOIN users u ON u.id = g.owner_id WHERE g.name ILIKE $1 OR g.instagram ILIKE $1 ORDER BY g.updated_at DESC LIMIT 1', [like(nome)]);
+      const { rows: [g] } = await db.query(`SELECT g.*, u.name AS owner_name FROM guests g LEFT JOIN users u ON u.id = g.owner_id WHERE (g.name ILIKE $1 OR g.instagram ILIKE $1)${only(user, 'g.project_id')} ORDER BY g.updated_at DESC LIMIT 1`, [like(nome)]);
       if (!g) return { erro: 'Convidado não encontrado.' };
       const next = {
         prospect: g.invite_token ? 'Enviar o convite (e-mail ou WhatsApp).' : 'Gerar o link do convite.',
@@ -111,7 +113,7 @@ const TOOLS = [
     decl: { name: 'patrocinador', description: 'Situação de um patrocinador pelo nome: etapa, cota, formulário (pendências), entregas e gravações reservadas.', parameters: { type: 'OBJECT', properties: { nome: { type: 'STRING' } }, required: ['nome'] } },
     async run({ nome }) {
       const sp = require('./sponsors');
-      const { rows: [s] } = await db.query('SELECT * FROM sponsors WHERE company ILIKE $1 ORDER BY updated_at DESC LIMIT 1', [like(nome)]);
+      const { rows: [s] } = await db.query(`SELECT * FROM sponsors WHERE company ILIKE $1${only(user, 'project_id')} ORDER BY updated_at DESC LIMIT 1`, [like(nome)]);
       if (!s) return { erro: 'Patrocinador não encontrado.' };
       const [brief, logo, deliv, eps, books] = await Promise.all([
         sp.loadBrief(s.id), sp.hasLogoFile(s.id),
@@ -133,11 +135,11 @@ const TOOLS = [
   {
     perm: 'social.read',
     decl: { name: 'social', description: 'Resumo das redes: posts esperando aprovação, agendados, com erro, conteúdo ainda não usado e ideias esperando.', parameters: { type: 'OBJECT', properties: {} } },
-    async run() {
+    async run(_a, user) {
       const social = require('./social');
       const [pubs, clips, imgs, ideas] = await Promise.all([
         db.query("SELECT status, count(*)::int AS n FROM episode_publications WHERE status IN ('revisao','recusado','agendado','erro') GROUP BY status"),
-        social.unusedClips(), social.unusedImages(), db.query("SELECT count(*)::int AS n FROM social_ideas WHERE status = 'sugerida'"),
+        social.unusedClips(), social.unusedImages(), db.query(`SELECT count(*)::int AS n FROM social_ideas WHERE status = 'sugerida'${only(user, 'project_id')}`),
       ]);
       const by = Object.fromEntries(pubs.rows.map((r) => [r.status, r.n]));
       return {
@@ -154,13 +156,13 @@ const TOOLS = [
       const subjects = {
         convidados: { perm: 'guests.read', run: async () => {
           const [by, loss, extra] = await Promise.all([
-            db.query('SELECT status, count(*)::int AS n FROM guests GROUP BY status'),
-            db.query("SELECT loss_reason, count(*)::int AS n FROM guests WHERE status = 'perdido' GROUP BY loss_reason"),
+            db.query(`SELECT status, count(*)::int AS n FROM guests WHERE true${only(user, 'project_id')} GROUP BY status`),
+            db.query(`SELECT loss_reason, count(*)::int AS n FROM guests WHERE status = 'perdido'${only(user, 'project_id')} GROUP BY loss_reason`),
             db.query(`SELECT count(*)::int AS total,
                              count(*) FILTER (WHERE owner_id IS NULL AND status NOT IN ('perdido', 'cancelado', 'gravado'))::int AS sem_responsavel,
                              count(*) FILTER (WHERE status = 'agendado' AND proposed_at BETWEEN now() AND now() + interval '7 days')::int AS agendados_7_dias,
                              count(*) FILTER (WHERE status IN ('em_agendamento', 'agendado') AND photo_key IS NULL)::int AS sem_foto
-                        FROM guests`),
+                        FROM guests WHERE true${only(user, 'project_id')}`),
           ]);
           const n = Object.fromEntries(by.rows.map((r) => [r.status, r.n]));
           return {
@@ -172,12 +174,12 @@ const TOOLS = [
           };
         } },
         patrocinadores: { perm: 'sponsors.read', run: async () => {
-          const { rows } = await db.query('SELECT stage, count(*)::int AS n FROM sponsors GROUP BY stage');
+          const { rows } = await db.query(`SELECT stage, count(*)::int AS n FROM sponsors WHERE true${only(user, 'project_id')} GROUP BY stage`);
           const n = Object.fromEntries(rows.map((r) => [r.stage, r.n]));
           return { por_etapa: C.SPONSOR_STAGES.map((s) => ({ etapa: s.label, quantidade: n[s.key] || 0 })), link: '/patrocinadores' };
         } },
         episodios: { perm: 'episodes.read', run: async () => {
-          const { rows } = await db.query('SELECT status, count(*)::int AS n FROM episodes GROUP BY status');
+          const { rows } = await db.query(`SELECT status, count(*)::int AS n FROM episodes WHERE true${only(user, 'project_id')} GROUP BY status`);
           const n = Object.fromEntries(rows.map((r) => [r.status, r.n]));
           return { total: rows.reduce((t, r) => t + r.n, 0), por_etapa: C.EPISODE_STAGES.map((s) => ({ etapa: s.label, quantidade: n[s.key] || 0 })), link: '/episodios' };
         } },
@@ -199,14 +201,14 @@ const TOOLS = [
             `SELECT count(*) FILTER (WHERE direction = 'saida' AND status = 'previsto' AND due_on < CURRENT_DATE)::int AS a_pagar_atrasadas,
                     coalesce(sum(amount_cents) FILTER (WHERE direction = 'saida' AND status = 'previsto' AND due_on < CURRENT_DATE), 0)::bigint AS a_pagar_atrasado_cents,
                     count(*) FILTER (WHERE direction = 'entrada' AND status = 'previsto' AND due_on < CURRENT_DATE)::int AS a_receber_atrasadas
-               FROM fin_entries`);
+               FROM fin_entries e WHERE true${only(user, 'e.project_id')}`);
           return { contas_a_pagar_atrasadas: r.a_pagar_atrasadas, valor_a_pagar_atrasado: fmt.formatBRL(Number(r.a_pagar_atrasado_cents)), contas_a_receber_atrasadas: r.a_receber_atrasadas, link: '/financeiro' };
         } },
       };
       const wanted = assunto === 'tudo' ? Object.keys(subjects) : [assunto].filter((k) => subjects[k]);
       const out = {}; const noAccess = [];
       for (const k of wanted) {
-        if (!can(user.role, subjects[k].perm)) { noAccess.push(k); continue; }
+        if (!can(user, subjects[k].perm)) { noAccess.push(k); continue; }
         out[k] = await subjects[k].run();
       }
       if (noAccess.length) out.sem_acesso_para_o_seu_perfil = noAccess;
@@ -242,9 +244,9 @@ const TOOLS = [
       }
       const cap = Math.min(30, Math.max(1, Number(limite) || 20));
       const [{ rows: [{ total }] }, { rows }] = await Promise.all([
-        db.query(`SELECT count(*)::int AS total FROM guests g LEFT JOIN users u ON u.id = g.owner_id WHERE ${where.join(' AND ')}`, params),
+        db.query(`SELECT count(*)::int AS total FROM guests g LEFT JOIN users u ON u.id = g.owner_id WHERE ${where.join(' AND ')}${only(user, 'g.project_id')}`, params),
         db.query(`SELECT g.id, g.name, g.instagram, g.proposed_at, g.loss_reason, u.name AS owner_name FROM guests g LEFT JOIN users u ON u.id = g.owner_id
-                   WHERE ${where.join(' AND ')} ORDER BY g.updated_at DESC LIMIT ${cap}`, params),
+                   WHERE ${where.join(' AND ')}${only(user, 'g.project_id')} ORDER BY g.updated_at DESC LIMIT ${cap}`, params),
       ]);
       return {
         etapa: C.STATUS_BY_KEY[key].label, total, mostrando: rows.length,
@@ -288,7 +290,7 @@ const TOOLS = [
       await audit({ user, ip: 'assistente' }, 'convidado.criado', 'guest', g.id, { name, via: 'assistente' });
       return {
         criado: true, convidado: name, instagram: `@${instagram}`, perfil: C.PROFILE_BY_KEY[profile].label, etapa: 'Prospecção', responsavel: user.name,
-        proximo_passo: can(user.role, 'guests.invite') ? 'Abrir o convidado e gerar o link do convite.' : 'Pedir a alguém da Gestão ou da Produção para gerar o convite.', link: `/convidados/${g.id}`,
+        proximo_passo: can(user, 'guests.invite') ? 'Abrir o convidado e gerar o link do convite.' : 'Pedir a alguém da Gestão ou da Produção para gerar o convite.', link: `/convidados/${g.id}`,
       };
     },
   },
@@ -296,7 +298,7 @@ const TOOLS = [
   ...require('./assistantActions').TOOLS,
 ];
 
-const toolsFor = (user) => TOOLS.filter((t) => !t.perm || can(user.role, t.perm));
+const toolsFor = (user) => TOOLS.filter((t) => !t.perm || can(user, t.perm));
 
 function systemPrompt(user, page) {
   const today = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' }).format(new Date());
@@ -340,7 +342,9 @@ const removeConversation = (userId, id) => db.query('DELETE FROM assistant_conve
 // Uma pergunta. Devolve { conversation, reply, tools } ou lança erro com mensagem amigável.
 // onEvent(tipo, dado): resposta em tempo real (tela escrevendo enquanto a IA gera). Tipos: 'delta' (pedaço de texto),
 // 'reset' (o texto daquela volta era só preâmbulo de uma consulta: apaga), 'tool' (nome da consulta em andamento).
-async function ask({ user, conversationId = null, text, page = null, audio = false, onEvent = null }) {
+// `pids`: os projetos de quem pergunta (services/scope). As ferramentas leem isso em `user.pids` e só olham ali.
+async function ask({ user: quem, conversationId = null, text, page = null, audio = false, onEvent = null, pids = null }) {
+  const user = pids ? { ...quem, pids } : quem;
   const question = String(text || '').trim().slice(0, 4000);
   if (!question) throw Object.assign(new Error('Escreva ou grave a pergunta.'), { status: 400 });
   let conv = conversationId ? (await db.query('SELECT * FROM assistant_conversations WHERE id = $1 AND user_id = $2', [conversationId, user.id])).rows[0] : null;

@@ -51,7 +51,7 @@ router.get('/conteudo/pedidos/:id', requirePerm('episodes.read'), wrap(async (re
     title: r.title, r, videos: d.videos.map((v) => ({ ...v, pub: pubOf(v) })), images: d.images.map((i) => ({ ...i, pub: idx && !imagesPub ? board.stateOf(idx.byCover.get(i.id)) : imagesPub })),
     comments: thread, docs: files.filter((a) => a.kind === 'file'), people: ppl, episodeList: eps, K: R.KINDS, S: R.STATUSES, F: R.FORMATS,
     today: new Date().toISOString().slice(0, 10), storageReady: config.storageConfigured,
-    perm: { edit: canEdit(req.user, r), work: R.canWork(req.user, r), mine: R.isMine(req.user, r), review: R.canReview(req.user.role), publish: can(req.user.role, 'social.request') },
+    perm: { edit: canEdit(req.user, r), work: R.canWork(req.user, r), mine: R.isMine(req.user, r), review: R.canReview(req.user.role), publish: can(req.user, 'social.request') },
     running: d.videos.some((v) => ['enviando', 'processando'].includes(v.status)),
   });
 }));
@@ -104,7 +104,7 @@ router.post('/conteudo/pedidos/:id/excluir', requirePerm('episodes.read'), wrap(
 router.post('/conteudo/pedidos/:pid/cortes/iniciar', requirePerm('episodes.read'), wrap(async (req, res) => {
   const r = await load(req);
   if (!r) return res.status(404).json({ ok: false, error: 'Pedido não encontrado.' });
-  if (!R.canWork(req.user, r) || !can(req.user.role, 'production.edit')) return res.status(403).json({ ok: false, error: 'Só quem faz o pedido envia a entrega.' });
+  if (!R.canWork(req.user, r) || !can(req.user, 'production.edit')) return res.status(403).json({ ok: false, error: 'Só quem faz o pedido envia a entrega.' });
   const continuous = R.KINDS[r.kind].continuous;
   if (continuous && r.status === 'pedido') await R.start(r, req.user); // cortes: o primeiro corte já põe o pedido em produção
   else if (r.status !== 'producao') return res.status(409).json({ ok: false, error: r.status === 'pedido' ? 'Comece o pedido antes de enviar.' : 'O pedido não está em produção.' });

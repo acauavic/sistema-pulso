@@ -14,7 +14,7 @@ const WRITE = { guest: 'guests.write', sponsor: 'sponsors.write' };
 function parse(req, res) {
   const kind = dup.KIND_OF_SLUG[req.params.tipo];
   if (!kind || !isIntId(req.params.a) || !isIntId(req.params.b) || req.params.a === req.params.b) { res.status(404).render('error', { title: 'Não encontrado', message: 'Página não encontrada.' }); return null; }
-  if (!can(req.user.role, WRITE[kind])) { res.status(403).render('error', { title: 'Sem permissão', message: 'Você não tem permissão para isso.' }); return null; }
+  if (!can(req.user, WRITE[kind])) { res.status(403).render('error', { title: 'Sem permissão', message: 'Você não tem permissão para isso.' }); return null; }
   return { kind, a: Number(req.params.a), b: Number(req.params.b) };
 }
 const backTo = (req, fallback) => { const v = String(req.body?.voltar || req.query?.voltar || ''); return v.startsWith('/') && !v.startsWith('//') ? v : fallback; };

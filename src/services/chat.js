@@ -161,11 +161,15 @@ const unreadCount = (userId) => db.query(
   `SELECT count(*)::int AS n FROM chat_members m JOIN chat_messages x ON x.conversation_id = m.conversation_id AND x.id > m.last_read_id AND x.deleted_at IS NULL AND x.event IS NULL AND x.author_id IS DISTINCT FROM m.user_id
     WHERE m.user_id = $1 AND m.left_at IS NULL`, [userId]).then((r) => r.rows[0].n);
 
-const activeUsers = async (ids) => (await db.query('SELECT id FROM users WHERE active AND id = ANY($1::uuid[])', [ids.filter((i) => UUID_RE.test(String(i)))])).rows.map((r) => r.id);
+// Quem a pessoa pode chamar para uma conversa: ativo e, com `pids`, só quem divide um projeto com ela.
+const activeUsers = async (ids, pids = null) => (await db.query(
+  `SELECT u.id FROM users u WHERE u.active AND u.id = ANY($1::uuid[])
+    ${pids ? 'AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.user_id = u.id AND pm.project_id = ANY($2::int[]))' : ''}`,
+  pids ? [ids.filter((i) => UUID_RE.test(String(i))), pids] : [ids.filter((i) => UUID_RE.test(String(i)))])).rows.map((r) => r.id);
 
-async function openDirect(user, otherId) {
+async function openDirect(user, otherId, pids = null) {
   if (String(otherId) === String(user.id)) return fail(400, 'Escolha outra pessoa.');
-  if (!(await activeUsers([otherId])).length) return fail(404, 'Pessoa não encontrada.');
+  if (!(await activeUsers([otherId], pids)).length) return fail(404, 'Pessoa não encontrada.');
   const key = [String(user.id), String(otherId)].sort().join(':');
   const id = await tx(async (c) => {
     const { rows: [made] } = await c.query("INSERT INTO chat_conversations (kind, direct_key, created_by) VALUES ('direct', $1, $2) ON CONFLICT (direct_key) DO NOTHING RETURNING id", [key, user.id]);
@@ -178,10 +182,10 @@ async function openDirect(user, otherId) {
 
 const cleanName = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
 
-async function createGroup(user, name, memberIds) {
+async function createGroup(user, name, memberIds, pids = null) {
   const title = cleanName(name);
   if (!title) return fail(400, 'Dê um nome ao grupo.');
-  const others = (await activeUsers([].concat(memberIds || []))).filter((id) => String(id) !== String(user.id));
+  const others = (await activeUsers([].concat(memberIds || []), pids)).filter((id) => String(id) !== String(user.id));
   if (!others.length) return fail(400, 'Escolha pelo menos uma pessoa.');
   const id = await tx(async (c) => {
     const { rows: [g] } = await c.query("INSERT INTO chat_conversations (kind, name, created_by) VALUES ('group', $1, $2) RETURNING id", [title, user.id]);
@@ -235,8 +239,8 @@ const renameGroup = (conversationId, user, name) => manage(conversationId, user,
   return { event: 'renomeou', text: `${nameOf(user)} mudou o nome do grupo para ${title}`, name: title };
 });
 
-const addMembers = (conversationId, user, ids) => manage(conversationId, user, async (c, g) => {
-  const people = await activeUsers([].concat(ids || []));
+const addMembers = (conversationId, user, ids, pids = null) => manage(conversationId, user, async (c, g) => {
+  const people = await activeUsers([].concat(ids || []), pids);
   if (!people.length) return fail(400, 'Escolha pelo menos uma pessoa.');
   // quem entra vê o histórico, mas ele não conta como "não lido"
   const upto = num(g.last_message_id) || 0;

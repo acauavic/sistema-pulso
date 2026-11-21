@@ -232,7 +232,7 @@ router.get('/financeiro/estoque', requirePerm('stock.read'), wrap(async (req, re
   res.render('finance/stock', {
     title: 'Estoque', items: showItems, archived: items.filter((i) => !i.active).length, showArchived: req.query.arquivados === '1',
     settings: await fin.settings(), fin, C, money, finProjects: pickProjects(req),
-    counts: can(req.user.role, 'finance.read') ? await fin.counts({ pids: pidsOf(req) }) : null,
+    counts: can(req.user, 'finance.read') ? await fin.counts({ pids: pidsOf(req) }) : null,
   });
 }));
 

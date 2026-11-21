@@ -67,7 +67,7 @@ const TOOLS = [
     perm: 'tasks.write',
     decl: { name: 'atualizar_tarefa', description: 'Muda uma tarefa existente: status (a_fazer, fazendo, feito, bloqueada com motivo), título, prazo (vencimento AAAA-MM-DD ou "limpar"), hora (HH:MM) e responsável (nome). tarefa: o título ou o id (veja "tarefas"). Só quem criou, o responsável ou a gestão/produção mexem. Use quando a pessoa pedir ("conclua", "passe para...", "mude o prazo").', parameters: { type: 'OBJECT', properties: { tarefa: { type: 'STRING' }, status: { type: 'STRING', enum: ['a_fazer', 'fazendo', 'feito', 'bloqueada'] }, motivo_bloqueio: { type: 'STRING' }, titulo_novo: { type: 'STRING' }, vencimento: { type: 'STRING' }, hora: { type: 'STRING' }, responsavel: { type: 'STRING' } }, required: ['tarefa'] } },
     async run(a, user) {
-      const found = await lookup.task(a.tarefa); if (found.erro) return found;
+      const found = await lookup.task(a.tarefa, user.pids); if (found.erro) return found;
       const task = await tasksSvc.get(found.row.id);
       if (!tasksSvc.canEdit(user, task)) return { erro: 'Só quem criou, o responsável ou a gestão/produção mexem nesta tarefa.' };
       const body = {};
@@ -107,7 +107,7 @@ const TOOLS = [
     async run(a, user) {
       const outreach = require('./outreach');
       const kind = a.tipo === 'patrocinador' ? 'sponsor' : 'guest';
-      if (!can(user.role, kind === 'guest' ? 'guests.write' : 'sponsors.write')) return DENIED(`registra abordagens de ${a.tipo === 'patrocinador' ? 'patrocinadores' : 'convidados'}`);
+      if (!can(user, kind === 'guest' ? 'guests.write' : 'sponsors.write')) return DENIED(`registra abordagens de ${a.tipo === 'patrocinador' ? 'patrocinadores' : 'convidados'}`);
       const r = await (kind === 'guest' ? lookup.guest : lookup.sponsor)(a.nome); if (r.erro) return r;
       const stage = outreach.KINDS[kind].stage;
       const current = kind === 'guest' ? r.row.status : r.row.stage;
@@ -142,7 +142,7 @@ const TOOLS = [
     perm: 'guests.write',
     decl: { name: 'mudar_etapa_convidado', description: 'Muda a etapa de um convidado no CRM, com as mesmas regras do painel (foto, contato, data e confirmações, motivo da perda). Etapas: prospect, convite_enviado, em_agendamento, agendado, gravado, perdido, cancelado. Para "perdido" informe motivo_perda (Recusado, Sem agenda próxima, Nunca respondeu, Parou de responder, Conflito de interesse ou Outros com descrição). Se faltar algo que o assistente não consegue preencher (foto, data da gravação), a ferramenta diz o que falta e o link. SEMPRE mostre o resumo e peça confirmação antes (confirmado=true só depois do sim).', parameters: { type: 'OBJECT', properties: { nome: { type: 'STRING' }, etapa: { type: 'STRING' }, motivo_perda: { type: 'STRING' }, descricao_da_perda: { type: 'STRING' }, confirmado: { type: 'BOOLEAN' } }, required: ['nome', 'etapa'] } },
     async run(a, user) {
-      const r = await lookup.guest(a.nome); if (r.erro) return r;
+      const r = await lookup.guest(a.nome, user.pids); if (r.erro) return r;
       const g = r.row;
       const target = rules.normalizeStatus(a.etapa);
       if (!target) return { erro: `Etapa desconhecida. Use: ${C.GUEST_STATUSES.map((s) => s.label).join(', ')}.` };
@@ -169,7 +169,7 @@ const TOOLS = [
     decl: { name: 'avancar_episodio', description: 'Move um episódio para outra etapa da produção quando o perfil de quem pede pode e nada falta (liberar para edição, assumir edição, enviar para revisão, aprovar, pedir ajustes, finalizar, publicar). episodio: número ou título. para: a etapa de destino (use as de "episodios" > proximos_passos). SEMPRE mostre o resumo e peça confirmação antes (confirmado=true só depois do sim).', parameters: { type: 'OBJECT', properties: { episodio: { type: 'STRING' }, para: { type: 'STRING' }, confirmado: { type: 'BOOLEAN' } }, required: ['episodio', 'para'] } },
     async run({ episodio, para, confirmado }, user) {
       const prod = require('./production');
-      const r = await lookup.episode(episodio); if (r.erro) return r;
+      const r = await lookup.episode(episodio, user.pids); if (r.erro) return r;
       const ep = r.row;
       const wanted = lookup.norm(para);
       const stage = C.EPISODE_STAGES.find((s) => lookup.norm(s.key) === wanted || lookup.norm(s.label) === wanted);
@@ -193,7 +193,7 @@ const TOOLS = [
       const audience = require('./audience');
       const name = fmt.clean(a.nome, 120); if (!name) return { erro: 'Informe o nome da pessoa.' };
       const phone = audience.validatePhone(String(a.pais || 'BR').toUpperCase(), a.whatsapp); if (phone.error) return { erro: phone.error };
-      const g = await lookup.guest(a.convidado); if (g.erro) return g;
+      const g = await lookup.guest(a.convidado, user.pids); if (g.erro) return g;
       if (g.row.status !== 'agendado' || !g.row.proposed_at) return { erro: `${g.row.name} não está Agendado com data: só dá para adicionar pessoas a gravações agendadas.` };
       const selected = a.situacao === 'selecionado';
       const cents = a.isento ? 0 : brlToCents(a.valor);

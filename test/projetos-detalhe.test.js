@@ -35,7 +35,8 @@ describe('projetos: páginas de detalhe', () => {
     for (const url of urls[1]) { const r = await paula.get(url); assert.equal(r.status, 200, url); assert.doesNotMatch(r.text, /project-tag/, url); }
     for (const url of urls[2]) {
       const r = await paula.get(url);
-      assert.equal(r.status, 404, url); assert.match(r.text, /Página não encontrada/); assert.doesNotMatch(r.text, / 2<\/|Convidada 2|Marca 2|Episodio 2/, url);
+      // 404 com a frase do manipulador de erros ("Página não encontrada") ou a da rota ("Episódio não encontrado"): o item é como se não existisse
+      assert.equal(r.status, 404, url); assert.match(r.text, /não encontrad[ao]/i, url); assert.doesNotMatch(r.text, / 2<\/|Convidada 2|Marca 2|Episodio 2/, url);
     }
   });
 

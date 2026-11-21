@@ -56,30 +56,55 @@ router.get('/usuarios', requirePerm('users.read'), wrap(async (req, res) => {
 }));
 
 // ---- criar ----
-router.get('/usuarios/novo', requirePerm('users.write'), (req, res) => {
-  res.render('users/form', { title: 'Novo usuário', target: null, values: { role: 'produtora' }, roles: assignableRoles(req.user.role), error: null });
-});
+// Onde a pessoa trabalha e se vê o dinheiro de cada lugar: a tela mostra uma linha por projeto.
+const projectsSvc = require('../services/projects');
+const projectRows = async (userId) => {
+  await projectsSvc.refresh();
+  const mine = userId ? await projectsSvc.membershipsOf(userId) : [];
+  const by = new Map(mine.map((m) => [Number(m.project_id), m]));
+  return projectsSvc.all().map((p) => ({ id: p.id, name: p.name, member: by.has(p.id), finance: Boolean(by.get(p.id) && by.get(p.id).finance) }));
+};
+// O que a tela mandou: projeto[] marcados e financeiro[] marcados. Sem o campo `acesso`, a tela não mexeu nisso
+// (os projetos de hoje ficam como estão). Projeto novo nasce com o padrão marcado.
+const projectsFromBody = (body, fallbackId) => {
+  if (!body.acesso) return null;
+  const ids = [].concat(body.projetos || []).map(Number).filter(Boolean);
+  const fin = new Set([].concat(body.financeiro || []).map(Number));
+  const list = ids.length ? ids : (fallbackId ? [fallbackId] : []);
+  return list.map((id) => ({ id, finance: fin.has(id) }));
+};
+
+router.get('/usuarios/novo', requirePerm('users.write'), wrap(async (req, res) => {
+  res.render('users/form', {
+    title: 'Novo usuário', target: null, values: { role: 'produtora', house: true }, roles: assignableRoles(req.user.role), error: null,
+    projectRows: await projectRows(null), isSelf: false,
+  });
+}));
 
 router.post('/usuarios', requirePerm('users.write'), wrap(async (req, res) => {
-  const values = { name: clean(req.body.name, 120), email: clean(req.body.email, 254).toLowerCase(), role: req.body.role };
+  const values = {
+    name: clean(req.body.name, 120), email: clean(req.body.email, 254).toLowerCase(), role: req.body.role,
+    house: req.body.house === '1' || req.body.role === 'superadmin', // o superadmin é sempre da casa
+  };
   const roles = assignableRoles(req.user.role);
+  const chosen = projectsFromBody(req.body, projectsSvc.defaultId()) || [{ id: projectsSvc.defaultId(), finance: true }];
   const error =
     values.name.length < 2 ? 'Informe o nome.'
       : !isEmail(values.email) ? 'E-mail inválido.'
         : !roles.includes(values.role) ? 'Perfil inválido para o seu nível de acesso.'
           : null;
-  if (error) return res.status(400).render('users/form', { title: 'Novo usuário', target: null, values, roles, error });
+  if (error) return res.status(400).render('users/form', { title: 'Novo usuário', target: null, values, roles, error, projectRows: await projectRows(null), isSelf: false });
 
   let user;
   try {
     ({ rows: [user] } = await db.query(
-      'INSERT INTO users (name, email, role) VALUES ($1, $2, $3) RETURNING *', [values.name, values.email, values.role]));
+      'INSERT INTO users (name, email, role, house) VALUES ($1, $2, $3, $4) RETURNING *', [values.name, values.email, values.role, values.house]));
   } catch (err) {
-    if (err.code === PG_UNIQUE) return res.status(409).render('users/form', { title: 'Novo usuário', target: null, values, roles, error: 'Já existe um usuário com este e-mail.' });
+    if (err.code === PG_UNIQUE) return res.status(409).render('users/form', { title: 'Novo usuário', target: null, values, roles, error: 'Já existe um usuário com este e-mail.', projectRows: await projectRows(null), isSelf: false });
     throw err;
   }
-  const projects = require('../services/projects');
-  await projects.addMember(user.id, projects.defaultId(), { finance: true }); // entra no projeto padrão; Gestão > Projetos marca os outros
+  const set = await projectsSvc.setUserProjects(user.id, chosen); // onde ela trabalha e onde vê o dinheiro
+  if (set.error) await projectsSvc.addMember(user.id, projectsSvc.defaultId(), { finance: true });
   await audit(req, 'usuario.criado', 'user', user.id, { email: user.email, role: user.role });
   try {
     await sendAccessLink(user, req.user.name);
@@ -96,7 +121,10 @@ router.get('/usuarios/:id/editar', requirePerm('users.write'), wrap(async (req, 
   const target = await findUser(req.params.id);
   if (!target) return notFound(res);
   if (!canManageUser(req.user.role, target.role)) return forbidden(res);
-  return res.render('users/form', { title: `Editar ${target.name}`, target, values: target, roles: assignableRoles(req.user.role), error: null, isSelf: target.id === req.user.id });
+  return res.render('users/form', {
+    title: `Editar ${target.name}`, target, values: target, roles: assignableRoles(req.user.role), error: null,
+    isSelf: target.id === req.user.id, projectRows: await projectRows(target.id),
+  });
 }));
 
 router.post('/usuarios/:id', requirePerm('users.write'), wrap(async (req, res) => {
@@ -110,10 +138,16 @@ router.post('/usuarios/:id', requirePerm('users.write'), wrap(async (req, res) =
     name: clean(req.body.name, 120),
     email: clean(req.body.email, 254).toLowerCase(),
     role: isSelf ? target.role : req.body.role, // ninguém muda o próprio perfil
+    // equipe da casa: ninguém muda a sua (não dá para se trancar fora), e o superadmin é sempre da casa
+    house: isSelf || !req.body.acesso ? target.house : (req.body.house === '1' || req.body.role === 'superadmin'),
   };
-  const rerender = (status, error) => res.status(status).render('users/form', { title: `Editar ${target.name}`, target, values: { ...target, ...values }, roles, error, isSelf });
+  const chosen = projectsFromBody(req.body, null); // null = a tela não mandou a parte de acesso
+  const rerender = async (status, error) => res.status(status).render('users/form', {
+    title: `Editar ${target.name}`, target, values: { ...target, ...values }, roles, error, isSelf, projectRows: await projectRows(target.id),
+  });
 
   if (values.name.length < 2) return rerender(400, 'Informe o nome.');
+  if (chosen && !chosen.length) return rerender(400, 'Marque pelo menos um projeto: toda pessoa trabalha em algum.');
   if (!isEmail(values.email)) return rerender(400, 'E-mail inválido.');
   if (!isSelf && !roles.includes(values.role)) return rerender(400, 'Perfil inválido para o seu nível de acesso.');
   // trocar o e-mail de quem já tem senha e depois "Enviar nova senha" daria a conta da pessoa a quem trocou: só o superadmin pode
@@ -125,17 +159,22 @@ router.post('/usuarios/:id', requirePerm('users.write'), wrap(async (req, res) =
     return rerender(400, 'Este é o único superadmin ativo. Promova outra pessoa antes de rebaixá-lo.');
   }
 
+  if (chosen) {
+    const set = await projectsSvc.setUserProjects(target.id, chosen);
+    if (set.error) return rerender(400, set.error);
+  }
   try {
-    await db.query('UPDATE users SET name = $2, email = $3, role = $4, updated_at = now() WHERE id = $1',
-      [target.id, values.name, values.email, values.role]);
+    await db.query('UPDATE users SET name = $2, email = $3, role = $4, house = $5, updated_at = now() WHERE id = $1',
+      [target.id, values.name, values.email, values.role, values.house]);
   } catch (err) {
     if (err.code === PG_UNIQUE) return rerender(409, 'Já existe um usuário com este e-mail.');
     throw err;
   }
-  if (values.role !== target.role || emailChanged) await sessions.destroyUserSessions(target.id); // força novo login
+  if (values.role !== target.role || values.house !== target.house || emailChanged) await sessions.destroyUserSessions(target.id); // força novo login
   if (emailChanged) await revokeAuthTokens(target.id); // convite/redefinição que já foi para o e-mail antigo deixa de valer
   await audit(req, 'usuario.editado', 'user', target.id, {
-    de: { email: target.email, role: target.role }, para: { email: values.email, role: values.role },
+    de: { email: target.email, role: target.role, casa: target.house }, para: { email: values.email, role: values.role, casa: values.house },
+    projetos: chosen ? chosen.map((c) => `${c.id}${c.finance ? ' (financeiro)' : ''}`).join(', ') : undefined,
   });
   await req.flash('ok', 'Usuário atualizado.');
   return res.redirect('/usuarios');

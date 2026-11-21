@@ -8,7 +8,7 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const like = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
 const prefixOf = (projectId) => (require('./projects').get(projectId) || {}).number_prefix || 'EP.'; // EP.012 no Pulso, V.003 no Projeto 100
 const pad3 = (n, projectId) => (n ? `${prefixOf(projectId)}${String(n).padStart(3, '0')}` : '');
-const allowed = (user, perm) => !perm || [].concat(perm).some((p) => can(user.role, p));
+const allowed = (user, perm) => !perm || [].concat(perm).some((p) => can(user, p));
 
 // ---------------------------------------------------------------- atalhos de ação (o sistema cresce: adicione aqui ou pela Gestão > Busca)
 const ACTIONS = [
@@ -128,8 +128,9 @@ const PROVIDERS = [
     const { ENTITIES, canSee } = require('./comments');
     return rows.filter((r) => canSee(user.role, r.entity_type)).slice(0, 5).map((r) => ({ title: r.body.length > 80 ? `${r.body.slice(0, 77)}…` : r.body, sub: `${r.author || '—'} · ${ENTITIES[r.entity_type].label}`, url: ENTITIES[r.entity_type].url(r.entity_id) }));
   } },
-  { key: 'finance', label: 'Financeiro', tables: ['fin_entries'], perm: 'finance.read', async search(q) {
-    const rows = await find('fin_entries e', ['e.description', 'e.supplier'], q, 'e.id, e.description, e.direction, e.status, e.amount_cents, coalesce(e.paid_on, e.due_on) AS day', 'e.due_on DESC', 5);
+  { key: 'finance', label: 'Financeiro', tables: ['fin_entries'], perm: 'finance.read', async search(q, user, pids) {
+    const own = pids ? ` AND ${require('./finOwner').where('e', `'{${(pids || []).map(Number).filter(Number.isInteger).join(',')}}'::int[]`)}` : '';
+    const rows = await find('fin_entries e', ['e.description', 'e.supplier'], q, 'e.id, e.description, e.direction, e.status, e.amount_cents, coalesce(e.paid_on, e.due_on) AS day', 'e.due_on DESC', 5, own);
     const brl = (c) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(c) / 100);
     return rows.map((r) => {
       const open = r.status === 'previsto'; const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(r.day).slice(0, 7);
@@ -245,12 +246,13 @@ async function suggestions(app) {
 // Itens que dá para citar com # numa mensagem (link clicável): os mesmos provedores da busca, só os que têm página própria,
 // respeitando o que a pessoa pode ver. data-ref = o tipo (ver richText.REF_PATHS).
 const REFS = { episodes: ['episodio', 'Episódio'], clips: ['corte', 'Corte'], guests: ['convidado', 'Convidado'], sponsors: ['patrocinador', 'Patrocinador'], publications: ['publicacao', 'Publicação'], tasks: ['tarefa', 'Tarefa'] };
-async function references(q, user) {
+// `pids`: o recorte de quem escreve a menção (ela só cita o que alcança).
+async function references(q, user, pids = null) {
   const query = String(q || '').trim().slice(0, 60);
   if (!query) return [];
   const { isRef } = require('./richText');
   const lists = await Promise.all(PROVIDERS.filter((p) => REFS[p.key] && allowed(user, p.perm)).map(async (p) => {
-    try { return (await p.search(query, user)).slice(0, 4).map((r) => ({ kind: REFS[p.key][0], label: REFS[p.key][1], title: r.title, sub: r.sub, url: r.url })); } catch { return []; }
+    try { return (await p.search(query, user, pids)).slice(0, 4).map((r) => ({ kind: REFS[p.key][0], label: REFS[p.key][1], title: r.title, sub: r.sub, url: r.url })); } catch { return []; }
   }));
   return lists.flat().filter((r) => isRef(r.kind, r.url)).slice(0, 12);
 }

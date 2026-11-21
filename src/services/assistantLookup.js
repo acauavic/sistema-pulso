@@ -3,6 +3,13 @@
 const db = require('../db/pool');
 
 const like = (s) => `%${String(s || '').replace(/[\\%_]/g, '\\$&').trim().slice(0, 80)}%`;
+// Recorte do assistente: trecho SQL com os ids do projeto (inteiros conferidos aqui, para não renumerar os $N).
+// Sem recorte (null), não filtra — é o que a rotina usa.
+const only = (pids, col) => {
+  if (!pids) return '';
+  const ids = pids.map(Number).filter(Number.isInteger);
+  return ` AND ${col} = ANY('{${ids.join(',')}}'::int[])`;
+};
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
 // Entre as candidatas, uma só vale: igualdade exata (sem acento) ou candidata única.
@@ -21,40 +28,41 @@ async function user(ref) {
   return pick(rows, term, 'Pessoa da equipe', (r) => r.name);
 }
 
-async function guest(ref) {
+async function guest(ref, pids = null) {
   const term = String(ref || '').trim();
   if (!term) return { erro: 'Diga o nome do convidado.' };
-  if (/^\d+$/.test(term)) { const { rows: [g] } = await db.query('SELECT * FROM guests WHERE id = $1', [term]); if (g) return { row: g }; }
-  const { rows } = await db.query('SELECT * FROM guests WHERE name ILIKE $1 OR instagram ILIKE $1 ORDER BY updated_at DESC LIMIT 8', [like(term)]);
+  if (/^\d+$/.test(term)) { const { rows: [g] } = await db.query(`SELECT * FROM guests WHERE id = $1${only(pids, 'project_id')}`, [term]); if (g) return { row: g }; }
+  const { rows } = await db.query(`SELECT * FROM guests WHERE (name ILIKE $1 OR instagram ILIKE $1)${only(pids, 'project_id')} ORDER BY updated_at DESC LIMIT 8`, [like(term)]);
   return pick(rows, term, 'Convidado', (r) => r.name);
 }
 
-async function sponsor(ref) {
+async function sponsor(ref, pids = null) {
   const term = String(ref || '').trim();
   if (!term) return { erro: 'Diga o nome do patrocinador.' };
-  const { rows } = await db.query('SELECT * FROM sponsors WHERE company ILIKE $1 ORDER BY updated_at DESC LIMIT 8', [like(term)]);
+  const { rows } = await db.query(`SELECT * FROM sponsors WHERE company ILIKE $1${only(pids, 'project_id')} ORDER BY updated_at DESC LIMIT 8`, [like(term)]);
   return pick(rows, term, 'Patrocinador', (r) => r.company);
 }
 
 // "12", "EP.012", "episódio 12" ou parte do título/nome do convidado.
-async function episode(ref) {
+async function episode(ref, pids = null) {
   const term = String(ref || '').trim();
   if (!term) return { erro: 'Diga o número ou o título do episódio.' };
   const num = term.match(/^(?:ep\.?\s*|epis[óo]dio\s*)?0*(\d{1,4})$/i);
-  if (num) { const { rows: [e] } = await db.query('SELECT e.*, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.number = $1', [Number(num[1])]); if (e) return { row: e }; }
+  if (num) { const { rows: [e] } = await db.query(`SELECT e.*, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.number = $1${only(pids, 'e.project_id')}`, [Number(num[1])]); if (e) return { row: e }; }
   const { rows } = await db.query(
-    'SELECT e.*, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.title ILIKE $1 OR g.name ILIKE $1 ORDER BY e.number DESC NULLS LAST LIMIT 8', [like(term)]);
+    `SELECT e.*, g.name AS guest_name FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE (e.title ILIKE $1 OR g.name ILIKE $1)${only(pids, 'e.project_id')} ORDER BY e.number DESC NULLS LAST LIMIT 8`, [like(term)]);
   return pick(rows, term, 'Episódio', (r) => `${r.number ? `EP.${String(r.number).padStart(3, '0')} ` : ''}${r.title}`);
 }
 
 // Tarefa por id ou por título. Prefere as abertas; entre várias abertas com o mesmo nome, pergunta.
-async function task(ref) {
+async function task(ref, pids = null) {
   const term = String(ref || '').trim();
   if (!term) return { erro: 'Diga qual tarefa (o título ou o id).' };
-  if (/^\d+$/.test(term)) { const { rows: [t] } = await db.query('SELECT * FROM tasks WHERE id = $1', [term]); if (t) return { row: t }; }
-  const { rows } = await db.query("SELECT * FROM tasks WHERE title ILIKE $1 ORDER BY (status = 'feito'), updated_at DESC LIMIT 8", [like(term)]);
+  const geral = pids ? ` AND (project_id IS NULL${only(pids, 'project_id').replace(' AND ', ' OR ')})` : ''; // tarefa geral abre para todos
+  if (/^\d+$/.test(term)) { const { rows: [t] } = await db.query(`SELECT * FROM tasks WHERE id = $1${geral}`, [term]); if (t) return { row: t }; }
+  const { rows } = await db.query(`SELECT * FROM tasks WHERE title ILIKE $1${geral} ORDER BY (status = 'feito'), updated_at DESC LIMIT 8`, [like(term)]);
   const open = rows.filter((r) => r.status !== 'feito');
   return pick(open.length ? open : rows, term, 'Tarefa', (r) => r.title);
 }
 
-module.exports = { like, norm, user, guest, sponsor, episode, task };
+module.exports = { like, norm, only, user, guest, sponsor, episode, task };

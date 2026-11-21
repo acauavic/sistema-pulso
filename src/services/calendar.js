@@ -27,7 +27,7 @@ const TYPES = [
 const TYPE_BY_KEY = Object.fromEntries(TYPES.map((t) => [t.key, t]));
 const MODES = { mes: 'Mês', semana: 'Semana', lista: 'Lista' };
 
-const allowedTypes = (user) => TYPES.filter((t) => can(user.role, t.perm));
+const allowedTypes = (user) => TYPES.filter((t) => can(user, t.perm));
 
 // O que é do PERFIL (não de uma pessoa): entra em "só os meus" de quem tem o perfil, mesmo sem responsável cadastrado.
 // Gravar, pagar e receber são da gestão e do superadmin; lembretes da gravação e cobranças da plateia, da produtora.
@@ -88,7 +88,7 @@ const POST_STATUS = { revisao: 'em revisão', recusado: 'devolvido', simulado: '
 // Cada fonte devolve eventos { type, id, title, sub, day, time, url, done, late, tentative, who, whoId, amount }.
 
 // Recorte por projeto: trecho SQL com os ids (inteiros conferidos aqui). Sem ids, não filtra.
-// Contas a pagar e a receber ainda não têm projeto (fin_entries só ganha o dono na fase do dinheiro).
+// Contas a pagar e a receber seguem o recorte do dinheiro (`finPids`): o compartilhado aparece para quem vê qualquer uma das partes.
 const inProject = (ids, col) => {
   const list = (ids || []).map(Number).filter(Number.isInteger);
   return ids ? ` AND ${col} = ANY('{${list.join(',')}}'::int[])` : '';
@@ -190,12 +190,15 @@ const SOURCES = {
     }));
   },
 
-  async financeiro({ from, to }, today, kinds) {
+  async financeiro({ from, to, finPids }, today, kinds) {
     const dirs = [kinds.has('receber') && 'entrada', kinds.has('pagar') && 'saida'].filter(Boolean);
     if (!dirs.length) return [];
+    const ids = (finPids || []).map(Number).filter(Number.isInteger);
+    if (finPids && !ids.length) return []; // não vê o dinheiro de projeto nenhum
+    const own = finPids ? ` AND ${require('./finOwner').where('e', `'{${ids.join(',')}}'::int[]`)}` : '';
     const { rows } = await db.query(
-      `SELECT id, direction, description, amount_cents, status, to_char(due_on, 'YYYY-MM-DD') AS day FROM fin_entries
-        WHERE status <> 'cancelado' AND direction = ANY($3) AND due_on BETWEEN $1::date AND $2::date ORDER BY due_on, id LIMIT ${MAX_PER_TYPE}`, [from, to, dirs]);
+      `SELECT e.id, e.direction, e.description, e.amount_cents, e.status, to_char(e.due_on, 'YYYY-MM-DD') AS day FROM fin_entries e
+        WHERE e.status <> 'cancelado' AND e.direction = ANY($3) AND e.due_on BETWEEN $1::date AND $2::date${own} ORDER BY e.due_on, e.id LIMIT ${MAX_PER_TYPE}`, [from, to, dirs]);
     return rows.map((e) => {
       const incoming = e.direction === 'entrada';
       return {
@@ -237,7 +240,7 @@ const SOURCES = {
 // a gestão responde por todas as gravações, contas a pagar e a receber; a produtora, por todos os lembretes e cobranças.
 // hideDone: tira o que já foi feito.
 // pids: o recorte de projeto de quem está olhando (services/scope).
-async function events({ user, from, to, types, owner = null, hideDone = false, pids = null }) {
+async function events({ user, from, to, types, owner = null, hideDone = false, pids = null, finPids = null }) {
   const allowed = new Set(allowedTypes(user).map((t) => t.key));
   let wanted = new Set(types.filter((k) => allowed.has(k)));
   const ownerFor = {}; // tipo -> id para filtrar (ausente = sem filtro de pessoa)
@@ -251,7 +254,7 @@ async function events({ user, from, to, types, owner = null, hideDone = false, p
   const today = todayISO();
   const jobs = [];
   for (const k of ['tarefa', 'gravacao', 'lembrete', 'episodio', 'post', 'patrocinio', 'reuniao', 'cobranca']) if (wanted.has(k)) jobs.push(SOURCES[k]({ from, to, owner: ownerFor[k] || null, pids }, today));
-  if (wanted.has('receber') || wanted.has('pagar')) jobs.push(SOURCES.financeiro({ from, to }, today, wanted));
+  if (wanted.has('receber') || wanted.has('pagar')) jobs.push(SOURCES.financeiro({ from, to, finPids }, today, wanted));
   let list = (await Promise.all(jobs)).flat();
   if (wanted.has('cobranca')) { // a conta da plateia aparece uma vez só: como cobrança
     const charged = new Set(list.filter((e) => e.type === 'cobranca').map((e) => e.entryId));
@@ -289,7 +292,7 @@ const sameConfig = (a, b) => a.visao === b.visao && a.resp === b.resp && a.ocult
 async function views(user) {
   const out = [];
   for (const b of BUILTIN) {
-    if (b.perm && !can(user.role, b.perm)) continue; // "Dinheiro" não aparece para quem não enxerga o financeiro
+    if (b.perm && !can(user, b.perm)) continue; // "Dinheiro" não aparece para quem não enxerga o financeiro
     const config = cleanConfig(b.config, user);
     if (config.tipos.length) out.push({ key: b.key, name: b.name, hint: b.hint, config, kind: 'casa' });
   }
@@ -320,7 +323,7 @@ async function saveView({ user, name, config, shared }) {
   const title = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
   if (!title) return { error: 'Dê um nome para a visualização.' };
   if (!clean.tipos.length) return { error: 'Escolha pelo menos um tipo para salvar.' };
-  const share = Boolean(shared) && can(user.role, 'calendar.share');
+  const share = Boolean(shared) && can(user, 'calendar.share');
   const { rows: [v] } = await db.query(
     `INSERT INTO calendar_views (user_id, name, config, shared) VALUES ($1, $2, $3, $4)
      ON CONFLICT (user_id, name) DO UPDATE SET config = EXCLUDED.config, shared = EXCLUDED.shared RETURNING id, (xmax <> 0) AS updated`,
@@ -331,7 +334,7 @@ async function saveView({ user, name, config, shared }) {
 async function deleteView({ user, id }) {
   const { rows: [v] } = await db.query('SELECT user_id FROM calendar_views WHERE id = $1', [id]);
   if (!v) return { error: 'Visualização não encontrada.', status: 404 };
-  if (v.user_id !== user.id && !can(user.role, 'calendar.share')) return { error: 'Só quem criou a visualização (ou a gestão) apaga.', status: 403 };
+  if (v.user_id !== user.id && !can(user, 'calendar.share')) return { error: 'Só quem criou a visualização (ou a gestão) apaga.', status: 403 };
   await db.query('DELETE FROM calendar_views WHERE id = $1', [id]);
   return { ok: true };
 }

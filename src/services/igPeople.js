@@ -60,7 +60,7 @@ async function guestOf(episodeId) {
 }
 
 // Alternativas da busca: convidado do episódio primeiro, depois convidados e perfis já usados em collab/marcação.
-async function suggest({ q = '', episodeId = null, limit = 12 } = {}) {
+async function suggest({ q = '', episodeId = null, limit = 12, pids = null } = {}) {
   const term = String(q || '').trim().toLowerCase().replace(/^@/, '').slice(0, 60);
   const out = new Map();
   const push = (s) => { if (s && s.handle && !out.has(s.handle)) out.set(s.handle, s); };
@@ -69,8 +69,8 @@ async function suggest({ q = '', episodeId = null, limit = 12 } = {}) {
   const like = `%${term}%`;
   const { rows: guests } = await db.query(
     `SELECT name, instagram FROM guests WHERE instagram IS NOT NULL AND instagram <> ''
-       AND ($1 = '' OR lower(instagram) LIKE $2 OR lower(name) LIKE $2)
-     ORDER BY (lower(instagram) LIKE $3) DESC, updated_at DESC NULLS LAST LIMIT 40`, [term, like, `${term}%`]);
+       AND ($1 = '' OR lower(instagram) LIKE $2 OR lower(name) LIKE $2)${pids ? ' AND project_id = ANY($4::int[])' : ''}
+     ORDER BY (lower(instagram) LIKE $3) DESC, updated_at DESC NULLS LAST LIMIT 40`, pids ? [term, like, `${term}%`, pids] : [term, like, `${term}%`]);
   for (const g of guests) push({ handle: clean(g.instagram), name: g.name, kind: 'convidado' });
   const { rows: used } = await db.query(
     `SELECT DISTINCT h FROM (

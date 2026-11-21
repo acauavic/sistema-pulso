@@ -20,7 +20,7 @@ const TOOLS = [
       if (!topics.length) return { erro: 'Não tenho um guia para esse assunto.', assuntos_que_conheco: knowledge.index() };
       return topics.map((t) => ({
         assunto: t.title, onde: t.where, passos: t.steps,
-        ...(t.perm ? { quem_faz: roleNames(t.perm), seu_perfil_faz: can(user.role, t.perm) } : {}),
+        ...(t.perm ? { quem_faz: roleNames(t.perm), seu_perfil_faz: can(user, t.perm) } : {}),
       }));
     },
   },
@@ -29,13 +29,13 @@ const TOOLS = [
     decl: { name: 'follow_ups', description: 'Cadência de follow-up: convidados em "Convite enviado" e patrocinadores em "Prospecção" que precisam de abordagem hoje, atrasados ou com possível perda por falta de resposta, e a meta diária. quem: "meus" (padrão: os da pessoa e os sem responsável) ou "todos" (só a gestão).', parameters: { type: 'OBJECT', properties: { quem: { type: 'STRING', enum: ['meus', 'todos'] } } } },
     async run({ quem = 'meus' }, user) {
       const outreach = require('./outreach');
-      const canGuests = can(user.role, 'guests.read'); const canSponsors = can(user.role, 'sponsors.read');
+      const canGuests = can(user, 'guests.read'); const canSponsors = can(user, 'sponsors.read');
       if (!canGuests && !canSponsors) return { erro: 'O seu perfil não vê convidados nem patrocinadores.' };
       const STATE = { hoje: 'hoje', atrasado: 'atrasado', possivel_perdido: 'possível perdido (sem resposta)' };
       const shape = (x) => ({ tipo: x.kind === 'guest' ? 'convidado' : 'patrocinador', nome: x.name, situacao: STATE[x.state] || x.state, responsavel: x.owner_name || 'sem responsável', link: `${x.kind === 'guest' ? '/convidados' : '/patrocinadores'}/${x.id}` });
       const allowedKind = (x) => (x.kind === 'guest' ? canGuests : canSponsors);
       if (quem === 'todos') {
-        if (!can(user.role, 'outreach.manage')) return { erro: 'Só a gestão vê os follow-ups de todo mundo.' };
+        if (!can(user, 'outreach.manage')) return { erro: 'Só a gestão vê os follow-ups de todo mundo.' };
         const [g, s] = await Promise.all([outreach.evaluateAll('guest'), outreach.evaluateAll('sponsor')]);
         const items = [...g.values(), ...s.values()].filter((x) => outreach.NEEDS.has(x.state) && allowedKind(x));
         return { total: items.length, itens: items.slice(0, 25).map(shape), painel: '/gestao/cadencia' };
@@ -48,7 +48,7 @@ const TOOLS = [
   {
     perm: 'audience.read',
     decl: { name: 'plateia', description: 'Pulso Podcast com Plateia: pedidos de vaga (nome, WhatsApp, situação, pagamento), resumo por situação e as próximas gravações com quantos pedidos e quantos selecionados. convidado: nome do convidado da gravação (opcional). situacao: novo, em_atendimento (em avaliação), confirmado (selecionado), nao_selecionado ou desistiu (opcional).', parameters: { type: 'OBJECT', properties: { convidado: { type: 'STRING' }, situacao: { type: 'STRING', enum: ['novo', 'em_atendimento', 'confirmado', 'nao_selecionado', 'desistiu'] }, limite: { type: 'NUMBER' } } } },
-    async run({ convidado, situacao, limite }) {
+    async run({ convidado, situacao, limite }, user) {
       const LABEL = { novo: 'Novo pedido', em_atendimento: 'Em avaliação', confirmado: 'Selecionado', nao_selecionado: 'Não selecionado', desistiu: 'Desistiu' };
       const p = []; const w = [];
       if (convidado) { p.push(lookup.like(convidado)); w.push(`l.guest_name ILIKE $${p.length}`); }
@@ -59,7 +59,7 @@ const TOOLS = [
         db.query(`SELECT l.id, l.name, l.phone, l.status, l.guest_name, l.recording_at, l.added_by, l.amount_cents, e.status AS pay_status, e.due_on AS pay_due
                     FROM plateia_leads l LEFT JOIN fin_entries e ON e.id = l.entry_id AND e.status <> 'cancelado' ${where} ORDER BY l.created_at DESC LIMIT ${cap(limite, 15, 30)}`, p),
         db.query(`SELECT g.id, g.name, g.proposed_at, count(l.id)::int AS pedidos, count(l.id) FILTER (WHERE l.status = 'confirmado')::int AS selecionados
-                    FROM guests g LEFT JOIN plateia_leads l ON l.guest_id = g.id WHERE g.status = 'agendado' AND g.proposed_at > now() GROUP BY g.id ORDER BY g.proposed_at LIMIT 8`),
+                    FROM guests g LEFT JOIN plateia_leads l ON l.guest_id = g.id WHERE g.status = 'agendado' AND g.proposed_at > now()${lookup.only(user.pids, 'g.project_id')} GROUP BY g.id ORDER BY g.proposed_at LIMIT 8`),
       ]);
       return {
         por_situacao: Object.fromEntries(summary.map((r) => [LABEL[r.status], r.n])),
@@ -85,7 +85,7 @@ const TOOLS = [
         caixa_hoje: brl(o.cash), atrasado_a_pagar: brl(o.late.out), atrasado_a_receber: brl(o.late.in), a_pagar_nos_proximos_7_dias: brl(o.out7),
         vencendo_ou_atrasadas: o.attention.map(e),
         projecao: o.forecast.map((f) => ({ mes: f.label, entra: brl(f.in), sai: brl(f.out), saldo_ao_fim: brl(f.balance) })),
-        estoque_para_repor: can(user.role, 'stock.read') ? o.stock.map((i) => ({ item: i.name, situacao: fin.STOCK_STATE[i.state] })) : undefined,
+        estoque_para_repor: can(user, 'stock.read') ? o.stock.map((i) => ({ item: i.name, situacao: fin.STOCK_STATE[i.state] })) : undefined,
         links: { resumo: '/financeiro', contas: '/financeiro/contas' },
       };
     },
@@ -155,7 +155,7 @@ const TOOLS = [
       let type; let row; let title;
       if (tipo === 'corte') {
         type = 'clip';
-        const { rows: [c] } = await db.query('SELECT id, title FROM episode_clips WHERE id::text = $1 OR title ILIKE $2 ORDER BY id DESC LIMIT 1', [String(referencia).trim(), lookup.like(referencia)]);
+        const { rows: [c] } = await db.query(`SELECT id, title FROM episode_clips WHERE (id::text = $1 OR title ILIKE $2)${lookup.only(user.pids, 'project_id')} ORDER BY id DESC LIMIT 1`, [String(referencia).trim(), lookup.like(referencia)]);
         if (!c) return { erro: 'Corte não encontrado.' };
         row = c; title = c.title;
       } else if (map[tipo]) {
