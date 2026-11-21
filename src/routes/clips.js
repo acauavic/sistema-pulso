@@ -331,7 +331,7 @@ router.get('/cortes/:id', requirePerm('episodes.read'), wrap(async (req, res) =>
   // independentes entre si: saem juntas (antes, uma depois da outra)
   const [provider, ls, social, thread, request, versions, replace] = await Promise.all([
     socialApi.active(), socialApi.liveState(),
-    canPublish(req.user.role) ? socialApi.connectedAll() : null, // cada rede com a conta do provedor dela
+    canPublish(req.user.role) ? socialApi.connectedAll({ projectId: c.project_id }) : null, // cada rede com a conta do projeto, no provedor dela
     require('../services/comments').list('clip', c.id),
     c.request_id ? require('../services/contentRequests').get(c.request_id) : null,
     clips.versionsOf(c.id), clips.replaceState(c),

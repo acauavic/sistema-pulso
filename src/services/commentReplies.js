@@ -38,13 +38,14 @@ const handleOf = (s) => String(s || '').trim().replace(/^@/, '').toLowerCase();
 const clampInt = (v, lo, hi, dflt) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt; };
 
 // ---------------------------------------------------------------- configuração
-async function getConfig() {
-  const v = { ...DEFAULTS, ...parseJson(await settings.get(KEY), {}) };
+// A configuração é por projeto (cada um tem o seu jeito de responder); o projeto padrão usa a chave de sempre.
+async function getConfig(projectId = null) {
+  const v = { ...DEFAULTS, ...parseJson(await settings.getFor(KEY, projectId), {}) };
   return { ...v, team_handles: Array.isArray(v.team_handles) ? v.team_handles : [] };
 }
 // Lê o formulário da janela de configuração (ou só o interruptor: { on }).
-async function setConfig(body, { onlyToggle = false } = {}) {
-  const cur = await getConfig();
+async function setConfig(body, { onlyToggle = false, projectId = null } = {}) {
+  const cur = await getConfig(projectId);
   const next = onlyToggle ? { ...cur, on: String(body.on) === '1' } : {
     ...cur,
     mode: MODES[body.mode] ? body.mode : cur.mode,
@@ -55,7 +56,7 @@ async function setConfig(body, { onlyToggle = false } = {}) {
     dm_on: String(body.dm_on) === '1', dm_per_day: clampInt(body.dm_per_day, 1, 300, cur.dm_per_day), invite_on: String(body.invite_on) === '1',
   };
   if (!onlyToggle && next.to <= next.from) return { error: 'O horário de fim precisa ser depois do de início.' };
-  await settings.set(KEY, JSON.stringify(next));
+  await settings.setFor(KEY, projectId, JSON.stringify(next));
   return { config: next };
 }
 const summary = (c) => `${MODES[c.mode].toLowerCase()} · até ${c.per_hour} por hora, das ${c.from}h às ${c.to}h${c.dm_on ? ` · direct até ${c.dm_per_day} por dia` : ''}`;
@@ -79,6 +80,7 @@ async function watchedPosts({ days = 14, pubId = null } = {}) {
 async function postContext(pubId) {
   const { rows: [r] } = await db.query(
     `SELECT p.id, coalesce(cl.post_title, cl.title, p.title) AS title, left(coalesce(p.description, ''), 600) AS caption,
+            coalesce(cl.project_id, e.project_id) AS project_id,
             g.name AS guest, g.instagram AS guest_ig, e.number AS ep_number, e.title AS ep_title,
             coalesce(p.options->'instagram'->>'trial', 'false') NOT IN ('false', '') AS trial
        FROM episode_publications p LEFT JOIN episode_clips cl ON cl.id = p.clip_id
@@ -198,12 +200,12 @@ async function fromWebhook({ network, post_ref: postRef, platform_post_id: platf
 }
 
 // ---------------------------------------------------------------- triagem pela IA
-const SYSTEM = `Você cuida dos comentários dos posts do Pulso Podcast (podcast de saúde, inovação, empreendedorismo e negócios) no Instagram, Facebook e Threads.
+const SYSTEM = (quem) => `Você cuida dos comentários dos posts do ${quem} no Instagram, Facebook e Threads.
 Para cada comentário, decida uma ação:
 - "reagir": comentário curto de apoio, só emoji, "verdade", elogio curto. A resposta é UM emoji (varie entre ${EMOJIS.join(' ')}), nada mais.
 - "responder": opinião, relato, pergunta ou elogio com conteúdo. Resposta curta (até 220 caracteres), concreta sobre o assunto do post, em português do Brasil, falando com a pessoa.
 - "ignorar": conversa com o convidado do post ou marcação dele, marcação de amigos (@alguém sozinho), comentário vazio ou sem sentido, robô/spam, texto genérico repetido ("Obrigado pelo Feedback"), comentário da própria equipe ou do convidado, ou continuação de outro comentário da mesma pessoa.
-- "equipe": SÓ o que é pesado de verdade: ameaça, ódio explícito, assédio, crise ou risco à vida, pedido de orientação de saúde individual (diagnóstico, remédio, dose, tratamento), assunto jurídico, reclamação séria contra o Pulso ou o convidado. Também quando você não tiver segurança do que a pessoa quis dizer.
+- "equipe": SÓ o que é pesado de verdade: ameaça, ódio explícito, assédio, crise ou risco à vida, pedido de orientação de saúde individual (diagnóstico, remédio, dose, tratamento), assunto jurídico, reclamação séria contra o ${quem} ou o convidado. Também quando você não tiver segurança do que a pessoa quis dizer.
 Regras de tom (são da marca e valem sempre):
 - Opinião polêmica, generalização ou preconceito (ex.: "toda mulher…", "50% das mulheres mentem"): RESPONDA, com um toque leve de acidez e discordando com elegância. Nunca ofenda a pessoa, nunca xingue, nunca concorde com preconceito. Isso não é caso de equipe.
 - Sempre que der, termine com uma pergunta que faça a pessoa comentar de novo (o objetivo é engajamento). Uma pergunta só.
@@ -211,8 +213,8 @@ Regras de tom (são da marca e valem sempre):
 - Não dê conselho médico, jurídico ou financeiro individual. Não invente fatos sobre o convidado nem sobre o episódio.
 - "Link da bio" só se a pessoa perguntar onde assistir.
 - Varie as respostas: duas respostas no mesmo post não podem começar igual nem repetir a mesma ideia.
-Convite para seguir ("convite", opcional, só com "responder"): quando couber de forma natural — pessoa engajada, principalmente em Reel de teste (quem vê ainda não segue) —, uma frase curta e calorosa que convide a acompanhar o Pulso, sem "segue aí", sem pedir like, sem urgência (ex.: "E se ainda não acompanha o Pulso, toda semana tem conversa nova por aqui."). Não repita o convite dentro da "resposta": ele vai separado.
-Direct ("direct", opcional, só Instagram e só com "responder"): para quem comentou com conteúdo (opinião, relato, pergunta, quem respondeu o Pulso), uma mensagem privada curta (até 350 caracteres), em tom de conversa, citando o que a pessoa disse, chamando para a comunidade do Pulso no WhatsApp, onde a conversa continua, e terminando com o marcador {comunidade} (vira o link). Sem "olá, tudo bem?" genérico, sem vender nada. Para reação com emoji, ignorar e equipe, deixe vazio.
+Convite para seguir ("convite", opcional, só com "responder"): quando couber de forma natural — pessoa engajada, principalmente em Reel de teste (quem vê ainda não segue) —, uma frase curta e calorosa que convide a acompanhar o ${quem}, sem "segue aí", sem pedir like, sem urgência (ex.: "E se ainda não acompanha, toda semana tem conversa nova por aqui."). Não repita o convite dentro da "resposta": ele vai separado.
+Direct ("direct", opcional, só Instagram e só com "responder"): para quem comentou com conteúdo (opinião, relato, pergunta, quem respondeu), uma mensagem privada curta (até 350 caracteres), em tom de conversa, citando o que a pessoa disse, chamando para a comunidade no WhatsApp, onde a conversa continua, e terminando com o marcador {comunidade} (vira o link). Sem "olá, tudo bem?" genérico, sem vender nada. Para reação com emoji, ignorar e equipe, deixe vazio.
 Devolva um item por comentário recebido, com o mesmo id, o motivo em poucas palavras e a confiança (0 a 1).`;
 
 const SCHEMA = {
@@ -285,10 +287,18 @@ async function inviteAllowed(username) {
 }
 
 // Triagem dos comentários novos de uma publicação (em lotes de 25).
+// Quem a IA é: o nome público do projeto e o que ele é (Gestão > Projetos).
+function whoOf(projectId) {
+  const projects = require('./projects');
+  const name = projects.publicName(projectId);
+  const ctx = projects.aiContext(projectId);
+  return ctx ? `${name} (${ctx})` : name;
+}
+
 async function classifyPublication(pubId) {
-  const c = await getConfig();
   const post = await postContext(pubId);
   if (!post) return { classified: 0 };
+  const c = await getConfig(post.project_id); // cada projeto responde do jeito dele
   const { rows: rules } = await db.query("SELECT keywords FROM social_rules WHERE publication_id = $1 AND active", [pubId]);
   const keywords = rules.flatMap((r) => r.keywords || []);
   const ctx = { team: c.team_handles.map(handleOf), guestIg: handleOf(post.guest_ig), keywords };
@@ -307,15 +317,15 @@ async function classifyPublication(pubId) {
     const { rows: done } = await db.query(
       "SELECT reply_text FROM social_comments WHERE publication_id = $1 AND status IN ('proposta','aprovada','enviada','simulada') AND action = 'responder' ORDER BY id DESC LIMIT 12", [pubId]);
     const brief = [
-      `Post: ${post.title || 'sem título'}${post.trial ? ' (Reel de teste: aparece primeiro para quem não segue o Pulso)' : ''}`,
+      `Post: ${post.title || 'sem título'}${post.trial ? ' (Reel de teste: aparece primeiro para quem ainda não segue)' : ''}`,
       post.ep_number ? `Episódio ${post.ep_number}${post.ep_title ? `: ${post.ep_title}` : ''}` : '',
       post.guest ? `Convidado: ${post.guest}${post.guest_ig ? ` (@${handleOf(post.guest_ig)})` : ''}` : '',
       post.caption ? `Legenda: ${post.caption}` : '',
-      done.length ? `Respostas que o Pulso já deu neste post (não repita): ${done.map((d) => d.reply_text).join(' | ')}` : '',
+      done.length ? `Respostas já dadas neste post (não repita): ${done.map((d) => d.reply_text).join(' | ')}` : '',
       '', 'Comentários (JSON):',
       JSON.stringify(forAi.map((r) => ({ id: String(r.id), usuario: r.author_username, texto: r.text, curtidas: r.likes, conversa: r.thread, e_resposta_ao_pulso: Boolean(r.parent_comment_id) }))),
     ].filter(Boolean).join('\n');
-    const { data } = await gemini.generateJson({ system: SYSTEM, parts: [{ text: brief }], schema: SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
+    const { data } = await gemini.generateJson({ system: SYSTEM(whoOf(post.project_id)), parts: [{ text: brief }], schema: SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
     const byId = new Map((data?.itens || []).map((i) => [String(i.id), i]));
     for (const row of forAi) {
       const it = byId.get(String(row.id));
@@ -389,20 +399,42 @@ function friendly(err) {
 }
 
 // Uma volta da rotina (a cada minuto): manda no máximo uma resposta, se o horário, o limite e o intervalo deixam.
-async function sendTick({ now = new Date() } = {}) {
-  const c = await getConfig();
+// `projectId`: a rotina roda um projeto por vez (configuração, limites e fila são dele).
+// As rotinas rodam para cada projeto que usa redes (cada um com a configuração, a fila e os limites dele).
+async function eachProject(fn) {
+  const projects = require('./projects');
+  await projects.refresh();
+  const list = projects.all().filter((p) => projects.has(p, 'redes'));
+  const only = list.length ? list : [projects.get(projects.defaultId())].filter(Boolean);
+  const out = [];
+  for (const p of only) out.push({ project: p.id, ...(await fn(p.id)) });
+  return out.length === 1 ? out[0] : { projects: out };
+}
+const sendTickAll = (opts = {}) => eachProject((projectId) => sendTick({ ...opts, projectId }));
+const dmTickAll = (opts = {}) => eachProject((projectId) => dmTick({ ...opts, projectId }));
+
+async function sendTick({ now = new Date(), projectId = null } = {}) {
+  const pids = projectId ? [Number(projectId)] : null;
+  const c = await getConfig(projectId);
   if (!c.on || !inWindow(c, now)) return { sent: 0, reason: !c.on ? 'desligada' : 'fora do horário' };
-  const state = parseJson(await settings.get(SEND_KEY), {});
+  const state = parseJson(await settings.getFor(SEND_KEY, projectId), {});
   if (state.next_at && new Date(state.next_at) > now) return { sent: 0, reason: 'intervalo' };
-  const { rows: [{ n }] } = await db.query("SELECT count(*)::int AS n FROM social_comments WHERE status IN ('enviada','simulada') AND sent_at > $1::timestamptz - interval '1 hour'", [now]);
+  const { rows: [{ n }] } = await db.query(
+    `SELECT count(*)::int AS n FROM social_comments c
+       LEFT JOIN episode_publications p ON p.id = c.publication_id LEFT JOIN episode_clips cl ON cl.id = p.clip_id
+       LEFT JOIN episodes e ON e.id = coalesce(p.episode_id, cl.episode_id)
+      WHERE c.status IN ('enviada','simulada') AND c.sent_at > $1::timestamptz - interval '1 hour'${inProject(pids)}`, [now]);
   if (n >= c.per_hour) return { sent: 0, reason: 'limite por hora' };
   const client = await db.getPool().connect();
   let row;
   try {
     await client.query('BEGIN');
     ({ rows: [row] } = await client.query(
-      `SELECT * FROM social_comments WHERE status = 'aprovada' AND coalesce(reply_text, '') <> ''
-        ORDER BY (publication_id IS NOT DISTINCT FROM $1) ASC, decided_at NULLS LAST, id LIMIT 1 FOR UPDATE SKIP LOCKED`, [state.last_pub ?? null]));
+      `SELECT c.* FROM social_comments c
+         LEFT JOIN episode_publications p ON p.id = c.publication_id LEFT JOIN episode_clips cl ON cl.id = p.clip_id
+         LEFT JOIN episodes e ON e.id = coalesce(p.episode_id, cl.episode_id)
+        WHERE c.status = 'aprovada' AND coalesce(c.reply_text, '') <> ''${inProject(pids)}
+        ORDER BY (c.publication_id IS NOT DISTINCT FROM $1) ASC, c.decided_at NULLS LAST, c.id LIMIT 1 FOR UPDATE OF c SKIP LOCKED`, [state.last_pub ?? null]));
     if (!row) { await client.query('COMMIT'); return { sent: 0, reason: 'fila vazia' }; }
     const live = config.outstand.live;
     try {
@@ -414,12 +446,12 @@ async function sendTick({ now = new Date() } = {}) {
       await client.query("UPDATE social_comments SET status = $2, error = $3, attempts = attempts + 1, updated_at = now() WHERE id = $1",
         [row.id, slow || row.attempts + 1 < 2 ? 'aprovada' : 'erro', friendly(err)]);
       await client.query('COMMIT');
-      await settings.set(SEND_KEY, JSON.stringify({ ...state, next_at: new Date(now.getTime() + (slow ? 15 * 60_000 : randomGap(c))).toISOString() }));
+      await settings.setFor(SEND_KEY, projectId, JSON.stringify({ ...state, next_at: new Date(now.getTime() + (slow ? 15 * 60_000 : randomGap(c))).toISOString() }));
       return { sent: 0, reason: 'erro', error: friendly(err) };
     }
     await client.query('COMMIT');
   } catch (err) { await client.query('ROLLBACK').catch(() => {}); throw err; } finally { client.release(); }
-  await settings.set(SEND_KEY, JSON.stringify({ last_pub: row.publication_id, next_at: new Date(now.getTime() + randomGap(c)).toISOString() }));
+  await settings.setFor(SEND_KEY, projectId, JSON.stringify({ last_pub: row.publication_id, next_at: new Date(now.getTime() + randomGap(c)).toISOString() }));
   return { sent: 1, id: row.id };
 }
 
@@ -427,10 +459,10 @@ async function sendTick({ now = new Date() } = {}) {
 // O direct leva um link curto só dele (os cliques dele não se misturam com os da bio): se o link cadastrado já é do encurtador,
 // vale o destino dele, com uma marca no fim para o encurtador criar um link novo. Sem encurtador, vai o link cadastrado.
 const DM_LINK_KEYWORDS = ['comunidade-direct', 'direct-comunidade'];
-async function communityLink() {
-  const long = (await require('./commentAutomation').links()).whatsapp_community;
+async function communityLink(projectId = null) {
+  const long = (await require('./commentAutomation').links(projectId)).whatsapp_community;
   if (!long) return null;
-  const cache = parseJson(await settings.get(`${DM_KEY}_link`), {});
+  const cache = parseJson(await settings.getFor(`${DM_KEY}_link`, projectId), {});
   if (cache.long === long && cache.short) return cache.short;
   if (!config.yourlsConfigured) return long;
   const y = require('./yourls');
@@ -438,8 +470,8 @@ async function communityLink() {
     let target = y.isOwnLink(long) ? await y.expand(long) : long;
     if (!target) return long;
     const u = new URL(target); u.searchParams.set('origem', 'direct-pulso'); target = u.toString();
-    const { shortUrl } = await y.shorten(target, { title: 'Comunidade · direct dos comentários', keywords: DM_LINK_KEYWORDS });
-    await settings.set(`${DM_KEY}_link`, JSON.stringify({ long, short: shortUrl }));
+    const { shortUrl } = await y.shorten(target, { title: 'Comunidade · direct dos comentários', keywords: DM_LINK_KEYWORDS, projectId });
+    await settings.setFor(`${DM_KEY}_link`, projectId, JSON.stringify({ long, short: shortUrl }));
     return shortUrl;
   } catch { return long; }
 }
@@ -456,21 +488,25 @@ function dmFriendly(err) {
 }
 
 // Uma volta (a cada minuto): manda no máximo um direct, depois que a resposta pública já saiu, no ritmo do dia.
-async function dmTick({ now = new Date() } = {}) {
-  const c = await getConfig();
+async function dmTick({ now = new Date(), projectId = null } = {}) {
+  const pids = projectId ? [Number(projectId)] : null;
+  const c = await getConfig(projectId);
   if (!c.on || !c.dm_on || !inWindow(c, now)) return { sent: 0, reason: !c.on || !c.dm_on ? 'desligado' : 'fora do horário' };
-  const state = parseJson(await settings.get(DM_KEY), {});
+  const state = parseJson(await settings.getFor(DM_KEY, projectId), {});
   if (state.next_at && new Date(state.next_at) > now) return { sent: 0, reason: 'intervalo' };
   const { rows: [{ n }] } = await db.query("SELECT count(*)::int AS n FROM social_comments WHERE dm_status IN ('enviada','simulada') AND dm_sent_at > $1::timestamptz - interval '1 day'", [now]);
   if (n >= c.dm_per_day) return { sent: 0, reason: 'limite do dia' };
   // passou do prazo do Instagram: não tenta
   await db.query(`UPDATE social_comments SET dm_status = 'pulada', dm_error = 'Passou de 7 dias do comentário.' WHERE dm_status = 'aprovada'
                    AND coalesce(commented_at, created_at) < $1::timestamptz - ($2 || ' hours')::interval`, [now, String(DM_MAX_AGE_DAYS * 24)]);
-  const link = await communityLink();
+  const link = await communityLink(projectId);
   if (!link) return { sent: 0, reason: 'sem link da comunidade' };
   const { rows: [row] } = await db.query(
-    `SELECT * FROM social_comments WHERE dm_status = 'aprovada' AND status IN ('enviada','simulada','respondida') AND network = 'instagram' AND author_id IS NOT NULL
-      ORDER BY sent_at NULLS LAST, id LIMIT 1`);
+    `SELECT c.* FROM social_comments c
+       LEFT JOIN episode_publications p ON p.id = c.publication_id LEFT JOIN episode_clips cl ON cl.id = p.clip_id
+       LEFT JOIN episodes e ON e.id = coalesce(p.episode_id, cl.episode_id)
+      WHERE c.dm_status = 'aprovada' AND c.status IN ('enviada','simulada','respondida') AND c.network = 'instagram' AND c.author_id IS NOT NULL${inProject(pids)}
+      ORDER BY c.sent_at NULLS LAST, c.id LIMIT 1`);
   if (!row) return { sent: 0, reason: 'fila vazia' };
   if (await dmRecently(row.network, row.author_username, row.id) && (await db.query(
     "SELECT 1 FROM social_comments WHERE network = $1 AND lower(author_username) = lower($2) AND id <> $3 AND dm_status IN ('enviada','simulada') AND dm_sent_at > now() - ($4 || ' days')::interval",
@@ -490,10 +526,10 @@ async function dmTick({ now = new Date() } = {}) {
   } catch (err) {
     const slow = /\(429\)/.test(String(err.message));
     await db.query('UPDATE social_comments SET dm_status = $2, dm_error = $3 WHERE id = $1', [row.id, slow ? 'aprovada' : /\(422\)/.test(String(err.message)) ? 'pulada' : 'erro', dmFriendly(err)]);
-    await settings.set(DM_KEY, JSON.stringify({ next_at: new Date(now.getTime() + (slow ? 30 * 60_000 : dmGap(c))).toISOString() }));
+    await settings.setFor(DM_KEY, projectId, JSON.stringify({ next_at: new Date(now.getTime() + (slow ? 30 * 60_000 : dmGap(c))).toISOString() }));
     return { sent: 0, reason: 'erro', error: dmFriendly(err) };
   }
-  await settings.set(DM_KEY, JSON.stringify({ next_at: new Date(now.getTime() + dmGap(c)).toISOString() }));
+  await settings.setFor(DM_KEY, projectId, JSON.stringify({ next_at: new Date(now.getTime() + dmGap(c)).toISOString() }));
   return { sent: 1, id: row.id };
 }
 const dmToday = () => db.query("SELECT count(*)::int AS n FROM social_comments WHERE dm_status IN ('enviada','simulada') AND dm_sent_at > now() - interval '1 day'").then((r) => r.rows[0].n);
@@ -501,14 +537,15 @@ const dmToday = () => db.query("SELECT count(*)::int AS n FROM social_comments W
 // Directs que ficaram para trás: comentários do Instagram com resposta pública (da IA ou à mão) que ainda não tiveram direct, até
 // 7 dias depois do comentário. Relê os posts (para guardar o id de quem comentou) e a IA escreve o direct só de quem comentou com
 // conteúdo. Depois, saem pela rotina de sempre, no ritmo do dia.
-const DM_SYSTEM = `Você escreve directs do Pulso Podcast (saúde, inovação, empreendedorismo e negócios) para quem comentou num post e já recebeu a resposta pública do Pulso.
-Para cada comentário com conteúdo (opinião, relato, pergunta, discordância, quem respondeu o Pulso), escreva "direct": uma mensagem privada curta (até 350 caracteres), em português do Brasil, em tom de conversa, citando o que a pessoa disse, chamando para a comunidade do Pulso no WhatsApp, onde a conversa continua, e terminando com o marcador {comunidade} (vira o link).
+const DM_SYSTEM = (quem) => `Você escreve directs do ${quem} para quem comentou num post e já recebeu a resposta pública dele.
+Para cada comentário com conteúdo (opinião, relato, pergunta, discordância, quem respondeu), escreva "direct": uma mensagem privada curta (até 350 caracteres), em português do Brasil, em tom de conversa, citando o que a pessoa disse, chamando para a comunidade no WhatsApp, onde a conversa continua, e terminando com o marcador {comunidade} (vira o link).
 Sem "olá, tudo bem?" genérico, sem vender nada, sem "!!!", sem urgência, sem repetir a resposta pública.
 Deixe "direct" vazio para: só emoji, só marcação de amigo, elogio de uma ou duas palavras, spam, ofensa pesada ou algo sem conteúdo.`;
 const DM_SCHEMA = { type: 'OBJECT', properties: { itens: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: { type: 'STRING' }, direct: { type: 'STRING' } }, required: ['id'] } } }, required: ['itens'] };
 
-async function catchUpDms({ postDays = 60 } = {}) {
-  const c = await getConfig();
+// `projectId`: de que projeto são os posts (a configuração, o nome e o contexto da IA são dele).
+async function catchUpDms({ postDays = 60, projectId = null } = {}) {
+  const c = await getConfig(projectId);
   if (!c.dm_on) return { proposed: 0, skipped: 'direct desligado' };
   if (!config.geminiConfigured) return { proposed: 0, skipped: 'sem IA' };
   if (config.outstandConfigured) {
@@ -536,8 +573,8 @@ async function catchUpDms({ postDays = 60 } = {}) {
   let proposed = 0;
   for (let i = 0; i < pick.length; i += 25) {
     const part = pick.slice(i, i + 25);
-    const brief = `Comentários (JSON):\n${JSON.stringify(part.map((r) => ({ id: String(r.id), usuario: r.author_username, texto: r.text, conversa: r.thread, resposta_do_pulso: r.reply_text || undefined })))}`;
-    const { data } = await gemini.generateJson({ system: DM_SYSTEM, parts: [{ text: brief }], schema: DM_SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
+    const brief = `Comentários (JSON):\n${JSON.stringify(part.map((r) => ({ id: String(r.id), usuario: r.author_username, texto: r.text, conversa: r.thread, resposta_dada: r.reply_text || undefined })))}`;
+    const { data } = await gemini.generateJson({ system: DM_SYSTEM(whoOf(projectId)), parts: [{ text: brief }], schema: DM_SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
     const byId = new Map((data?.itens || []).map((it) => [String(it.id), it]));
     for (const r of part) {
       const dm = cleanDm(byId.get(String(r.id))?.direct);
@@ -618,17 +655,32 @@ async function undo(id) {
 }
 
 // ---------------------------------------------------------------- leitura para as telas
-async function counts({ pubId = null } = {}) {
-  const { rows } = await db.query(`SELECT status, count(*)::int AS n FROM social_comments ${pubId ? 'WHERE publication_id = $1' : ''} GROUP BY status`, pubId ? [pubId] : []);
+// Recorte: o comentário é do projeto do post (o corte manda; senão o episódio). Ids inteiros conferidos aqui.
+const inProject = (pids) => {
+  if (!pids) return '';
+  const ids = pids.map(Number).filter(Number.isInteger);
+  return ` AND coalesce(cl.project_id, e.project_id) = ANY('{${ids.join(',')}}'::int[])`;
+};
+
+async function counts({ pubId = null, pids = null } = {}) {
+  const { rows } = await db.query(
+    `SELECT c.status, count(*)::int AS n FROM social_comments c
+       LEFT JOIN episode_publications p ON p.id = c.publication_id LEFT JOIN episode_clips cl ON cl.id = p.clip_id
+       LEFT JOIN episodes e ON e.id = coalesce(p.episode_id, cl.episode_id)
+      WHERE true ${pubId ? 'AND c.publication_id = $1' : ''}${inProject(pids)} GROUP BY c.status`, pubId ? [pubId] : []);
   const by = Object.fromEntries(rows.map((r) => [r.status, r.n]));
   return Object.fromEntries(Object.entries(VIEWS).map(([k, v]) => [k, v.statuses.reduce((s, st) => s + (by[st] || 0), 0)]));
 }
 // Contagem do que precisa de alguém (para o rótulo da aba): para aprovar + precisam de você.
-async function pendingCount() {
-  const { rows: [r] } = await db.query("SELECT count(*)::int AS n FROM social_comments WHERE status IN ('proposta','equipe','erro')");
+async function pendingCount({ pids = null } = {}) {
+  const { rows: [r] } = await db.query(
+    `SELECT count(*)::int AS n FROM social_comments c
+       LEFT JOIN episode_publications p ON p.id = c.publication_id LEFT JOIN episode_clips cl ON cl.id = p.clip_id
+       LEFT JOIN episodes e ON e.id = coalesce(p.episode_id, cl.episode_id)
+      WHERE c.status IN ('proposta','equipe','erro')${inProject(pids)}`);
   return r.n;
 }
-async function list(view, { pubId = null, limit = 60, offset = 0 } = {}) {
+async function list(view, { pubId = null, limit = 60, offset = 0, pids = null } = {}) {
   const v = VIEWS[view] || VIEWS.aprovar;
   const order = view === 'fila' ? 'c.decided_at NULLS LAST, c.id' : view === 'enviadas' ? 'c.sent_at DESC NULLS LAST, c.id DESC' : 'c.commented_at DESC NULLS LAST, c.id DESC';
   const params = [v.statuses];
@@ -638,14 +690,16 @@ async function list(view, { pubId = null, limit = 60, offset = 0 } = {}) {
        FROM social_comments c LEFT JOIN episode_publications p ON p.id = c.publication_id LEFT JOIN episode_clips cl ON cl.id = p.clip_id
        LEFT JOIN episodes e ON e.id = coalesce(p.episode_id, cl.episode_id) LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = c.decided_by
        LEFT JOIN episode_covers cv ON cv.id = coalesce(p.cover_id, p.cover_ids[1])
-      WHERE c.status = ANY($1) ${pubId ? 'AND c.publication_id = $2' : ''} ORDER BY ${order} LIMIT ${Math.min(200, limit) + 1} OFFSET ${Math.max(0, offset)}`, params);
+      WHERE c.status = ANY($1) ${pubId ? 'AND c.publication_id = $2' : ''}${inProject(pids)} ORDER BY ${order} LIMIT ${Math.min(200, limit) + 1} OFFSET ${Math.max(0, offset)}`, params);
   return { rows: rows.slice(0, limit), more: rows.length > limit };
 }
 // Posts com comentários acompanhados (filtro da tela).
-async function postsWithComments() {
+async function postsWithComments({ pids = null } = {}) {
   const { rows } = await db.query(
     `SELECT p.id, coalesce(cl.post_title, cl.title, p.title) AS title, count(c.*)::int AS n
        FROM social_comments c JOIN episode_publications p ON p.id = c.publication_id LEFT JOIN episode_clips cl ON cl.id = p.clip_id
+       LEFT JOIN episodes e ON e.id = coalesce(p.episode_id, cl.episode_id)
+      WHERE true${inProject(pids)}
       GROUP BY p.id, cl.post_title, cl.title, p.title ORDER BY max(c.commented_at) DESC NULLS LAST LIMIT 200`);
   return rows;
 }
@@ -659,5 +713,5 @@ module.exports = {
   KEY, SEND_KEY, NETWORKS, NETWORK_LABEL, MODES, DEFAULTS, VIEWS, EMOJIS, REPLY_MAX, SYSTEM,
   getConfig, setConfig, summary, watchedPosts, postContext, ingest, sweep, fromWebhook, classifyPublication, cleanReply,
   hourBR, inWindow, sendTick, estimate, friendly, approve, approveAll, setReply, skip, unqueue, undo,
-  DM_KEY, DM_PER_PERSON_DAYS, cleanDm, looksLikeCode, dmRecently, inviteAllowed, communityLink, catchUpDms, renderDm, dmTick, dmToday, skipDm, counts, pendingCount, list, postsWithComments, ofPublication,
+  DM_KEY, DM_PER_PERSON_DAYS, sendTickAll, dmTickAll, eachProject, cleanDm, looksLikeCode, dmRecently, inviteAllowed, communityLink, catchUpDms, renderDm, dmTick, dmToday, skipDm, counts, pendingCount, list, postsWithComments, ofPublication,
 };

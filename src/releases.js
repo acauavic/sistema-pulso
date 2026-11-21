@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.105.0', date: '2026-11-21', title: 'Redes por projeto',
+    items: [
+      { kind: 'novo', text: 'Cada projeto tem as contas de rede dele no provedor: a publicação sai pela conta do projeto do corte ou do vídeo, e as telas mostram as contas daquele projeto. O Pulso continua com as contas de sempre.' },
+      { kind: 'novo', text: 'Publicações, insights, comentários, automações e ideias passaram a seguir o projeto escolhido no menu. Os números das redes são guardados por projeto (uma foto por dia, por rede e por projeto).' },
+      { kind: 'novo', text: 'As respostas por IA e os directs têm configuração, horário, limites e links (canal, comunidade, Spotify) por projeto, e a IA fala pelo nome público e pelo contexto de cada um — que a gestão escreve em Gestão > Projetos.' },
+      { kind: 'novo', text: 'O aviso de conta caída diz de que projeto é a conta, e o painel de Integrações mostra as contas dos projetos que a pessoa vê.' },
+      { kind: 'ajuste', text: 'Tela de um módulo que nenhum projeto da pessoa usa responde como se não existisse: com o Projeto 100 escolhido, o Social sai do caminho (ele publica por fora até ligar as contas).' },
+    ],
+  },
+  {
     version: '1.104.0', date: '2026-11-21', title: 'Acesso por projeto',
     items: [
       { kind: 'novo', text: 'Cada pessoa agora tem três coisas separadas: o perfil (o que ela faz), os projetos em que trabalha (onde ela faz) e o interruptor "Equipe da casa" (se ela alcança o que é geral do sistema).' },

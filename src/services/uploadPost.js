@@ -22,25 +22,29 @@ const headers = () => ({ Authorization: `Apikey ${config.uploadPost.key}` });
 const api = (path) => `${config.uploadPost.base}${path}`;
 const fail = (res, json) => new Error(`Upload-Post recusou (${res.status}): ${json.message || json.error || 'erro desconhecido'}`);
 
-let cache = { at: 0, value: null };
+// Um cache por perfil: cada projeto tem o seu "user" no Upload-Post (UPLOAD_POST_USER_<SLUG>).
+const caches = new Map();
+const cacheOf = (u) => { if (!caches.has(u)) caches.set(u, { at: 0, value: null, refreshing: null }); return caches.get(u); };
+const whoFor = (user) => String(user || config.uploadPost.user);
 // Redes conectadas ao perfil. Só leitura. Guarda 60 s para não bater na API a cada abertura de tela.
-let refreshing = null; // consulta em andamento: quem chega junto espera a mesma (sem pedidos repetidos ao provedor)
 // Depois de 60 s a tela não espera o provedor: mostra o último estado (até 10 min) e atualiza por trás.
-async function connected({ force = false, fresh = false } = {}) {
+async function connected({ force = false, fresh = false, uploadPostUser = null } = {}) {
   if (!config.uploadPostConfigured) return { ok: false, platforms: {}, error: 'UPLOAD_POST_KEY não configurada.' };
+  const who = whoFor(uploadPostUser);
+  const cache = cacheOf(who);
   if (!force && !fresh) {
     const age = Date.now() - cache.at;
     if (cache.value && age < 60_000) return cache.value;
-    if (!refreshing) refreshing = connected({ fresh: true }).finally(() => { refreshing = null; });
+    if (!cache.refreshing) cache.refreshing = connected({ fresh: true, uploadPostUser: who }).finally(() => { cache.refreshing = null; });
     if (cache.value && age < 10 * 60_000) return cache.value;
-    return refreshing;
+    return cache.refreshing;
   }
   let value;
   try {
-    const res = await fetch(api(`/api/uploadposts/users/${encodeURIComponent(config.uploadPost.user)}`), { headers: headers(), signal: AbortSignal.timeout(8_000) });
+    const res = await fetch(api(`/api/uploadposts/users/${encodeURIComponent(who)}`), { headers: headers(), signal: AbortSignal.timeout(8_000) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw fail(res, json);
-    const profile = json.profile || (json.profiles || []).find((p) => p.username === config.uploadPost.user) || json;
+    const profile = json.profile || (json.profiles || []).find((p) => p.username === who) || json;
     const platforms = {};
     for (const [name, acc] of Object.entries(profile.social_accounts || {})) {
       if (acc && typeof acc === 'object') platforms[name] = { handle: acc.handle || acc.display_name || '', name: acc.display_name || '', reauth: Boolean(acc.reauth_required), capabilities: acc.capabilities || [] };
@@ -49,10 +53,10 @@ async function connected({ force = false, fresh = false } = {}) {
   } catch (err) {
     value = { ok: false, platforms: {}, error: err.message };
   }
-  cache = { at: Date.now(), value };
+  caches.set(who, { ...cacheOf(who), at: Date.now(), value });
   return value;
 }
-const resetCache = () => { cache = { at: 0, value: null }; refreshing = null; };
+const resetCache = () => caches.clear();
 
 // Confere o pedido contra os limites de cada rede ANTES de enviar. kind: 'episode' | 'clip'.
 function validate({ kind, platforms, title, description, scheduledAt }) {
@@ -82,8 +86,8 @@ function validate({ kind, platforms, title, description, scheduledAt }) {
 }
 
 // Campos do formulário enviado ao Upload-Post (lista de pares, porque platform[] se repete).
-function buildFields({ id, kind, platforms, title, description, videoUrl, coverUrl, thumbnailUrl, tags = [], accounts = {}, instagram = null }) {
-  const f = [['user', config.uploadPost.user], ['title', title], ['async_upload', 'true'], ['request_id', `pulso-${id}-${crypto.randomBytes(4).toString('hex')}`], ['external_id', `pulso-pub-${id}`], ['video', videoUrl]];
+function buildFields({ id, kind, platforms, title, description, videoUrl, coverUrl, thumbnailUrl, tags = [], accounts = {}, instagram = null, uploadPostUser = null }) {
+  const f = [['user', whoFor(uploadPostUser)], ['title', title], ['async_upload', 'true'], ['request_id', `pulso-${id}-${crypto.randomBytes(4).toString('hex')}`], ['external_id', `pulso-pub-${id}`], ['video', videoUrl]];
   if (description) f.push(['description', description]);
   for (const p of platforms) f.push(['platform[]', p]);
   if (platforms.includes('youtube')) {
@@ -171,8 +175,8 @@ function validatePhotos({ media, platforms, title, description, scheduledAt, cou
   return { ok: issues.length === 0, issues, warnings };
 }
 
-function buildPhotoFields({ id, media, platforms, title, description, photoUrls, instagram = null }) {
-  const f = [['user', config.uploadPost.user], ['async_upload', 'true'], ['request_id', `pulso-${id}-${crypto.randomBytes(4).toString('hex')}`], ['external_id', `pulso-pub-${id}`]];
+function buildPhotoFields({ id, media, platforms, title, description, photoUrls, instagram = null, uploadPostUser = null }) {
+  const f = [['user', whoFor(uploadPostUser)], ['async_upload', 'true'], ['request_id', `pulso-${id}-${crypto.randomBytes(4).toString('hex')}`], ['external_id', `pulso-pub-${id}`]];
   if (title) f.push(['title', title]);
   if (description) f.push(['description', description]);
   for (const p of platforms) f.push(['platform[]', p]);
@@ -209,9 +213,9 @@ async function getJson(path, params = {}) {
 }
 
 // Números da conta por rede: seguidores, visualizações, alcance, curtidas, comentários, compartilhamentos.
-async function analytics(platforms) {
+async function analytics(platforms, { uploadPostUser = null } = {}) {
   if (!platforms.length) return {};
-  const json = await getJson(`/api/analytics/${encodeURIComponent(config.uploadPost.user)}`, { platforms: platforms.join(',') });
+  const json = await getJson(`/api/analytics/${encodeURIComponent(whoFor(uploadPostUser))}`, { platforms: platforms.join(',') });
   const out = {};
   for (const p of platforms) {
     const d = json[p];
@@ -222,18 +226,18 @@ async function analytics(platforms) {
   return out;
 }
 
-async function listComments({ platform = 'instagram', postId = null, postUrl = null, limit = 50 }) {
-  const json = await getJson('/api/uploadposts/comments', { platform, user: config.uploadPost.user, post_id: postId, post_url: postUrl, limit });
+async function listComments({ platform = 'instagram', postId = null, postUrl = null, limit = 50, uploadPostUser = null }) {
+  const json = await getJson('/api/uploadposts/comments', { platform, user: whoFor(uploadPostUser), post_id: postId, post_url: postUrl, limit });
   return (json.comments || []).map((c) => ({ id: String(c.id), text: c.text || '', timestamp: c.timestamp || null, userId: c.user?.id || null, username: c.user?.username || '' }));
 }
 
-async function recentMedia({ platform = 'instagram', limit = 10 }) {
-  const json = await getJson('/api/uploadposts/media', { platform, user: config.uploadPost.user, limit });
+async function recentMedia({ platform = 'instagram', limit = 10, uploadPostUser = null }) {
+  const json = await getJson('/api/uploadposts/media', { platform, user: whoFor(uploadPostUser), limit });
   return (json.media || []).map((m) => ({ id: String(m.id), caption: m.caption || '', permalink: m.permalink || null, timestamp: m.timestamp || null, type: m.media_type || null }));
 }
 
-async function dmConversations() {
-  const json = await getJson('/api/uploadposts/dms/conversations', { platform: 'instagram', user: config.uploadPost.user });
+async function dmConversations({ uploadPostUser = null } = {}) {
+  const json = await getJson('/api/uploadposts/dms/conversations', { platform: 'instagram', user: whoFor(uploadPostUser) });
   return (json.conversations || []).map((c) => ({
     id: c.id, participants: (c.participants?.data || []).map((p) => ({ id: p.id, username: p.username || '' })),
     messages: (c.messages?.data || []).map((m) => ({ id: m.id, at: m.created_time || null, fromId: m.from?.id || null, from: m.from?.username || '', text: m.message || '' })),

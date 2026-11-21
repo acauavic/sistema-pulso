@@ -23,16 +23,17 @@ const TITLES = /^(dra?\.?|prof\.?|profa\.?|sr\.?|sra\.?)$/i;
 const parseJson = (s, fallback) => { try { return s ? JSON.parse(s) : fallback; } catch { return fallback; } };
 
 // ---------------------------------------------------------------- links que a automação manda
-async function links() {
-  const v = parseJson(await settings.get(LINKS_KEY), {});
+// Os links são de cada projeto (canal, comunidade e Spotify dele); o projeto padrão usa a chave de sempre.
+async function links(projectId = null) {
+  const v = parseJson(await settings.getFor(LINKS_KEY, projectId), {});
   return { youtube_channel: v.youtube_channel || '', whatsapp_community: v.whatsapp_community || '', spotify_show: v.spotify_show || '' };
 }
 const httpsOrEmpty = (s) => { const t = String(s || '').trim().slice(0, 500); return /^https:\/\/\S+$/i.test(t) ? t : ''; };
-async function setLinks(body) {
+async function setLinks(body, { projectId = null } = {}) {
   const v = { youtube_channel: httpsOrEmpty(body.youtube_channel), whatsapp_community: httpsOrEmpty(body.whatsapp_community), spotify_show: httpsOrEmpty(body.spotify_show) };
   const bad = ['youtube_channel', 'whatsapp_community', 'spotify_show'].filter((k) => String(body[k] || '').trim() && !v[k]);
   if (bad.length) return { error: 'Use endereços completos, começando com https://.' };
-  await settings.set(LINKS_KEY, JSON.stringify(v));
+  await settings.setFor(LINKS_KEY, projectId, JSON.stringify(v));
   return { links: v };
 }
 

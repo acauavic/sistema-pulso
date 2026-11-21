@@ -160,7 +160,7 @@ describe('Uma rede por provedor (X pela Zernio, o resto pela Outstand) e vigia d
       await assert.rejects(publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['x'], title: 'X', description: 'L', userId: u.gestao.id }), /Reconecte X na Zernio: o acesso da conta venceu/);
       st.zAccounts = [zAcc('ZX1', 'twitter', 'pulso_x'), zAcc('ZIG', 'instagram', 'podcastpulso')]; socialApi.PROVIDERS.zernio.resetCache();
       // a Outstand só mostra o token vencido pela checagem: o estado guardado também bloqueia
-      await h.db.query("INSERT INTO social_account_status (provider, network, handle, status) VALUES ('outstand', 'instagram', 'podcastpulso', 'reauth') ON CONFLICT (provider, network) DO UPDATE SET status = 'reauth'");
+      await h.db.query("INSERT INTO social_account_status (provider, network, handle, status) VALUES ('outstand', 'instagram', 'podcastpulso', 'reauth') ON CONFLICT (project_id, provider, network) DO UPDATE SET status = 'reauth'");
       await assert.rejects(publishing.create({ media: 'imagem', coverIds: [cover.id], platforms: ['instagram'], title: 'IG', description: 'L', userId: u.gestao.id }), /Reconecte Instagram na Outstand/);
       await h.db.query("DELETE FROM social_account_status WHERE provider = 'outstand'");
     } finally { h.config.outstand.live = false; h.config.zernio.live = false; }
@@ -214,7 +214,7 @@ describe('Uma rede por provedor (X pela Zernio, o resto pela Outstand) e vigia d
     assert.equal((await q("SELECT status FROM social_account_status WHERE provider = 'zernio' AND network = 'instagram'"))[0].status, 'sumiu');
     assert.ok(!(await notes()).some((x) => /Instagram/.test(x.title) && /Zernio/.test(x.title)), 'não avisa de conta que não publica');
     // conta de X no Upload-Post não conta: o X sai pela Zernio
-    await q("INSERT INTO social_account_status (provider, network, handle, status) VALUES ('uploadpost', 'x', 'antigo', 'sumiu') ON CONFLICT (provider, network) DO UPDATE SET status = 'sumiu'");
+    await q("INSERT INTO social_account_status (provider, network, handle, status) VALUES ('uploadpost', 'x', 'antigo', 'sumiu') ON CONFLICT (project_id, provider, network) DO UPDATE SET status = 'sumiu'");
     health.resetCache();
     assert.ok(!(await health.problems()).some((p) => p.provider === 'uploadpost' && p.network === 'x'), 'Upload-Post não publica o X');
     await q("DELETE FROM social_account_status WHERE provider = 'uploadpost' AND network = 'x'");

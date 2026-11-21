@@ -117,7 +117,8 @@ describe('isolamento entre projetos', () => {
     // o que é da casa some para quem não é da casa
     for (const url of ['/usuarios', '/auditoria', '/integracoes', '/gestao/categorias', '/gestao/projetos', '/financeiro/estoque']) {
       const r = await dela.get(url);
-      assert.equal(r.status, 403, `${url} é da casa: devia recusar (veio ${r.status})`);
+      // 403 (permissão da casa) ou 404 (módulo que o projeto dela não usa): em nenhum dos dois ela entra
+      assert.ok([403, 404].includes(r.status), `${url} é da casa: devia recusar (veio ${r.status})`);
     }
     const lixeira = await dela.get('/lixeira');
     assert.ok([200, 403].includes(lixeira.status));

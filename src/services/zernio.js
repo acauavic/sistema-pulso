@@ -45,22 +45,26 @@ async function call(method, path, { body = null, idempotency = null, timeout = 3
   throw last;
 }
 
-let cache = { at: 0, value: null };
+// Um cache por perfil: cada projeto tem o seu perfil na Zernio (ZERNIO_PROFILE_ID_<SLUG>).
+const caches = new Map();
+const cacheOf = (k) => { if (!caches.has(k)) caches.set(k, { at: 0, value: null, refreshing: null }); return caches.get(k); };
 // Contas conectadas (só leitura), no formato do painel: { youtube: { handle, name, reauth, accountId } }. Guarda 60 s.
-let refreshing = null; // consulta em andamento: quem chega junto espera a mesma (sem pedidos repetidos ao provedor)
 // Depois de 60 s a tela não espera o provedor: mostra o último estado (até 10 min) e atualiza por trás.
-async function connected({ force = false, fresh = false } = {}) {
+async function connected({ force = false, fresh = false, zernioProfileId = null } = {}) {
   if (!config.zernioConfigured) return { ok: false, platforms: {}, error: 'ZERNIO_API_KEY não configurada.' };
+  const key = String(zernioProfileId || config.zernio.profileId || '');
+  const cache = cacheOf(key);
   if (!force && !fresh) {
     const age = Date.now() - cache.at;
     if (cache.value && age < 60_000) return cache.value;
-    if (!refreshing) refreshing = connected({ fresh: true }).finally(() => { refreshing = null; });
+    if (!cache.refreshing) cache.refreshing = connected({ fresh: true, zernioProfileId: key }).finally(() => { cache.refreshing = null; });
     if (cache.value && age < 10 * 60_000) return cache.value;
-    return refreshing;
+    return cache.refreshing;
   }
   let value;
   try {
-    const qs = new URLSearchParams({ limit: '100', ...(config.zernio.profileId ? { profileId: config.zernio.profileId } : {}) });
+    const profileId = zernioProfileId || config.zernio.profileId;
+    const qs = new URLSearchParams({ limit: '100', ...(profileId ? { profileId } : {}) });
     const { json } = await call('GET', `/v1/accounts?${qs}`, { timeout: 10_000 });
     const platforms = {};
     for (const acc of json.accounts || []) {
@@ -72,10 +76,10 @@ async function connected({ force = false, fresh = false } = {}) {
   } catch (err) {
     value = { ok: false, platforms: {}, error: err.message };
   }
-  cache = { at: Date.now(), value };
+  caches.set(key, { ...cacheOf(key), at: Date.now(), value });
   return value;
 }
-const resetCache = () => { cache = { at: 0, value: null }; refreshing = null; };
+const resetCache = () => caches.clear();
 
 // Opções de cada rede (platformSpecificData) e o texto de cada uma.
 function platformEntry(p, { kind, media, title, description, coverUrl, accounts, instagram = null }) {

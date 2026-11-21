@@ -111,11 +111,12 @@ async function fromZernio(accountId) {
 
 // ---------------------------------------------------------------- leitura de todas as redes
 // Contas por provedor configurado (cada um uma vez) e a rota de cada rede.
-async function accounts() {
+async function accounts({ projectId = null } = {}) {
   const map = await social.routeMap();
   const ids = social.list().filter((p) => p.configured()).map((p) => p.id);
+  const profile = social.profileFor(projectId); // as contas do projeto, em cada provedor
   const conns = {};
-  await Promise.all(ids.map(async (id) => { try { conns[id] = await social.get(id).connected(); } catch (err) { conns[id] = { ok: false, platforms: {}, error: err.message }; } }));
+  await Promise.all(ids.map(async (id) => { try { conns[id] = await social.get(id).connected(profile); } catch (err) { conns[id] = { ok: false, platforms: {}, error: err.message }; } }));
   const out = {};
   for (const net of NETWORKS) {
     const order = [map[net], ...ids.filter((id) => id !== map[net])].filter((id) => conns[id]?.platforms?.[net]);
@@ -138,14 +139,15 @@ async function fetchNetwork(net, { provider, account }, ctx) {
   return { ...base, followers: n(d.followers), period: clean({ views: n(d.views), reach: n(d.reach), likes: n(d.likes), comments: n(d.comments), shares: n(d.shares), saves: n(d.saves) && d.saves >= 0 ? d.saves : null }), top: [], note: null };
 }
 
-let running = null;
+const runs = new Map(); // uma leitura por projeto
 // Atualiza as redes que estão velhas (ou todas, com force; only = só estas redes). Grava a foto do dia de cada uma. Devolve os erros por rede.
-async function refresh({ force = false, only = null } = {}) {
-  if (running) return running;
-  running = (async () => {
-    const { list: all, errors } = await accounts();
+async function refresh({ force = false, only = null, projectId = null } = {}) {
+  const pid = projectId == null ? require('./projects').defaultId() : Number(projectId);
+  if (runs.get(pid)) return runs.get(pid);
+  const running = (async () => {
+    const { list: all, errors } = await accounts({ projectId: pid });
     const list = only ? Object.fromEntries(Object.entries(all).filter(([net]) => only.includes(net))) : all;
-    const { rows } = await db.query('SELECT platform, data, updated_at FROM social_snapshots WHERE taken_on = $1', [today()]);
+    const { rows } = await db.query('SELECT platform, data, updated_at FROM social_snapshots WHERE taken_on = $1 AND project_id = $2', [today(), pid]);
     const fresh = Object.fromEntries(rows.map((r) => [r.platform, r]));
     const ctx = { upNets: Object.entries(list).filter(([, v]) => v.provider === 'uploadpost').map(([k]) => k) };
     const failed = {};
@@ -155,30 +157,32 @@ async function refresh({ force = false, only = null } = {}) {
       if (!force && sameSource && Date.now() - new Date(cur.updated_at) < maxAgeMs(net, src.provider)) return;
       try {
         const data = await fetchNetwork(net, src, ctx);
-        await db.query(`INSERT INTO social_snapshots (taken_on, platform, data) VALUES ($1,$2,$3)
-                        ON CONFLICT (taken_on, platform) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`, [today(), net, JSON.stringify(data)]);
+        await db.query(`INSERT INTO social_snapshots (taken_on, platform, data, project_id) VALUES ($1,$2,$3,$4)
+                        ON CONFLICT (project_id, taken_on, platform) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`, [today(), net, JSON.stringify(data), pid]);
       } catch (err) { failed[net] = err.message; }
     }));
     return { failed, errors, networks: Object.keys(list) };
-  })().finally(() => { running = null; });
+  })().finally(() => { runs.delete(pid); });
+  runs.set(pid, running);
   return running;
 }
 
 // O que a tela de Insights mostra. Sem nada guardado de hoje, espera a leitura; com dados velhos, mostra o que tem e atualiza por trás.
-async function overview({ force = false } = {}) {
+async function overview({ force = false, projectId = null } = {}) {
+  const pid = projectId == null ? require('./projects').defaultId() : Number(projectId);
   const out = { ok: true, error: null, networks: [], updatedAt: null, refreshing: false };
   if (!social.list().some((p) => p.configured())) { out.ok = false; out.error = 'Nenhum provedor de redes configurado neste servidor.'; return out; }
-  const { rows: stored } = await db.query('SELECT platform FROM social_snapshots WHERE taken_on = $1', [today()]);
+  const { rows: stored } = await db.query('SELECT platform FROM social_snapshots WHERE taken_on = $1 AND project_id = $2', [today(), pid]);
   let result = null;
   if (force || !stored.length) {
-    try { result = await refresh({ force }); } catch (err) { out.error = `Não foi possível ler os números agora: ${err.message}`; }
+    try { result = await refresh({ force, projectId: pid }); } catch (err) { out.error = `Não foi possível ler os números agora: ${err.message}`; }
   } else {
     out.refreshing = true;
-    refresh().catch((err) => console.error('[insights]', err.message)); // atualiza por trás; a próxima visita já vê
+    refresh({ projectId: pid }).catch((err) => console.error('[insights]', err.message)); // atualiza por trás; a próxima visita já vê
   }
-  const { rows: latest } = await db.query('SELECT DISTINCT ON (platform) platform, taken_on, data, updated_at FROM social_snapshots ORDER BY platform, taken_on DESC');
-  const { rows: week } = await db.query("SELECT DISTINCT ON (platform) platform, data FROM social_snapshots WHERE taken_on <= ($1::date - 7) ORDER BY platform, taken_on DESC", [today()]);
-  const { rows: history } = await db.query("SELECT platform, taken_on, (data->>'followers')::numeric AS followers FROM social_snapshots WHERE taken_on > ($1::date - $2::int) ORDER BY taken_on", [today(), DAYS]);
+  const { rows: latest } = await db.query('SELECT DISTINCT ON (platform) platform, taken_on, data, updated_at FROM social_snapshots WHERE project_id = $1 ORDER BY platform, taken_on DESC', [pid]);
+  const { rows: week } = await db.query("SELECT DISTINCT ON (platform) platform, data FROM social_snapshots WHERE taken_on <= ($1::date - 7) AND project_id = $2 ORDER BY platform, taken_on DESC", [today(), pid]);
+  const { rows: history } = await db.query("SELECT platform, taken_on, (data->>'followers')::numeric AS followers FROM social_snapshots WHERE taken_on > ($1::date - $2::int) AND project_id = $3 ORDER BY taken_on", [today(), DAYS, pid]);
   const before = Object.fromEntries(week.map((r) => [r.platform, r.data]));
   const live = result ? new Set(result.networks) : null;
   for (const net of NETWORKS) {
@@ -206,11 +210,18 @@ const END_OF_DAY = '23:40';
 async function endOfDay(now = new Date()) {
   const hm = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
   if (hm < END_OF_DAY || !social.list().some((p) => p.configured())) return null;
-  const { rows: [r] } = await db.query(
-    `SELECT count(*)::int AS n, count(*) FILTER (WHERE updated_at < ($1::date + $2::time) AT TIME ZONE '${TZ}')::int AS old
-       FROM social_snapshots WHERE taken_on = $1 AND platform IN ('instagram', 'youtube')`, [dayOf(now), END_OF_DAY]);
-  if (r.n && !r.old) return null; // já lido depois das 23:40
-  return refresh({ force: true, only: ['instagram', 'youtube'] });
+  const projects = require('./projects');
+  await projects.refresh();
+  const mine = projects.all().filter((p) => projects.has(p, 'redes'));
+  const out = [];
+  for (const pr of (mine.length ? mine : [projects.get(projects.defaultId())].filter(Boolean))) {
+    const { rows: [r] } = await db.query(
+      `SELECT count(*)::int AS n, count(*) FILTER (WHERE updated_at < ($1::date + $2::time) AT TIME ZONE '${TZ}')::int AS old
+         FROM social_snapshots WHERE taken_on = $1 AND project_id = $3 AND platform IN ('instagram', 'youtube')`, [dayOf(now), END_OF_DAY, pr.id]);
+    if (r.n && !r.old) continue; // já lido depois das 23:40
+    out.push(await refresh({ force: true, only: ['instagram', 'youtube'], projectId: pr.id }));
+  }
+  return out.length ? out[0] : null;
 }
 
 module.exports = { NETWORKS, DAYS, overview, refresh, endOfDay, fromOutstand, fromZernio, accounts, outstandGet, zernioGet };

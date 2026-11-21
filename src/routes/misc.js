@@ -145,7 +145,7 @@ router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, 
     storage: config.storageConfigured ? { direct: config.uploadDirect, origin: new URL(config.appBaseUrl).origin, cors: await require('../services/b2').corsStatus(new URL(config.appBaseUrl).origin) } : null,
     social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), by: p.by, env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))), outstandTiktok: await require('../services/outstand').tiktokMode(), outstandProcess: await require('../services/outstand').processMedia(),
       routeMap: await require('../services/socialApi').routeMap(), overrides: await require('../services/socialApi').routes(), networks: Object.fromEntries(Object.entries(require('../services/socialApi').PLATFORMS).map(([k, v]) => [k, v.label])),
-      accounts: await require('../services/socialHealth').overview(), problems: await require('../services/socialHealth').problems() },
+      accounts: await require('../services/socialHealth').overview({ pids: require('../services/scope').idsOf(req) }), problems: await require('../services/socialHealth').problems({ pids: require('../services/scope').idsOf(req) }) },
     comments: await commentsSetup(),
   });
 }));

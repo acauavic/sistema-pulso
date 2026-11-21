@@ -26,6 +26,16 @@ async function set(key, value) {
   return out;
 }
 
+// Ajuste de um projeto: a mesma chave com o projeto no fim (`respostas_ia:2`). O projeto padrão usa a chave sem
+// sufixo, para nada do que já existe mudar de lugar.
+const keyFor = (key, projectId = null) => {
+  const projects = require('./projects');
+  const id = projectId == null ? projects.defaultId() : Number(projectId);
+  return id === projects.defaultId() ? key : `${key}:${id}`;
+};
+const getFor = (key, projectId = null) => get(keyFor(key, projectId));
+const setFor = (key, projectId, value) => set(keyFor(key, projectId), value);
+
 // Episódio que é entrega de um patrocinador (exclusivo) não recebe inserção de outro — se a gestão deixar ligado.
 const blockInsertion = async () => (await get('block_insertion_in_exclusive')) === 'true';
 
@@ -43,4 +53,4 @@ async function getMany(keys) {
   return Object.fromEntries(keys.map((k) => [k, found[k] ?? DEFAULTS[k] ?? '']));
 }
 
-module.exports = { get, getMany, set, blockInsertion, conflict };
+module.exports = { get, getMany, set, keyFor, getFor, setFor, blockInsertion, conflict };

@@ -115,14 +115,15 @@ async function forPublication(pubId) {
 }
 
 // Os cortes que mais funcionaram (soma das views nos últimos `days`), com os textos que foram ao ar.
-async function top({ days = WINDOW_DAYS, limit = 10 } = {}) {
+async function top({ days = WINDOW_DAYS, limit = 10, pids = null } = {}) {
+  const only = pids ? ` AND c.project_id = ANY('{${(pids || []).map(Number).filter(Number.isInteger).join(',')}}'::int[])` : '';
   const { rows } = await db.query(
     `SELECT c.id, c.title, c.post_title, c.cover_texts, c.cover_id, e.number AS ep_number, g.name AS guest_name,
             sum(m.views)::bigint AS views, sum(m.likes)::bigint AS likes, sum(m.comments)::bigint AS comments, sum(m.shares)::bigint AS shares,
             (array_agg(p.title ORDER BY p.created_at DESC))[1] AS pub_title, (array_agg(p.description ORDER BY p.created_at DESC))[1] AS pub_caption
        FROM post_metrics m JOIN episode_publications p ON p.id = m.publication_id JOIN episode_clips c ON c.id = p.clip_id
        LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id
-      WHERE coalesce(m.published_at, p.created_at) > now() - make_interval(days => $1)
+      WHERE coalesce(m.published_at, p.created_at) > now() - make_interval(days => $1)${only}
       GROUP BY c.id, e.number, g.name HAVING sum(m.views) > 0 ORDER BY sum(m.views) DESC LIMIT $2`, [days, limit]);
   return rows.map((r) => ({ ...r, views: Number(r.views || 0), likes: Number(r.likes || 0), comments: Number(r.comments || 0), shares: Number(r.shares || 0) }));
 }

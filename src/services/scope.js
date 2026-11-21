@@ -73,10 +73,21 @@ function assert(req, projectId) {
 
 // De que módulo é uma tela (projects.modules): ao trocar para um projeto que não usa o módulo da tela aberta, a pessoa vai para o Início.
 const PATH_MODULES = [[/^\/convidados/, 'convidados'], [/^\/patrocinadores/, 'patrocinio'], [/^\/(episodios|conteudo|cortes|capas)/, 'producao'],
-  [/^\/social/, 'redes'], [/^\/plateia/, 'plateia'], [/^\/financeiro/, 'financeiro']];
+  [/^\/social/, 'redes'], [/^\/plateia/, 'plateia'], [/^\/financeiro/, 'financeiro'], [/^\/pautas/, 'producao'], [/^\/duplicatas/, 'convidados']];
 const moduleOfPath = (p) => (PATH_MODULES.find(([re]) => re.test(String(p || ''))) || [])[1] || null;
+
+// Tela de um módulo que NENHUM projeto da pessoa usa não existe para ela (404): o menu já não mostra, e isto fecha o
+// caminho pelo endereço. Vale pelos projetos dela, não pelo escolhido no menu: trocar de projeto já leva ao Início
+// (moduleOfPath), e o que foi criado antes de o módulo ser desligado continua alcançável.
+function requireModule(req, res, next) {
+  const key = moduleOfPath(req.path);
+  if (!key || !req.scope) return next();
+  const list = req.scope.projects || [];
+  if (!list.length || list.some((p) => projects.has(p, key))) return next();
+  return next(Object.assign(new Error('Módulo não usado pelos projetos da pessoa'), { status: 404 }));
+}
 
 // Só caminho do próprio painel (nunca um endereço de fora): para onde voltar depois de trocar o projeto.
 const localPath = (value) => (typeof value === 'string' && /^\/(?![/\\])/.test(value) && !/[\\\r\n]/.test(value) ? value.slice(0, 2000) : '/');
 
-module.exports = { attach, where, idsOf, financeIdsOf, target, assert, canSee, localPath, moduleOfPath };
+module.exports = { attach, where, idsOf, financeIdsOf, target, assert, canSee, localPath, moduleOfPath, requireModule };

@@ -78,6 +78,14 @@ dinheiro são sempre de um projeto**. Convidados, patrocinadores, episódios, co
   projetos, integrações, categorias, rotinas, notificações, lembretes, busca, contatos, cadência, estoque, auditoria e
   lixeira completa (`HOUSE_PERMISSIONS`); quem não é perde isso mesmo com perfil de Gestão, e o superadmin é sempre da
   casa. O **financeiro** pede o perfil (`finance.read`) **e** o interruptor "Vê o financeiro" naquele projeto.
+- **Redes por projeto**: cada projeto tem as contas dele no provedor (`UPLOAD_POST_USER_<SLUG>`,
+  `ZERNIO_PROFILE_ID_<SLUG>`, `OUTSTAND_ACCOUNTS_<SLUG>`; sem variável, as contas de sempre — a chave de API é uma só).
+  A publicação sai pela conta do projeto do corte/vídeo; publicações, insights, comentários, automações e ideias seguem
+  o seletor; os números das redes são guardados por projeto. A configuração das respostas por IA, os links (canal,
+  comunidade, Spotify) e o contexto da IA (`projects.ai_context`, em Gestão > Projetos) também são por projeto.
+  **Ainda da casa**: os Números dos comentários (Social > Comentários > Números) somam os posts de todos os projetos.
+- **Módulos**: tela de um módulo que nenhum projeto da pessoa usa responde 404 (`scope.requireModule`); o menu já não
+  mostra, e trocar para um projeto que não usa a tela aberta leva ao Início.
 - **Isolamento**: página, ação ou arquivo de projeto que a pessoa não participa responde 404. O teste
   `test/project-isolation.test.js` percorre **todas** as rotas GET registradas no Express com ids do outro projeto e
   falha se algum marcador aparecer — rota nova entra na conferência sozinha.

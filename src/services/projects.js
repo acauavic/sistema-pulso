@@ -23,6 +23,8 @@ const get = (id) => rows.find((p) => p.id === Number(id)) || null;
 const defaultId = () => (all()[0] || rows[0] || { id: 1 }).id;
 const has = (project, module) => Boolean(project && project.modules && project.modules[module]);
 // Nome que quem está de fora vê (convite, portal, e-mail): o nome público do projeto, senão o nome dele.
+// Uma linha dizendo o que o projeto é, para a IA das respostas e dos directs ("podcast de saúde…").
+const aiContext = (projectId) => { const p = get(projectId == null ? defaultId() : projectId); return (p && p.ai_context) || ''; };
 const publicName = (projectId) => { const p = get(projectId == null ? defaultId() : projectId); return p ? (p.public_name || p.name) : ''; };
 const label = (project, plural = true) => (project ? (plural ? project.video_label_plural : project.video_label) : (plural ? 'Episódios' : 'Episódio'));
 
@@ -113,6 +115,7 @@ async function update(id, body) {
     name: text(body.name, 60), sigla: text(body.sigla, 12).toUpperCase(), video_label: text(body.video_label, 30),
     video_label_plural: text(body.video_label_plural, 30), number_prefix: text(body.number_prefix, 8),
     public_name: text(body.public_name, 80) || null,
+    ai_context: text(body.ai_context, 200) || null,
     public_host: host(body.public_host) || null, short_link_host: host(body.short_link_host) || null,
     mail_from_name: text(body.mail_from_name, 60) || null, mail_from_address: text(body.mail_from_address, 120).toLowerCase() || null,
   };
@@ -129,9 +132,10 @@ async function update(id, body) {
   try {
     const { rows: [project] } = await db.query(
       `UPDATE projects SET name = $2, sigla = $3, video_label = $4, video_label_plural = $5, number_prefix = $6,
-              public_name = $7, public_host = $8, short_link_host = $9, mail_from_name = $10, mail_from_address = $11, updated_at = now()
+              public_name = $7, public_host = $8, short_link_host = $9, mail_from_name = $10, mail_from_address = $11,
+              ai_context = $12, updated_at = now()
         WHERE id = $1 RETURNING *`,
-      [id, v.name, v.sigla, v.video_label, v.video_label_plural, v.number_prefix, v.public_name, v.public_host, v.short_link_host, v.mail_from_name, v.mail_from_address]);
+      [id, v.name, v.sigla, v.video_label, v.video_label_plural, v.number_prefix, v.public_name, v.public_host, v.short_link_host, v.mail_from_name, v.mail_from_address, v.ai_context]);
     if (!project) return { error: 'Projeto não encontrado.' };
     await refresh(true);
     return { project };
@@ -141,4 +145,4 @@ async function update(id, body) {
   }
 }
 
-module.exports = { refresh, all, get, defaultId, has, label, publicName, currentFor, membershipsOf, members, addMember, setMembers, setUserProjects, setLast, update };
+module.exports = { refresh, all, get, defaultId, has, label, publicName, aiContext, currentFor, membershipsOf, members, addMember, setMembers, setUserProjects, setLast, update };

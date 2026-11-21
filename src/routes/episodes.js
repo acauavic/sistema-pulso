@@ -340,7 +340,7 @@ router.get('/episodios/:id', requirePerm('episodes.read'), wrap(async (req, res)
   // o resto da página, também em paralelo (antes: uma consulta depois da outra)
   const [provider, ls, social, finRaw, finSettings, epComments, trJob, allSponsors, reviewComments] = await Promise.all([
     socialApi.active(), socialApi.liveState(),
-    can(req.user, 'production.review') && ['pronto_publicar', 'publicado'].includes(ep.status) ? socialApi.connectedAll() : null,
+    can(req.user, 'production.review') && ['pronto_publicar', 'publicado'].includes(ep.status) ? socialApi.connectedAll({ projectId: ep.project_id }) : null,
     can(req.user, 'finance.read') ? finSvc.episodeFinance(ep.id) : null,
     can(req.user, 'finance.read') ? finSvc.settings() : null,
     commentsSvc.list('episode', ep.id),

@@ -70,8 +70,15 @@ const unusedClips = () => availableClips();
 const unusedImages = () => availableImages();
 
 const STATUS_LABEL = { revisao: 'Em revisão', recusado: 'Devolvido', simulado: 'Simulado', enviando: 'Enviando', agendado: 'Agendado', publicado: 'Publicado', parcial: 'Parcial', erro: 'Erro' };
-async function listPublications({ status = '', media = '', q = '', limit = 200, offset = 0 } = {}) {
+// `pids`: o recorte de projeto. A publicação herda o projeto pela raiz (corte, senão episódio).
+const pubProject = (ids) => {
+  const list = (ids || []).map(Number).filter(Number.isInteger);
+  return ids ? `coalesce(c.project_id, e.project_id) = ANY('{${list.join(',')}}'::int[])` : '';
+};
+
+async function listPublications({ status = '', media = '', q = '', limit = 200, offset = 0, pids = null } = {}) {
   const where = []; const params = [];
+  if (pids) where.push(pubProject(pids));
   if (STATUS_LABEL[status]) { params.push(status); where.push(`p.status = $${params.length}`); }
   if (['video', 'imagem', 'carrossel', 'story'].includes(media)) { params.push(media); where.push(`p.media = $${params.length}`); }
   const term = String(q || '').trim().slice(0, 80);
@@ -82,7 +89,8 @@ async function listPublications({ status = '', media = '', q = '', limit = 200, 
   }
   params.push(limit);
   const { rows } = await db.query(
-    `SELECT p.*, e.number AS episode_number, e.title AS episode_title, c.title AS clip_title, u.name AS created_by_name
+    `SELECT p.*, e.number AS episode_number, e.title AS episode_title, e.project_id AS episode_project_id,
+            c.title AS clip_title, c.project_id AS clip_project_id, u.name AS created_by_name
        FROM episode_publications p LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN users u ON u.id = p.created_by
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY coalesce(p.scheduled_at, p.created_at) DESC, p.id DESC LIMIT $${params.length} OFFSET ${Math.max(0, Number(offset) || 0)}`, params);
@@ -342,11 +350,13 @@ async function runRules() {
 
 // ---------------------------------------------------------------- insights (números das redes: services/socialInsights.js)
 // O que a equipe publicou nos últimos 30 dias (dos nossos registros).
-async function ourActivity() {
+async function ourActivity({ pids = null } = {}) {
+  const only = pids ? ` AND ${pubProject(pids)}` : '';
+  const join = 'LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id';
   const { rows } = await db.query(
-    `SELECT media, status, count(*)::int AS n FROM episode_publications WHERE created_at > now() - interval '30 days' GROUP BY media, status`);
+    `SELECT p.media, p.status, count(*)::int AS n FROM episode_publications p ${join} WHERE p.created_at > now() - interval '30 days'${only} GROUP BY p.media, p.status`);
   const { rows: byPlatform } = await db.query(
-    `SELECT unnest(platforms) AS platform, count(*)::int AS n FROM episode_publications WHERE created_at > now() - interval '30 days' AND status IN ('publicado','parcial') GROUP BY 1 ORDER BY 2 DESC`);
+    `SELECT unnest(p.platforms) AS platform, count(*)::int AS n FROM episode_publications p ${join} WHERE p.created_at > now() - interval '30 days' AND p.status IN ('publicado','parcial')${only} GROUP BY 1 ORDER BY 2 DESC`);
   const total = (filter) => rows.filter(filter).reduce((s, r) => s + r.n, 0);
   return {
     published: total((r) => ['publicado', 'parcial'].includes(r.status)), scheduled: total((r) => r.status === 'agendado'), failed: total((r) => r.status === 'erro'), tested: total((r) => r.status === 'simulado'),
@@ -356,6 +366,7 @@ async function ourActivity() {
 }
 
 module.exports = {
+  pubProject,
   USED, STATUS_LABEL, IDEA_KINDS, unusedClips, unusedImages, availableClips, availableImages, listPublications, editPublication,
   fingerprint, similar, doneFor, generateIdeas, has, record, claimItem, runRules, runCommentRule, runDirectRule, ourActivity,
 };

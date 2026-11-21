@@ -43,9 +43,9 @@ describe('projetos: seletor no menu', () => {
     assert.match(m, /<strong>Projeto 100<\/strong>/);
     assert.match(m, /name="project" value="2" class="on" aria-current="true">/);
     assert.match(m, /<span class="project-now mono">P100<\/span>/);
-    // o Projeto 100 trabalha com vídeos, convidados e conteúdo; patrocínio, redes, plateia e financeiro ainda não são dele
-    for (const item of ['Patrocinadores', 'Social', 'Plateia', 'Financeiro']) assert.doesNotMatch(m, new RegExp(`<span>${item}</span>`), item);
-    for (const item of ['Painel', 'Tarefas', 'Calendário', 'Mensagens', 'Painel de gestão', 'Convidados', 'Conteúdo']) assert.match(m, new RegExp(`<span>${item}</span>`), item);
+    // o Projeto 100 trabalha com vídeos, convidados, conteúdo e o dinheiro dele; patrocínio, redes e plateia ainda não são dele
+    for (const item of ['Patrocinadores', 'Social', 'Plateia']) assert.doesNotMatch(m, new RegExp(`<span>${item}</span>`), item);
+    for (const item of ['Painel', 'Tarefas', 'Calendário', 'Mensagens', 'Painel de gestão', 'Convidados', 'Conteúdo', 'Financeiro']) assert.match(m, new RegExp(`<span>${item}</span>`), item);
     assert.match(m, /<span>Vídeos<\/span>/, 'o item usa o nome que o projeto dá aos seus vídeos');
     assert.match(m, />Operação</, 'com Convidados e Conteúdo, o grupo aparece');
   });

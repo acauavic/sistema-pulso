@@ -65,7 +65,7 @@ async function navData(req, res, next) {
     res.locals.navCounts = counts.rows[0];
     res.locals.teamUsers = users.rows;
     // contas de redes que caíram (só para quem mexe com social ou integrações): a faixa de alerta nas telas
-    if (can(req.user, 'social.read') || can(req.user, 'integrations.manage')) res.locals.socialProblems = await require('./services/socialHealth').problemsCached();
+    if (can(req.user, 'social.read') || can(req.user, 'integrations.manage')) res.locals.socialProblems = await require('./services/socialHealth').problemsCached({ pids: req.scope && req.scope.ids });
   } catch (err) {
     console.error('menu:', err.message);
   }

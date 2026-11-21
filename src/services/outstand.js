@@ -67,19 +67,24 @@ async function call(method, path, { body = null, idempotency = null, timeout = 3
   throw last;
 }
 
-let cache = { at: 0, value: null };
+// Um cache por conjunto de contas (cada projeto tem as dele).
+const caches = new Map();
+const cacheOf = (k) => { if (!caches.has(k)) caches.set(k, { at: 0, value: null, refreshing: null }); return caches.get(k); };
 // Contas conectadas (só leitura), no formato do painel: { youtube: { handle, name, reauth, accountId } }. Guarda 60 s.
 // force (botão "Testar"): confere também o token de cada conta (GET /v1/social-accounts/:id/health) e marca "reconectar".
-let refreshing = null; // consulta em andamento: quem chega junto espera a mesma (sem pedidos repetidos ao provedor)
 // Depois de 60 s a tela não espera o provedor: mostra o último estado (até 10 min) e atualiza por trás.
-async function connected({ force = false, fresh = false } = {}) {
+// `outstandAccounts`: ids das contas daquele projeto (OUTSTAND_ACCOUNTS_<SLUG>); null = todas as contas da chave.
+async function connected({ force = false, fresh = false, outstandAccounts = null } = {}) {
   if (!config.outstandConfigured) return { ok: false, platforms: {}, error: 'OUTSTAND_API_KEY não configurada.' };
+  const only = outstandAccounts && outstandAccounts.length ? new Set(outstandAccounts.map(String)) : null;
+  const key = only ? [...only].sort().join(',') : '';
+  const cache = cacheOf(key);
   if (!force && !fresh) {
     const age = Date.now() - cache.at;
     if (cache.value && age < 60_000) return cache.value;
-    if (!refreshing) refreshing = connected({ fresh: true }).finally(() => { refreshing = null; });
+    if (!cache.refreshing) cache.refreshing = connected({ fresh: true, outstandAccounts }).finally(() => { cache.refreshing = null; });
     if (cache.value && age < 10 * 60_000) return cache.value;
-    return refreshing;
+    return cache.refreshing;
   }
   let value;
   try {
@@ -94,6 +99,7 @@ async function connected({ force = false, fresh = false } = {}) {
     for (const acc of rows) {
       const ours = NETWORKS.includes(acc.network) ? acc.network : null;
       if (!ours || !acc.isActive || platforms[ours]) continue; // uma conta por rede: a primeira ativa
+      if (only && !only.has(String(acc.id))) continue; // conta de outro projeto
       platforms[ours] = { handle: acc.username || acc.nickname || '', name: acc.nickname || '', reauth: false, accountId: acc.id, capabilities: [] };
     }
     if (force) {
@@ -105,10 +111,10 @@ async function connected({ force = false, fresh = false } = {}) {
   } catch (err) {
     value = { ok: false, platforms: {}, error: err.message };
   }
-  cache = { at: Date.now(), value };
+  caches.set(key, { ...cacheOf(key), at: Date.now(), value });
   return value;
 }
-const resetCache = () => { cache = { at: 0, value: null }; refreshing = null; };
+const resetCache = () => caches.clear();
 
 // Como o TikTok sai: 'direto' (publica) ou 'rascunho' (vai para a caixa do TikTok e a pessoa termina no app). Padrão: direto.
 const tiktokMode = async () => ((await settings.get('outstand_tiktok_mode')) === 'rascunho' ? 'rascunho' : 'direto');

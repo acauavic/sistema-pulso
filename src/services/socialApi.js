@@ -45,6 +45,21 @@ const ORDER = ['uploadpost', 'zernio', 'outstand'];
 
 const get = (id) => PROVIDERS[id] || PROVIDERS.uploadpost;
 
+// Conta de cada provedor no projeto: o que as variáveis do projeto dizem; sem isso, a conta de sempre (o Pulso).
+// Quem publica e quem lê contas passa isso adiante, para cada projeto sair nas redes dele.
+function profileFor(projectId = null) {
+  const projects = require('./projects');
+  const p = projects.get(projectId == null ? projects.defaultId() : projectId);
+  const own = p ? config.socialEnv(p.slug) : {};
+  return {
+    projectId: p ? p.id : null,
+    uploadPostUser: own.uploadPostUser || config.uploadPost.user,
+    zernioProfileId: own.zernioProfileId || config.zernio.profileId,
+    outstandAccounts: (own.outstandAccounts && own.outstandAccounts.length) ? own.outstandAccounts : null, // null = todas as contas da chave
+    own: Boolean(own.uploadPostUser || own.zernioProfileId || (own.outstandAccounts && own.outstandAccounts.length)),
+  };
+}
+
 // O escolhido em Integrações, se tiver chave; senão o primeiro configurado (Upload-Post antes, como sempre foi).
 async function activeId() {
   const chosen = await settings.get('social_provider');
@@ -103,14 +118,15 @@ async function plan(platforms) {
 // Marcar pessoas em vídeo do Instagram: a Outstand exige posição e o Instagram recusa posição em vídeo, então por ela não vai.
 const videoTags = async () => (await plan(['instagram']))[0]?.provider.id !== 'outstand';
 // Contas conectadas por rede, cada uma vinda do provedor que atende a rede: { ok, platforms: { rede: { handle, reauth, provider… } }, errors }.
-async function connectedAll({ force = false } = {}) {
+async function connectedAll({ force = false, projectId = null } = {}) {
   const map = await routeMap(); const ids = [...new Set(Object.values(map))];
+  const profile = profileFor(projectId); // cada projeto lê as contas dele no provedor
   const conns = {};
-  await Promise.all(ids.map(async (id) => { conns[id] = PROVIDERS[id].configured() ? await PROVIDERS[id].connected({ force }) : { ok: false, platforms: {}, error: `${PROVIDERS[id].env} não configurada.` }; }));
+  await Promise.all(ids.map(async (id) => { conns[id] = PROVIDERS[id].configured() ? await PROVIDERS[id].connected({ force, ...profile }) : { ok: false, platforms: {}, error: `${PROVIDERS[id].env} não configurada.` }; }));
   const platforms = {};
   for (const [net, id] of Object.entries(map)) if (conns[id].platforms?.[net]) platforms[net] = { ...conns[id].platforms[net], provider: id };
   const errors = ids.filter((id) => !conns[id].ok).map((id) => ({ provider: id, label: PROVIDERS[id].label, error: conns[id].error }));
-  return { ok: !errors.length, platforms, errors, error: errors.map((e) => `${e.label}: ${e.error}`).join(' · ') || undefined, routes: map };
+  return { ok: !errors.length, platforms, errors, error: errors.map((e) => `${e.label}: ${e.error}`).join(' · ') || undefined, routes: map, profile };
 }
 // Algum provedor em uso (padrão ou rota) está em modo de teste? Para o aviso das telas de Social.
 async function liveState() {
@@ -164,4 +180,4 @@ function sentMessage(pub, { trail = '' } = {}) {
   return `Enviado ${joinNames(ps.map((x) => x.to))}.${trail}`;
 }
 
-module.exports = { videoTags, syncLive, setLive, liveSource, sentMessage, PROVIDERS, PLATFORMS: up.PLATFORMS, DEFAULTS: up.DEFAULTS, MAX_LINK_SECONDS: up.MAX_LINK_SECONDS, get, active, activeId, state, choose, list, routes, setRoutes, routeMap, plan, connectedAll, providersOf, joinNames, liveState };
+module.exports = { profileFor, videoTags, syncLive, setLive, liveSource, sentMessage, PROVIDERS, PLATFORMS: up.PLATFORMS, DEFAULTS: up.DEFAULTS, MAX_LINK_SECONDS: up.MAX_LINK_SECONDS, get, active, activeId, state, choose, list, routes, setRoutes, routeMap, plan, connectedAll, providersOf, joinNames, liveState };

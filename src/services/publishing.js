@@ -36,6 +36,9 @@ function targetOf(pub) {
   return loadTarget({ episodeId: pub.episode_id, clipId: pub.clip_id, media: pub.media, coverIds: pub.cover_ids });
 }
 
+// De que projeto é o que está sendo publicado (o corte manda; senão o episódio): as contas das redes são as dele.
+const projectOf = (target) => (target && ((target.clip && target.clip.project_id) || (target.covers && target.covers[0] && target.covers[0].project_id) || (target.episode && target.episode.project_id))) || null;
+
 async function loadTarget({ episodeId, clipId, media = 'video', coverIds = [] }) {
   if (media !== 'video') { // imagens geradas no editor de capas (post, carrossel, story)
     const ids = [...new Set((coverIds || []).map(Number).filter(Number.isInteger))];
@@ -93,14 +96,15 @@ async function create({ episodeId, clipId = null, media = 'video', coverIds = []
   }
   if (!check.ok) { const err = new Error(check.issues[0]); err.issues = check.issues; throw err; }
   const groups = await social.plan(list); // cada rede sai pelo provedor dela (padrão ou rota); pode haver mais de um provedor
+  const profile = social.profileFor(projectOf(target)); // as contas são as do projeto do corte/episódio
   if (!review) {
     for (const g of groups) {
       if (!g.provider.live()) continue;
-      const conn = await g.provider.connected();
+      const conn = await g.provider.connected(profile);
       if (!conn.ok) throw new Error(`Não foi possível consultar as redes conectadas ${g.provider.at}: ${conn.error}`);
       const missing = g.platforms.filter((p) => !conn.platforms[p]);
       if (missing.length) throw new Error(`Sem conta conectada ${g.provider.at}: ${names(missing)}.`);
-      const stale = [...new Set([...g.platforms.filter((p) => conn.platforms[p]?.reauth), ...await health.reauthOf(g.provider.id, g.platforms)])];
+      const stale = [...new Set([...g.platforms.filter((p) => conn.platforms[p]?.reauth), ...await health.reauthOf(g.provider.id, g.platforms, profile.projectId)])];
       if (stale.length) throw new Error(`Reconecte ${names(stale)} ${g.provider.at}: o acesso da conta venceu e a publicação falharia.`);
     }
   }
@@ -215,6 +219,7 @@ async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {
   let outcomes = [];
   try {
     const target = await targetOf(pub);
+    const profile = social.profileFor(projectOf(target)); // as contas são as do projeto do corte/episódio
     // agendado/revisão: sai pelos provedores atuais na hora de enviar (a gestão pode ter trocado nesse meio-tempo)
     const groups = await social.plan(platforms);
     const planned = Object.fromEntries(groups.flatMap((g) => g.platforms.map((p) => [p, g.provider.id])));
@@ -226,14 +231,14 @@ async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {
     for (const g of byText(pub, groups)) {
       const key = keyFor(pub, g);
       try {
-        const conn = g.provider.live() ? await g.provider.connected() : { platforms: {} };
+        const conn = g.provider.live() ? await g.provider.connected(profile) : { platforms: {} };
         const sent = target.kind === 'photo'
-          ? await g.provider.sendPhotos({ id: pub.id, media: pub.media, platforms: g.platforms, title: g.title, description: g.description, photoUrls: media.photosFor(g), accounts: conn.platforms, instagram: pub.options?.instagram || null, idempotencyKey: key })
+          ? await g.provider.sendPhotos({ id: pub.id, media: pub.media, platforms: g.platforms, title: g.title, description: g.description, photoUrls: media.photosFor(g), accounts: conn.platforms, instagram: pub.options?.instagram || null, idempotencyKey: key, ...profile })
           : await g.provider.sendVideo({
             id: pub.id, kind: target.kind, platforms: g.platforms, title: g.title, description: g.description, videoUrl: media.videoFor(g),
             coverUrl: target.kind === 'clip' ? media.coverFor(g) : null, thumbnailUrl: target.kind === 'episode' ? media.coverFor(g) : null, tags: pub.options?.tags || [], accounts: conn.platforms,
             instagram: pub.options?.instagram || null, durationSec: target.durationMs ? target.durationMs / 1000 : null, idempotencyKey: key,
-            sizeBytes: target.size || null, processMedia: Boolean(pub.options?.process_media),
+            sizeBytes: target.size || null, processMedia: Boolean(pub.options?.process_media), ...profile,
           });
         outcomes.push({ g, sent, key });
       } catch (err) { outcomes.push({ g, error: err, key }); }

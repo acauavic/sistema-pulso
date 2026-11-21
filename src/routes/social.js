@@ -24,7 +24,7 @@ const pubLive = () => socialApi.liveState(); // publicar: algum provedor em uso 
 // contador da aba Comentários (o que precisa de alguém)
 router.use('/social', (req, res, next) => {
   if (req.method !== 'GET' || !req.user || !can(req.user, 'social.comments')) return next();
-  require('../services/commentReplies').pendingCount().then((n) => { res.locals.commentsPending = n; next(); }, next);
+  require('../services/commentReplies').pendingCount({ pids: require('../services/scope').idsOf(req) }).then((n) => { res.locals.commentsPending = n; next(); }, next);
 });
 router.get('/social', requirePerm('social.read'), (req, res) => res.redirect('/social/publicacoes'));
 
@@ -35,9 +35,12 @@ router.get('/social/publicacoes', requirePerm('social.read'), wrap(async (req, r
   const q = String(req.query.q || '').trim().slice(0, 80);
   const { pageOf, paginate } = require('../utils/pager');
   const pg = pageOf(req, 50);
+  const pids = require('../services/scope').idsOf(req); // publicações do projeto escolhido
   const [rawPubs, counts] = await Promise.all([
-    social.listPublications({ status, media, q, limit: pg.limit, offset: pg.offset }),
-    db.query('SELECT status, count(*)::int AS n FROM episode_publications GROUP BY status'),
+    social.listPublications({ status, media, q, limit: pg.limit, offset: pg.offset, pids }),
+    db.query(`SELECT p.status, count(*)::int AS n FROM episode_publications p
+                LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id
+               WHERE ${social.pubProject(pids)} GROUP BY p.status`),
   ]);
   const { rows: pubs, pager } = paginate(req, rawPubs, pg);
   res.render('social/publications', {
@@ -46,12 +49,17 @@ router.get('/social/publicacoes', requirePerm('social.read'), wrap(async (req, r
   });
 }));
 
-async function findPub(id) {
+// De que projeto é a publicação: do corte, senão do episódio (ela herda pela raiz).
+const projectOfPub = (pub) => (pub && (pub.clip_project_id || pub.episode_project_id)) || null;
+
+async function findPub(req, id) {
   if (!isIntId(id)) return null;
   const { rows: [p] } = await db.query(
-    `SELECT p.*, e.number AS episode_number, e.title AS episode_title, c.title AS clip_title, u.name AS created_by_name
+    `SELECT p.*, e.number AS episode_number, e.title AS episode_title, e.project_id AS episode_project_id,
+            c.title AS clip_title, c.project_id AS clip_project_id, u.name AS created_by_name
        FROM episode_publications p LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN users u ON u.id = p.created_by WHERE p.id = $1`, [id]);
-  return p || null;
+  if (!p) return null;
+  return require('../services/scope').canSee(req, projectOfPub(p)) ? p : null; // de outro projeto: como se não existisse
 }
 
 // Histórico de envio: por que a tentativa começou e o que foi feito com o arquivo (hospedado na Outstand, conferido no Backblaze).
@@ -76,7 +84,7 @@ function warningText(w) {
 // rede que ainda não recebeu fica disponível; sem conta, desabilitada), e o texto que vai (o próprio da primeira que falhou).
 async function resendChoices(pub) {
   const nets = pub.media === 'story' ? ['instagram'] : pub.media !== 'video' ? up.PHOTO_PLATFORMS : pub.clip_id ? Object.keys(up.PLATFORMS).filter((k) => up.PLATFORMS[k].clip) : ['youtube'];
-  const conn = await socialApi.connectedAll().catch(() => ({ platforms: {} }));
+  const conn = await socialApi.connectedAll({ projectId: projectOfPub(pub) }).catch(() => ({ platforms: {} }));
   const hasConn = Object.keys(conn.platforms || {}).length > 0;
   const results = pub.results || [];
   const list = nets.map((k) => {
@@ -94,7 +102,7 @@ async function resendChoices(pub) {
 }
 
 router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (req, res) => {
-  const pub = await findPub(req.params.id);
+  const pub = await findPub(req, req.params.id);
   if (!pub) return notFound(res);
   const attempts = (await publishing.attemptsOf(pub.id)).map((a) => ({ ...a, triggerLabel: TRIGGER[a.trigger] || a.trigger, mediaText: mediaText(a.media) }));
   const okPlatforms = (pub.results || []).filter((r) => r.ok).map((r) => r.platform);
@@ -118,7 +126,7 @@ const canTouch = (req, pub) => can(req.user, 'social.publish') || (String(pub.cr
 const forbidden = (res) => res.status(403).render('error', { title: 'Sem permissão', message: 'Só a gestão mexe nesta publicação.' });
 
 router.post('/social/publicacoes/:id', requirePerm('social.request'), wrap(async (req, res) => {
-  const pub = await findPub(req.params.id);
+  const pub = await findPub(req, req.params.id);
   if (!pub) return notFound(res);
   if (!canTouch(req, pub)) return forbidden(res);
   let scheduledAt = null;
@@ -134,7 +142,7 @@ router.post('/social/publicacoes/:id', requirePerm('social.request'), wrap(async
 
 // Reenviar editando: só as redes marcadas, com o texto e o collab do Instagram desta vez (o que já saiu não muda).
 router.post('/social/publicacoes/:id/reenviar', requirePerm('social.publish'), wrap(async (req, res) => {
-  const pub = await findPub(req.params.id);
+  const pub = await findPub(req, req.params.id);
   if (!pub) return notFound(res);
   const back = `/social/publicacoes/${pub.id}`;
   const platforms = [].concat(req.body.platforms || []).map(String).filter((p) => up.PLATFORMS[p]);
@@ -153,7 +161,7 @@ router.post('/social/publicacoes/:id/reenviar', requirePerm('social.publish'), w
 // revisão da gestão
 // Uma rede foi postada por fora (pelo app da rede): registra o link e a rede passa a contar como no ar.
 router.post('/social/publicacoes/:id/por-fora', requirePerm('social.publish'), wrap(async (req, res) => {
-  const pub = await findPub(req.params.id);
+  const pub = await findPub(req, req.params.id);
   if (!pub) return notFound(res);
   const r = await publishing.markManual(pub.id, { platform: String(req.body.platform || ''), url: String(req.body.url || ''), user: req.user });
   if (r.error) await req.flash('error', r.error);
@@ -162,7 +170,7 @@ router.post('/social/publicacoes/:id/por-fora', requirePerm('social.publish'), w
 }));
 
 router.post('/social/publicacoes/:id/aprovar', requirePerm('social.publish'), wrap(async (req, res) => {
-  const pub = await findPub(req.params.id);
+  const pub = await findPub(req, req.params.id);
   if (!pub) return notFound(res);
   const done = await publishing.approve(pub.id, req.user);
   if (!done) await req.flash('error', 'Este pedido já foi revisado.');
@@ -173,7 +181,7 @@ router.post('/social/publicacoes/:id/aprovar', requirePerm('social.publish'), wr
   res.redirect(`/social/publicacoes/${pub.id}`);
 }));
 router.post('/social/publicacoes/:id/recusar', requirePerm('social.publish'), wrap(async (req, res) => {
-  const pub = await findPub(req.params.id);
+  const pub = await findPub(req, req.params.id);
   if (!pub) return notFound(res);
   const note = fmt.clean(req.body.note, 1000);
   if (note.length < 3) { await req.flash('error', 'Diga o que precisa mudar: a nota vai para quem pediu.'); return res.redirect(`/social/publicacoes/${pub.id}`); }
@@ -183,7 +191,7 @@ router.post('/social/publicacoes/:id/recusar', requirePerm('social.publish'), wr
 }));
 
 router.post('/social/publicacoes/:id/:acao(atualizar|repetir|parar|cancelar)', requirePerm('social.read'), wrap(async (req, res) => {
-  const pub = await findPub(req.params.id);
+  const pub = await findPub(req, req.params.id);
   if (!pub) return notFound(res);
   if (['repetir', 'parar'].includes(req.params.acao) && !can(req.user, 'social.publish')) return forbidden(res);
   if (req.params.acao === 'cancelar' && !canTouch(req, pub)) return forbidden(res);
@@ -202,7 +210,7 @@ router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => 
   const tipo = MEDIA[req.query.tipo] ? req.query.tipo : 'video';
   const provider = await socialApi.active();
   const showUsed = req.query.publicados === '1';
-  const [clips, images, conn, ls] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), socialApi.connectedAll(), socialApi.liveState()]);
+  const [clips, images, conn, ls] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), socialApi.connectedAll({ projectId: require('../services/scope').target(req, {}) }), socialApi.liveState()]);
   res.render('social/new', {
     defaultCtas: require('../services/socialCopy').forClip(null), autoDefaults: await require('../services/commentAutomation').formDefaults({}),
     videoTags: await socialApi.videoTags(), title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
@@ -332,7 +340,10 @@ router.post('/social/ideias/:id/:acao(aprovar|feita|descartar|reabrir)', require
 
 // ---------------------------------------------------------------- insights
 router.get('/social/insights', requirePerm('social.read'), wrap(async (req, res) => {
-  const [data, ours, best] = await Promise.all([require('../services/socialInsights').overview({ force: req.query.atualizar === '1' }), social.ourActivity(), require('../services/postMetrics').top({ limit: 10 })]);
+  const pids = require('../services/scope').idsOf(req);
+  const [data, ours, best] = await Promise.all([
+    require('../services/socialInsights').overview({ force: req.query.atualizar === '1', projectId: require('../services/scope').target(req, {}) }),
+    social.ourActivity({ pids }), require('../services/postMetrics').top({ limit: 10, pids })]);
   res.render('social/insights', { title: 'Insights', tab: 'insights', data, ours, best, platforms: up.PLATFORMS, MEDIA });
 }));
 
@@ -376,13 +387,13 @@ router.get('/social/automacoes', requirePerm('social.read'), wrap(async (req, re
   res.render('social/automations', {
     title: 'Automações', tab: 'automacoes', rules, triggers: TRIGGERS, actions: ACTIONS, commentPlatforms: COMMENT_PLATFORMS, platforms: up.PLATFORMS, igPosts,
     live: live(), configured: config.uploadPostConfigured, canAutomate: can(req.user, 'social.automate'), openNew: req.query.nova === '1',
-    links: await automation.links(), inbox: await automation.state(), outstandLive: config.outstand.live, canIntegrate: can(req.user, 'integrations.manage'),
+    links: await automation.links(require('../services/scope').target(req, {})), inbox: await automation.state(), outstandLive: config.outstand.live, canIntegrate: can(req.user, 'integrations.manage'),
   });
 }));
 
 // Links que a automação manda no direct: canal do YouTube, comunidade do WhatsApp e Spotify.
 router.post('/social/automacoes/links', requirePerm('social.automate'), wrap(async (req, res) => {
-  const r = await automation.setLinks(req.body);
+  const r = await automation.setLinks(req.body, { projectId: require('../services/scope').target(req, {}) });
   if (r.error) { await req.flash('error', r.error); return res.redirect('/social/automacoes'); }
   await audit(req, 'automacao.links', 'settings', null);
   await req.flash('ok', 'Links da automação salvos.');
@@ -466,21 +477,22 @@ const backTo = (req, fallback = '/social/comentarios') => { const v = String(req
 
 router.get('/social/comentarios', requirePerm('social.comments'), wrap(async (req, res) => {
   const pubId = isIntId(String(req.query.pub || '')) ? Number(req.query.pub) : null;
+  const pids = require('../services/scope').idsOf(req); // comentários dos posts do projeto escolhido
   const [cfg, counts, posts, sweepState, sendState] = await Promise.all([
-    replies.getConfig(), replies.counts({ pubId }), replies.postsWithComments(),
+    replies.getConfig(require('../services/scope').target(req, {})), replies.counts({ pubId, pids }), replies.postsWithComments({ pids }),
     require('../services/settings').get(`${replies.KEY}_varredura`), require('../services/settings').get(replies.SEND_KEY),
   ]);
   // abre onde há algo a fazer: precisam de você > para aprovar > na fila > enviadas
   const vista = replies.VIEWS[req.query.vista] ? req.query.vista : (['equipe', 'aprovar', 'fila', 'enviadas'].find((k) => counts[k]) || 'aprovar');
   const showAll = req.query.todos === '1';
-  const { rows, more } = await replies.list(vista, { pubId, limit: showAll ? 200 : 60 });
+  const { rows, more } = await replies.list(vista, { pubId, limit: showAll ? 200 : 60, pids });
   const parse = (s) => { try { return s ? JSON.parse(s) : {}; } catch { return {}; } };
   const eta = vista === 'fila' ? replies.estimate(rows, cfg, { nextAt: parse(sendState).next_at }) : new Map();
   res.render('social/comments', {
     title: 'Comentários', tab: 'comentarios', cfg, counts, rows, more, vista, pubId, posts, eta, VIEWS: replies.VIEWS, MODES: replies.MODES, NETWORK_LABEL: replies.NETWORK_LABEL,
     summary: replies.summary(cfg), lastSweep: parse(sweepState), canSetup: can(req.user, 'social.automate'), outstandLive: config.outstand.live,
     aiReady: config.geminiConfigured, outstandReady: config.outstandConfigured, showAll, REPLY_MAX: replies.REPLY_MAX,
-    dmToday: await replies.dmToday(), communityOk: Boolean((await require('../services/commentAutomation').links()).whatsapp_community), DM_DAYS: replies.DM_PER_PERSON_DAYS,
+    dmToday: await replies.dmToday(), communityOk: Boolean((await require('../services/commentAutomation').links(require('../services/scope').target(req, {}))).whatsapp_community), DM_DAYS: replies.DM_PER_PERSON_DAYS,
   });
 }));
 
@@ -501,7 +513,7 @@ router.get('/social/comentarios/numeros', requirePerm('social.comments'), wrap(a
 }));
 
 router.post('/social/comentarios/config', requirePerm('social.automate'), wrap(async (req, res) => {
-  const r = await replies.setConfig(req.body);
+  const r = await replies.setConfig(req.body, { projectId: require('../services/scope').target(req, {}) });
   if (r.error) { await req.flash('error', r.error); return res.redirect('/social/comentarios'); }
   await audit(req, 'respostas_ia.config', 'settings', null, { mode: r.config.mode, per_hour: r.config.per_hour });
   await req.flash('ok', 'Respostas por IA atualizadas.');
@@ -510,7 +522,7 @@ router.post('/social/comentarios/config', requirePerm('social.automate'), wrap(a
 
 router.post('/social/comentarios/ligar', requirePerm('social.automate'), wrap(async (req, res) => {
   const on = String(req.body.on) === '1';
-  await replies.setConfig({ on: on ? '1' : '0' }, { onlyToggle: true });
+  await replies.setConfig({ on: on ? '1' : '0' }, { onlyToggle: true, projectId: require('../services/scope').target(req, {}) });
   await audit(req, on ? 'respostas_ia.ligada' : 'respostas_ia.desligada', 'settings', null);
   if (on) await jobs.enqueue('comentarios_varredura', { payload: { days: 14 }, maxAttempts: 2, createdBy: req.user.id });
   await req.flash('ok', on ? 'Respostas por IA ligadas. Os comentários dos posts das últimas duas semanas estão sendo lidos agora.' : 'Respostas por IA desligadas. Nada mais sai, e a fila fica guardada.');
@@ -556,7 +568,7 @@ router.post('/social/comentarios/:id/:acao(aprovar|ignorar|tirar|tentar|apagar|s
 
 // Liga ou desliga a IA nos comentários de uma publicação.
 router.post('/social/publicacoes/:id/respostas-ia', requirePerm('social.automate'), wrap(async (req, res) => {
-  const pub = await findPub(req.params.id);
+  const pub = await findPub(req, req.params.id);
   if (!pub) return notFound(res);
   const on = String(req.body.on) === '1';
   await db.query('UPDATE episode_publications SET ai_replies = $2 WHERE id = $1', [pub.id, on]);

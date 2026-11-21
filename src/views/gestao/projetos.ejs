@@ -18,7 +18,7 @@
       <span class="mono small muted"><%= n %> <%= n === 1 ? 'pessoa' : 'pessoas' %></span>
       <span class="row cat-actions">
         <button class="btn sm" type="button" data-modal-open="proj-pessoas-<%= p.id %>"><%- icon('users', 14) %> Pessoas</button>
-        <button class="btn sm ghost" type="button" data-fill-modal="proj-editar" data-fill-action="/gestao/projetos/<%= p.id %>" data-fill="<%= JSON.stringify({ name: p.name, sigla: p.sigla, video_label: p.video_label, video_label_plural: p.video_label_plural, number_prefix: p.number_prefix, public_name: p.public_name || '', public_host: p.public_host || '', short_link_host: p.short_link_host || '', mail_from_name: p.mail_from_name || '', mail_from_address: p.mail_from_address || '' }) %>"><%- icon('pencil', 14) %> Editar</button>
+        <button class="btn sm ghost" type="button" data-fill-modal="proj-editar" data-fill-action="/gestao/projetos/<%= p.id %>" data-fill="<%= JSON.stringify({ name: p.name, sigla: p.sigla, video_label: p.video_label, video_label_plural: p.video_label_plural, number_prefix: p.number_prefix, public_name: p.public_name || '', public_host: p.public_host || '', short_link_host: p.short_link_host || '', mail_from_name: p.mail_from_name || '', mail_from_address: p.mail_from_address || '', ai_context: p.ai_context || '' }) %>"><%- icon('pencil', 14) %> Editar</button>
       </span>
     </li>
     <% }) %>
@@ -69,6 +69,7 @@
           <label>Remetente dos e-mails <small class="muted">(endereço)</small><input type="email" name="mail_from_address" maxlength="120" placeholder="ex.: contato@podcastpulso.com" autocapitalize="off" spellcheck="false"></label>
         </div>
         <p class="small muted m-0">O endereço precisa estar autenticado no Brevo. Em branco, vale o remetente padrão. Os e-mails da equipe saem como Health Scale Studio.</p>
+        <label>O que o projeto é, em uma linha <small class="muted">(a IA usa nas respostas aos comentários)</small><input type="text" name="ai_context" maxlength="200" placeholder="ex.: podcast de saúde, inovação, empreendedorismo e negócios"></label>
       </div>
     </details>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>

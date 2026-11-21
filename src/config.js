@@ -102,6 +102,16 @@ const config = {
   },
   // Encurtador de um projeto específico: YOURLS_LINK_<SLUG>/YOURLS_KEY_<SLUG> (ex.: YOURLS_LINK_PROJETO_100).
   // O projeto padrão usa as variáveis sem sufixo. Chave nenhuma fica no banco.
+  // Conta de cada provedor por projeto: UPLOAD_POST_USER_<SLUG>, ZERNIO_PROFILE_ID_<SLUG>, OUTSTAND_ACCOUNTS_<SLUG>
+  // (ids separados por vírgula). O projeto padrão usa as variáveis sem sufixo. Chave de API é uma só por provedor.
+  socialEnv: (slug) => {
+    const k = String(slug || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    return {
+      uploadPostUser: String(env[`UPLOAD_POST_USER_${k}`] || '').trim(),
+      zernioProfileId: String(env[`ZERNIO_PROFILE_ID_${k}`] || '').trim(),
+      outstandAccounts: String(env[`OUTSTAND_ACCOUNTS_${k}`] || '').split(',').map((s) => s.trim()).filter(Boolean),
+    };
+  },
   yourlsEnv: (slug) => {
     const k = String(slug || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_');
     return { base: normalizeBase(env[`YOURLS_LINK_${k}`]), key: env[`YOURLS_KEY_${k}`] || '' };
