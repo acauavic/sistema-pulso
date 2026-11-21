@@ -1,0 +1,22 @@
+<%#
+  Aviso de duplicata no formulário de cadastro (dentro do <form>): o que já existe e "Cadastrar mesmo assim".
+  Variáveis: duplicates (de duplicates.findFor), dupKind ('guest' | 'sponsor').
+%>
+<% if (typeof duplicates !== 'undefined' && duplicates && duplicates.length) { var sure = duplicates.some(function (d) { return d.level === 'certa' && !d.cross; }); var base = dupKind === 'guest' ? '/convidados/' : '/patrocinadores/'; var cross = duplicates.every(function (d) { return d.cross; }); %>
+<div class="dup-notice <%= sure ? 'sure' : '' %>" role="alert">
+  <%# de outro projeto não é duplicata: é a mesma pessoa/empresa, e o caminho é abrir o cadastro e usar "Convidar também" -%>
+  <p><strong><%= cross ? (dupKind === 'guest' ? 'Esta pessoa já está em outro projeto.' : 'Esta empresa já está em outro projeto.') : sure ? (dupKind === 'guest' ? 'Este convidado já está cadastrado.' : 'Este patrocinador já está cadastrado.') : 'Pode já estar cadastrado.' %></strong>
+    <%= cross ? (dupKind === 'guest' ? 'Abra o cadastro e use “Convidar também para…”, para não digitar de novo:' : 'Abra o cadastro e use “Abrir negociação também no…”, para não digitar de novo:') : 'Confira antes de criar outro:' %></p>
+  <ul class="plain dup-list">
+    <% duplicates.slice(0, 5).forEach(function (d) { %>
+    <li>
+      <span class="dup-name"><%= d.name %></span>
+      <span class="badge b-st-<%= d.stage %>"><%= d.stage_label %></span>
+      <span class="mono small muted"><%= d.reasons.join(' · ') %><%= d.owner_name ? ' · ' + d.owner_name : '' %></span>
+      <a class="link small" href="<%= base + d.id %>" target="_blank" rel="noopener">Abrir cadastro</a>
+    </li>
+    <% }) %>
+  </ul>
+  <button class="btn sm" type="submit" name="confirmar_duplicata" value="1">Cadastrar mesmo assim</button>
+</div>
+<% } %>

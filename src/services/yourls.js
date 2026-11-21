@@ -4,12 +4,25 @@ const crypto = require('crypto');
 const config = require('../config');
 const { slugify } = require('../utils/format');
 
-async function call(params) {
-  if (!config.yourlsConfigured) throw new Error('YOURLS não configurado (YOURLS_LINK, YOURLS_KEY).');
-  const res = await fetch(`${config.yourls.base}/yourls-api.php`, {
+// Cada projeto tem o seu encurtador; o projeto padrão usa YOURLS_LINK/YOURLS_KEY. Projeto sem encurtador: o link
+// inteiro continua valendo (quem chama trata o erro e segue).
+function accountFor(projectId = null) {
+  const projects = require('./projects');
+  const p = projects.get(projectId == null ? projects.defaultId() : projectId);
+  const own = p ? config.yourlsEnv(p.slug) : { base: '', key: '' };
+  if (own.base && own.key) return own;
+  if (p && p.id === projects.defaultId()) return config.yourls;
+  return { base: '', key: '' };
+}
+const configuredFor = (projectId) => { const a = accountFor(projectId); return Boolean(a.base && a.key); };
+
+async function call(params, { projectId = null } = {}) {
+  const acc = accountFor(projectId);
+  if (!acc.base || !acc.key) throw new Error('YOURLS não configurado (YOURLS_LINK, YOURLS_KEY).');
+  const res = await fetch(`${acc.base}/yourls-api.php`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ ...params, signature: config.yourls.key, format: 'json' }),
+    body: new URLSearchParams({ ...params, signature: acc.key, format: 'json' }),
     signal: AbortSignal.timeout(10_000),
   });
   const text = await res.text();
@@ -37,13 +50,14 @@ function keywordCandidates(guestName, random = () => crypto.randomBytes(2).toStr
 }
 
 // Gera um link curto para `longUrl`.
-async function shorten(longUrl, { title, guestName } = {}) {
-  for (const keyword of keywordCandidates(guestName)) {
-    const json = await call({ action: 'shorturl', url: longUrl, keyword, title: title || '' });
+// keywords: nomes a tentar antes dos do convidado (ex.: o link do direct da comunidade).
+async function shorten(longUrl, { title, guestName, keywords = [], projectId = null } = {}) {
+  for (const keyword of [...new Set([...keywords, ...keywordCandidates(guestName)])]) {
+    const json = await call({ action: 'shorturl', url: longUrl, keyword, title: title || '' }, { projectId });
     if (json.shorturl) return { shortUrl: json.shorturl, keyword: json.url?.keyword || keyword };
     if (!isKeywordTaken(json)) throw new Error(`YOURLS: ${json.message || json.code || 'falha ao encurtar'}`);
   }
-  const json = await call({ action: 'shorturl', url: longUrl, title: title || '' });
+  const json = await call({ action: 'shorturl', url: longUrl, title: title || '' }, { projectId });
   if (json.shorturl) return { shortUrl: json.shorturl, keyword: json.url?.keyword || null };
   throw new Error(`YOURLS: ${json.message || 'falha ao encurtar'}`);
 }
@@ -56,4 +70,21 @@ async function ping() {
   return json['db-stats'] || json;
 }
 
-module.exports = { shorten, ping, keywordCandidates };
+// Total de cliques de um link curto (só leitura). null se o encurtador não souber dele.
+async function clicks(shortUrl) {
+  const json = await call({ action: 'url-stats', shorturl: String(shortUrl).replace(/\/+$/, '').split('/').pop() });
+  const n = Number(json?.link?.clicks);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Para onde um link curto leva (só leitura). null se não for um link do encurtador.
+async function expand(shortUrl) {
+  const json = await call({ action: 'expand', shorturl: String(shortUrl).replace(/\/+$/, '').split('/').pop() });
+  return json?.longurl || null;
+}
+
+const isOwnLink = (url) => {
+  try { return new URL(url).host === new URL(config.yourls.base).host; } catch { return false; }
+};
+
+module.exports = { shorten, ping, keywordCandidates, clicks, expand, isOwnLink, accountFor, configuredFor };

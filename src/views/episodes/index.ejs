@@ -1,0 +1,122 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Produção</span><h1><%= videoLabel %></h1></div>
+  <div class="row">
+    <div class="seg">
+      <% var fq = filterUi.query ? '&' + filterUi.query : ''; /* os filtros combináveis seguem entre Quadro e Lista */ %>
+      <a class="<%= view === 'quadro' ? 'on' : '' %>" href="/episodios?view=quadro<%= mine ? '&editor=eu' : '' %><%= fq %>"><%- icon('columns-3') %> Quadro</a>
+      <a class="<%= view === 'lista' ? 'on' : '' %>" href="/episodios?view=lista<%= mine ? '&editor=eu' : '' %><%= fq %>"><%- icon('list') %> Lista</a>
+      <a class="<%= view === 'pautas' ? 'on' : '' %>" href="/episodios?view=pautas"><%- icon('file-text') %> Pautas</a>
+    </div>
+    <a class="btn <%= mine ? 'on' : '' %>" href="/episodios?view=<%= view %><%= mine ? '' : '&editor=eu' %><%= fq %>"><%- icon('user') %> <%= mine ? 'Todos' : 'Só os meus' %></a>
+    <% if (can('production.checklists')) { %><a class="btn" href="/episodios/checklists"><%- icon('check') %> Checklists</a><% } %>
+    <a class="btn" href="/sessoes"><%- icon('calendar') %> Sessões de gravação</a>
+    <% if (can('episodes.write') && videoFirst) { %><button class="btn primary" type="button" data-modal-open="modal-novo-video"><%- icon('plus') %> Novo <%= videoWord %></button><% } %>
+    <% if (can('episodes.write')) { %><a class="btn <%= videoFirst ? '' : 'primary' %>" href="/episodios/novo"><%- icon('plus') %> Registrar <%= videoFirst ? 'gravado' : 'episódio gravado' %></a><% } %>
+  </div>
+</div>
+<p class="lead"><% if (videoFirst) { %>O vídeo começa em <strong>Pré-produção</strong> (pauta e roteiro), vira <strong>Gravado</strong> quando a gravação acontece e segue até <strong>Publicado</strong>.<% } else { %>O episódio nasce quando a conversa é <strong>gravada</strong> (o convidado vai para Gravado) e segue até <strong>Publicado</strong>. Antes disso, a gravação marcada fica na agenda do convidado.<% } %></p>
+
+<% if (can('episodes.write') && videoFirst) { %>
+<dialog class="modal" id="modal-novo-video" aria-labelledby="novo-video-h">
+  <form method="post" action="/episodios/video" class="stack" data-busy="Criando…">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="novo-video-h">Novo <%= videoWord %></h2>
+    <p class="small muted m-0">Ele nasce em Pré-produção. A pauta e o roteiro ficam na aba Pauta; o número sai sozinho.</p>
+    <%- include('../partials/project-field', { hint: 'Em que projeto este vídeo entra.' }) %>
+    <label>Título *<input type="text" name="title" maxlength="200" required autofocus placeholder="ex.: Como escolher um plano de saúde"></label>
+    <label>Data prevista da gravação<input type="date" name="recorded_on"></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Criar <%= videoWord %></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<div class="board-tools"><%- include('../partials/filter-builder') %><% if (view === 'quadro') { %><%- include('../partials/card-fields') %><% } %></div>
+<% if (view === 'pautas') { %>
+<%# Quadro das pautas: onde está cada uma, de uma vez. A aprovação acontece no WhatsApp; aqui fica o rastro. %>
+<div class="board board-wide">
+  <% pautaCols.forEach(function (col) { %>
+  <section class="column">
+    <header><span class="badge <%= col.badge %>"><%= col.label %></span><span class="count"><%= col.items.length %></span></header>
+    <div class="cards">
+      <% col.items.forEach(function (p) { var late = p.due_on && col.key !== 'aprovada' && fmt.toInputDate(p.due_on) < today; %>
+      <a class="kcard" href="<%= p.episode_id ? '/episodios/' + p.episode_id + '#pauta' : '/convidados/' + p.guest_id + '#pauta' %>">
+        <span class="handle muted"><%- include('../partials/project-tag', { id: p.project_id }) %> <%= pautaSvc.KINDS[p.kind].label.toUpperCase() %><%= p.episode_number ? ' · ' + videoNo(p.episode_number, p.project_id) : '' %></span>
+        <strong><%= p.episode_title || p.guest_name %></strong>
+        <span class="meta small muted">
+          <span><%= p.owner_name || 'sem responsável' %></span>
+          <% if (p.due_on) { %><span class="<%= late ? 'err' : '' %>"><%- icon('clock', 12) %> <%= fmt.formatDayShort(p.due_on) %><%= late ? ' · atrasada' : '' %></span><% } %>
+          <% if (p.state === 'aprovacao' && p.sent_to) { %><span><%= p.sent_to %></span><% } %>
+        </span>
+        <% if (p.state === 'ajustes' && p.review_note) { %><span class="small err"><%= p.review_note %></span><% } %>
+      </a>
+      <% }) %>
+    </div>
+    <p class="col-empty small muted">Nenhuma nesta etapa.</p>
+  </section>
+  <% }) %>
+</div>
+<% } else if (view === 'quadro') { %>
+<div class="board board-wide">
+  <% columns.forEach(function (col) { %>
+  <section class="column" data-status="<%= col.key %>">
+    <header><span class="badge b-st-<%= col.key %>"><%= col.label %></span><span class="count"><%= col.items.length %></span></header>
+    <div class="cards">
+      <% if (!col.items.length) { %><p class="col-empty small muted">Nenhum <%= videoWord %> nesta etapa.</p><% } %>
+      <% col.items.forEach(function (e) { %>
+      <a class="kcard" href="/episodios/<%= e.id %>"><% var o = order[e.id]; %>
+        <span class="handle muted"<%- cardUi.attr('numero') %>><%- include('../partials/project-tag', { id: e.project_id }) %> <% if (o) { %><b class="order-n" title="<%= o.rank %>º na ordem de edição"><%= o.rank %>º</b> · <% } %><%= videoNo(e.number, e.project_id) || '—' %> · <% if (o) { %><span class="air-<%= o.air.tone || 'ok' %>" title="<%= o.air.line %>"><%= o.air.short %></span><% } else { %><%= fmt.formatDayShort(e.aired_on) %><% } %></span>
+        <strong><%= e.title %></strong>
+        <% if (e.guest_name) { %><span class="muted small"<%- cardUi.attr('convidado') %>><%= e.guest_name %></span><% } %>
+        <span class="meta small muted">
+          <% if (e.sponsors) { %><span title="<%= fmt.plural(e.sponsors, 'patrocinador', 'patrocinadores') %>"<%- cardUi.attr('patrocinadores') %>><%- icon('shield-check', 12) %><%= e.sponsors %></span><% } %>
+          <% if (e.files) { %><span title="<%= fmt.plural(e.files, 'arquivo de material', 'arquivos de material') %>"<%- cardUi.attr('arquivos') %>><%- icon('file-text', 12) %><%= e.files %> arq.</span><% } %>
+          <% if (e.tasks) { %><span title="Tarefas feitas de <%= e.tasks %>"<%- cardUi.attr('tarefas') %>><%- icon('check', 12) %><%= e.tasks_done %>/<%= e.tasks %></span><% } %>
+          <% if (e.open_comments) { %><span class="warn" title="<%= fmt.plural(e.open_comments, 'ajuste em aberto', 'ajustes em aberto') %>"<%- cardUi.attr('ajustes') %>><%- icon('message-square', 12) %><%= e.open_comments %></span><% } %>
+          <% if (e.recorded_on) { %><span class="mono" title="Gravado em"<%- cardUi.attr('gravado') %>>grav. <%= fmt.formatDayShort(e.recorded_on) %></span><% } %>
+          <% if (e.published_at) { %><span class="mono" title="Publicado em"<%- cardUi.attr('publicado') %>>publ. <%= fmt.shortDate(e.published_at) %></span><% } %>
+          <% if (e.review_round) { %><span title="Rodadas de revisão"<%- cardUi.attr('rodada') %>><%= e.review_round %>ª revisão</span><% } %>
+          <span class="mono" title="Criado em"<%- cardUi.attr('criado') %>>criado <%= fmt.shortDate(e.created_at) %></span>
+          <span class="mono" title="Atualizado em"<%- cardUi.attr('atualizado') %>>atual. <%= fmt.shortDate(e.updated_at) %></span>
+        </span>
+        <span class="card-foot"<%- cardUi.attr('editor') %>><%- include('../partials/dot', { type: 'episode', id: e.id, user: e.editor_id ? { id: e.editor_id, name: e.editor_name } : null, editable: can('production.manage'), inLink: true }) %></span>
+      </a>
+      <% }) %>
+    </div>
+  </section>
+  <% }) %>
+</div>
+<% } else { %>
+<div class="table-wrap">
+<table>
+  <thead><tr><th class="num">EP.</th><th class="num" title="Ordem de edição: o que vai ao ar antes é editado primeiro">Ordem</th><th>Título</th><th>Convidado</th><th>Veiculação</th><th>Etapa</th><th>Editor</th><th class="num">Patroc.</th><th></th></tr></thead>
+  <tbody>
+    <% if (!episodes.length) { %><tr><td colspan="9"><div class="empty"><%- include('../partials/signal') %><strong>Nenhum episódio por aqui</strong><span>Quando um convidado ficar Agendado, o episódio aparece sozinho.</span></div></td></tr><% } %>
+    <% episodes.forEach(function (e) { var o = order[e.id]; %>
+    <tr>
+      <td class="num mono"><%= videoNo(e.number, e.project_id) || '—' %></td>
+      <td class="num mono"><% if (o) { %><b class="order-n"><%= o.rank %>º</b><% } else { %><span class="muted">—</span><% } %></td>
+      <td><a href="/episodios/<%= e.id %>"><strong><%= e.title %></strong></a> <%- include('../partials/project-tag', { id: e.project_id }) %></td>
+      <td><%= e.guest_name || '—' %></td>
+      <td class="mono nowrap<%= o ? ' air-' + (o.air.tone || 'ok') : '' %>"<% if (o) { %> title="<%= o.air.line %>"<% } %>><%= fmt.formatDay(e.aired_on) %></td>
+      <td><span class="badge b-st-<%= e.status %>"><%= statuses[e.status] %></span></td>
+      <td><%- include('../partials/dot', { type: 'episode', id: e.id, user: e.editor_id ? { id: e.editor_id, name: e.editor_name } : null, editable: can('production.manage'), label: true }) %></td>
+      <td class="num mono"><%= e.sponsors %></td>
+      <td class="actions">
+        <a class="btn sm" href="/episodios/<%= e.id %>">Abrir</a>
+        <% if (can('episodes.delete')) { %>
+        <details class="row-menu">
+          <summary class="btn sm icon-only ghost" aria-label="Mais ações para <%= e.title %>" title="Mais ações"><%- icon('ellipsis', 14) %></summary>
+          <div class="row-menu-list">
+            <form method="post" action="/episodios/<%= e.id %>/excluir" data-confirm="Mandar o episódio “<%= e.title %>” para a lixeira? Fica 15 dias lá, com os arquivos, e dá para restaurar."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link danger-link" type="submit"><%- icon('trash-2', 14) %> Mandar para a lixeira</button></form>
+          </div>
+        </details>
+        <% } %>
+      </td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+<%- include('../partials/foot') %>

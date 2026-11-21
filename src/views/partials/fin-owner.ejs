@@ -1,0 +1,21 @@
+<%#
+  "De quem é" o dinheiro: um projeto ou compartilhado com a divisão. Só aparece para quem vê mais de um projeto.
+  Lê de `locals` (nunca exige a variável): finProjects (projetos que a pessoa pode escolher), ownerCurrent (id do
+  projeto, 'compartilhado' ou ''), ownerParts (opcional, { projeto: valor em reais }), ownerHint (opcional).
+  Precisa de um [data-when-form] no formulário em volta para a divisão aparecer só no compartilhado.
+%>
+<% var fps = locals.finProjects || []; if (fps.length > 1) { var ocur = String(locals.ownerCurrent == null ? '' : locals.ownerCurrent); var oparts = locals.ownerParts || {}; %>
+<div class="stack tight">
+  <span class="label-text">De quem é *</span>
+  <div class="seg-radio" role="radiogroup" aria-label="De quem é">
+    <% fps.forEach(function (p, i) { %><label><input type="radio" name="de_quem" value="<%= p.id %>" <%= ocur === String(p.id) || (!ocur && i === 0) ? 'checked' : '' %>> <%= p.name %></label><% }) %>
+    <label><input type="radio" name="de_quem" value="compartilhado" <%= ocur === 'compartilhado' ? 'checked' : '' %>> Compartilhado</label>
+  </div>
+  <div class="grid-2 tight" data-when="de_quem=compartilhado">
+    <% fps.forEach(function (p) { %>
+    <label><%= p.name %> (R$)<input type="text" name="parte_<%= p.id %>" inputmode="decimal" value="<%= oparts[p.id] || '' %>" placeholder="ex.: 75,00"></label>
+    <% }) %>
+  </div>
+  <p class="small muted"><%= locals.ownerHint || 'A divisão precisa somar o valor. Ligado a um episódio, convidado ou patrocinador, o projeto vem dele.' %></p>
+</div>
+<% } %>

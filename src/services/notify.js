@@ -1,0 +1,122 @@
+// Notificações do painel: tarefas, comentários, agendamentos concluídos e rotinas do sistema.
+// Respeita a configuração geral (gestão) e o que cada pessoa silenciou. Nunca avisa a própria pessoa que fez a ação.
+const db = require('../db/pool');
+const config = require('../config');
+const mailer = require('./mailer');
+const { NOTIFICATION_TYPES } = require('../constants');
+const jobs = require('./jobs');
+const realtime = require('./realtime');
+const { memo } = require('../utils/requestCache');
+
+const TYPES = Object.keys(NOTIFICATION_TYPES);
+
+// De que projeto é o aviso, pelo item que ele aponta ($7 = tipo da entidade, $8 = id). Tarefa geral e aviso do sistema ficam sem
+// projeto, e aparecem para quem os recebeu em qualquer recorte.
+const PROJECT_OF = `(CASE $7::text
+  WHEN 'guest' THEN (SELECT project_id FROM guests WHERE id = $8::int)
+  WHEN 'sponsor' THEN (SELECT project_id FROM sponsors WHERE id = $8::int)
+  WHEN 'episode' THEN (SELECT project_id FROM episodes WHERE id = $8::int)
+  WHEN 'clip' THEN (SELECT project_id FROM episode_clips WHERE id = $8::int)
+  WHEN 'content_request' THEN (SELECT project_id FROM content_requests WHERE id = $8::int)
+  WHEN 'task' THEN (SELECT project_id FROM tasks WHERE id = $8::int)
+  WHEN 'publication' THEN (SELECT coalesce((SELECT c.project_id FROM episode_clips c WHERE c.id = p.clip_id), (SELECT e.project_id FROM episodes e WHERE e.id = p.episode_id))
+                             FROM episode_publications p WHERE p.id = $8::int)
+  ELSE NULL END)`;
+
+// Lida uma vez por requisição (uma ação em massa chamava notify várias vezes e relia a tabela a cada aviso).
+const settings = () => memo('notificacoes:config', async () => {
+  const { rows } = await db.query('SELECT * FROM notification_settings');
+  const out = Object.fromEntries(TYPES.map((t) => [t, { type: t, in_app: true, email: false, roles: [] }]));
+  for (const r of rows) out[r.type] = r;
+  return out;
+});
+
+// Pessoas ativas com estes papéis (para os avisos gerais: agendamento, rotinas).
+// `house`: aviso do que é geral (estoque, banco de horas, sistema) só vai para a equipe da casa.
+// `pid`: aviso de um projeto vai para quem participa dele.
+async function usersWithRoles(roles, { house = false, pid = null } = {}) {
+  if (!roles?.length) return [];
+  const { rows } = await db.query(
+    `SELECT u.id FROM users u WHERE u.active AND u.role = ANY($1)${house ? ' AND u.house' : ''}
+      ${pid ? 'AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.user_id = u.id AND pm.project_id = $2)' : ''}`,
+    pid ? [roles, pid] : [roles]);
+  return rows.map((r) => r.id);
+}
+
+// Cria as notificações. users: ids (repetidos e nulos são ignorados). broadcast: soma quem tem os papéis configurados para o tipo.
+// dedupe: mesma chave para a mesma pessoa não duplica (ex.: "tarefa vence hoje" uma vez por dia).
+// topic: assunto do aviso dentro da entidade ('prazo', 'bloqueada'), para clearTopics marcar como lido quando deixa de valer.
+async function notify({ type, users = [], broadcast = false, title, body = null, url = null, actorId = null, entity = null, dedupe = null, topic = null, projectId = null, house = false }) {
+  if (!TYPES.includes(type)) throw new Error(`Tipo de notificação desconhecido: ${type}`);
+  const cfg = (await settings())[type];
+  if (!cfg.in_app && !cfg.email) return [];
+  let ids = [...users];
+  if (broadcast) ids.push(...(await usersWithRoles(cfg.roles, { house, pid: projectId })));
+  ids = [...new Set(ids.filter(Boolean).map(String))].filter((id) => id !== String(actorId || ''));
+  if (!ids.length) return [];
+  const { rows: active } = await db.query(
+    `SELECT u.id, u.email, u.name FROM users u WHERE u.active AND u.id = ANY($1::uuid[])
+       AND NOT EXISTS (SELECT 1 FROM notification_mutes m WHERE m.user_id = u.id AND m.type = $2)`, [ids, type]);
+  if (!active.length) return [];
+  // uma gravação para todas as pessoas (antes: um INSERT por pessoa)
+  const { rows: inserted } = await db.query(
+    // project_id: o projeto do item que o aviso aponta (quem não participa dele não vê o aviso)
+    `INSERT INTO notifications (user_id, type, title, body, url, actor_id, entity_type, entity_id, dedupe_key, read_at, topic, project_id)
+     SELECT u, $2::text, $3::text, $4::text, $5::text, $6::uuid, $7::text, $8::int, $9::text, CASE WHEN $10::boolean THEN NULL ELSE now() END, $11::text, coalesce($12::int, ${PROJECT_OF}) FROM unnest($1::uuid[]) AS u
+     ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING *`,
+    [active.map((u) => u.id), type, String(title).slice(0, 300), body ? String(body).slice(0, 1000) : null, url, actorId, entity?.type || null, entity?.id || null, dedupe, cfg.in_app, topic, projectId]);
+  const byUser = new Map(inserted.map((n) => [String(n.user_id), n]));
+  const created = active.map((u) => byUser.get(String(u.id))).filter(Boolean); // mesma ordem de antes
+  // e-mail vai pela fila (com novas tentativas), fora da requisição
+  if (cfg.email) for (const u of active) { const n = byUser.get(String(u.id)); if (n && u.email) await jobs.enqueue('email_notificacao', { refId: n.id, maxAttempts: 5 }); }
+  // aviso na hora para quem está com o painel aberto (badge + aviso flutuante)
+  for (const n of created.filter((x) => !x.read_at)) await require('./push').queue(n); // aparelhos com o painel fechado
+  for (const n of created.filter((x) => !x.read_at)) await realtime.publish([n.user_id], { type: 'notification', id: n.id, kind: n.type, title: n.title, body: n.body, url: n.url ? `/notificacoes/${n.id}/abrir` : null });
+  return created;
+}
+
+jobs.register('email_notificacao', async (job) => {
+  const { rows: [n] } = await db.query('SELECT n.*, u.email FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.id = $1 AND u.active', [job.ref_id]);
+  if (!n || n.emailed_at || !n.email) return { skipped: true };
+  await mailer.sendNotification({ to: n.email, title: n.title, text: n.body || '', url: n.url ? `${config.appBaseUrl}${n.url}` : null });
+  await db.query('UPDATE notifications SET emailed_at = now() WHERE id = $1', [n.id]);
+  return { sent: true };
+});
+
+const unreadCount = (userId) => db.query('SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL', [userId]).then((r) => r.rows[0].n);
+
+// pids: o recorte de projeto de quem está olhando (services/scope). Aviso sem projeto aparece sempre.
+async function list(userId, { type = null, unread = false, limit = 50, before = null, offset = 0, pids = null } = {}) {
+  const params = [userId]; const where = ['n.user_id = $1'];
+  if (pids) { params.push(pids); where.push(`(n.project_id IS NULL OR n.project_id = ANY($${params.length}::int[]))`); }
+  if (type && TYPES.includes(type)) { params.push(type); where.push(`n.type = $${params.length}`); }
+  if (unread) where.push('n.read_at IS NULL');
+  if (before) { params.push(before); where.push(`n.id < $${params.length}`); }
+  params.push(Math.min(201, limit));
+  const { rows } = await db.query(
+    `SELECT n.*, a.name AS actor_name FROM notifications n LEFT JOIN users a ON a.id = n.actor_id
+      WHERE ${where.join(' AND ')} ORDER BY n.created_at DESC, n.id DESC LIMIT $${params.length} OFFSET ${Math.max(0, Number(offset) || 0)}`, params);
+  return rows;
+}
+
+const markRead = (userId, id) => db.query('UPDATE notifications SET read_at = coalesce(read_at, now()) WHERE id = $1 AND user_id = $2 RETURNING *', [id, userId]).then((r) => r.rows[0] || null);
+const markAllRead = (userId, type = null) => db.query(
+  `UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL ${type && TYPES.includes(type) ? 'AND type = $2' : ''}`, type && TYPES.includes(type) ? [userId, type] : [userId]);
+
+// O aviso deixou de valer (ex.: a tarefa começou ou terminou): os não lidos destes assuntos ficam lidos, para todo mundo que recebeu.
+// Quem está com o painel aberto recebe 'notifications-read' e o contador se refaz na hora.
+// users: só os avisos destas pessoas (sem users = de todo mundo que recebeu).
+async function clearTopics({ entity, topics, users = null }) {
+  if (!entity?.type || !entity?.id || !topics?.length) return 0;
+  const only = users ? [...new Set(users.filter(Boolean).map(String))] : null;
+  if (only && !only.length) return 0;
+  const { rows } = await db.query(
+    `UPDATE notifications SET read_at = now() WHERE entity_type = $1 AND entity_id = $2 AND topic = ANY($3::text[]) AND read_at IS NULL
+       ${only ? 'AND user_id = ANY($4::uuid[])' : ''} RETURNING user_id`,
+    only ? [entity.type, entity.id, topics, only] : [entity.type, entity.id, topics]);
+  const touched = [...new Set(rows.map((r) => String(r.user_id)))];
+  if (touched.length) await realtime.publish(touched, { type: 'notifications-read' });
+  return rows.length;
+}
+
+module.exports = { TYPES, settings, notify, unreadCount, list, markRead, markAllRead, usersWithRoles, clearTopics };

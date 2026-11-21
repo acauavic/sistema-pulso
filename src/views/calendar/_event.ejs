@@ -1,0 +1,7 @@
+<%# Um evento do calendário. Variáveis: e (evento), meta (tipos por chave). %>
+<a class="cal-ev ev-<%= e.type %><%= e.done ? ' is-done' : '' %><%= e.late ? ' is-late' : '' %><%= e.tentative ? ' is-tentative' : '' %>" href="<%= e.url %>" title="<%= e.title %><%= e.sub ? ' · ' + e.sub : '' %><%= e.who ? ' · ' + e.who : '' %><%= e.amount ? ' · ' + e.amount : '' %>">
+  <%- icon(meta[e.type].icon, 12) %>
+  <% if (e.time) { %><span class="mono cal-ev-time"><%= e.time %></span><% } %>
+  <span class="cal-ev-t"><%= e.title %></span>
+  <% if (e.amount) { %><span class="mono cal-ev-amt"><%= e.amount %></span><% } %>
+</a>

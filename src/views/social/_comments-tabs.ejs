@@ -1,0 +1,5 @@
+<%# Abas de Social > Comentários: a fila das respostas e os números. Variável: cmtTab ('respostas' | 'numeros'). %>
+<nav class="seg seg-tabs cmt-tabs" aria-label="Comentários">
+  <a href="/social/comentarios" class="<%= cmtTab === 'respostas' ? 'on' : '' %>"<%- cmtTab === 'respostas' ? ' aria-current="page"' : '' %>><%- icon('message-circle', 14) %> Respostas</a>
+  <a href="/social/comentarios/numeros" class="<%= cmtTab === 'numeros' ? 'on' : '' %>"<%- cmtTab === 'numeros' ? ' aria-current="page"' : '' %>><%- icon('chart-column', 14) %> Números</a>
+</nav>

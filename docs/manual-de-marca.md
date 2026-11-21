@@ -1,7 +1,9 @@
 # Pulso — Manual de Identidade Visual (v2.0 · 2026)
 
-> Fonte: `docs/referencias/Manual_de_Marca_Pulso.dc.html`. Resumo de trabalho para qualquer peça, tela, e-mail ou
-> texto do projeto. Interface: `docs/design-system.md`.
+> Fonte: `docs/referencias/Manual_de_Marca_Pulso.dc.html`. Manual do **projeto Pulso**: vale para tudo o que o Pulso
+> mostra para fora (convite, portal do convidado, pós-gravação, media kit, portal do patrocinador, plateia, capas,
+> posts e e-mails ao convidado e ao patrocinador). **O painel da equipe não é mais Pulso**: é Health Scale Studio e
+> segue `docs/design-system.md` (verde, Archivo, monograma "St"). Outro projeto (Projeto 100) terá o manual dele.
 
 ## Essência
 

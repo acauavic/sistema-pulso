@@ -1,0 +1,150 @@
+<%- include('../partials/head') %>
+<%#
+  Acerto da parceria. Jornada: a gestão abre para saber "quanto já gastamos, quanto voltou e se tem lucro"; quando entra dinheiro
+  e ela decide distribuir, faz o acerto (uma transferência só); no fim do mês, fecha o mês; manda o extrato por link ao parceiro.
+  Números em mono e display, nunca lime (medir não é ação); o lime da área é "Fazer acerto".
+%>
+<%
+  var canWrite = can('finance.write');
+  var pp = part ? part.partner_people : [];
+  var housePct = part ? Math.round(part.house_pct) : 50;
+  var tr = preview ? preview.transfer : 0;
+  var transferLine = function (t) { return t > 0 ? 'A casa paga ' + money(t) + ' a ' + part.partner_name : t < 0 ? part.partner_name + ' repassa ' + money(-t) + ' à casa' : 'Ninguém deve nada a ninguém'; };
+%>
+<div class="page-head">
+  <div><span class="kicker">Financeiro · <%= project ? project.name : '' %></span><h1>Parceria</h1></div>
+  <% if (canWrite && part) { %><button class="btn <%= (preview.profit || tr) ? 'primary' : '' %>" type="button" data-modal-open="modal-acerto"><%- icon('handshake') %> Fazer acerto</button><% } %>
+</div>
+<%- include('_nav', { active: 'parceria', counts: counts }) %>
+<% if (otherProjects.length) { %><p class="small muted">Outras parcerias: <% otherProjects.forEach(function (p) { %><a href="/financeiro/parceria?projeto=<%= p.id %>"><%= p.name %></a> <% }) %></p><% } %>
+
+<% if (!part) { %>
+<section class="card empty">
+  <%- include('../partials/signal') %>
+  <h2>Este projeto não tem acordo de parceria</h2>
+  <p class="muted">Com um acordo, o custo do projeto volta primeiro para quem pagou e o lucro é dividido na proporção combinada.</p>
+  <% if (canWrite) { %><button class="btn primary" type="button" data-modal-open="modal-acordo">Registrar acordo</button><% } %>
+</section>
+<% } else { %>
+
+<section class="card part-terms">
+  <div class="row spread">
+    <p class="m-0"><strong><%= part.partner_name %></strong> · <span class="mono small muted">CASA <%= housePct %>% · PARCEIRO <%= 100 - housePct %>% · DESDE <%= P.monthShort(part.start_on.slice(0, 7)) %></span></p>
+    <% if (canWrite) { %><button class="btn sm ghost" type="button" data-modal-open="modal-acordo"><%- icon('pencil', 14) %> Editar acordo</button><% } %>
+  </div>
+  <p class="small muted m-0">O custo volta primeiro para quem pagou (a casa ou <%= pp.join(', ') %>, na proporção do que cada um gastou). O que passa disso é lucro, dividido quando a casa decide distribuir.</p>
+</section>
+
+<section class="stat-grid" aria-label="A conta da parceria">
+  <div class="stat"><span class="stat-label">Custo a recuperar</span><span class="stat-n money"><%= money(L.toRecover.total) %></span><span class="stat-delta mono">de <%= money(L.costs.total) %> gastos</span></div>
+  <div class="stat"><span class="stat-label">Já voltou</span><span class="stat-n money"><%= money(L.recovered.total) %></span><span class="stat-delta mono">de <%= money(L.revenue.total) %> recebidos</span></div>
+  <div class="stat"><span class="stat-label">Lucro a distribuir</span><span class="stat-n money"><%= money(L.profit.available) %></span><span class="stat-delta mono"><%= money(L.profit.distributed) %> já distribuídos</span></div>
+  <div class="stat"><span class="stat-label">Se acertar agora</span><span class="stat-n part-transfer"><%= tr > 0 ? '−' : tr < 0 ? '+' : '' %><%= money(Math.abs(tr)) %></span><span class="stat-delta mono"><%= tr > 0 ? 'a casa paga ao parceiro' : tr < 0 ? 'o parceiro repassa à casa' : 'contas zeradas' %></span></div>
+</section>
+
+<section class="card top-gap" aria-labelledby="part-quem-h">
+  <h2 id="part-quem-h">Quem gastou e quem recebeu</h2>
+  <ul class="plain plan-list">
+    <li><div class="plan-list-main"><strong>A casa</strong><span class="mono small muted">GASTOU <%= money(L.costs.casa) %> · JÁ VOLTOU <%= money(L.recovered.casa) %> · RECEBEU NA CONTA <%= money(L.revenue.casa) %></span></div><span class="mono"><%= money(L.toRecover.casa) %></span><span class="small muted">a recuperar</span></li>
+    <li><div class="plan-list-main"><strong><%= part.partner_name %></strong><span class="mono small muted">GASTOU DO BOLSO <%= money(L.costs.parceiro) %><% Object.keys(L.costs.byPerson).forEach(function (k) { %> · <%= k.toUpperCase() %> <%= money(L.costs.byPerson[k]) %><% }) %> · RECEBEU NA CONTA <%= money(L.revenue.parceiro) %></span></div><span class="mono"><%= money(L.toRecover.parceiro) %></span><span class="small muted">a recuperar</span></li>
+  </ul>
+  <% if (proj) { %><p class="small muted top-gap m-0"><%- icon('info', 14) %>
+    <% if (proj.done) { %>O custo já voltou inteiro: o que entrar daqui em diante é lucro.
+    <% } else if (proj.month) { %>Com o que está previsto (receitas e custos lançados), o custo volta em <span class="mono"><%= proj.short %></span>.
+    <% } else { %>Com o que está previsto<%= proj.until ? ' até ' + proj.until : '' %>, ainda faltariam <span class="mono"><%= money(proj.missing) %></span> para o custo voltar.<% } %></p><% } %>
+  <% if (L.profit.over) { %><p class="notice">Entrou custo depois do último acerto: <span class="mono"><%= money(L.profit.over) %></span> do lucro já distribuído voltam a ser custo a recuperar.</p><% } %>
+</section>
+
+<section class="card top-gap" id="meses" aria-labelledby="part-meses-h">
+  <div class="row spread"><h2 id="part-meses-h">Mês a mês</h2><span class="small muted">só o que foi pago ou recebido · o mês fechado não muda mais</span></div>
+  <ul class="plain plan-list part-months">
+    <% months.forEach(function (m) { %>
+    <li>
+      <div class="plan-list-main"><strong class="part-month"><%= m.label %></strong>
+        <span class="mono small muted">CUSTOS <%= money(m.costCasa + m.costParceiro) %><%= m.costParceiro ? ' (PARCEIRO ' + money(m.costParceiro) + ')' : '' %> · RECEITAS <%= money(m.revCasa + m.revParceiro) %> · NO FIM: A RECUPERAR <%= money(m.toRecover) %><%= m.profitAvailable ? ' · LUCRO ' + money(m.profitAvailable) : '' %></span>
+        <% if (m.closing && m.closing.reopened_at) { %><span class="small muted">reaberto: <%= m.closing.reopen_reason %></span><% } %>
+      </div>
+      <span class="badge <%= m.closed ? 'b-green' : 'b-gray' %>"><%= m.closed ? 'fechado' : 'aberto' %></span>
+      <span class="plan-list-tools">
+        <% if (canWrite && !m.closed) { %>
+          <form method="post" action="/financeiro/parceria/meses/<%= m.ym %>/fechar" class="inline" data-confirm="Fechar <%= m.label %>? O que foi pago nele não muda mais.">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="projeto" value="<%= project.id %>"><button class="btn sm" type="submit">Fechar mês</button>
+          </form>
+        <% } else if (canWrite && m.closed) { %>
+          <details class="row-menu">
+            <summary class="icon-btn" aria-label="Mais ações de <%= m.label %>"><%- icon('ellipsis') %></summary>
+            <div class="row-menu-list">
+              <form method="post" action="/financeiro/parceria/meses/<%= m.ym %>/reabrir" class="stack" data-confirm="Reabrir <%= m.label %>? Os lançamentos pagos nele voltam a poder mudar.">
+                <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="projeto" value="<%= project.id %>">
+                <label class="small">Por que reabrir *<input type="text" name="reason" maxlength="300" required placeholder="ex.: faltou lançar a nota do estúdio"></label>
+                <button class="link small danger-link" type="submit">reabrir o mês</button>
+              </form>
+            </div>
+          </details>
+        <% } %>
+      </span>
+    </li>
+    <% }) %>
+  </ul>
+</section>
+
+<% if (settled.length) { %>
+<section class="card top-gap" aria-labelledby="part-acertos-h">
+  <h2 id="part-acertos-h">Acertos feitos</h2>
+  <ul class="plain plan-list">
+    <% settled.forEach(function (st) { var t = Number(st.transfer_cents); %>
+    <li><div class="plan-list-main"><strong><%= transferLine(t) %></strong><span class="mono small muted"><%= fmt.formatDayShort(st.settled_on) %> · LUCRO DISTRIBUÍDO <%= money(st.profit_cents) %><%= st.user_name ? ' · ' + st.user_name.toUpperCase() : '' %><%= st.entry_status ? ' · CONTA ' + (st.entry_status === 'pago' ? 'PAGA' : st.entry_status === 'cancelado' ? 'CANCELADA' : 'EM ABERTO') : '' %></span><% if (st.note) { %><span class="small muted"><%= st.note %></span><% } %></div><span></span><span></span></li>
+    <% }) %>
+  </ul>
+</section>
+<% } %>
+
+<section class="card top-gap" aria-labelledby="part-link-h">
+  <h2 id="part-link-h">Extrato para o parceiro</h2>
+  <p class="small muted">Um link só de leitura, com a conta e o mês a mês, para <%= part.partner_name %> ver sem entrar no sistema.</p>
+  <% if (link) { %>
+  <p class="mono small"><%= link %></p>
+  <div class="row"><button class="btn sm" type="button" data-copy="<%= link %>"><%- icon('copy', 14) %> Copiar link</button>
+    <% if (canWrite) { %><form method="post" action="/financeiro/parceria/link/cancelar" class="inline" data-confirm="Cancelar o link do extrato? Quem tiver o link não vai mais conseguir abrir."><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="projeto" value="<%= project.id %>"><button class="link small" type="submit">cancelar o link</button></form><% } %></div>
+  <% } else if (canWrite) { %>
+  <form method="post" action="/financeiro/parceria/link"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="projeto" value="<%= project.id %>"><button class="btn sm ghost" type="submit"><%- icon('link', 14) %> Gerar link do extrato</button></form>
+  <% } %>
+</section>
+
+<% if (canWrite) { %>
+<dialog class="modal" id="modal-acerto" aria-labelledby="acerto-h">
+  <form method="post" action="/financeiro/parceria/acerto" class="stack" data-busy="Registrando…">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="projeto" value="<%= project.id %>">
+    <h2 id="acerto-h">Fazer acerto</h2>
+    <p class="small muted m-0">O custo que já voltou fica com quem pagou. Do lucro, você escolhe quanto distribuir agora (<%= housePct %>% casa, <%= 100 - housePct %>% <%= part.partner_name %>); o resto fica para depois.</p>
+    <dl class="kv">
+      <dt>Lucro disponível</dt><dd class="mono"><%= money(L.profit.available) %></dd>
+      <dt>Se distribuir tudo</dt><dd class="mono"><%= transferLine(tr) %></dd>
+      <% if (L.profit.available) { var noProfit = P.transferFor(L, 0); %><dt>Sem distribuir lucro</dt><dd class="mono"><%= transferLine(noProfit) %></dd><% } %>
+    </dl>
+    <label>Lucro a distribuir agora (R$)<input type="text" name="lucro" inputmode="decimal" value="<%= (L.profit.available / 100).toFixed(2).replace('.', ',') %>" placeholder="ex.: 2.000,00"></label>
+    <label>Observação<input type="text" name="note" maxlength="500" placeholder="ex.: acerto de novembro"></label>
+    <p class="small muted m-0">Vira uma conta em "A pagar" (a casa paga ao parceiro) ou em "A receber" (o parceiro repassa), na categoria Acerto da parceria, que não conta como custo nem receita.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Registrar o acerto</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<% } %>
+
+<% if (canWrite) { %>
+<dialog class="modal" id="modal-acordo" aria-labelledby="acordo-h">
+  <form method="post" action="/financeiro/parceria/acordo" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="projeto" value="<%= project ? project.id : '' %>">
+    <h2 id="acordo-h">Acordo da parceria</h2>
+    <p class="small muted m-0">* obrigatório</p>
+    <label>Parceiro *<input type="text" name="partner_name" maxlength="120" required value="<%= part ? part.partner_name : '' %>" placeholder="ex.: Dra. Maria Souza"></label>
+    <label>Quem pode pagar do bolso do lado dele <small class="muted">(separe por vírgula)</small><input type="text" name="partner_people" maxlength="400" value="<%= pp.join(', ') %>" placeholder="ex.: Dra. Maria Souza, João"></label>
+    <div class="grid-2">
+      <label>Parte da casa no lucro (%) *<input type="number" name="house_pct" min="0" max="100" step="1" required value="<%= housePct %>"></label>
+      <label>Os custos contam desde *<input type="date" name="start_on" required value="<%= part ? part.start_on : today %>"></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<%- include('../partials/foot') %>

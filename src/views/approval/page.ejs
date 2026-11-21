@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><%= title %></title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="icon" href="<%= brandDir %>/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="<%= brandDir %>/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/portal.css?v=<%= assetV %>">
+<link rel="stylesheet" href="/static/aprovacao.css?v=<%= assetV %>">
+<% if (typeof brandCss !== 'undefined' && brandCss) { %><link rel="stylesheet" href="<%= brandCss %>?v=<%= assetV %>"><% } %>
+<script src="/static/aprovacao.js?v=<%= assetV %>" defer></script>
+</head>
+<body class="ap">
+<%#
+  Aprovação por link. Jornada: quem aprova (fora do sistema) abre pelo WhatsApp no celular, lê a pauta, assiste ao vídeo ou vê as
+  capas, escreve o nome e responde uma vez: Aprovar (o botão principal) ou Pedir ajustes. No vídeo, pode comentar na minutagem.
+  Link respondido, vencido, revogado ou de uma versão que mudou mostra o porquê e não aceita resposta.
+%>
+<%
+  var isVideo = l.kind === 'video'; var isCovers = l.kind === 'capas'; var isPauta = l.kind === 'pauta';
+  var open = state === 'aberto';
+  var mmss = function (ms) { if (ms == null) return ''; var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  var epTag = l.ep_number ? (l.number_prefix || 'EP.') + String(l.ep_number).padStart(3, '0') : '';
+  var what = isPauta ? (l.pauta_kind === 'roteiro' ? 'Roteiro' : 'Pauta') : isVideo ? 'Vídeo editado' : 'Capas do vídeo';
+%>
+<header class="pt-top">
+  <span class="pt-wordmark"><%= publicName %></span>
+  <span class="pt-mono pt-muted">Para aprovar</span>
+</header>
+
+<main class="pt-wrap ap-wrap">
+  <section class="ap-hero" aria-labelledby="ap-titulo">
+    <span class="pt-kicker"><%= [what, epTag].filter(Boolean).join(' · ') %></span>
+    <h1 id="ap-titulo"><%= l.ep_title || l.guest_name || what %></h1>
+    <p class="ap-meta pt-mono pt-muted">
+      <% if (isPauta && content.version) { %>versão <%= content.version.n %><% } %>
+      <% if (isVideo && content.file) { %>versão v<%= content.file.version %><% } %>
+      <% if (isPauta && l.pauta_due_on) { %> · resposta até <%= fmt.formatDayShort(l.pauta_due_on) %><% } %>
+    </p>
+  </section>
+
+  <% if (state === 'respondido') { %>
+  <section class="ap-state" role="status">
+    <span class="pt-chip <%= l.answer === 'aprovado' ? '' : 'ap-chip-warn' %>"><%= l.answer === 'aprovado' ? 'aprovado' : 'ajustes pedidos' %></span>
+    <h2>Resposta registrada</h2>
+    <p class="pt-sub"><%= l.answer === 'aprovado' ? 'Aprovado' : 'Ajustes pedidos' %> por <%= l.answer_name %> em <span class="pt-mono-in"><%= fmt.formatDateTime(l.answered_at) %></span>. A equipe já foi avisada.</p>
+    <% if (l.answer_note) { %><p class="ap-note pt-pre"><%= l.answer_note %></p><% } %>
+  </section>
+  <% } else if (state !== 'aberto') { %>
+  <section class="ap-state" role="status">
+    <% if (state === 'substituido') { %>
+      <h2>Esta versão foi substituída</h2>
+      <p class="pt-sub">A equipe já tem uma versão mais nova (ou o trabalho seguiu adiante). Peça o link novo no grupo para responder.</p>
+    <% } else if (state === 'vencido') { %>
+      <h2>Este link venceu</h2>
+      <p class="pt-sub">O link de aprovação vale 30 dias. Peça um novo à equipe do <%= publicName %>.</p>
+    <% } else { %>
+      <h2>Este link foi cancelado</h2>
+      <p class="pt-sub">A equipe cancelou este link. Se ainda precisar responder, peça um novo no grupo.</p>
+    <% } %>
+  </section>
+  <% } %>
+
+  <% if (open || state === 'respondido') { %>
+  <section class="pt-sec ap-content" aria-label="<%= what %>">
+    <% if (isPauta) { %>
+      <% if (open && content.diff) { %>
+      <div class="ap-diff">
+        <h2>O que mudou desde o pedido de ajustes</h2>
+        <% if (content.diff.added.length) { %><ul class="ap-diff-list"><% content.diff.added.forEach(function (p) { %><li class="ap-add"><span class="pt-mono">novo</span> <%= p %></li><% }) %></ul><% } %>
+        <% if (content.diff.removed.length) { %><ul class="ap-diff-list"><% content.diff.removed.forEach(function (p) { %><li class="ap-del"><span class="pt-mono">saiu</span> <s><%= p %></s></li><% }) %></ul><% } %>
+      </div>
+      <% } %>
+      <% if (content.link) { %>
+        <p class="pt-sub">A <%= what.toLowerCase() %> está num documento à parte.</p>
+        <p><a class="pt-btn pt-btn-sec" href="<%= content.link %>" target="_blank" rel="noopener noreferrer"><%- icon('external-link', 16) %> Abrir o documento</a></p>
+      <% } else { %>
+        <article class="ap-doc"><%- content.html %></article>
+      <% } %>
+    <% } else if (isVideo && content.file) { %>
+      <div class="ap-player">
+        <video controls playsinline preload="metadata" src="<%= base %>/video" data-ap-video></video>
+      </div>
+      <p class="ap-player-meta pt-mono pt-muted">v<%= content.file.version %> · <a class="pt-link" href="<%= base %>/video?original=1" target="_blank" rel="noopener">ver no original</a></p>
+      <% if (state === 'respondido' && content.comments.length) { %>
+      <h2 class="ap-h">Comentários</h2>
+      <ul class="ap-comments">
+        <% content.comments.forEach(function (c) { %><li><span class="pt-mono"><%= c.at_ms == null ? 'geral' : mmss(c.at_ms) + (c.end_ms ? ' – ' + mmss(c.end_ms) : '') %></span><p class="pt-pre"><%= c.body %></p></li><% }) %>
+      </ul>
+      <% } %>
+    <% } else if (isCovers) { %>
+      <% if (open) { %><p class="pt-sub">Marque a capa (ou as capas) que você aprova. Para pedir mudança, escreva no recado.</p><% } %>
+      <div class="ap-covers">
+        <% content.covers.forEach(function (c, i) { var checked = (form.covers || []).includes(String(c.id)); %>
+        <% if (open) { %>
+        <label class="ap-cover">
+          <input type="checkbox" name="capa" value="<%= c.id %>" form="ap-form" <%= checked ? 'checked' : '' %>>
+          <img src="<%= base %>/capa/<%= c.id %>?v=<%= new Date(c.updated_at).getTime() %>" alt="Capa <%= i + 1 %>" loading="lazy" decoding="async" width="1280" height="720">
+          <span class="pt-mono">Capa <%= i + 1 %><%= c.angle ? ' · ' + c.angle : '' %></span>
+        </label>
+        <% } else if (c.approved) { %>
+        <figure class="ap-cover is-approved">
+          <img src="<%= base %>/capa/<%= c.id %>?v=<%= new Date(c.updated_at).getTime() %>" alt="Capa <%= i + 1 %> aprovada" loading="lazy" decoding="async" width="1280" height="720">
+          <figcaption class="pt-mono">Capa <%= i + 1 %> · aprovada</figcaption>
+        </figure>
+        <% } %>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+  <% } %>
+
+  <% if (open) { %>
+  <section class="pt-sec ap-answer" aria-labelledby="ap-resposta">
+    <h2 id="ap-resposta">Sua resposta</h2>
+    <% if (error) { %><p class="pt-err" role="alert"><%= error %></p><% } %>
+    <form method="post" action="<%= base %>" class="pt-form ap-form" id="ap-form">
+      <% if (isVideo) { %>
+      <div class="ap-js">
+        <p class="pt-sub">Pause no ponto e toque em <strong>Comentar neste ponto</strong>. Pode deixar quantos comentários quiser.</p>
+        <ul class="ap-comments ap-comments-edit" data-ap-list>
+          <% (form.comments || []).forEach(function (c) { %>
+          <li class="ap-row">
+            <input type="hidden" name="c_at" value="<%= c.at_ms == null ? '' : c.at_ms %>"><input type="hidden" name="c_end" value="<%= c.end_ms == null ? '' : c.end_ms %>">
+            <span class="pt-mono"><%= c.at_ms == null ? 'geral' : mmss(Number(c.at_ms)) %></span>
+            <textarea name="c_body" rows="2" maxlength="2000" aria-label="Comentário"><%= c.body %></textarea>
+          </li>
+          <% }) %>
+        </ul>
+        <button type="button" class="pt-btn pt-btn-sec" data-ap-add><%- icon('message-square', 16) %> Comentar neste ponto <span class="pt-mono-in" data-ap-now>0:00</span></button>
+        <template data-ap-row>
+          <li class="ap-row">
+            <input type="hidden" name="c_at" value=""><input type="hidden" name="c_end" value="">
+            <span class="pt-mono" data-ap-time></span>
+            <textarea name="c_body" rows="2" maxlength="2000" aria-label="Comentário" placeholder="ex.: cortar essa pausa"></textarea>
+            <span class="ap-row-acts"><button type="button" class="pt-link" data-ap-end>marcar o fim aqui</button> <button type="button" class="pt-link" data-ap-del>tirar</button></span>
+          </li>
+        </template>
+      </div>
+      <% } %>
+      <label for="ap-recado"><%= isVideo ? 'Recado geral' : 'Recado' %> <span class="pt-muted">(para pedir ajustes, diga o que precisa mudar)</span></label>
+      <textarea id="ap-recado" name="recado" rows="4" maxlength="2000" placeholder="ex.: tudo certo, só trocar a ordem dos blocos 2 e 3"><%= form.note || '' %></textarea>
+      <label for="ap-nome">Seu nome *</label>
+      <input id="ap-nome" name="nome" type="text" maxlength="80" required autocomplete="name" value="<%= form.name || '' %>" data-ap-name>
+      <div class="ap-actions">
+        <button class="pt-btn" type="submit" name="resposta" value="aprovar"><%- icon('check', 16) %> Aprovar</button>
+        <button class="pt-btn pt-btn-sec" type="submit" name="resposta" value="ajustes"><%- icon('pencil', 16) %> Pedir ajustes</button>
+      </div>
+      <p class="pt-muted ap-foot">A resposta vai para a equipe do <%= publicName %>. Este link aceita uma resposta.</p>
+    </form>
+  </section>
+  <% } %>
+</main>
+</body>
+</html>

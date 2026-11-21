@@ -1,0 +1,3 @@
+<%# Cloudflare Turnstile: só com as chaves configuradas (res.locals.turnstileKey, via turnstile.page). tsManual = quem envia por fetch. %>
+<% if (typeof turnstileKey !== 'undefined' && turnstileKey) { %><div class="ts-box" data-turnstile="<%= turnstileKey %>"<% if (typeof tsAction !== 'undefined' && tsAction) { %> data-ts-action="<%= tsAction %>"<% } %><% if (typeof tsManual !== 'undefined' && tsManual) { %> data-ts-manual<% } %><% if (typeof tsLazy !== 'undefined' && tsLazy) { %> data-ts-lazy<% } %>></div>
+<script src="/static/turnstile.js?v=<%= assetV %>" defer></script><% } %>

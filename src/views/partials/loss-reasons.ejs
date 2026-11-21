@@ -1,0 +1,25 @@
+<%
+  // Por que os convidados foram perdidos nos últimos 30 dias (daySummary.lossReasons): uma linha por motivo, do mais comum para o
+  // menos, com a quantidade, a porcentagem e a barra (proporcional ao mais comum; a do primeiro na cor do texto). Medir não é ação:
+  // nada de lime. Variáveis: losses, mineOnly (só os convidados da pessoa), bandId.
+  var href = '/convidados?view=lista&status=perdido' + (mineOnly ? '&owner=eu' : '');
+%>
+<section class="day-band" aria-labelledby="<%= bandId %>">
+  <div class="day-band-head">
+    <h3 class="day-band-t" id="<%= bandId %>">Por que <%= mineOnly ? 'seus convidados foram perdidos' : 'os convidados foram perdidos' %> · últimos 30 dias</h3>
+    <% if (losses.total) { %><a class="day-aside" href="<%= href %>"><b><%= losses.total %></b> <%= losses.total === 1 ? 'perdido' : 'perdidos' %> · ver a lista</a><% } %>
+  </div>
+  <% if (!losses.total) { %>
+  <p class="loss-empty small muted"><%= mineOnly ? 'Nenhum convidado seu' : 'Nenhum convidado' %> foi dado como perdido nos últimos 30 dias.</p>
+  <% } else { %>
+  <ul class="loss-reasons">
+    <% losses.list.forEach(function (x) { %>
+    <li class="loss-reason">
+      <span class="loss-reason-l"><%= x.label %></span>
+      <svg class="goal-bar" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="bg" width="100" height="6" rx="3"/><rect class="fg" width="<%= x.bar %>" height="6" rx="3"/></svg>
+      <span class="loss-reason-n"><%= x.n %></span><span class="loss-reason-p"><%= x.pct %>%</span>
+    </li>
+    <% }) %>
+  </ul>
+  <% } %>
+</section>

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><%= title %></title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="icon" href="<%= brandDir %>/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
+<link rel="stylesheet" href="/static/portal.css?v=<%= assetV %>">
+<link rel="stylesheet" href="/static/aprovacao.css?v=<%= assetV %>">
+<% if (typeof brandCss !== 'undefined' && brandCss) { %><link rel="stylesheet" href="<%= brandCss %>?v=<%= assetV %>"><% } %>
+</head>
+<body class="ap">
+<main class="pt-wrap ap-wrap">
+  <section class="ap-state ap-missing" role="status">
+    <span class="pt-kicker">Aprovação</span>
+    <h1>Link não encontrado</h1>
+    <p class="pt-sub">Este link não é válido. Confira se ele chegou inteiro no WhatsApp ou peça um novo à equipe.</p>
+  </section>
+</main>
+</body>
+</html>

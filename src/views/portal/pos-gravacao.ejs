@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><%= title %></title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="description" content="O que acontece depois da gravação no Pulso Podcast.">
+<link rel="icon" href="<%= brandDir %>/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="<%= brandDir %>/apple-touch-icon.png">
+<meta name="theme-color" content="#F4F2EC">
+<link rel="stylesheet" href="/static/portal.css?v=<%= assetV %>">
+<% if (typeof brandCss !== 'undefined' && brandCss) { %><link rel="stylesheet" href="<%= brandCss %>?v=<%= assetV %>"><% } %>
+</head>
+<body class="pp">
+<%# Página pós-gravação: a mesma para todos os convidados (QR Code do cartão de agradecimento). Curta de ler: agradecimento, três
+    frases-resumo, o caminho até o episódio, o que tem no portal, os cortes em collab, as redes e o WhatsApp da produção. %>
+<header class="pt-top">
+  <span class="pt-wordmark" aria-label="pulso.">pulso<span>.</span></span>
+  <span class="pt-mono pt-muted">Depois da gravação</span>
+</header>
+
+<main class="pt-wrap">
+  <section class="pp-hero" aria-labelledby="pp-obrigado">
+    <span class="pt-kicker">Pulso Podcast · pós-gravação</span>
+    <h1 class="pp-thanks" id="pp-obrigado">Obrigado por sentar à mesa.</h1>
+    <p class="pt-lede">A conversa está gravada. Aqui está, em poucos passos, o que acontece agora e como você acompanha cada um.</p>
+    <ul class="pp-glance">
+      <li><%- icon('calendar-days', 18) %><span>A data do episódio chega junto com o seu portal do convidado</span></li>
+      <li><%- icon('scissors', 18) %><span>Você recebe cortes para postar em collab com o Pulso</span></li>
+      <li><%- icon('share-2', 18) %><span>O episódio sai em todas as redes do Pulso</span></li>
+    </ul>
+  </section>
+
+  <section class="pt-sec" aria-labelledby="pp-agora">
+    <h2 id="pp-agora">O que acontece agora</h2>
+    <ol class="pp-path">
+      <li class="is-done">
+        <span class="pp-dot"><%- icon('check', 15) %></span>
+        <div><span class="pt-mono pt-muted">Feito</span><h3>Gravação</h3><p>A conversa está gravada. Obrigado pelo tempo e pela história.</p></div>
+      </li>
+      <li>
+        <span class="pp-dot"><%- icon('image', 15) %></span>
+        <div><span class="pt-mono pt-muted">Agora</span><h3>Triagem e edição</h3><p>Selecionamos as fotografias e as imagens e editamos o episódio e os cortes.</p></div>
+      </li>
+      <li>
+        <span class="pp-dot"><%- icon('send', 15) %></span>
+        <div><span class="pt-mono pt-muted">Sexta-feira antes do episódio</span><h3>Seu portal, com a data do episódio</h3><p>A produção manda pelo WhatsApp o seu portal do convidado: é ali que você vê a data do episódio e tudo o que é seu.</p></div>
+      </li>
+      <li>
+        <span class="pp-dot"><%- icon('clapperboard', 15) %></span>
+        <div><span class="pt-mono pt-muted">Semana do episódio</span><h3>Bastidores e aviso</h3><p>Soltamos um bastidores da gravação e avisamos você quando o episódio vai ao ar.</p></div>
+      </li>
+      <li>
+        <span class="pp-dot"><%- icon('play', 15) %></span>
+        <div><span class="pt-mono pt-muted">Episódio no ar</span><h3>Episódio e cortes</h3><p>O episódio sai no YouTube e no Spotify, e os cortes vão saindo nas redes do Pulso, em collab com você.</p></div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="pt-sec" aria-labelledby="pp-portal">
+    <h2 id="pp-portal">O que tem no seu portal</h2>
+    <p class="pt-sub">Um link só seu, que chega na sexta-feira antes do episódio. Fica tudo num lugar, para acompanhar, baixar e postar quando quiser.</p>
+    <ul class="pp-items">
+      <li><%- icon('camera', 20) %><div><h3>Fotos da gravação</h3><p>Para baixar e postar.</p></div></li>
+      <li><%- icon('play', 20) %><div><h3>O episódio</h3><p>A data e, quando ele sai, os links do YouTube e do Spotify.</p></div></li>
+      <li><%- icon('users', 20) %><div><h3>Posts em collab</h3><p>Em tempo real, conforme vão saindo.</p></div></li>
+      <li><%- icon('calendar-days', 20) %><div><h3>Agenda dos cortes</h3><p>Quando sai cada corte, para você programar o collab.</p></div></li>
+      <li><%- icon('scissors', 20) %><div><h3>Cortes inéditos</h3><p>Exclusivos, para você postar no seu perfil.</p></div></li>
+    </ul>
+  </section>
+
+  <section class="pp-collab" aria-labelledby="pp-collab-h">
+    <span class="pt-mono">Cortes em collab</span>
+    <h2 id="pp-collab-h">Sua conversa chega a mais gente, sem custo para você.</h2>
+    <p>A gente entrega cortes do seu episódio. Postados em collab com o Pulso, eles aparecem no seu perfil e no nosso ao mesmo tempo: distribuição em parceria, de graça.</p>
+  </section>
+
+  <section class="pt-sec pp-after-collab" aria-labelledby="pp-redes">
+    <h2 id="pp-redes">Onde o Pulso posta</h2>
+    <p class="pt-sub">Além do Instagram, o episódio e os cortes saem em todas as redes do Pulso:</p>
+    <ul class="pp-nets">
+      <% networks.forEach(function (n) { %><li><%- brand(n[0], 18) %><span><%= n[1] %></span></li><% }) %>
+    </ul>
+  </section>
+
+  <section class="pt-sec" aria-labelledby="pp-duvidas">
+    <h2 id="pp-duvidas">Ficou alguma dúvida?</h2>
+    <p class="pt-sub">Fale com a produção do Pulso pelo WhatsApp. É por lá também que chega o seu portal, com a data do episódio.</p>
+    <% if (wa) { %>
+    <div class="pp-help"><a class="pt-btn" href="<%= wa %>" target="_blank" rel="noopener">Falar com a produção</a><span class="pt-mono pp-phone"><%= phone %></span></div>
+    <% } %>
+  </section>
+</main>
+
+<footer class="pp-foot">
+  <span class="pt-wordmark" aria-label="pulso.">pulso<span>.</span></span>
+  <p class="pp-tagline">As conversas que estão movimentando a saúde.</p>
+</footer>
+
+<% if (wa) { %><a class="pp-wa" href="<%= wa %>" target="_blank" rel="noopener" aria-label="Falar com a produção pelo WhatsApp"><%- icon('whatsapp', 22) %><span>Dúvidas? Fale com a produção</span></a><% } %>
+</body>
+</html>

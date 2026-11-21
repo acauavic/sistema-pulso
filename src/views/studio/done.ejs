@@ -1,0 +1,11 @@
+<%- include('_top') %>
+  <section class="studio-card">
+    <span class="kicker mono"><%= tag %><%= link.guest_name ? ' · ' + link.guest_name.toUpperCase() : '' %></span>
+    <h1>Recebido. Obrigado.</h1>
+    <p class="muted">O material chegou ao Pulso e a produção já foi avisada. Pode fechar esta página.</p>
+    <p class="mono small studio-total"><%= files.length %> arquivo<%= files.length === 1 ? '' : 's' %> · <%= fmt.formatBytes ? fmt.formatBytes(bytes) : Math.round(bytes / 1073741824 * 10) / 10 + ' GB' %></p>
+    <ul class="plain studio-files">
+      <% files.forEach(function (f) { %><li><%- icon('check', 14) %> <span class="mono small"><%= f.source_path || f.filename %></span></li><% }) %>
+    </ul>
+  </section>
+<%- include('_bottom') %>

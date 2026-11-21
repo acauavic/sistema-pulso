@@ -16,6 +16,11 @@ async function createAuthToken(userId, purpose) {
   return token;
 }
 
+// Invalida os links ainda não usados (convite e redefinição): ao trocar o e-mail ou a senha, um link que já saiu não vale mais.
+async function revokeAuthTokens(userId) {
+  await db.query('DELETE FROM auth_tokens WHERE user_id = $1 AND used_at IS NULL', [userId]);
+}
+
 // Só consulta (para mostrar o formulário). Não consome.
 async function peekAuthToken(token, purposes) {
   if (!token || typeof token !== 'string') return null;
@@ -43,4 +48,4 @@ async function consumeAuthToken(token, purposes) {
   return rows[0] || null;
 }
 
-module.exports = { createAuthToken, peekAuthToken, consumeAuthToken, TTL_HOURS };
+module.exports = { createAuthToken, peekAuthToken, consumeAuthToken, TTL_HOURS, revokeAuthTokens };

@@ -1,8 +1,8 @@
 <%- include('partials/head') %>
 <div class="card <%= currentUser ? '' : 'auth-card' %>">
   <span class="kicker">Erro</span>
-  <h1 style="margin-bottom:12px"><%= title %></h1>
+  <h1 class="mb-12"><%= title %></h1>
   <p class="muted"><%= message %></p>
-  <p style="margin:20px 0 0"><a class="btn" href="<%= currentUser ? '/' : '/login' %>">Voltar ao início</a></p>
+  <p class="mt-20 mb-0"><a class="btn" href="<%= currentUser ? '/' : '/login' %>">Voltar ao início</a></p>
 </div>
 <%- include('partials/foot') %>

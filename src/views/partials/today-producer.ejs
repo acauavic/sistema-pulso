@@ -1,0 +1,42 @@
+<%
+  // Hoje, no Início da produtora: os follow-ups que faltam (os dela e os sem responsável) e, ao lado, o que está quente agora e os
+  // aceitos ainda sem data. Variáveis: outToday (outreach.todayFor), mineNow (myDay.now), CHANNELS, outBase.
+  var items = outToday ? outToday.items : [];
+  var hot = mineNow.hot, waiting = mineNow.waiting;
+  var SIGNALS = { kit: 'ABRIU O MEDIA KIT', conversa: 'PEDIU UMA CONVERSA', convite: 'ABRIU O CONVITE' };
+  var side = hot.length || waiting.n;
+%>
+<section class="card today" aria-labelledby="today-h">
+  <div class="today-head"><h2 id="today-h">Hoje</h2><% if (items.length > 6) { %><a class="small" href="/convidados?view=lista&status=convite_enviado&followup=1">Ver os follow-ups de convidados</a><% } %></div>
+  <div class="today-grid <%= side ? '' : 'one' %>">
+    <div>
+      <span class="kicker">Follow-ups que faltam<%= items.length ? ' · ' + items.length : '' %></span>
+      <% if (!items.length) { %><p class="small muted">Nenhum follow-up para hoje. Tudo em dia.</p><% } %>
+      <ul class="plain today-list">
+        <% items.slice(0, 6).forEach(function (x) { %>
+        <li>
+          <a href="<%= outBase(x.kind) %>/<%= x.id %>#abordagens"><strong><%= x.name %></strong></a>
+          <span class="mono small muted"><%= x.kind === 'guest' ? 'CONVIDADO' : 'PATROCINADOR' %><%= x.lastChannel ? ' · ' + CHANNELS[x.lastChannel].toUpperCase() : '' %></span>
+          <span class="outreach-chip <%= x.d.tone %> small"><%= x.d.short %></span>
+        </li>
+        <% }) %>
+      </ul>
+    </div>
+    <% if (side) { %>
+    <div class="today-hot">
+      <% if (hot.length) { %>
+      <span class="kicker">Quentes agora</span>
+      <ul class="plain today-list">
+        <% hot.forEach(function (x) { %>
+        <li>
+          <a href="<%= x.kind === 'guest' ? '/convidados/' : '/patrocinadores/' %><%= x.id %>#abordagens"><strong><%= x.name %></strong></a>
+          <span class="mono small muted"><%= SIGNALS[x.signal] %> · <%= x.when.toUpperCase() %></span>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+      <% if (waiting.n) { %><p class="small today-warn"><b><%= waiting.n %> <%= waiting.n === 1 ? 'aceito sem data' : 'aceitos sem data' %></b> de gravação<%= waiting.days ? ', há ' + waiting.days + (waiting.days === 1 ? ' dia' : ' dias') + ' em média' : '' %> · <a href="/convidados?view=lista&amp;status=em_agendamento">marcar gravações</a></p><% } %>
+    </div>
+    <% } %>
+  </div>
+</section>

@@ -1,0 +1,18 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Patrocinadores · Briefing</span><h1><%= sponsor.company %></h1></div>
+  <a class="btn ghost" href="/patrocinadores/<%= sponsor.id %>#briefing"><%- icon('arrow-left') %> Voltar</a>
+</div>
+<p class="lead">Estas são as respostas do formulário do patrocinador. A equipe pode completar ou ajustar aqui (o patrocinador também pode editar pelo link dele).</p>
+<div class="card form-card wide">
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <form method="post" action="/patrocinadores/<%= sponsor.id %>/briefing" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <%- include('_brief-fields') %>
+    <div class="row">
+      <button class="btn primary" type="submit">Salvar</button>
+      <a class="btn" href="/patrocinadores/<%= sponsor.id %>#briefing">Cancelar</a>
+    </div>
+  </form>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<div class="page-head"><div><span class="kicker">Conteúdo · Episódios</span><h1>Editar episódio</h1></div></div>
+<div class="card form-card wide">
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <form method="post" action="/episodios/<%= episode.id %>" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2 tight">
+      <label>Número (EP.)<input type="number" name="number" min="1" max="99999" value="<%= values.number || '' %>"></label>
+      <p class="muted small">Etapa atual: <span class="badge b-st-<%= episode.status %>"><%= statuses[episode.status] %></span> (a etapa muda pelos botões da página do episódio).</p>
+    </div>
+    <label>Título *<input type="text" name="title" value="<%= values.title || '' %>" maxlength="200" required autofocus></label>
+    <div class="grid-2 tight">
+      <label>Data de veiculação<input type="date" name="aired_on" value="<%= typeof values.aired_on === 'string' ? values.aired_on : fmt.toInputDate(values.aired_on) %>"></label>
+      <label>Gravado em<input type="date" name="recorded_on" value="<%= typeof values.recorded_on === 'string' ? values.recorded_on : fmt.toInputDate(values.recorded_on) %>"></label>
+    </div>
+    <label>Observações<textarea name="notes" rows="3" maxlength="2000"><%= values.notes || '' %></textarea></label>
+    <div class="row">
+      <button class="btn primary" type="submit">Salvar</button>
+      <a class="btn ghost" href="/episodios/<%= episode.id %>">Cancelar</a>
+    </div>
+  </form>
+</div>
+<%- include('../partials/foot') %>

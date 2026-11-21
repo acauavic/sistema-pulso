@@ -4,8 +4,30 @@ version: "3.8"
 # Copie para stack.yml, preencha os valores reais (NUNCA commite o stack.yml com segredos)
 # e ajuste rede overlay, domínios e resolver de certificado ao seu ambiente.
 #
-# Não usa basic auth do Traefik: o painel tem login próprio, e o convite (/convite/*)
-# precisa ser público para o convidado abrir.
+# Dois serviços com a MESMA imagem:
+#   - pulso_gestao (ROLE=web): o painel. Pode ter várias réplicas (sessão, limitador e avisos ficam no Postgres).
+#   - pulso_worker (ROLE=worker): fila em segundo plano (FFmpeg, transcrição, IA, e-mails) e rotinas automáticas
+#     (publicar agendados, automações de comentários, avisos de tarefas, limpeza). 1 réplica basta; mais réplicas dividem a fila.
+# Fila, rotinas, tempo real e limitador usam o Postgres (SKIP LOCKED, travas consultivas, LISTEN/NOTIFY): não precisa de Redis.
+#
+# Não usa basic auth do Traefik: o painel tem login próprio, e o convite (/convite/*) precisa ser público.
+
+x-env: &env
+  PORT: "3100"
+  APP_BASE_URL: "https://gestao.podcastpulso.com"
+  # Opcional: servir os convites em outro domínio (adicione o Host no router abaixo)
+  PUBLIC_BASE_URL: ""
+  PODCAST_NAME: "Podcast Pulso"
+  SESSION_SECRET: ""
+  PODCAST_DATABASE_URL: "postgresql://usuario:senha@postgres:5432/pulso"
+  BREVO_SERVER: "smtp-relay.brevo.com"
+  BREVO_PORT: "587"
+  BREVO_USER: ""
+  BREVO_CHAVE_SMTP: ""
+  BREVO_EMAIL: ""
+  YOURLS_LINK: "link.podcastpulso.com"
+  YOURLS_KEY: ""
+  TZ: "America/Sao_Paulo"
 
 services:
   pulso_gestao:
@@ -13,23 +35,10 @@ services:
     networks:
       - BrunoNet
     environment:
-      - PORT=3100
-      - APP_BASE_URL=https://gestao.podcastpulso.com
-      # Opcional: servir os convites em outro domínio (adicione o Host no router abaixo)
-      - PUBLIC_BASE_URL=
-      - PODCAST_NAME=Podcast Pulso
-      - SESSION_SECRET=
-      - PODCAST_DATABASE_URL=postgresql://usuario:senha@postgres:5432/pulso
-      - BREVO_SERVER=smtp-relay.brevo.com
-      - BREVO_PORT=587
-      - BREVO_USER=
-      - BREVO_CHAVE_SMTP=
-      - BREVO_EMAIL=
-      - YOURLS_LINK=link.podcastpulso.com
-      - YOURLS_KEY=
-      - TZ=America/Sao_Paulo
+      <<: *env
+      ROLE: "web"
     deploy:
-      replicas: 1 # o limitador de login é em memória; mantenha 1 réplica
+      replicas: 2
       restart_policy:
         condition: any
         delay: 5s
@@ -42,6 +51,22 @@ services:
         - "traefik.http.routers.pulso_gestao.tls.certresolver=letsencryptresolver"
         - "traefik.http.services.pulso_gestao.loadbalancer.server.port=3100"
         - "traefik.http.services.pulso_gestao.loadbalancer.passhostheader=1"
+
+  pulso_worker:
+    image: pulso-gestao:1
+    networks:
+      - BrunoNet
+    environment:
+      <<: *env
+      ROLE: "worker"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          memory: 2G # FFmpeg e leitura de vídeo
 
 networks:
   BrunoNet:

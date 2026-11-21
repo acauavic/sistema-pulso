@@ -1,0 +1,10 @@
+<%# Bolinha de responsável (clique para trocar). Variáveis: type (guest|sponsor|episode|task), id, user ({id,name} ou null), editable, label (opcional, mostra o nome ao lado), inLink (opcional: dentro de um card que já é link). %>
+<% var who = user && user.id ? user : null; var lbl = typeof label !== 'undefined' && label; var tag = typeof inLink !== 'undefined' && inLink ? 'span' : 'button'; %>
+<% if (editable) { %>
+<<%= tag %> <%- tag === 'button' ? 'type="button"' : 'role="button" tabindex="0"' %> class="dot <%= who ? '' : 'is-empty' %> <%= lbl ? 'with-label' : '' %>" data-dot data-tipo="<%= type %>" data-id="<%= id %>" data-user="<%= who ? who.id : '' %>"
+  title="<%= who ? 'Responsável: ' + who.name + ' (clique para trocar)' : 'Sem responsável (clique para escolher)' %>" aria-label="<%= who ? 'Responsável: ' + who.name + '. Trocar' : 'Escolher responsável' %>">
+  <span class="dot-av"><%= who ? fmt.initials(who.name) : '+' %></span><% if (lbl) { %><span class="dot-name"><%= who ? who.name : 'Sem responsável' %></span><% } %>
+</<%= tag %>>
+<% } else { %>
+<span class="dot <%= who ? '' : 'is-empty' %> <%= lbl ? 'with-label' : '' %>" title="<%= who ? 'Responsável: ' + who.name : 'Sem responsável' %>"><span class="dot-av"><%= who ? fmt.initials(who.name) : '—' %></span><% if (lbl) { %><span class="dot-name"><%= who ? who.name : 'Sem responsável' %></span><% } %></span>
+<% } %>

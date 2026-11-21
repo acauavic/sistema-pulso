@@ -1,0 +1,11 @@
+<%#
+  Vídeo que só carrega quando a pessoa clica (antes, a página baixava o começo do vídeo ao abrir).
+  locals: src (endereço do vídeo), id (id do <video> que nasce), poster (imagem da capa, opcional), duration (ms, opcional),
+          tall (vertical 9:16, padrão true), label (nome para leitor de tela).
+%>
+<% var isTall = typeof tall === 'undefined' ? true : tall; %>
+<button type="button" class="video-poster<%= isTall ? ' tall' : '' %>" data-video-load data-src="<%= src %>" data-id="<%= id %>"<% if (typeof poster !== 'undefined' && poster) { %> data-poster="<%= poster %>"<% } %> aria-label="Assistir: <%= typeof label !== 'undefined' ? label : 'vídeo' %>">
+  <% if (typeof poster !== 'undefined' && poster) { %><img src="<%= poster %>" alt="" decoding="async"><% } %>
+  <span class="video-play" aria-hidden="true"><%- icon('play', 22) %></span>
+  <% if (typeof duration !== 'undefined' && duration) { %><span class="video-dur mono"><%= fmt.formatClock(duration) %></span><% } %>
+</button>

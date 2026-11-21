@@ -1,0 +1,219 @@
+<%- include('../partials/head') %>
+<%- include('../partials/social-nav') %>
+<%- include('_comments-tabs', { cmtTab: 'respostas' }) %>
+<%
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var here = '/social/comentarios?vista=' + vista + (pubId ? '&pub=' + pubId : '');
+  var back = '<input type="hidden" name="voltar" value="' + here + '">';
+  var link = function (v) { return '/social/comentarios?vista=' + v + (pubId ? '&pub=' + pubId : ''); };
+  var pad = function (n) { return n ? 'EP.' + String(n).padStart(3, '0') : ''; };
+  var hm = function (d) { return d ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date(d)) : ''; };
+  var when = function (d) { return d ? fmt.formatSoon(d) : ''; };
+  var actionLabel = { responder: 'Responder', reagir: 'Reagir' };
+  var empty = {
+    equipe: ['Nada esperando você.', 'Quando um comentário for pesado ou delicado demais para a IA (ameaça, pedido de orientação de saúde, reclamação séria), ele aparece aqui e você recebe um aviso.'],
+    aprovar: ['Nenhuma resposta para aprovar.', cfg.on ? 'Os comentários novos chegam pela Outstand e pela leitura de 30 em 30 minutos. A IA escreve a resposta e ela espera aqui o seu ok.' : 'Ligue as respostas por IA para a lista começar a encher.'],
+    fila: ['A fila está vazia.', 'O que você aprova entra aqui e sai uma por vez, no ritmo configurado.'],
+    enviadas: ['Nenhuma resposta enviada ainda.', 'As respostas que saírem para as redes ficam aqui, com o botão de apagar se precisar.'],
+    ignoradas: ['Nada ignorado.', 'Comentários que são conversa com o convidado, marcação de amigos, vazios ou de robô ficam aqui, sem resposta.'],
+  };
+%>
+
+<% if (!cfg.on && !rows.length && !Object.keys(counts).some(function (k) { return counts[k]; })) { %>
+<section class="card cmt-intro">
+  <span class="kicker mono">Respostas por IA · desligada</span>
+  <h2>A IA responde os comentários dos posts do Pulso</h2>
+  <p class="muted">Ela lê cada comentário dos posts que saíram pela Outstand, escreve uma resposta curta no tom da marca e, sempre que dá, termina com uma pergunta para a pessoa comentar de novo. As respostas saem aos poucos, para a conta não parecer robô.</p>
+  <ul class="plain cmt-rules">
+    <li><%- icon('message-circle', 16) %><span><strong>Responde</strong> opiniões, relatos e perguntas, e discorda com elegância das generalizações.</span></li>
+    <li><%- icon('smile-plus', 16) %><span><strong>Reage com um emoji</strong> aos comentários curtos de apoio.</span></li>
+    <li><%- icon('eye-off', 16) %><span><strong>Deixa de lado</strong> quem está falando com o convidado, marcações, robôs e comentários vazios.</span></li>
+    <li><%- icon('bell', 16) %><span><strong>Chama você</strong> no que é pesado: ameaça, pedido de orientação de saúde, reclamação séria.</span></li>
+  </ul>
+  <% if (canSetup) { %>
+  <div class="row top-gap">
+    <form method="post" action="/social/comentarios/ligar" class="inline"><%- csrfField %><input type="hidden" name="on" value="1"><button class="btn primary" type="submit"><%- icon('sparkles') %> Ligar respostas por IA</button></form>
+    <button class="btn ghost" type="button" data-modal-open="modal-cmt-config">Ajustar antes</button>
+  </div>
+  <p class="small muted m-0 top-gap">Começa em <strong><%= MODES[cfg.mode].toLowerCase() %></strong>: nada sai sem alguém aprovar. Até <%= cfg.per_hour %> respostas por hora, das <%= cfg.from %>h às <%= cfg.to %>h.</p>
+  <% } else { %>
+  <p class="small muted m-0 top-gap">A gestão liga as respostas por IA aqui. Depois disso, você aprova, edita e responde por esta tela.</p>
+  <% } %>
+</section>
+<% } else { %>
+<section class="card cmt-setup">
+  <div class="cmt-setup-main">
+    <span class="kicker mono">Respostas por IA</span>
+    <p class="m-0"><strong><%= cfg.on ? 'Ligada' : 'Desligada' %></strong><span class="muted"> · <%= summary %></span></p>
+    <% if (cfg.on && cfg.dm_on) { %><p class="mono small muted m-0">DIRECTS NAS ÚLTIMAS 24 H <%= dmToday %> DE <%= cfg.dm_per_day %></p><% } %>
+    <% if (lastSweep && lastSweep.at) { %><p class="mono small muted m-0">ÚLTIMA LEITURA <%= when(lastSweep.at) %> · <%= lastSweep.posts %> POST<%= lastSweep.posts === 1 ? '' : 'S' %><%= lastSweep.errors ? ' · ' + lastSweep.errors + ' COM ERRO' : '' %></p><% } %>
+  </div>
+  <% if (canSetup) { %>
+  <div class="row cmt-setup-actions">
+    <form method="post" action="/social/comentarios/ligar" class="inline"><%- csrfField %><%- back %><input type="hidden" name="on" value="<%= cfg.on ? '0' : '1' %>">
+      <label class="switch"><input type="checkbox" role="switch" <%= cfg.on ? 'checked' : '' %> data-autosubmit aria-label="Respostas por IA ligadas"><span class="switch-track" aria-hidden="true"></span><span class="mono small switch-state"><%= cfg.on ? 'LIGADA' : 'DESLIGADA' %></span></label>
+    </form>
+    <button class="btn sm ghost" type="button" data-modal-open="modal-cmt-config"><%- icon('pencil', 14) %> Editar</button>
+    <details class="row-menu"><summary class="icon-btn" aria-label="Mais ações"><%- icon('ellipsis', 16) %></summary>
+      <div class="row-menu-list">
+        <form method="post" action="/social/comentarios/buscar" data-busy="Lendo…"><%- csrfField %><%- back %><button type="submit"><%- icon('refresh-cw', 14) %> Ler os últimos 60 dias agora</button></form>
+      </div>
+    </details>
+  </div>
+  <% } %>
+</section>
+<% } %>
+<% if (!outstandLive) { %><p class="test-mode small"><%- icon('info', 14) %> <span>A Outstand está em modo de teste: as respostas aprovadas são só simuladas, nada sai para as redes.</span></p><% } %>
+<% if (cfg.on && cfg.dm_on && !communityOk) { %><div class="notice"><%- icon('link', 16) %> O direct com a comunidade está esperando o link: cadastre "Comunidade no WhatsApp" em <a href="/social/automacoes">Social &gt; Automações</a>. Até lá, os directs ficam na fila.</div><% } %>
+<% if (cfg.on && !aiReady) { %><div class="notice"><%- icon('triangle-alert', 16) %> A IA não está configurada neste servidor: os comentários chegam, mas ficam sem resposta proposta.</div><% } %>
+
+<% if (cfg.on || rows.length || Object.keys(counts).some(function (k) { return counts[k]; })) { %>
+<div class="board-filter cmt-filters">
+  <div class="seg" role="group" aria-label="Comentários">
+    <% Object.keys(VIEWS).forEach(function (k) { %><a class="<%= vista === k ? 'on' : '' %>" href="<%= link(k) %>"<%- vista === k ? ' aria-current="page"' : '' %>><%= VIEWS[k].label %> <span class="mono"><%= counts[k] %></span></a><% }) %>
+  </div>
+  <% if (posts.length > 1) { %>
+  <form method="get" action="/social/comentarios" class="inline cmt-post-filter">
+    <input type="hidden" name="vista" value="<%= vista %>">
+    <select name="pub" aria-label="Post" data-autosubmit data-search>
+      <option value="">Todos os posts</option>
+      <% posts.forEach(function (p) { %><option value="<%= p.id %>" <%= pubId === p.id ? 'selected' : '' %>><%= p.title %> (<%= p.n %>)</option><% }) %>
+    </select>
+  </form>
+  <% if (pubId) { %><a class="link small" href="/social/comentarios?vista=<%= vista %>">Limpar filtro</a><% } %>
+  <% } %>
+</div>
+
+<% if (vista === 'aprovar' && rows.length) { %>
+<div class="cmt-bulk">
+  <p class="m-0"><span class="mono"><%= counts.aprovar %></span> resposta<%= counts.aprovar === 1 ? ' pronta' : 's prontas' %>. Confira, edite o que quiser e aprove.</p>
+  <form method="post" action="/social/comentarios/aprovar-todas" class="inline" data-confirm="Aprovar <%= counts.aprovar %> resposta<%= counts.aprovar === 1 ? '' : 's' %>? Elas saem aos poucos, até <%= cfg.per_hour %> por hora." data-busy="Aprovando…"><%- csrfField %><%- back %><% if (pubId) { %><input type="hidden" name="pub" value="<%= pubId %>"><% } %>
+    <button class="btn primary" type="submit"><%- icon('check') %> Aprovar todas (<%= counts.aprovar %>)</button>
+  </form>
+</div>
+<% } else if (vista === 'fila' && rows.length) { %>
+<p class="small muted cmt-pace"><%- icon('clock', 14) %> Saem uma por vez, com intervalo variado, até <%= cfg.per_hour %> por hora e só das <%= cfg.from %>h às <%= cfg.to %>h. A ordem mistura os posts.<%= cfg.on ? '' : ' As respostas por IA estão desligadas: a fila está parada.' %></p>
+<% } %>
+
+<% if (!rows.length) { %>
+<div class="empty card"><%- include('../partials/signal') %><p><strong><%= empty[vista][0] %></strong></p><p class="muted small"><%= empty[vista][1] %></p></div>
+<% } else { %>
+<ul class="plain cmt-list">
+  <% rows.forEach(function (c) {
+       var others = (c.thread || []).filter(function (t) { return t.texto; });
+       var dmEditable = c.network === 'instagram' && ['enviada', 'simulada'].indexOf(c.dm_status) < 0;
+       var fill = JSON.stringify({ texto: c.reply_text || '', comentario: c.id, voltar: here, original: '@' + (c.author_username || 'alguém') + ': ' + (c.text || ''), direct: dmEditable ? (c.dm_text || '') : '', dm_ok: dmEditable ? '1' : '' });
+       var dmLabel = { proposta: ['b-gray', 'para aprovar'], aprovada: ['b-gray', c.status === 'enviada' || c.status === 'simulada' ? 'na fila' : 'depois da resposta'], enviada: ['b-gray', 'enviado'], simulada: ['b-gray', 'simulado'], erro: ['b-red', 'não saiu'], pulada: ['b-gray', 'não vai'] }; %>
+  <li class="cmt-row cmt-<%= c.status %>">
+    <a class="cmt-thumb" href="/social/publicacoes/<%= c.publication_id %>" tabindex="-1" aria-hidden="true"><% if (c.thumb_cover) { %><img src="/capas/<%= c.thumb_cover %>/imagem?v=<%= c.thumb_at ? new Date(c.thumb_at).getTime() : 0 %>&w=640" alt="" loading="lazy" decoding="async"><% } else { %><%- icon('image', 18) %><% } %></a>
+    <div class="cmt-body">
+      <p class="cmt-post mono small muted"><span><%= NETWORK_LABEL[c.network] || c.network %></span><% if (c.ep_number) { %><span><%= pad(c.ep_number) %></span><% } %><% if (c.guest) { %><span><%= c.guest %></span><% } %> · <a href="/social/publicacoes/<%= c.publication_id %>"><%= c.post_title || 'publicação' %></a></p>
+      <p class="cmt-who"><span class="mono cmt-handle">@<%= c.author_username || 'alguém' %></span><span class="mono small muted"><%= when(c.commented_at || c.created_at) %></span><% if (c.likes) { %><span class="mono small muted"><%- icon('heart', 12) %> <%= c.likes %></span><% } %><% if (c.parent_comment_id) { %><span class="badge b-gray">respondeu ao Pulso</span><% } %></p>
+      <p class="cmt-text"><%= c.text || '(sem texto)' %></p>
+      <% if (others.length) { %><details class="cmt-thread"><summary class="small muted">Conversa no comentário · <span class="mono"><%= others.length %></span></summary>
+        <ul class="plain"><% others.forEach(function (t) { %><li class="small"><span class="mono cmt-handle<%= t.pulso ? '' : ' muted' %>">@<%= t.usuario || 'alguém' %><%= t.pulso ? ' (Pulso)' : '' %></span> <%= t.texto %></li><% }) %></ul>
+      </details><% } %>
+
+      <% if (c.status === 'equipe') { %>
+        <div class="cmt-reply cmt-reply-warn"><p class="m-0"><span class="badge b-amber">Precisa de você</span> <span class="small"><%= c.reason || 'A IA preferiu não responder sozinha.' %></span></p><% if (c.reply_text) { %><p class="small muted m-0">Sugestão da IA: <%= c.reply_text %></p><% } %></div>
+      <% } else if (c.status === 'erro') { %>
+        <div class="cmt-reply cmt-reply-bad"><p class="m-0"><span class="badge b-red">Não saiu</span> <span class="small"><%= c.error %></span></p><p class="m-0"><%= c.reply_text %></p></div>
+      <% } else if (c.reply_text && ['proposta', 'aprovada', 'enviada', 'simulada', 'apagada'].indexOf(c.status) >= 0) { %>
+        <div class="cmt-reply<%= c.status === 'apagada' ? ' cmt-reply-off' : '' %>">
+          <p class="m-0"><span class="badge b-gray"><%= actionLabel[c.action] || 'Responder' %></span> <span class="cmt-reply-text<%= c.action === 'reagir' ? ' cmt-emoji' : '' %>"><%= c.reply_text %></span></p>
+          <p class="mono small muted m-0">
+            <% if (c.status === 'aprovada') { var t = eta.get(String(c.id)); %>SAI POR VOLTA DE <%= t ? hm(t) + (new Date(t).toDateString() !== new Date().toDateString() ? ' · ' + fmt.formatDateTime(t).slice(0, 5) : '') : '—' %><% if (c.error) { %> · <span class="warn"><%= c.error %></span><% } %>
+            <% } else if (c.status === 'enviada' || c.status === 'simulada') { %><%= c.status === 'simulada' ? 'SIMULADA' : 'ENVIADA' %> <%= when(c.sent_at) %> · <%= c.decided_by_name ? 'APROVADA POR ' + c.decided_by_name.toUpperCase() : 'IA' %>
+            <% } else if (c.status === 'apagada') { %>APAGADA DA REDE
+            <% } else { %>IA: <%= (c.reason || '').toUpperCase() %><% } %>
+          </p>
+          <% if (c.invited) { %><p class="mono small muted m-0"><%- icon('user-plus', 12) %> COM CONVITE PARA SEGUIR</p><% } %>
+        </div>
+        <% if (c.dm_text && c.dm_status) { %>
+        <div class="cmt-dm<%= c.dm_status === 'pulada' ? ' cmt-reply-off' : '' %>">
+          <p class="m-0"><span class="mono small muted"><%- icon('send', 12) %> DIRECT</span> <span class="badge <%= dmLabel[c.dm_status][0] %>"><%= dmLabel[c.dm_status][1] %></span><% if (c.dm_sent_at) { %> <span class="mono small muted"><%= when(c.dm_sent_at) %></span><% } %></p>
+          <p class="m-0 small cmt-dm-text"><%= c.dm_text.replace(/\{comunidade\}/g, '[link da comunidade]') %></p>
+          <% if (c.dm_error) { %><p class="small m-0 <%= c.dm_status === 'erro' ? 'bad-text' : 'muted' %>"><%= c.dm_error %></p><% } %>
+          <% if (['proposta', 'aprovada', 'erro'].indexOf(c.dm_status) >= 0) { %><form method="post" action="/social/comentarios/<%= c.id %>/sem-direct" class="inline"><%- csrfField %><%- back %><button class="link small" type="submit">sem direct</button></form><% } %>
+        </div>
+        <% } %>
+      <% } else if (['ignorada', 'respondida'].indexOf(c.status) >= 0) { %>
+        <p class="small muted m-0 cmt-why"><%- icon(c.status === 'respondida' ? 'check' : 'eye-off', 12) %> <%= c.reason || 'Sem resposta.' %></p>
+      <% } %>
+    </div>
+    <div class="cmt-actions">
+      <% if (c.status === 'proposta') { %>
+        <form method="post" action="/social/comentarios/<%= c.id %>/aprovar" class="inline"><%- csrfField %><%- back %><button class="btn sm" type="submit"><%- icon('check', 14) %> Aprovar</button></form>
+        <button class="btn sm ghost" type="button" data-fill-modal="modal-cmt-reply" data-fill-action="/social/comentarios/<%= c.id %>/resposta" data-fill="<%= fill %>"><%- icon('pencil', 14) %> Editar</button>
+      <% } else if (c.status === 'equipe') { %>
+        <button class="btn sm" type="button" data-fill-modal="modal-cmt-reply" data-fill-action="/social/comentarios/<%= c.id %>/resposta" data-fill="<%= fill %>"><%- icon('message-circle', 14) %> Responder</button>
+      <% } else if (c.status === 'erro') { %>
+        <form method="post" action="/social/comentarios/<%= c.id %>/tentar" class="inline"><%- csrfField %><%- back %><button class="btn sm" type="submit"><%- icon('rotate-ccw', 14) %> Tentar de novo</button></form>
+        <button class="btn sm ghost" type="button" data-fill-modal="modal-cmt-reply" data-fill-action="/social/comentarios/<%= c.id %>/resposta" data-fill="<%= fill %>"><%- icon('pencil', 14) %> Editar</button>
+      <% } else if (c.status === 'aprovada') { %>
+        <button class="btn sm ghost" type="button" data-fill-modal="modal-cmt-reply" data-fill-action="/social/comentarios/<%= c.id %>/resposta" data-fill="<%= fill %>"><%- icon('pencil', 14) %> Editar</button>
+        <form method="post" action="/social/comentarios/<%= c.id %>/tirar" class="inline"><%- csrfField %><%- back %><button class="link small" type="submit">tirar da fila</button></form>
+      <% } else if (c.status === 'ignorada') { %>
+        <button class="btn sm ghost" type="button" data-fill-modal="modal-cmt-reply" data-fill-action="/social/comentarios/<%= c.id %>/resposta" data-fill="<%= fill %>"><%- icon('message-circle', 14) %> Responder</button>
+      <% } else if (c.status === 'enviada' && c.reply_id) { %>
+        <form method="post" action="/social/comentarios/<%= c.id %>/apagar" class="inline" data-confirm="Apagar esta resposta da rede? Quem já viu, viu; ela some do post." data-busy="Apagando…"><%- csrfField %><%- back %><button class="link small danger-link" type="submit">apagar resposta</button></form>
+      <% } %>
+      <% if (['proposta', 'equipe', 'erro', 'aprovada'].indexOf(c.status) >= 0) { %>
+        <form method="post" action="/social/comentarios/<%= c.id %>/ignorar" class="inline"><%- csrfField %><%- back %><button class="link small" type="submit">não responder</button></form>
+      <% } %>
+    </div>
+  </li>
+  <% }) %>
+</ul>
+<% if (more) { %><p class="top-gap"><a class="btn sm" href="<%= here %>&todos=1">Ver todos</a></p><% } %>
+<% } %>
+<% } %>
+
+<dialog class="modal" id="modal-cmt-reply" aria-labelledby="m-cmt-reply-h">
+  <form method="post" action="" class="stack" data-fill-form data-busy="Salvando…">
+    <%- csrfField %><input type="hidden" name="voltar" value="<%= here %>"><input type="hidden" name="comentario" value="">
+    <h2 id="m-cmt-reply-h">Resposta</h2>
+    <output name="original" class="cmt-quote"></output>
+    <label>O que vai no comentário <small class="counter" data-counter-for="cmt-texto" data-max="<%= REPLY_MAX %>"></small>
+      <textarea id="cmt-texto" name="texto" rows="4" maxlength="<%= REPLY_MAX %>" required data-ai="resposta" placeholder="ex.: Faz sentido. E no seu dia a dia, como isso aparece?"></textarea>
+    </label>
+    <p class="small muted m-0">Só um emoji vira reação. A resposta entra na fila e sai no ritmo configurado.</p>
+    <div data-if="dm_ok">
+      <label>Direct com o link da comunidade <small class="counter" data-counter-for="cmt-direct" data-max="900"></small>
+        <textarea id="cmt-direct" name="direct" rows="4" maxlength="900" placeholder="ex.: Gostei do que você contou sobre a rotina. A conversa continua na nossa comunidade: {comunidade}"></textarea>
+      </label>
+      <p class="small muted m-0">Só Instagram, sai depois da resposta pública. <span class="mono">{comunidade}</span> vira o link. Em branco, não vai direct. A mesma pessoa recebe no máximo um a cada <%= DM_DAYS %> dias.</p>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Pôr na fila</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<% if (canSetup) { %>
+<dialog class="modal" id="modal-cmt-config" aria-labelledby="m-cmt-config-h">
+  <form method="post" action="/social/comentarios/config" class="stack">
+    <%- csrfField %><%- back %>
+    <h2 id="m-cmt-config-h">Respostas por IA</h2>
+    <fieldset class="m-0"><legend class="small">Como as respostas saem</legend>
+      <div class="seg seg-radio" role="radiogroup">
+        <% Object.keys(MODES).forEach(function (m) { %><label><input type="radio" name="mode" value="<%= m %>" <%= cfg.mode === m ? 'checked' : '' %>><span><%= MODES[m] %></span></label><% }) %>
+      </div>
+    </fieldset>
+    <p class="small muted m-0">Aprovar antes: cada resposta espera alguém da equipe. Automático: a IA põe na fila sozinha; o que ela não tem segurança continua vindo para vocês.</p>
+    <div class="grid-3">
+      <label>Por hora, no máximo<input type="number" name="per_hour" min="1" max="60" value="<%= cfg.per_hour %>" inputmode="numeric"></label>
+      <label>Das (hora)<input type="number" name="from" min="0" max="23" value="<%= cfg.from %>" inputmode="numeric"></label>
+      <label>Até (hora)<input type="number" name="to" min="1" max="24" value="<%= cfg.to %>" inputmode="numeric"></label>
+    </div>
+    <fieldset class="m-0 stack"><legend class="small">Instagram</legend>
+      <label class="check"><input type="checkbox" name="invite_on" value="1" <%= cfg.invite_on ? 'checked' : '' %>> Convidar para seguir o Pulso em parte das respostas (no máximo 1 a cada 4, nunca duas vezes para a mesma pessoa)</label>
+      <label class="check"><input type="checkbox" name="dm_on" value="1" <%= cfg.dm_on ? 'checked' : '' %>> Mandar direct com o link da comunidade para quem comentou com conteúdo</label>
+      <label>Directs por dia, no máximo<input type="number" name="dm_per_day" min="1" max="300" value="<%= cfg.dm_per_day %>" inputmode="numeric"></label>
+    </fieldset>
+    <label>Perfis da equipe (a IA não responde)<input type="text" name="team_handles" value="<%= cfg.team_handles.map(function (h) { return '@' + h; }).join(', ') %>" placeholder="ex.: @produtora, @host"></label>
+    <p class="small muted m-0">O próprio perfil do Pulso e o convidado do post já ficam de fora.</p>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<%- include('../partials/ai-assist') %>
+<%- include('../partials/foot') %>

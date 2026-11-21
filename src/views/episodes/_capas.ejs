@@ -1,0 +1,193 @@
+<%#
+  Capas do episódio pelo guia de peças (docs/referencias/capas). Variáveis: ep, covers, meta, frames, perm, csrf, fmt, aiReady,
+  coverModels (public/design/models.js), coverMissing (o que falta para um ângulo sair), capasTab.
+  Jornada: quem finaliza o episódio chega aqui depois da análise por IA; quer sair com as thumbnails do teste A/B e a capa do
+  Spotify aprovadas; o próximo passo é o checklist. Um clique gera tudo; cada capa tem só Aprovar e Ajustar; o resto fica no menu.
+%>
+<%
+  var M = coverModels;
+  var designers = perm.cover || perm.review || perm.edit; var approvers = perm.review;
+  var canGen = (perm.review || perm.edit) && frames.length;
+  var sheet = (meta || {}).cover_sheet || null;
+  var mainId = (meta || {}).thumb_cover_id || null;
+  var yt = covers.filter(function (c) { return c.kind === 'youtube_thumb'; });
+  var sp = covers.filter(function (c) { return c.kind === 'spotify_cover'; });
+  var order = { curiosidade: 0, contraste: 1, autoridade: 2 };
+  yt = yt.slice().sort(function (a, b) { return (a.angle in order ? order[a.angle] : 9) - (b.angle in order ? order[b.angle] : 9) || a.position - b.position || a.id - b.id; });
+  var okYt = yt.filter(function (c) { return c.approved; });
+  var clean = function (c) { return !((c.lint || {}).issues || []).length; };
+  // o único lime da área: gerar enquanto está vazio; depois, aprovar a primeira capa sem problema (enquanto nada foi aprovado)
+  var firstGood = !okYt.length ? (yt.find(clean) || null) : null;
+  var csrfField = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+  var img = function (c, w) { return '/episodios/' + ep.id + '/capas/' + c.id + '/imagem?v=' + new Date(c.updated_at).getTime() + (w ? '&w=640' : ''); };
+  var empty = !yt.length && !sp.length && !coverMissing.length; // sem nenhuma capa: o convite para gerar
+  var showTabs = !empty || Boolean(sheet); // com a ficha pronta, as abas aparecem mesmo sem capas (os vídeos saem dela)
+%>
+<% var card = function (c, kind) {
+     var l = c.lint || {}; var issues = l.issues || []; var warns = l.warnings || []; var m = c.model ? M.MODELS[c.model] : null;
+     var isMain = kind === 'yt' && c.approved && c.id === mainId; %>
+  <figure class="piece-card <%= c.approved ? 'approved' : '' %>">
+    <a class="piece-img piece-<%= kind %>" href="<%= img(c) %>" target="_blank" rel="noopener"><img src="<%= img(c, true) %>" alt="<%= c.label || '' %>" loading="lazy" decoding="async" width="<%= c.width %>" height="<%= c.height %>"></a>
+    <figcaption>
+      <p class="piece-kicker mono"><span><%= c.angle ? M.ANGLES[c.angle].toUpperCase() : (kind === 'sp' ? 'SPOTIFY' : 'THUMBNAIL') %></span><% if (isMain) { %><span class="badge b-gray" title="É a que vai para o YouTube quando o episódio é publicado"><%- icon('star', 12) %> principal</span><% } else if (c.approved) { %><span class="badge b-green"><%= kind === 'yt' ? 'no teste A/B' : 'aprovada' %></span><% } %><% if (c.stale) { %><span class="badge b-amber" title="A ficha mudou depois que esta capa foi aprovada">desatualizada</span><% } %></p>
+      <p class="piece-model"><strong><%= m ? m.name : 'Capa livre' %></strong><% if (c.model) { %> <span class="mono small muted"><%= c.model %></span><% } %></p>
+      <div class="piece-read">
+        <img class="piece-mini piece-mini-<%= kind %>" src="<%= img(c, true) %>" alt="" loading="lazy" decoding="async" width="<%= kind === 'sp' ? 64 : 168 %>" height="<%= kind === 'sp' ? 64 : 95 %>">
+        <div class="piece-checks">
+          <span class="mono small muted"><%= kind === 'sp' ? '64 PX · LISTA DO APP' : '168 PX · CELULAR' %></span>
+          <% if (issues.length) { %><span class="small bad-text"><%= issues[0] %><%= issues.length > 1 ? ' (+' + (issues.length - 1) + ')' : '' %></span>
+          <% } else if (warns.length) { %><span class="small warn-text"><%= warns[0] %><%= warns.length > 1 ? ' (+' + (warns.length - 1) + ')' : '' %></span>
+          <% } else { %><span class="small muted"><%= l.reads ? 'lê bem' : 'sem avisos' %></span><% } %>
+        </div>
+      </div>
+      <div class="row piece-actions">
+        <% if (approvers && !c.approved) { %>
+        <form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/aprovar" class="inline"><%- csrfField %><input type="hidden" name="aprovar" value="1"><button class="btn sm <%= firstGood && firstGood.id === c.id && locals.stepNext !== false ? 'primary' : '' %>" type="submit"><%- icon('check', 14) %> Aprovar</button></form>
+        <% } %>
+        <% if (c.stale && designers) { %>
+        <form method="post" action="/capas/<%= c.id %>/atualizar" class="inline" data-busy="Atualizando…"><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw', 14) %> Atualizar</button></form>
+        <% } else if (designers && c.model) { %>
+        <button class="btn sm <%= c.approved ? '' : 'ghost' %>" type="button" data-ajustar-open="/capas/<%= c.id %>/ajustar"><%- icon('sliders-horizontal', 14) %> Ajustar</button>
+        <% } else if (designers) { %><a class="btn sm ghost" href="/episodios/<%= ep.id %>/capas/<%= c.id %>/editar">Editar</a><% } %>
+        <details class="row-menu"><summary class="icon-btn" aria-label="Mais ações desta capa"><%- icon('ellipsis', 16) %></summary>
+          <div class="row-menu-list">
+            <a href="<%= img(c) %>&baixar=1" data-no-skeleton><%- icon('download', 14) %> Baixar</a>
+            <% if (approvers && c.approved && kind === 'yt' && !isMain) { %><form method="post" action="/capas/<%= c.id %>/principal"><%- csrfField %><button type="submit"><%- icon('star', 14) %> Usar como principal</button></form><% } %>
+            <% if (approvers && c.approved) { %><form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/aprovar"><%- csrfField %><input type="hidden" name="aprovar" value="0"><button type="submit"><%- icon('x', 14) %> Tirar a aprovação</button></form><% } %>
+            <% if (designers) { %><form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/excluir" data-confirm="Mandar esta capa para a lixeira?"><%- csrfField %><button type="submit" class="danger"><%- icon('trash-2', 14) %> Excluir</button></form><% } %>
+          </div>
+        </details>
+      </div>
+    </figcaption>
+  </figure>
+<% }; %>
+
+<div id="capas" class="capas pieces">
+  <% if (empty) { %>
+  <div class="pieces-empty">
+    <p class="m-0"><strong>Um clique monta tudo.</strong> <span class="muted">A IA lê a transcrição, escreve os textos para quem ainda não conhece o convidado e monta 3 thumbnails (curiosidade, contraste e autoridade) e a capa do Spotify, sem texto sobre o rosto.</span></p>
+    <% if (canGen) { %>
+    <form method="post" action="/episodios/<%= ep.id %>/capas/gerar" class="inline" data-busy="Gerando as capas…"><%- csrfField %><input type="hidden" name="pecas" value="1"><button class="btn <%= locals.stepNext === false ? '' : 'primary' %>" type="submit"><%- icon('sparkles') %> Gerar capas</button></form>
+    <% } else if (!frames.length) { %><p class="small muted m-0">As capas usam os quadros do vídeo: rode a análise por IA primeiro.</p><% } %>
+  </div>
+  <% } %>
+  <% if (showTabs) { %>
+
+  <div class="pieces-head">
+    <dl class="pieces-sheet">
+      <div><dt>Credencial</dt><dd><%= sheet && sheet.tag ? sheet.tag : 'sem credencial' %></dd></div>
+      <div><dt>Eixo</dt><dd><%= sheet && sheet.axis ? sheet.axis : '—' %></dd></div>
+    </dl>
+    <div class="row">
+      <% if (designers && sheet) { %><button class="btn sm ghost" type="button" data-modal-open="modal-ficha"><%- icon('pencil', 14) %> Editar</button><% } %>
+      <% if (canGen) { %>
+      <details class="row-menu"><summary class="icon-btn" aria-label="Mais ações das capas"><%- icon('ellipsis', 16) %></summary>
+        <div class="row-menu-list">
+          <form method="post" action="/episodios/<%= ep.id %>/capas/gerar" data-busy="Gerando…"><%- csrfField %><input type="hidden" name="pecas" value="1"><button type="submit"><%- icon('refresh-cw', 14) %> Gerar as que faltam</button></form>
+          <% if (aiReady) { %><form method="post" action="/episodios/<%= ep.id %>/capas/gerar" data-busy="Reescrevendo…" data-confirm="A IA escreve os textos de novo e refaz as capas que ninguém aprovou nem ajustou. Continuar?"><%- csrfField %><input type="hidden" name="pecas" value="1"><input type="hidden" name="ficha" value="nova"><button type="submit"><%- icon('sparkles', 14) %> Reescrever os textos com a IA</button></form><% } %>
+        </div>
+      </details>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="tabs-wrap" data-tabs data-default="<%= capasTab %>">
+    <div class="seg seg-tabs" role="tablist" aria-label="Peças do episódio">
+      <button type="button" role="tab" data-tab-btn="youtube">YouTube <span class="mono"><%= yt.length %></span></button>
+      <% if (isPodcast) { %><button type="button" role="tab" data-tab-btn="spotify">Spotify <span class="mono"><%= sp.length %></span></button><% } %>
+      <% if (isPodcast && ep.guest_id) { %><button type="button" role="tab" data-tab-btn="videos">Vídeos <span class="mono"><%= guestVideos.filter(function (v) { return v.row && v.row.status === 'pronto'; }).length %></span></button><% } %>
+    </div>
+
+    <div class="pane" data-pane-id="youtube">
+      <% if (approvers && (yt.length || coverLinks.length)) { %>
+      <div class="review-appr">
+        <%- include('../partials/approval-links', { links: coverLinks, action: '/episodios/' + ep.id + '/aprovacao/capas', canCreate: yt.length > 0, idKey: 'capas',
+              sentTo: 'Grupo ' + ((projectScope && projectScope.projects.find(function (p) { return p.id === ep.project_id; })) || {}).name, what: 'as capas do YouTube', tone: '', voltar: '/episodios/' + ep.id + '?capas=youtube#capas' }) %>
+      </div>
+      <% } %>
+      <% if (okYt.length > 1) { %>
+      <div class="pieces-note"><span class="small muted"><span class="mono"><%= okYt.length %></span> aprovadas: suba as <%= okYt.length %> no teste de miniatura do YouTube Studio. A principal é a que sai na publicação.</span>
+        <a class="btn sm" href="/episodios/<%= ep.id %>/capas/teste.zip" data-no-skeleton><%- icon('download', 14) %> Baixar para o teste</a></div>
+      <% } %>
+      <div class="piece-grid">
+        <% yt.forEach(function (c) { card(c, 'yt'); }); %>
+        <% coverMissing.forEach(function (x) { %>
+        <div class="piece-missing">
+          <p class="piece-kicker mono"><span><%= x.what.toUpperCase() %></span></p>
+          <p class="m-0"><strong>Esta capa não saiu.</strong></p>
+          <ul class="plain small muted"><% x.reasons.forEach(function (r) { %><li><%= r %></li><% }) %></ul>
+          <% if (designers) { %><button class="btn sm" type="button" data-ajustar-open="/episodios/<%= ep.id %>/capas/angulo/<%= x.angle %>/ajustar"><%- icon('sliders-horizontal', 14) %> Ajustar o texto</button><% } %>
+        </div>
+        <% }) %>
+      </div>
+      <% if (!yt.length && !coverMissing.length) { %><p class="small muted">Nenhuma thumbnail ainda. Use "Gerar as que faltam" no menu acima.</p><% } %>
+    </div>
+
+    <% if (isPodcast) { %><div class="pane" data-pane-id="spotify" hidden>
+      <div class="piece-grid piece-grid-sp">
+        <% sp.forEach(function (c) { card(c, 'sp'); }); %>
+      </div>
+      <% if (!sp.length) { %><p class="small muted">Sem capa do Spotify ainda. Use "Gerar as que faltam" no menu acima.</p><% } else { %>
+      <p class="small muted">O arquivo sai em 3000×3000, abaixo de 512 KB. Foto de câmera fica melhor que quadro do vídeo: troque em Ajustar &gt; Foto.</p><% } %>
+    </div><% } %>
+
+    <% if (isPodcast && ep.guest_id) { %><div class="pane" data-pane-id="videos" hidden<% if (guestVideos.some(function (v) { return v.row && (v.row.status === 'fila' || v.row.status === 'gerando'); })) { %> data-video-wait="/episodios/<%= ep.id %>/videos/status"<% } %>>
+      <div class="piece-grid piece-grid-vd">
+        <% guestVideos.forEach(function (v) {
+             var r = v.row; var st = r ? r.status : 'novo'; var busy = st === 'fila' || st === 'gerando'; var ready = st === 'pronto';
+             var base = '/episodios/' + ep.id + '/videos/' + v.kind; var ver = r ? new Date(r.updated_at).getTime() : 0; %>
+        <div class="piece-card video-card">
+          <% if (ready) { %>
+          <%- include('../partials/video-poster', { src: base + '/arquivo?v=' + ver, id: 'video-' + v.kind, poster: r.poster_key ? base + '/capa?v=' + ver : null, duration: r.duration_ms, label: v.label }) %>
+          <% } else { %>
+          <div class="video-blank<%= busy ? ' is-busy' : '' %>" aria-hidden="true"><%- icon(busy ? 'clock' : 'play', 22) %></div>
+          <% } %>
+          <figcaption>
+            <p class="piece-kicker mono"><span><%= v.kind === 'story' ? 'STORY' : 'TEASER' %> · <%= v.seconds %> S</span><% if (ready) { %><span class="badge b-gray">pronto</span><% } else if (busy) { %><span class="badge b-amber">gerando</span><% } %></p>
+            <p class="piece-model"><strong><%= v.label %></strong></p>
+            <p class="small muted m-0"><%= v.hint %></p>
+            <% if (v.kind === 'teaser' && v.data.quote) { %><p class="small m-0"><span class="mono muted">FRASE</span> “<%= v.data.quote %>”<% if (v.data.quote_at !== null && v.data.quote_at !== undefined) { %> <span class="mono muted">· <%= fmt.formatClock(v.data.quote_at) %></span><% } %></p><% } %>
+            <% if (busy) { %>
+            <p class="small muted m-0" aria-live="polite">Montando o vídeo. Leva de 1 a 2 minutos; pode sair desta tela, ele fica aqui quando terminar.</p>
+            <% } else if (v.missing.length) { %>
+            <ul class="plain small muted video-missing"><% v.missing.forEach(function (m) { %><li><%= m %></li><% }) %></ul>
+            <% } else { %>
+              <% if (st === 'erro') { %><p class="small bad-text m-0">Não saiu: <%= r.error %></p><% } %>
+              <% if (ready && r.inputs && r.inputs.soft) { %><p class="small warn-text m-0">Foto ampliada <%= String(r.inputs.zoom).replace('.', ',') %>×: uma fotografia vertical da gravação fica melhor.</p><% } %>
+              <% if (ready && v.kind === 'teaser' && r.inputs && r.inputs.synced === false) { %><p class="small warn-text m-0">A legenda entrou num ritmo fixo (sem o tempo de cada palavra): confira se acompanha a fala.</p><% } %>
+              <div class="row piece-actions">
+                <% if (ready) { %><a class="btn sm" href="<%= base %>/arquivo?baixar=1" data-no-skeleton><%- icon('download', 14) %> Baixar</a><% } %>
+                <% if (canGen || designers) { %>
+                <form method="post" action="<%= base %>/gerar" class="inline" data-busy="Pedindo…"<%- ready ? ' data-confirm="Refazer este vídeo com os textos e a foto de agora?"' : '' %>><%- csrfField %><button class="btn sm <%= ready ? 'ghost' : '' %>" type="submit"><%- icon(ready ? 'refresh-cw' : 'sparkles', 14) %> <%= ready ? 'Refazer' : (st === 'erro' ? 'Gerar de novo' : 'Gerar vídeo') %></button></form>
+                <% } %>
+              </div>
+              <% if (ready) { %><p class="small muted m-0"><%= v.kind === 'teaser' ? 'Vai com a voz do convidado; a trilha entra na hora de postar.' : 'Sai sem som: a trilha entra na hora de postar.' %> <span class="mono"><%= fmt.formatBytes(r.size_bytes) %></span></p><% } %>
+            <% } %>
+          </figcaption>
+        </div>
+        <% }) %>
+      </div>
+    </div><% } %>
+  </div>
+  <% } %>
+</div>
+
+<% if (sheet && designers) { %>
+<dialog class="modal" id="modal-ficha" aria-labelledby="ficha-h"<%= locals.openModal === 'modal-ficha' ? ' data-open-on-load' : '' %>>
+  <form method="post" action="/episodios/<%= ep.id %>/ficha-das-capas" class="stack" data-busy="Salvando…">
+    <%- csrfField %>
+    <h2 id="ficha-h">Quem é o convidado nas capas</h2>
+    <p class="muted small">Estes campos entram em todas as peças. A capa fala com quem ainda não conhece o <%= podcastName %> nem o convidado.</p>
+    <label>Nome como aparece<input type="text" name="guest" value="<%= sheet.guest || '' %>" maxlength="40" placeholder="ex.: Dr. Márcio Martins"></label>
+    <label>Credencial <small class="counter" data-word-counter="ficha-tag" data-max="<%= M.LIMITS.tag.words %>"></small>
+      <input type="text" id="ficha-tag" name="tag" value="<%= sheet.tag || '' %>" maxlength="90" placeholder="ex.: o único médico das Forças Especiais"></label>
+    <p class="small muted m-0">O que explica o convidado a um desconhecido, em até <%= M.LIMITS.tag.ideal %> palavras. O nome não é o gancho.</p>
+    <fieldset class="seg-radio"><legend>Eixo</legend>
+      <% M.AXES.forEach(function (a) { %><label><input type="radio" name="axis" value="<%= a %>" <%= (sheet.axis || 'Histórias') === a ? 'checked' : '' %>><span><%= a %></span></label><% }) %>
+    </fieldset>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<% if (designers) { %><%- include('../partials/cover-adjust') %><% } %>

@@ -1,0 +1,34 @@
+<%# Onde mais esta pessoa (ou empresa) está, e o convite para o projeto que falta. Só aparece para quem vê mais de um projeto.
+    Variáveis: others (de people.participations / companies.participations), invitable ([{ id, name }] projetos que faltam),
+    action (base do POST, ex.: '/convidados/123/tambem'), noun ('convidado' | 'patrocinador'), canWrite.
+    Nada de verde: a ação da tela continua sendo o próximo passo. -%>
+<% if (projectScope.multi && (others.length || (canWrite && invitable.length))) { %>
+<section class="card" id="outros-projetos">
+  <h2>Em outros projetos</h2>
+  <% if (others.length) { %>
+  <ul class="plain other-proj">
+    <% others.forEach(function (o) { %>
+    <li>
+      <span class="op-name"><%= o.project_name %></span>
+      <span class="badge b-st-<%= o.status %>"><%= o.stage_label %></span>
+      <a class="small" href="<%= noun === 'convidado' ? '/convidados/' + o.guest_id : '/patrocinadores/' + o.sponsor_id %>">abrir</a>
+    </li>
+    <% }) %>
+  </ul>
+  <% } else { %>
+  <p class="small muted">Só neste projeto por enquanto.</p>
+  <% } %>
+  <% if (canWrite && invitable.length) { %>
+  <div class="row top-gap">
+    <% invitable.forEach(function (p) { %>
+    <form method="post" action="<%= action %>" data-busy="Criando…">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="project_id" value="<%= p.id %>">
+      <button class="btn sm" type="submit"><%- icon('user-plus', 14) %> <%= noun === 'convidado' ? 'Convidar também para o ' : 'Abrir negociação também no ' %><%= p.name %></button>
+    </form>
+    <% }) %>
+  </div>
+  <p class="small muted top-gap"><%= noun === 'convidado' ? 'Entra em Prospecção, com os dados que já estão aqui.' : 'Entra em Prospecção, com os dados da empresa.' %></p>
+  <% } %>
+</section>
+<% } %>

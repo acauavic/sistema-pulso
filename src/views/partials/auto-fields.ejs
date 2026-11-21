@@ -1,0 +1,27 @@
+<%#
+  Automação no Instagram na hora de publicar: quem comentar a palavra recebe o link no direct.
+  locals: auto = { keyword, message, days, linkSet, ready, heard, on? } (commentAutomation.formDefaults; on = já vem marcada), bulk = true quando são vários cortes.
+  Fica fechado; o resumo diz o que é. A chamada do Instagram passa a pedir a palavra (no envio).
+%>
+<% var bulkMode = typeof bulk !== 'undefined' && bulk; %>
+<details class="cta-box auto-box" data-auto-box<%= auto.on ? ' open' : '' %>>
+  <summary><span class="cta-box-title">Automação no Instagram</span> <span class="small muted">quem comentar a palavra recebe o link no direct</span></summary>
+  <% if (!auto.heard) { %><p class="notice small">Falta ligar o aviso de comentários da Outstand (Integrações &gt; Comentários e directs). Sem ele, a automação fica criada, mas não responde.</p><% } %>
+  <label class="check"><input type="checkbox" name="auto_on" value="1" data-auto-on<%= auto.on ? ' checked' : '' %>> Responder no direct quem comentar a palavra</label>
+  <div class="grid-2 tight">
+    <label>Palavra<input type="text" name="auto_palavra" value="<%= auto.keyword %>" maxlength="30" placeholder="<%= bulkMode ? 'Nome do convidado de cada corte' : 'Ex.: EPISODIO' %>" autocomplete="off" data-auto-word></label>
+    <label>Fica ativa por
+      <select name="auto_dias"><% [7, 30, 90].forEach(function (d) { %><option value="<%= d %>" <%= d === (auto.days || 30) ? 'selected' : '' %>><%= d %> dias</option><% }) %></select>
+    </label>
+  </div>
+  <% if (bulkMode) { %><p class="small muted m-0">Em branco, cada corte usa o primeiro nome do convidado dele (ex.: TAMIRIS).</p><% } %>
+  <label>Mensagem do direct<textarea name="auto_mensagem" rows="4" maxlength="1000"><%= auto.message %></textarea></label>
+  <p class="small muted m-0">
+    <span class="mono">{episodio}</span> é o link do episódio no YouTube<%= auto.linkSet.youtube_channel ? ' (antes da estreia, o do canal)' : '' %> ·
+    <span class="mono">{comunidade}</span> <%= auto.linkSet.whatsapp_community ? 'a comunidade no WhatsApp' : '(sem link cadastrado: a linha não vai)' %> ·
+    <span class="mono">{canal}</span> · <span class="mono">{spotify}</span> · <span class="mono">{convidado}</span>.
+    Links em Social &gt; Automações. O texto vai com os links clicáveis; o Instagram não deixa botão na primeira mensagem para quem não segue.
+  </p>
+  <label>Resposta no comentário <small class="muted">(opcional, pública)</small><input type="text" name="auto_resposta" maxlength="300" placeholder="Ex.: Te mandei no direct."></label>
+  <p class="small muted m-0">A chamada do Instagram passa a pedir a palavra: "Comente <span data-auto-echo><%= auto.keyword || 'PALAVRA' %></span> e receba no direct o link do episódio completo."</p>
+</details>

@@ -1,0 +1,45 @@
+<%#
+  Janela "Ajustar capa" (public/capas.js), a mesma para as peças do episódio e as capas de corte: prévia ao vivo à esquerda (o mesmo
+  motor do servidor) e três abas à direita. A página precisa carregar design/engine.js, design/models.js e capas.js.
+%>
+<dialog class="modal modal-adjust" id="modal-ajustar" aria-labelledby="ajustar-h" data-ajustar>
+  <div class="adjust">
+    <div class="adjust-head"><h2 id="ajustar-h">Ajustar capa</h2><span class="mono small muted" data-aj-kicker></span></div>
+    <div class="adjust-body">
+      <div class="adjust-preview">
+        <canvas data-aj-canvas width="1280" height="720" role="img" aria-label="Prévia da capa"></canvas>
+        <div class="piece-read">
+          <canvas class="piece-mini" data-aj-mini width="168" height="95" aria-hidden="true"></canvas>
+          <div class="piece-checks"><span class="mono small muted" data-aj-mini-label>168 PX · CELULAR</span><span class="small" data-aj-status aria-live="polite"></span></div>
+        </div>
+      </div>
+      <div class="adjust-side">
+        <div class="seg" role="tablist" aria-label="O que ajustar">
+          <button type="button" role="tab" data-aj-tab="texto" class="on">Texto</button>
+          <button type="button" role="tab" data-aj-tab="modelo">Modelo</button>
+          <button type="button" role="tab" data-aj-tab="foto">Foto</button>
+        </div>
+        <div data-aj-pane="texto" class="stack">
+          <div data-aj-fields class="stack"></div>
+          <p class="small muted m-0" data-aj-rule></p>
+        </div>
+        <div data-aj-pane="modelo" hidden>
+          <p class="small muted">A mesma capa em cada modelo deste ângulo. Toque para trocar.</p>
+          <div class="adjust-models" data-aj-models></div>
+        </div>
+        <div data-aj-pane="foto" hidden class="stack">
+          <div class="adjust-face">
+            <canvas data-aj-source width="320" height="180" aria-label="Foto escolhida: toque no rosto para marcar"></canvas>
+            <div class="stack">
+              <p class="small muted m-0">O recorte sai do rosto. Se ele ficou fora do lugar, <strong>toque no rosto</strong> na foto ao lado.</p>
+              <div class="row"><button class="btn sm ghost" type="button" data-aj-zoom="in">Aproximar</button><button class="btn sm ghost" type="button" data-aj-zoom="out">Afastar</button><button class="btn sm ghost" type="button" data-aj-flip>Espelhar o desenho</button></div>
+            </div>
+          </div>
+          <div class="seg" role="group" aria-label="De onde vem a foto"><button type="button" data-aj-src="quadros" class="on">Quadros do vídeo</button><button type="button" data-aj-src="fotos">Fotos da gravação</button></div>
+          <div class="adjust-frames" data-aj-frames></div>
+        </div>
+      </div>
+    </div>
+    <div class="row modal-actions adjust-actions"><button class="btn primary" type="button" data-aj-save>Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button><span class="small bad-text" data-aj-error role="alert"></span></div>
+  </div>
+</dialog>

@@ -1,0 +1,580 @@
+// Social: publicações (ver e editar), novo post a partir do que ainda não foi usado, ideias por episódio, insights e automações
+// de comentários e directs. Ver: equipe de conteúdo. Publicar e automatizar: gestão. Nada sai para as redes sem UPLOAD_POST_LIVE.
+const express = require('express');
+const db = require('../db/pool');
+const config = require('../config');
+const social = require('../services/social');
+const publishing = require('../services/publishing');
+const up = require('../services/uploadPost');
+const socialApi = require('../services/socialApi');
+const tasksSvc = require('../services/tasks');
+const jobs = require('../services/jobs');
+const fmt = require('../utils/format');
+const { audit } = require('../services/audit');
+const { requirePerm } = require('../middleware');
+const { can } = require('../permissions');
+const { wrap, isIntId } = require('../utils/wrap');
+
+const router = express.Router();
+const MEDIA = { video: 'Vídeo', imagem: 'Post', carrossel: 'Carrossel', story: 'Story' };
+const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Não encontrado.' });
+const live = () => config.uploadPost.live; // automações e respostas (sempre pelo Upload-Post)
+const pubLive = () => socialApi.liveState(); // publicar: algum provedor em uso (padrão ou rota) em modo de teste?
+
+// contador da aba Comentários (o que precisa de alguém)
+router.use('/social', (req, res, next) => {
+  if (req.method !== 'GET' || !req.user || !can(req.user, 'social.comments')) return next();
+  require('../services/commentReplies').pendingCount({ pids: require('../services/scope').idsOf(req) }).then((n) => { res.locals.commentsPending = n; next(); }, next);
+});
+router.get('/social', requirePerm('social.read'), (req, res) => res.redirect('/social/publicacoes'));
+
+// ---------------------------------------------------------------- publicações
+router.get('/social/publicacoes', requirePerm('social.read'), wrap(async (req, res) => {
+  const status = social.STATUS_LABEL[req.query.status] ? req.query.status : '';
+  const media = MEDIA[req.query.tipo] ? req.query.tipo : '';
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const { pageOf, paginate } = require('../utils/pager');
+  const pg = pageOf(req, 50);
+  const pids = require('../services/scope').idsOf(req); // publicações do projeto escolhido
+  const [rawPubs, counts] = await Promise.all([
+    social.listPublications({ status, media, q, limit: pg.limit, offset: pg.offset, pids }),
+    db.query(`SELECT p.status, count(*)::int AS n FROM episode_publications p
+                LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id
+               WHERE ${social.pubProject(pids)} GROUP BY p.status`),
+  ]);
+  const { rows: pubs, pager } = paginate(req, rawPubs, pg);
+  res.render('social/publications', {
+    title: 'Social', tab: 'publicacoes', pubs, pager, status, media, q, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, ...(await pubLive()),
+    counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])),
+  });
+}));
+
+// De que projeto é a publicação: do corte, senão do episódio (ela herda pela raiz).
+const projectOfPub = (pub) => (pub && (pub.clip_project_id || pub.episode_project_id)) || null;
+
+async function findPub(req, id) {
+  if (!isIntId(id)) return null;
+  const { rows: [p] } = await db.query(
+    `SELECT p.*, e.number AS episode_number, e.title AS episode_title, e.project_id AS episode_project_id,
+            c.title AS clip_title, c.project_id AS clip_project_id, u.name AS created_by_name
+       FROM episode_publications p LEFT JOIN episodes e ON e.id = p.episode_id LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN users u ON u.id = p.created_by WHERE p.id = $1`, [id]);
+  if (!p) return null;
+  return require('../services/scope').canSee(req, projectOfPub(p)) ? p : null; // de outro projeto: como se não existisse
+}
+
+// Histórico de envio: por que a tentativa começou e o que foi feito com o arquivo (hospedado na Outstand, conferido no Backblaze).
+const TRIGGER = { agora: 'Envio na hora', agendado: 'No horário agendado', aprovado: 'Aprovado pela gestão', manual: 'Reenvio pedido', automatico: 'Nova tentativa automática', retomado: 'Retomado' };
+function mediaText(media) {
+  const files = media?.files || [];
+  return files.map((f) => {
+    if (f.erro) return `${f.arquivo}: ilegível, saiu sem`;
+    const size = f.bytes ? ` (${fmt.formatBytes(f.bytes)})` : '';
+    if (f.onde === 'outstand') return `${f.arquivo}${size} ${f.reaproveitado ? 'já estava na Outstand' : `hospedado na Outstand${f.ms ? ` em ${Math.max(1, Math.round(f.ms / 1000))} s` : ''}`}`;
+    return `${f.arquivo}${size} conferido no Backblaze${f.conferido === 'partes' ? ' parte a parte' : ''}`;
+  }).join(' · ');
+}
+// Avisos que a Outstand manda em inglês, traduzidos (os conhecidos) para a equipe.
+function warningText(w) {
+  if (/edit lists?/i.test(w)) return 'o vídeo tem lista de edição (edit list), que o Instagram às vezes recusa. Até agora ele tem aceitado; se recusar, ligue "Ajustar o vídeo para cada rede" em Integrações.';
+  if (/moov|faststart/i.test(w)) return 'o índice do vídeo está no fim do arquivo, o que o Instagram recusa. Exporte com "início rápido" (faststart) ou ligue "Ajustar o vídeo para cada rede" em Integrações.';
+  return w;
+}
+
+// Reenviar editando: as redes que a publicação pode receber e o estado de cada uma (no ar não entra; falhou vem marcada;
+// rede que ainda não recebeu fica disponível; sem conta, desabilitada), e o texto que vai (o próprio da primeira que falhou).
+async function resendChoices(pub) {
+  const nets = pub.media === 'story' ? ['instagram'] : pub.media !== 'video' ? up.PHOTO_PLATFORMS : pub.clip_id ? Object.keys(up.PLATFORMS).filter((k) => up.PLATFORMS[k].clip) : ['youtube'];
+  const conn = await socialApi.connectedAll({ projectId: projectOfPub(pub) }).catch(() => ({ platforms: {} }));
+  const hasConn = Object.keys(conn.platforms || {}).length > 0;
+  const results = pub.results || [];
+  const list = nets.map((k) => {
+    const r = results.find((x) => x.platform === k);
+    const acc = conn.platforms?.[k];
+    const state = r?.ok && !r.simulated ? 'ar' : r && !r.ok ? (r.retry_at ? 'tentando' : 'falhou') : pub.platforms.includes(k) ? 'aguardando' : 'nova';
+    return { key: k, state, hint: r && !r.ok ? r.hint || r.error : null, noAccount: hasConn && (!acc || acc.reauth) };
+  });
+  const failed = list.filter((n) => ['falhou', 'tentando', 'aguardando'].includes(n.state) && !n.noAccount).map((n) => n.key);
+  const text = publishing.textOf(pub, failed[0] || '');
+  // falha que reenviar igual não resolve (perfil, formato, conta): a ação principal passa a ser corrigir
+  const E = require('../services/publishErrors');
+  const needsFix = results.some((r) => !r.ok && r.error && !r.retry_at && E.classify(r.error, { code: r.code }).terminal);
+  return { needsFix, list, failed, text, open: list.some((n) => n.state !== 'ar' && !n.noAccount), photo: pub.media !== 'video', img: (pub.cover_ids && pub.cover_ids[0]) || pub.cover_id || null };
+}
+
+router.get('/social/publicacoes/:id', requirePerm('social.read'), wrap(async (req, res) => {
+  const pub = await findPub(req, req.params.id);
+  if (!pub) return notFound(res);
+  const attempts = (await publishing.attemptsOf(pub.id)).map((a) => ({ ...a, triggerLabel: TRIGGER[a.trigger] || a.trigger, mediaText: mediaText(a.media) }));
+  const okPlatforms = (pub.results || []).filter((r) => r.ok).map((r) => r.platform);
+  const providers = socialApi.providersOf(pub); // um, ou vários quando as redes foram divididas entre provedores
+  const viaOf = (p) => socialApi.get((pub.results || []).find((r) => r.platform === p)?.provider || pub.options?.routes?.[p] || pub.provider);
+  const canEditNet = (p) => !(pub.results || []).some((r) => r.platform === p && r.manual) && viaOf(p).canEdit && up.EDITABLE[p];
+  const canResend = can(req.user, 'social.publish') && ['parcial', 'erro', 'publicado', 'simulado'].includes(pub.status);
+  const resend = canResend ? await resendChoices(pub) : null;
+  res.render('social/publication', {
+    resend, videoTags: await socialApi.videoTags(), auto: await automation.ofPublication(pub.id), aiReplies: await require('../services/commentReplies').ofPublication(pub.id), canAutomate: can(req.user, 'social.automate'), canComments: can(req.user, 'social.comments'), nums: await require('../services/postMetrics').forPublication(pub.id),
+    title: pub.title, tab: 'publicacoes', pub, MEDIA, statusLabel: social.STATUS_LABEL, platforms: up.PLATFORMS, live: providers.every((p) => p.live()), provider: providers[0], providers,
+    providerNames: socialApi.joinNames(providers.map((p) => p.label)), providerBy: socialApi.joinNames(providers.map((p) => p.by)), viaCanEdit: providers.some((p) => p.canEdit),
+    testAt: socialApi.joinNames(providers.filter((p) => !p.live()).map((p) => p.at)),
+    editable: okPlatforms.filter(canEditNet), notEditable: okPlatforms.filter((p) => !canEditNet(p)),
+    canPublish: can(req.user, 'social.publish'), canCover: can(req.user, 'covers.edit'), mine: String(pub.created_by) === String(req.user.id), attempts, warningText,
+  });
+}));
+
+// Quem pode mexer: a gestão em tudo; quem pediu, no próprio pedido enquanto ele não saiu (em revisão ou devolvido).
+const canTouch = (req, pub) => can(req.user, 'social.publish') || (String(pub.created_by) === String(req.user.id) && ['revisao', 'recusado'].includes(pub.status));
+const forbidden = (res) => res.status(403).render('error', { title: 'Sem permissão', message: 'Só a gestão mexe nesta publicação.' });
+
+router.post('/social/publicacoes/:id', requirePerm('social.request'), wrap(async (req, res) => {
+  const pub = await findPub(req, req.params.id);
+  if (!pub) return notFound(res);
+  if (!canTouch(req, pub)) return forbidden(res);
+  let scheduledAt = null;
+  if (req.body.agendar) { const d = fmt.parseInputDateTime(String(req.body.agendar)); if (!d) { await req.flash('error', 'Data de agendamento inválida.'); return res.redirect(`/social/publicacoes/${pub.id}`); } scheduledAt = d.toISOString(); }
+  const r = await social.editPublication(pub, { title: fmt.clean(req.body.title, 300), description: String(req.body.description ?? '').replace(/\r/g, '').trim(), scheduledAt }, req.user);
+  if (r.error) await req.flash('error', r.error);
+  else {
+    await audit(req, 'publicacao.editada', 'publication', pub.id);
+    if (pub.status === 'recusado' && req.body.reenviar === '1') { await publishing.resubmit(pub.id, req.user); await req.flash('ok', 'Ajustado e reenviado para a revisão da gestão.'); } else await req.flash('ok', r.message);
+  }
+  res.redirect(`/social/publicacoes/${pub.id}`);
+}));
+
+// Reenviar editando: só as redes marcadas, com o texto e o collab do Instagram desta vez (o que já saiu não muda).
+router.post('/social/publicacoes/:id/reenviar', requirePerm('social.publish'), wrap(async (req, res) => {
+  const pub = await findPub(req, req.params.id);
+  if (!pub) return notFound(res);
+  const back = `/social/publicacoes/${pub.id}`;
+  const platforms = [].concat(req.body.platforms || []).map(String).filter((p) => up.PLATFORMS[p]);
+  const ig = require('../services/igPeople').parse(req.body, { media: pub.media, platforms });
+  if (ig.error) { await req.flash('error', ig.error); return res.redirect(back); }
+  const out = await publishing.resend(pub.id, {
+    platforms, title: fmt.clean(req.body.title, 300), description: String(req.body.description ?? '').replace(/\r/g, '').trim(),
+    instagram: platforms.includes('instagram') ? ig.instagram : undefined,
+  });
+  if (!out || out.error) { await req.flash('error', out?.error || 'Esta publicação já está sendo enviada.'); return res.redirect(back); }
+  await audit(req, 'publicacao.reenviada', 'publication', pub.id, { redes: platforms, editado: true });
+  await req.flash(out.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(out));
+  res.redirect(back);
+}));
+
+// revisão da gestão
+// Uma rede foi postada por fora (pelo app da rede): registra o link e a rede passa a contar como no ar.
+router.post('/social/publicacoes/:id/por-fora', requirePerm('social.publish'), wrap(async (req, res) => {
+  const pub = await findPub(req, req.params.id);
+  if (!pub) return notFound(res);
+  const r = await publishing.markManual(pub.id, { platform: String(req.body.platform || ''), url: String(req.body.url || ''), user: req.user });
+  if (r.error) await req.flash('error', r.error);
+  else { await audit(req, 'publicacao.postada_por_fora', 'publication', pub.id, { rede: req.body.platform }); await req.flash('ok', `Registrado: ${up.PLATFORMS[req.body.platform].label} postado por fora.`); }
+  res.redirect(`/social/publicacoes/${pub.id}`);
+}));
+
+router.post('/social/publicacoes/:id/aprovar', requirePerm('social.publish'), wrap(async (req, res) => {
+  const pub = await findPub(req, req.params.id);
+  if (!pub) return notFound(res);
+  const done = await publishing.approve(pub.id, req.user);
+  if (!done) await req.flash('error', 'Este pedido já foi revisado.');
+  else {
+    await audit(req, 'publicacao.aprovada', 'publication', pub.id);
+    await req.flash(done.status === 'erro' ? 'error' : 'ok', done.status === 'agendado' ? 'Aprovado e agendado.' : done.status === 'simulado' ? 'Aprovado. Modo de teste: nada foi enviado às redes.' : done.status === 'erro' ? `Aprovado, mas o envio falhou: ${done.error}` : 'Aprovado e enviado às redes.');
+  }
+  res.redirect(`/social/publicacoes/${pub.id}`);
+}));
+router.post('/social/publicacoes/:id/recusar', requirePerm('social.publish'), wrap(async (req, res) => {
+  const pub = await findPub(req, req.params.id);
+  if (!pub) return notFound(res);
+  const note = fmt.clean(req.body.note, 1000);
+  if (note.length < 3) { await req.flash('error', 'Diga o que precisa mudar: a nota vai para quem pediu.'); return res.redirect(`/social/publicacoes/${pub.id}`); }
+  if (!(await publishing.reject(pub.id, req.user, note))) await req.flash('error', 'Este pedido já foi revisado.');
+  else { await audit(req, 'publicacao.devolvida', 'publication', pub.id); await req.flash('ok', 'Devolvido com a sua nota.'); }
+  res.redirect(`/social/publicacoes/${pub.id}`);
+}));
+
+router.post('/social/publicacoes/:id/:acao(atualizar|repetir|parar|cancelar)', requirePerm('social.read'), wrap(async (req, res) => {
+  const pub = await findPub(req, req.params.id);
+  if (!pub) return notFound(res);
+  if (['repetir', 'parar'].includes(req.params.acao) && !can(req.user, 'social.publish')) return forbidden(res);
+  if (req.params.acao === 'cancelar' && !canTouch(req, pub)) return forbidden(res);
+  if (req.params.acao === 'atualizar') await publishing.refresh(pub.id);
+  if (req.params.acao === 'repetir') { // só registra o reenvio que aconteceu (clique repetido no meio de um envio não faz nada)
+    const r = await publishing.retry(pub.id);
+    if (r) { await audit(req, 'publicacao.reenviada', 'publication', pub.id); await req.flash(r.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(r)); }
+  }
+  if (req.params.acao === 'parar') { if (await publishing.stopRetries(pub.id)) { await audit(req, 'publicacao.tentativas_paradas', 'publication', pub.id); await req.flash('ok', 'Novas tentativas automáticas paradas. Reenvie quando quiser.'); } }
+  if (req.params.acao === 'cancelar') { await publishing.cancel(pub.id); await req.flash('ok', pub.status === 'agendado' ? 'Agendamento cancelado.' : 'Pedido retirado.'); return res.redirect('/social/publicacoes'); }
+  res.redirect(`/social/publicacoes/${pub.id}`);
+}));
+
+// ---------------------------------------------------------------- novo post (só o que ainda não foi usado)
+router.get('/social/novo', requirePerm('social.read'), wrap(async (req, res) => {
+  const tipo = MEDIA[req.query.tipo] ? req.query.tipo : 'video';
+  const provider = await socialApi.active();
+  const showUsed = req.query.publicados === '1';
+  const [clips, images, conn, ls] = await Promise.all([social.availableClips({ includeUsed: showUsed }), social.availableImages({ includeUsed: showUsed }), socialApi.connectedAll({ projectId: require('../services/scope').target(req, {}) }), socialApi.liveState()]);
+  res.render('social/new', {
+    defaultCtas: require('../services/socialCopy').forClip(null), autoDefaults: await require('../services/commentAutomation').formDefaults({}),
+    videoTags: await socialApi.videoTags(), title: 'Novo post', tab: 'novo', tipo, MEDIA, clips, images, showUsed, requestKinds: require('../services/contentRequests').KINDS, platforms: up.PLATFORMS, photoPlatforms: up.PHOTO_PLATFORMS, defaults: up.DEFAULTS,
+    connected: conn.platforms || {}, connError: conn.error || null, routes: conn.routes, providerNames: Object.fromEntries(socialApi.list().map((p) => [p.id, p.label])), live: ls.live, testAt: ls.testAt, provider, canPublish: can(req.user, 'social.request'), direct: can(req.user, 'social.publish'), canCover: can(req.user, 'covers.edit'), pick: req.query.item || '',
+  });
+}));
+
+// IA nos textos (capa, título, legenda, YouTube): 3 opções a partir de um atalho ou de um pedido livre. Não grava nada.
+const aiLimiter = require('../auth/rateLimit').createLimiter({ name: 'ia-texto', max: 40, windowMs: 10 * 60_000 });
+router.post('/ia/texto', wrap(async (req, res) => {
+  const forInvite = String(req.body.campo || '') === 'convite_motivo';
+  const forComment = String(req.body.campo || '') === 'resposta';
+  const allowed = forInvite ? can(req.user, 'guests.write') : forComment ? can(req.user, 'social.comments') : (can(req.user, 'episodes.read') || can(req.user, 'social.read'));
+  if (!req.user || !allowed) return res.status(403).json({ ok: false, error: 'Seu perfil não usa a IA nos textos.' });
+  if (!await aiLimiter.hit(req.user.id)) return res.status(429).json({ ok: false, error: 'Muitos pedidos seguidos. Espere alguns minutos.' });
+  const id = (v) => (isIntId(String(v || '')) ? Number(v) : null);
+  const r = await require('../services/aiText').suggest({
+    field: String(req.body.campo || ''), coverKind: req.body.tipo_capa ? String(req.body.tipo_capa) : null, current: req.body.atual,
+    shortcut: req.body.atalho ? String(req.body.atalho) : null, prompt: req.body.pedido, episodeId: id(req.body.episodio), clipId: id(req.body.corte), guestId: id(req.body.convidado), commentId: id(req.body.comentario),
+  });
+  if (r.error) return res.status(r.status || 400).json({ ok: false, error: r.error });
+  res.json({ ok: true, opcoes: r.opcoes });
+}));
+
+// Instagram: alternativas para collab e marcação (convidado do episódio primeiro, convidados com @ e perfis já usados).
+router.get('/social/instagram/sugestoes', requirePerm('social.read'), wrap(async (req, res) => {
+  const episodeId = isIntId(String(req.query.episodio || '')) ? Number(req.query.episodio) : null;
+  const pids = require('../services/scope').idsOf(req); // só sugere @ de quem é dos projetos dela
+  res.set('Cache-Control', 'private, max-age=30').json({ ok: true, items: await require('../services/igPeople').suggest({ q: req.query.q, episodeId, pids }) });
+}));
+
+router.post('/social/publicar', requirePerm('social.request'), wrap(async (req, res) => {
+  const review = !can(req.user, 'social.publish'); // produtora: vai para a revisão da gestão
+  const media = MEDIA[req.body.tipo] ? req.body.tipo : 'video';
+  const back = `/social/novo?tipo=${media}`;
+  const fail = async (msg) => { await req.flash('error', msg); return res.redirect(back); };
+  if (req.body.confirmar !== '1' && !review) return fail('Confirme o envio marcando "Entendi que isto publica nas redes escolhidas".');
+  const platforms = [].concat(req.body.platforms || []).map(String).filter((p) => up.PLATFORMS[p]);
+  let scheduledAt = null;
+  if (req.body.agendar) { const d = fmt.parseInputDateTime(String(req.body.agendar)); if (!d) return fail('Data de agendamento inválida.'); scheduledAt = d.toISOString(); }
+  const title = fmt.clean(req.body.title, 300);
+  const description = String(req.body.description || '').replace(/\r/g, '').trim();
+  let target = {};
+  if (media === 'video') {
+    if (!isIntId(String(req.body.clip_id || ''))) return fail('Escolha o corte.');
+    const { rows: [c] } = await db.query('SELECT id, episode_id FROM episode_clips WHERE id = $1', [req.body.clip_id]);
+    if (!c) return fail('Corte não encontrado.');
+    target = { episodeId: c.episode_id, clipId: c.id };
+  } else {
+    const ids = String(req.body.cover_ids || '').split(',').map(Number).filter(Number.isInteger);
+    target = { coverIds: ids };
+  }
+  const ig = require('../services/igPeople').parse(req.body, { media, platforms });
+  if (ig.error) return fail(ig.error);
+  try {
+    const automation = require('../services/commentAutomation');
+    const auto = media === 'story' ? null : automation.readForm(req.body);
+    const prep = await automation.prepare(auto, { platforms, ctas: require('../services/socialCopy').readForm(req.body, platforms), clipId: target.clipId || null, coverIds: target.coverIds || [] });
+    const pub = await publishing.create({ ...target, media, platforms, title, description, scheduledAt, userId: req.user.id, review, instagram: ig.instagram, ctas: prep.ctas });
+    if (auto) await automation.attach(pub, auto, { keyword: prep.keyword, userId: req.user.id });
+    await audit(req, review ? 'publicacao.pedida' : 'publicacao.criada', 'publication', pub.id, { redes: pub.platforms, tipo: media, simulado: pub.status === 'simulado' });
+    await req.flash(pub.status === 'erro' ? 'error' : 'ok', socialApi.sentMessage(pub));
+    return res.redirect(`/social/publicacoes/${pub.id}`);
+  } catch (err) {
+    return fail(err.message);
+  }
+}));
+
+// ---------------------------------------------------------------- ideias
+router.get('/social/ideias', requirePerm('social.read'), wrap(async (req, res) => {
+  const status = ['sugerida', 'aprovada', 'feita', 'descartada'].includes(req.query.status) ? req.query.status : 'sugerida';
+  const pids = require('../services/scope').idsOf(req); // ideias e episódios do projeto escolhido
+  const [episodes, ideas, counts, pending] = await Promise.all([
+    db.query(`SELECT e.id, e.number, e.title, e.status, e.project_id, g.name AS guest_name,
+                     EXISTS (SELECT 1 FROM episode_transcripts t WHERE t.episode_id = e.id) OR EXISTS (SELECT 1 FROM episode_clips c WHERE c.episode_id = e.id AND coalesce(c.transcript, '') <> '') AS has_text,
+                     (SELECT count(*)::int FROM social_ideas i WHERE i.episode_id = e.id) AS ideas
+                FROM episodes e LEFT JOIN guests g ON g.id = e.guest_id WHERE e.project_id = ANY($1::int[]) ORDER BY e.number DESC NULLS LAST, e.id DESC LIMIT 200`, [pids]),
+    db.query(`SELECT i.*, e.number AS episode_number, e.title AS episode_title, e.project_id, t.status AS task_status
+                FROM social_ideas i JOIN episodes e ON e.id = i.episode_id LEFT JOIN tasks t ON t.id = i.task_id
+               WHERE i.status = $1 AND i.project_id = ANY($2::int[]) ORDER BY e.number DESC NULLS LAST, i.kind, i.id`, [status, pids]),
+    db.query('SELECT status, count(*)::int AS n FROM social_ideas WHERE project_id = ANY($1::int[]) GROUP BY status', [pids]),
+    db.query("SELECT 1 FROM jobs WHERE kind = 'social_ideias' AND status IN ('queued','running') LIMIT 1"),
+  ]);
+  res.render('social/ideas', {
+    title: 'Ideias', tab: 'ideias', episodes: episodes.rows, ideas: ideas.rows, status, kinds: social.IDEA_KINDS,
+    counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])), running: pending.rowCount > 0,
+    aiReady: config.geminiConfigured, canIdeas: can(req.user, 'social.ideas'),
+  });
+}));
+
+router.post('/social/ideias/gerar', requirePerm('social.ideas'), wrap(async (req, res) => {
+  const ids = [...new Set([].concat(req.body.episodes || []).map(Number).filter(Number.isInteger))].slice(0, 30);
+  const kinds = [].concat(req.body.kinds || []).filter((k) => social.IDEA_KINDS[k]);
+  if (!ids.length) { await req.flash('error', 'Escolha pelo menos um episódio.'); return res.redirect('/social/ideias'); }
+  if (!kinds.length) { await req.flash('error', 'Escolha o que sugerir: cortes, stories ou carrosséis.'); return res.redirect('/social/ideias'); }
+  if (ids.length === 1) { // um episódio: na hora
+    const r = await social.generateIdeas(ids[0], kinds, req.user.id);
+    if (r.error) await req.flash('error', r.error);
+    else await req.flash('ok', r.created ? `${fmt.plural(r.created, 'ideia nova', 'ideias novas')}.${r.skipped ? ` ${r.skipped === 1 ? '1 parecida com o que já existe ficou de fora' : `${r.skipped} parecidas com o que já existe ficaram de fora`}.` : ''}` : 'Nenhuma ideia nova: o que a IA sugeriu já tinha sido feito ou sugerido.');
+  } else {
+    await jobs.enqueue('social_ideias', { refId: Date.now() % 2147483647, payload: { episodeIds: ids, kinds, userId: req.user.id } });
+    await req.flash('ok', `Pedido de ideias para ${ids.length} episódios na fila. Você recebe uma notificação quando terminar.`);
+  }
+  res.redirect('/social/ideias');
+}));
+
+router.post('/social/ideias/:id/:acao(aprovar|feita|descartar|reabrir)', requirePerm('social.ideas'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const { rows: [idea] } = await db.query('SELECT i.*, e.editor_id, e.title AS episode_title FROM social_ideas i JOIN episodes e ON e.id = i.episode_id WHERE i.id = $1', [req.params.id]);
+  if (!idea) return notFound(res);
+  const to = { aprovar: 'aprovada', feita: 'feita', descartar: 'descartada', reabrir: 'sugerida' }[req.params.acao];
+  let taskId = idea.task_id;
+  if (to === 'aprovada' && !taskId) { // vira tarefa: corte para o editor do episódio; story e carrossel ficam para quem pegar
+    const b = idea.body || {};
+    const lines = [idea.hook ? `Gancho: ${idea.hook}` : '', b.inicio_seg != null ? `Trecho: ${fmt.formatClock(b.inicio_seg * 1000)} a ${b.fim_seg != null ? fmt.formatClock(b.fim_seg * 1000) : '?'}` : '',
+      b.frase ? `Frase: "${b.frase}"` : '', (b.slides || []).length ? `Slides:\n${b.slides.map((s, n) => `${n + 1}. ${s}`).join('\n')}` : '', b.legenda ? `Legenda sugerida: ${b.legenda}` : ''].filter(Boolean);
+    const t = await tasksSvc.create({
+      values: { title: `${{ corte: 'Corte', story: 'Story', carrossel: 'Carrossel' }[idea.kind]}: ${idea.title}`, description: lines.join('\n'), kind: idea.kind === 'corte' ? 'cortes' : 'geral', due_on: tasksSvc.addDays(tasksSvc.todayISO(), 3) },
+      user: req.user, assigneeId: idea.kind === 'corte' ? idea.editor_id : null, links: { episodeId: idea.episode_id },
+    });
+    taskId = t.id;
+  }
+  await db.query('UPDATE social_ideas SET status = $2, task_id = $3, updated_at = now() WHERE id = $1', [idea.id, to, taskId]);
+  await req.flash('ok', { aprovada: 'Ideia aprovada e virou tarefa.', feita: 'Marcada como feita: não será sugerida de novo.', descartada: 'Descartada: não será sugerida de novo.', sugerida: 'Ideia reaberta.' }[to]);
+  res.redirect(`/social/ideias?status=${idea.status}`);
+}));
+
+// ---------------------------------------------------------------- insights
+router.get('/social/insights', requirePerm('social.read'), wrap(async (req, res) => {
+  const pids = require('../services/scope').idsOf(req);
+  const [data, ours, best] = await Promise.all([
+    require('../services/socialInsights').overview({ force: req.query.atualizar === '1', projectId: require('../services/scope').target(req, {}) }),
+    social.ourActivity({ pids }), require('../services/postMetrics').top({ limit: 10, pids })]);
+  res.render('social/insights', { title: 'Insights', tab: 'insights', data, ours, best, platforms: up.PLATFORMS, MEDIA });
+}));
+
+// ---------------------------------------------------------------- automações
+const automation = require('../services/commentAutomation');
+const TRIGGERS = { comentario: 'Comentário', direct: 'Direct' };
+const ACTIONS = { dm: 'Mandar direct para quem comentou', resposta: 'Responder o comentário publicamente', ambos: 'Os dois' };
+const COMMENT_PLATFORMS = ['instagram', 'facebook', 'youtube'];
+
+function parseRule(body) {
+  const v = {
+    name: fmt.clean(body.name, 120), trigger: TRIGGERS[body.trigger] ? body.trigger : 'comentario',
+    platform: COMMENT_PLATFORMS.includes(body.platform) ? body.platform : 'instagram', scope: body.scope === 'post' ? 'post' : 'recentes',
+    post_url: fmt.clean(body.post_url, 500) || null, keywords: String(body.keywords || '').split(/[,\n]/).map((k) => fmt.clean(k, 60)).filter(Boolean).slice(0, 20),
+    action: ACTIONS[body.action] ? body.action : 'dm', message: String(body.message || '').replace(/\r/g, '').trim().slice(0, 1000),
+    reply_text: String(body.reply_text || '').replace(/\r/g, '').trim().slice(0, 1000) || null,
+    buttons: [0, 1, 2].map((n) => ({ title: fmt.clean(body[`button_title_${n}`], 20), url: fmt.clean(body[`button_url_${n}`], 500) })).filter((b) => b.title || b.url),
+  };
+  if (v.trigger === 'direct') { v.platform = 'instagram'; v.action = 'dm'; v.scope = 'recentes'; v.post_url = null; }
+  let error = null;
+  if (v.name.length < 2) error = 'Dê um nome para a automação.';
+  else if (!v.message && v.action !== 'resposta') error = 'Escreva a mensagem do direct.';
+  else if (v.action === 'resposta' && !v.reply_text && !v.message) error = 'Escreva a resposta pública.';
+  else if (v.scope === 'post' && !/^https?:\/\//.test(v.post_url || '')) error = 'Cole o link do post a vigiar.';
+  else if ((v.action === 'dm' || v.action === 'ambos') && v.platform !== 'instagram') error = 'Direct para quem comentou só funciona no Instagram.';
+  else if (v.buttons.some((b) => !b.title || !/^https?:\/\//.test(b.url))) error = 'Cada botão precisa de um texto (até 20 letras) e de um link https://.';
+  if (!v.message && v.action === 'resposta') v.message = v.reply_text;
+  return { values: v, error };
+}
+
+router.get('/social/automacoes', requirePerm('social.read'), wrap(async (req, res) => {
+  const { rows: rules } = await db.query(
+    `SELECT r.*, (SELECT count(*)::int FROM social_events e WHERE e.rule_id = r.id AND e.status IN ('enviado','simulado')) AS answered,
+            (SELECT count(*)::int FROM social_events e WHERE e.rule_id = r.id AND e.status = 'erro') AS errors,
+            p.title AS pub_title, p.status AS pub_status, p.scheduled_at AS pub_at
+       FROM social_rules r LEFT JOIN episode_publications p ON p.id = r.publication_id
+      ORDER BY (r.active AND (r.expires_at IS NULL OR r.expires_at > now())) DESC, r.id DESC LIMIT 200`);
+  const { rows: igPosts } = await db.query(
+    `SELECT DISTINCT ON (r->>'url') p.title, r->>'url' AS url FROM episode_publications p, jsonb_array_elements(p.results) r
+      WHERE r->>'platform' = 'instagram' AND (r->>'ok')::boolean AND coalesce(r->>'url', '') <> '' ORDER BY r->>'url', p.created_at DESC LIMIT 30`);
+  res.render('social/automations', {
+    title: 'Automações', tab: 'automacoes', rules, triggers: TRIGGERS, actions: ACTIONS, commentPlatforms: COMMENT_PLATFORMS, platforms: up.PLATFORMS, igPosts,
+    live: live(), configured: config.uploadPostConfigured, canAutomate: can(req.user, 'social.automate'), openNew: req.query.nova === '1',
+    links: await automation.links(require('../services/scope').target(req, {})), inbox: await automation.state(), outstandLive: config.outstand.live, canIntegrate: can(req.user, 'integrations.manage'),
+  });
+}));
+
+// Links que a automação manda no direct: canal do YouTube, comunidade do WhatsApp e Spotify.
+router.post('/social/automacoes/links', requirePerm('social.automate'), wrap(async (req, res) => {
+  const r = await automation.setLinks(req.body, { projectId: require('../services/scope').target(req, {}) });
+  if (r.error) { await req.flash('error', r.error); return res.redirect('/social/automacoes'); }
+  await audit(req, 'automacao.links', 'settings', null);
+  await req.flash('ok', 'Links da automação salvos.');
+  res.redirect('/social/automacoes');
+}));
+
+router.post('/social/automacoes', requirePerm('social.automate'), wrap(async (req, res) => {
+  const { values: v, error } = parseRule(req.body);
+  if (error) { await req.flash('error', error); return res.redirect('/social/automacoes?nova=1'); }
+  const { rows: [r] } = await db.query(
+    `INSERT INTO social_rules (name, trigger, platform, scope, post_url, keywords, action, message, reply_text, buttons, created_by, provider)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+    // comentário e direct no Instagram: chegam pela Outstand (aviso na hora); o resto continua pela leitura da Upload-Post
+    [v.name, v.trigger, v.platform, v.scope, v.post_url, v.keywords, v.action, v.message, v.reply_text, JSON.stringify(v.buttons), req.user.id,
+      ((v.trigger === 'comentario' && v.platform === 'instagram') || v.trigger === 'direct') && config.outstandConfigured ? 'outstand' : 'uploadpost']);
+  await audit(req, 'automacao.criada', 'social_rule', r.id, { name: v.name });
+  await req.flash('ok', 'Automação criada, ainda pausada. Revise e ative quando quiser.');
+  res.redirect(`/social/automacoes/${r.id}`);
+}));
+
+async function findRule(id) {
+  if (!isIntId(id)) return null;
+  const { rows: [r] } = await db.query('SELECT * FROM social_rules WHERE id = $1', [id]);
+  return r || null;
+}
+
+router.get('/social/automacoes/:id', requirePerm('social.read'), wrap(async (req, res) => {
+  const rule = await findRule(req.params.id);
+  if (!rule) return notFound(res);
+  const { rows: events } = await db.query('SELECT * FROM social_events WHERE rule_id = $1 ORDER BY created_at DESC, id DESC LIMIT 100', [rule.id]);
+  res.render('social/automation', {
+    title: rule.name, tab: 'automacoes', rule, events, triggers: TRIGGERS, actions: ACTIONS, commentPlatforms: COMMENT_PLATFORMS, platforms: up.PLATFORMS,
+    live: live(), configured: config.uploadPostConfigured, canAutomate: can(req.user, 'social.automate'),
+  });
+}));
+
+router.post('/social/automacoes/:id', requirePerm('social.automate'), wrap(async (req, res) => {
+  const rule = await findRule(req.params.id);
+  if (!rule) return notFound(res);
+  const { values: v, error } = parseRule(rule.scope === 'publicacao' ? { ...req.body, trigger: 'comentario', platform: 'instagram', scope: 'recentes' } : req.body);
+  if (error) { await req.flash('error', error); return res.redirect(`/social/automacoes/${rule.id}`); }
+  if (rule.scope === 'publicacao') { v.scope = 'publicacao'; v.post_url = null; } // a de uma publicação continua presa ao post dela
+  await db.query(
+    `UPDATE social_rules SET name=$2, trigger=$3, platform=$4, scope=$5, post_url=$6, keywords=$7, action=$8, message=$9, reply_text=$10, buttons=$11, updated_at=now() WHERE id=$1`,
+    [rule.id, v.name, v.trigger, v.platform, v.scope, v.post_url, v.keywords, v.action, v.message, v.reply_text, JSON.stringify(v.buttons)]);
+  await audit(req, 'automacao.editada', 'social_rule', rule.id);
+  await req.flash('ok', 'Automação atualizada.');
+  res.redirect(`/social/automacoes/${rule.id}`);
+}));
+
+router.post('/social/automacoes/:id/:acao(ativar|pausar|excluir|rodar)', requirePerm('social.automate'), wrap(async (req, res) => {
+  const rule = await findRule(req.params.id);
+  if (!rule) return notFound(res);
+  const acao = req.params.acao;
+  if (acao === 'ativar') {
+    if (req.body.confirmar !== '1') { await req.flash('error', 'Confirme que a automação vai responder pessoas de verdade.'); return res.redirect(`/social/automacoes/${rule.id}`); }
+    await db.query('UPDATE social_rules SET active = true, active_since = now(), last_error = NULL, updated_at = now() WHERE id = $1', [rule.id]);
+    await req.flash('ok', live() ? 'Automação ativa. Ela responde o que chegar a partir de agora.' : 'Automação ativa em modo de teste: ela lê os comentários e registra o que responderia, sem enviar nada.');
+  } else if (acao === 'pausar') {
+    await db.query('UPDATE social_rules SET active = false, updated_at = now() WHERE id = $1', [rule.id]);
+    await req.flash('ok', 'Automação pausada.');
+  } else if (acao === 'excluir') {
+    await db.query('DELETE FROM social_rules WHERE id = $1', [rule.id]);
+    await audit(req, 'automacao.excluida', 'social_rule', rule.id, { name: rule.name });
+    await req.flash('ok', 'Automação excluída.');
+    return res.redirect('/social/automacoes');
+  } else if (acao === 'rodar') {
+    if (rule.provider === 'outstand') { await req.flash('ok', 'Esta automação responde sozinha: cada comentário chega pela Outstand na hora.'); return res.redirect(`/social/automacoes/${rule.id}`); }
+    if (!rule.active) { await req.flash('error', 'Ative a automação antes de rodar.'); return res.redirect(`/social/automacoes/${rule.id}`); }
+    const n = await social.runRules();
+    const { rows: [fresh] } = await db.query('SELECT last_error FROM social_rules WHERE id = $1', [rule.id]);
+    await req.flash(fresh.last_error ? 'error' : 'ok', fresh.last_error ? `Não rodou: ${fresh.last_error}` : `Rodou agora: ${fmt.plural(n, 'resposta', 'respostas')}.`);
+  }
+  await audit(req, `automacao.${acao}`, 'social_rule', rule.id);
+  res.redirect(`/social/automacoes/${rule.id}`);
+}));
+
+// ---------------------------------------------------------------- comentários (respostas por IA)
+const replies = require('../services/commentReplies');
+const backTo = (req, fallback = '/social/comentarios') => { const v = String(req.body.voltar || ''); return /^\/social\/(comentarios|publicacoes\/\d+)(\?[\w=&%.-]*)?$/.test(v) ? v : fallback; };
+
+router.get('/social/comentarios', requirePerm('social.comments'), wrap(async (req, res) => {
+  const pubId = isIntId(String(req.query.pub || '')) ? Number(req.query.pub) : null;
+  const pids = require('../services/scope').idsOf(req); // comentários dos posts do projeto escolhido
+  const [cfg, counts, posts, sweepState, sendState] = await Promise.all([
+    replies.getConfig(require('../services/scope').target(req, {})), replies.counts({ pubId, pids }), replies.postsWithComments({ pids }),
+    require('../services/settings').get(`${replies.KEY}_varredura`), require('../services/settings').get(replies.SEND_KEY),
+  ]);
+  // abre onde há algo a fazer: precisam de você > para aprovar > na fila > enviadas
+  const vista = replies.VIEWS[req.query.vista] ? req.query.vista : (['equipe', 'aprovar', 'fila', 'enviadas'].find((k) => counts[k]) || 'aprovar');
+  const showAll = req.query.todos === '1';
+  const { rows, more } = await replies.list(vista, { pubId, limit: showAll ? 200 : 60, pids });
+  const parse = (s) => { try { return s ? JSON.parse(s) : {}; } catch { return {}; } };
+  const eta = vista === 'fila' ? replies.estimate(rows, cfg, { nextAt: parse(sendState).next_at }) : new Map();
+  res.render('social/comments', {
+    title: 'Comentários', tab: 'comentarios', cfg, counts, rows, more, vista, pubId, posts, eta, VIEWS: replies.VIEWS, MODES: replies.MODES, NETWORK_LABEL: replies.NETWORK_LABEL,
+    summary: replies.summary(cfg), lastSweep: parse(sweepState), canSetup: can(req.user, 'social.automate'), outstandLive: config.outstand.live,
+    aiReady: config.geminiConfigured, outstandReady: config.outstandConfigured, showAll, REPLY_MAX: replies.REPLY_MAX,
+    dmToday: await replies.dmToday(), communityOk: Boolean((await require('../services/commentAutomation').links(require('../services/scope').target(req, {}))).whatsapp_community), DM_DAYS: replies.DM_PER_PERSON_DAYS,
+  });
+}));
+
+// Números dos comentários e das automações, por dia (?dia=AAAA-MM-DD; sem ele, hoje).
+router.get('/social/comentarios/numeros', requirePerm('social.comments'), wrap(async (req, res) => {
+  const cal = require('../services/calendar');
+  const today = cal.todayISO();
+  const { rows: [first] } = await db.query("SELECT to_char(min(created_at) AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS d FROM social_comments");
+  const min = first?.d && first.d < today ? first.d : today;
+  let d = cal.isISO(req.query.dia) ? req.query.dia : today;
+  if (d > today) d = today; if (d < min) d = min;
+  const day = { day: d, today, min, isToday: d === today, weekday: cal.dayLabel(d).split(',')[0], prev: d > min ? cal.addDays(d, -1) : null, next: d < today ? cal.addDays(d, 1) : null };
+  const stats = await require('../services/commentStats').forDay(d, { isToday: day.isToday });
+  res.render('social/comments-numbers', {
+    title: 'Números dos comentários', tab: 'comentarios', cmtTab: 'numeros', day, k: stats, dayBase: '/social/comentarios/numeros', dayHash: '',
+    MODES: replies.MODES, outstandLive: config.outstand.live,
+  });
+}));
+
+router.post('/social/comentarios/config', requirePerm('social.automate'), wrap(async (req, res) => {
+  const r = await replies.setConfig(req.body, { projectId: require('../services/scope').target(req, {}) });
+  if (r.error) { await req.flash('error', r.error); return res.redirect('/social/comentarios'); }
+  await audit(req, 'respostas_ia.config', 'settings', null, { mode: r.config.mode, per_hour: r.config.per_hour });
+  await req.flash('ok', 'Respostas por IA atualizadas.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/ligar', requirePerm('social.automate'), wrap(async (req, res) => {
+  const on = String(req.body.on) === '1';
+  await replies.setConfig({ on: on ? '1' : '0' }, { onlyToggle: true, projectId: require('../services/scope').target(req, {}) });
+  await audit(req, on ? 'respostas_ia.ligada' : 'respostas_ia.desligada', 'settings', null);
+  if (on) await jobs.enqueue('comentarios_varredura', { payload: { days: 14 }, maxAttempts: 2, createdBy: req.user.id });
+  await req.flash('ok', on ? 'Respostas por IA ligadas. Os comentários dos posts das últimas duas semanas estão sendo lidos agora.' : 'Respostas por IA desligadas. Nada mais sai, e a fila fica guardada.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/buscar', requirePerm('social.automate'), wrap(async (req, res) => {
+  await jobs.enqueue('comentarios_varredura', { payload: { days: 60 }, maxAttempts: 2, createdBy: req.user.id });
+  await req.flash('ok', 'Lendo os comentários dos posts dos últimos 60 dias. Em alguns minutos eles aparecem aqui.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/aprovar-todas', requirePerm('social.comments'), wrap(async (req, res) => {
+  const pubId = isIntId(String(req.body.pub || '')) ? Number(req.body.pub) : null;
+  const n = await replies.approveAll({ userId: req.user.id, pubId });
+  await audit(req, 'respostas_ia.aprovadas', 'publication', pubId, { n });
+  await req.flash('ok', n ? `${fmt.plural(n, 'resposta foi', 'respostas foram')} para a fila. Saem aos poucos, no ritmo configurado.` : 'Nada para aprovar.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/:id/resposta', requirePerm('social.comments'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const r = await replies.setReply(Number(req.params.id), req.body.texto, req.user.id, { dm: req.body.direct === undefined ? undefined : String(req.body.direct) });
+  await req.flash(r.error ? 'error' : 'ok', r.error || 'Resposta na fila. Sai na próxima vez que o ritmo deixar.');
+  if (!r.error) await audit(req, 'respostas_ia.editada', 'social_comment', Number(req.params.id));
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/:id/:acao(aprovar|ignorar|tirar|tentar|apagar|sem-direct)', requirePerm('social.comments'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const id = Number(req.params.id); const acao = req.params.acao;
+  let msg = null; let error = null;
+  if (acao === 'aprovar' || acao === 'tentar') msg = (await replies.approve([id], req.user.id)) ? 'Resposta na fila.' : null;
+  else if (acao === 'ignorar') msg = (await replies.skip(id, req.user.id)) ? 'Este comentário fica sem resposta.' : null;
+  else if (acao === 'tirar') msg = (await replies.unqueue(id)) ? 'Saiu da fila e voltou para aprovar.' : null;
+  else if (acao === 'sem-direct') msg = (await replies.skipDm(id)) ? 'O direct não vai. A resposta pública continua.' : null;
+  else if (acao === 'apagar') { const r = await replies.undo(id); error = r.error || null; msg = r.ok ? 'Resposta apagada da rede.' : null; }
+  if (!msg && !error) error = 'Este comentário mudou enquanto você olhava. A lista foi atualizada.';
+  if (msg) await audit(req, `respostas_ia.${acao}`, 'social_comment', id);
+  await req.flash(error ? 'error' : 'ok', error || msg);
+  res.redirect(backTo(req));
+}));
+
+// Liga ou desliga a IA nos comentários de uma publicação.
+router.post('/social/publicacoes/:id/respostas-ia', requirePerm('social.automate'), wrap(async (req, res) => {
+  const pub = await findPub(req, req.params.id);
+  if (!pub) return notFound(res);
+  const on = String(req.body.on) === '1';
+  await db.query('UPDATE episode_publications SET ai_replies = $2 WHERE id = $1', [pub.id, on]);
+  await audit(req, on ? 'respostas_ia.post_ligado' : 'respostas_ia.post_desligado', 'publication', pub.id);
+  await req.flash('ok', on ? 'A IA volta a cuidar dos comentários deste post.' : 'A IA não responde mais os comentários deste post.');
+  res.redirect(`/social/publicacoes/${pub.id}`);
+}));
+
+module.exports = router;
