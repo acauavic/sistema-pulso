@@ -18,6 +18,7 @@
     <label class="check" data-when="direction=saida"><input type="checkbox" name="paid" value="1"> Já foi pago</label>
     <label class="check" data-when="direction=entrada"><input type="checkbox" name="paid" value="1"> Já foi recebido</label>
     <%- include('../partials/fin-owner') %>
+    <%- include('../partials/fin-payer') %>
     <details class="more">
       <summary>Mais detalhes</summary>
       <div class="stack top-gap">
@@ -52,6 +53,7 @@
       <label>Vence em<input type="date" name="due_on" required></label>
     </div>
     <%- include('../partials/fin-owner') %>
+    <%- include('../partials/fin-payer') %>
     <details class="more">
       <summary>Mais detalhes</summary>
       <div class="stack top-gap">

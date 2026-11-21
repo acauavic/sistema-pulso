@@ -349,6 +349,24 @@ Menu **Financeiro** (gestão e superadmin; a produtora vê só o **Estoque**). C
 - Apagar convidado, episódio ou patrocinador cancela o que era automático e ainda não foi pago (e devolve ao estoque o que o episódio gastou).
 - Permissões: `finance.read`/`finance.write` (superadmin, gestão), `stock.read`/`stock.write` (também produtora; sem ver valores nem comprar).
 
+### Parceria (acerto com o parceiro)
+
+`services/partnership.js`, aba **Financeiro > Parceria** (`/financeiro/parceria`, só quando algum projeto do recorte tem
+acordo) e o extrato público `/extrato/:token` (`routes/partnershipPublic.js`). O acordo (`partnerships`: parceiro, quem
+paga do bolso do lado dele, parte da casa no lucro, desde quando) do Projeto 100 nasce na migração 105 (Dr. José Bento e
+Pedro, 50%, desde 01/11/2026), editável na tela.
+
+- **A regra**: só o que foi pago ou recebido, desde o começo do acordo, do projeto mais a parte dele nos compartilhados.
+  `fin_entries.account` diz em que conta o dinheiro passou (`casa` | `parceiro`, com `account_person`). Enquanto a receita
+  não passa do custo, ela é devolução, repartida na proporção do que cada lado gastou; o excedente é lucro, que só é
+  dividido num acerto.
+- **Acerto** (`settle`): o lucro que a casa escolhe distribuir + a transferência que zera as contas
+  (`partnership_settlements.transfer_cents`: > 0 a casa paga, < 0 o parceiro repassa), gerada como conta da categoria
+  `acerto` (fora do resultado, do acerto e do custo por episódio).
+- **Caixa**: o que é da conta do parceiro não entra em `cashNow`, nos atrasados, no "a pagar em 7 dias" nem na projeção.
+- **Mês fechado** (`partnership_closings`): grava o extrato; `partnership.lockedReason` recusa editar, desfazer e pagar com
+  data no mês fechado. Reabrir pede motivo.
+
 ## Pulso Podcast com Plateia
 
 Página **pública** `/plateia` (sem login, indexável) para o público pedir para assistir às gravações. Código: `src/routes/plateia.js` (público), `src/routes/plateiaAdmin.js` (interno), `src/services/audience.js`, `src/views/plateia/`, `src/public/plateia.{css,js}`, migração `021_plateia.sql`.

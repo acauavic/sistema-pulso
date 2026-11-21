@@ -233,9 +233,10 @@ async function ensureRecurring(monthsAhead = 3) {
       if (date < iso(r.starts_on) || (r.ends_on && date > iso(r.ends_on))) continue;
       // o custo mensal não tem vínculo de onde herdar: o dono (ou a divisão) guardado nele vai para cada mês que nasce
       const { rows: [made1] } = await db.query(
-        `INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, supplier, recurring_id, source, auto_key, project_id)
-         VALUES ('saida',$1,$2,$3,$4,$5,$6,'mensal',$7,$8) ON CONFLICT (auto_key) DO NOTHING RETURNING id`,
-        [r.category, `${r.name} · ${monthShortLabel(ym)}`, r.amount_cents, date, r.supplier, r.id, `mensal-${r.id}-${ym}`, r.project_id || (r.split ? null : projects.defaultId())]);
+        `INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, supplier, recurring_id, source, auto_key, project_id, account, account_person)
+         VALUES ('saida',$1,$2,$3,$4,$5,$6,'mensal',$7,$8,$9,$10) ON CONFLICT (auto_key) DO NOTHING RETURNING id`,
+        [r.category, `${r.name} · ${monthShortLabel(ym)}`, r.amount_cents, date, r.supplier, r.id, `mensal-${r.id}-${ym}`, r.project_id || (r.split ? null : projects.defaultId()),
+          r.account || 'casa', r.account_person || null]);
       if (made1 && r.split) await owner.save(made1.id, { weights: r.split, amount: Number(r.amount_cents) });
       made += made1 ? 1 : 0;
     }
@@ -404,7 +405,7 @@ async function cashNow(s, { pids = null } = {}) {
   const whole = !pids || projects.all().every((pr) => pids.includes(pr.id)); // saldo inicial só no consolidado da casa
   const { rows: [r] } = await db.query(
     `SELECT coalesce(sum(CASE WHEN e.direction = 'entrada' THEN ${pids ? owner.share('e', '$2') : 'e.amount_cents'} ELSE -${pids ? owner.share('e', '$2') : 'e.amount_cents'} END), 0)::bigint AS v
-       FROM fin_entries e WHERE e.status = 'pago' AND ($1::date IS NULL OR e.paid_on >= $1::date) AND ${pids ? owner.where('e', '$2') : 'true'}`, p);
+       FROM fin_entries e WHERE e.status = 'pago' AND e.account = 'casa' AND ($1::date IS NULL OR e.paid_on >= $1::date) AND ${pids ? owner.where('e', '$2') : 'true'}`, p);
   return (whole ? s.opening_balance_cents : 0) + Number(r.v);
 }
 
@@ -418,19 +419,19 @@ async function overview({ months = 4, pids = null } = {}) {
   const p3 = pids ? [ym, today, pids] : [ym, today];
   const [{ rows: [m] }, { rows: attention }, { rows: pend }, cash, perEp, byProject] = await Promise.all([
     db.query(
-      `SELECT coalesce(sum(${v}) FILTER (WHERE e.direction = 'entrada' AND e.status = 'pago' AND to_char(e.paid_on,'YYYY-MM') = $1), 0)::bigint AS in_paid,
-              coalesce(sum(${v}) FILTER (WHERE e.direction = 'saida' AND e.status = 'pago' AND to_char(e.paid_on,'YYYY-MM') = $1), 0)::bigint AS out_paid,
-              coalesce(sum(${v}) FILTER (WHERE e.direction = 'entrada' AND e.status = 'previsto' AND e.due_on <= (date_trunc('month', $2::date) + interval '1 month - 1 day')::date), 0)::bigint AS in_open,
-              coalesce(sum(${v}) FILTER (WHERE e.direction = 'saida' AND e.status = 'previsto' AND e.due_on <= (date_trunc('month', $2::date) + interval '1 month - 1 day')::date), 0)::bigint AS out_open,
-              coalesce(sum(${v}) FILTER (WHERE e.status = 'previsto' AND e.due_on < $2::date AND e.direction = 'saida'), 0)::bigint AS late_out,
-              coalesce(sum(${v}) FILTER (WHERE e.status = 'previsto' AND e.due_on < $2::date AND e.direction = 'entrada'), 0)::bigint AS late_in,
-              coalesce(sum(${v}) FILTER (WHERE e.status = 'previsto' AND e.direction = 'saida' AND e.due_on BETWEEN $2::date AND ($2::date + 7)), 0)::bigint AS out_7
+      `SELECT coalesce(sum(${v}) FILTER (WHERE e.direction = 'entrada' AND e.status = 'pago' AND e.category <> 'acerto' AND to_char(e.paid_on,'YYYY-MM') = $1), 0)::bigint AS in_paid,
+              coalesce(sum(${v}) FILTER (WHERE e.direction = 'saida' AND e.status = 'pago' AND e.category <> 'acerto' AND to_char(e.paid_on,'YYYY-MM') = $1), 0)::bigint AS out_paid,
+              coalesce(sum(${v}) FILTER (WHERE e.direction = 'entrada' AND e.status = 'previsto' AND e.account = 'casa' AND e.due_on <= (date_trunc('month', $2::date) + interval '1 month - 1 day')::date), 0)::bigint AS in_open,
+              coalesce(sum(${v}) FILTER (WHERE e.direction = 'saida' AND e.status = 'previsto' AND e.account = 'casa' AND e.due_on <= (date_trunc('month', $2::date) + interval '1 month - 1 day')::date), 0)::bigint AS out_open,
+              coalesce(sum(${v}) FILTER (WHERE e.status = 'previsto' AND e.account = 'casa' AND e.due_on < $2::date AND e.direction = 'saida'), 0)::bigint AS late_out,
+              coalesce(sum(${v}) FILTER (WHERE e.status = 'previsto' AND e.account = 'casa' AND e.due_on < $2::date AND e.direction = 'entrada'), 0)::bigint AS late_in,
+              coalesce(sum(${v}) FILTER (WHERE e.status = 'previsto' AND e.account = 'casa' AND e.direction = 'saida' AND e.due_on BETWEEN $2::date AND ($2::date + 7)), 0)::bigint AS out_7
          FROM fin_entries e WHERE true${only}`, p3),
     db.query(
       `SELECT e.*, ${pids ? owner.share('e', '$2') : 'e.amount_cents'} AS share_cents, s.company AS sponsor_name, ep.number AS episode_number, ep.title AS episode_title, g.name AS guest_name FROM fin_entries e
          LEFT JOIN sponsors s ON s.id = e.sponsor_id LEFT JOIN episodes ep ON ep.id = e.episode_id LEFT JOIN guests g ON g.id = e.guest_id
-        WHERE e.status = 'previsto' AND e.due_on <= ($1::date + 7)${pids ? ` AND ${owner.where('e', '$2')}` : ''} ORDER BY e.due_on, e.id LIMIT 6`, pids ? [today, pids] : [today]),
-    db.query(`SELECT e.direction, ${pids ? owner.share('e', '$1') : 'e.amount_cents'} AS amount_cents, e.due_on FROM fin_entries e WHERE e.status = 'previsto'${pids ? ` AND ${owner.where('e', '$1')}` : ''}`, pids ? [pids] : []),
+        WHERE e.status = 'previsto' AND e.account = 'casa' AND e.due_on <= ($1::date + 7)${pids ? ` AND ${owner.where('e', '$2')}` : ''} ORDER BY e.due_on, e.id LIMIT 6`, pids ? [today, pids] : [today]),
+    db.query(`SELECT e.direction, ${pids ? owner.share('e', '$1') : 'e.amount_cents'} AS amount_cents, e.due_on FROM fin_entries e WHERE e.status = 'previsto' AND e.account = 'casa'${pids ? ` AND ${owner.where('e', '$1')}` : ''}`, pids ? [pids] : []),
     cashNow(s, { pids }),
     costPerEpisode(6, { pids }),
     resultByProject({ pids, ym }),
@@ -465,11 +466,11 @@ async function resultByProject({ pids = null, ym = monthOf(todayISO()) } = {}) {
        FROM projects p
        LEFT JOIN (
          SELECT e.project_id AS pid, e.direction, e.amount_cents AS cents, false AS shared FROM fin_entries e
-          WHERE e.status = 'pago' AND to_char(e.paid_on, 'YYYY-MM') = $1 AND e.project_id IS NOT NULL
+          WHERE e.status = 'pago' AND e.category <> 'acerto' AND to_char(e.paid_on, 'YYYY-MM') = $1 AND e.project_id IS NOT NULL
          UNION ALL
          SELECT s.project_id AS pid, e.direction, s.amount_cents AS cents, true AS shared
            FROM fin_entry_splits s JOIN fin_entries e ON e.id = s.entry_id
-          WHERE e.status = 'pago' AND to_char(e.paid_on, 'YYYY-MM') = $1
+          WHERE e.status = 'pago' AND e.category <> 'acerto' AND to_char(e.paid_on, 'YYYY-MM') = $1
        ) part ON part.pid = p.id
       WHERE p.id = ANY($2::int[]) GROUP BY p.id, p.name, p.sigla, p.position ORDER BY p.position, p.id`, [ym, ids]);
   return rows.map((r) => ({

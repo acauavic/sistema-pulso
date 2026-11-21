@@ -20,7 +20,7 @@
 <li class="fin-row<%= e.status === 'cancelado' ? ' is-off' : '' %>">
   <div class="plan-list-main">
     <strong><%= e.description %></strong>
-    <span class="small muted"><%= C.FIN_CATEGORIES[e.category] || e.category %><%= e.supplier ? ' · ' + e.supplier : '' %><% if (links.length) { %> · <%- links.join(' · ') %><% } %><%= e.auto_key ? ' · automático' : '' %><% if (tag) { %> · <span class="mono">[ <%= tag %> ]</span><% } %><% if (sharedNote) { %> · <%= sharedNote %><% } %></span>
+    <span class="small muted"><%= C.FIN_CATEGORIES[e.category] || e.category %><%= e.supplier ? ' · ' + e.supplier : '' %><% if (links.length) { %> · <%- links.join(' · ') %><% } %><%= e.auto_key ? ' · automático' : '' %><% if (tag) { %> · <span class="mono">[ <%= tag %> ]</span><% } %><% if (sharedNote) { %> · <%= sharedNote %><% } %><% if (e.account === 'parceiro') { %> · <span class="mono"><%= isIn ? 'recebido por' : 'pago por' %> <%= e.account_person || 'parceiro' %></span><% } %></span>
   </div>
   <span class="fin-when mono small <%= late ? 'err' : 'muted' %>">
     <% if (e.status === 'pago') { %><%= fmt.formatDayShort(e.paid_on) %> · <%= isIn ? 'recebido' : 'pago' %><% } else if (e.status === 'cancelado') { %>cancelado<% } else { %><%= fmt.formatDayShort(e.due_on) %><%= late ? ' · atrasado' : '' %><% } %>
@@ -32,7 +32,7 @@
         <button class="btn sm" type="button" data-fill-modal="modal-pagar" data-fill-mode="<%= e.direction %>" data-fill-action="/financeiro/lancamentos/<%= e.id %>/pagar" data-fill='<%- eJson({ _label: e.description, amount: brl(e.amount_cents), paid_on: today, voltar: here }) %>'><%= isIn ? 'Receber' : 'Pagar' %></button>
         <button class="btn sm ghost" type="button" aria-label="Editar <%= e.description %>" data-fill-modal="modal-lanc" data-fill-mode="edit" data-fill-action="/financeiro/lancamentos/<%= e.id %>"
           <% if (!e.auto_key) { %>data-fill-remove="/financeiro/lancamentos/<%= e.id %>/excluir" data-fill-remove-label="Excluir lançamento" data-fill-confirm="Excluir este lançamento?"<% } else { %>data-fill-remove="/financeiro/lancamentos/<%= e.id %>/cancelar" data-fill-remove-label="Anular este custo" data-fill-confirm="Anular este custo automático? Ele sai das contas e não volta sozinho."<% } %>
-          data-fill='<%- eJson({ description: e.description, amount: brl(e.amount_cents), due_on: e.due_on, category: e.category, supplier: e.supplier || '', notes: e.notes || '', episode_id: e.episode_id ? String(e.episode_id) : '', sponsor_id: e.sponsor_id ? String(e.sponsor_id) : '', de_quem: e.shared ? 'compartilhado' : String(e.project_id || ''), voltar: here }) %>'><%- icon('pencil', 14) %></button>
+          data-fill='<%- eJson({ description: e.description, amount: brl(e.amount_cents), due_on: e.due_on, category: e.category, supplier: e.supplier || '', notes: e.notes || '', episode_id: e.episode_id ? String(e.episode_id) : '', sponsor_id: e.sponsor_id ? String(e.sponsor_id) : '', de_quem: e.shared ? 'compartilhado' : String(e.project_id || ''), pago_por: e.account === 'parceiro' ? 'parceiro:' + (e.account_person || '') : 'casa', voltar: here }) %>'><%- icon('pencil', 14) %></button>
       <% } else if (e.status === 'pago') { %>
         <form method="post" action="/financeiro/lancamentos/<%= e.id %>/desfazer" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= here %>"><button class="link small" type="submit">Desfazer</button></form>
       <% } else { %>

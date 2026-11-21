@@ -85,7 +85,7 @@
         <li class="<%= r.active ? '' : 'is-off' %>">
           <div class="plan-list-main"><strong><%= r.name %><% if (!r.active) { %> <span class="badge b-gray">Pausado</span><% } %></strong><span class="small muted">Todo dia <span class="mono"><%= r.day_of_month %></span> · <%= C.FIN_OUT[r.category] %><%= r.supplier ? ' · ' + r.supplier : '' %><%= r.ends_on ? ' · até ' + fmt.formatDay(r.ends_on) : '' %><% if (finProjs.length > 1) { %> · <%= r.project_id ? ownerName(r.project_id) : 'compartilhado' %><% } %></span></div>
           <span class="mono"><%= money(r.amount_cents) %></span>
-          <span class="plan-list-tools"><% if (canWrite) { %><button class="btn sm ghost" type="button" data-fill-modal="modal-mensal" data-fill-mode="edit" data-fill-action="/financeiro/mensais/<%= r.id %>" data-fill-remove="/financeiro/mensais/<%= r.id %>/excluir" data-fill-remove-label="Excluir custo mensal" data-fill-confirm="Excluir este custo mensal? As contas em aberto somem; o que já foi pago fica." data-fill='<%- json({ name: r.name, category: r.category, amount: brl(r.amount_cents), day_of_month: String(r.day_of_month), starts_on: r.starts_on, ends_on: r.ends_on || '', supplier: r.supplier || '', active: r.active ? '1' : '0', de_quem: r.project_id ? String(r.project_id) : 'compartilhado' }) %>'>Editar</button><% } %></span>
+          <span class="plan-list-tools"><% if (canWrite) { %><button class="btn sm ghost" type="button" data-fill-modal="modal-mensal" data-fill-mode="edit" data-fill-action="/financeiro/mensais/<%= r.id %>" data-fill-remove="/financeiro/mensais/<%= r.id %>/excluir" data-fill-remove-label="Excluir custo mensal" data-fill-confirm="Excluir este custo mensal? As contas em aberto somem; o que já foi pago fica." data-fill='<%- json({ name: r.name, category: r.category, amount: brl(r.amount_cents), day_of_month: String(r.day_of_month), starts_on: r.starts_on, ends_on: r.ends_on || '', supplier: r.supplier || '', active: r.active ? '1' : '0', de_quem: r.project_id ? String(r.project_id) : 'compartilhado', pago_por: r.account === 'parceiro' ? 'parceiro:' + (r.account_person || '') : 'casa' }) %>'>Editar</button><% } %></span>
         </li>
         <% }) %>
       </ul>
@@ -191,6 +191,7 @@
       <label>Todo dia<input type="number" name="day_of_month" min="1" max="28" required></label>
     </div>
     <%- include('../partials/fin-owner', { ownerHint: 'A divisão precisa somar o valor e vale para cada mês lançado. Em branco no compartilhado, a divisão de hoje fica.' }) %>
+    <%- include('../partials/fin-payer', { payerLabel: 'Quem paga' }) %>
     <details class="more">
       <summary>Categoria, período e fornecedor</summary>
       <div class="stack top-gap">

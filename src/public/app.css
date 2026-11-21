@@ -2401,3 +2401,10 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
   .sess-files li { grid-template-columns: minmax(0, 1fr); }
   .sess-read { font-size: 18px; }
 }
+
+/* ---- Parceria (Financeiro > Parceria): números sem lime; a transferência na cor do texto ---- */
+.part-terms { display: grid; gap: 8px; margin-bottom: 16px; }
+.part-transfer { font-variant-numeric: tabular-nums; }
+.part-month { text-transform: capitalize; }
+.part-months .plan-list-tools .stack { min-width: 240px; }
+.stat-delta { font: 500 11px var(--f-mono); letter-spacing: .08em; color: var(--muted); }

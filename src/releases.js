@@ -4,6 +4,18 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.3.0', date: '2026-11-21', title: 'Acerto da parceria',
+    items: [
+      { kind: 'novo', text: 'Financeiro > Parceria (no projeto com acordo, como o Projeto 100): quanto foi gasto, quanto já voltou, quanto falta recuperar e o lucro a distribuir. O custo volta primeiro para quem pagou — a casa ou o parceiro, na proporção do que cada um gastou — e o que passa disso é lucro, dividido na proporção do acordo (50/50).' },
+      { kind: 'novo', text: '"Fazer acerto": você escolhe quanto do lucro distribuir agora e o sistema diz numa frase quem paga quem ("A casa paga R$ X ao Dr. José Bento"). A transferência vira uma conta em A pagar ou A receber, na categoria Acerto da parceria, que não conta como custo nem receita.' },
+      { kind: 'novo', text: 'Nos lançamentos do projeto com parceria, o campo "Quem pagou" / "Quem recebeu": a casa ou uma pessoa do parceiro (do bolso dela). O que o parceiro paga ou recebe na conta dele não mexe no caixa da casa, mas entra no custo do projeto e no acerto. Vale também nos custos mensais.' },
+      { kind: 'novo', text: 'Fechar mês: o extrato do mês fica gravado e o que foi pago nele não muda mais (editar, desfazer e pagar com data no mês fechado são recusados). Reabrir é raro, pede o motivo e fica registrado.' },
+      { kind: 'novo', text: 'Extrato por link, só leitura, para o parceiro ver a conta e o mês a mês sem entrar no sistema. A tela também mostra quando, pelo que está previsto, o custo volta.' },
+      { kind: 'novo', text: 'Receita nova: YouTube / AdSense.' },
+      { kind: 'ajuste', text: 'O resultado do mês e o resultado por projeto deixam o acerto de fora (é divisão de lucro, não custo). Caixa, contas da semana e atrasados mostram só o que passa pela conta da casa.' },
+    ],
+  },
+  {
     version: '2.2.0', date: '2026-11-21', title: 'Sessão de gravação',
     items: [
       { kind: 'novo', text: 'Sessões de gravação (em Vídeos > Sessões de gravação): marque a ida ao estúdio com dia, hora, duração prevista e local, e escolha os vídeos em Pré-produção que vão ser gravados, na ordem da fila.' },

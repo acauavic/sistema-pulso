@@ -118,8 +118,10 @@ const FIN_OUT = {
   estudio: 'Estúdio', equipe: 'Equipe e salários', edicao: 'Edição', brindes: 'Brindes e presentes', impressos: 'Impressos e cartões',
   transporte: 'Transporte e Uber', marketing: 'Marketing e anúncios', software: 'Software e assinaturas', impostos: 'Impostos e taxas', outros: 'Outros custos',
 };
-const FIN_IN = { patrocinio: 'Patrocínio', plateia: 'Plateia', outros_in: 'Outras receitas' };
-const FIN_CATEGORIES = { ...FIN_OUT, ...FIN_IN };
+const FIN_IN = { patrocinio: 'Patrocínio', youtube: 'YouTube / AdSense', plateia: 'Plateia', outros_in: 'Outras receitas' };
+// Acerto da parceria: transferência entre a casa e o parceiro. Não é custo nem receita (fica fora do resultado e do acerto).
+const FIN_SETTLE = { acerto: 'Acerto da parceria' };
+const FIN_CATEGORIES = { ...FIN_OUT, ...FIN_IN, ...FIN_SETTLE };
 const FIN_TRIGGERS = {
   gravacao_agendada: 'Quando a gravação é agendada',
   episodio_gravado: 'Quando o episódio é gravado',
@@ -129,5 +131,5 @@ const FIN_ANCHORS = { gatilho: 'a partir do dia em que acontece', gravacao: 'a p
 const FILE_KINDS = ['logo', 'audio', 'moldura', 'qrcode', 'material'];
 
 module.exports = {
-  LOSS_REASONS, FIN_OUT, FIN_IN, FIN_CATEGORIES, FIN_TRIGGERS, FIN_ANCHORS, NOTIFICATION_TYPES, ROUTINE_TRIGGERS, ROUTINE_ANCHORS, ROUTINE_ASSIGNEES, EPISODE_STAGES, EPISODE_STAGE_BY_KEY, EPISODE_FILE_KINDS, TASK_KINDS, TASK_STATUSES, CHECKLIST_GATES, SPONSOR_STAGES, SPONSOR_STAGE_BY_KEY, isSponsorStage, SPONSOR_KINDS, SPONSOR_TIERS, SPONSOR_GOALS,
+  LOSS_REASONS, FIN_OUT, FIN_IN, FIN_SETTLE, FIN_CATEGORIES, FIN_TRIGGERS, FIN_ANCHORS, NOTIFICATION_TYPES, ROUTINE_TRIGGERS, ROUTINE_ANCHORS, ROUTINE_ASSIGNEES, EPISODE_STAGES, EPISODE_STAGE_BY_KEY, EPISODE_FILE_KINDS, TASK_KINDS, TASK_STATUSES, CHECKLIST_GATES, SPONSOR_STAGES, SPONSOR_STAGE_BY_KEY, isSponsorStage, SPONSOR_KINDS, SPONSOR_TIERS, SPONSOR_GOALS,
   DELIVERABLE_KINDS, DELIVERABLE_STATUSES, EPISODE_STATUSES, FILE_KINDS, GUEST_STATUSES, STATUS_BY_KEY, isStatus, RSVP_OPEN, ACCEPT_FROM, PROFILES, PROFILE_BY_KEY, CLICK_KINDS };

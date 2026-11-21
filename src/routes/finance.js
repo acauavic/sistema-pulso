@@ -25,6 +25,25 @@ const money = (c) => (Number(c) < 0 ? `−\u00a0${formatBRL(-Number(c))}` : form
 const pidsOf = (req) => scope.financeIdsOf(req);
 // Projetos que ela pode escolher em "De quem é".
 const pickProjects = (req) => pidsOf(req).map((id) => projects.get(id)).filter(Boolean);
+const partnership = require('../services/partnership');
+
+// Em todas as telas do Financeiro: quem pode ter pago do bolso (o campo "Quem pagou") e se a aba Parceria aparece.
+router.use('/financeiro', wrap(async (req, res, next) => {
+  if (!req.user || !req.scope) return next();
+  const ids = await partnership.ofProjects(pidsOf(req));
+  const parts = await Promise.all(ids.map((id) => partnership.get(id)));
+  res.locals.partnerPeople = parts.filter(Boolean).map((p) => ({ projectId: p.project_id, projectName: (projects.get(p.project_id) || {}).name || '', people: p.partner_people }));
+  res.locals.partnerTab = ids.length > 0;
+  return next();
+}));
+
+// "Quem pagou" do formulário vira a conta do lançamento. Gasto do parceiro é de um projeto com parceria, nunca compartilhado.
+async function accountOf(req, own) {
+  const v = String(req.body.pago_por || 'casa');
+  if (v === 'casa') return { account: 'casa', person: null };
+  if (!own || own.weights) return { error: 'Gasto do parceiro é de um projeto só (o do acordo), não compartilhado.' };
+  return partnership.accountFrom(v, own.projectId);
+}
 
 // ---------------------------------------------------------------- resumo
 router.get('/financeiro', requirePerm('finance.read'), wrap(async (req, res) => {
@@ -46,6 +65,84 @@ async function pickers(pids) {
   ]);
   return { episodes: episodes.rows, sponsors: sponsors.rows, suppliers: suppliers.rows.map((r) => r.supplier) };
 }
+
+// ---------------------------------------------------------------- parceria (Projeto 100): custo volta primeiro, depois o lucro
+// O projeto da tela: o pedido em ?projeto (se for de parceria e a pessoa vê o dinheiro dele), senão o primeiro do recorte.
+async function partnerProjectOf(req) {
+  const pids = pidsOf(req);
+  const want = Number(req.query.projeto || req.body.projeto);
+  if (pids.includes(want)) return want;
+  const ids = await partnership.ofProjects(pids);
+  return ids[0] || (req.scope.current && pids.includes(req.scope.current.id) ? req.scope.current.id : null);
+}
+
+router.get('/financeiro/parceria', requirePerm('finance.read'), wrap(async (req, res) => {
+  const projectId = await partnerProjectOf(req);
+  if (!projectId) return notFound(res, 'Projeto');
+  const part = await partnership.get(projectId);
+  const L = part ? await partnership.ledger(projectId) : null;
+  const [months, settled, proj, link] = part ? await Promise.all([
+    partnership.months(projectId), partnership.settlements(projectId), partnership.projection(projectId, L), partnership.currentLink(projectId),
+  ]) : [[], [], null, null];
+  const counts = await fin.counts({ pids: pidsOf(req) });
+  res.render('finance/partnership', {
+    title: 'Parceria', project: projects.get(projectId), part, L, months, settled, proj, preview: L ? partnership.preview(L) : null,
+    link: link ? partnership.linkUrl(link) : null, money, counts, today: fin.todayISO(), P: partnership,
+    otherProjects: (await partnership.ofProjects(pidsOf(req))).filter((id) => id !== projectId).map((id) => projects.get(id)).filter(Boolean),
+  });
+}));
+
+const back = (projectId, hash = '') => `/financeiro/parceria?projeto=${projectId}${hash}`;
+const partnerAct = (path, fn) => router.post(`/financeiro/parceria${path}`, requirePerm('finance.write'), wrap(async (req, res) => {
+  const projectId = await partnerProjectOf(req);
+  if (!projectId) return notFound(res, 'Projeto');
+  const out = await fn(req, projectId);
+  await req.flash(out.error ? 'error' : 'ok', out.error || out.ok);
+  return res.redirect(back(projectId, out.hash || ''));
+}));
+
+partnerAct('/acordo', async (req, projectId) => {
+  const out = await partnership.setTerms(projectId, req.body, req.user);
+  if (out.error) return out;
+  await audit(req, 'parceria.acordo', 'project', projectId, { parceiro: req.body.partner_name, casa: req.body.house_pct, desde: req.body.start_on });
+  return { ok: 'Acordo salvo.' };
+});
+
+partnerAct('/acerto', async (req, projectId) => {
+  const profit = String(req.body.lucro || '').trim() === '' ? null : parseBRL(req.body.lucro);
+  if (profit != null && Number.isNaN(profit)) return { error: 'Valor do lucro inválido. Use algo como 2.000,00.' };
+  const out = await partnership.settle(projectId, { profit, note: req.body.note, user: req.user });
+  if (out.error) return out;
+  await audit(req, 'parceria.acerto', 'project', projectId, { lucro: out.preview.profit, transferencia: out.preview.transfer });
+  const t = out.preview.transfer;
+  return { ok: t > 0 ? `Acerto registrado: a conta de ${money(t)} ao parceiro está em "A pagar".` : t < 0 ? `Acerto registrado: o repasse de ${money(-t)} do parceiro está em "A receber".` : 'Acerto registrado.' };
+});
+
+partnerAct('/meses/:ym/fechar', async (req, projectId) => {
+  const out = await partnership.close(projectId, req.params.ym, req.user);
+  if (out.error) return out;
+  await audit(req, 'parceria.mes_fechado', 'project', projectId, { mes: req.params.ym });
+  return { ok: `Mês ${partnership.monthShort(req.params.ym)} fechado: o que foi pago nele não muda mais.`, hash: '#meses' };
+});
+
+partnerAct('/meses/:ym/reabrir', async (req, projectId) => {
+  const out = await partnership.reopen(projectId, req.params.ym, req.body.reason, req.user);
+  if (out.error) return { ...out, hash: '#meses' };
+  await audit(req, 'parceria.mes_reaberto', 'project', projectId, { mes: req.params.ym, motivo: req.body.reason });
+  return { ok: `Mês ${partnership.monthShort(req.params.ym)} reaberto.`, hash: '#meses' };
+});
+
+partnerAct('/link', async (req, projectId) => {
+  await partnership.link(projectId, req.user);
+  await audit(req, 'parceria.link', 'project', projectId, {});
+  return { ok: 'Link do extrato pronto. Copie e mande ao parceiro.' };
+});
+
+partnerAct('/link/cancelar', async (req, projectId) => {
+  await partnership.revokeLink(projectId, req.user);
+  await audit(req, 'parceria.link_cancelado', 'project', projectId, {});
+  return { ok: 'Link do extrato cancelado.' };
+});
 
 // ---------------------------------------------------------------- lançamentos
 const SCOPES = { pagar: 'A pagar', receber: 'A receber', historico: 'Histórico' };
@@ -104,16 +201,18 @@ router.post('/financeiro/lancamentos', requirePerm('finance.write'), wrap(async 
   if (error) { await req.flash('error', error); return res.redirect(to); }
   const own = await ownerOfBody(req, v, v.amount);
   if (own.error) { await req.flash('error', own.error); return res.redirect(to); }
+  const acc = await accountOf(req, own);
+  if (acc.error) { await req.flash('error', acc.error); return res.redirect(to); }
   const base = Math.floor(v.amount / v.installments);
   for (let i = 0; i < v.installments; i += 1) {
     const amount = i === v.installments - 1 ? v.amount - base * (v.installments - 1) : base;
     const paidNow = v.paid && i === 0;
     const { rows: [novo] } = await db.query(
-      `INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, paid_on, status, supplier, notes, episode_id, sponsor_id, installment_no, installments, source, created_by, project_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'manual',$14,$15) RETURNING id`,
+      `INSERT INTO fin_entries (direction, category, description, amount_cents, due_on, paid_on, status, supplier, notes, episode_id, sponsor_id, installment_no, installments, source, created_by, project_id, account, account_person)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'manual',$14,$15,$16,$17) RETURNING id`,
       [v.direction, v.category, v.installments > 1 ? `${v.description} · parcela ${i + 1}/${v.installments}` : v.description, amount, fin.addMonths(v.due, i),
         paidNow ? fin.todayISO() : null, paidNow ? 'pago' : 'previsto', v.supplier, v.notes, v.episode_id, v.sponsor_id, v.installments > 1 ? i + 1 : null, v.installments > 1 ? v.installments : null, req.user.id,
-        own.weights ? null : own.projectId]);
+        own.weights ? null : own.projectId, acc.account, acc.person]);
     if (own.weights) await owner.save(novo.id, { weights: own.weights, amount }); // cada parcela mantém a proporção
   }
   await audit(req, 'financeiro.lancado', 'fin_entry', null, { description: v.description, amount: v.amount, parcelas: v.installments });
@@ -136,8 +235,13 @@ router.post('/financeiro/lancamentos/:id', requirePerm('finance.write'), wrap(as
   const to = backTo(req, '/financeiro/lancamentos');
   if (error) { await req.flash('error', error); return res.redirect(to); }
   // "De quem é" só vem quando a tela mandou; sem isso, o lançamento continua de quem era (e o valor novo redivide o compartilhado)
+  const locked = await partnership.lockedReason(e);
+  if (locked) { await req.flash('error', locked); return res.redirect(to); }
   const own = req.body.de_quem ? await ownerOfBody(req, v, v.amount, { keepAs: 'keep' }) : null;
   if (own && own.error) { await req.flash('error', own.error); return res.redirect(to); }
+  const acc = req.body.pago_por != null ? await accountOf(req, own || (e.project_id != null ? { projectId: e.project_id } : { weights: true })) : null;
+  if (acc && acc.error) { await req.flash('error', acc.error); return res.redirect(to); }
+  if (acc) await db.query('UPDATE fin_entries SET account = $2, account_person = $3 WHERE id = $1', [e.id, acc.account, acc.person]);
   await db.query(
     `UPDATE fin_entries SET category=$2, description=$3, amount_cents=$4, due_on=$5, supplier=$6, notes=$7, episode_id=$8, sponsor_id=$9, updated_at=now() WHERE id=$1`,
     [e.id, v.category, v.description, v.amount, v.due, v.supplier, v.notes, v.episode_id, v.sponsor_id]);
@@ -159,6 +263,8 @@ router.post('/financeiro/lancamentos/:id/pagar', requirePerm('finance.write'), w
   let amount = parseBRL(req.body.amount);
   if (amount == null) amount = Number(e.amount_cents);
   if (Number.isNaN(amount) || amount < 0) { await req.flash('error', 'Valor inválido.'); return res.redirect(to); }
+  const locked = await partnership.lockedReason(e, { paidOn });
+  if (locked) { await req.flash('error', locked); return res.redirect(to); }
   const { rows: [done] } = await db.query("UPDATE fin_entries SET status='pago', paid_on=$2, amount_cents=$3, cancel_reason=NULL, updated_at=now() WHERE id=$1 RETURNING *", [e.id, paidOn, amount]);
   if (done.project_id == null) await owner.rescale(done.id, amount); // pagou outro valor: a divisão acompanha
   await fin.afterPaid(done, req.user.id);
@@ -171,6 +277,8 @@ router.post('/financeiro/lancamentos/:id/pagar', requirePerm('finance.write'), w
 router.post('/financeiro/lancamentos/:id/desfazer', requirePerm('finance.write'), wrap(async (req, res) => {
   const e = await findEntry(req, req.params.id);
   if (!e) return notFound(res, 'Lançamento');
+  const locked = await partnership.lockedReason(e);
+  if (locked) { await req.flash('error', locked); return res.redirect(backTo(req, '/financeiro/lancamentos?escopo=historico')); }
   await db.query("UPDATE fin_entries SET status='previsto', paid_on=NULL, cancel_reason=NULL, updated_at=now() WHERE id=$1", [e.id]);
   await audit(req, 'financeiro.reaberto', 'fin_entry', e.id);
   await req.flash('ok', 'Lançamento voltou para em aberto.');
@@ -436,9 +544,11 @@ async function regenerate(id) {
 router.post('/financeiro/mensais', requirePerm('finance.write'), wrap(async (req, res) => {
   const { v, error } = parseRecurring(req.body, pidsOf(req));
   if (error) { await req.flash('error', error); return res.redirect('/financeiro/regras#mensais'); }
+  const acc = await accountOf(req, v.split ? { weights: v.split } : { projectId: v.project_id });
+  if (acc.error) { await req.flash('error', acc.error); return res.redirect('/financeiro/regras#mensais'); }
   const { rows: [r] } = await db.query(
-    'INSERT INTO fin_recurring (name, category, amount_cents, day_of_month, starts_on, ends_on, supplier, active, project_id, split) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
-    [v.name, v.category, v.amount, v.day, v.starts, v.ends, v.supplier, v.active, v.project_id, v.split]);
+    'INSERT INTO fin_recurring (name, category, amount_cents, day_of_month, starts_on, ends_on, supplier, active, project_id, split, account, account_person) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id',
+    [v.name, v.category, v.amount, v.day, v.starts, v.ends, v.supplier, v.active, v.project_id, v.split, acc.account, acc.person]);
   await fin.ensureRecurring(3);
   await audit(req, 'financeiro.mensal_criado', 'fin_recurring', r.id, { name: v.name });
   await req.flash('ok', 'Custo mensal criado; as próximas contas já estão em "A pagar".');
@@ -449,9 +559,11 @@ router.post('/financeiro/mensais/:id', requirePerm('finance.write'), wrap(async 
   if (!isIntId(req.params.id)) return notFound(res, 'Custo mensal');
   const { v, error } = parseRecurring(req.body, pidsOf(req));
   if (error) { await req.flash('error', error); return res.redirect('/financeiro/regras#mensais'); }
+  const acc = await accountOf(req, v.split ? { weights: v.split } : { projectId: v.project_id });
+  if (acc.error) { await req.flash('error', acc.error); return res.redirect('/financeiro/regras#mensais'); }
   const { rowCount } = await db.query(
-    'UPDATE fin_recurring SET name=$2, category=$3, amount_cents=$4, day_of_month=$5, starts_on=$6, ends_on=$7, supplier=$8, active=$9, project_id=$10, split=$11 WHERE id=$1',
-    [req.params.id, v.name, v.category, v.amount, v.day, v.starts, v.ends, v.supplier, v.active, v.project_id, v.split]);
+    'UPDATE fin_recurring SET name=$2, category=$3, amount_cents=$4, day_of_month=$5, starts_on=$6, ends_on=$7, supplier=$8, active=$9, project_id=$10, split=$11, account=$12, account_person=$13 WHERE id=$1',
+    [req.params.id, v.name, v.category, v.amount, v.day, v.starts, v.ends, v.supplier, v.active, v.project_id, v.split, acc.account, acc.person]);
   if (!rowCount) return notFound(res, 'Custo mensal');
   await regenerate(req.params.id);
   await audit(req, 'financeiro.mensal_editado', 'fin_recurring', req.params.id, { name: v.name });
