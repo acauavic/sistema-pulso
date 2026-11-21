@@ -9,7 +9,8 @@ async function addEvent(guestId, userId, type, message) {
     [guestId, userId || null, type, String(message).slice(0, 1000)]);
 }
 
-const longInviteUrl = (token) => `${config.publicBaseUrl}/convite/${token}`;
+// o convite abre no endereço público do projeto do convidado (o do Pulso é o de hoje: nenhum link enviado muda)
+const longInviteUrl = (token, projectId = null) => require('./publicUrl').publicUrl(projectId, `/convite/${token}`);
 
 // Gera (ou regenera) o link do convite: token secreto + link curto no YOURLS.
 // Se o YOURLS falhar, o link longo continua válido e o erro é devolvido em `warning`.
@@ -17,7 +18,7 @@ async function generateInvite(guest, userId, { regenerate = false } = {}) {
   let token = guest.invite_token;
   const fresh = !token || regenerate;
   if (fresh) token = crypto.randomBytes(18).toString('base64url');
-  const longUrl = longInviteUrl(token);
+  const longUrl = longInviteUrl(token, guest.project_id);
 
   let shortUrl = fresh ? null : guest.short_url;
   let keyword = fresh ? null : guest.short_keyword;
@@ -25,7 +26,7 @@ async function generateInvite(guest, userId, { regenerate = false } = {}) {
   if (!shortUrl) {
     try {
       ({ shortUrl, keyword } = await yourls.shorten(longUrl, {
-        title: `${config.podcastName} — Convite (${guest.name})`, guestName: guest.name,
+        title: `${(require('./projects').get(guest.project_id) || {}).name || ''} — Convite (${guest.name})`.trim(), guestName: guest.name, projectId: guest.project_id,
       }));
     } catch (err) {
       warning = err.message;
@@ -61,16 +62,17 @@ async function renderInvite(guest, { rsvpState = null, closed = false, preview =
     links: preview ? {} : { aceitar: `${base}/aceitar`, producao: `${base}/producao` },
   });
   vars.bloco_resposta = tpl.responseBlock(preview ? '#' : `${base}/responder`, { state: rsvpState, closed });
+  vars.brand_dir = require('./publicUrl').brandDirOf(guest.project_id); // ícone da marca do projeto
   return {
     html: tpl.render(tpl.inviteHtml(), vars),
-    subject: `Convite para o ${config.podcastName}`,
+    subject: `Convite para o ${require('./projects').publicName(guest.project_id)}`,
     vars,
   };
 }
 
 // Link do WhatsApp da produção com mensagem pronta (número e texto em Gestão > WhatsApp dos convites). kind: 'aceitar' | 'producao'.
 async function whatsappUrl(kind, guest) {
-  return require('./contacts').waUrl('producao', kind, guest.name || 'convidado');
+  return require('./contacts').waUrl('producao', kind, guest.name || 'convidado', guest.project_id);
 }
 
 const recordClick = (guestId, kind) =>

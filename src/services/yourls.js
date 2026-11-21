@@ -4,12 +4,25 @@ const crypto = require('crypto');
 const config = require('../config');
 const { slugify } = require('../utils/format');
 
-async function call(params) {
-  if (!config.yourlsConfigured) throw new Error('YOURLS não configurado (YOURLS_LINK, YOURLS_KEY).');
-  const res = await fetch(`${config.yourls.base}/yourls-api.php`, {
+// Cada projeto tem o seu encurtador; o projeto padrão usa YOURLS_LINK/YOURLS_KEY. Projeto sem encurtador: o link
+// inteiro continua valendo (quem chama trata o erro e segue).
+function accountFor(projectId = null) {
+  const projects = require('./projects');
+  const p = projects.get(projectId == null ? projects.defaultId() : projectId);
+  const own = p ? config.yourlsEnv(p.slug) : { base: '', key: '' };
+  if (own.base && own.key) return own;
+  if (p && p.id === projects.defaultId()) return config.yourls;
+  return { base: '', key: '' };
+}
+const configuredFor = (projectId) => { const a = accountFor(projectId); return Boolean(a.base && a.key); };
+
+async function call(params, { projectId = null } = {}) {
+  const acc = accountFor(projectId);
+  if (!acc.base || !acc.key) throw new Error('YOURLS não configurado (YOURLS_LINK, YOURLS_KEY).');
+  const res = await fetch(`${acc.base}/yourls-api.php`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ ...params, signature: config.yourls.key, format: 'json' }),
+    body: new URLSearchParams({ ...params, signature: acc.key, format: 'json' }),
     signal: AbortSignal.timeout(10_000),
   });
   const text = await res.text();
@@ -38,13 +51,13 @@ function keywordCandidates(guestName, random = () => crypto.randomBytes(2).toStr
 
 // Gera um link curto para `longUrl`.
 // keywords: nomes a tentar antes dos do convidado (ex.: o link do direct da comunidade).
-async function shorten(longUrl, { title, guestName, keywords = [] } = {}) {
+async function shorten(longUrl, { title, guestName, keywords = [], projectId = null } = {}) {
   for (const keyword of [...new Set([...keywords, ...keywordCandidates(guestName)])]) {
-    const json = await call({ action: 'shorturl', url: longUrl, keyword, title: title || '' });
+    const json = await call({ action: 'shorturl', url: longUrl, keyword, title: title || '' }, { projectId });
     if (json.shorturl) return { shortUrl: json.shorturl, keyword: json.url?.keyword || keyword };
     if (!isKeywordTaken(json)) throw new Error(`YOURLS: ${json.message || json.code || 'falha ao encurtar'}`);
   }
-  const json = await call({ action: 'shorturl', url: longUrl, title: title || '' });
+  const json = await call({ action: 'shorturl', url: longUrl, title: title || '' }, { projectId });
   if (json.shorturl) return { shortUrl: json.shorturl, keyword: json.url?.keyword || null };
   throw new Error(`YOURLS: ${json.message || 'falha ao encurtar'}`);
 }
@@ -74,4 +87,4 @@ const isOwnLink = (url) => {
   try { return new URL(url).host === new URL(config.yourls.base).host; } catch { return false; }
 };
 
-module.exports = { shorten, ping, keywordCandidates, clicks, expand, isOwnLink };
+module.exports = { shorten, ping, keywordCandidates, clicks, expand, isOwnLink, accountFor, configuredFor };

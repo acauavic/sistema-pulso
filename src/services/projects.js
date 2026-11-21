@@ -22,6 +22,8 @@ const get = (id) => rows.find((p) => p.id === Number(id)) || null;
 // O ativo de menor posição (hoje o Pulso): para onde vai o que entra sem pessoa logada, como os formulários do site.
 const defaultId = () => (all()[0] || rows[0] || { id: 1 }).id;
 const has = (project, module) => Boolean(project && project.modules && project.modules[module]);
+// Nome que quem está de fora vê (convite, portal, e-mail): o nome público do projeto, senão o nome dele.
+const publicName = (projectId) => { const p = get(projectId == null ? defaultId() : projectId); return p ? (p.public_name || p.name) : ''; };
 const label = (project, plural = true) => (project ? (plural ? project.video_label_plural : project.video_label) : (plural ? 'Episódios' : 'Episódio'));
 
 async function membershipsOf(userId) {
@@ -84,22 +86,33 @@ async function setLast(userId, projectId) {
 
 const text = (s, max) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-// Ajustes que a gestão faz na tela: nome, sigla e como o projeto chama os seus vídeos. Devolve { project } ou { error }.
+// Ajustes que a gestão faz na tela: nome, sigla, como o projeto chama os seus vídeos e os endereços (o que é público,
+// o encurtador e o remetente dos e-mails). Devolve { project } ou { error }.
+const host = (s) => text(s, 120).toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 async function update(id, body) {
   const v = {
     name: text(body.name, 60), sigla: text(body.sigla, 12).toUpperCase(), video_label: text(body.video_label, 30),
     video_label_plural: text(body.video_label_plural, 30), number_prefix: text(body.number_prefix, 8),
+    public_name: text(body.public_name, 80) || null,
+    public_host: host(body.public_host) || null, short_link_host: host(body.short_link_host) || null,
+    mail_from_name: text(body.mail_from_name, 60) || null, mail_from_address: text(body.mail_from_address, 120).toLowerCase() || null,
   };
+  const badHost = (h) => h && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(h);
   const error = v.name.length < 2 ? 'Informe o nome do projeto.'
     : !/^[A-Z0-9]{2,6}$/.test(v.sigla) ? 'A sigla tem de 2 a 6 letras ou números, sem espaço.'
       : !v.video_label || !v.video_label_plural ? 'Informe como o projeto chama os vídeos, no singular e no plural.'
         : !v.number_prefix ? 'Informe o prefixo do número (ex.: EP.).'
-          : null;
+          : badHost(v.public_host) ? 'Endereço público inválido (ex.: sistema.podcastpulso.com).'
+            : badHost(v.short_link_host) ? 'Endereço do encurtador inválido (ex.: link.podcastpulso.com).'
+              : v.mail_from_address && !/^[^@\s]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(v.mail_from_address) ? 'E-mail do remetente inválido.'
+                : null;
   if (error) return { error };
   try {
     const { rows: [project] } = await db.query(
-      `UPDATE projects SET name = $2, sigla = $3, video_label = $4, video_label_plural = $5, number_prefix = $6, updated_at = now()
-        WHERE id = $1 RETURNING *`, [id, v.name, v.sigla, v.video_label, v.video_label_plural, v.number_prefix]);
+      `UPDATE projects SET name = $2, sigla = $3, video_label = $4, video_label_plural = $5, number_prefix = $6,
+              public_name = $7, public_host = $8, short_link_host = $9, mail_from_name = $10, mail_from_address = $11, updated_at = now()
+        WHERE id = $1 RETURNING *`,
+      [id, v.name, v.sigla, v.video_label, v.video_label_plural, v.number_prefix, v.public_name, v.public_host, v.short_link_host, v.mail_from_name, v.mail_from_address]);
     if (!project) return { error: 'Projeto não encontrado.' };
     await refresh(true);
     return { project };
@@ -109,4 +122,4 @@ async function update(id, body) {
   }
 }
 
-module.exports = { refresh, all, get, defaultId, has, label, currentFor, membershipsOf, members, addMember, setMembers, setLast, update };
+module.exports = { refresh, all, get, defaultId, has, label, publicName, currentFor, membershipsOf, members, addMember, setMembers, setLast, update };

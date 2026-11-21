@@ -57,18 +57,19 @@ async function current() {
 
 const fill = (text, vars) => String(text).replace(/\{(nome|podcast|link)\}/g, (all, k) => vars[k] ?? all);
 
-// Link wa.me com a mensagem pronta. group: 'producao' | 'patrocinio'; kind: chave da mensagem; name: quem clicou.
-async function waUrl(group, kind, name) {
+// Link wa.me com a mensagem pronta. group: 'producao' | 'patrocinio'; kind: chave da mensagem; name: quem clicou;
+// projectId: de que projeto é o item (o {podcast} da mensagem é o nome público dele).
+async function waUrl(group, kind, name, projectId = null) {
   const cur = (await current())[group];
-  const text = fill(cur.messages[kind].text, { nome: name, podcast: config.podcastName });
+  const text = fill(cur.messages[kind].text, { nome: name, podcast: require('./projects').publicName(projectId) });
   return `https://wa.me/${cur.number}?text=${encodeURIComponent(text)}`;
 }
 
 // WhatsApp do estúdio com o link de envio (null sem número configurado: o cartão mostra só "Copiar link").
-async function studioWaUrl(name, link) {
+async function studioWaUrl(name, link, projectId = null) {
   const cur = (await current()).estudio;
   if (!cur.number) return null;
-  const text = fill(cur.messages.link.text, { nome: name || 'o episódio', podcast: config.podcastName, link });
+  const text = fill(cur.messages.link.text, { nome: name || 'o episódio', podcast: require('./projects').publicName(projectId), link });
   return `https://wa.me/${cur.number}?text=${encodeURIComponent(text)}`;
 }
 

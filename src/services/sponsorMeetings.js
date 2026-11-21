@@ -81,7 +81,7 @@ async function eventBody(m, { withMeet = false } = {}) {
   const team = await usersOf([m.owner_id, ...(m.team_ids || [])].filter(Boolean));
   const start = new Date(m.starts_at); const end = new Date(start.getTime() + m.minutes * 60_000);
   // a descrição é vista pelo patrocinador: só a pauta e a assinatura (nada do painel interno)
-  const description = [m.agenda, `${config.podcastName}${s ? ` · ${s.company}` : ''}`].filter(Boolean).join('\n\n');
+  const description = [m.agenda, `${require('./projects').publicName(s && s.project_id)}${s ? ` · ${s.company}` : ''}`].filter(Boolean).join('\n\n');
   const emails = new Set();
   const attendees = [];
   for (const a of m.attendees || []) if (!emails.has(a.email)) { emails.add(a.email); attendees.push({ email: a.email }); }

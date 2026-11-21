@@ -60,7 +60,7 @@ function layout({ title, bodyHtml, button, footer, brand = 'pulso' }) {
 <tr><td style="padding:28px;color:#0A0A0A;font-size:15px;line-height:1.6">
 <h1 style="font-family:${DISPLAY};font-size:24px;letter-spacing:-0.04em;line-height:1.15;margin:0 0 16px">${esc(title)}</h1>${bodyHtml}${btn}
 </td></tr>
-<tr><td style="padding:16px 28px;background:#F4F2EC;color:#6B6B6B;font-family:${MONO};font-size:11px;letter-spacing:.08em;text-transform:uppercase">${esc(footer || `Mensagem enviada por ${config.podcastName}.`)}</td></tr>
+<tr><td style="padding:16px 28px;background:#F4F2EC;color:#6B6B6B;font-family:${MONO};font-size:11px;letter-spacing:.08em;text-transform:uppercase">${esc(footer || `Mensagem enviada por ${require('./projects').publicName(null)}.`)}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -68,14 +68,25 @@ function layout({ title, bodyHtml, button, footer, brand = 'pulso' }) {
 const outbox = [];
 
 // fromName: os e-mails da equipe saem como "Health Scale Studio"; sem ele, vale o remetente do projeto (BREVO_FROM_NAME).
-async function sendMail({ to, subject, html, text, replyTo, icalEvent, fromName }) {
+// Quem está de fora recebe no nome do projeto do item (nome público e, se a gestão cadastrou, o remetente dele).
+// O que é da equipe sai como Health Scale Studio (fromName: STUDIO).
+function sender(projectId = null) {
+  const projects = require('./projects');
+  const p = projects.get(projectId == null ? projects.defaultId() : projectId);
+  const from = {};
+  if (p && p.mail_from_name) from.fromName = p.mail_from_name;
+  if (p && p.mail_from_address) from.fromAddress = p.mail_from_address;
+  return { podcast: projects.publicName(projectId), from };
+}
+
+async function sendMail({ to, subject, html, text, replyTo, icalEvent, fromName, fromAddress }) {
   if (config.mailDryRun) {
     outbox.push({ to, subject, html, replyTo, icalEvent, fromName });
     console.log(`[mail:dry-run] para=${to} assunto="${subject}"`);
     return `dry-run-${outbox.length}`;
   }
   const info = await getTransport().sendMail({
-    from: { name: fromName || config.brevo.fromName, address: config.brevo.from },
+    from: { name: fromName || config.brevo.fromName, address: fromAddress || config.brevo.from },
     to,
     replyTo,
     subject,
@@ -126,16 +137,18 @@ async function sendPasswordReset({ to, name, url }) {
   });
 }
 
-async function sendGuestInvite({ to, guestName, subject, message, url, replyTo }) {
+async function sendGuestInvite({ to, guestName, subject, message, url, replyTo, projectId = null }) {
+  const p = sender(projectId);
   return sendMail({
     to,
     replyTo,
     subject,
+    ...p.from,
     html: layout({
       title: `Olá, ${guestName}!`,
       bodyHtml: paragraphs(message),
       button: { label: 'Ver meu convite', url },
-      footer: `Você recebeu este e-mail porque foi convidado(a) para o ${config.podcastName}.`,
+      footer: `Você recebeu este e-mail porque foi convidado(a) para o ${p.podcast}.`,
     }),
   });
 }
@@ -155,17 +168,18 @@ async function sendRsvpNotice({ to, guestName, accepted, message, url }) {
 }
 
 // Convite de calendário da gravação (REQUEST) ou cancelamento (CANCEL), com o .ics no corpo para o e-mail mostrar "Adicionar ao calendário".
-async function sendCalendarInvite({ to, guestName, whenLabel, address, method, ics, update }) {
+async function sendCalendarInvite({ to, guestName, whenLabel, address, method, ics, update, projectId = null }) {
+  const p = sender(projectId);
   const cancel = method === 'CANCEL';
   const first = String(guestName || '').split(/\s+/)[0] || 'tudo bem';
   const body = cancel
-    ? `<p>Olá, ${esc(first)}. A gravação do dia <strong>${esc(whenLabel)}</strong> no ${esc(config.podcastName)} foi cancelada. O evento sai do seu calendário. Se quiser combinar outra data, é só responder esta mensagem.</p>`
-    : `<p>Olá, ${esc(first)}. ${update ? 'A data da sua gravação mudou.' : 'Sua gravação no ' + esc(config.podcastName) + ' está marcada.'}</p>
+    ? `<p>Olá, ${esc(first)}. A gravação do dia <strong>${esc(whenLabel)}</strong> no ${esc(p.podcast)} foi cancelada. O evento sai do seu calendário. Se quiser combinar outra data, é só responder esta mensagem.</p>`
+    : `<p>Olá, ${esc(first)}. ${update ? 'A data da sua gravação mudou.' : 'Sua gravação no ' + esc(p.podcast) + ' está marcada.'}</p>
 <p style="font-family:${MONO};font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:16px 0 4px">${esc(whenLabel)}</p>
 ${address ? `<p style="margin:0 0 16px">${esc(address)}</p>` : ''}
 <p>O convite está neste e-mail: use "Sim" ou "Adicionar ao calendário" para guardar a data${update ? ' (ele atualiza o evento anterior)' : ''}. Qualquer dúvida, é só responder esta mensagem. Obrigado por sentar à mesa.</p>`;
   return sendMail({
-    to, subject: cancel ? `Gravação cancelada: ${whenLabel}` : `${update ? 'Nova data' : 'Convite'}: gravação no ${config.podcastName}, ${whenLabel}`,
+    to, ...p.from, subject: cancel ? `Gravação cancelada: ${whenLabel}` : `${update ? 'Nova data' : 'Convite'}: gravação no ${p.podcast}, ${whenLabel}`,
     html: layout({ title: cancel ? 'Gravação cancelada' : (update ? 'A data da gravação mudou' : 'Sua gravação está marcada'), bodyHtml: body }),
     icalEvent: { method, content: ics, filename: 'convite-pulso.ics' },
   });
@@ -181,7 +195,8 @@ async function sendSponsorNotice({ to, title, text, url }) {
 }
 
 // Portal do convidado: o link (kind 'link') ou os posts novos em collab (kind 'novos', com a lista).
-async function sendGuestPortal({ to, guestName, url, kind, posts = [] }) {
+async function sendGuestPortal({ to, guestName, url, kind, posts = [], projectId = null }) {
+  const p = sender(projectId);
   const first = String(guestName || '').split(/\s+/)[0] || 'tudo bem';
   const link = (p) => (p.links.find((l) => l.platform === 'instagram') || p.links[0]).url;
   const body = kind === 'novos'
@@ -189,11 +204,11 @@ async function sendGuestPortal({ to, guestName, url, kind, posts = [] }) {
 <ul style="padding-left:18px;margin:0 0 16px">${posts.map((p) => `<li style="margin:0 0 6px"><a href="${esc(link(p))}" style="color:#0A0A0A">${esc(p.title)}</a></li>`).join('')}</ul>
 <p>Compartilhar nos stories e comentar ajuda o post a chegar mais longe. Está tudo no seu portal, junto com o cronograma da semana.</p>`
     : `<p>Olá, ${esc(first)}. Obrigado por sentar à mesa.</p>
-<p>Preparamos o seu portal no ${esc(config.podcastName)}: o cronograma da semana do episódio, os posts em collab com você, cortes exclusivos para você postar e as fotos da gravação. Ele vai se atualizando durante a semana.</p>`;
+<p>Preparamos o seu portal no ${esc(p.podcast)}: o cronograma da semana do episódio, os posts em collab com você, cortes exclusivos para você postar e as fotos da gravação. Ele vai se atualizando durante a semana.</p>`;
   return sendMail({
-    to, subject: kind === 'novos' ? `${posts.length > 1 ? 'Posts novos' : 'Post novo'} em collab com você` : `Seu portal no ${config.podcastName}`,
+    to, ...p.from, subject: kind === 'novos' ? `${posts.length > 1 ? 'Posts novos' : 'Post novo'} em collab com você` : `Seu portal no ${p.podcast}`,
     html: layout({ title: kind === 'novos' ? 'Mais um post em collab' : 'Seu portal está pronto', bodyHtml: body, button: { label: 'Abrir meu portal', url },
-      footer: `Você recebeu este e-mail porque participou do ${config.podcastName}.` }),
+      footer: `Você recebeu este e-mail porque participou do ${p.podcast}.` }),
   });
 }
 

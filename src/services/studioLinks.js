@@ -38,7 +38,7 @@ function splitPath(raw) {
 }
 
 const newToken = () => crypto.randomBytes(32).toString('base64url');
-const urlOf = (link) => `${config.appBaseUrl.replace(/\/+$/, '')}/estudio/${link.token}`;
+const urlOf = (link, projectId = null) => require('./publicUrl').publicUrl(projectId == null ? link.project_id : projectId, `/estudio/${link.token}`);
 const lastUse = (l) => new Date(l.last_activity_at || l.created_at).getTime();
 const isOpen = (l, now = Date.now()) => Boolean(l && !l.finished_at && !l.closed_at && now - lastUse(l) < IDLE_DAYS * 86400000);
 
@@ -66,7 +66,7 @@ async function current(episodeId) {
 async function byToken(token) {
   if (!TOKEN_RE.test(String(token || ''))) return null;
   const { rows: [l] } = await db.query(
-    `SELECT l.*, e.number AS episode_number, e.title AS episode_title, g.name AS guest_name
+    `SELECT l.*, e.project_id, e.number AS episode_number, e.title AS episode_title, g.name AS guest_name
        FROM episode_upload_links l JOIN episodes e ON e.id = l.episode_id LEFT JOIN guests g ON g.id = e.guest_id WHERE l.token = $1`, [token]);
   if (!l) return null;
   if (!isOpen(l)) { if (!l.finished_at && !l.closed_at) await expire(l); return null; }
@@ -121,11 +121,12 @@ async function panelState(episodeId) {
   const l = await current(episodeId);
   if (!l) return null;
   const s = await summary(l.id);
+  const { rows: [ep] } = await db.query('SELECT project_id FROM episodes WHERE id = $1', [episodeId]);
   let state = 'aguardando';
   if (l.finished_at) state = 'concluido';
   else if (l.closed_at || !isOpen(l)) state = 'fechado';
   else if (s.ready || s.sending) state = 'enviando';
-  return { link: l, url: urlOf(l), state, ...s };
+  return { link: l, url: urlOf(l, ep && ep.project_id), state, ...s };
 }
 
 const users = async (link) => {

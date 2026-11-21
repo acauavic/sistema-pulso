@@ -30,7 +30,7 @@ const config = {
   // Miniaturas da galeria do material: ficam no disco do servidor (volume no Docker), não no Backblaze.
   previewDir: env.PREVIEW_DIR || require('path').join(__dirname, '..', 'data', 'previews'),
   mailDryRun: env.MAIL_DRY_RUN === 'true', // dev/teste: registra o e-mail em vez de enviar
-  podcastName: env.PODCAST_NAME || 'Podcast Pulso',
+  // o nome que quem está de fora vê vem do projeto do item (projects.public_name, services/projects.publicName)
   appName: env.APP_NAME || 'Health Scale Studio', // nome do painel (a gerência); o que é público leva o nome do projeto
   // WhatsApp da produção (só dígitos, com DDI): destino dos botões do convite.
   // WhatsApp comercial (media kit): destino dos botões "Quero ser patrocinador" e "Falar com a equipe".
@@ -44,7 +44,7 @@ const config = {
     user: env.BREVO_USER,
     pass: env.BREVO_CHAVE_SMTP,
     from: env.BREVO_EMAIL,
-    fromName: env.BREVO_FROM_NAME || env.PODCAST_NAME || 'Podcast Pulso',
+    fromName: env.BREVO_FROM_NAME || 'Podcast Pulso', // padrão do "De:"; o projeto pode ter o seu (projects.mail_from_name)
   },
 
   // Backblaze B2 (API S3). O endereço S3 é descoberto com a própria chave; BB_ENDPOINT força um endereço.
@@ -99,6 +99,12 @@ const config = {
   yourls: {
     base: normalizeBase(env.YOURLS_LINK),
     key: env.YOURLS_KEY,
+  },
+  // Encurtador de um projeto específico: YOURLS_LINK_<SLUG>/YOURLS_KEY_<SLUG> (ex.: YOURLS_LINK_PROJETO_100).
+  // O projeto padrão usa as variáveis sem sufixo. Chave nenhuma fica no banco.
+  yourlsEnv: (slug) => {
+    const k = String(slug || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    return { base: normalizeBase(env[`YOURLS_LINK_${k}`]), key: env[`YOURLS_KEY_${k}`] || '' };
   },
 };
 

@@ -35,7 +35,8 @@ const missingFor = (stage, sponsor) => (REQUIREMENTS[stage] ? REQUIREMENTS[stage
 
 // ---- links públicos (um token por patrocinador; cada página se libera pela etapa) ----
 const publicPath = (token, page = '') => `/patrocinador/${token}${page}`;
-const publicUrl = (token, page = '') => `${config.publicBaseUrl}${publicPath(token, page)}`;
+// media kit, cadastro e portal abrem no endereço público do projeto do contrato
+const publicUrl = (token, page = '', projectId = null) => require('./publicUrl').publicUrl(projectId, publicPath(token, page));
 
 async function ensureToken(sponsor, { regenerate = false } = {}) {
   if (sponsor.public_token && !regenerate) return sponsor.public_token;
@@ -45,7 +46,7 @@ async function ensureToken(sponsor, { regenerate = false } = {}) {
 }
 
 async function whatsappUrl(kind, sponsor) { // número e textos em Gestão > WhatsApp dos convites
-  return require('./contacts').waUrl('patrocinio', kind, sponsor.company);
+  return require('./contacts').waUrl('patrocinio', kind, sponsor.company, sponsor.project_id);
 }
 
 const recordClick = (sponsorId, kind) => db.query('INSERT INTO sponsor_clicks (sponsor_id, kind) VALUES ($1,$2)', [sponsorId, kind]);

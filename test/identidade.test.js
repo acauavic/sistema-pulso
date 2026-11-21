@@ -108,7 +108,8 @@ describe('identidade: ícones do painel e ícones do Pulso', () => {
       const t = read(f);
       if (!/<head|<title/.test(t)) continue;
       assert.doesNotMatch(t, /href="\/static\/favicon\.svg|href="\/favicon\.ico"|href="\/apple-touch-icon\.png"/, `${f} usa o ícone do painel`);
-      assert.match(t, /rel="icon" href="\/static\/brand\/pulso\/favicon\.svg/, `${f} sem o ícone do Pulso`);
+      // desde a fase dos endereços o ícone é o do projeto da página: brandDir nas views, {{brand_dir}} nos modelos
+      assert.match(t, /rel="icon" href="(<%= brandDir %>|\{\{brand_dir\}\}|\/static\/brand\/pulso)\/favicon\.svg/, `${f} sem o ícone do projeto`);
     }
   });
 });

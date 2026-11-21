@@ -233,7 +233,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   if (!guest) return notFound(res);
   require('../services/scope').assert(req, guest.project_id); // de outro projeto de que a pessoa não participa: 404
   const defaultMessage =
-    `Olá, ${firstName(guest.name)}! Tudo bem?\n\nÉ um prazer convidar você para participar do ${config.podcastName}.` +
+    `Olá, ${firstName(guest.name)}! Tudo bem?\n\nÉ um prazer convidar você para participar do ${require('../services/projects').publicName(guest.project_id)}.` +
     `${guest.topic ? ` Gostaríamos de conversar sobre: ${guest.topic}.` : ''}\n\nPreparamos um convite com todos os detalhes. É só clicar no botão abaixo e responder.`;
   const audiencePage = require('../services/audiencePage');
   const portalSvc = require('../services/guestPortal');
@@ -263,7 +263,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   // página da plateia do convidado: só faz sentido com ele aberto para plateia
   const pagePlateia = guest.audience_enabled ? {
     photos: audPhotos, partners: audPartners, max: audiencePage.MAX_PHOTOS,
-    url: guest.audience_slug ? `${config.appBaseUrl}/plateia/com/${guest.audience_slug}` : null, arrival: audiencePage.timeLabel(guest.audience_arrival),
+    url: guest.audience_slug ? require('../services/publicUrl').publicUrl(guest.project_id, `/plateia/com/${guest.audience_slug}`) : null, arrival: audiencePage.timeLabel(guest.audience_arrival),
     arrivalInput: guest.audience_arrival ? String(guest.audience_arrival).slice(0, 5) : '',
     live: guest.status === 'agendado' && guest.proposed_at && new Date(guest.proposed_at) > new Date(),
   } : null;
@@ -272,7 +272,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
   const pgContent = pg ? await portalSvc.content(pg) : null;
   const portalMod = (require('../services/projects').get(guest.project_id) || {}).modules || {};
   const portalTab = pg && portalMod.portal ? {
-    g: pg, url: pg.portal_token ? portalSvc.url(pg.portal_token) : null, c: pgContent, pending: pg.portal_enabled ? await portalSvc.pending(pg, pgContent) : [],
+    g: pg, url: pg.portal_token ? portalSvc.url(pg.portal_token, pg.project_id) : null, c: pgContent, pending: pg.portal_enabled ? await portalSvc.pending(pg, pgContent) : [],
     channel: portalSvc.channelOf(pg), NOTIFY: portalSvc.NOTIFY, dayLabel: portalSvc.dayLabel, ytUrl: portalSvc.youtubeUrl(pg.portal_yt_channel),
     hasPhone: Boolean(require('../services/contacts').normalizeNumber(pg.phone)), hasEmail: isEmail(pg.email || ''),
   } : null;
@@ -302,7 +302,7 @@ router.get('/convidados/:id', requirePerm('guests.read'), wrap(async (req, res) 
     episode: episode.rows[0] || null, lossReasons: LOSS_REASONS, pendingStage: isStatus(req.query.para) ? req.query.para : null, storageReady: config.storageConfigured, openModal: ['contato', 'agenda', 'email', 'perda', 'foto'].includes(req.query.abrir) ? req.query.abrir : null,
     title: guest.name, guest, events, clicks, comments: thread, linkedTasks: linkedTasks.rows, clickKinds: CLICK_KINDS, profileLabels: PROFILE_BY_KEY,
     statuses: GUEST_STATUSES, statusInfo: STATUS_BY_KEY[guest.status],
-    longUrl: guest.invite_token ? guestsSvc.longInviteUrl(guest.invite_token) : null,
+    longUrl: guest.invite_token ? guestsSvc.longInviteUrl(guest.invite_token, guest.project_id) : null,
     defaultMessage, mailReady: config.mailConfigured, yourlsReady: config.yourlsConfigured,
   });
 }));

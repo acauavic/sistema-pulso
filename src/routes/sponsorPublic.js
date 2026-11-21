@@ -12,6 +12,7 @@ const groq = require('../services/groq');
 const mailer = require('../services/mailer');
 const tpl = require('../services/inviteTemplate');
 const pages = require('../services/publicPages');
+const host = require('../services/hostContext');
 const pixel = require('../services/pixel');
 const { createLimiter } = require('../auth/rateLimit');
 const { wrap } = require('../utils/wrap');
@@ -81,6 +82,8 @@ async function enter(req, res, page) {
   if (!await viewLimiter.hit(req.ip)) return res.status(429).send('Muitas requisições.');
   const sponsor = await sponsorByToken(req.params.token);
   if (!sponsor) return gone(res);
+  const go = host.wrongHost(req, sponsor.project_id); // link do contrato aberto em outro domínio: leva para o certo
+  if (go) return res.redirect(302, go);
   if (isBot(req)) return res.set(tpl.publicHeaders()).type('html').send(pages.messageHtml(`Pulso · ${sponsor.company}`, 'Abra este link no navegador para acessar sua página do Pulso.'));
   const current = await sessions.load(req);
   if (!current || current.sponsor.id !== sponsor.id) await sessions.create(res, sponsor.id, req);
@@ -94,7 +97,7 @@ async function notifyOwner(sponsor, subject, text) {
   if (!sponsor.owner_id) return;
   try {
     const { rows } = await db.query('SELECT email FROM users WHERE id = $1 AND active', [sponsor.owner_id]);
-    if (rows[0]) await mailer.sendSponsorNotice({ to: rows[0].email, title: subject, text, url: `${config.appBaseUrl}/patrocinadores/${sponsor.id}` });
+    if (rows[0]) await mailer.sendSponsorNotice({ to: rows[0].email, title: subject, text, url: require('../services/publicUrl').panelUrl(`/patrocinadores/${sponsor.id}`) });
   } catch (err) {
     console.error('Falha ao avisar responsável:', err.message);
   }
@@ -110,7 +113,7 @@ router.get('/patrocinador/kit', withSession(), wrap(async (req, res) => {
     const { rowCount } = await db.query('UPDATE sponsors SET kit_viewed_at = now() WHERE id = $1 AND kit_viewed_at IS NULL', [sponsor.id]);
     if (rowCount) await sponsorsSvc.addEvent(sponsor.id, null, 'kit_visto', 'Abriu o media kit');
   }
-  const html = tpl.render(tpl.mediaKitHtml(), { link_quero: '/patrocinador/quero', link_equipe: '/patrocinador/equipe', agenda_html: await sponsorsSvc.kitAgendaHtml(), vagas_html: await sponsorsSvc.kitSlotsHtml(), marcas_html: await sponsorsSvc.kitBrandsHtml(), guests_json: tpl.safeJson(await require('../services/kitGallery').items()), kit_rodape: await require('../services/kitGallery').footText(), ...(await require('../services/plans').kitHtml()) });
+  const html = tpl.render(tpl.mediaKitHtml(), { brand_dir: res.locals.brandDir, link_quero: '/patrocinador/quero', link_equipe: '/patrocinador/equipe', agenda_html: await sponsorsSvc.kitAgendaHtml(), vagas_html: await sponsorsSvc.kitSlotsHtml(), marcas_html: await sponsorsSvc.kitBrandsHtml(), guests_json: tpl.safeJson(await require('../services/kitGallery').items()), kit_rodape: await require('../services/kitGallery').footText(), ...(await require('../services/plans').kitHtml()) });
   res.set(tpl.publicHeaders("'none'", { pixel: true })).type('html').send(pixel.inject(html, { content: 'Media kit', category: 'patrocinador', v: res.locals.assetV, absolute: true }));
 }));
 

@@ -95,7 +95,8 @@ async function attachSession(req, res, next) {
     res.locals.projectNow = () => (res.locals.projectScope && res.locals.projectScope.current ? res.locals.projectScope.current.name : '');
     res.locals.icon = icon;
     res.locals.reactionEmojis = require('./services/reactions').EMOJIS;
-    res.locals.podcastName = config.podcastName;
+    // nome que quem está de fora vê: do projeto escolhido (em "todos", o do projeto padrão)
+    res.locals.podcastName = require('./services/projects').publicName(req.scope && req.scope.current ? req.scope.current.id : null);
     res.locals.appName = config.appName;
     // recorte por projeto: os valores de verdade vêm de services/scope.js, depois do login; aqui, o que vale sem sessão
     res.locals.projectScope = null;

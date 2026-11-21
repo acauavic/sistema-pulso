@@ -107,7 +107,7 @@ async function partnerFor(guestId, token) {
 async function bySlug(slug) {
   if (!/^[a-z0-9-]{1,80}$/.test(String(slug || ''))) return null;
   const { rows: [g] } = await db.query(
-    `SELECT id, name, instagram, job_title, company, topic, bio, proposed_at, audience_status, (photo_key IS NOT NULL) AS has_photo, ${PAGE_FIELDS},
+    `SELECT id, name, project_id, instagram, job_title, company, topic, bio, proposed_at, audience_status, (photo_key IS NOT NULL) AS has_photo, ${PAGE_FIELDS},
             (status = 'agendado' AND audience_enabled AND proposed_at > now()) AS on_agenda
        FROM guests WHERE audience_slug = $1 AND audience_page_enabled`, [slug]);
   return g || null;

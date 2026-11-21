@@ -339,7 +339,7 @@ router.post('/integracoes/email', requirePerm('integrations.manage'), wrap(async
   try {
     await mailer.sendMail({
       to: req.user.email,
-      subject: `Teste de e-mail — ${config.podcastName}`,
+      subject: `Teste de e-mail — ${require('../services/projects').publicName(null)}`,
       html: `<p>Se você recebeu esta mensagem, o SMTP da Brevo está funcionando.</p>`,
     });
     await audit(req, 'integracao.teste_email', 'system', null, { to: req.user.email });

@@ -12,13 +12,13 @@
     <li class="cat-row">
       <span class="cat-name">
         <strong><%= p.name %></strong>
-        <span class="mono small muted"><%= p.sigla %> · <%= p.video_label_plural %> · <%= p.number_prefix %>001</span>
+        <span class="mono small muted"><%= p.sigla %> · <%= p.video_label_plural %> · <%= p.number_prefix %>001<%= p.public_host ? ' · ' + p.public_host : '' %></span>
         <span class="proj-mods"><% p.moduleLabels.forEach(function (m) { %><span class="badge b-gray"><%= m %></span><% }) %></span>
       </span>
       <span class="mono small muted"><%= n %> <%= n === 1 ? 'pessoa' : 'pessoas' %></span>
       <span class="row cat-actions">
         <button class="btn sm" type="button" data-modal-open="proj-pessoas-<%= p.id %>"><%- icon('users', 14) %> Pessoas</button>
-        <button class="btn sm ghost" type="button" data-fill-modal="proj-editar" data-fill-action="/gestao/projetos/<%= p.id %>" data-fill="<%= JSON.stringify({ name: p.name, sigla: p.sigla, video_label: p.video_label, video_label_plural: p.video_label_plural, number_prefix: p.number_prefix }) %>"><%- icon('pencil', 14) %> Editar</button>
+        <button class="btn sm ghost" type="button" data-fill-modal="proj-editar" data-fill-action="/gestao/projetos/<%= p.id %>" data-fill="<%= JSON.stringify({ name: p.name, sigla: p.sigla, video_label: p.video_label, video_label_plural: p.video_label_plural, number_prefix: p.number_prefix, public_name: p.public_name || '', public_host: p.public_host || '', short_link_host: p.short_link_host || '', mail_from_name: p.mail_from_name || '', mail_from_address: p.mail_from_address || '' }) %>"><%- icon('pencil', 14) %> Editar</button>
       </span>
     </li>
     <% }) %>
@@ -55,6 +55,22 @@
       <label>Vários se chamam<input type="text" name="video_label_plural" maxlength="30" required placeholder="ex.: Episódios"></label>
       <label>Prefixo do número<input type="text" name="number_prefix" maxlength="8" required placeholder="ex.: EP."></label>
     </div>
+    <details class="more">
+      <summary>Fora do painel: nome público, endereço e e-mails</summary>
+      <div class="stack top-gap">
+        <label>Nome público <small class="muted">(como quem está de fora chama o projeto)</small><input type="text" name="public_name" maxlength="80" placeholder="ex.: Podcast Pulso"></label>
+        <div class="grid-2">
+          <label>Endereço das páginas públicas<input type="text" name="public_host" maxlength="120" placeholder="ex.: sistema.podcastpulso.com" autocapitalize="off" spellcheck="false"></label>
+          <label>Endereço dos links curtos<input type="text" name="short_link_host" maxlength="120" placeholder="ex.: link.podcastpulso.com" autocapitalize="off" spellcheck="false"></label>
+        </div>
+        <p class="small muted m-0">Em branco, convite, portal, media kit e plateia continuam no endereço de hoje. Ligue só depois que o DNS apontar para o servidor: os links já enviados passam a abrir aqui.</p>
+        <div class="grid-2">
+          <label>Remetente dos e-mails <small class="muted">(nome)</small><input type="text" name="mail_from_name" maxlength="60" placeholder="ex.: Podcast Pulso"></label>
+          <label>Remetente dos e-mails <small class="muted">(endereço)</small><input type="email" name="mail_from_address" maxlength="120" placeholder="ex.: contato@podcastpulso.com" autocapitalize="off" spellcheck="false"></label>
+        </div>
+        <p class="small muted m-0">O endereço precisa estar autenticado no Brevo. Em branco, vale o remetente padrão. Os e-mails da equipe saem como Health Scale Studio.</p>
+      </div>
+    </details>
     <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
   </form>
 </dialog>

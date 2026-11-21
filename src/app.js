@@ -11,14 +11,22 @@ function createApp() {
   app.set('views', path.join(__dirname, 'views'));
 
   app.use('/static', require('./utils/staticFiles').staticFiles(mw.staticDir)); // Brotli/gzip prontos em memória + cache longo com ?v=
+  // O domínio decide o que a página pode ser: painel na casa, público no projeto (services/hostContext.js).
+  app.use(require('./services/hostContext').middleware);
   // Ícones na raiz: o navegador e o iOS pedem esses caminhos sozinhos (convite e media kit não têm <link rel="icon">).
-  app.get('/favicon.ico', (req, res) => res.sendFile(path.join(mw.staticDir, 'favicon.ico'), { maxAge: '7d' }));
+  // No domínio de um projeto, o ícone é o dele; no painel, o monograma "St".
+  const brandFile = (req, name) => {
+    const slug = req.hostProject && req.hostProject.slug;
+    const file = slug && path.join(mw.staticDir, 'brand', slug, name);
+    return file && require('fs').existsSync(file) ? file : path.join(mw.staticDir, name);
+  };
+  app.get('/favicon.ico', (req, res) => res.sendFile(brandFile(req, 'favicon.ico'), { maxAge: '7d' }));
   // Service worker na raiz (escopo = painel inteiro) e manifesto do app (iPhone: alertas só com o painel na Tela de Início).
   // O sw.js leva a versão dos arquivos: a cada deploy o navegador vê um service worker novo e troca o cache do app.
   const swSource = require('fs').readFileSync(path.join(mw.staticDir, 'sw.js'), 'utf8').replace('__ASSET_VERSION__', mw.ASSET_VERSION);
   app.get('/sw.js', (req, res) => res.set({ 'Cache-Control': 'no-cache', 'Content-Type': 'text/javascript; charset=utf-8', 'Service-Worker-Allowed': '/' }).send(swSource));
   app.get('/manifest.webmanifest', (req, res) => res.type('application/manifest+json').sendFile(path.join(mw.staticDir, 'manifest.webmanifest'), { maxAge: '1d' }));
-  app.get('/apple-touch-icon.png', (req, res) => res.sendFile(path.join(mw.staticDir, 'apple-touch-icon.png'), { maxAge: '7d' }));
+  app.get('/apple-touch-icon.png', (req, res) => res.sendFile(brandFile(req, 'apple-touch-icon.png'), { maxAge: '7d' }));
   app.use(mw.securityHeaders);
   app.use(require('./services/perf').middleware); // tempo de cada resposta (e do banco): Server-Timing e requisições lentas
 

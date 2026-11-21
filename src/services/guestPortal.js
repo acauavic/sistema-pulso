@@ -43,7 +43,7 @@ function spotifyEmbed(link) {
   } catch { return null; }
 }
 
-const url = (token) => `${config.appBaseUrl}/convidado/${token}`;
+const url = (token, projectId = null) => require('./publicUrl').publicUrl(projectId, `/convidado/${token}`);
 const newToken = () => crypto.randomBytes(18).toString('base64url');
 
 // Datas do cronograma (texto AAAA-MM-DD): episódio no ar = a ajustada ou a do episódio; cortes = segunda daquela semana (ou a ajustada);
@@ -280,7 +280,7 @@ async function teamIds() {
 // ---------------------------------------------------------------- avisos
 // Mensagens do WhatsApp (a equipe abre o wa.me e envia do próprio aparelho).
 const waTo = (g, text) => { const n = contacts.normalizeNumber(g.phone); return n ? `https://wa.me/${n}?text=${encodeURIComponent(text)}` : null; };
-const linkMessage = (g) => `Olá, ${firstName(g.name)}! Preparamos o seu portal no ${config.podcastName}. Lá ficam o cronograma da semana do episódio, os posts em collab com você, cortes exclusivos para você postar e as fotos da gravação. Ele vai se atualizando durante a semana: ${url(g.portal_token)}`;
+const linkMessage = (g) => `Olá, ${firstName(g.name)}! Preparamos o seu portal no ${require('./projects').publicName(g.project_id)}. Lá ficam o cronograma da semana do episódio, os posts em collab com você, cortes exclusivos para você postar e as fotos da gravação. Ele vai se atualizando durante a semana: ${url(g.portal_token, g.project_id)}`;
 const newsMessage = (g, posts) => `Olá, ${firstName(g.name)}! ${posts.length > 1 ? `Saíram ${posts.length} posts novos` : 'Saiu um post novo'} em collab com você:\n${posts.map((p) => `${p.title}: ${(p.links.find((l) => l.platform === 'instagram') || p.links[0]).url}`).join('\n')}\n\nCompartilhar nos stories e comentar ajuda o post a chegar mais longe. Está tudo no seu portal: ${url(g.portal_token)}`;
 
 // Primeiro envio do link: o que já estava em collab não vira aviso (o convidado vê tudo ao abrir o portal).
@@ -295,7 +295,7 @@ async function markSent(g) {
 
 async function sendLinkEmail(g) {
   if (!isEmail(g.email || '')) return { error: 'O convidado não tem e-mail no cadastro.' };
-  await require('./mailer').sendGuestPortal({ to: g.email, guestName: g.name, url: url(g.portal_token), kind: 'link' });
+  await require('./mailer').sendGuestPortal({ to: g.email, guestName: g.name, url: url(g.portal_token, g.project_id), kind: 'link', projectId: g.project_id });
   await markSent(g);
   return { ok: true };
 }
@@ -329,7 +329,7 @@ async function tick() {
     const fresh = collab.filter((p) => addedIds.has(p.id));
     if (!fresh.length) continue;
     if (channel === 'email') {
-      await require('./mailer').sendGuestPortal({ to: g.email, guestName: g.name, url: url(g.portal_token), kind: 'novos', posts: fresh })
+      await require('./mailer').sendGuestPortal({ to: g.email, guestName: g.name, url: url(g.portal_token, g.project_id), kind: 'novos', posts: fresh, projectId: g.project_id })
         .catch((err) => console.error(`[portal do convidado ${g.id}] e-mail:`, err.message));
       sent += 1;
     } else if (channel === 'whatsapp') {

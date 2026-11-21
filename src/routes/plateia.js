@@ -2,6 +2,8 @@
 // (com UTMs) e leva a pessoa ao WhatsApp da produtora. Nada é cobrado nem confirmado aqui.
 const express = require('express');
 const config = require('../config');
+const pu = require('../services/publicUrl'); // endereço público do projeto (o do Pulso é o de hoje)
+const host = require('../services/hostContext');
 const audience = require('../services/audience');
 const page = require('../services/audiencePage');
 const b2 = require('../services/b2');
@@ -64,8 +66,8 @@ router.get('/plateia', turnstile.page, wrap(async (req, res) => {
     benefits: BENEFITS, hasReels: Boolean(s.reelsKey || s.reelsWebmKey), hasWebm: Boolean(s.reelsWebmKey), hasMp4: Boolean(s.reelsKey), hasReelsPoster: Boolean(s.reelsPosterKey),
     title: 'Pulso Podcast com Plateia: assista às gravações em São Paulo',
     description: 'Assista de perto às gravações do Pulso Podcast em São Paulo. Uma plateia pequena, escolhida pela produção por afinidade com o convidado. Peça sua participação.',
-    ogImage: `${config.appBaseUrl}/static/og-plateia.jpg?v=${res.locals.assetV}`, s, agenda, faq: FAQ(s, { varies, min }), icon, countries: audience.COUNTRIES, price: varies ? `a partir de ${audience.money(min)}` : audience.money(s.priceCents), videoUrl: HERO_VIDEO,
-    hasHero: Boolean(s.heroKey), hasStudio: Boolean(s.studioKey), assetV: res.locals.assetV, canonical: `${config.appBaseUrl}/plateia`,
+    ogImage: `${pu.publicUrl(null)}/static/og-plateia.jpg?v=${res.locals.assetV}`, s, agenda, faq: FAQ(s, { varies, min }), icon, countries: audience.COUNTRIES, price: varies ? `a partir de ${audience.money(min)}` : audience.money(s.priceCents), videoUrl: HERO_VIDEO,
+    hasHero: Boolean(s.heroKey), hasStudio: Boolean(s.studioKey), assetV: res.locals.assetV, canonical: pu.publicUrl(null, '/plateia'),
   });
 }));
 
@@ -74,6 +76,7 @@ router.get('/plateia', turnstile.page, wrap(async (req, res) => {
 router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], turnstile.page, wrap(async (req, res, next) => {
   if (req.params.token === 'foto' || req.params.token === 'fotos') return next();
   const g = await page.bySlug(req.params.slug);
+  if (g) { const go = host.wrongHost(req, g.project_id); if (go) return res.redirect(302, go); }
   if (!g) return res.status(404).set(require('../services/inviteTemplate').publicHeaders()).type('html').send(require('../services/publicPages').messageHtml('Página não encontrada', 'Esta página de plateia não existe ou foi desligada. Veja as próximas gravações em podcastpulso.com/plateia.'));
   const s = await audience.settings();
   if (req.params.token && await partnerMissLimiter.blocked(req.ip)) return res.redirect(302, `/plateia/com/${g.audience_slug}`); // chutando links: só a página normal
@@ -89,12 +92,12 @@ router.get(['/plateia/com/:slug', '/plateia/com/:slug/:token'], turnstile.page, 
     date: audience.dateLong(g.proposed_at), time: audience.timeShort(g.proposed_at), weekday: audience.weekday(g.proposed_at), arrival: page.timeLabel(g.audience_arrival),
     intro: g.audience_intro, extraTitle: g.audience_extra_title, extra: g.audience_extra,
   };
-  const canonical = `${config.appBaseUrl}/plateia/com/${g.audience_slug}`;
+  const canonical = pu.publicUrl(g.project_id, `/plateia/com/${g.audience_slug}`);
   res.set(pageHeaders(s, await reelsOrigin(s))).render('plateia/guest', {
     benefits: BENEFITS, hasReels: Boolean(s.reelsKey || s.reelsWebmKey), hasWebm: Boolean(s.reelsWebmKey), hasMp4: Boolean(s.reelsKey), hasReelsPoster: Boolean(s.reelsPosterKey),
     title: `Plateia com ${g.name} · Pulso Podcast`,
     description: `Assista de perto à gravação do Pulso Podcast com ${g.name}${g.topic ? ` sobre ${g.topic}` : ''}, em ${view.date}. Plateia pequena, selecionada pela produção. Peça sua participação.`,
-    ogImage: g.has_photo ? `${canonical}/foto` : `${config.appBaseUrl}/static/og-plateia.jpg?v=${res.locals.assetV}`,
+    ogImage: g.has_photo ? `${canonical}/foto` : `${pu.publicUrl(g.project_id)}/static/og-plateia.jpg?v=${res.locals.assetV}`,
     canonical, s, g: view, photos: await page.photos(g.id), partner, partnerFull: full, exempt, open, closedLabel, price, priceLabel: exempt ? `Isenta (convite de ${partner.name})` : price,
     countries: audience.COUNTRIES, icon, assetV: res.locals.assetV,
   });

@@ -25,7 +25,7 @@ router.get(PATH, wrap(async (req, res) => {
   const producao = (await contacts.current()).producao;
   const wa = producao.number ? await contacts.waUrl('producao', 'posgravacao', '') : null;
   res.set(HEADERS).render('portal/pos-gravacao', {
-    title: `Depois da gravação · ${config.podcastName}`, wa, phone: producao.number ? prettyPhone(producao.number) : null,
+    title: `Depois da gravação · ${require('../services/projects').publicName(null)}`, wa, phone: producao.number ? prettyPhone(producao.number) : null,
     networks: NETWORKS, icon, brand, assetV: res.locals.assetV,
   });
 }));

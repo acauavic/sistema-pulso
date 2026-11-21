@@ -2,6 +2,7 @@
 // Só deixa ENVIAR material da gravação para o episódio do link, com o mesmo motor do painel (partes direto para o Backblaze, retomada).
 // Cada arquivo só é aceito pelo link que o criou; o link nunca lista, baixa ou apaga material pronto.
 const express = require('express');
+const host = require('../services/hostContext');
 const config = require('../config');
 const db = require('../db/pool');
 const prod = require('../services/production');
@@ -27,6 +28,7 @@ function closedPage(res, status = 404) {
 // Link válido (aberto) ou responde: a página fechada para o navegador, JSON para o envio. Nunca diz se o link existiu.
 async function load(req, res, { page = false } = {}) {
   const link = await links.byToken(req.params.token);
+  if (link) { const go = host.wrongHost(req, link.project_id); if (go) return res.redirect(302, go); }
   if (link) return link;
   if (!await missLimiter.hit(req.ip)) { res.status(429).set(HEADERS).send('Muitas tentativas. Tente mais tarde.'); return null; }
   if (page) closedPage(res); else jsonError(res, 404, 'Este link não está mais aberto. Fale com a produção.', 'link_fechado');

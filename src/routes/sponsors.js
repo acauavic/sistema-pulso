@@ -209,7 +209,7 @@ router.get('/patrocinadores/:id', requirePerm('sponsors.read'), wrap(async (req,
     roleByEpisode: Object.fromEntries(linked.rows.map((r) => [r.episode_id, r.role])), episodes: episodes.rows, clicks,
     stageInfo: C.SPONSOR_STAGE_BY_KEY[sponsor.stage], C, stages: C.SPONSOR_STAGES,
     links: sponsor.public_token ? {
-      kit: sponsorsSvc.publicUrl(sponsor.public_token), form: sponsorsSvc.publicUrl(sponsor.public_token, '/cadastro'), portal: sponsorsSvc.publicUrl(sponsor.public_token, '/portal'),
+      kit: sponsorsSvc.publicUrl(sponsor.public_token, '', sponsor.project_id), form: sponsorsSvc.publicUrl(sponsor.public_token, '/cadastro', sponsor.project_id), portal: sponsorsSvc.publicUrl(sponsor.public_token, '/portal', sponsor.project_id),
     } : null,
     storageReady: config.storageConfigured, groqReady: config.groqConfigured,
   });

@@ -23,16 +23,16 @@ const fold = (line) => { // linhas do .ics têm no máximo 75 caracteres; as seg
 const esc = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 const utc = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 
-function ics({ guestId, name, email, start, minutes, sequence, method, address }) {
+function ics({ guestId, name, email, start, minutes, sequence, method, address, projectId = null }) {
   const end = new Date(new Date(start).getTime() + minutes * 60_000);
   const organizer = config.brevo.from || 'contato@podcastpulso.com';
   const lines = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${config.podcastName}//Pulso Gestao//PT`, 'CALSCALE:GREGORIAN', `METHOD:${method}`,
+    'BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${require('./projects').publicName(null)}//Health Scale Studio//PT`, 'CALSCALE:GREGORIAN', `METHOD:${method}`,
     'BEGIN:VEVENT', `UID:gravacao-${guestId}@podcastpulso.com`, `SEQUENCE:${sequence}`, `DTSTAMP:${utc(new Date())}`, `DTSTART:${utc(start)}`, `DTEND:${utc(end)}`,
-    `SUMMARY:${esc(`Gravação no ${config.podcastName}`)}`,
+    `SUMMARY:${esc(`Gravação no ${require('./projects').publicName(projectId)}`)}`,
     ...(address ? [`LOCATION:${esc(address)}`] : []),
     `DESCRIPTION:${esc(`Gravação com ${name}. Qualquer dúvida, responda ao e-mail do convite.`)}`,
-    `ORGANIZER;CN=${esc(config.podcastName)}:mailto:${organizer}`,
+    `ORGANIZER;CN=${esc(require('./projects').publicName(projectId))}:mailto:${organizer}`,
     `ATTENDEE;CN=${esc(name)};ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${email}`,
     `STATUS:${method === 'CANCEL' ? 'CANCELLED' : 'CONFIRMED'}`, 'TRANSP:OPAQUE', 'END:VEVENT', 'END:VCALENDAR',
   ];
@@ -53,7 +53,7 @@ const wanted = async () => (await db.query(
 
 async function deliver({ g, minutes, address, sequence, method }) {
   const body = ics({ guestId: g.id, name: g.name, email: g.email, start: g.proposed_at, minutes, sequence, method, address });
-  await mailer.sendCalendarInvite({ to: g.email, guestName: g.name, whenLabel: formatDateTime(g.proposed_at), address, method, ics: body, update: sequence > 0 });
+  await mailer.sendCalendarInvite({ to: g.email, guestName: g.name, whenLabel: formatDateTime(g.proposed_at), address, method, ics: body, update: sequence > 0, projectId: g.project_id });
 }
 
 async function save(g, { minutes, sequence, hash, sent }) {

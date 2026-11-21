@@ -74,12 +74,21 @@ dinheiro são sempre de um projeto**. Convidados, patrocinadores, episódios, co
   ativo de menor `position`, hoje o Pulso). Toda pessoa participa de pelo menos um projeto.
 - **Seletor** (topo do menu, só para quem participa de mais de um): Todos os projetos, ou um deles. A escolha fica em
   `users.last_project_id`. Seguem o recorte: Convidados, Patrocinadores, Episódios/Vídeos, Conteúdo, Tarefas, Pautas,
-  Início, Resumo do dia, Seu dia, Calendário, Busca e Avisos. Ainda mostram tudo: Social, Plateia e Financeiro
-  (contas no calendário e na busca) — próximas fases.
+  Início, Resumo do dia, Seu dia, Calendário, Busca, Avisos e Financeiro. Ainda mostram tudo: Social e Plateia
+  — próximas fases.
 - **Criar**: o item nasce no projeto escolhido; em "Todos os projetos" o formulário pergunta. Item ligado a outro herda
   o projeto dele (episódio do convidado, corte do episódio, tarefa do patrocinador).
-- **No código**: `services/projects.js` (lista em memória, membros, projeto padrão) e `services/scope.js` (o único
-  lugar que decide o recorte: `where` nas listas, `assert` nas páginas de detalhe, `target` na criação).
+- **No código**: `services/projects.js` (lista em memória, membros, projeto padrão, nome público) e `services/scope.js`
+  (o único lugar que decide o recorte: `where` nas listas, `assert` nas páginas de detalhe, `target` na criação,
+  `financeIdsOf` no dinheiro).
+- **Endereços** (`services/publicUrl.js`, `services/hostContext.js`): o painel fica no endereço da casa e cada projeto
+  tem o endereço das páginas públicas dele (`projects.public_host`), o encurtador (`short_link_host` +
+  `YOURLS_LINK_<SLUG>`/`YOURLS_KEY_<SLUG>`) e o remetente dos e-mails (`mail_from_name`/`mail_from_address`). Quem liga
+  é a gestão, em Gestão > Projetos > "Fora do painel"; **em branco, tudo continua num endereço só** (é assim em
+  desenvolvimento e no teste). Com o endereço ligado: tela do painel aberta no domínio público vai para o painel, link
+  público aberto no domínio errado vai para o certo, e o ícone do navegador/celular sai de `public/brand/<slug>/`
+  (sem arquivos próprios, usa os do projeto padrão). O nome que quem está de fora lê é `projects.public_name`
+  (`projects.publicName()`): o do Pulso é "Podcast Pulso", como sempre.
 - **Módulos** (`projects.modules`): o menu mostra só o que o projeto escolhido usa. O Projeto 100 usa tarefas,
   produção (vídeos) e convidados; convites, portal, plateia, redes e financeiro entram nas fases deles.
 - **Empresa e contrato**: a identidade do patrocinador é de uma **empresa** da casa (`companies`: nome, site, tipo e
@@ -411,7 +420,7 @@ Veja `.env.example` (comentado). Resumo:
 - **YOURLS**: `YOURLS_LINK` (host), `YOURLS_KEY` (signature da página *Tools* do YOURLS).
 - **Patrocinadores**: `BB_KEY_ID`, `BB_APPLICATION_KEY`, `BUCKET_NAME` (Backblaze B2; `BB_ENDPOINT` e `BB_PREFIX` são descobertos pela chave, só informe para forçar), `GROQ_APIKEY` (transcrição de voz; `GROQ_WHISPER_MODEL` opcional) e `PATROCINIO_WHATSAPP`.
 - **Episódios**: `GEMINI_KEY` (`GEMINI_MODEL` opcional), `UPLOAD_POST_KEY`, `UPLOAD_POST_USER` (padrão `default`), `UPLOAD_POST_LIVE` (**padrão `false`: só simula**), `ROLE` (`web`, `worker` ou `all`, padrão `all`; ver Arquitetura), `VIDEO_FORMAT_CHECK` (padrão `true`; `false` só em teste), `UPLOAD_PART_BYTES` (só em teste).
-- **Opcionais**: `PUBLIC_BASE_URL` (domínio dos convites), `PRODUCAO_WHATSAPP` (destino dos botões do convite), `PODCAST_NAME`, `AUTO_MIGRATE`, `PORT`.
+- **Opcionais**: `PUBLIC_BASE_URL` (endereço público quando o projeto não tem o seu), `PRODUCAO_WHATSAPP` (destino dos botões do convite), `AUTO_MIGRATE`, `PORT`. O nome que quem está de fora lê fica em Gestão > Projetos (nome público), não em variável.
 - **"Não sou robô" (Cloudflare Turnstile)**: `TURNSTILE_SITE_KEY` (pública) e `TURNSTILE_SECRET_KEY`. Com as duas, o login, o "Esqueci minha senha", o link do estúdio (uma vez, vale 12 h), o pedido da plateia e os formulários do site pedem a confirmação; sem elas, desligado. Se o Cloudflare não responder, deixa passar e os limites de tentativa continuam valendo.
 - **Site do Pulso**: `SITE_ORIGIN` (origens do podcastpulso.com, separadas por vírgula; padrão `https://podcastpulso.com,https://www.podcastpulso.com`). Só elas recebem CORS e mandam os formulários; a primeira é o endereço para onde os formulários sem JavaScript voltam (`/obrigado/` ou `/ops/`). Ver [Site do Pulso](#site-do-pulso-podcastpulsocom).
 

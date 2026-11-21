@@ -6,6 +6,7 @@ const guestsSvc = require('../services/guests');
 const mailer = require('../services/mailer');
 const tpl = require('../services/inviteTemplate');
 const pages = require('../services/publicPages');
+const host = require('../services/hostContext');
 const pixel = require('../services/pixel');
 const { createLimiter } = require('../auth/rateLimit');
 const { RSVP_OPEN, ACCEPT_FROM, STATUS_BY_KEY } = require('../constants');
@@ -56,6 +57,8 @@ router.get('/convite/:token', wrap(async (req, res) => {
 async function showInvite(req, res, token) {
   const guest = await guestByToken(token);
   if (!guest) return gone(res);
+  const go = host.wrongHost(req, guest.project_id); // link do projeto aberto em outro domínio: leva para o certo
+  if (go) return res.redirect(302, go);
 
   if (!guest.invite_viewed_at && !isBot(req)) {
     const { rowCount } = await db.query('UPDATE guests SET invite_viewed_at = now() WHERE id = $1 AND invite_viewed_at IS NULL', [guest.id]);

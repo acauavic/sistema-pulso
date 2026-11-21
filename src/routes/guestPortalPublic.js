@@ -1,6 +1,7 @@
 // Portal do convidado, lado público: /convidado/<token>. Sem login: o token secreto na URL é a chave (como no convite).
 // Só leitura, mais o pedido de collab do episódio no YouTube. Mídias saem por redirecionamento assinado (Backblaze) ou do disco (prévias).
 const express = require('express');
+const host = require('../services/hostContext');
 const config = require('../config');
 const portal = require('../services/guestPortal');
 const b2 = require('../services/b2');
@@ -40,6 +41,7 @@ const gone = (res) => res.status(404).set(tpl.publicHeaders()).type('html')
 async function load(req, res, token = req.params.token) {
   if (!await viewLimiter.hit(req.ip)) { res.status(429).send('Muitas requisições.'); return null; }
   const g = await portal.byToken(token);
+  if (g) { const go = host.wrongHost(req, g.project_id); if (go) return res.redirect(302, go); }
   if (!g) { gone(res); return null; }
   if (portal.expired(g)) { expiredPage(res); return null; }
   return g;
@@ -69,7 +71,7 @@ async function showPortal(req, res, token) {
     ytEmbed: portal.youtubeEmbed(c.episode.youtube), spEmbed: portal.spotifyEmbed(c.episode.spotify), validDays: portal.VALID_DAYS,
     epNo: g.episode_number ? `EP.${String(g.episode_number).padStart(3, '0')}` : null, first: fmt.firstName(g.name),
     ytSent: req.query.youtube === 'ok', ytError: req.query.youtube === 'erro', ytUrl: portal.youtubeUrl(g.portal_yt_channel),
-    assetV: res.locals.assetV, title: `Seu portal no ${config.podcastName}`,
+    assetV: res.locals.assetV, title: `Seu portal no ${require('../services/projects').publicName(g.project_id)}`,
     pixelTag: pixel.tag({ content: 'Portal do convidado', category: 'convidado', v: res.locals.assetV }),
   });
 }
@@ -151,7 +153,7 @@ router.get('/convidado/:token/fotos.zip', wrap(async (req, res) => {
 // "Falar com a produção": WhatsApp da produção com a mensagem do portal.
 router.get('/convidado/:token/producao', wrap(async (req, res) => {
   const g = await load(req, res); if (!g) return;
-  res.redirect(302, await require('../services/contacts').waUrl('producao', 'portal', g.name));
+  res.redirect(302, await require('../services/contacts').waUrl('producao', 'portal', g.name, g.project_id));
 }));
 
 // Pedido do convidado: o episódio no YouTube em collab com o canal dele.

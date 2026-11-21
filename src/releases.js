@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.103.0', date: '2026-11-21', title: 'Cada projeto com o seu endereço',
+    items: [
+      { kind: 'novo', text: 'O painel passa a ter o endereço da casa e cada projeto ganha o endereço das páginas públicas dele (convite, portal, media kit, plateia, link do estúdio, pós-gravação). O do Pulso continua o de hoje: nenhum link já enviado muda ou quebra.' },
+      { kind: 'novo', text: 'Em Gestão > Projetos, dentro de "Fora do painel": nome público do projeto, endereço das páginas públicas, endereço dos links curtos e o remetente dos e-mails. Em branco, tudo continua como está — ligue o endereço só depois que o DNS apontar para o servidor.' },
+      { kind: 'novo', text: 'Quem abre um link no endereço errado é levado ao certo, e quem abre uma tela do painel num endereço público vai para o painel. O ícone do navegador e o do celular seguem o projeto do endereço.' },
+      { kind: 'novo', text: 'O nome que o convidado e o patrocinador leem vem do projeto: "Convite para o Podcast Pulso" continua igual, e o convidado do Projeto 100 lê o nome dele. Os e-mails e o WhatsApp também.' },
+      { kind: 'novo', text: 'Cada projeto pode ter o seu encurtador de links; sem encurtador, o link inteiro continua valendo.' },
+    ],
+  },
+  {
     version: '1.102.0', date: '2026-11-21', title: 'Dinheiro por projeto',
     items: [
       { kind: 'novo', text: 'Todo lançamento agora tem dono: um projeto, ou compartilhado com a divisão entre eles. O que está ligado a um vídeo, convidado ou patrocinador herda o projeto dele — receita de patrocínio cai no projeto do contrato, sem escolha manual.' },
