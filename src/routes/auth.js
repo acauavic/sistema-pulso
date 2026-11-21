@@ -41,9 +41,10 @@ router.post('/login', turnstile.page, wrap(async (req, res) => {
     return fail(429, 'Muitas tentativas. Aguarde alguns minutos e tente de novo.');
   }
   if (!(await turnstile.verify(turnstile.tokenOf(req.body), req.ip)).ok) return fail(400, turnstile.MESSAGE);
-  const { rows } = await db.query('SELECT * FROM users WHERE lower(email) = $1', [email]);
+  const { rows } = await db.query(
+    "SELECT *, (access_until IS NOT NULL AND access_until < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS expired FROM users WHERE lower(email) = $1", [email]);
   const user = rows[0];
-  const checks = Boolean(user && user.active && user.password_hash);
+  const checks = Boolean(user && user.active && !user.expired && user.password_hash); // acesso vencido entra como senha errada (não diz qual)
   const ok = checks && (await verifyPassword(password, user.password_hash));
   if (!checks) await burnPasswordCheck(password); // mesmo tempo de resposta para conta inexistente, sem senha ou desativada
   if (!ok) {

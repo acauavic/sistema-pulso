@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.4.0', date: '2026-11-21', title: 'Funções sob medida',
+    items: [
+      { kind: 'novo', text: 'Gestão > Equipe > Funções: crie funções e escolha o que cada uma acessa, área por área (Não vê, Vê, Edita, Gerencia, ou caixa por caixa), e como ela trabalha no dia a dia (que Início e que avisos recebe). Os quatro perfis de antes viraram as quatro funções de fábrica, com os mesmos poderes; dá para editar e voltar ao padrão.' },
+      { kind: 'novo', text: 'Função por projeto: na janela do usuário, cada projeto tem a sua função. A mesma pessoa pode ser editora no Pulso e gestora no Projeto 100, ou ver só o financeiro do Projeto 100 e nada do Pulso.' },
+      { kind: 'novo', text: '"Acesso até": para quem é de fora por um tempo, o acesso desliga sozinho depois da data.' },
+      { kind: 'ajuste', text: 'O interruptor "Vê o financeiro" saiu: o dinheiro de um projeto aparece para quem tem, nele, uma função com a área Financeiro. Quem estava com o interruptor desligado ganhou a função "Gestão sem financeiro" naquele projeto — ninguém ganhou nem perdeu acesso.' },
+      { kind: 'correcao', text: 'Ações de convidados, patrocinadores, pedidos, plateia, portal, material, capas e redes não conferiam o projeto do item: quem não era do projeto conseguia mexer pelo endereço. Agora toda rota com o item no endereço confere o projeto e a função da pessoa nele, e responde como se o item não existisse.' },
+    ],
+  },
+  {
     version: '2.3.0', date: '2026-11-21', title: 'Acerto da parceria',
     items: [
       { kind: 'novo', text: 'Financeiro > Parceria (no projeto com acordo, como o Projeto 100): quanto foi gasto, quanto já voltou, quanto falta recuperar e o lucro a distribuir. O custo volta primeiro para quem pagou — a casa ou o parceiro, na proporção do que cada um gastou — e o que passa disso é lucro, dividido na proporção do acordo (50/50).' },

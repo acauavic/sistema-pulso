@@ -1,6 +1,6 @@
 # Projeto 100 na prática — desenho
 
-Data: 2026-11-21 · **Aguardando a revisão do dono.** Continua a especificação do multiprojetos
+Data: 2026-11-21 · **Aprovado pelo dono ("implemente tudo") e implementado no mesmo dia, da v2.1.0 à v2.4.0; nada publicado.** Continua a especificação do multiprojetos
 (`2026-11-20-multiprojetos-design.md`, nove fases feitas até a v2.0.0). Como lá, este documento é o guarda-chuva: cada
 parte abaixo ganha o seu plano, a sua branch e o seu lançamento, e só vai para produção com autorização.
 
@@ -222,6 +222,18 @@ Com as nove fases, o Projeto 100 tem lugar no sistema. Mas ele trabalha de um je
   isolamento roda também com funções por projeto.
 - Acesso vencido não entra; quem perdeu a área deixa de ver a tela na hora (sessão relida).
 - Nenhum ponto do código compara o perfil pelo nome (varredura no `src/`).
+
+## Desvios na execução
+
+- **Funções de fábrica**: continuam lendo a matriz do código enquanto ninguém as edita (`roles.perms` NULL); editar grava a
+  lista e "voltar ao padrão" desfaz. Assim um ajuste futuro na matriz não se perde nas funções que ninguém mexeu.
+- **"Trabalha como"** (`roles.base`, guardado em `users.role`): a função escolhe o Início, os avisos padrão e os deveres do
+  calendário de um dos quatro perfis; o que a pessoa acessa vem das permissões. Os 36 pontos que citavam o perfil pelo nome
+  ficaram como "trabalha como" (é o que eles querem dizer); só a etapa do vídeo passou a perguntar pela função do projeto.
+- **Guarda do item na URL** (`scope.ITEMS`): entrou além do desenho, porque a revisão achou ações POST sem recorte de
+  projeto (só as páginas de detalhe conferiam). Vale para qualquer rota com o id no endereço, em GET e POST.
+- **Trecho na aprovação do vídeo**: ponto e trecho ("marcar o fim aqui"), sem arrastar na linha do tempo.
+- **Link do estúdio da sessão**: preso no primeiro vídeo gravado (o arquivo continua tendo um vídeo), com a triagem na sessão.
 
 ## Ordem e versões
 

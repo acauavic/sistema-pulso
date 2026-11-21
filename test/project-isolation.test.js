@@ -176,7 +176,7 @@ describe('isolamento entre projetos', () => {
     assert.match(page.text, /Onde essa pessoa trabalha/);
     assert.match(page.text, /name="projetos" value="1"/);
     assert.match(page.text, /name="projetos" value="2"[^>]*checked/, 'ela participa do Projeto 100');
-    assert.match(page.text, /name="financeiro" value="2"/, 'e o "vê o financeiro" por projeto');
+    assert.match(page.text, /name="funcao_2"/, 'e a função em cada projeto (o financeiro vem da função)');
     assert.match(page.text, /name="house" value="1"/);
     assert.match(page.text, /SÓ DOS PROJETOS MARCADOS/, 'o interruptor mostra o estado em mono');
     // a gestão da casa também vê os campos de endereço e marca do projeto

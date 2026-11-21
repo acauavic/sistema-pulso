@@ -270,7 +270,7 @@ describe('produção de episódios', () => {
     it('só quem tem permissão faz cada passo (editor não libera para edição)', async () => {
       const denied = await move(as.editor, epId, 'disponivel_edicao');
       assert.equal(denied.status, 422);
-      assert.match(denied.json.error, /perfil não pode/);
+      assert.match(denied.json.error, /função neste projeto não pode/);
       assert.equal((await ep(epId)).status, 'gravado');
     });
 

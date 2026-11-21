@@ -130,7 +130,11 @@ function requireAuth(req, res, next) {
 function requirePerm(permission) {
   return (req, res, next) => {
     if (!req.user) return requireAuth(req, res, next);
-    if (can(req.user, permission)) return next();
+    if (can(req.user, permission)) {
+      const scope = require('./services/scope');
+      scope.narrow(req, permission); // daqui em diante, só os projetos em que a função dela dá esta permissão
+      return scope.guardNarrowed(req).then((ok) => (ok ? next() : next(Object.assign(new Error('Fora da função neste projeto'), { status: 404 }))), next);
+    }
     return res.status(403).render('error', { title: 'Sem permissão', message: 'Seu perfil não tem acesso a esta área.' });
   };
 }

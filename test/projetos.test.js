@@ -66,6 +66,6 @@ describe('projetos: serviço', () => {
     const r = await c.act('/usuarios', { name: 'Nina Nova', email: 'n@t.com', role: 'produtora' }, { from: '/usuarios' });
     assert.equal(r.status, 302);
     const { rows: [u] } = await h.db.query("SELECT id FROM users WHERE email = 'n@t.com'");
-    assert.deepEqual(await projects.membershipsOf(u.id), [{ project_id: 1, finance: true }]);
+    assert.deepEqual(await projects.membershipsOf(u.id), [{ project_id: 1, finance: true, role_id: null }]); // sem função própria no projeto: vale a padrão
   });
 });

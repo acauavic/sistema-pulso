@@ -7,12 +7,13 @@
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <label>Nome<input type="text" name="name" value="<%= values.name || '' %>" maxlength="120" required autofocus></label>
     <label>E-mail<input type="email" name="email" value="<%= values.email || '' %>" maxlength="254" required></label>
-    <label>Perfil
-      <select name="role" <%= (typeof isSelf !== 'undefined' && isSelf) ? 'disabled' : '' %>>
-        <% roles.forEach(function (r) { %><option value="<%= r %>" <%= values.role === r ? 'selected' : '' %>><%= ROLES[r].label %></option><% }) %>
-        <% if (typeof isSelf !== 'undefined' && isSelf && !roles.includes(values.role)) { %><option selected><%= ROLES[values.role].label %></option><% } %>
+    <% var selfEdit = typeof isSelf !== 'undefined' && isSelf; var ownRole = roles.filter(function (r) { return r.id === Number(values.role_id); })[0]; %>
+    <label>Função
+      <select name="role_id" data-native <%= selfEdit ? 'disabled' : '' %>>
+        <% roles.forEach(function (r) { %><option value="<%= r.id %>" <%= Number(values.role_id) === r.id ? 'selected' : '' %>><%= r.name %></option><% }) %>
+        <% if (selfEdit && !ownRole) { %><option selected><%= ROLES[values.role] ? ROLES[values.role].label : values.role %></option><% } %>
       </select>
-      <% if (typeof isSelf !== 'undefined' && isSelf) { %><small class="muted">Você não pode alterar o seu próprio perfil.</small><% } %>
+      <small class="muted"><% if (selfEdit) { %>Você não pode alterar a sua própria função.<% } else { %>O que a pessoa acessa. Para criar outras, Gestão > Equipe > <a href="/gestao/funcoes">Funções</a>.<% } %></small>
     </label>
     <% var self = typeof isSelf !== 'undefined' && isSelf; var house = values.house !== false; var sudo = values.role === 'superadmin'; %>
     <fieldset class="stack user-access">
@@ -23,14 +24,18 @@
         <% projectRows.forEach(function (p) { %>
         <li>
           <label class="check"><input type="checkbox" name="projetos" value="<%= p.id %>"<%= p.member ? ' checked' : '' %>> <%= p.name %></label>
-          <label class="check small muted"><input type="checkbox" name="financeiro" value="<%= p.id %>"<%= p.finance ? ' checked' : '' %>> Vê o financeiro</label>
+          <label class="small access-role">Função neste projeto
+            <select name="funcao_<%= p.id %>" data-native aria-label="Função no <%= p.name %>">
+              <option value="">A função padrão</option>
+              <% roles.forEach(function (r) { %><option value="<%= r.id %>" <%= Number(p.roleId) === r.id ? 'selected' : '' %>><%= r.name %></option><% }) %>
+            </select>
+          </label>
         </li>
         <% }) %>
       </ul>
-      <p class="muted small m-0">A pessoa só encontra convidados, vídeos, tarefas e números dos projetos marcados. O financeiro também precisa do perfil (Gestão ou Superadmin).</p>
+      <p class="muted small m-0">A pessoa só encontra convidados, vídeos, tarefas e números dos projetos marcados, e em cada um faz o que a função daquele projeto permite (o financeiro também: só onde a função vê o financeiro).</p>
       <% } else { %>
       <input type="hidden" name="projetos" value="<%= projectRows[0] ? projectRows[0].id : '' %>">
-      <input type="hidden" name="financeiro" value="<%= projectRows[0] ? projectRows[0].id : '' %>">
       <% } %>
       <label class="switch">
         <input type="checkbox" role="switch" name="house" value="1"<%= house ? ' checked' : '' %><%= (self || sudo) ? ' disabled' : '' %> aria-label="Equipe da casa">
@@ -40,6 +45,9 @@
       <% if (self || sudo) { %><input type="hidden" name="house" value="<%= house ? '1' : '0' %>"><% } %>
       <p class="muted small m-0">A equipe da casa alcança o que é geral: usuários, integrações, categorias, rotinas, estoque, auditoria e lixeira completas, e criar projetos.<% if (self) { %> Você não pode mudar a sua.<% } else if (sudo) { %> O superadmin é sempre da casa.<% } %></p>
     </fieldset>
+    <label>Acesso até <small class="muted">(para quem é de fora por um tempo; em branco, sem data)</small>
+      <input type="date" name="access_until" value="<%= values.access_until ? fmt.toInputDate(values.access_until) : '' %>" <%= selfEdit ? 'disabled' : '' %>>
+    </label>
     <% if (!target) { %><p class="muted small">Enviaremos um e-mail com um link (válido por 72h) para a pessoa definir a própria senha.</p><% } %>
     <div class="row">
       <button class="btn primary" type="submit"><%= target ? 'Salvar' : 'Criar e enviar acesso' %></button>

@@ -68,8 +68,10 @@ function createApp() {
   app.use(mw.requireAuth); // tudo abaixo exige login
   app.use((req, res, next) => { require('./services/catalog').refresh().then(() => next(), next); }); // categorias e tipos de vídeo (Gestão > Categorias), a cada 30 s
   app.use((req, res, next) => { require('./services/projects').refresh().then(() => next(), next); }); // projetos (Gestão > Projetos), a cada 30 s
-  app.use(require('./services/scope').attach); // de quais projetos a pessoa participa e qual está escolhido no menu
+  app.use((req, res, next) => { require('./services/roles').refresh().then(() => next(), next); }); // funções (Gestão > Funções), a cada 30 s
+  app.use(require('./services/scope').attach); // de quais projetos a pessoa participa, qual está escolhido no menu e a função em cada um
   app.use(require('./services/scope').requireModule); // tela de módulo que nenhum projeto dela usa: 404
+  app.use(require('./services/scope').guardItem); // item de outro projeto no endereço (GET ou POST): 404, em qualquer rota
   app.use(mw.navData);
   app.use(require('./routes/misc'));
   app.use(require('./routes/collab')); // comentários, responsável, notificações e busca global
@@ -80,6 +82,7 @@ function createApp() {
   app.use(require('./routes/outreach')); // Cadência de abordagem: registro por canal, follow-ups e painel da gestão
   app.use(require('./routes/catalog')); // Gestão > Sistema > Categorias
   app.use(require('./routes/projects')); // Gestão > Sistema > Projetos: nome, sigla e quem participa
+  app.use(require('./routes/roles')); // Gestão > Equipe > Funções: o que cada função acessa
   app.use(require('./routes/savedFilters')); // visualizações salvas dos filtros (Convidados, Conteúdo > Cortes)
   app.use(require('./routes/goals')); // Gestão > Metas: até 3 metas por pessoa, contadas sozinhas
   app.use(require('./routes/releases')); // Novidades: versões do sistema e aviso de atualização

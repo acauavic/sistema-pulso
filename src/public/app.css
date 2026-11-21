@@ -2408,3 +2408,12 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
 .part-month { text-transform: capitalize; }
 .part-months .plan-list-tools .stack { min-width: 240px; }
 .stat-delta { font: 500 11px var(--f-mono); letter-spacing: .08em; color: var(--muted); }
+
+/* ---- Gestão > Funções: uma moldura por área, com os atalhos de nível e as caixas ---- */
+.role-areas { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.role-area { margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: var(--r-card); display: grid; gap: 8px; min-width: 0; }
+.role-area legend { padding: 0 6px; font-weight: 600; }
+.role-presets { flex-wrap: wrap; }
+.role-detail summary { cursor: pointer; }
+.role-detail[open] summary { margin-bottom: 4px; }
+.access-role { display: flex; align-items: center; gap: 8px; color: var(--text-2); } .access-role select { width: auto; min-width: 180px; }

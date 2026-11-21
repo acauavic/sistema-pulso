@@ -58,6 +58,27 @@ está no código, depois das nove fases. **Suíte completa: 1214 testes, todos p
 5. **Usuário restrito em produção**: o teste de isolamento passa, então a trava da fase 7 está liberada — mas **criar**
    o usuário do Dr. José Bento e da equipe dele é decisão do dono (quem entra, com o financeiro ligado ou não).
 
+## Depois da v2.0.0: o Projeto 100 na prática (2.1.0 → 2.4.0)
+
+Desenho em `docs/superpowers/specs/2026-11-21-projeto-100-na-pratica-design.md`, a partir do que o dono disse em 2026-11-21
+(acordo com o Dr. José Bento, quem aprova só recebe link, gravação em lote, funções por área e projeto).
+
+| Parte | Versão | Teste |
+| --- | --- | --- |
+| Aprovação por link (pauta, roteiro, vídeo, capas) | 2.1.0 | `test/aprovacao-link.test.js` |
+| Sessão de gravação (horas da sessão, um link do estúdio) | 2.2.0 | `test/sessao-gravacao.test.js` |
+| Acerto da parceria (custo volta primeiro, lucro quando decidir, mês fechado, extrato) | 2.3.0 | `test/acerto-parceria.test.js` |
+| Funções sob medida (por área e por projeto, acesso até) + guarda do item na URL | 2.4.0 | `test/funcoes.test.js` |
+
+**Achado na revisão**: várias ações POST (convidados, patrocinadores, pedidos, plateia, portal, material, capas, social)
+não conferiam o projeto do item — só as páginas de detalhe conferiam, e o teste de isolamento cobria POST em três rotas. O
+guarda do item na URL (`scope.guardItem`) fecha isso para toda rota com o id no endereço. **Antes de alguém de fora
+ganhar login, este é o ponto que precisava estar fechado.**
+
+**Fica com o dono**: os três custos mensais da equipe no Projeto 100 (editor, produtora e gestão de projetos e qualidade)
+entram pela tela Financeiro > Custos automáticos > Mensais — os valores não vão para o repositório; a data de começo do
+acordo (adotado 01/11/2026) se confirma em Financeiro > Parceria > Editar acordo.
+
 ## Perguntas que o dono precisa responder antes de publicar
 
 1. Publicar a pilha inteira (1.95.0 → 2.0.0) de uma vez, ou por partes?

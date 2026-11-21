@@ -126,7 +126,7 @@ const whoDoes = (perm) => (PERMISSIONS[perm] || []).filter((r) => r !== 'superad
 async function availableMoves(ep, role) {
   const out = [];
   for (const t of TRANSITIONS.filter((x) => x.from === ep.status)) {
-    const allowed = can(role, t.perm);
+    const allowed = can(role, t.perm, typeof role === 'object' ? ep.project_id : null);
     out.push({ to: t.to, label: t.label, tone: t.tone || '', allowed, missing: allowed && t.gate ? await t.gate(ep) : [], who: allowed ? '' : whoDoes(t.perm) });
   }
   return out;
@@ -193,7 +193,7 @@ async function notifyStage(ep, to, user) {
 async function move(ep, to, user, { trusted = false } = {}) {
   const t = TRANSITIONS.find((x) => x.from === ep.status && x.to === to);
   if (!t) return { error: 'Essa mudança de etapa não é permitida a partir da etapa atual.' };
-  if (!trusted && !can(user, t.perm)) return { error: 'Seu perfil não pode fazer essa mudança de etapa.' };
+  if (!trusted && !can(user, t.perm, ep.project_id)) return { error: 'Sua função neste projeto não pode fazer essa mudança de etapa.' };
   const missing = t.gate ? await t.gate(ep) : [];
   if (missing.length) return { error: `Para "${t.label.toLowerCase()}" falta: ${missing.join(' · ')}.`, missing };
   const client = await db.getPool().connect();

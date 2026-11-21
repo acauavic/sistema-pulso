@@ -172,6 +172,24 @@ Para mudar, edite só `src/permissions.js` — todas as telas e rotas consultam 
 - **Produtora**: convidados (criar/editar, importar CSV, gerar e enviar convite) e o **Estoque** (sem valores).
 - **Editor de Vídeo**: **só lê** convidados e patrocinadores (briefing, datas, restrições), sem criar nem mudar nada. Não vê plateia, social nem financeiro. O **Início** dele é a fila de edição, os episódios dele (com "ajustes pedidos") e as tarefas dele. Na página do episódio ele vê só os passos que faz (os da produção aparecem como "Esta etapa está com…"), **não sobe material bruto** (é da produção) e sobe o **vídeo editado** depois de assumir a edição. Recebe avisos: **liberado para edição** (todos os editores), **ajustes pedidos**, **vídeo aprovado**, **pronto** e **publicado** (tipo "Etapas do episódio", configurável e silenciável); a produção é avisada de quem assumiu e quem devolveu, e quem revisa, de que há vídeo para revisar.
 
+### Funções sob medida (Gestão > Equipe > Funções)
+
+Os quatro perfis acima viraram as quatro **funções de fábrica** (mesmos poderes; a matriz de `src/permissions.js` continua
+sendo a delas enquanto ninguém edita). A gestão cria outras (`roles`), escolhendo, por área (`permissions.AREAS`), o que a
+função acessa — Não vê | Vê | Edita | Gerencia, ou caixa por caixa — e como ela **trabalha no dia a dia** (`roles.base`:
+o Início, os avisos padrão e as tarefas do calendário; é o que `users.role` guarda).
+
+- **Por projeto**: cada pessoa tem uma função padrão (`users.role_id`) e pode ter outra em cada projeto
+  (`project_members.role_id`). `permissions.can(pessoa, permissão, projeto)` lê a função daquele projeto; sem projeto, a
+  soma das funções dela (é o que decide se a rota abre).
+- **A trava**: `requirePerm(permissão)` estreita o recorte (`scope.narrow`) aos projetos em que a função dá aquela
+  permissão, e o **guarda do item** (`scope.guardItem` no `app.js`, e de novo depois do `requirePerm`) lê o id do item no
+  endereço (`scope.ITEMS`: convidado, patrocinador, vídeo, corte, pedido, capa, tarefa, pauta, sessão, publicação,
+  comentário, ideia, inscrição da plateia) e responde 404 fora disso, em GET e em POST.
+- **Financeiro**: o interruptor "Vê o financeiro" saiu; vê o dinheiro de um projeto quem tem, nele, uma função com a área
+  Financeiro. A migração 106 deu "Gestão sem financeiro" a quem estava com o interruptor desligado.
+- **Acesso até** (`users.access_until`): depois do dia, a sessão cai e o login não entra (freelancer).
+
 ## Etapas do convidado e regras para avançar
 
 **Convidado é a pessoa; episódio é o produto.** O funil do convidado vai de Prospecção até **Gravado** (o fim dele). Antes da

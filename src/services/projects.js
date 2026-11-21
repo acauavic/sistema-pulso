@@ -29,7 +29,7 @@ const publicName = (projectId) => { const p = get(projectId == null ? defaultId(
 const label = (project, plural = true) => (project ? (plural ? project.video_label_plural : project.video_label) : (plural ? 'Episódios' : 'Episódio'));
 
 async function membershipsOf(userId) {
-  const { rows: m } = await db.query('SELECT project_id, finance FROM project_members WHERE user_id = $1 ORDER BY project_id', [userId]);
+  const { rows: m } = await db.query('SELECT project_id, finance, role_id FROM project_members WHERE user_id = $1 ORDER BY project_id', [userId]);
   return m;
 }
 
@@ -46,17 +46,20 @@ async function addMember(userId, projectId, { finance = false } = {}) {
 
 // Troca os projetos DE UMA PESSOA (tela do usuário): lista de { id, finance }. Ninguém fica sem projeto.
 // Quem continua mantém o que era, só o "vê o financeiro" acompanha a escolha.
+// `chosen`: [{ id, finance, roleId }]. `roleId` (a função naquele projeto; null = a padrão) só muda quando vem na lista.
 async function setUserProjects(userId, chosen) {
-  const list = [...new Map((chosen || []).filter((c) => get(c.id)).map((c) => [Number(c.id), Boolean(c.finance)])).entries()];
+  const list = [...new Map((chosen || []).filter((c) => get(c.id)).map((c) => [Number(c.id), c])).entries()];
   if (!list.length) return { error: 'Toda pessoa participa de pelo menos um projeto.' };
   const client = await db.getPool().connect();
   try {
     await client.query('BEGIN');
     await client.query('DELETE FROM project_members WHERE user_id = $1 AND NOT (project_id = ANY($2::int[]))', [userId, list.map(([id]) => id)]);
-    for (const [id, finance] of list) {
+    for (const [id, c] of list) {
+      const withRole = Object.prototype.hasOwnProperty.call(c, 'roleId');
       await client.query(
-        `INSERT INTO project_members (project_id, user_id, finance) VALUES ($1, $2, $3)
-         ON CONFLICT (project_id, user_id) DO UPDATE SET finance = EXCLUDED.finance`, [id, userId, finance]);
+        `INSERT INTO project_members (project_id, user_id, finance, role_id) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (project_id, user_id) DO UPDATE SET finance = EXCLUDED.finance${withRole ? ', role_id = EXCLUDED.role_id' : ''}`,
+        [id, userId, c.finance !== false, withRole ? c.roleId : null]);
     }
     await client.query('COMMIT');
     return { ok: true, projects: list.length };
