@@ -105,9 +105,18 @@ async function ingest(post, comments, mine) {
   // No Instagram, a resposta do Pulso vem aninhada sem o @ e repetida no primeiro nível com o @: é nossa se o id está lá.
   const ourIds = new Set(comments.filter((k) => me && handleOf(k.username) === me).map((k) => String(k.id)));
   const isOurs = (x) => Boolean((me && handleOf(x.username) === me) || ourIds.has(String(x.id)));
+  // Toda resposta vem também solta no primeiro nível, com o nome; dentro da conversa ela vem sem o nome. A cópia solta não é
+  // comentário novo (tratá-la assim fazia a IA responder sem contexto e sem o limite por pessoa): o nome vem dela para a conversa.
+  const topById = new Map(comments.map((k) => [String(k.id), k]));
+  const nestedIds = new Set(comments.flatMap((k) => (k.replies || []).map((x) => String(x.id))));
+  const fill = (x) => {
+    const t = topById.get(String(x.id));
+    return t ? { ...x, username: x.username || t.username, authorId: x.authorId || t.authorId, timestamp: x.timestamp || t.timestamp } : x;
+  };
   for (const k of comments) {
     if (ourIds.has(String(k.id))) continue; // comentário (ou resposta) da própria conta
-    const replies = k.replies || [];
+    if (nestedIds.has(String(k.id))) continue; // é resposta dentro de uma conversa: entra pela conversa
+    const replies = (k.replies || []).map(fill);
     const oursAt = replies.findIndex(isOurs);
     const thread = replies.slice(0, 20).map((x) => ({ id: x.id, usuario: isOurs(x) ? me : (x.username || null), texto: String(x.text || '').slice(0, 400), pulso: isOurs(x) }));
     const base = [post.network, post.post_ref, post.platform_post_id, post.publication_id];

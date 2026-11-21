@@ -4,7 +4,7 @@ const config = require('../config');
 const imagePart = (buffer, mime = 'image/jpeg') => ({ inline_data: { mime_type: mime, data: Buffer.from(buffer).toString('base64') } });
 
 // Chama o modelo pedindo JSON que obedece ao `schema` (formato OpenAPI do Gemini). Tenta de novo em 429/5xx.
-async function generateJson({ system, parts, schema, temperature = 0.7, thinking = null, model = config.gemini.model, timeoutMs = 180_000, attempts = 5 }) {
+async function generateJson({ system, parts, schema, temperature = 0.7, thinking = null, model = config.gemini.model, timeoutMs = 180_000, attempts = 5, retryDelayMs = 3000 }) {
   if (!config.geminiConfigured) throw new Error('IA não configurada (GEMINI_KEY).');
   const body = {
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
@@ -16,9 +16,16 @@ async function generateJson({ system, parts, schema, temperature = 0.7, thinking
   };
   let lastErr;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': config.gemini.key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
-    });
+    let res;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': config.gemini.key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) { // passou do tempo ou a rede caiu: tenta de novo (antes, derrubava o trabalho inteiro na primeira vez)
+      lastErr = err;
+      if (attempt < attempts) await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
+      continue;
+    }
     const json = await res.json().catch(() => ({}));
     if (res.ok) {
       const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
@@ -29,7 +36,7 @@ async function generateJson({ system, parts, schema, temperature = 0.7, thinking
       lastErr = new Error(`Gemini recusou (${res.status}): ${json.error?.message || 'erro desconhecido'}`);
       if (res.status !== 429 && res.status < 500) throw lastErr;
     }
-    if (attempt < attempts) await new Promise((r) => setTimeout(r, 3000 * attempt));
+    if (attempt < attempts) await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
   }
   throw lastErr;
 }

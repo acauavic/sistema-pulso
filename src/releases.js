@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.5.2', date: '2026-11-21', title: 'Respostas por IA sem conversa em série',
+    items: [
+      { kind: 'correcao', text: 'Quando alguém respondia à resposta do Pulso, a IA tratava a resposta como um comentário novo, sem a conversa em volta e sem o limite de duas respostas por pessoa no mesmo post. Como cada resposta termina com uma pergunta, a conversa não parava (houve quem recebesse 8 respostas no mesmo post). Agora a resposta entra como continuação da conversa, com o contexto, e o limite vale.' },
+      { kind: 'correcao', text: 'Resposta de uma pessoa a outra (não ao Pulso) não entra mais na fila da IA.' },
+      { kind: 'correcao', text: 'Quando a IA demorava demais para classificar os comentários de um post, a leitura caía de uma vez; agora ela tenta de novo.' },
+    ],
+  },
+  {
     version: '2.5.1', date: '2026-11-21', title: 'Carregamento sem piscar',
     items: [
       { kind: 'correcao', text: 'O contorno de carregamento (esqueleto) entrava cedo demais e sumia logo em seguida em quase metade das trocas de página, e a tela piscava. Agora ele só aparece quando a página demora de verdade (mais de meio segundo).' },

@@ -124,6 +124,34 @@ describe('Respostas por IA nos comentários (Social > Comentários)', () => {
     assert.equal((await byText('50% das mulheres mentem')).status, 'proposta');
   });
 
+  // Como o Instagram devolve de verdade (pela Outstand): dentro da conversa as respostas vêm SEM o nome, e cada resposta vem
+  // também solta no primeiro nível, com o nome. A cópia solta não é comentário novo: é a conversa, e vale o limite por pessoa.
+  it('resposta ao Pulso que vem solta e sem nome na conversa: continua a conversa, com contexto e com limite', async () => {
+    const post = { network: 'instagram', post_ref: 'op9', platform_post_id: '1799', publication_id: pub2.id };
+    const top = (id, text, username, replies = []) => ({ id, text, username, timestamp: '2026-11-19T12:00:00+0000', likes: 0, authorId: `id-${username}`, replies });
+    const nested = (id, text) => ({ id, text, username: null, timestamp: null, authorId: null });
+    await R.ingest(post, [
+      top('v1', 'A Carol mudou meu treino', 'vlad', [nested('p1', 'Qual treino mais mudou?'), nested('v2', '@podcastpulso os braços, que eram moles'), nested('z1', '@vlad discordo de tudo')]),
+      top('p1', '@vlad Qual treino mais mudou?', 'podcastpulso'),
+      top('v2', '@podcastpulso os braços, que eram moles', 'vlad'),
+      top('z1', '@vlad discordo de tudo', 'zeca'),
+    ], 'podcastpulso');
+    const v2 = (await q("SELECT * FROM social_comments WHERE comment_id = 'v2'"))[0];
+    assert.equal(v2.parent_comment_id, 'v1', 'é a conversa com o Pulso, não um comentário solto');
+    assert.equal(v2.author_username, 'vlad'); assert.equal(v2.author_id, 'id-vlad', 'o id de quem comentou vem da cópia solta (o direct precisa)');
+    assert.ok(v2.thread.some((t) => t.pulso && /Qual treino/.test(t.texto)), 'a IA recebe a conversa');
+    assert.equal((await q("SELECT count(*)::int AS n FROM social_comments WHERE comment_id = 'z1'"))[0].n, 0, 'resposta de outra pessoa a alguém fica de fora');
+    assert.equal((await q("SELECT status FROM social_comments WHERE comment_id = 'v1'"))[0].status, 'respondida');
+
+    // o Pulso respondeu duas vezes: a terceira volta da pessoa não vira mais uma resposta da IA
+    await R.ingest(post, [
+      top('v1', 'A Carol mudou meu treino', 'vlad', [nested('p1', 'Qual treino mais mudou?'), nested('v2', '@podcastpulso os braços'), nested('p2', 'E a constância?'), nested('v3', '@podcastpulso o tempo é o problema')]),
+      top('p1', '@vlad Qual treino mais mudou?', 'podcastpulso'), top('v2', '@podcastpulso os braços', 'vlad'),
+      top('p2', '@vlad E a constância?', 'podcastpulso'), top('v3', '@podcastpulso o tempo é o problema', 'vlad'),
+    ], 'podcastpulso');
+    assert.equal((await q("SELECT count(*)::int AS n FROM social_comments WHERE comment_id = 'v3'"))[0].n, 0, `no máximo ${2} respostas da IA à mesma pessoa no mesmo post`);
+  });
+
   it('a tela abre no que precisa de você; aprovar todas, editar e não responder (a produtora também)', async () => {
     let page = (await as.prod.get('/social/comentarios')).text;
     assert.match(page, /Precisa de você/); assert.match(page, /Qual remédio eu tomo para ansiedade\?/);
