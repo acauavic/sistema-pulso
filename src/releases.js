@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.6.0', date: '2026-11-21', title: 'Estoque de cada projeto e comprovante nas contas',
+    items: [
+      { kind: 'novo', text: 'Comprovante nas contas: ao lançar um custo dá para anexar a nota, o boleto ou o recibo (PDF ou foto), e ao marcar como pago, o comprovante do pagamento. O clipe na linha mostra os arquivos, anexa mais depois (mesmo já pago) e tira o que entrou errado.' },
+      { kind: 'ajuste', text: 'O estoque passou a ser de cada projeto: com o Projeto 100 escolhido, aparecem só os itens dele e os compartilhados (as canecas e os kits do Pulso ficam no Pulso). O que todos usam, como o café do estúdio, é marcado como Compartilhado.' },
+      { kind: 'correcao', text: 'Um vídeo gravado de um projeto descontava do estoque os itens de todos os projetos. Agora desconta só o que é do projeto dele ou compartilhado.' },
+      { kind: 'ajuste', text: 'Registrar compra de um item já vem com o projeto dele em "De quem é".' },
+    ],
+  },
+  {
     version: '2.5.2', date: '2026-11-21', title: 'Respostas por IA sem conversa em série',
     items: [
       { kind: 'correcao', text: 'Quando alguém respondia à resposta do Pulso, a IA tratava a resposta como um comentário novo, sem a conversa em volta e sem o limite de duas respostas por pessoa no mesmo post. Como cada resposta termina com uma pergunta, a conversa não parava (houve quem recebesse 8 respostas no mesmo post). Agora a resposta entra como continuação da conversa, com o contexto, e o limite vale.' },

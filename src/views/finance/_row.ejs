@@ -27,6 +27,29 @@
   </span>
   <span class="fin-amt mono" <% if (e.shared && e.share_cents !== e.amount_cents) { %>title="Valor cheio: <%= money(e.amount_cents) %>"<% } %>><%= isIn ? '+' : '−' %> <%= money(e.share_cents) %></span>
   <span class="plan-list-tools">
+    <%# comprovantes: o clipe aparece quando há algum, ou no lançamento já pago (onde não há mais a janela de pagar) %>
+    <% var rc = (typeof receipts !== 'undefined' && receipts && receipts[e.id]) || [];
+       if (rc.length || (typeof receipts !== 'undefined' && e.status === 'pago' && can('finance.write'))) { %>
+    <details class="row-menu receipt-menu">
+      <summary class="btn sm ghost" aria-label="Comprovantes de <%= e.description %>" title="Comprovantes"><%- icon('paperclip', 14) %><% if (rc.length) { %> <span class="mono"><%= rc.length %></span><% } %></summary>
+      <div class="row-menu-list">
+        <% rc.forEach(function (a) { %>
+        <div class="receipt-row">
+          <a href="/anexos/<%= a.id %>" target="_blank" rel="noopener"><%= a.filename %></a>
+          <span class="mono small muted"><%= a.purpose === 'pagamento' ? 'PAGAMENTO' : 'CONTA' %></span>
+          <% if (can('finance.write')) { %><form method="post" action="/financeiro/lancamentos/<%= e.id %>/comprovantes/<%= a.id %>/excluir" class="inline" data-confirm="Tirar este comprovante do lançamento?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= here %>"><button class="icon-btn row-del" type="submit" aria-label="Tirar <%= a.filename %>"><%- icon('trash-2', 14) %></button></form><% } %>
+        </div>
+        <% }) %>
+        <% if (can('finance.write')) { %>
+        <form method="post" action="/financeiro/lancamentos/<%= e.id %>/comprovantes" data-receipt-box>
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= here %>">
+          <label class="link receipt-add"><%- icon('plus', 14) %> Anexar comprovante<input type="file" class="sr-only" data-receipt data-receipt-submit accept="application/pdf,image/png,image/jpeg,image/webp" multiple></label>
+          <p class="small muted m-0" data-receipt-msg aria-live="polite"></p>
+        </form>
+        <% } %>
+      </div>
+    </details>
+    <% } %>
     <% if (can('finance.write')) { %>
       <% if (e.status === 'previsto') { %>
         <button class="btn sm" type="button" data-fill-modal="modal-pagar" data-fill-mode="<%= e.direction %>" data-fill-action="/financeiro/lancamentos/<%= e.id %>/pagar" data-fill='<%- eJson({ _label: e.description, amount: brl(e.amount_cents), paid_on: today, voltar: here }) %>'><%= isIn ? 'Receber' : 'Pagar' %></button>

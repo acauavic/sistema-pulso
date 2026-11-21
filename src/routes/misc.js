@@ -58,7 +58,7 @@ router.get('/', wrap(async (req, res) => {
   const outreach = require('../services/outreach');
   const finPids = require('../services/scope').financeIdsOf(req); // dinheiro: só os projetos em que a pessoa vê o financeiro
   const finOwner = require('../services/finOwner');
-  const pMoney = can(req.user, 'finance.read') && finPids.length ? Promise.all([fin.counts({ pids: finPids }), fin.stockItems(), db.query(
+  const pMoney = can(req.user, 'finance.read') && finPids.length ? Promise.all([fin.counts({ pids: finPids }), fin.stockItems({ pids: finPids }), db.query(
     // mesma conta do Financeiro ("A pagar em 7 dias"): de hoje até daqui a 7 dias; o atrasado aparece à parte
     `SELECT coalesce(sum(${finOwner.share('e', '$2')}) FILTER (WHERE e.direction = 'saida' AND e.due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7
        FROM fin_entries e WHERE e.status = 'previsto' AND ${finOwner.where('e', '$2')}`,

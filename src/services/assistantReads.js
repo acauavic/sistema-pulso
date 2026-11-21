@@ -113,9 +113,9 @@ const TOOLS = [
   {
     perm: 'stock.read',
     decl: { name: 'estoque', description: 'Estoque do estúdio: itens que precisam de reposição (acabou, comprar agora ou em breve) ou, com todos=true, todos os itens com a quantidade.', parameters: { type: 'OBJECT', properties: { todos: { type: 'BOOLEAN' } } } },
-    async run({ todos = false }) {
+    async run({ todos = false }, user) {
       const fin = require('./finance');
-      const items = (await fin.stockItems()).filter((i) => i.active && (todos || i.state !== 'ok'));
+      const items = (await fin.stockItems({ pids: user && user.pids ? user.pids : null })).filter((i) => i.active && (todos || i.state !== 'ok'));
       return { itens: items.slice(0, 40).map((i) => ({ item: i.name, quantidade: `${i.qty} ${i.unit}`, situacao: fin.STOCK_STATE[i.state], fornecedor: i.supplier || undefined })), ver_no_painel: '/financeiro/estoque' };
     },
   },

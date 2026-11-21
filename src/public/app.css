@@ -2455,3 +2455,16 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   .welcome, .welcome *, .welcome-signal rect { animation: none !important; }
 }
+
+/* Comprovante nos lançamentos (janelas do Financeiro e clipe da linha) */
+.receipt-field { display: grid; gap: 6px; justify-items: start; }
+.receipt-pick { cursor: pointer; }
+.receipt-list { display: grid; gap: 4px; width: 100%; }
+.receipt-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 10px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-card); }
+.receipt-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.receipt-menu .row-menu-list { min-width: 260px; }
+.receipt-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 6px 10px; }
+.receipt-row a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.receipt-row form { margin: 0; }
+.receipt-menu .row-menu-list .receipt-row .row-del { width: auto; padding: 4px; }
+.receipt-add { cursor: pointer; display: flex; align-items: center; gap: 6px; }

@@ -125,6 +125,7 @@ const ITEMS = [
   [/^\/social\/publicacoes\/(\d+)(?:\/|$)/, `${PUB_PROJECT} WHERE p.id = $1`],
   [/^\/social\/comentarios\/(\d+)(?:\/|$)/, `${PUB_PROJECT} WHERE p.id = (SELECT publication_id FROM social_comments WHERE id = $1)`],
   [/^\/social\/ideias\/(\d+)(?:\/|$)/, 'SELECT project_id FROM social_ideas WHERE id = $1'],
+  [/^\/financeiro\/estoque\/(\d+)(?:\/|$)/, 'SELECT project_id FROM fin_stock_items WHERE id = $1'],
   [/^\/plateia\/painel\/leads\/(\d+)(?:\/|$)/, 'SELECT g.project_id FROM plateia_leads l LEFT JOIN guests g ON g.id = l.guest_id WHERE l.id = $1'],
 ];
 

@@ -6,6 +6,14 @@
   var canBuy = can('finance.write'); var seeMoney = can('finance.read');
   var qtyTxt = function (n) { return String(Math.round(n * 100) / 100).replace('.', ','); };
   var REASONS = { compra: 'Compra', episodio: 'Usado no episódio', ajuste: 'Ajuste', perda: 'Perda ou quebra', brinde: 'Brinde avulso' };
+  var sps = typeof stockProjects !== 'undefined' ? stockProjects : [];
+  // De que projeto é o item (só para quem vê mais de um projeto): os projetos e Compartilhado.
+  var ownerField = function (required) {
+    var out = '<fieldset class="seg-radio"><legend>De que projeto é' + (required ? ' *' : '') + '</legend>';
+    sps.forEach(function (p) { out += '<label><input type="radio" name="project_id" value="' + p.id + '"' + (required ? ' required' : '') + '><span>' + fmt.escHtml(p.name) + '</span></label>'; });
+    out += '<label><input type="radio" name="project_id" value="compartilhado"' + (required ? ' required' : '') + '><span>Compartilhado</span></label></fieldset>';
+    return out + '<p class="small muted m-0">Compartilhado é o que todos os projetos usam (ex.: café do estúdio). O vídeo gravado desconta só o que é do projeto dele ou compartilhado.</p>';
+  };
 %>
 <div class="page-head">
   <div><span class="kicker">Financeiro</span><h1>Estoque</h1></div>
@@ -25,7 +33,7 @@
   <li class="card stock-item <%= i.active ? '' : 'is-off' %>">
     <div class="row spread">
       <div class="plan-list-main">
-        <h3><%= i.name %> <% if (!i.active) { %><span class="badge b-gray">Arquivado</span><% } %></h3>
+        <h3><%= i.name %><% if (sps.length) { if (i.project_id) { %><%- include('../partials/project-tag', { id: i.project_id }) %><% } else { %> <span class="project-tag mono">[ compartilhado ]</span><% } } %> <% if (!i.active) { %><span class="badge b-gray">Arquivado</span><% } %></h3>
         <span class="small muted">
           <% if (i.per_episode > 0) { %>Sai <span class="mono"><%= qtyTxt(i.per_episode) %></span> <%= i.unit %> por episódio<% } else { %>Sem uso fixo por episódio<% } %>
           <% if (seeMoney && i.unit_cost_cents) { %> · custo médio <span class="mono"><%= money(i.unit_cost_cents) %></span><% } %>
@@ -42,12 +50,12 @@
       </p>
       <% if (can('stock.write')) { %>
       <div class="row">
-        <% if (canBuy && i.active) { %><button class="btn sm" type="button" data-fill-modal="modal-comprar" data-fill-mode="new" data-fill-action="/financeiro/estoque/<%= i.id %>/comprar" data-fill='<%- json({ _label: i.name + ' (' + i.unit + ')', qty: '', total: '', installments: '1', due_on: fin.todayISO(), paid: '0', category: 'brindes', supplier: i.supplier || '' }) %>'><%- icon('plus', 14) %> Registrar compra</button><% } %>
+        <% if (canBuy && i.active) { %><button class="btn sm" type="button" data-fill-modal="modal-comprar" data-fill-mode="new" data-fill-action="/financeiro/estoque/<%= i.id %>/comprar" data-fill='<%- json({ _label: i.name + ' (' + i.unit + ')', qty: '', total: '', installments: '1', due_on: fin.todayISO(), paid: '0', category: 'brindes', supplier: i.supplier || '', de_quem: i.project_id ? String(i.project_id) : 'compartilhado' }) %>'><%- icon('plus', 14) %> Registrar compra</button><% } %>
         <details class="row-menu">
           <summary class="btn sm ghost" aria-label="Mais ações para <%= i.name %>">Mais</summary>
           <div class="row-menu-list">
             <button class="link" type="button" data-fill-modal="modal-ajuste" data-fill-mode="new" data-fill-action="/financeiro/estoque/<%= i.id %>/ajustar" data-fill='<%- json({ _label: i.name + ' · hoje ' + qtyTxt(i.qty) + ' ' + i.unit, acao: 'contagem', qty: String(i.qty).replace('.', ','), note: '' }) %>'>Acertar ou dar baixa</button>
-            <button class="link" type="button" data-fill-modal="modal-item" data-fill-mode="edit" data-fill-action="/financeiro/estoque/<%= i.id %>" data-fill='<%- json({ name: i.name, unit: i.unit, per_episode: qtyTxt(i.per_episode), min_qty: qtyTxt(i.min_qty), lead_days: String(i.lead_days), supplier: i.supplier || '', notes: i.notes || '', active: i.active ? '1' : '0' }) %>'>Editar item</button>
+            <button class="link" type="button" data-fill-modal="modal-item" data-fill-mode="edit" data-fill-action="/financeiro/estoque/<%= i.id %>" data-fill='<%- json({ name: i.name, unit: i.unit, per_episode: qtyTxt(i.per_episode), min_qty: qtyTxt(i.min_qty), lead_days: String(i.lead_days), supplier: i.supplier || '', notes: i.notes || '', active: i.active ? '1' : '0', project_id: i.project_id ? String(i.project_id) : 'compartilhado' }) %>'>Editar item</button>
           </div>
         </details>
       </div>
@@ -73,6 +81,7 @@
   <form method="post" action="/financeiro/estoque" class="stack">
     <%- csrfField %>
     <h2 id="min-h">Novo item de estoque</h2>
+    <% if (sps.length && !projectScope.current) { %><div class="project-field"><%- ownerField(true) %></div><% } %>
     <label>Nome<input type="text" name="name" maxlength="80" required placeholder="Ex.: Caneca da marca"></label>
     <div class="grid-2 tight">
       <label>Quanto tem agora<input type="text" name="qty" inputmode="decimal" placeholder="0"></label>
@@ -100,6 +109,7 @@
   <form method="post" action="" class="stack" data-fill-form>
     <%- csrfField %>
     <h2 id="mi-h">Editar item</h2>
+    <% if (sps.length) { %><div class="project-field"><%- ownerField(false) %></div><% } %>
     <label>Nome<input type="text" name="name" maxlength="80" required></label>
     <div class="grid-2 tight">
       <label>Sai por episódio<input type="text" name="per_episode" inputmode="decimal"></label>
@@ -155,7 +165,7 @@
       <label>Primeiro vencimento<input type="date" name="due_on" required></label>
     </div>
     <label>Pagamento<select name="paid"><option value="0">Vou pagar no vencimento</option><option value="1">Já paguei (a primeira parcela)</option></select></label>
-    <%- include('../partials/fin-owner', { ownerHint: 'O estoque é da casa; a despesa da compra é de um projeto ou dividida. A divisão precisa somar o valor total.' }) %>
+    <%- include('../partials/fin-owner', { ownerHint: 'Já vem marcado o projeto do item. A divisão do compartilhado precisa somar o valor total.' }) %>
     <details class="more">
       <summary>Mais detalhes</summary>
       <div class="stack top-gap">

@@ -147,8 +147,11 @@ async function recomputeStudio(episodeId) {
 }
 
 // ---- estoque: o episódio gravado consome o que cada item gasta por episódio
+// Só o que é do projeto do vídeo, ou compartilhado (a caneca do Pulso não sai num vídeo do Projeto 100).
 async function consumeStock(episodeId) {
-  const { rows: items } = await db.query('SELECT * FROM fin_stock_items WHERE active AND per_episode > 0');
+  const { rows: items } = await db.query(
+    `SELECT i.* FROM fin_stock_items i, episodes e WHERE e.id = $1 AND i.active AND i.per_episode > 0
+        AND (i.project_id IS NULL OR i.project_id = e.project_id)`, [episodeId]);
   for (const it of items) {
     await db.query(
       `INSERT INTO fin_stock_moves (item_id, qty, reason, episode_id, unit_cost_cents, note) VALUES ($1, $2, 'episodio', $3, $4, 'Uso no episódio')
@@ -283,12 +286,14 @@ async function afterPaid(entry, userId) {
 }
 
 // ---------------------------------------------------------------- estoque
-async function stockItems() {
+// pids: só os itens desses projetos e os compartilhados (null = todos).
+async function stockItems({ pids = null } = {}) {
   const s = await settings();
+  const ids = pids ? pids.map(Number).filter(Number.isInteger) : null;
   const { rows } = await db.query(
     `SELECT i.*, coalesce((SELECT sum(qty) FROM fin_stock_moves m WHERE m.item_id = i.id), 0)::float AS qty,
             coalesce((SELECT sum(-qty) FROM fin_stock_moves m WHERE m.item_id = i.id AND m.reason = 'episodio' AND m.created_at > now() - interval '90 days'), 0)::float AS used90
-       FROM fin_stock_items i ORDER BY i.active DESC, lower(i.name)`);
+       FROM fin_stock_items i ${ids ? 'WHERE i.project_id IS NULL OR i.project_id = ANY($1::int[])' : ''} ORDER BY i.active DESC, lower(i.name)`, ids ? [ids] : []);
   return rows.map((i) => ({ ...i, per_episode: Number(i.per_episode), min_qty: Number(i.min_qty), unit_cost_cents: Number(i.unit_cost_cents), ...forecast(i, s) }));
 }
 
@@ -447,7 +452,7 @@ async function overview({ months = 4, pids = null } = {}) {
   }
   let run = cash;
   const forecastRows = Object.values(rowsByMonth).map((r) => { run += r.in - r.out; return { ...r, net: r.in - r.out, balance: run, label: monthShortLabel(r.ym) }; });
-  const stock = (await stockItems()).filter((i) => i.active && ['comprar', 'acabou', 'atencao'].includes(i.state));
+  const stock = (await stockItems({ pids })).filter((i) => i.active && ['comprar', 'acabou', 'atencao'].includes(i.state));
   return {
     month: { ym, label: monthLabel(ym), in_paid: Number(m.in_paid), out_paid: Number(m.out_paid), in_open: Number(m.in_open), out_open: Number(m.out_open), result: Number(m.in_paid) - Number(m.out_paid) },
     late: { out: Number(m.late_out), in: Number(m.late_in) }, out7: Number(m.out_7), cash, attention: attention.map(toEntry), forecast: forecastRows, stock, perEpisode: perEp, settings: s, byProject,
@@ -523,7 +528,7 @@ async function tick() {
   }
   try { await require('./hourBank').tick(); } catch (err) { console.error('Banco de horas (aviso):', err.message); }
   for (const i of (await stockItems()).filter((x) => x.active && ['comprar', 'acabou'].includes(x.state))) {
-    await require('./notify').notify({ type: 'financeiro', broadcast: true, house: true, title: `Estoque: ${i.name} ${i.state === 'acabou' ? 'acabou' : 'precisa ser reposto'}`, body: i.runs_out ? `Dura até ~${i.runs_out.split('-').reverse().join('/')} (${i.qty} ${i.unit}).` : `Restam ${i.qty} ${i.unit}.`, url: '/financeiro/estoque', dedupe: `fin-estoque-${i.id}-${monthOf(today)}` });
+    await require('./notify').notify({ type: 'financeiro', broadcast: true, ...(i.project_id ? { projectId: i.project_id } : { house: true }), title: `Estoque: ${i.name} ${i.state === 'acabou' ? 'acabou' : 'precisa ser reposto'}`, body: i.runs_out ? `Dura até ~${i.runs_out.split('-').reverse().join('/')} (${i.qty} ${i.unit}).` : `Restam ${i.qty} ${i.unit}.`, url: '/financeiro/estoque', dedupe: `fin-estoque-${i.id}-${monthOf(today)}` });
   }
 }
 

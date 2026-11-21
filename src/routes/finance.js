@@ -7,6 +7,9 @@ const hourBank = require('../services/hourBank');
 const scope = require('../services/scope');
 const owner = require('../services/finOwner');
 const projects = require('../services/projects');
+const attachments = require('../services/attachments');
+// Os comprovantes que a janela enviou (ids dos anexos, um campo por arquivo).
+const receiptIds = (body) => [].concat(body.comprovante || []).map(Number).filter(Number.isInteger);
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
 const { can } = require('../permissions');
@@ -52,7 +55,7 @@ router.get('/financeiro', requirePerm('finance.read'), wrap(async (req, res) => 
   const [ov, counts, bank] = await Promise.all([fin.overview({ pids }), fin.counts({ pids }), hourBank.status({ pids })]);
   res.render('finance/index', {
     title: 'Financeiro', ov, counts, bank, hourBank, fin, C, money, today: fin.todayISO(), here: req.originalUrl,
-    finProjects: pickProjects(req), ...(await pickers(pids)),
+    finProjects: pickProjects(req), receipts: await attachments.forEntries(ov.attention.map((e) => e.id)), ...(await pickers(pids)),
   });
 }));
 
@@ -157,10 +160,11 @@ router.get('/financeiro/lancamentos', requirePerm('finance.read'), wrap(async (r
     fin.entries({ scope, month: scope === 'historico' ? month : null, q, category, pids }), fin.counts({ pids }), pickers(pids),
   ]);
   const splits = await owner.splitsOf(items.filter((e) => e.shared).map((e) => e.id));
+  const receipts = await attachments.forEntries(items.map((e) => e.id));
   const totals = items.reduce((a, e) => { if (e.status !== 'cancelado') a[e.direction === 'entrada' ? 'in' : 'out'] += e.share_cents; return a; }, { in: 0, out: 0 });
   res.render('finance/entries', {
     title: 'Contas a pagar e receber', here: req.originalUrl, scope, scopes: SCOPES, month, q, category, items, counts, totals,
-    today: fin.todayISO(), fin, C, money, splits, finProjects: pickProjects(req), ...pick,
+    today: fin.todayISO(), fin, C, money, splits, receipts, finProjects: pickProjects(req), ...pick,
   });
 }));
 
@@ -204,6 +208,7 @@ router.post('/financeiro/lancamentos', requirePerm('finance.write'), wrap(async 
   const acc = await accountOf(req, own);
   if (acc.error) { await req.flash('error', acc.error); return res.redirect(to); }
   const base = Math.floor(v.amount / v.installments);
+  let firstId = null;
   for (let i = 0; i < v.installments; i += 1) {
     const amount = i === v.installments - 1 ? v.amount - base * (v.installments - 1) : base;
     const paidNow = v.paid && i === 0;
@@ -214,7 +219,10 @@ router.post('/financeiro/lancamentos', requirePerm('finance.write'), wrap(async 
         paidNow ? fin.todayISO() : null, paidNow ? 'pago' : 'previsto', v.supplier, v.notes, v.episode_id, v.sponsor_id, v.installments > 1 ? i + 1 : null, v.installments > 1 ? v.installments : null, req.user.id,
         own.weights ? null : own.projectId, acc.account, acc.person]);
     if (own.weights) await owner.save(novo.id, { weights: own.weights, amount }); // cada parcela mantém a proporção
+    firstId = firstId || novo.id;
   }
+  // o comprovante fica na primeira parcela (já paga: é do pagamento; senão, da conta)
+  await attachments.linkReceipts(receiptIds(req.body), firstId, req.user, v.paid ? 'pagamento' : 'conta');
   await audit(req, 'financeiro.lancado', 'fin_entry', null, { description: v.description, amount: v.amount, parcelas: v.installments });
   await req.flash('ok', v.installments > 1 ? `${v.installments} parcelas lançadas.` : 'Lançamento criado.');
   res.redirect(to);
@@ -248,6 +256,7 @@ router.post('/financeiro/lancamentos/:id', requirePerm('finance.write'), wrap(as
   if (own && !own.keep) await owner.save(e.id, { projectId: own.projectId, weights: own.weights, amount: v.amount });
   else if (own && own.keep && e.project_id != null) await owner.save(e.id, { weights: owner.halves(v.amount, pidsOf(req)), amount: v.amount }); // virou compartilhado sem valores: meio a meio
   else if (e.project_id == null) await owner.rescale(e.id, v.amount); // compartilhado que fica: a divisão acompanha o valor
+  await attachments.linkReceipts(receiptIds(req.body), e.id, req.user, 'conta');
   await audit(req, 'financeiro.editado', 'fin_entry', e.id, { description: v.description });
   await req.flash('ok', 'Lançamento atualizado.');
   res.redirect(to);
@@ -267,11 +276,33 @@ router.post('/financeiro/lancamentos/:id/pagar', requirePerm('finance.write'), w
   if (locked) { await req.flash('error', locked); return res.redirect(to); }
   const { rows: [done] } = await db.query("UPDATE fin_entries SET status='pago', paid_on=$2, amount_cents=$3, cancel_reason=NULL, updated_at=now() WHERE id=$1 RETURNING *", [e.id, paidOn, amount]);
   if (done.project_id == null) await owner.rescale(done.id, amount); // pagou outro valor: a divisão acompanha
+  await attachments.linkReceipts(receiptIds(req.body), done.id, req.user, 'pagamento');
   await fin.afterPaid(done, req.user.id);
   if (done.auto_key && /^estudio-saldo-e/.test(done.auto_key) && done.episode_id) await fin.recomputeStudio(done.episode_id); // pode ter sobrado hora extra
   await audit(req, e.direction === 'entrada' ? 'financeiro.recebido' : 'financeiro.pago', 'fin_entry', e.id, { amount });
   await req.flash('ok', e.direction === 'entrada' ? 'Recebimento registrado.' : 'Pagamento registrado.');
   res.redirect(to);
+}));
+
+// Comprovante depois (pelo clipe da linha), em qualquer situação do lançamento; e tirar um.
+router.post('/financeiro/lancamentos/:id/comprovantes', requirePerm('finance.write'), wrap(async (req, res) => {
+  const e = await findEntry(req, req.params.id);
+  if (!e) return notFound(res, 'Lançamento');
+  const n = await attachments.linkReceipts(receiptIds(req.body), e.id, req.user, e.status === 'pago' ? 'pagamento' : 'conta');
+  if (n) await audit(req, 'financeiro.comprovante', 'fin_entry', e.id, { arquivos: n });
+  await req.flash(n ? 'ok' : 'error', n ? (n > 1 ? `${n} comprovantes anexados.` : 'Comprovante anexado.') : 'Não consegui anexar o comprovante. Envie o arquivo de novo.');
+  res.redirect(backTo(req, '/financeiro/lancamentos'));
+}));
+
+router.post('/financeiro/lancamentos/:id/comprovantes/:aid/excluir', requirePerm('finance.write'), wrap(async (req, res) => {
+  const e = await findEntry(req, req.params.id);
+  if (!e || !isIntId(req.params.aid)) return notFound(res, 'Lançamento');
+  const { rows: [att] } = await db.query("SELECT * FROM attachments WHERE id = $1 AND entity_type = 'fin_entry' AND entity_id = $2", [req.params.aid, e.id]);
+  if (!att) return notFound(res, 'Comprovante');
+  await attachments.remove(att);
+  await audit(req, 'financeiro.comprovante_tirado', 'fin_entry', e.id, { arquivo: att.filename });
+  await req.flash('ok', 'Comprovante tirado.');
+  res.redirect(backTo(req, '/financeiro/lancamentos'));
 }));
 
 router.post('/financeiro/lancamentos/:id/desfazer', requirePerm('finance.write'), wrap(async (req, res) => {
@@ -332,14 +363,28 @@ router.get('/financeiro/exportar.csv', requirePerm('finance.read'), wrap(async (
 }));
 
 // ---------------------------------------------------------------- estoque
+// De quem é o item: um projeto do recorte, ou compartilhado (null). Com um projeto escolhido no menu, o item novo nasce nele.
+// Na edição, sem o campo (ou com um projeto que a pessoa não alcança), continua de quem era. -> { projectId } | { keep } | { error }
+function stockOwner(req, raw, { create = false } = {}) {
+  const ids = scope.idsOf(req);
+  const multi = req.scope.ids.length > 1;
+  if (create && req.scope.current) return ids.includes(req.scope.current.id) ? { projectId: req.scope.current.id } : { error: 'Sua função neste projeto não cadastra estoque.' };
+  if (raw === 'compartilhado' && multi) return { projectId: null };
+  if (ids.includes(Number(raw))) return { projectId: Number(raw) };
+  if (!create) return { keep: true };
+  if (ids.length === 1) return { projectId: ids[0] };
+  return { error: 'Diga de que projeto é o item (ou se é compartilhado).' };
+}
+
 router.get('/financeiro/estoque', requirePerm('stock.read'), wrap(async (req, res) => {
-  const items = await fin.stockItems(); // o estoque é da casa; só a compra tem "De quem é"
+  const items = await fin.stockItems({ pids: scope.idsOf(req) }); // os itens do recorte e os compartilhados
   const moves = await fin.stockMovesFor(items.map((i) => i.id), 6);
   for (const i of items) i.moves = moves[i.id] || [];
   const showItems = req.query.arquivados === '1' ? items : items.filter((i) => i.active);
   res.render('finance/stock', {
     title: 'Estoque', items: showItems, archived: items.filter((i) => !i.active).length, showArchived: req.query.arquivados === '1',
     settings: await fin.settings(), fin, C, money, finProjects: pickProjects(req),
+    stockProjects: req.scope.ids.length > 1 ? scope.idsOf(req).map((id) => projects.get(id)).filter(Boolean) : [],
     counts: can(req.user, 'finance.read') ? await fin.counts({ pids: pidsOf(req) }) : null,
   });
 }));
@@ -361,9 +406,11 @@ router.post('/financeiro/estoque', requirePerm('stock.write'), wrap(async (req, 
   const cost = parseBRL(req.body.unit_cost);
   const qty = req.body.qty ? num(req.body.qty) : 0;
   if (!(qty >= 0) || (cost != null && Number.isNaN(cost))) { await req.flash('error', 'Quantidade ou custo inválido.'); return res.redirect('/financeiro/estoque'); }
+  const own = stockOwner(req, req.body.project_id, { create: true });
+  if (own.error) { await req.flash('error', own.error); return res.redirect('/financeiro/estoque'); }
   const { rows: [it] } = await db.query(
-    'INSERT INTO fin_stock_items (name, unit, per_episode, min_qty, lead_days, supplier, notes, unit_cost_cents) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-    [v.name, v.unit, v.per_episode, v.min_qty, v.lead_days, v.supplier, v.notes, cost || 0]);
+    'INSERT INTO fin_stock_items (name, unit, per_episode, min_qty, lead_days, supplier, notes, unit_cost_cents, project_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+    [v.name, v.unit, v.per_episode, v.min_qty, v.lead_days, v.supplier, v.notes, cost || 0, own.projectId]);
   if (qty > 0) await db.query("INSERT INTO fin_stock_moves (item_id, qty, reason, unit_cost_cents, note, user_id) VALUES ($1,$2,'ajuste',$3,'Saldo inicial',$4)", [it.id, qty, cost || 0, req.user.id]);
   await audit(req, 'estoque.item_criado', 'fin_stock_item', it.id, { name: v.name });
   await req.flash('ok', `${v.name} adicionado ao estoque.`);
@@ -381,8 +428,9 @@ router.post('/financeiro/estoque/:id', requirePerm('stock.write'), wrap(async (r
   if (!it) return notFound(res, 'Item');
   const { v, error } = parseItem(req.body);
   if (error) { await req.flash('error', error); return res.redirect('/financeiro/estoque'); }
-  await db.query('UPDATE fin_stock_items SET name=$2, unit=$3, per_episode=$4, min_qty=$5, lead_days=$6, supplier=$7, notes=$8, active=$9 WHERE id=$1',
-    [it.id, v.name, v.unit, v.per_episode, v.min_qty, v.lead_days, v.supplier, v.notes, req.body.active !== '0']);
+  const own = stockOwner(req, req.body.project_id);
+  await db.query('UPDATE fin_stock_items SET name=$2, unit=$3, per_episode=$4, min_qty=$5, lead_days=$6, supplier=$7, notes=$8, active=$9, project_id=$10 WHERE id=$1',
+    [it.id, v.name, v.unit, v.per_episode, v.min_qty, v.lead_days, v.supplier, v.notes, req.body.active !== '0', own.keep ? it.project_id : own.projectId]);
   await audit(req, 'estoque.item_editado', 'fin_stock_item', it.id, { name: v.name });
   await req.flash('ok', 'Item atualizado.');
   res.redirect('/financeiro/estoque');
