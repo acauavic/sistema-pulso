@@ -2,6 +2,9 @@
 // mesma empresa ou site (patrocinador) = duplicata CERTA; nome parecido (e, no patrocinador, mesmo e-mail ou telefone, porque grupos
 // dividem e-mail) = POSSÍVEL. O único estado guardado são os pares marcados como "não é duplicata" (duplicate_dismissals).
 // Juntar (merge) move tudo do cadastro que sai para o que fica e manda o que sai para a lixeira.
+// Com projetos: a MESMA pessoa (mesmo person_id) em dois projetos NÃO é duplicata — são duas participações dela. Duas
+// pessoas diferentes e parecidas em projetos diferentes aparecem com `cross: true`, e aí a resolução é unir as pessoas
+// (services/people.js `join`), mantendo as duas participações; no mesmo projeto, continua indo uma para a lixeira.
 const db = require('../db/pool');
 
 const TABLE = { guest: 'guests', sponsor: 'sponsors' };
@@ -111,7 +114,7 @@ function compare(kind, a, b) {
 
 // ---------------------------------------------------------------- consultas
 const LIST_SQL = {
-  guest: `SELECT g.id, g.name, g.instagram, g.email, g.phone, g.status AS stage, g.created_at, u.name AS owner_name
+  guest: `SELECT g.id, g.name, g.instagram, g.email, g.phone, g.status AS stage, g.created_at, g.person_id, g.project_id, u.name AS owner_name
             FROM guests g LEFT JOIN users u ON u.id = g.owner_id`,
   sponsor: `SELECT s.id, s.company AS name, s.website, s.contact_email AS email, s.contact_phone AS phone, s.stage, s.created_at, u.name AS owner_name
               FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id`,
@@ -119,6 +122,11 @@ const LIST_SQL = {
 const stageLabel = (kind, key) => { const C = require('../constants'); return (kind === 'guest' ? C.STATUS_BY_KEY : C.SPONSOR_STAGE_BY_KEY)[key]?.label || key; };
 const all = async (kind) => (await db.query(LIST_SQL[kind])).rows.map((r) => ({ ...r, stage_label: stageLabel(kind, r.stage) }));
 const pairKey = (a, b) => (Number(a) < Number(b) ? `${a}-${b}` : `${b}-${a}`);
+// De quem é cada linha (a pessoa do convidado, a empresa do patrocinador) e se as duas são de projetos diferentes.
+const ownerOf = (kind, r) => (kind === 'guest' ? r.person_id : r.company_id);
+const sameOwner = (kind, a, b) => Boolean(ownerOf(kind, a) && ownerOf(kind, a) === ownerOf(kind, b));
+const ownerKey = (kind, a, b) => (ownerOf(kind, a) && ownerOf(kind, b) ? pairKey(ownerOf(kind, a), ownerOf(kind, b)) : null);
+const isCross = (a, b) => Boolean(a.project_id && b.project_id && Number(a.project_id) !== Number(b.project_id));
 async function dismissedSet(kind) {
   const { rows } = await db.query('SELECT a_id, b_id FROM duplicate_dismissals WHERE kind = $1', [kind]);
   return new Set(rows.map((r) => `${r.a_id}-${r.b_id}`));
@@ -131,11 +139,13 @@ async function findFor(kind, rec, { excludeId = null } = {}) {
   const k = keys(kind, rec);
   const [rows, dismissed] = await Promise.all([all(kind), excludeId ? dismissedSet(kind) : new Set()]);
   const out = [];
+  const ownerId = kind === 'guest' ? rec.person_id : rec.company_id; // a pessoa/empresa de quem estamos comparando
   for (const r of rows) {
     if (excludeId && Number(r.id) === Number(excludeId)) continue;
     if (excludeId && dismissed.has(pairKey(excludeId, r.id))) continue;
+    if (ownerId && sameOwner(kind, rec, r)) continue; // a mesma pessoa em outro projeto: é ela, não uma duplicata
     const c = compare(kind, k, keys(kind, r));
-    if (c) out.push({ ...r, ...c });
+    if (c) out.push({ ...r, ...c, cross: isCross(rec, r) });
   }
   return out.sort(byLevel);
 }
@@ -145,12 +155,16 @@ async function pairs(kind) {
   const [rows, dismissed] = await Promise.all([all(kind), dismissedSet(kind)]);
   const ks = rows.map((r) => keys(kind, r));
   const out = []; const off = [];
+  const seen = new Set(); // um par por pessoa/empresa: a mesma dupla com várias participações aparece uma vez
   for (let i = 0; i < rows.length; i += 1) {
     for (let j = i + 1; j < rows.length; j += 1) {
+      if (sameOwner(kind, rows[i], rows[j])) continue; // duas participações da mesma pessoa
       const c = compare(kind, ks[i], ks[j]);
       if (!c) continue;
       const [a, b] = Number(rows[i].id) < Number(rows[j].id) ? [rows[i], rows[j]] : [rows[j], rows[i]];
-      (dismissed.has(pairKey(a.id, b.id)) ? off : out).push({ a, b, ...c });
+      const owners = ownerKey(kind, a, b);
+      if (owners) { if (seen.has(owners)) continue; seen.add(owners); }
+      (dismissed.has(pairKey(a.id, b.id)) ? off : out).push({ a, b, ...c, cross: isCross(a, b) });
     }
   }
   const sort = (x, y) => LEVEL_ORDER[x.level] - LEVEL_ORDER[y.level] || String(x.a.name).localeCompare(String(y.a.name), 'pt-BR');
@@ -193,8 +207,8 @@ const same = (field, a, b) => {
 };
 
 // Campos preenchidos nos dois com valores diferentes: [{ field, label, a, b }].
-function conflicts(kind, a, b) {
-  return Object.entries(FIELDS[kind]).filter(([f]) => !empty(a[f]) && !empty(b[f]) && !same(f, a[f], b[f]))
+function conflicts(kind, a, b, { only = null } = {}) {
+  return Object.entries(FIELDS[kind]).filter(([f]) => (!only || only.includes(f)) && !empty(a[f]) && !empty(b[f]) && !same(f, a[f], b[f]))
     .map(([field, label]) => ({ field, label, a: a[field], b: b[field] }));
 }
 
@@ -333,6 +347,6 @@ async function merge(kind, keepId, dropId, choices, user) {
 }
 
 module.exports = {
-  norm: { personName, companyName, instagram, email, phone, site }, distance, keys, compare, findFor, pairs, dismiss, undismiss,
+  norm: { personName, companyName, instagram, email, phone, site }, distance, keys, compare, findFor, pairs, dismiss, undismiss, isCross,
   conflicts, summary, pickKeep, lostLinks, merge, stageLabel, FIELDS, TABLE, URL, SLUG, KIND_OF_SLUG,
 };

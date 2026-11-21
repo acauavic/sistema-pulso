@@ -6,19 +6,23 @@
   var noun = kind === 'guest' ? 'convidado' : 'patrocinador';
 %>
 <div class="page-head">
-  <div><span class="kicker"><%= kind === 'guest' ? 'Convidados' : 'Patrocinadores' %> · Duplicata</span><h1>Comparar e juntar</h1></div>
+  <div><span class="kicker"><%= kind === 'guest' ? 'Convidados' : 'Patrocinadores' %> · <%= cross ? 'A mesma pessoa?' : 'Duplicata' %></span><h1><%= cross ? 'Comparar e unir' : 'Comparar e juntar' %></h1></div>
   <div class="row"><a class="btn ghost" href="<%= back %>"><%- icon('arrow-left') %> Voltar</a></div>
 </div>
 <p class="lead">
   <% if (cmp) { %><span class="badge <%= cmp.level === 'certa' ? 'b-red' : 'b-amber' %>"><%= cmp.level === 'certa' ? 'Duplicata' : 'Possível duplicata' %></span> <span class="mono small"><%= cmp.reasons.join(' · ') %></span>
-  <% } else { %>Estes dois cadastros não parecem iguais pelas regras do sistema. Junte só se tiver certeza de que são o mesmo <%= noun %>.<% } %>
+  <% } else { %>Estes dois cadastros não parecem iguais pelas regras do sistema. <%= cross ? 'Una' : 'Junte' %> só se tiver certeza de que são o mesmo <%= noun %>.<% } %>
 </p>
+<% if (cross) { %>
+<p class="notice">São de projetos diferentes (<%= projectOf(A) %> e <%= projectOf(B) %>). Unir não apaga nada: as duas
+  participações seguem, cada uma com a etapa dela, e a pessoa passa a ser uma só — corrigir um dado num projeto vale no outro.</p>
+<% } %>
 
-<form method="post" action="/duplicatas/<%= slug %>/<%= A.id %>/<%= B.id %>/juntar" class="stack" data-busy="Juntando…" data-confirm="Juntar os dois cadastros? O que sai vai para a lixeira; o histórico dele passa para o que fica.">
+<form method="post" action="/duplicatas/<%= slug %>/<%= A.id %>/<%= B.id %>/<%= cross ? 'mesma-pessoa' : 'juntar' %>" class="stack" data-busy="<%= cross ? 'Unindo…' : 'Juntando…' %>" data-confirm="<%= cross ? 'Tratar os dois como a mesma pessoa? As duas participações continuam, cada uma no seu projeto.' : 'Juntar os dois cadastros? O que sai vai para a lixeira; o histórico dele passa para o que fica.' %>">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
   <input type="hidden" name="voltar" value="<%= back %>">
   <fieldset class="dup-compare">
-    <legend class="seg-label">Qual cadastro fica</legend>
+    <legend class="seg-label"><%= cross ? 'De quem são os dados da pessoa' : 'Qual cadastro fica' %></legend>
     <% [A, B].forEach(function (r) { var s = r.id === A.id ? sA : sB; var lost = r.id === A.id ? lostA : lostB; %>
     <label class="card dup-card">
       <span class="row spread align-start">
@@ -26,16 +30,17 @@
           <span class="kicker mono">#<%= r.id %> · criado em <%= fmt.formatDateTime(r.created_at) %></span>
           <span class="dup-card-name"><%= nameOf(r) %></span>
         </span>
-        <input type="radio" name="manter" value="<%= r.id %>" <%= Number(r.id) === Number(keepId) ? 'checked' : '' %> aria-label="Manter o cadastro #<%= r.id %>">
+        <input type="radio" name="manter" value="<%= r.id %>" <%= Number(r.id) === Number(keepId) ? 'checked' : '' %> aria-label="<%= cross ? 'Usar os dados do cadastro' : 'Manter o cadastro' %> #<%= r.id %>">
       </span>
       <span class="row dup-card-meta">
+        <% if (cross) { %><span class="mono small muted"><%= projectOf(r) %></span><% } %>
         <span class="badge b-st-<%= stageOf(r) %>"><%= labelOf(stageOf(r)) %></span>
         <span class="mono small muted"><%= r.owner_name || 'sem responsável' %></span>
       </span>
       <span class="dup-counts">
         <% s.items.forEach(function (it) { %><span class="<%= it.n ? '' : 'muted' %>"><span class="mono"><%= it.n %></span> <%= it.label.toLowerCase() %></span><% }) %>
       </span>
-      <% if (lost.length) { %><span class="notice small">Se este sair: <%= lost.join(', ') %> deixa<%= lost.length > 1 ? 'm' : '' %> de funcionar.</span><% } %>
+      <% if (!cross && lost.length) { %><span class="notice small">Se este sair: <%= lost.join(', ') %> deixa<%= lost.length > 1 ? 'm' : '' %> de funcionar.</span><% } %>
       <a class="link small" href="/<%= slug %>/<%= r.id %>" target="_blank" rel="noopener">Abrir cadastro</a>
     </label>
     <% }) %>
@@ -44,7 +49,7 @@
   <% if (conflicts.length) { %>
   <section class="card">
     <h2>O que fica onde os dois são diferentes</h2>
-    <p class="small muted">O que estiver vazio num cadastro é preenchido com o do outro. O valor que não ficar vai para as observações.</p>
+    <p class="small muted"><% if (cross) { %>Só os dados da pessoa entram aqui: etapa, tema e convite continuam de cada projeto.<% } else { %>O que estiver vazio num cadastro é preenchido com o do outro. O valor que não ficar vai para as observações.<% } %></p>
     <div class="stack top-gap">
       <% conflicts.forEach(function (c) { var keepIsA = Number(keepId) === Number(A.id); %>
       <div class="seg-wrap">
@@ -59,9 +64,9 @@
   </section>
   <% } %>
 
-  <p class="small muted">O cadastro que sai vai para a lixeira. Restaurar devolve os dados dele, mas o histórico continua no que ficou.</p>
+  <p class="small muted"><% if (cross) { %>Nada vai para a lixeira: as duas participações continuam.<% } else { %>O cadastro que sai vai para a lixeira. Restaurar devolve os dados dele, mas o histórico continua no que ficou.<% } %></p>
   <div class="row">
-    <button class="btn primary" type="submit"><%- icon('layers') %> Juntar os dois cadastros</button>
+    <button class="btn primary" type="submit"><%- icon('layers') %> <%= cross ? 'É a mesma pessoa' : 'Juntar os dois cadastros' %></button>
     <a class="btn ghost" href="<%= back %>">Cancelar</a>
   </div>
 </form>

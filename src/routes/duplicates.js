@@ -31,10 +31,15 @@ router.get('/duplicatas/:tipo/:a/:b', wrap(async (req, res) => {
   if (rows.length < 2) { await req.flash('error', 'Um dos cadastros não existe mais.'); return res.redirect(backTo(req, dup.URL[p.kind](rows[0]?.id || p.a))); }
   const [A, B] = rows;
   const [sA, sB] = await Promise.all([dup.summary(p.kind, A.id), dup.summary(p.kind, B.id)]);
+  // De projetos diferentes: o que se resolve é "é a mesma pessoa" (as duas participações ficam, só a identidade se une),
+  // e então só os campos da pessoa entram na escolha — o funil de cada projeto não se mistura.
+  const cross = dup.isCross(A, B) && p.kind === 'guest'; // o patrocinador entra na parte B (empresa e contrato)
+  const only = cross ? require('../services/people').COLUMNS : null;
+  const projectOf = (r) => (require('../services/projects').get(r.project_id) || {}).name || '';
   res.render('duplicates/compare', {
-    title: 'Comparar e juntar', kind: p.kind, slug: req.params.tipo, A, B, sA, sB,
+    title: cross ? 'Comparar e unir' : 'Comparar e juntar', kind: p.kind, slug: req.params.tipo, A, B, sA, sB, cross, projectOf,
     cmp: dup.compare(p.kind, dup.keys(p.kind, A), dup.keys(p.kind, B)),
-    conflicts: dup.conflicts(p.kind, A, B), keepId: dup.pickKeep(p.kind, A, B, sA, sB),
+    conflicts: dup.conflicts(p.kind, A, B, { only }), keepId: dup.pickKeep(p.kind, A, B, sA, sB),
     lostA: dup.lostLinks(p.kind, A, B), lostB: dup.lostLinks(p.kind, B, A),
     labelOf: (key) => dup.stageLabel(p.kind, key), back: backTo(req, dup.URL[p.kind](p.a)),
   });
@@ -52,6 +57,23 @@ router.post('/duplicatas/:tipo/:a/:b/juntar', wrap(async (req, res) => {
   await audit(req, p.kind === 'guest' ? 'convidado.juntado' : 'patrocinador.juntado', p.kind, keepId, { ficou: keepId, saiu: dropId, saiu_nome: r.drop.name, campos: choices });
   await req.flash('ok', `${r.drop.name} foi juntado a ${r.keep.name} e foi para a lixeira.`, r.trash && { undo: r.trash.batch });
   res.redirect(dup.URL[p.kind](keepId));
+}));
+
+// "É a mesma pessoa" (projetos diferentes): une as pessoas e mantém as duas participações. Ninguém vai para a lixeira.
+router.post('/duplicatas/:tipo/:a/:b/mesma-pessoa', wrap(async (req, res) => {
+  const p = parse(req, res); if (!p) return;
+  const back = `/duplicatas/${req.params.tipo}/${p.a}/${p.b}`;
+  const keepId = Number(req.body.manter);
+  if (![p.a, p.b].includes(keepId)) { await req.flash('error', 'Escolha de quem são os dados.'); return res.redirect(back); }
+  const dropId = keepId === p.a ? p.b : p.a;
+  const choices = {};
+  for (const f of Object.keys(dup.FIELDS[p.kind])) if (req.body[`campo_${f}`] != null) choices[f] = req.body[`campo_${f}`];
+  if (p.kind !== 'guest') { await req.flash('error', 'Ainda não dá para unir empresas: junte os cadastros.'); return res.redirect(back); }
+  const r = await require('../services/people').join(keepId, dropId, choices, req.user);
+  if (r.error) { await req.flash('error', r.error); return res.redirect(back); }
+  await audit(req, 'convidado.mesma_pessoa', p.kind, keepId, { com: dropId, campos: choices });
+  await req.flash('ok', 'Certo: é a mesma pessoa. As duas participações seguem, cada uma no seu projeto.');
+  return res.redirect(dup.URL[p.kind](keepId));
 }));
 
 router.post('/duplicatas/:tipo/:a/:b/dispensar', wrap(async (req, res) => {
