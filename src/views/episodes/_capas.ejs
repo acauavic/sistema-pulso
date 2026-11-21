@@ -171,7 +171,7 @@
   <form method="post" action="/episodios/<%= ep.id %>/ficha-das-capas" class="stack" data-busy="Salvando…">
     <%- csrfField %>
     <h2 id="ficha-h">Quem é o convidado nas capas</h2>
-    <p class="muted small">Estes campos entram em todas as peças. A capa fala com quem ainda não conhece o Pulso nem o convidado.</p>
+    <p class="muted small">Estes campos entram em todas as peças. A capa fala com quem ainda não conhece o <%= podcastName %> nem o convidado.</p>
     <label>Nome como aparece<input type="text" name="guest" value="<%= sheet.guest || '' %>" maxlength="40" placeholder="ex.: Dr. Márcio Martins"></label>
     <label>Credencial <small class="counter" data-word-counter="ficha-tag" data-max="<%= M.LIMITS.tag.words %>"></small>
       <input type="text" id="ficha-tag" name="tag" value="<%= sheet.tag || '' %>" maxlength="90" placeholder="ex.: o único médico das Forças Especiais"></label>

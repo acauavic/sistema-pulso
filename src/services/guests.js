@@ -63,6 +63,8 @@ async function renderInvite(guest, { rsvpState = null, closed = false, preview =
   });
   vars.bloco_resposta = tpl.responseBlock(preview ? '#' : `${base}/responder`, { state: rsvpState, closed });
   vars.brand_dir = require('./publicUrl').brandDirOf(guest.project_id); // ícone da marca do projeto
+  // o convite é um documento com identidade própria: a folha de marca do projeto NÃO entra aqui (seria meio Pulso,
+  // meio Projeto 100). Projeto com identidade própria ganha o documento dele; só o ícone segue o projeto.
   return {
     html: tpl.render(tpl.inviteHtml(), vars),
     subject: `Convite para o ${require('./projects').publicName(guest.project_id)}`,

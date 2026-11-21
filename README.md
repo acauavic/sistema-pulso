@@ -84,6 +84,12 @@ dinheiro são sempre de um projeto**. Convidados, patrocinadores, episódios, co
   o seletor; os números das redes são guardados por projeto. A configuração das respostas por IA, os links (canal,
   comunidade, Spotify) e o contexto da IA (`projects.ai_context`, em Gestão > Projetos) também são por projeto.
   **Ainda da casa**: os Números dos comentários (Social > Comentários > Números) somam os posts de todos os projetos.
+- **Marca por projeto nas páginas públicas** (`src/public/brand/<slug>/`): `favicon.svg`, `favicon.ico`,
+  `apple-touch-icon.png` e `brand.css` (uma folha que troca **só os tokens** — ação, externo, texto, fundo e o display;
+  nada de layout). O passo do domínio põe `res.locals.brandDir` e `res.locals.brandCss`, e as páginas públicas em EJS
+  (portal do convidado, pós-gravação, plateia, cadastro e portal do patrocinador) carregam a folha depois da delas.
+  **Convite, media kit e capas geradas ficam fora**: são documentos e modelos com texto, wordmark e tipografia
+  próprios; cada projeto ganha a versão dele (trabalho de design, não de cor).
 - **Módulos**: tela de um módulo que nenhum projeto da pessoa usa responde 404 (`scope.requireModule`); o menu já não
   mostra, e trocar para um projeto que não usa a tela aberta leva ao Início.
 - **Isolamento**: página, ação ou arquivo de projeto que a pessoa não participa responde 404. O teste

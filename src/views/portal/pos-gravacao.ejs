@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="<%= brandDir %>/apple-touch-icon.png">
 <meta name="theme-color" content="#F4F2EC">
 <link rel="stylesheet" href="/static/portal.css?v=<%= assetV %>">
+<% if (typeof brandCss !== 'undefined' && brandCss) { %><link rel="stylesheet" href="<%= brandCss %>?v=<%= assetV %>"><% } %>
 </head>
 <body class="pp">
 <%# Página pós-gravação: a mesma para todos os convidados (QR Code do cartão de agradecimento). Curta de ler: agradecimento, três

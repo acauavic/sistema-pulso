@@ -23,6 +23,7 @@
 <link rel="apple-touch-icon" href="<%= brandDir %>/apple-touch-icon.png">
 <meta name="theme-color" content="#0A0A0A">
 <link rel="stylesheet" href="/static/plateia.css?v=<%= assetV %>">
+<% if (typeof brandCss !== 'undefined' && brandCss) { %><link rel="stylesheet" href="<%= brandCss %>?v=<%= assetV %>"><% } %>
 </head>
 <body data-plateia data-guest="<%= g.id %>" data-partner="<%= partner && !partnerFull ? partner.token : '' %>" data-meta-pixel="<%= s.metaPixel %>" data-ga4="<%= s.ga4 %>" data-price="<%= priceLabel %>" data-price-label="<%= exempt ? 'Participação' : 'Investimento (se selecionado)' %>" data-duration="<%= s.duration %>" data-location="<%= s.location %>">
 <header class="pl-top">

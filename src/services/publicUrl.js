@@ -43,4 +43,12 @@ function brandDirOf(projectId) {
   return `/static/brand/${slug}`;
 }
 
-module.exports = { publicUrl, panelUrl, baseOf, hostOf, projectByHost, isPanelHost, panelHost, bare, brandDirOf };
+// Folha de estilo da marca do projeto nas páginas públicas (`brand/<slug>/brand.css`), se ele tiver a dele.
+// Ela entra depois do CSS da página e troca só os tokens. Sem arquivo, as páginas ficam como estão (o Pulso).
+function brandCssOf(projectId) {
+  const dir = brandDirOf(projectId);
+  const file = require('path').join(__dirname, '..', 'public', dir.replace('/static/', ''), 'brand.css');
+  return require('fs').existsSync(file) ? `${dir}/brand.css` : '';
+}
+
+module.exports = { publicUrl, panelUrl, baseOf, hostOf, projectByHost, isPanelHost, panelHost, bare, brandDirOf, brandCssOf };

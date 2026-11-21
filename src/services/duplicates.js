@@ -120,7 +120,11 @@ const LIST_SQL = {
               FROM sponsors s LEFT JOIN users u ON u.id = s.owner_id`,
 };
 const stageLabel = (kind, key) => { const C = require('../constants'); return (kind === 'guest' ? C.STATUS_BY_KEY : C.SPONSOR_STAGE_BY_KEY)[key]?.label || key; };
-const all = async (kind) => (await db.query(LIST_SQL[kind])).rows.map((r) => ({ ...r, stage_label: stageLabel(kind, r.stage) }));
+// `pids`: recorte da lista da gestão. Sem ids, lê todos os projetos — é assim que o aviso do cadastro mostra
+// "esta pessoa já está em outro projeto".
+const all = async (kind, pids = null) => (await db.query(
+  pids ? `SELECT * FROM (${LIST_SQL[kind]}) q WHERE q.project_id = ANY($1::int[])` : LIST_SQL[kind], pids ? [pids] : []
+)).rows.map((r) => ({ ...r, stage_label: stageLabel(kind, r.stage) }));
 const pairKey = (a, b) => (Number(a) < Number(b) ? `${a}-${b}` : `${b}-${a}`);
 // De quem é cada linha (a pessoa do convidado, a empresa do patrocinador) e se as duas são de projetos diferentes.
 const ownerOf = (kind, r) => (kind === 'guest' ? r.person_id : r.company_id);
@@ -151,8 +155,8 @@ async function findFor(kind, rec, { excludeId = null } = {}) {
 }
 
 // Todos os pares de um tipo: { pairs: [{ a, b, level, reasons }], dismissed: [...] }.
-async function pairs(kind) {
-  const [rows, dismissed] = await Promise.all([all(kind), dismissedSet(kind)]);
+async function pairs(kind, pids = null) {
+  const [rows, dismissed] = await Promise.all([all(kind, pids), dismissedSet(kind)]);
   const ks = rows.map((r) => keys(kind, r));
   const out = []; const off = [];
   const seen = new Set(); // um par por pessoa/empresa: a mesma dupla com várias participações aparece uma vez

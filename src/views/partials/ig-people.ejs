@@ -10,7 +10,7 @@
   <legend><%- icon('instagram', 14) %> Instagram</legend>
   <% if (!locals.photo) { %>
   <div class="igp-trial" data-igp-trial>
-    <label class="check"><input type="checkbox" name="ig_trial" value="1" data-igp-trial-on<%= trialNow ? ' checked' : '' %>> <strong>Reel de teste</strong> <span class="small muted">aparece primeiro só para quem não segue o Pulso</span></label>
+    <label class="check"><input type="checkbox" name="ig_trial" value="1" data-igp-trial-on<%= trialNow ? ' checked' : '' %>> <strong>Reel de teste</strong> <span class="small muted">aparece primeiro só para quem ainda não segue o perfil</span></label>
     <div class="igp-trial-mode" data-igp-trial-mode<%= trialNow ? '' : ' hidden' %>>
       <div class="seg-radio" role="radiogroup" aria-label="Como liberar para os seguidores">
         <label><input type="radio" name="ig_trial_modo" value="auto"<%= trialNow !== 'manual' ? ' checked' : '' %>> Libera sozinho se for bem</label>

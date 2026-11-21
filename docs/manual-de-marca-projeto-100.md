@@ -80,10 +80,18 @@
   credencial de evento 10×15 cm com a faixa trocando de cor por categoria (convidado e palco, equipe, patrocinador,
   imprensa).
 
-## No sistema
+## No sistema (feito na v2.0.0)
 
-- **Hoje**: o Projeto 100 trabalha no painel (vídeos, pauta, cortes, pedidos, tarefas) com a identidade da casa. Nada
-  público sai pelo sistema ainda.
-- **Fase 9 do multiprojetos** (`docs/superpowers/specs/2026-11-20-multiprojetos-design.md`): convite, portal, media kit e
-  capas com esta identidade — tokens próprios por projeto, Archivo no repositório, favicon e imagem de compartilhamento
-  pelo domínio. Até lá, nenhuma cor ou fonte daqui entra no `app.css`.
+- **Onde a marca vive**: `src/public/brand/projeto-100/` — `favicon.svg` (a marca 1 + ∞ = 100 no gradiente),
+  `favicon.ico` (16/32/48), `apple-touch-icon.png` (180) e **`brand.css`**, a folha que troca só os tokens:
+  `--lime` (ação) = Azul 100, `--plum` (externo) = Violeta, texto em Noite, fundo em Papel, apoio em Névoa e Grafite,
+  display em **Archivo** (o mesmo woff2 do painel). Nada de layout: a estrutura das páginas é a mesma.
+- **Como entra**: o passo do domínio (`services/hostContext.js`) põe `res.locals.brandDir` e `res.locals.brandCss` pela
+  marca do projeto do domínio; as páginas públicas em EJS (portal do convidado, pós-gravação, plateia, cadastro e
+  portal do patrocinador) carregam a folha **depois** da delas. `/favicon.ico` e o ícone do celular saem da pasta do
+  projeto, com reserva no projeto padrão.
+- **O que não é só cor**: o **convite** e o **media kit** são documentos com texto e wordmark próprios — eles ganham uma
+  versão do Projeto 100 (texto + desenho), não um filtro de cores; e as **capas** geradas seguem os modelos do Pulso
+  (Space Grotesk, Instrument Serif, o Ponto). As capas do Projeto 100 pedem modelos dele, no mesmo formato do guia de
+  peças — trabalho de design, não de token.
+- **Nada daqui entra no `app.css`**: o painel é da casa (Health Scale Studio).

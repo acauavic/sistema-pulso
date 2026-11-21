@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.0.0', date: '2026-11-21', title: 'Health Scale Studio: a casa com dois projetos',
+    items: [
+      { kind: 'novo', text: 'O sistema virou a casa de mais de um projeto. Fecham aqui as nove partes do trabalho: identidade da casa, projetos e seletor, vídeo e pauta, pessoas e empresas, dinheiro, endereços, acesso, redes e a marca do Projeto 100. Para quem trabalha num projeto só, nada muda: as telas são as mesmas, sem seletor, sem sigla e sem campo de projeto.' },
+      { kind: 'novo', text: 'O Projeto 100 ganhou a identidade dele nas páginas públicas: ícone próprio (a marca 1 + ∞ = 100), ícone do celular e a folha de marca com as cores e a tipografia do manual — Azul 100 é a ação, o violeta marca o que é de fora. O portal do convidado, a página pós-gravação, a plateia e as páginas do patrocinador saem na cor do projeto do item.' },
+      { kind: 'ajuste', text: 'O convite e o media kit continuam documentos com identidade própria: o ícone segue o projeto, mas a aparência deles muda junto com o texto, numa versão própria de cada projeto — não trocando só as cores.' },
+      { kind: 'ajuste', text: 'Varredura final: o painel não fala mais "Pulso" onde o nome tem de vir do projeto (capas, galeria do media kit, Reel de teste, instalação no celular e os avisos), e a lista de duplicatas da gestão passou a seguir o projeto escolhido.' },
+      { kind: 'ajuste', text: 'As capas geradas pelo sistema continuam no desenho do Pulso (os modelos são a linguagem dele). As do Projeto 100 entram quando ele tiver os modelos dele — é trabalho de design, não de cor.' },
+    ],
+  },
+  {
     version: '1.105.0', date: '2026-11-21', title: 'Redes por projeto',
     items: [
       { kind: 'novo', text: 'Cada projeto tem as contas de rede dele no provedor: a publicação sai pela conta do projeto do corte ou do vídeo, e as telas mostram as contas daquele projeto. O Pulso continua com as contas de sempre.' },

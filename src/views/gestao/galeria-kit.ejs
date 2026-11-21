@@ -14,7 +14,7 @@
     <% picked.forEach(function (c) { %><li><figure class="pick"><img src="/capas/<%= c.cover_id %>/imagem?w=640" alt="Capa de <%= c.shown_title %>" loading="lazy" width="108" height="192"><span class="small"><%= c.shown_title %></span><span class="mono small muted"><%= c.ep_number ? 'EP.' + String(c.ep_number).padStart(3, '0') : '' %> · <%= c.guest_name || '' %></span></figure></li><% }) %>
   </ul>
   <% } else { %>
-  <p class="small muted">Nenhum escolhido: o convite mostra o corte publicado mais recente de cada episódio (só os que têm capa). Escolha até <%= maxPicks %> para mostrar os que mais representam o Pulso.</p>
+  <p class="small muted">Nenhum escolhido: o convite mostra o corte publicado mais recente de cada episódio (só os que têm capa). Escolha até <%= maxPicks %> para mostrar os que mais representam o projeto.</p>
   <% } %>
 </section>
 <dialog class="modal modal-wide" id="modal-cortes-convite" aria-labelledby="mcc-h">

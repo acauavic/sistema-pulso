@@ -85,7 +85,7 @@ const NOTIFICATION_TYPES = {
   comentario: { label: 'Comentários', hint: 'Comentários em convidados, patrocinadores, episódios, cortes e tarefas de que você participa, e menções com @.' },
   reacao: { label: 'Reações', hint: 'Alguém reagiu com um emoji a um comentário seu.' },
   agendamento: { label: 'Agendamentos concluídos', hint: 'Convidado com gravação agendada (data, estúdio, hosts e convidado confirmados).' },
-  plateia: { label: 'Plateia', hint: 'Nova inscrição pedida pela página pública do Pulso Podcast com Plateia.' },
+  plateia: { label: 'Plateia', hint: 'Nova inscrição pedida pela página pública da plateia.' },
   convite: { label: 'Respostas ao convite', hint: 'Convidado aceitou ou recusou o convite pelo link.' },
   lembrete: { label: 'Lembretes da gravação', hint: 'Hora de mandar o lembrete ao convidado agendado: 3 dias, 1 dia, no dia e 3 horas antes.' },
   financeiro: { label: 'Financeiro', hint: 'Contas vencendo ou atrasadas e estoque que precisa ser reposto.' },
@@ -94,7 +94,7 @@ const NOTIFICATION_TYPES = {
   alteracao: { label: 'Cadastro alterado', hint: 'Quem é responsável por um convidado, patrocinador, episódio, corte ou tarefa recebe um aviso quando outra pessoa altera o cadastro, com o que mudou.' },
   exclusao: { label: 'Cadastro excluído', hint: 'Quem era responsável por um convidado, patrocinador, episódio, corte ou tarefa recebe um aviso quando outra pessoa o exclui.' },
   integracao: { label: 'Contas das redes', hint: 'Uma conta do Instagram, TikTok, YouTube, X ou outra rede foi desconectada ou precisa ser reconectada no provedor (Upload-Post, Zernio ou Outstand). Enquanto isso, as publicações nessa rede falham.' },
-  redes: { label: 'Comentários nas redes', hint: 'Comentário num post do Pulso que a IA preferiu deixar para a equipe (pesado, delicado ou sem segurança) e respostas da IA esperando aprovação.' },
+  redes: { label: 'Comentários nas redes', hint: 'Comentário num post que a IA preferiu deixar para a equipe (pesado, delicado ou sem segurança) e respostas da IA esperando aprovação.' },
   site: { label: 'Pedidos pelo site', hint: 'Alguém pediu para ser convidado ou para patrocinar pelo site podcastpulso.com.' },
   rotina: { label: 'Rotinas do sistema', hint: 'Análise por IA pronta ou com erro, corte lido, publicação concluída, patrocinador respondeu o formulário.' },
 };

@@ -8,6 +8,7 @@
 <title><%= title %></title>
 <link rel="icon" href="<%= brandDir %>/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/plateia.css?v=<%= assetV %>">
+<% if (typeof brandCss !== 'undefined' && brandCss) { %><link rel="stylesheet" href="<%= brandCss %>?v=<%= assetV %>"><% } %>
 </head>
 <body data-plateia>
 <main class="pl-thanks">

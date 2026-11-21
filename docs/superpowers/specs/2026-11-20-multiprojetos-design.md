@@ -286,6 +286,9 @@ Hoje tudo abre em `sistema.podcastpulso.com` (painel e links públicos) e os lin
 
 ## Fases
 
+**Estado (2026-11-21): as nove estão feitas, da v1.95.0 à v2.0.0; nada publicado.** A conferência linha por linha, com
+o que ficou de fora e por quê, está em `docs/superpowers/plans/2026-11-21-conferencia-multiprojetos.md`.
+
 Cada fase é um lançamento que funciona sozinho.
 
 1. **Identidade Health Scale Studio.** Nome, logotipo, monograma, Sinal, cores e Archivo no painel; favicon separado

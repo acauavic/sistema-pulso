@@ -7,6 +7,7 @@
 <title><%= title %> · Pulso</title>
 <link rel="icon" href="<%= brandDir %>/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/patrocinador.css?v=<%= assetV %>">
+<% if (typeof brandCss !== 'undefined' && brandCss) { %><link rel="stylesheet" href="<%= brandCss %>?v=<%= assetV %>"><% } %>
 </head>
 <%
   var tierLabel = sponsor.tier ? C.SPONSOR_TIERS[sponsor.tier] : '';

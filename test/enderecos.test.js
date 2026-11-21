@@ -101,8 +101,10 @@ describe('endereços por projeto', () => {
     assert.equal(projects.publicName(P100), 'Projeto 100');
     const convite = await guestsSvc.renderInvite(await one('SELECT * FROM guests WHERE invite_token = $1', [tokenCem]), {});
     assert.equal(convite.subject, 'Convite para o Projeto 100');
-    // o Projeto 100 ainda não tem ícones próprios (vêm na marca dele): a página pública usa os do projeto padrão
-    assert.match(convite.html, /brand\/pulso\/favicon\.svg/, 'sem ícone próprio ainda, o convite usa o do projeto padrão');
+    // o Projeto 100 tem os ícones dele (fase da marca): o convite dele aponta para a pasta dele
+    assert.match(convite.html, /brand\/projeto-100\/favicon\.svg/, 'o convite usa o ícone do projeto');
+    // o convite é documento com identidade própria: a folha de marca não entra nele (só o ícone segue o projeto)
+    assert.doesNotMatch(convite.html, /brand\.css/);
   });
 
   it('a sessão do painel não serve de nada no domínio de um projeto', async () => {

@@ -168,6 +168,21 @@ describe('dinheiro por projeto', () => {
     assert.match(page.text, /passou 2 h da cota/);
   });
 
+  it('a tela pergunta de quem é, com a divisão escondida até escolher compartilhado', async () => {
+    const page = await as.casa.get('/financeiro/lancamentos');
+    assert.equal(page.status, 200);
+    assert.match(page.text, /De quem é/);
+    assert.match(page.text, /name="de_quem" value="1"/);
+    assert.match(page.text, /name="de_quem" value="compartilhado"/);
+    assert.match(page.text, /data-when="de_quem=compartilhado"/, 'a divisão só aparece no compartilhado');
+    assert.match(page.text, /name="parte_1"[\s\S]*name="parte_2"/, 'um valor por projeto');
+    // o custo mensal e a compra de estoque perguntam o mesmo
+    assert.match((await as.casa.get('/financeiro/regras')).text, /name="de_quem"/);
+    assert.match((await as.casa.get('/financeiro/estoque')).text, /name="de_quem"/);
+    // e a regra por episódio pergunta em que projeto ela vale
+    assert.match((await as.casa.get('/financeiro/regras')).text, /name="vale_para"[\s\S]*Todos os projetos/);
+  });
+
   it('um projeto só: nenhuma tela mostra seletor nem campo de projeto', async () => {
     const page = await as.cem.get('/financeiro/lancamentos');
     assert.doesNotMatch(page.text, /De quem é/, 'quem vê um projeto só não escolhe projeto');

@@ -22,6 +22,7 @@ async function middleware(req, res, next) {
     res.locals.hostProject = project;
     // marca das páginas públicas (ícones): a do projeto do domínio; no painel, a do projeto padrão
     res.locals.brandDir = pu.brandDirOf(project && project.id);
+    res.locals.brandCss = pu.brandCssOf(project && project.id); // marca do projeto nas páginas públicas (vazio = a de sempre)
     if (!project) return next(); // domínio do painel (ou endereço único): segue o jogo
     if (isPublicPath(req.path)) return next();
     return res.redirect(302, pu.panelUrl(req.originalUrl)); // tela do painel num domínio de projeto

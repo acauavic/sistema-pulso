@@ -169,6 +169,23 @@ describe('isolamento entre projetos', () => {
     assert.deepEqual(ruins, [], `chamadas de can() com o perfil em vez da pessoa:\n${ruins.join('\n')}`);
   });
 
+  it('o cadastro do usuário mostra onde a pessoa trabalha e o interruptor da casa', async () => {
+    const id = (await one("SELECT id FROM users WHERE email = 'cem@local.test'")).id;
+    const page = await casa.get(`/usuarios/${id}/editar`);
+    assert.equal(page.status, 200);
+    assert.match(page.text, /Onde essa pessoa trabalha/);
+    assert.match(page.text, /name="projetos" value="1"/);
+    assert.match(page.text, /name="projetos" value="2"[^>]*checked/, 'ela participa do Projeto 100');
+    assert.match(page.text, /name="financeiro" value="2"/, 'e o "vê o financeiro" por projeto');
+    assert.match(page.text, /name="house" value="1"/);
+    assert.match(page.text, /SÓ DOS PROJETOS MARCADOS/, 'o interruptor mostra o estado em mono');
+    // a gestão da casa também vê os campos de endereço e marca do projeto
+    const proj = await casa.get('/gestao/projetos');
+    assert.match(proj.text, /Fora do painel: nome público, endereço e e-mails/);
+    assert.match(proj.text, /name="public_host"/);
+    assert.match(proj.text, /name="ai_context"/);
+  });
+
   it('a gestão da casa continua vendo tudo', async () => {
     const r = await casa.get('/convidados');
     assert.equal(r.status, 200);

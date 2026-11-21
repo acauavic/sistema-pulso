@@ -20,7 +20,8 @@ function parse(req, res) {
 const backTo = (req, fallback) => { const v = String(req.body?.voltar || req.query?.voltar || ''); return v.startsWith('/') && !v.startsWith('//') ? v : fallback; };
 
 router.get('/gestao/duplicatas', requirePerm('duplicates.manage'), wrap(async (req, res) => {
-  const [guest, sponsor] = await Promise.all([dup.pairs('guest'), dup.pairs('sponsor')]);
+  const pids = require('../services/scope').idsOf(req); // a lista da gestão é dos projetos dela
+  const [guest, sponsor] = await Promise.all([dup.pairs('guest', pids), dup.pairs('sponsor', pids)]);
   res.render('gestao/duplicatas', { title: 'Duplicatas', data: { guest, sponsor } });
 }));
 
