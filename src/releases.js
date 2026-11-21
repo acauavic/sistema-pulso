@@ -8,6 +8,7 @@ module.exports = [
     items: [
       { kind: 'novo', text: 'Planilha dos convidados: no menu "⋯" de Convidados, "Baixar planilha" traz a lista com os filtros que estão na tela (etapa, responsável, busca, filtros e projeto).' },
       { kind: 'novo', text: 'Financeiro: além do mês, a planilha do ano inteiro (o que o contador costuma pedir), e as duas seguem a busca e a categoria da tela.' },
+      { kind: 'correcao', text: 'Convidado cadastrado já gravado (gravação de última hora) não tinha onde receber a foto: o botão só aparecia nas etapas de agendamento. Agora a foto fica no cartão Sobre, em qualquer etapa, com o aviso quando falta.' },
       { kind: 'correcao', text: 'Na planilha do financeiro, as saídas vinham como texto e o Excel não somava. Agora são números.' },
       { kind: 'correcao', text: 'Importar convidados de um arquivo salvo pelo Excel embaralhava os acentos ("Jo�o"). Agora o arquivo é lido certo, e em "Todos os projetos" a importação pergunta em que projeto os convidados entram (antes caíam no Pulso sem aviso). A mesma pessoa em outro projeto não aparece mais como duplicada.' },
       { kind: 'correcao', text: 'A planilha da plateia trazia a data no fuso de Londres (3 horas a mais) e ignorava os filtros da tela. Agora sai no horário de Brasília e com os filtros.' },

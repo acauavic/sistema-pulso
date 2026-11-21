@@ -2487,3 +2487,7 @@ input[type=date], input[type=time], input[type=datetime-local] { min-width: 0; }
 .req-legend { margin-bottom: 4px; }
 .card .sticky-actions { background: var(--surface); } /* dentro do cartão, a faixa do botão tem o fundo do cartão */
 .danger-zone { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); } /* ação destrutiva rara: pequena e longe do Salvar */
+/* Foto do convidado no cartão Sobre (qualquer etapa): a moldura 4:3, a frase do que ela alimenta e o botão que abre o recorte */
+.guest-photo-line { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.guest-photo-txt { display: grid; gap: 8px; justify-items: start; min-width: 0; }
+.guest-photo-empty { display: grid; place-items: center; color: var(--muted); flex: none; }

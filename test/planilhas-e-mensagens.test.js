@@ -77,6 +77,17 @@ describe('planilhas e mensagens', () => {
     assert.equal(nf.status, 404); assert.match(nf.text, /data-go-back/); assert.match(nf.text, /lixeira ou em outro projeto/);
   });
 
+  it('foto do convidado em qualquer etapa: quem foi cadastrado já gravado também envia (cartão Sobre)', async () => {
+    const g = await one("INSERT INTO guests (name, status, project_id, instagram, profile) VALUES ('Luisa Gravada', 'gravado', 1, 'luisag', 'medico') RETURNING id");
+    await h.db.query('UPDATE guests SET photo_key = NULL WHERE id = $1', [g.id]); // nos testes, o convidado nasce com foto
+    await h.db.query('UPDATE people SET photo_key = NULL WHERE id = (SELECT person_id FROM guests WHERE id = $1)', [g.id]);
+    const page = (await as.casa.get(`/convidados/${g.id}`)).text;
+    const sobre = page.split('id="sobre"')[1].split('</section>')[0];
+    assert.match(sobre, /data-modal-open="modal-foto"/, 'o botão abre a janela de foto');
+    assert.match(sobre, /Enviar foto/); assert.match(sobre, /Sem foto/);
+    assert.match(page, /id="modal-foto"/, 'a janela de recorte existe nesta etapa');
+  });
+
   it('erro técnico do provedor não chega à pessoa; a frase do próprio sistema passa', () => {
     assert.equal(userMessage(new Error('Outstand recusou (500): Internal server error'), 'Reserva.'), 'Reserva.');
     assert.equal(userMessage(new Error('InfinitePay não configurada (INFINITEPAY_HANDLE).'), 'Reserva.'), 'Reserva.');
