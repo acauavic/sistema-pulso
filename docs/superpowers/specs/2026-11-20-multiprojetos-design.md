@@ -322,6 +322,8 @@ As fases 8 e 9 podem subir se o Projeto 100 precisar publicar pelo sistema antes
   marcador em cada; uma pessoa só do projeto B percorre todas as rotas GET registradas e nenhum marcador do projeto A
   pode aparecer; ids do projeto A respondem 404 em GET e POST; busca, notificações, assistente, downloads e arquivos por
   chave entram na lista. Rota nova entra no teste sozinha (ele lê a tabela de rotas do Express).
+  **Já sabido**: `duplicates.all()` (o aviso de duplicata e a lista da gestão) lê todos os projetos de propósito até aqui,
+  porque é assim que aparece o "já está em outro projeto" da fase 4; na fase 7 ela passa a receber o recorte.
 - Migração: banco com dados de hoje → tudo no Pulso, contagens iguais antes e depois, números de episódio intactos.
 - Espelho: editar a pessoa atualiza todas as participações; editar pela participação atualiza a pessoa.
 - Financeiro: lançamento com dono ou com divisão que soma o valor (nunca os dois); herança pelo vínculo; soma dos

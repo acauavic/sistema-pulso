@@ -83,6 +83,8 @@ const TOPICS = [
       'Convidado Agendado vira agenda (media kit, portal dos patrocinadores, página da plateia) e gera os lembretes da gravação. Quando grava, nasce o episódio.',
       'Se o aceite foi por engano, quem edita convidados usa "Zerar aceite e voltar para Prospecção" na aba Convite do convidado.',
       'Lista: seleção de vários para "Editar em massa" (etapa, responsável, perfil, gênero e patrocinador; Agendado e Gravado não vão em massa); Importar CSV traz convidados e, para gravados, o episódio com links.',
+      'A identidade (nome, @, telefone, e-mail, empresa, cargo, bio, foto) é da pessoa, não do projeto: corrigir num lugar vale em todos. No cadastro, "Em outros projetos" mostra onde mais ela está e "Convidar também para…" cria a participação no outro projeto, em Prospecção, com os dados que já estão lá.',
+      'A mesma pessoa em dois projetos não é duplicata. Dois cadastros parecidos em projetos diferentes se resolvem com "É a mesma pessoa" (as duas participações continuam); no mesmo projeto, "Juntar os dois cadastros" manda um para a lixeira.',
       'Pelo assistente: "convidado" mostra a situação, "lista_convidados" lista uma etapa, "criar_convidado" cadastra em Prospecção e "mudar_etapa_convidado" muda a etapa quando o convidado já tem o que a etapa exige.',
     ],
   },

@@ -73,14 +73,26 @@ dinheiro são sempre de um projeto**. Convidados, patrocinadores, episódios, co
 - **Quem participa de quê**: `project_members` (Gestão > Sistema > Projetos). Usuário novo entra no projeto padrão (o
   ativo de menor `position`, hoje o Pulso). Toda pessoa participa de pelo menos um projeto.
 - **Seletor** (topo do menu, só para quem participa de mais de um): Todos os projetos, ou um deles. A escolha fica em
-  `users.last_project_id`. Convidados, Patrocinadores, Episódios, Conteúdo e Tarefas seguem o recorte; Início,
-  Calendário, Busca, Social, Plateia e Financeiro ainda mostram tudo (próximas fases).
+  `users.last_project_id`. Seguem o recorte: Convidados, Patrocinadores, Episódios/Vídeos, Conteúdo, Tarefas, Pautas,
+  Início, Resumo do dia, Seu dia, Calendário, Busca e Avisos. Ainda mostram tudo: Social, Plateia e Financeiro
+  (contas no calendário e na busca) — próximas fases.
 - **Criar**: o item nasce no projeto escolhido; em "Todos os projetos" o formulário pergunta. Item ligado a outro herda
   o projeto dele (episódio do convidado, corte do episódio, tarefa do patrocinador).
 - **No código**: `services/projects.js` (lista em memória, membros, projeto padrão) e `services/scope.js` (o único
   lugar que decide o recorte: `where` nas listas, `assert` nas páginas de detalhe, `target` na criação).
-- **Módulos** (`projects.modules`): o menu mostra só o que o projeto escolhido usa. O Projeto 100 começa só com
-  tarefas; a produção liga junto com a numeração por projeto.
+- **Módulos** (`projects.modules`): o menu mostra só o que o projeto escolhido usa. O Projeto 100 usa tarefas,
+  produção (vídeos) e convidados; convites, portal, plateia, redes e financeiro entram nas fases deles.
+- **Empresa e contrato**: a identidade do patrocinador é de uma **empresa** da casa (`companies`: nome, site, tipo e
+  contato) e a linha de `sponsors` é o **contrato** dela num projeto (etapa, plano, valor, vigência, entregáveis,
+  portal, material). `services/companies.js` espelha igual ao `people.js`. "Abrir negociação também no…" cria o contrato
+  no outro projeto, e na aba Material "Trazer do outro projeto" copia os arquivos da empresa dentro do próprio
+  armazenamento (cada contrato com a chave dele).
+- **Pessoa e participação**: a identidade do convidado é de uma **pessoa** da casa (`people`) e a linha de `guests` é a
+  **participação** dela num projeto (etapa, tema, convite, portal, plateia). `services/people.js` é o único lugar que
+  escreve identidade: grava a pessoa e todas as participações dela na mesma transação (as colunas continuam em `guests`
+  como cópia espelhada). No cadastro, "Em outros projetos" mostra onde mais ela está e "Convidar também para…" cria a
+  participação no outro projeto sem digitar de novo. A mesma pessoa em dois projetos não é duplicata; duas pessoas
+  parecidas em projetos diferentes se resolvem com "É a mesma pessoa" (as duas participações ficam).
 - Desenho completo e as fases: `docs/superpowers/specs/2026-11-20-multiprojetos-design.md`.
 
 ## Vídeos, episódios e pauta

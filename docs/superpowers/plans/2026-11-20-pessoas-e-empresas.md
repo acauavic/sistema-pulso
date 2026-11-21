@@ -253,11 +253,31 @@ partir de `telas-por-projeto`. Nada é publicado sem a autorização do dono.
 - [ ] **Step 4: entrada 1.101.0, `package.json`, design system, README e `memory.md`; suíte completa verde.**
 - [ ] **Step 5: commit.**
 
+## Como ficou (2026-11-20)
+
+Tudo o que está acima foi feito, com estas diferenças, decididas na execução:
+
+- **`guests.person_id` e `sponsors.company_id` ficaram opcionais** (o plano dizia `NOT NULL`): exigir a ligação no banco
+  obrigaria 102 inserts de teste e 6 do código a saber da pessoa antes de criar o cadastro. A garantia virou o serviço
+  (`sync` liga na primeira escrita, e `idOf` liga na primeira leitura de quem chegou solto) mais o teste com um caso por
+  escritor.
+- **Duplicata por pessoa** foi feita como "pula o par da mesma pessoa + um par por pessoa na lista", em vez de agregar as
+  pessoas numa consulta nova: o resultado é o mesmo e a tela de comparação não precisou ser reescrita.
+- **O material trazido é copiado no armazenamento** (`b2.copyObject`), não compartilhado pela mesma chave: apagar um
+  arquivo apaga o objeto, e um contrato apagaria o arquivo do outro.
+- **Além do planejado**, "de outro projeto não é duplicata" entrou também no aviso do formulário de cadastro (que ensina
+  o botão em vez de falar de duplicata), no assistente e na criação de convidado/patrocinador pela tela de episódio.
+- `people.idOf`/`companies.idOf` para as páginas de detalhe, para a leitura não escrever (o `sync` na página bumpava o
+  `updated_at` a cada visita).
+
 ## O que esta fase não faz
 
 - Perfil diferente por projeto para a mesma pessoa (fase 7 decide onde o perfil vale).
 - Dinheiro por projeto (fase 5): `fin_entries` continua como está, mesmo no contrato novo.
 - Página de "pessoas da casa" (uma lista de `people` fora dos convidados): ninguém pediu; a pessoa aparece sempre pela
   participação.
+- **Recorte na comparação de duplicatas**: `duplicates.all()` continua lendo todos os projetos (hoje todo mundo vê
+  tudo, e é assim que o aviso "já está em outro projeto" aparece). Quando a fase 7 restringir gente, essa consulta entra
+  no teste de isolamento e passa a receber o recorte — está anotado lá.
 - Marca do Projeto 100 nas páginas públicas (fase 9), ainda que o manual já esteja em
   `docs/manual-de-marca-projeto-100.md`.

@@ -9,7 +9,7 @@ const ACTIONS = {
   'users.write': { text: 'criar, editar e desativar usuários (a gestão não mexe em superadmin)', where: 'Gestão > Usuários' },
   'users.delete': { text: 'excluir usuários', where: 'Gestão > Usuários' },
   'guests.read': { text: 'ver convidados, a agenda, o histórico e o quadro do CRM', where: 'Convidados' },
-  'guests.write': { text: 'cadastrar e editar convidados, mudar a etapa (quadro, "próximo passo" ou janela da etapa), editar vários de uma vez na Lista, importar CSV, zerar o aceite, mandar os lembretes da gravação e enviar a foto do convidado', where: 'Convidados' },
+  'guests.write': { text: 'cadastrar e editar convidados, mudar a etapa (quadro, "próximo passo" ou janela da etapa), editar vários de uma vez na Lista, importar CSV, zerar o aceite, mandar os lembretes da gravação, enviar a foto do convidado e convidar a mesma pessoa também para outro projeto', where: 'Convidados' },
   'guests.invite': { text: 'gerar o link do convite e enviá-lo por e-mail', where: 'Convidado > Convite' },
   'guests.delete': { text: 'excluir convidados', where: 'Convidado > Excluir' },
   'sponsors.read': { text: 'ver patrocinadores e o que cada um já entregou', where: 'Patrocinadores' },

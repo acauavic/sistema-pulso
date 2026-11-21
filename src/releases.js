@@ -4,6 +4,24 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '1.101.0', date: '2026-11-20', title: 'A mesma empresa nos dois projetos',
+    items: [
+      { kind: 'novo', text: 'O patrocinador agora tem um cadastro de empresa: nome, site, tipo e o contato valem em todos os projetos em que ela tem negociação. Cada projeto fica com o contrato dele (etapa, plano, valor, vigência).' },
+      { kind: 'novo', text: 'No patrocinador, "Em outros projetos" mostra onde mais a empresa está e "Abrir negociação também no…" cria o contrato no outro projeto, em Prospecção, com os dados da empresa.' },
+      { kind: 'novo', text: 'Na aba Material, "Trazer do outro projeto" copia logo, moldura, QR Code e material da marca que a empresa já enviou no outro contrato — sem subir de novo. Cada contrato fica com o arquivo dele: apagar num lado não mexe no outro.' },
+      { kind: 'ajuste', text: 'A mesma empresa nos dois projetos deixou de aparecer como duplicata; empresas parecidas em projetos diferentes se resolvem com "É a mesma empresa", e os dois contratos continuam.' },
+    ],
+  },
+  {
+    version: '1.100.0', date: '2026-11-20', title: 'A mesma pessoa nos dois projetos',
+    items: [
+      { kind: 'novo', text: 'O cadastro do convidado agora é de uma pessoa: corrigir nome, telefone, e-mail, @, empresa, cargo, bio ou foto num projeto vale em todos os outros em que ela está.' },
+      { kind: 'novo', text: 'No cadastro, o bloco "Em outros projetos" mostra onde mais a pessoa está (com a etapa de cada lugar) e o botão "Convidar também para…" cria a participação no outro projeto, em Prospecção, com os dados que já estão aqui.' },
+      { kind: 'ajuste', text: 'A mesma pessoa em dois projetos deixou de aparecer como duplicata, e a lista da gestão mostra um par por pessoa.' },
+      { kind: 'ajuste', text: 'Duplicata entre projetos se resolve com "É a mesma pessoa": as duas participações continuam, cada uma com a etapa dela, e nada vai para a lixeira. No mesmo projeto, continua "Juntar os dois cadastros".' },
+    ],
+  },
+  {
     version: '1.99.0', date: '2026-11-20', title: 'O dia a dia também segue o projeto',
     items: [
       { kind: 'novo', text: 'Início, Resumo do dia, Seu dia, Calendário, Busca (Ctrl+K) e Avisos passaram a seguir o projeto escolhido no menu. Em "Todos os projetos", tudo junto, como antes.' },
