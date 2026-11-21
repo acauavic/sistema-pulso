@@ -11,7 +11,7 @@ const mac = (kind, id, exp) => crypto.createHmac('sha256', config.sessionSecret)
 function signedUrl(kind, id, now = Date.now()) {
   if (!KINDS.includes(kind)) throw new Error(`Tipo de imagem desconhecido: ${kind}`);
   const exp = Math.floor(now / 1000) + TTL_SECONDS;
-  return `${config.appBaseUrl}/api/site/v1/imagem/${kind}/${Number(id)}?e=${exp}&s=${mac(kind, Number(id), exp)}`;
+  return `${config.publicBaseUrl}/api/site/v1/imagem/${kind}/${Number(id)}?e=${exp}&s=${mac(kind, Number(id), exp)}`;
 }
 
 function verify(kind, id, exp, sig, now = Date.now()) {

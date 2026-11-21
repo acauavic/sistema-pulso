@@ -191,9 +191,10 @@ router.get('/integracoes/outstand/voltou', requirePerm('integrations.manage'), w
 router.post('/integracoes/armazenamento/cors', requirePerm('integrations.manage'), wrap(async (req, res) => {
   const b2 = require('../services/b2');
   const origin = new URL(config.appBaseUrl).origin;
+  const origins = require('../services/publicUrl').allOrigins(); // o painel e os endereços públicos (o link do estúdio também envia direto)
   const on = req.body.acao === 'ligar';
   try {
-    if (on) await b2.putCors(origin); else await b2.deleteCors();
+    if (on) await b2.putCors(origins); else await b2.deleteCors();
     await audit(req, on ? 'integracao.cors_ligado' : 'integracao.cors_desligado', 'system', null, { origem: origin });
     await req.flash('ok', on ? 'Envio direto ligado: a partir do próximo envio, os arquivos vão do navegador direto ao Backblaze.' : 'Envio direto desligado: os arquivos voltam a passar pelo servidor.');
   } catch (err) {

@@ -511,6 +511,13 @@ e-mail em dry-run — nada externo é chamado), página pública, rastreio de cl
 
 ## Deploy numa VPS única (Docker Compose + Caddy)
 
+**Domínios**: `DOMINIO` (o de sempre, `sistema.podcastpulso.com`) e `DOMINIOS_EXTRAS` (separados por espaço: o painel
+`studio.healthscale.com.br` e o endereço público de cada projeto, como `links.projeto100.com`) no `deploy/.env`; o Caddy
+emite o certificado de cada um. `APP_BASE_URL` é o painel; `PUBLIC_BASE_URL` é o endereço público de sempre (sem ele, os
+links públicos seguiriam o painel). Quem decide o que abre em cada domínio é `services/hostContext.js`, com o endereço de
+cada projeto em Gestão > Projetos. Ao trocar o domínio do painel: os domínios novos entram no widget do "Não sou robô" do
+Cloudflare, e o envio direto ao Backblaze é religado em Integrações (o CORS passa a listar todas as origens).
+
 `deploy/instalar.sh` instala o Docker, baixa o código, gera `SESSION_SECRET` e a senha do Postgres, pergunta o domínio e o e-mail do superadmin e sobe Postgres + painel (web) + fila/rotinas (worker) + Caddy com HTTPS automático (`deploy/docker-compose.yml`). **O domínio precisa apontar (DNS tipo A) para o IP do servidor antes**; sem domínio, basta apertar Enter e o script usa `<ip-com-tracos>.sslip.io`, que já tem HTTPS. Sem HTTPS o login não funciona em produção (cookie Secure). O script também cria 2 GB de swap em VPS pequena e agenda backup diário do banco (`deploy/backup.sh`): 14 dias em `/opt/pulso-backups` e uma cópia no Backblaze (`<prefixo>/backups/banco/`, 30 dias; bucket próprio com `BACKUP_BUCKET_NAME`, `BACKUP_BB_KEY_ID`, `BACKUP_BB_APPLICATION_KEY`). O SSH da VPS de produção só aceita chave, com fail2ban. Segredos e integrações ficam em `deploy/.env` no servidor (nunca no git). Atualizar: `cd /opt/pulso && git pull && cd deploy && docker compose up -d --build`.
 
 ## Deploy (Docker Swarm + Traefik)

@@ -31,7 +31,12 @@ describe('versões e novidades', () => {
 
   it('cada pessoa vê o aviso uma vez por versão; abrir as novidades ou dispensar apaga o aviso', async () => {
     const v = list[0].version;
+    // quem vem de uma versão de antes (ou nunca viu nenhuma) ganha as boas-vindas da versão nova, no lugar do aviso pequeno
     let t = (await c.get('/')).text;
+    assert.match(t, /data-welcome/); assert.match(t, /Boas-vindas,/); assert.doesNotMatch(t, /release-toast/);
+    await h.db.query(`UPDATE users SET release_seen = '${v.split('.')[0]}.0.0'`);
+    t = (await c.get('/')).text;
+    assert.doesNotMatch(t, /data-welcome/, 'da mesma versão grande: só o aviso pequeno');
     assert.match(t, /release-toast/); assert.match(t, new RegExp(`Sistema atualizado · v${v.replace(/\./g, '\\.')}`));
     assert.match(t, new RegExp(`class="version-link[^>]*>v${v.replace(/\./g, '\\.')}`), 'versão no menu');
 
@@ -41,10 +46,11 @@ describe('versões e novidades', () => {
     assert.doesNotMatch((await c.get('/')).text, /release-toast/, 'já viu');
 
     await h.db.query("UPDATE users SET release_seen = '0.0.1'");
-    assert.match((await c.get('/tarefas')).text, /release-toast/, 'versão nova volta a avisar');
+    assert.match((await c.get('/tarefas')).text, /data-welcome/, 'versão grande nova volta a dar as boas-vindas');
     const r = await c.act('/novidades/visto', { voltar: '/tarefas' }, { from: '/tarefas' });
     assert.equal(r.status, 302); assert.equal(r.headers.get('location'), '/tarefas');
-    assert.doesNotMatch((await c.get('/tarefas')).text, /release-toast/);
+    const after = (await c.get('/tarefas')).text;
+    assert.doesNotMatch(after, /release-toast/); assert.doesNotMatch(after, /data-welcome/, '"Começar" marca a versão: não volta');
     const evil = await c.act('/novidades/visto', { voltar: '//evil.com' }, { from: '/' });
     assert.equal(evil.headers.get('location'), '/', 'só volta para caminhos do painel');
   });

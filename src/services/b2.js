@@ -150,7 +150,8 @@ async function presignGet(key, { expires = 900, download = null, contentType = n
 // Regra única: a origem do painel pode fazer PUT e ler o ETag. Estado: 'ligado' | 'desligado' | 'outra' (há regras, mas não a nossa) | 'erro'.
 const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 function corsRulesXml(origin) {
-  return `<CORSConfiguration><CORSRule><AllowedOrigin>${xmlEsc(origin)}</AllowedOrigin><AllowedMethod>PUT</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>`;
+  const origins = (Array.isArray(origin) ? origin : [origin]).map((o) => `<AllowedOrigin>${xmlEsc(o)}</AllowedOrigin>`).join('');
+  return `<CORSConfiguration><CORSRule>${origins}<AllowedMethod>PUT</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>`;
 }
 async function corsStatus(origin) {
   try {

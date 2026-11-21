@@ -27,6 +27,12 @@ function baseOf(projectId) {
 
 const publicUrl = (projectId, path = '') => `${baseOf(projectId)}${path}`;
 const panelUrl = (path = '') => `${config.appBaseUrl}${path}`;
+// Todas as origens em que o sistema abre (o painel, o endereço público de sempre e o de cada projeto): o CORS do bucket
+// precisa delas para o navegador enviar direto ao Backblaze do painel e do link do estúdio.
+function allOrigins() {
+  const list = [config.appBaseUrl, config.publicBaseUrl, ...projects.all().map((p) => (clean(p.public_host) ? `https://${clean(p.public_host)}` : ''))];
+  return [...new Set(list.filter(Boolean).map((u) => { try { return new URL(u).origin; } catch { return ''; } }).filter(Boolean))];
+}
 // Host público de um projeto (vazio = usa o de sempre).
 const hostOf = (projectId) => { const p = projects.get(projectId); return p ? clean(p.public_host) : ''; };
 
@@ -51,4 +57,4 @@ function brandCssOf(projectId) {
   return require('fs').existsSync(file) ? `${dir}/brand.css` : '';
 }
 
-module.exports = { publicUrl, panelUrl, baseOf, hostOf, projectByHost, isPanelHost, panelHost, bare, brandDirOf, brandCssOf };
+module.exports = { allOrigins, publicUrl, panelUrl, baseOf, hostOf, projectByHost, isPanelHost, panelHost, bare, brandDirOf, brandCssOf };

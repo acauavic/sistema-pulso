@@ -6,7 +6,7 @@
 %>
 <%
   var d = new Date(s.starts_at);
-  var when = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' }) + ' · ' + d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+  var when = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' }).replace(/^./, function (c) { return c.toUpperCase(); }) + ' · ' + d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
   var planned = s.status === 'planejada';
   var done = videos.filter(function (v) { return v.status !== 'pre_producao'; });
   var allDone = videos.length && done.length === videos.length;

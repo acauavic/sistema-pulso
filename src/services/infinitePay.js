@@ -12,7 +12,7 @@ const dateShort = (d) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/S
 
 const secret = () => config.infinitepay.webhookSecret
   || crypto.createHmac('sha256', config.sessionSecret || 'dev').update('infinitepay-webhook').digest('hex').slice(0, 32);
-const webhookUrl = () => `${config.appBaseUrl}/webhooks/infinitepay/${secret()}`;
+const webhookUrl = () => `${config.publicBaseUrl}/webhooks/infinitepay/${secret()}`; // endereço público estável (o painel pode mudar de domínio)
 const secretOk = (given) => { const a = Buffer.from(String(given || '')); const b = Buffer.from(secret()); return a.length === b.length && crypto.timingSafeEqual(a, b); };
 
 async function post(path, body) {
@@ -43,7 +43,7 @@ async function createLink({ lead, amountCents, userId = null, description }) {
   const body = {
     handle: config.infinitepay.handle, order_nsu: orderNsu,
     items: [{ quantity: 1, price: amountCents, description: description || `Plateia Pulso Podcast: ${lead.guest_name}${lead.recording_at ? ` (${dateShort(lead.recording_at)})` : ''}` }],
-    redirect_url: `${config.appBaseUrl}/plateia/pagamento-concluido`, webhook_url: webhookUrl(),
+    redirect_url: require('./publicUrl').publicUrl(null, '/plateia/pagamento-concluido'), webhook_url: webhookUrl(),
     // Sem `customer` de propósito: com o telefone preenchido o checkout pede confirmar o número por WhatsApp/SMS, e quem paga nem sempre é
     // quem se inscreveu. Sem ele, a pessoa informa o próprio contato. O pedido é identificado pelo order_nsu, não pelos dados dela.
   };

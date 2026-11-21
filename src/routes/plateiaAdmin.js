@@ -72,7 +72,7 @@ router.get('/plateia/painel', requirePerm('audience.read'), wrap(async (req, res
   const { rows: recordings } = await db.query("SELECT id, name, proposed_at FROM guests WHERE status = 'agendado' AND proposed_at IS NOT NULL AND proposed_at > now() - interval '1 day' ORDER BY proposed_at, id");
   res.render('plateia/admin', {
     title: 'Plateia', view, q, origin, past, showPast, pastToggle: req.query.anteriores === '1', recordings, countries: audience.COUNTRIES, leads: leads.rows, results, s, days, guests: upcoming.rows, agenda, guestFilter, statusFilter, STATUS, counts, price: audience.money(s.priceCents),
-    canManage: can(req.user, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: `${config.appBaseUrl}/plateia`, fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, COUNTRY_BY_CODE: audience.COUNTRY_BY_CODE, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
+    canManage: can(req.user, 'audience.manage'), storageReady: config.storageConfigured, publicUrl: require('../services/publicUrl').publicUrl(null, '/plateia'), fmtMoney: formatBRL, payLinks: config.infinitepayConfigured, COUNTRY_BY_CODE: audience.COUNTRY_BY_CODE, isExempt: (l) => l.status === 'confirmado' && l.amount_cents != null && Number(l.amount_cents) === 0 && !l.entry_id,
   });
 }));
 

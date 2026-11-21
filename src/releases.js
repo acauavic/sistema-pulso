@@ -4,6 +4,16 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.5.0', date: '2026-11-21', title: 'Boas-vindas ao novo Health Scale Studio',
+    items: [
+      { kind: 'novo', text: 'Na primeira vez depois da atualização, uma tela de boas-vindas apresenta a nova versão: o Sinal sobe barra a barra, e as novidades principais entram em sequência (projetos lado a lado, aprovação por link, sessões de gravação e o endereço novo). Aparece uma vez por pessoa; "Ver tudo o que mudou" leva às Novidades.' },
+      { kind: 'novo', text: 'O painel passa a abrir em studio.healthscale.com.br. Os links que vão para fora (convites, portais, plateia, media kit, pós-gravação) continuam no endereço do Pulso, e os do Projeto 100 no endereço dele (links.projeto100.com).' },
+      { kind: 'ajuste', text: 'O convite para instalar o app no celular fala do Studio, não mais do Pulso. Quem já tinha o app instalado instala de novo pelo endereço novo e liga os alertas.' },
+      { kind: 'ajuste', text: 'O envio direto ao armazenamento vale no painel e nos endereços públicos (o link do estúdio envia direto também). A plateia, o pagamento da plateia, o pixel e as imagens do site ficam no endereço público, que não muda com o painel.' },
+      { kind: 'correcao', text: 'O dia da sessão de gravação aparecia como "Quinta-Feira"; agora "Quinta-feira".' },
+    ],
+  },
+  {
     version: '2.4.0', date: '2026-11-21', title: 'Funções sob medida',
     items: [
       { kind: 'novo', text: 'Gestão > Equipe > Funções: crie funções e escolha o que cada uma acessa, área por área (Não vê, Vê, Edita, Gerencia, ou caixa por caixa), e como ela trabalha no dia a dia (que Início e que avisos recebe). Os quatro perfis de antes viraram as quatro funções de fábrica, com os mesmos poderes; dá para editar e voltar ao padrão.' },

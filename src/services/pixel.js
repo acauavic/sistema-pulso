@@ -18,11 +18,11 @@ const csp = {
 // absolute: para páginas em sandbox (convite, media kit), onde 'self' não vale e o script vem do endereço do sistema.
 function tag({ content, category, v = '', absolute = false }) {
   if (!on()) return '';
-  const src = `${absolute ? config.appBaseUrl : ''}/static/pixel.js${v ? `?v=${esc(v)}` : ''}`;
+  const src = `${absolute ? config.publicBaseUrl : ''}/static/pixel.js${v ? `?v=${esc(v)}` : ''}`;
   return `<script src="${src}" data-pixel="${esc(config.metaPixelId)}" data-content="${esc(content)}" data-category="${esc(category)}" defer></script>`;
 }
 const inject = (html, opts) => (on() ? (html.includes('</body>') ? html.replace('</body>', `${tag(opts)}</body>`) : html + tag(opts)) : html);
-const appOrigin = () => new URL(config.appBaseUrl).origin;
+const appOrigin = () => new URL(config.publicBaseUrl).origin; // o pixel só vai nas páginas públicas: vem do endereço público, não do painel
 
 // Abertura pelo navegador (não robô, não pré-visualização): guarda o código no cookie e manda para o endereço limpo.
 // Devolve true quando redirecionou.

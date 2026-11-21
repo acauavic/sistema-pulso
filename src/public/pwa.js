@@ -35,7 +35,7 @@
     installBtns.forEach((b) => { b.hidden = !canInstall(); });
     if (!card || !mobile) return;
     if (canInstall() && !quiet('pulso-app-install')) {
-      return showCard('install', 'Use o Pulso como app', 'Fica na tela de início, abre em tela cheia e recebe os alertas mesmo fechado.', 'Instalar');
+      return showCard('install', 'Use o Studio como app', 'Fica na tela de início, abre em tela cheia e recebe os alertas mesmo fechado.', 'Instalar');
     }
     if (standalone && window.PulsoPush && !quiet('pulso-app-push') && await window.PulsoPush.state() === 'off') {
       return showCard('push', 'Ligue os alertas deste celular', 'Tarefas, prazos e respostas de convidados chegam como notificação, com o app fechado.', 'Ativar alertas');

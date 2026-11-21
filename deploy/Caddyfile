@@ -7,8 +7,10 @@
 	}
 }
 
-# HTTPS automático (Let's Encrypt) para o domínio do painel. O DNS do domínio precisa apontar para este servidor.
-{$DOMINIO} {
+# HTTPS automático (Let's Encrypt) para o domínio do sistema e os outros que chegam nele (DOMINIOS_EXTRAS, separados por
+# espaço: o painel da casa e o endereço público de cada projeto). O DNS de cada um precisa apontar para este servidor; quem
+# decide o que abre em cada domínio é o próprio sistema (services/hostContext.js).
+{$DOMINIO} {$DOMINIOS_EXTRAS} {
 	encode zstd gzip
 	# as cópias do painel (serviço "web") são descobertas pelo DNS do Docker; uma que cair sai da roda por 30 s
 	reverse_proxy {
