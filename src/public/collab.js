@@ -14,7 +14,6 @@
   if (palette) {
     const input = palette.querySelector('[data-palette-input]');
     const box = palette.querySelector('[data-palette-results]');
-    const tips = palette.querySelector('[data-palette-tips]');
     let items = []; let active = 0; let timer = null; let lastQ = null; let seq = 0;
     const RECENT_KEY = 'pulso-busca-recentes';
     const recents = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; } };
@@ -22,7 +21,7 @@
 
     function render(groups) {
       items = []; box.innerHTML = '';
-      if (!groups.length) { box.innerHTML = '<p class="palette-empty">Nada encontrado. A gestão vê as buscas sem resultado e pode criar atalhos para elas.</p>'; return; }
+      if (!groups.length) { box.innerHTML = '<p class="palette-empty">Nada encontrado. Tente outra palavra ou o nome da pessoa.</p>'; return; }
       for (const g of groups) {
         const h = document.createElement('div'); h.className = 'palette-group'; h.textContent = g.label; box.appendChild(h);
         for (const it of g.items) {
@@ -65,7 +64,6 @@
         render(groups);
         shownQ = q; box.classList.remove('is-stale'); box.removeAttribute('aria-busy');
         if (enterPending) { enterPending = false; if (items.length) choose(active, false); }
-        if (tips) { tips.hidden = !data.tips; tips.textContent = data.tips ? `${data.tips} sugest${data.tips > 1 ? 'ões' : 'ão'} para melhorar a busca →` : ''; }
       } catch (err) { if (my === seq && err.name !== 'AbortError') box.innerHTML = '<p class="palette-empty">Não foi possível buscar agora.</p>'; } finally { clearTimeout(wait); }
     }
     function choose(i, newTab) {
@@ -73,7 +71,6 @@
       if (it.js === 'theme') { document.querySelector('[data-theme-toggle]')?.click(); palette.close(); return; }
       if (it.js === 'logout') { document.querySelector('form[action="/logout"]')?.submit(); return; }
       if (!it.url) return;
-      if (lastQ && lastQ.length >= 2) navigator.sendBeacon?.('/busca/escolha', new Blob([JSON.stringify({ q: lastQ, url: it.url, _csrf: csrf })], { type: 'application/json' }));
       if (it.kind !== 'acao') remember({ title: it.title, sub: it.sub, url: it.url, kind: it.kind });
       if (newTab) window.open(it.url, '_blank'); else { palette.close(); window.PulsoSkeleton?.show(it.url); window.location.href = it.url; }
     }

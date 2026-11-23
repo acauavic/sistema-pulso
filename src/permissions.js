@@ -63,7 +63,6 @@ const PERMISSIONS = {
   'routines.manage': ['superadmin', 'gestao'],          // rotinas de tarefas (vencimento padrão)
   'reminders.manage': ['superadmin', 'gestao'],         // lembretes da gravação: endereço, horário e textos
   'plans.manage': ['superadmin', 'gestao'],             // planos de patrocínio (Ouro/Diamond): nome, preço e entregáveis
-  'search.manage': ['superadmin', 'gestao'],            // atalhos e sugestões da busca global
   'contacts.manage': ['superadmin', 'gestao'],          // WhatsApp para onde vão os botões dos convites e do media kit, e as mensagens prontas
   'outreach.manage': ['superadmin', 'gestao'],          // cadência de abordagem: intervalos e o painel de follow-ups
   'goals.manage': ['superadmin', 'gestao'],
@@ -80,7 +79,7 @@ const PERMISSIONS = {
 // mesmo com perfil de gestão: o gestor de um projeto cuida do projeto dele, não do sistema.
 const HOUSE_PERMISSIONS = new Set([
   'users.read', 'users.write', 'users.delete', 'projects.manage', 'integrations.manage', 'catalog.manage',
-  'routines.manage', 'notifications.manage', 'roles.manage', 'reminders.manage', 'search.manage', 'contacts.manage',
+  'routines.manage', 'notifications.manage', 'roles.manage', 'reminders.manage', 'contacts.manage',
   'outreach.manage', 'stock.read', 'stock.write', 'audit.read', 'trash.manage',
 ]);
 
@@ -118,7 +117,7 @@ const AREAS = [
   { key: 'plateia', label: 'Plateia', read: ['audience.read'], edit: [], manage: ['audience.manage'] },
   { key: 'tarefas', label: 'Tarefas e calendário', read: ['tasks.read', 'calendar.read'], edit: ['tasks.write', 'comments.write'], manage: ['tasks.manage', 'calendar.share', 'goals.manage'] },
   { key: 'mensagens', label: 'Mensagens', read: ['chat.use'], edit: [], manage: [] },
-  { key: 'sistema', label: 'Sistema (só para a equipe da casa)', read: ['users.read', 'audit.read'], edit: ['users.write', 'notifications.manage', 'reminders.manage', 'search.manage', 'contacts.manage', 'outreach.manage', 'routines.manage', 'catalog.manage'], manage: ['users.delete', 'roles.manage', 'projects.manage', 'integrations.manage', 'trash.manage'] },
+  { key: 'sistema', label: 'Sistema (só para a equipe da casa)', read: ['users.read', 'audit.read'], edit: ['users.write', 'notifications.manage', 'reminders.manage', 'contacts.manage', 'outreach.manage', 'routines.manage', 'catalog.manage'], manage: ['users.delete', 'roles.manage', 'projects.manage', 'integrations.manage', 'trash.manage'] },
 ];
 const PERM_LABELS = {
   'guests.read': 'Ver convidados', 'guests.write': 'Cadastrar e mover convidados', 'guests.invite': 'Gerar e enviar convites', 'guests.delete': 'Apagar convidados', 'duplicates.manage': 'Lista de duplicatas',
@@ -136,7 +135,7 @@ const PERM_LABELS = {
   'tasks.manage': 'Mexer em qualquer tarefa e reatribuir', 'calendar.share': 'Compartilhar visualizações do calendário', 'goals.manage': 'Definir metas da equipe',
   'chat.use': 'Usar as mensagens da equipe',
   'users.read': 'Ver usuários', 'audit.read': 'Ver a auditoria', 'users.write': 'Criar e editar usuários', 'notifications.manage': 'Configurar avisos', 'reminders.manage': 'Lembretes da gravação',
-  'search.manage': 'Atalhos da busca', 'contacts.manage': 'WhatsApp dos convites', 'outreach.manage': 'Cadência de abordagem', 'routines.manage': 'Rotinas de tarefas', 'catalog.manage': 'Categorias',
+  'contacts.manage': 'WhatsApp dos convites', 'outreach.manage': 'Cadência de abordagem', 'routines.manage': 'Rotinas de tarefas', 'catalog.manage': 'Categorias',
   'users.delete': 'Excluir usuários', 'roles.manage': 'Funções', 'projects.manage': 'Projetos', 'integrations.manage': 'Integrações', 'trash.manage': 'Lixeira completa',
 };
 

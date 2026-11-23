@@ -48,7 +48,6 @@ const ACTIONS = [
   { id: 'auditoria', label: 'Logs (auditoria)', keywords: 'logs auditoria historico acoes', url: '/auditoria', perm: 'audit.read', group: 'Gestão' },
   { id: 'config-notificacoes', label: 'Configurar notificações', keywords: 'notificacoes email avisos configuracao', url: '/gestao/notificacoes', perm: 'notifications.manage', group: 'Gestão' },
   { id: 'rotinas', label: 'Rotinas de tarefas (vencimentos)', keywords: 'rotinas prazos vencimento padrao tarefas automaticas', url: '/gestao/rotinas', perm: 'routines.manage', group: 'Gestão' },
-  { id: 'config-busca', label: 'Busca global: atalhos e sugestões', keywords: 'busca atalhos sugestoes', url: '/gestao/busca', perm: 'search.manage', group: 'Gestão' },
   { id: 'integracoes', label: 'Integrações', keywords: 'brevo email yourls backblaze groq gemini upload-post', url: '/integracoes', perm: 'integrations.manage', group: 'Gestão' },
   { id: 'perfil', label: 'Meu perfil e senha', keywords: 'perfil senha conta', url: '/perfil', group: 'Conta' },
   { id: 'tema', label: 'Alternar tema claro/escuro', keywords: 'tema escuro claro modo', js: 'theme', group: 'Conta' },
@@ -152,13 +151,6 @@ const PROVIDERS = [
   } },
 ];
 
-// Tabelas técnicas que não fazem sentido na busca (não viram sugestão).
-const TECHNICAL = new Set(['migrations', 'schema_migrations', 'auth_tokens', 'checklist_template_items', 'sessions', 'user_tokens', 'audit_log', 'jobs', 'episode_file_parts', 'clip_upload_parts', 'sponsor_sessions',
-  'invite_clicks', 'sponsor_clicks', 'notification_settings', 'notification_mutes', 'search_log', 'search_dismissed', 'search_shortcuts', 'episode_frames',
-  'episode_transcripts', 'episode_metadata', 'episode_events', 'guest_events', 'sponsor_events', 'notifications', 'sponsor_files', 'episode_files',
-  'checklist_templates', 'checklist_items', 'episode_checklist_items', 'episode_comments', 'sponsor_episodes', 'episode_covers', 'episode_publications',
-  'sponsor_bookings', 'social_events', 'social_snapshots', 'fin_settings', 'plateia_events', 'fin_rules', 'fin_recurring', 'fin_stock_moves']);
-
 function scoreAction(a, nq) {
   const label = norm(a.label); const kw = norm(a.keywords);
   if (label.startsWith(nq)) return 100;
@@ -170,21 +162,16 @@ function scoreAction(a, nq) {
   return 0;
 }
 
-async function shortcuts() {
-  const { rows } = await db.query('SELECT * FROM search_shortcuts ORDER BY label');
-  return rows.map((s) => ({ id: `atalho-${s.id}`, label: s.label, keywords: s.keywords || '', url: s.url, perm: s.perm || null, group: 'Atalhos da equipe', custom: true }));
-}
-
-async function actionsFor(user) {
-  return [...ACTIONS, ...(await shortcuts())].filter((a) => allowed(user, a.perm));
+function actionsFor(user) {
+  return ACTIONS.filter((a) => allowed(user, a.perm));
 }
 
 // Resultado agrupado. Sem texto: os atalhos principais.
 // pids: o recorte de projeto de quem busca (services/scope).
 async function search(q, user, pids = null) {
   const query = String(q || '').trim().slice(0, 80);
-  const actions = await actionsFor(user);
-  if (query.length < 1) return { q: '', groups: [{ label: 'Atalhos', items: actions.filter((a) => ['Criar', 'Atalhos da equipe'].includes(a.group) || ['minhas-tarefas', 'tarefas-hoje', 'notificacoes'].includes(a.id)).slice(0, 10).map(asItem) }], total: 0 };
+  const actions = actionsFor(user);
+  if (query.length < 1) return { q: '', groups: [{ label: 'Atalhos', items: actions.filter((a) => a.group === 'Criar' || ['minhas-tarefas', 'tarefas-hoje', 'notificacoes'].includes(a.id)).slice(0, 10).map(asItem) }], total: 0 };
   const nq = norm(query);
   const matched = actions.map((a) => ({ a, s: scoreAction(a, nq) })).filter((x) => x.s > 0).sort((x, y) => y.s - x.s).slice(0, 8).map((x) => asItem(x.a));
   const groups = [];
@@ -197,51 +184,6 @@ async function search(q, user, pids = null) {
   return { q: query, groups, total };
 }
 const asItem = (a) => ({ title: a.label, sub: a.group, url: a.url || null, js: a.js || null, kind: 'acao', id: a.id });
-
-const log = (user, q, results, picked = null) => db.query('INSERT INTO search_log (user_id, q, results, picked) VALUES ($1,$2,$3,$4)', [user.id, String(q).slice(0, 80), results, picked ? String(picked).slice(0, 300) : null]);
-
-// Todas as páginas GET do painel (sem parâmetros), lidas do próprio Express: o que entrar no sistema aparece aqui sozinho.
-function pagesOf(app) {
-  const out = new Set();
-  const walk = (stack) => {
-    for (const layer of stack || []) {
-      if (layer.route) {
-        const paths = [].concat(layer.route.path);
-        if (!layer.route.methods.get) continue;
-        for (const p of paths) if (typeof p === 'string' && !p.includes(':') && !/\.(json|csv|ico|txt|xml)$|\/(status|resumo)$|^\/(static|healthz|patrocinador|convite|login|logout|esqueci|definir|busca)/.test(p) && p !== '/') out.add(p); // só páginas (não endpoints de dados)
-      } else if (layer.handle?.stack) walk(layer.handle.stack);
-    }
-  };
-  walk(app._router?.stack);
-  return [...out].sort();
-}
-const pathOf = (url) => String(url || '').split(/[?#]/)[0];
-
-// Sugestões para a gestão. Cada uma tem uma chave (para "dispensar") e, quando der, um atalho pronto para criar.
-async function suggestions(app) {
-  const { rows: dismissed } = await db.query('SELECT key FROM search_dismissed');
-  const skip = new Set(dismissed.map((r) => r.key));
-  const out = [];
-  const actionPaths = new Set([...ACTIONS, ...(await shortcuts())].map((a) => pathOf(a.url)).filter(Boolean));
-
-  const { rows: misses } = await db.query(
-    `SELECT lower(q) AS q, count(*)::int AS n, max(created_at) AS last FROM search_log WHERE results = 0 AND created_at > now() - interval '90 days'
-      GROUP BY lower(q) HAVING count(*) >= 2 ORDER BY count(*) DESC, max(created_at) DESC LIMIT 15`);
-  for (const m of misses) out.push({ key: `busca:${m.q}`, kind: 'busca', title: `Buscaram “${m.q}” ${m.n} vezes sem resultado`, hint: 'Crie um atalho com essa palavra-chave (para a página certa) ou anote como pedido de funcionalidade.', shortcut: { label: '', url: '', keywords: m.q } });
-
-  for (const p of pagesOf(app)) if (!actionPaths.has(p)) out.push({ key: `pagina:${p}`, kind: 'pagina', title: `A página ${p} ainda não tem atalho na busca`, hint: 'Página nova do sistema. Um atalho deixa ela a um Ctrl+K de distância.', shortcut: { label: '', url: p, keywords: p.split('/').filter(Boolean).join(' ') } });
-
-  const covered = new Set(PROVIDERS.flatMap((p) => p.tables));
-  const { rows: tables } = await db.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name");
-  for (const t of tables.map((r) => r.table_name)) if (!covered.has(t) && !TECHNICAL.has(t)) out.push({ key: `tabela:${t}`, kind: 'dados', title: `Os dados de “${t}” ainda não aparecem na busca`, hint: 'Tabela nova no banco. Para buscar nela, inclua um provedor em src/services/search.js (PROVIDERS).' });
-
-  const { rows: picks } = await db.query(
-    `SELECT picked, count(*)::int AS n FROM search_log WHERE picked IS NOT NULL AND picked ~ '^/[a-z]+/[0-9]+' AND created_at > now() - interval '60 days'
-      GROUP BY picked HAVING count(*) >= 3 ORDER BY count(*) DESC LIMIT 10`);
-  for (const p of picks) if (!actionPaths.has(pathOf(p.picked))) out.push({ key: `fixar:${p.picked}`, kind: 'frequente', title: `${p.picked} foi aberto ${p.n} vezes pela busca`, hint: 'Vale um atalho fixo com um nome fácil.', shortcut: { label: '', url: p.picked, keywords: '' } });
-
-  return out.filter((s) => !skip.has(s.key));
-}
 
 // Itens que dá para citar com # numa mensagem (link clicável): os mesmos provedores da busca, só os que têm página própria,
 // respeitando o que a pessoa pode ver. data-ref = o tipo (ver richText.REF_PATHS).
@@ -257,4 +199,4 @@ async function references(q, user, pids = null) {
   return lists.flat().filter((r) => isRef(r.kind, r.url)).slice(0, 12);
 }
 
-module.exports = { ACTIONS, PROVIDERS, TECHNICAL, REFS, norm, search, references, actionsFor, log, suggestions, pagesOf };
+module.exports = { ACTIONS, PROVIDERS, REFS, norm, search, references, actionsFor };

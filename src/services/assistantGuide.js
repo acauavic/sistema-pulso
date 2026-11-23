@@ -47,7 +47,6 @@ const ACTIONS = {
   'routines.manage': { text: 'configurar as rotinas de tarefas que nascem sozinhas', where: 'Gestão > Rotinas de tarefas' },
   'reminders.manage': { text: 'configurar os lembretes da gravação: endereço do estúdio, horário e textos', where: 'Gestão > Lembretes da gravação' },
   'plans.manage': { text: 'editar os planos de patrocínio (Ouro e Diamond) e escolher quais episódios publicados aparecem na galeria do media kit', where: 'Gestão > Planos de patrocínio e Galeria do media kit' },
-  'search.manage': { text: 'editar os atalhos da busca global', where: 'Gestão > Busca global' },
   'contacts.manage': { text: 'mudar o WhatsApp da produção (botões do convite do convidado) e o do comercial (media kit e portal do patrocinador), e as mensagens prontas que abrem nele', where: 'Gestão > WhatsApp dos convites' },
   'outreach.manage': { text: 'configurar a cadência de follow-up (intervalos entre abordagens) e acompanhar o painel de abordagens por canal e por pessoa', where: 'Gestão > Cadência' },
   'pautas.read': { text: 'ler a pauta e o roteiro do vídeo (o editor lê o roteiro aprovado)', where: 'Vídeo > aba Pauta' },

@@ -155,27 +155,9 @@ router.post('/notificacoes/preferencias', wrap(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------- busca global
-// Quantas sugestões de melhoria a busca tem (aparece ao abrir a busca vazia): percorre as rotas e o banco, então guarda 10 min.
-let tipsCache = { at: 0, n: 0 };
-async function tipsCount(app) {
-  if (Date.now() - tipsCache.at < 10 * 60_000) return tipsCache.n;
-  tipsCache = { at: Date.now(), n: (await search.suggestions(app)).length };
-  return tipsCache.n;
-}
-
 router.get('/busca', wrap(async (req, res) => {
   const result = await search.search(req.query.q, req.user, require('../services/scope').idsOf(req));
-  if (result.q.length >= 2 && req.query.registrar !== '0') await search.log(req.user, result.q, result.total);
-  let tips = 0;
-  if (!result.q && require('../permissions').can(req.user, 'search.manage')) tips = await tipsCount(req.app);
-  res.set('Cache-Control', 'no-store').json({ ok: true, ...result, tips });
-}));
-
-// o que a pessoa escolheu (melhora as sugestões de atalhos)
-router.post('/busca/escolha', wrap(async (req, res) => {
-  const q = String(req.body.q || '').trim(); const url = String(req.body.url || '');
-  if (q.length >= 2 && url.startsWith('/')) await db.query('UPDATE search_log SET picked = $3 WHERE id = (SELECT id FROM search_log WHERE user_id = $1 AND lower(q) = lower($2) ORDER BY id DESC LIMIT 1)', [req.user.id, q.slice(0, 80), url.slice(0, 300)]);
-  res.json({ ok: true });
+  res.set('Cache-Control', 'no-store').json({ ok: true, ...result });
 }));
 
 module.exports = router;

@@ -28,7 +28,7 @@
      const navItem = function (href, iconName, label, active) {
        return '<a href="' + href + '" class="' + (active ? 'active' : '') + '"' + (active ? ' aria-current="page"' : '') + '>' + icon(iconName) + '<span>' + label + '</span></a>';
      };
-     const adminOpen = can('users.read') || can('audit.read') || can('integrations.manage') || can('notifications.manage') || can('routines.manage') || can('search.manage'); %>
+     const adminOpen = can('users.read') || can('audit.read') || can('integrations.manage') || can('notifications.manage') || can('routines.manage'); %>
 <div class="app">
 <aside class="sidebar" data-sidebar>
   <div class="sidebar-top">

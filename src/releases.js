@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.8.1', date: '2026-11-23', title: 'Menos uma tela de configuração',
+    items: [
+      { kind: 'ajuste', text: 'Saiu a página Gestão > Busca global (atalhos e sugestões do que incluir na busca). Ela nunca foi usada e as sugestões não ajudavam. A busca (Ctrl+K) continua igual, procurando convidados, episódios, tarefas, cortes e o resto.' },
+    ],
+  },
+  {
     version: '2.8.0', date: '2026-11-23', title: 'Agendados: o que sai em cada dia, hora a hora',
     items: [
       { kind: 'novo', text: 'Conteúdo > Agendados: escolha um dia (ou a semana inteira) e veja tudo o que sai nas redes, e o que já saiu, com o horário de cada post, a capa, o episódio, as redes e a marca "Reel de teste". Dá para ver só os vídeos ou só as imagens.' },

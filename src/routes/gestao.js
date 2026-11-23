@@ -1,8 +1,7 @@
-// Painel de gestão: usuários, logs (auditoria), notificações, rotinas de tarefas, busca global e integrações num lugar só.
+// Painel de gestão: usuários, logs (auditoria), notificações, rotinas de tarefas e integrações num lugar só.
 const express = require('express');
 const db = require('../db/pool');
 const C = require('../constants');
-const search = require('../services/search');
 const { ROLES, PERMISSIONS, can } = require('../permissions');
 const { requirePerm } = require('../middleware');
 const { audit } = require('../services/audit');
@@ -10,18 +9,16 @@ const { clean } = require('../utils/format');
 const { wrap, isIntId, isUuid } = require('../utils/wrap');
 
 const router = express.Router();
-const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'search.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage'].some((p) => can(req.user, p))
+const anyGestao = (req, res, next) => (['users.read', 'audit.read', 'notifications.manage', 'routines.manage', 'reminders.manage', 'integrations.manage', 'plans.manage', 'outreach.manage', 'contacts.manage'].some((p) => can(req.user, p))
   ? next() : res.status(403).render('error', { title: 'Sem permissão', message: 'Sua função não acessa o painel de gestão.' }));
 
 router.get('/gestao', anyGestao, wrap(async (req, res) => {
-  const [users, audit24, routines, shortcuts, tips] = await Promise.all([
+  const [users, audit24, routines] = await Promise.all([
     db.query('SELECT count(*) FILTER (WHERE active)::int AS active, count(*) FILTER (WHERE active AND password_hash IS NULL)::int AS pending FROM users'),
     db.query("SELECT count(*)::int AS n FROM audit_log WHERE created_at > now() - interval '24 hours'"),
     db.query('SELECT count(*) FILTER (WHERE active)::int AS n FROM task_routines'),
-    db.query('SELECT count(*)::int AS n FROM search_shortcuts'),
-    can(req.user, 'search.manage') ? search.suggestions(req.app) : [],
   ]);
-  res.render('gestao/index', { title: 'Gestão', stats: { users: users.rows[0], audit: audit24.rows[0].n, routines: routines.rows[0].n, shortcuts: shortcuts.rows[0].n, tips: tips.length } });
+  res.render('gestao/index', { title: 'Gestão', stats: { users: users.rows[0], audit: audit24.rows[0].n, routines: routines.rows[0].n } });
 }));
 
 // ---------------------------------------------------------------- notificações (configuração geral)
@@ -212,43 +209,6 @@ router.post('/gestao/rotinas/:id', requirePerm('routines.manage'), wrap(async (r
 router.post('/gestao/rotinas/:id/excluir', requirePerm('routines.manage'), wrap(async (req, res) => {
   if (isIntId(req.params.id)) { await db.query('DELETE FROM task_routines WHERE id = $1', [req.params.id]); await audit(req, 'rotina.excluida', 'routine', req.params.id, {}); }
   res.redirect('/gestao/rotinas');
-}));
-
-// ---------------------------------------------------------------- busca global: atalhos e sugestões
-router.get('/gestao/busca', requirePerm('search.manage'), wrap(async (req, res) => {
-  const [tips, shortcuts, top, misses] = await Promise.all([
-    search.suggestions(req.app),
-    db.query('SELECT s.*, u.name AS author FROM search_shortcuts s LEFT JOIN users u ON u.id = s.created_by ORDER BY s.label'),
-    db.query("SELECT lower(q) AS q, count(*)::int AS n FROM search_log WHERE created_at > now() - interval '30 days' GROUP BY lower(q) ORDER BY count(*) DESC LIMIT 12"),
-    db.query("SELECT count(*)::int AS n FROM search_log WHERE results = 0 AND created_at > now() - interval '30 days'"),
-  ]);
-  res.render('gestao/search', {
-    title: 'Busca global', tips, shortcuts: shortcuts.rows, top: top.rows, misses: misses.rows[0].n,
-    actions: search.ACTIONS, providers: search.PROVIDERS.map((p) => ({ label: p.label, tables: p.tables })), perms: Object.keys(PERMISSIONS),
-    prefill: { label: String(req.query.label || ''), url: String(req.query.url || ''), keywords: String(req.query.keywords || ''), sugestao: String(req.query.sugestao || '') },
-  });
-}));
-
-router.post('/gestao/busca/atalhos', requirePerm('search.manage'), wrap(async (req, res) => {
-  const label = clean(req.body.label, 80); const url = String(req.body.url || '').trim().slice(0, 300);
-  const keywords = clean(req.body.keywords, 300) || null; const perm = PERMISSIONS[req.body.perm] ? req.body.perm : null;
-  if (!label || !/^\/(?![\/\\])/.test(url)) { await req.flash('error', 'Dê um nome e um endereço do próprio painel (começando com /).'); return res.redirect('/gestao/busca'); }
-  const { rows: [s] } = await db.query('INSERT INTO search_shortcuts (label, url, keywords, perm, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id', [label, url, keywords, perm, req.user.id]);
-  if (req.body.sugestao) await db.query('INSERT INTO search_dismissed (key) VALUES ($1) ON CONFLICT DO NOTHING', [String(req.body.sugestao).slice(0, 300)]);
-  await audit(req, 'busca.atalho_criado', 'shortcut', s.id, { label, url });
-  await req.flash('ok', `Atalho “${label}” criado: já aparece no Ctrl+K.`);
-  res.redirect('/gestao/busca');
-}));
-
-router.post('/gestao/busca/atalhos/:id/excluir', requirePerm('search.manage'), wrap(async (req, res) => {
-  if (isIntId(req.params.id)) await db.query('DELETE FROM search_shortcuts WHERE id = $1', [req.params.id]);
-  res.redirect('/gestao/busca');
-}));
-
-router.post('/gestao/busca/dispensar', requirePerm('search.manage'), wrap(async (req, res) => {
-  const key = String(req.body.key || '').slice(0, 300);
-  if (key) await db.query('INSERT INTO search_dismissed (key) VALUES ($1) ON CONFLICT DO NOTHING', [key]);
-  res.redirect('/gestao/busca');
 }));
 
 // ---- Sistema: fila de trabalhos, processos (workers) e rotinas ----

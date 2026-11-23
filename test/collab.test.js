@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const tasksSvc = require('../src/services/tasks');
 const notifySvc = require('../src/services/notify');
-const search = require('../src/services/search');
 
 describe('colaboração: comentários, notificações, responsável, tarefas, rotinas, gestão e busca', () => {
   let app; const as = {}; const u = {};
@@ -496,7 +495,7 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       assert.ok(!(await json(as.editor, 'GET', '/busca?q=gil')).json.groups.some((g) => g.label === 'Pessoas'), 'editor não busca pessoas');
       const empty = await json(as.gestao, 'GET', '/busca?q=');
       assert.equal(empty.json.groups[0].label, 'Atalhos');
-      assert.ok(typeof empty.json.tips === 'number', 'quem gerencia a busca vê quantas sugestões há');
+      assert.equal(empty.json.tips, undefined, 'a busca não manda mais sugestões de atalho');
     });
 
     it('não liga para acento, maiúsculas nem ordem das palavras; acha também o que é do Social', async () => {
@@ -512,39 +511,23 @@ describe('colaboração: comentários, notificações, responsável, tarefas, ro
       assert.ok(!noise.json.groups.some((g) => g.items.some((i) => i.id === 'rotinas')), 'palavra-chave só casa no começo da palavra ("dra" não é "padrão")');
     });
 
-    it('registra buscas e sugere à gestão o que incluir (buscas sem resultado, páginas sem atalho, dados novos); atalho criado aparece no Ctrl+K', async () => {
+    it('sem a página de configuração da busca: nada de atalhos, sugestões ou registro das buscas', async () => {
+      assert.equal((await as.gestao.get('/gestao/busca')).status, 404);
+      assert.equal((await form(as.gestao, '/gestao/busca/atalhos', { label: 'Contratos', url: '/patrocinadores' })).status, 404);
+      const before = (await h.db.query('SELECT count(*)::int n FROM search_log')).rows[0].n;
       await json(as.prod, 'GET', '/busca?q=contrato assinado');
-      await json(as.editor, 'GET', '/busca?q=Contrato assinado');
-      const pages = search.pagesOf(require('../src/app').createApp());
-      assert.ok(pages.includes('/tarefas') && pages.includes('/gestao/busca'));
-      assert.ok(!pages.some((p) => p.startsWith('/patrocinador/')), 'páginas públicas ficam de fora');
-      const tips = await search.suggestions(require('../src/app').createApp());
-      assert.ok(tips.some((t) => t.key === 'busca:contrato assinado' && /2 vezes sem resultado/.test(t.title)));
-      assert.ok(tips.some((t) => t.key === 'tabela:sponsor_deliverables'), 'tabela sem busca vira sugestão');
-      const page = (await as.gestao.get('/gestao/busca')).text;
-      assert.match(page, /Buscaram “contrato assinado” 2 vezes sem resultado/);
-      assert.equal((await as.editor.get('/gestao/busca')).status, 403);
-      assert.equal((await form(as.gestao, '/gestao/busca/atalhos', { label: 'Contratos', url: '/patrocinadores?etapa=ativo', keywords: 'contrato assinado', sugestao: 'busca:contrato assinado' })).status, 302);
-      const found = await json(as.prod, 'GET', '/busca?q=contrato');
-      assert.ok(found.json.groups.some((g) => g.items.some((i) => i.title === 'Contratos' && i.url === '/patrocinadores?etapa=ativo')));
-      assert.ok(!(await search.suggestions(require('../src/app').createApp())).some((t) => t.key === 'busca:contrato assinado'), 'a sugestão atendida some');
-      assert.equal((await form(as.gestao, '/gestao/busca/atalhos', { label: 'Fora', url: 'https://evil.example' })).status, 302);
-      assert.equal((await h.db.query("SELECT count(*)::int n FROM search_shortcuts WHERE label='Fora'")).rows[0].n, 0, 'só endereços do próprio painel');
-      await form(as.gestao, '/gestao/busca/dispensar', { key: 'tabela:sponsor_deliverables' });
-      assert.ok(!(await search.suggestions(require('../src/app').createApp())).some((t) => t.key === 'tabela:sponsor_deliverables'));
-    });
-
-    it('a escolha feita na busca fica registrada (vira sugestão de atalho quando é frequente)', async () => {
-      await json(as.gestao, 'GET', '/busca?q=Marcos');
-      assert.equal((await json(as.gestao, 'POST', '/busca/escolha', { q: 'Marcos', url: '/convidados/1' })).status, 200);
-      assert.equal((await h.db.query("SELECT picked FROM search_log WHERE lower(q)='marcos' ORDER BY id DESC LIMIT 1")).rows[0].picked, '/convidados/1');
+      assert.equal((await h.db.query('SELECT count(*)::int n FROM search_log')).rows[0].n, before, 'a busca não é mais registrada');
+      assert.ok(!(await json(as.gestao, 'GET', '/busca?q=busca global')).json.groups.some((g) => g.items.some((i) => i.url === '/gestao/busca')));
+      const home = (await as.gestao.get('/')).text;
+      assert.doesNotMatch(home, /data-palette-tips/); assert.doesNotMatch(home, /href="\/gestao\/busca"/);
     });
   });
 
   describe('painel de gestão e menu', () => {
-    it('gestão reúne usuários, logs, notificações, rotinas, busca e integrações; editor não entra', async () => {
+    it('gestão reúne usuários, logs, notificações, rotinas e integrações; editor não entra', async () => {
       const page = (await as.gestao.get('/gestao')).text;
-      for (const t of ['Usuários', 'Auditoria', 'Notificações', 'Rotinas de tarefas', 'Busca global', 'Integrações']) assert.match(page, new RegExp(t), t);
+      for (const t of ['Usuários', 'Auditoria', 'Notificações', 'Rotinas de tarefas', 'Integrações']) assert.match(page, new RegExp(t), t);
+      assert.doesNotMatch(page, /href="\/gestao\/busca"/, 'a configuração da busca saiu');
       assert.equal((await as.editor.get('/gestao')).status, 403);
       for (const p of ['/usuarios', '/auditoria', '/integracoes']) assert.match((await as.gestao.get(p)).text, /class="subnav subnav-groups"/, `${p} com as abas da gestão`);
     });
