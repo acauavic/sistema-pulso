@@ -47,7 +47,7 @@ const eligibleEpisodes = (projectIds = null) => db.query(
 router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const only = isIntId(req.query.episodio) ? Number(req.query.episodio) : null;
   // cada aba é uma página: só monta o que a aba aberta mostra (o quadro, os cortes, os posts ou os pedidos)
-  const vista = ['quadro', 'cortes', 'posts', 'pedidos'].includes(req.query.vista) ? req.query.vista : 'quadro';
+  const vista = ['quadro', 'cortes', 'posts', 'pedidos', 'agenda'].includes(req.query.vista) ? req.query.vista : 'quadro';
   const board = require('../services/contentBoard');
   const R = require('../services/contentRequests');
   // recorte: os projetos da pessoa, ou o escolhido no menu. Imagem herda o projeto do episódio ou do pedido dela.
@@ -155,13 +155,17 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     shownRequests = reqs.filter(f.passes);
   }
 
+  // Agendados: o que sai (ou saiu) no dia ou na semana, com o horário, o Reel de teste e o mapa de horários
+  const agendaSvc = require('../services/postAgenda');
+  const [agenda, agendaCount] = await Promise.all([vista === 'agenda' ? agendaSvc.agenda(req.query, { pids }) : null, agendaSvc.upcomingCount(pids)]);
+
   const moments = only && vista === 'cortes' ? await clips.momentsFor(only) : [];
   const pedir = Object.prototype.hasOwnProperty.call(R.KINDS, req.query.pedir) ? req.query.pedir : (req.query.pedir === '1' ? 'trailer' : null);
   await require('../services/catalog').refresh();
   res.render('content/index', {
     filterUi, videoTypes: require('../services/catalog').videoOptions(), cardUi: vista === 'quadro' || vista === 'cortes' ? require('../services/cardFields').forList(vista === 'quadro' ? 'conteudo' : 'cortes') : null,
     uploadPost: up, autoDefaults: vista === 'cortes' ? await require('../services/commentAutomation').formDefaults({}) : null, situacao, ordem, readyCount, clipPager, clipTotals,
-    tabCounts: { cortes: allClips.length, posts: postCountRow.rows[0].n },
+    tabCounts: { cortes: allClips.length, posts: postCountRow.rows[0].n, agenda: agendaCount }, agenda, statusLabel: require('../services/social').STATUS_LABEL,
     columns, hiddenOld, tipo, vista,
     requests: shownRequests, openRequests: shownRequests.filter((r) => R.OPEN.includes(r.status)), people: people.rows, episodeList: episodeList.rows, K: R.KINDS, S: R.STATUSES, F: R.FORMATS,
     pedir, today: new Date().toISOString().slice(0, 10), isLate: R.isLate, stageLabel: board.STAGE_LABEL,

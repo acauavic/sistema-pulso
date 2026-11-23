@@ -5,7 +5,7 @@
   var link = function (s, m) { var p = []; if (s) p.push('status=' + s); if (m) p.push('tipo=' + m); if (q) p.push('q=' + encodeURIComponent(q)); return '/social/publicacoes' + (p.length ? '?' + p.join('&') : ''); };
   var total = Object.keys(counts).reduce(function (n, k) { return n + counts[k]; }, 0);
 %>
-<div class="toolbar">
+<div class="toolbar" data-list-memory="Publicações">
   <div class="seg" role="group" aria-label="Status">
     <a href="<%= link('', media) %>" class="<%= !status ? 'on' : '' %>">Todas <span class="mono"><%= total %></span></a>
     <% ['revisao', 'recusado', 'agendado', 'publicado', 'erro', 'simulado'].forEach(function (s) { if (!counts[s] && status !== s) return; %>

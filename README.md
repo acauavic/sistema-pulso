@@ -428,6 +428,9 @@ Cada convidado com episódio tem a aba **Portal** no cadastro. **Ativar portal**
 compartilhamentos e alcance de cada publicação que saiu pelo painel nos últimos 90 dias, por rede (Outstand: `GET /v1/posts/{id}/analytics`,
 uma consulta por post; Zernio: lista de posts da conta, casada pelo link). Aparecem na publicação (por rede), no corte (total), no cartão do
 quadro e em Insights > "O que publicamos" ("Cortes que mais funcionaram"); os 5 mais vistos entram como referência no prompt de copy.
+**Agendados** (Conteúdo, aba `?vista=agenda`, `services/postAgenda.js`): o que sai ou saiu num dia ou numa semana, com o horário, as
+redes, a marca de Reel de teste e um mapa de horários (régua de 0h a 24h por dia). Os botões de voltar do corte, do pedido e da publicação
+levam de volta à lista de onde a pessoa veio, com os filtros (lembrança na aba do navegador).
 **Agenda da semana** (`/conteudo/semana`, `bulkPublish.weekPicks`): a semana montada com os cortes prontos, um episódio de cada vez, para
 conferir e agendar; "Ajustar" guarda as escolhas (`app_settings.piloto_semana`) e a rotina `piloto-semana` avisa a equipe na segunda de manhã.
 **Palavra no direct**: o webhook da Outstand também aceita `message.received`; a mensagem vira `social_inbox` e o trabalho `direct_recebido`

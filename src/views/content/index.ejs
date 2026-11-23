@@ -25,12 +25,13 @@
 %>
 <%# Cada aba é uma página: só a aba aberta é montada no servidor (antes, as quatro vinham juntas). %>
 <% var tabHref = function (v) { return '/conteudo?vista=' + v + (only ? '&episodio=' + only : ''); }; %>
-<div class="tabs-wrap">
+<div class="tabs-wrap" data-list-memory="Conteúdo">
   <nav class="tabbar" aria-label="Conteúdo">
     <a href="<%= tabHref('quadro') %>" class="<%= vista === 'quadro' ? 'on' : '' %>"<%- vista === 'quadro' ? ' aria-current="page"' : '' %>><%- icon('columns-3', 14) %> Quadro</a>
     <a href="<%= tabHref('cortes') %>" class="<%= vista === 'cortes' ? 'on' : '' %>"<%- vista === 'cortes' ? ' aria-current="page"' : '' %>>Cortes <span class="count"><%= tabCounts.cortes %></span></a>
     <a href="<%= tabHref('posts') %>" class="<%= vista === 'posts' ? 'on' : '' %>"<%- vista === 'posts' ? ' aria-current="page"' : '' %>>Posts e carrosséis <span class="count"><%= tabCounts.posts %></span></a>
     <a href="<%= tabHref('pedidos') %>" class="<%= vista === 'pedidos' ? 'on' : '' %>"<%- vista === 'pedidos' ? ' aria-current="page"' : '' %>>Pedidos <span class="count"><%= openRequests.length %></span></a>
+    <a href="/conteudo?vista=agenda" class="<%= vista === 'agenda' ? 'on' : '' %>"<%- vista === 'agenda' ? ' aria-current="page"' : '' %>><%- icon('calendar-clock', 14) %> Agendados <span class="count"><%= tabCounts.agenda %></span></a>
   </nav>
 
   <% if (vista === 'quadro') { %>
@@ -234,6 +235,8 @@
     <% }) %>
   </div>
   <% } %>
+
+  <% if (vista === 'agenda') { %><%- include('_agenda') %><% } %>
 
   <% if (vista === 'pedidos') { %>
   <div class="pane" id="pane-pedidos">

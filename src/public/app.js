@@ -235,6 +235,22 @@
   };
   markRequired(document);
 
+  // Voltar que lembra: a lista (Conteúdo em qualquer aba, Publicações) guarda o endereço com os filtros nesta aba do navegador;
+  // a página do corte, do pedido e da publicação leva de volta para lá, mesmo depois de salvar algo nela. Em qualquer outra
+  // página a lembrança se apaga, e o botão volta a levar ao destino de sempre.
+  try {
+    const KEY = 'pulso-voltar';
+    const list = document.querySelector('[data-list-memory]');
+    const backs = document.querySelectorAll('a[data-back-memory]');
+    if (list) sessionStorage.setItem(KEY, JSON.stringify({ href: location.pathname + location.search, label: list.dataset.listMemory }));
+    else if (backs.length) {
+      const v = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+      if (v && typeof v.href === 'string' && /^\/(conteudo|social\/publicacoes)(\?|$)/.test(v.href)) {
+        backs.forEach((a) => { a.href = v.href; const t = a.querySelector('[data-back-label]'); if (t && v.label) t.textContent = v.label; });
+      }
+    } else sessionStorage.removeItem(KEY);
+  } catch { /* navegador sem sessionStorage: o botão leva ao destino de sempre */ }
+
   // página de erro: Voltar leva à página anterior (sem histórico, ao início)
   document.querySelectorAll('[data-go-back]').forEach((b) => b.addEventListener('click', () => { if (history.length > 1) history.back(); else location.href = '/'; }));
 

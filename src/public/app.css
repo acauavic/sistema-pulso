@@ -2157,6 +2157,42 @@ body:has(.chat) .assist-fab { display: none; } /* o botão do assistente cobriri
 .agenda-row > div { grid-area: txt; min-width: 0; } .agenda-row > div strong { font-family: var(--f-display); }
 .agenda-row .when { grid-area: when; font-size: 13px; } .agenda-row .trial-cell { grid-area: trial; align-self: center; margin: 0; }
 .agenda-row input[type="datetime-local"] { width: 100%; font-family: var(--f-mono); font-size: 12px; padding: 0 10px; }
+/* Conteúdo > Agendados: cabeçalho com o período, régua de 0h a 24h por dia (SVG, sem style=) e a lista por horário. Nada de verde:
+   ver a agenda não é ação; o verde fica só no chip "publicado". */
+.agenda-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.agenda-title { font-size: 20px; margin: 0 0 4px; }
+.agenda-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.agenda-type { margin-top: 12px; }
+.agenda-map h3 { font-size: 15px; }
+.amap { margin-top: 12px; display: grid; gap: 6px; }
+.amap-row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; }
+.amap.is-week .amap-row { grid-template-columns: 76px minmax(0, 1fr); gap: 8px; }
+.amap-day { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.amap-row.is-today .amap-day { color: var(--text); }
+.amap-svg { display: block; width: 100%; height: 32px; overflow: visible; }
+.amap-base { fill: var(--line-strong); }
+.amap-tick { fill: var(--line); } .amap-tick.major { fill: var(--line-strong); }
+.amap-now { fill: var(--muted); }
+.amap-mark { fill: var(--text-2); }
+.amap-mark.many { fill: var(--text); }
+.amap-mark.trial { fill: var(--surface); stroke: var(--text); stroke-width: 1.5px; stroke-dasharray: 3 2; }
+.amap-mark.bad { fill: var(--bad); }
+.amap-svg a:hover .amap-mark, .amap-svg a:focus .amap-mark { fill: var(--text); }
+.amap-hours { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.amap-hours span { width: 0; display: flex; justify-content: center; white-space: nowrap; }
+.amap-hours span:first-child { justify-content: flex-start; } .amap-hours span:last-child { justify-content: flex-end; }
+.amap-legend { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.amap-key { display: inline-block; width: 4px; height: 12px; background: var(--text-2); margin-left: 6px; }
+.amap-key.trial { width: 8px; background: transparent; border: 1px dashed var(--text); }
+.amap-key.bad { background: var(--bad); }
+.agenda-row.is-view { grid-template-columns: 64px 48px minmax(0, 1fr) auto; }
+.agenda-row.is-view .when { font-size: 16px; color: var(--text); }
+.agenda-row.is-view .trial-cell { gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 900px) {
+  .agenda-row.is-view { grid-template-columns: 48px minmax(0, 1fr); grid-template-areas: "img when" "img txt" "img trial"; }
+  .agenda-row.is-view .trial-cell { justify-content: flex-start; }
+  .amap.is-week .amap-row { grid-template-columns: 56px minmax(0, 1fr); }
+}
 .bulk-cover-row { display: grid; grid-template-columns: minmax(160px, 220px) 1fr minmax(240px, 360px); gap: 16px; align-items: start; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .bulk-cover-row .cover-picks { display: flex; flex-wrap: wrap; gap: 8px; }
 .bulk-cover-row .cover-pick { position: relative; cursor: pointer; }

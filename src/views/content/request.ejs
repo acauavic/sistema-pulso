@@ -32,7 +32,7 @@
     <% if (r.episode_id) { %><p class="small top-gap"><span class="muted">Episódio:</span> <a href="/episodios/<%= r.episode_id %>"><%= r.episode_number ? videoNo(r.episode_number, r.project_id) + ' · ' : '' %><%= r.episode_title %></a></p><% } %>
   </div>
   <div class="row">
-    <a class="btn ghost" href="/conteudo?vista=pedidos"><%- icon('arrow-left') %> Conteúdo</a>
+    <a class="btn ghost" href="/conteudo?vista=pedidos" data-back-memory><%- icon('arrow-left') %> <span data-back-label>Conteúdo</span></a>
     <% if (perm.edit && ['pedido', 'producao', 'revisao'].indexOf(r.status) >= 0) { %><button class="btn" type="button" data-modal-open="modal-pedido-editar"><%- icon('pencil', 14) %> Editar</button><% } %>
   </div>
 </div>

@@ -30,7 +30,7 @@
     <p class="clip-category small"><span class="mono muted">CATEGORIA</span> <span class="badge b-gray"><%= (K[clip.video_type] && K[clip.video_type].label) || clip.video_type %></span><% if (perm.cut) { %> <button class="link small" type="button" data-modal-open="modal-categoria">mudar</button><% } %></p>
   </div>
   <div class="row">
-    <a class="btn ghost" href="/conteudo<%= episode ? '?episodio=' + episode.id : '' %>"><%- icon('arrow-left') %> Conteúdo</a>
+    <a class="btn ghost" href="/conteudo<%= episode ? '?episodio=' + episode.id : '' %>" data-back-memory><%- icon('arrow-left') %> <span data-back-label>Conteúdo</span></a>
     <% if (episode) { %><a class="btn" href="/episodios/<%= episode.id %>">Episódio</a><% } %>
     <% if (ready) { %><a class="btn" href="/cortes/<%= clip.id %>/video?baixar=1"><%- icon('download') %> Baixar</a><% } %>
   </div>

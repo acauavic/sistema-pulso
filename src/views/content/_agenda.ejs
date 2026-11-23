@@ -1,0 +1,96 @@
+<%# Conteúdo > Agendados: o que sai (ou saiu) no dia ou na semana. Variáveis: agenda (services/postAgenda), statusLabel. %>
+<%
+  var A = agenda;
+  var agHref = function (o) {
+    o = o || {}; var p = ['vista=agenda'];
+    var dia = o.dia !== undefined ? o.dia : (A.isToday ? '' : A.day);
+    var per = o.periodo !== undefined ? o.periodo : A.period;
+    var tp = o.tipo !== undefined ? o.tipo : A.media;
+    if (dia) p.push('dia=' + dia); if (per === 'semana') p.push('periodo=semana'); if (tp) p.push('tipo=' + tp);
+    return '/conteudo?' + p.join('&');
+  };
+  var badge = { revisao: 'b-amber', publicado: 'b-st-publicado', parcial: 'b-amber', agendado: 'b-st-agendado', erro: 'b-red', enviando: 'b-amber' };
+  var hrefOf = function (it) { return can('social.read') ? '/social/publicacoes/' + it.id : (it.clip_id ? '/cortes/' + it.clip_id : null); };
+  var week = A.period === 'semana';
+  var withItems = A.days.filter(function (d) { return d.items.length; });
+  var nowMin = (function () { var t = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()).split(':'); return Number(t[0]) * 60 + Number(t[1]); })();
+  var hours = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+%>
+<div class="pane" id="pane-agenda">
+  <div class="agenda-head">
+    <div>
+      <h2 class="agenda-title"><%= A.title %><% if (!week && A.isToday) { %> <span class="mono small muted">HOJE</span><% } %></h2>
+      <p class="mono small muted m-0">
+        <% if (A.summary.total) { %><%= A.summary.total %> <%= A.summary.total === 1 ? 'POST' : 'POSTS' %> · <%= A.summary.trials %> <%= A.summary.trials === 1 ? 'REEL DE TESTE' : 'REELS DE TESTE' %><%= A.summary.first ? (A.summary.first === A.summary.last ? ' · ÀS ' + A.summary.first : ' · DAS ' + A.summary.first + ' ÀS ' + A.summary.last) : '' %><% } else { %>NENHUM POST NO PERÍODO<% } %>
+      </p>
+    </div>
+    <div class="agenda-controls">
+      <div class="seg" role="group" aria-label="Período">
+        <a class="<%= week ? '' : 'on' %>" href="<%= agHref({ periodo: 'dia' }) %>"<%- week ? '' : ' aria-current="true"' %>>Dia</a>
+        <a class="<%= week ? 'on' : '' %>" href="<%= agHref({ periodo: 'semana' }) %>"<%- week ? ' aria-current="true"' : '' %>>Semana</a>
+      </div>
+      <form class="day-nav" method="get" action="/conteudo">
+        <input type="hidden" name="vista" value="agenda"><% if (week) { %><input type="hidden" name="periodo" value="semana"><% } %><% if (A.media) { %><input type="hidden" name="tipo" value="<%= A.media %>"><% } %>
+        <a class="btn sm" href="<%= agHref({ dia: A.prev }) %>" aria-label="<%= week ? 'Semana anterior' : 'Dia anterior' %>"><%- icon('chevron-left') %></a>
+        <label class="sr-only" for="agenda-dia">Escolher o dia</label>
+        <input type="date" id="agenda-dia" name="dia" value="<%= A.day %>" data-day-pick>
+        <a class="btn sm" href="<%= agHref({ dia: A.next }) %>" aria-label="<%= week ? 'Próxima semana' : 'Próximo dia' %>"><%- icon('chevron-right') %></a>
+        <% if (!A.isToday) { %><a class="btn sm ghost" href="<%= agHref({ dia: '' }) %>">Hoje</a><% } %>
+      </form>
+    </div>
+  </div>
+
+  <div class="seg agenda-type" role="group" aria-label="Tipo de post">
+    <% [['', 'Tudo'], ['video', 'Vídeos'], ['imagem', 'Imagens']].forEach(function (f) { %><a class="<%= A.media === f[0] ? 'on' : '' %>" href="<%= agHref({ tipo: f[0] }) %>"<%- A.media === f[0] ? ' aria-current="true"' : '' %>><%= f[1] %></a><% }) %>
+  </div>
+
+  <% if (!A.items.length) { %>
+  <div class="empty card top-gap"><%- include('../partials/signal') %>
+    <p><strong><%= week ? 'Nada agendado nesta semana.' : 'Nada agendado para este dia.' %></strong></p>
+    <p class="muted small">Aqui aparece o que sai nas redes e o que já saiu, com o horário de cada post.<% if (perm.publish) { %> Para agendar, use a <a href="/conteudo/semana">Agenda da semana</a> ou "Publicar em massa" na aba Cortes.<% } %></p>
+  </div>
+  <% } else { %>
+  <section class="card agenda-map top-gap" aria-label="Mapa de horários">
+    <div class="row spread">
+      <h3 class="m-0">Mapa de horários</h3>
+      <span class="amap-legend small muted"><span class="amap-key"></span> post <span class="amap-key trial"></span> Reel de teste <span class="amap-key bad"></span> com erro</span>
+    </div>
+    <div class="amap<%= week ? ' is-week' : '' %>">
+      <% (week ? A.days : A.days.slice(0, 1)).forEach(function (d) { %>
+      <div class="amap-row<%= d.isToday ? ' is-today' : '' %>">
+        <% if (week) { %><span class="amap-day mono"><%= d.label %></span><% } %>
+        <svg class="amap-svg" viewBox="0 0 1440 32" preserveAspectRatio="none" role="img" aria-label="<%= d.label %>: <%= d.items.length ? d.items.map(function (i) { return i.hhmm; }).join(', ') : 'nenhum post' %>">
+          <rect class="amap-base" x="0" y="15" width="1440" height="2"></rect>
+          <% for (var h = 0; h <= 24; h += 1) { var x = Math.min(h * 60, 1438); %><rect class="amap-tick<%= h % 3 === 0 ? ' major' : '' %>" x="<%= x %>" y="<%= h % 3 === 0 ? 8 : 12 %>" width="2" height="<%= h % 3 === 0 ? 16 : 8 %>"></rect><% } %>
+          <% if (d.isToday) { %><rect class="amap-now" x="<%= nowMin %>" y="0" width="2" height="32"><title>Agora</title></rect><% } %>
+          <% d.marks.forEach(function (mk) { var href = mk.count === 1 ? hrefOf(mk.items[0]) : null; var x = Math.max(0, Math.min(mk.minute - 5, 1430)); %>
+          <% if (href) { %><a href="<%= href %>"><% } %><rect class="amap-mark<%= mk.trial ? ' trial' : '' %><%= mk.bad ? ' bad' : '' %><%= mk.count > 1 ? ' many' : '' %>" x="<%= x %>" y="4" width="10" height="24" vector-effect="non-scaling-stroke"><title><%= mk.tip %></title></rect><% if (href) { %></a><% } %>
+          <% }) %>
+        </svg>
+      </div>
+      <% }) %>
+      <div class="amap-row amap-hours-row"><% if (week) { %><span class="amap-day"></span><% } %><div class="amap-hours mono"><% hours.forEach(function (h) { %><span><%= h %>h</span><% }) %></div></div>
+    </div>
+  </section>
+
+  <% withItems.forEach(function (d) { %>
+  <section class="agenda-day">
+    <h2><span class="mono"><%= d.label %></span><% if (d.isToday && week) { %> <span class="mono small muted">HOJE</span><% } %> <span class="small muted"><%= d.items.length %> <%= d.items.length === 1 ? 'post' : 'posts' %></span></h2>
+    <% d.items.forEach(function (it) { var href = hrefOf(it); %>
+    <div class="agenda-row is-view">
+      <span class="when mono"><%= it.hhmm %></span>
+      <% if (it.thumb) { %><img src="<%= it.thumb %>" alt="" loading="lazy" decoding="async"><% } else { %><span class="poster-empty"><%- icon(it.media === 'video' ? 'film' : 'image', 16) %></span><% } %>
+      <div>
+        <% if (href) { %><a href="<%= href %>"><strong><%= it.title || it.post_title %></strong></a><% } else { %><strong><%= it.title || it.post_title %></strong><% } %>
+        <p class="mono small muted m-0"><%- include('../partials/project-tag', { id: it.project_id }) %> <%= it.episode_number ? videoNo(it.episode_number, it.project_id) + ' · ' : '' %><%= { video: 'VÍDEO', imagem: 'IMAGEM', carrossel: 'CARROSSEL', story: 'STORY' }[it.media] %> · <%= it.networks.join(', ') %><%= it.scheduled ? '' : ' · SAIU NA HORA' %></p>
+      </div>
+      <span class="trial-cell row">
+        <% if (it.trial) { %><span class="badge b-trial" title="Instagram como Reel de teste: aparece primeiro só para quem não segue">Reel de teste</span><% } %>
+        <% if (it.retry_at) { %><span class="badge b-amber">Nova tentativa</span><% } else { %><span class="badge <%= badge[it.status] %>"><%= statusLabel[it.status] %></span><% } %>
+      </span>
+    </div>
+    <% }) %>
+  </section>
+  <% }) %>
+  <% } %>
+</div>

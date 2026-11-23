@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.8.0', date: '2026-11-23', title: 'Agendados: o que sai em cada dia, hora a hora',
+    items: [
+      { kind: 'novo', text: 'Conteúdo > Agendados: escolha um dia (ou a semana inteira) e veja tudo o que sai nas redes, e o que já saiu, com o horário de cada post, a capa, o episódio, as redes e a marca "Reel de teste". Dá para ver só os vídeos ou só as imagens.' },
+      { kind: 'novo', text: 'Mapa de horários: uma régua de 0h a 24h com uma marca por post (o Reel de teste tracejado, o que deu erro em vermelho). Na semana, uma régua por dia, para ver os horários se repetindo ou batendo. Passe o mouse na marca para ver qual post é.' },
+      { kind: 'correcao', text: 'Voltar que lembra: ao abrir um corte, um pedido ou uma publicação e clicar em voltar, você volta para a tela onde estava, com os filtros que tinha posto (antes, o voltar do corte levava sempre ao conteúdo daquele episódio).' },
+    ],
+  },
+  {
     version: '2.7.0', date: '2026-11-21', title: 'Telas mais alinhadas, mensagens mais claras e planilhas que abrem certo',
     items: [
       { kind: 'novo', text: 'Planilha dos convidados: no menu "⋯" de Convidados, "Baixar planilha" traz a lista com os filtros que estão na tela (etapa, responsável, busca, filtros e projeto).' },
