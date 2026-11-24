@@ -130,6 +130,10 @@ async function content(g) {
   const photos = files.filter((f) => PHOTO_EXT.test(f.filename));
   const video = await latestVideo(g.episode_id);
   const plan = await postPlan(g.id);
+  const scheduled = await scheduledPosts(g, handle);
+  const planOn = Boolean(g.portal_post_plan && plan.length);
+  const calendar = [...(planOn ? plan : []), ...scheduled]
+    .sort((a, b) => a.on_date.localeCompare(b.on_date) || (a.at_time || '99:99').localeCompare(b.at_time || '99:99'));
   const exclusiveOpen = Boolean(g.exclusive_from) && g.exclusive_from <= today();
   const episodeIg = posts.find((p) => p.episodeVideo && p.links.some((l) => l.platform === 'instagram'));
   return {
@@ -139,7 +143,7 @@ async function content(g) {
     exclusive: clips.filter((c) => c.for_guest), clipsOut: clips.filter((c) => !c.for_guest), exclusiveOpen,
     photos: photos.filter((f) => f.for_guest), photoChoices: photos,
     video, videoOn: Boolean(g.portal_video && video),
-    plan, planOn: Boolean(g.portal_post_plan && plan.length),
+    plan, planOn, scheduled, calendar,
     episode: {
       youtube: g.ep_youtube || null, spotify: g.ep_spotify || null,
       instagram: episodeIg ? episodeIg.links.find((l) => l.platform === 'instagram').url : null,
@@ -206,6 +210,28 @@ async function postPlan(guestId) {
       WHERE guest_id = $1 ORDER BY on_date, at_time NULLS LAST, id`, [guestId]);
   const now = today();
   return rows.map((r) => ({ ...r, day: dayLabel(r.on_date), time: planTime(r.at_time), state: r.on_date < now ? 'feito' : r.on_date === now ? 'hoje' : 'vem' }));
+}
+// Agendados do convidado (do episódio dele ou com o @ dele no collab) que ainda não saíram, para o calendário do portal: dia, hora,
+// título, redes e capa (só a imagem). Reel de teste fica de fora inteiro; esperando aprovação e com erro também. Saiu, vai para os posts.
+async function scheduledPosts(g, handle = igPeople.clean(g.instagram)) {
+  const { rows } = await db.query(
+    `SELECT p.id, p.title, p.platforms, p.options, c.post_title, c.title AS clip_title, coalesce(c.cover_id, p.cover_id, p.cover_ids[1]) AS cover,
+            to_char(p.scheduled_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS on_date,
+            to_char(p.scheduled_at AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI') AS at_time
+       FROM episode_publications p LEFT JOIN episode_clips c ON c.id = p.clip_id
+      WHERE p.status IN ('agendado', 'enviando') AND p.scheduled_at IS NOT NULL
+        AND (p.episode_id = $1 OR ($2 <> '' AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(coalesce(p.options->'instagram'->'collaborators', '[]'::jsonb)) x WHERE lower(ltrim(x, '@')) = $2)))
+      ORDER BY p.scheduled_at, p.id`, [g.episode_id || 0, handle || '']);
+  const now = today();
+  return rows
+    .filter((p) => !((p.platforms || []).includes('instagram') && igPeople.trialOf(p.options?.instagram)))
+    .map((p) => ({
+      id: p.id, auto: true, on_date: p.on_date, at_time: p.at_time, day: dayLabel(p.on_date), time: planTime(p.at_time),
+      state: p.on_date < now ? 'feito' : p.on_date === now ? 'hoje' : 'vem',
+      title: p.title || p.post_title || p.clip_title || 'Post', cover: p.cover || null,
+      networks: (p.platforms || []).map((k) => up.PLATFORMS[k]?.label || k),
+      collab: Boolean(handle) && (p.platforms || []).includes('instagram') && (p.options?.instagram?.collaborators || []).map(igPeople.clean).includes(handle),
+    }));
 }
 // Linhas da janela. Linha toda vazia é ignorada; horário e descrição são opcionais, a data não.
 function parsePostPlan(body) {
@@ -345,5 +371,5 @@ async function tick() {
 
 module.exports = {
   TOKEN_RE, NOTIFY, VALID_DAYS, expired, extend, youtubeEmbed, spotifyEmbed, url, byId, byToken, content, schedule, dayLabel, today, channelOf, setEnabled, regenerate, parseDates, saveDates, setNotify,
-  postPlan, parsePostPlan, savePostPlan, setPostPlanVisible, latestVideo, setPhotos, setVideo, setYoutube, parseChannel, requestYoutube, youtubeUrl, waTo, linkMessage, newsMessage, markSent, sendLinkEmail, pending, markWhatsappSent, tick,
+  postPlan, scheduledPosts, parsePostPlan, savePostPlan, setPostPlanVisible, latestVideo, setPhotos, setVideo, setYoutube, parseChannel, requestYoutube, youtubeUrl, waTo, linkMessage, newsMessage, markSent, sendLinkEmail, pending, markWhatsappSent, tick,
 };

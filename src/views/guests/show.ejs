@@ -495,11 +495,19 @@
 
         <section class="card">
           <div class="row spread"><h2>Calendário de posts</h2><% if (pc.plan.length) { %><span class="badge b-gray"><%= pc.planOn ? 'no portal' : 'fora do portal' %></span><% } %></div>
+          <% if (pc.scheduled.length) { %>
+          <p class="mono small muted"><%= pc.scheduled.length %> agendado<%= pc.scheduled.length === 1 ? '' : 's' %> no Social · aparece<%= pc.scheduled.length === 1 ? '' : 'm' %> sozinho<%= pc.scheduled.length === 1 ? '' : 's' %> no portal</p>
+          <ul class="plain post-plan">
+            <% pc.scheduled.forEach(function (it) { %>
+            <li class="<%= it.state === 'feito' ? 'is-off' : '' %>"><span class="mono small"><%= it.day %> · <%= it.time %></span> <span><%= it.title %></span> <span class="mono small muted">AGENDADO<%= it.collab ? ' · COLLAB' : '' %></span></li>
+            <% }) %>
+          </ul>
+          <% } %>
           <% if (!pc.plan.length) { %>
-          <p class="small muted">Avise <%= gFirst %> antes de os posts ficarem prontos: quantos vão sair, em que data e o horário provável. Só aparece no portal depois de salvar.</p>
+          <p class="small muted"><%= pc.scheduled.length ? 'Algum post previsto que ainda não foi agendado? Coloque à mão: data e horário provável.' : 'O que for agendado no Social aparece aqui e no portal sozinho (menos o Reel de teste). Para avisar ' + gFirst + ' antes de agendar, monte o calendário à mão: data e horário provável.' %></p>
           <% if (canW) { %><p><button class="btn sm" type="button" data-modal-open="modal-portal-calendario"><%- icon('calendar', 14) %> Montar calendário</button></p><% } %>
           <% } else { %>
-          <p class="mono small muted"><%= pc.plan.length %> previsto<%= pc.plan.length === 1 ? '' : 's' %></p>
+          <p class="mono small muted<%= pc.scheduled.length ? ' top-gap' : '' %>"><%= pc.plan.length %> previsto<%= pc.plan.length === 1 ? '' : 's' %> à mão</p>
           <ul class="plain post-plan">
             <% pc.plan.forEach(function (it) { %>
             <li class="<%= it.state === 'feito' ? 'is-off' : '' %>"><span class="mono small"><%= it.day %><%= it.time ? ' · ' + it.time : '' %></span> <span><%= it.label || 'Post em collab' %></span></li>

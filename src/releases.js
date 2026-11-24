@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.9.0', date: '2026-11-24', title: 'O calendário do portal se monta com os agendados',
+    items: [
+      { kind: 'novo', text: 'O calendário de posts do portal do convidado mostra sozinho o que está agendado no Social: os posts do episódio dele e os que marcam o @ dele como collab, com o dia, a hora, as redes e a capa (sem o vídeo). Reel de teste não aparece. Quando o post vai ao ar, sai do calendário e entra na lista de posts com o link.' },
+      { kind: 'ajuste', text: 'O calendário avisa que a collab é só no Instagram e, para collab em outra rede, leva a pessoa a falar com a produção. As linhas que a equipe digita à mão continuam e entram na mesma lista; na aba Portal, os agendados aparecem com "AGENDADO".' },
+    ],
+  },
+  {
     version: '2.8.1', date: '2026-11-23', title: 'Menos uma tela de configuração',
     items: [
       { kind: 'ajuste', text: 'Saiu a página Gestão > Busca global (atalhos e sugestões do que incluir na busca). Ela nunca foi usada e as sugestões não ajudavam. A busca (Ctrl+K) continua igual, procurando convidados, episódios, tarefas, cortes e o resto.' },

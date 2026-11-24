@@ -76,12 +76,12 @@ async function showPortal(req, res, token) {
   });
 }
 
-// Capa de um post ou de um corte que está no portal (nada além disso).
+// Capa de um post, de um agendado do calendário ou de um corte que está no portal (nada além disso).
 router.get('/convidado/:token/capa/:cid', wrap(async (req, res) => {
   const g = await load(req, res); if (!g) return;
   if (!isIntId(req.params.cid)) return res.status(404).end();
   const c = await portal.content(g);
-  const allowed = new Set([...c.posts.map((p) => p.cover), ...(c.exclusiveOpen ? c.exclusive.map((x) => x.cover_id) : [])].filter(Boolean).map(Number));
+  const allowed = new Set([...c.posts.map((p) => p.cover), ...c.scheduled.map((p) => p.cover), ...(c.exclusiveOpen ? c.exclusive.map((x) => x.cover_id) : [])].filter(Boolean).map(Number));
   if (!allowed.has(Number(req.params.cid))) return res.status(404).end();
   const { rows: [cv] } = await db.query('SELECT storage_key FROM episode_covers WHERE id = $1', [req.params.cid]);
   if (!cv?.storage_key) return res.status(404).end();
