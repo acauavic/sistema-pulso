@@ -1010,6 +1010,11 @@ dialog.modal.modal-wide { width: min(720px, calc(100vw - 32px)); max-height: cal
 .row-menu { position: relative; display: inline-block; } .row-menu > summary { list-style: none; } .row-menu > summary::-webkit-details-marker { display: none; }
 .row-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: grid; gap: 2px; min-width: 190px; padding: 6px; background: var(--raised); border: 1px solid var(--line-strong); border-radius: var(--r-card); text-align: left; }
 .row-menu-list .link, .row-menu-list button { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 4px; font-size: 13px; }
+/* "Novo" com mais de uma opção: o botão principal abre a lista; cada opção diz o que faz numa linha embaixo */
+.new-menu .row-menu-list { min-width: 280px; }
+.new-menu .row-menu-list .link { display: grid; gap: 2px; color: var(--text); text-decoration: none; }
+.new-menu .row-menu-list .link:hover { background: var(--surface); }
+.new-menu .row-menu-list .link b { font-weight: 600; }
 .row-menu-list .link:hover { background: var(--surface); }
 :root[data-theme="light"] .row-menu-list { box-shadow: var(--shadow); }
 .table-wrap:has(.row-menu[open]) { overflow: visible; }

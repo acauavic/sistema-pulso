@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.9.1', date: '2026-11-24', title: 'Criar vídeo para gravar também em "Todos os projetos"',
+    items: [
+      { kind: 'ajuste', text: 'Em Episódios e vídeos, o botão Novo abre um menu quando há mais de uma opção: "Vídeo para gravar" (nasce em pré-produção, com pauta e roteiro) e o registro do que já foi gravado. Antes, em "Todos os projetos", só aparecia "Registrar episódio gravado" e não dava para começar um vídeo do Projeto 100 sem trocar de projeto.' },
+    ],
+  },
+  {
     version: '2.9.0', date: '2026-11-24', title: 'O calendário do portal se monta com os agendados',
     items: [
       { kind: 'novo', text: 'O calendário de posts do portal do convidado mostra sozinho o que está agendado no Social: os posts do episódio dele e os que marcam o @ dele como collab, com o dia, a hora, as redes e a capa (sem o vídeo). Reel de teste não aparece. Quando o post vai ao ar, sai do calendário e entra na lista de posts com o link.' },

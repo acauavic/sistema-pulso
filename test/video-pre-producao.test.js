@@ -22,7 +22,10 @@ describe('vídeo: etapa de pré-produção', () => {
   it('no projeto de vídeo, a ação principal é "Novo vídeo" e a janela pede título e data prevista', async () => {
     const page = (await c.get('/episodios')).text;
     assert.match(page, /<h1>Vídeos<\/h1>/);
-    assert.match(page, /data-modal-open="modal-novo-video"[^>]*>[\s\S]{0,600}Novo vídeo/);
+    assert.match(page, /<summary class="btn primary">[\s\S]{0,400}Novo vídeo/, 'duas opções: o botão abre um menu');
+    assert.match(page, /data-modal-open="modal-novo-video"><b>Vídeo para gravar<\/b><span class="small muted">nasce em pré-produção, com pauta e roteiro/);
+    assert.match(page, /href="\/episodios\/novo"><b>Vídeo já gravado<\/b>/);
+    assert.doesNotMatch(page, /Registrar um vídeo já gravado/);
     assert.match(page, /<h2 id="novo-video-h">Novo vídeo<\/h2>/);
     assert.match(page, /name="title"[^>]*required/); assert.match(page, /name="recorded_on"/);
     assert.match(page, /O vídeo começa em <strong>Pré-produção<\/strong>/);
@@ -72,5 +75,42 @@ describe('vídeo: etapa de pré-produção', () => {
     const g = await one("INSERT INTO guests (name, status, project_id) VALUES ('Dra. Pulso', 'gravado', 1) RETURNING id");
     const ep = await require('../src/services/production').syncFromGuest(g.id, sara.id);
     assert.equal(ep.status, 'gravado'); assert.equal(ep.format, 'podcast');
+  });
+
+  describe('o botão Novo em cada recorte', () => {
+    const header = (page) => page.split('<div class="page-head">')[1].split('<p class="lead">')[0];
+    after(async () => { await c.act('/projeto', { project: '2', voltar: '/' }); });
+
+    it('em "Todos os projetos": menu com o vídeo para gravar (projeto só entre os que gravam vídeo) e o já gravado', async () => {
+      await c.act('/projeto', { project: '', voltar: '/' });
+      const page = (await c.get('/episodios')).text;
+      const head = header(page);
+      assert.match(head, /<summary class="btn primary">[\s\S]{0,300} Novo [\s\S]{0,300}<\/summary>/);
+      assert.match(head, /<b>Vídeo para gravar<\/b><span class="small muted">Projeto 100 · nasce em pré-produção/);
+      assert.match(head, /<b>Episódio ou vídeo já gravado<\/b>/);
+      const modal = page.split('id="modal-novo-video"')[1].split('</dialog>')[0];
+      assert.match(modal, /<input type="hidden" name="project_id" value="2">/, 'um projeto de vídeo só: vai escondido');
+      assert.doesNotMatch(modal, /name="project_id" value="1"/, 'o Pulso não aparece');
+      assert.match(modal, /no Projeto 100\./);
+
+      await c.act('/episodios/video', { title: 'Vídeo criado do Todos', project_id: '2' }, { from: '/episodios' });
+      const v = await one("SELECT project_id, status FROM episodes WHERE title = 'Vídeo criado do Todos'");
+      assert.equal(v.project_id, 2); assert.equal(v.status, 'pre_producao');
+    });
+
+    it('projeto que grava na gravação não cria vídeo em pré-produção', async () => {
+      await c.act('/episodios/video', { title: 'Vídeo no Pulso', project_id: '1' }, { from: '/episodios' });
+      assert.equal(await one("SELECT 1 FROM episodes WHERE title = 'Vídeo no Pulso'"), undefined);
+      assert.match((await c.get('/episodios')).text, /Nesse projeto o episódio nasce na gravação/);
+    });
+
+    it('no Pulso: uma opção só, botão direto, sem menu e sem a janela do vídeo', async () => {
+      await c.act('/projeto', { project: '1', voltar: '/' });
+      const page = (await c.get('/episodios')).text;
+      const head = header(page);
+      assert.match(head, /<a class="btn primary" href="\/episodios\/novo">[\s\S]{0,600}Registrar episódio gravado<\/a>/);
+      assert.doesNotMatch(head, /new-menu/);
+      assert.doesNotMatch(page, /id="modal-novo-video"/);
+    });
   });
 });

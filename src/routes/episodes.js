@@ -162,8 +162,9 @@ router.get('/episodios', requirePerm('episodes.read'), wrap(async (req, res) => 
   // projeto que grava vídeo (e não episódio de podcast): a ação principal é "Novo vídeo", que nasce em Pré-produção
   const projects = require('../services/projects');
   const chosen = projects.get(require('../services/scope').target(req, {}) || projects.defaultId()) || {};
+  const created = newActions(req);
   res.render('episodes/index', { filterUi: f.ui, cardUi: require('../services/cardFields').forList('episodios'), title: res.locals.videoLabel || 'Episódios',
-    videoFirst: chosen.default_format === 'video', videoWord: (chosen.video_label || 'Episódio').toLowerCase(),
+    videoFirst: chosen.default_format === 'video', ...created,
     view, mine, episodes: rows, columns, order, stages: C.EPISODE_STAGES, statuses: C.EPISODE_STATUSES,
     pautaCols, pautaSvc, today: require('../services/tasks').todayISO() });
 }));
@@ -180,6 +181,21 @@ router.get('/episodios/novo', requirePerm('episodes.write'), wrap(async (req, re
   res.render('episodes/new', await formLocals({ title: 'Novo episódio', error: null, values: pre }, req));
 }));
 
+// O que dá para criar daqui, no recorte da pessoa: o vídeo para gravar (projeto que grava vídeo; nasce em Pré-produção) e o
+// registro do que já foi gravado. Uma opção vira botão; mais de uma, um menu (o copo fica na cozinha). Em "Todos os projetos",
+// a janela do vídeo pergunta o projeto só entre os que gravam vídeo.
+function newActions(req) {
+  const projects = require('../services/projects');
+  const ids = scope.idsOf(req);
+  const videoIds = ids.filter((id) => projects.get(id)?.default_format === 'video');
+  const onlyVideo = ids.length > 0 && videoIds.length === ids.length;
+  const word = videoIds.length === 1 ? (projects.get(videoIds[0]).video_label || 'Vídeo').toLowerCase() : 'vídeo';
+  const actions = [];
+  if (videoIds.length) actions.push({ key: 'video', label: `${word[0].toUpperCase()}${word.slice(1)} para gravar`, hint: `${videoIds.length < ids.length ? `${videoIds.map((id) => projects.get(id).name).join(', ')} · ` : ''}nasce em pré-produção, com pauta e roteiro` });
+  actions.push({ key: 'gravado', href: '/episodios/novo', label: onlyVideo ? `${word[0].toUpperCase()}${word.slice(1)} já gravado` : videoIds.length ? 'Episódio ou vídeo já gravado' : 'Registrar episódio gravado', hint: 'registra uma gravação que já aconteceu' });
+  return { newActions: actions, newLabel: onlyVideo ? `Novo ${word}` : 'Novo', videoIds, videoWord: word };
+}
+
 // Novo vídeo (projeto que grava vídeo, não episódio de podcast): nasce em Pré-produção, antes da gravação.
 // Janela curta: título e a data prevista da gravação. O resto vem depois, na pauta.
 router.post('/episodios/video', requirePerm('episodes.write'), wrap(async (req, res) => {
@@ -188,6 +204,10 @@ router.post('/episodios/video', requirePerm('episodes.write'), wrap(async (req, 
   const plannedOn = require('../services/calendar').isISO(String(req.body.recorded_on || '')) ? String(req.body.recorded_on) : null;
   if (!title || !projectId) {
     await req.flash('error', title ? 'Escolha o projeto.' : 'Dê um título para o vídeo.');
+    return res.redirect('/episodios');
+  }
+  if (require('../services/projects').get(projectId)?.default_format !== 'video') {
+    await req.flash('error', 'Nesse projeto o episódio nasce na gravação. Use "Registrar episódio gravado".');
     return res.redirect('/episodios');
   }
   const ep = await prod.createEpisode({ title, recordedOn: plannedOn, userId: req.user.id, projectId, stage: 'pre_producao', format: 'video', origin: 'Novo vídeo' });

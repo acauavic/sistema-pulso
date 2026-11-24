@@ -10,14 +10,23 @@
     </div>
     <a class="btn <%= mine ? 'on' : '' %>" href="/episodios?view=<%= view %><%= mine ? '' : '&editor=eu' %><%= fq %>"><%- icon('user') %> <%= mine ? 'Todos' : 'Só os meus' %></a>
     <a class="btn" href="/sessoes"><%- icon('calendar') %> Sessões de gravação</a>
-    <% if (can('episodes.write') && videoFirst) { %><button class="btn primary" type="button" data-modal-open="modal-novo-video"><%- icon('plus') %> Novo <%= videoWord %></button><% } %>
-    <% if (can('episodes.write') && !videoFirst) { %><a class="btn primary" href="/episodios/novo"><%- icon('plus') %> Registrar episódio gravado</a><% } %>
-    <% if (can('production.checklists') || (can('episodes.write') && videoFirst)) { %>
+    <% if (can('episodes.write') && newActions.length === 1) { var na = newActions[0]; %>
+    <% if (na.key === 'video') { %><button class="btn primary" type="button" data-modal-open="modal-novo-video"><%- icon('plus') %> <%= newLabel %></button><% } else { %><a class="btn primary" href="<%= na.href %>"><%- icon('plus') %> <%= na.label %></a><% } %>
+    <% } else if (can('episodes.write') && newActions.length > 1) { %>
+    <details class="row-menu new-menu">
+      <summary class="btn primary"><%- icon('plus') %> <%= newLabel %> <%- icon('chevron-down', 14) %></summary>
+      <div class="row-menu-list">
+        <% newActions.forEach(function (na) { %>
+        <% if (na.key === 'video') { %><button class="link" type="button" data-modal-open="modal-novo-video"><b><%= na.label %></b><span class="small muted"><%= na.hint %></span></button><% } else { %><a class="link" href="<%= na.href %>"><b><%= na.label %></b><span class="small muted"><%= na.hint %></span></a><% } %>
+        <% }) %>
+      </div>
+    </details>
+    <% } %>
+    <% if (can('production.checklists')) { %>
     <details class="row-menu">
       <summary class="btn icon-only" aria-label="Mais ações"><%- icon('ellipsis') %></summary>
       <div class="row-menu-list">
-        <% if (can('episodes.write') && videoFirst) { %><a class="link" href="/episodios/novo"><%- icon('plus', 14) %> Registrar um vídeo já gravado</a><% } %>
-        <% if (can('production.checklists')) { %><a class="link" href="/episodios/checklists"><%- icon('check', 14) %> Checklists padrão</a><% } %>
+        <a class="link" href="/episodios/checklists"><%- icon('check', 14) %> Checklists padrão</a>
       </div>
     </details>
     <% } %>
@@ -25,13 +34,13 @@
 </div>
 <p class="lead"><% if (videoFirst) { %>O vídeo começa em <strong>Pré-produção</strong> (pauta e roteiro), vira <strong>Gravado</strong> quando a gravação acontece e segue até <strong>Publicado</strong>.<% } else { %>O episódio nasce quando a conversa é <strong>gravada</strong> (o convidado vai para Gravado) e segue até <strong>Publicado</strong>. Antes disso, a gravação marcada fica na agenda do convidado.<% } %></p>
 
-<% if (can('episodes.write') && videoFirst) { %>
+<% if (can('episodes.write') && videoIds.length) { %>
 <dialog class="modal" id="modal-novo-video" aria-labelledby="novo-video-h">
   <form method="post" action="/episodios/video" class="stack" data-busy="Criando…">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h2 id="novo-video-h">Novo <%= videoWord %></h2>
-    <p class="small muted m-0">Ele nasce em Pré-produção. A pauta e o roteiro ficam na aba Pauta; o número sai sozinho.</p>
-    <%- include('../partials/project-field', { hint: 'Em que projeto este vídeo entra.' }) %>
+    <p class="small muted m-0">Ele nasce em Pré-produção<% if (videoIds.length === 1 && projectScope && projectScope.multi && !projectScope.current) { var vp = projectScope.projects.find(function (p) { return p.id === videoIds[0]; }); %>, no <%= vp ? vp.name : 'projeto' %><% } %>. A pauta e o roteiro ficam na aba Pauta; o número sai sozinho.</p>
+    <%- include('../partials/project-field', { only: videoIds, hint: 'Em que projeto este vídeo entra.' }) %>
     <label>Título *<input type="text" name="title" maxlength="200" required autofocus placeholder="ex.: Como escolher um plano de saúde"></label>
     <label>Data prevista da gravação<input type="date" name="recorded_on"></label>
     <div class="row modal-actions"><button class="btn primary" type="submit">Criar <%= videoWord %></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>

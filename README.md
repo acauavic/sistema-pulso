@@ -134,8 +134,9 @@ do projeto). O que muda:
 
 - **Numeração por projeto**: `EP.012` no Pulso e `V.003` no Projeto 100 convivem (`UNIQUE (project_id, number)`), e o
   prefixo é do projeto (`projects.number_prefix`). Nas telas, use `videoNo(numero, projectId)`.
-- **Pré-produção**: etapa nova, antes de Gravado. "Novo vídeo" (nos projetos que gravam vídeo) cria o vídeo nela, com
-  título e data prevista; as tarefas das rotinas, os custos automáticos e o link do estúdio só nascem quando alguém usa
+- **Pré-produção**: etapa nova, antes de Gravado. "Vídeo para gravar" (nos projetos que gravam vídeo; em "Todos os projetos"
+  também, perguntando o projeto só entre os de vídeo) cria o vídeo nela, com título e data prevista. Com mais de uma opção, o
+  botão **Novo** abre um menu com ela e o registro do que já foi gravado; as tarefas das rotinas, os custos automáticos e o link do estúdio só nascem quando alguém usa
   **Marcar como gravado**. O episódio que vem do convidado continua nascendo em Gravado.
 - **Formato**: vídeo não mostra Spotify, capa do Spotify nem os vídeos de lançamento do convidado.
 - **Pauta e roteiro** (`pautas`): um documento de cada tipo por vídeo (ou por convidado, enquanto o episódio não
