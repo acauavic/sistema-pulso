@@ -71,7 +71,7 @@ const OWN = {
   tiktok_privado: { kind: 'conta', hint: 'O app do TikTok só publica como privado: em Integrações, mande o TikTok como rascunho' },
   interrompido: { kind: 'rede', hint: 'O envio foi interrompido (o servidor reiniciou no meio)' },
   sem_resposta: { kind: 'conteudo', hint: 'O provedor não respondeu sobre este envio por mais de 2 dias' },
-  travado: { kind: 'rede', hint: 'A Outstand não andou com o envio por mais de 30 minutos (o normal é sair em segundos): cancelamos lá, e a próxima tentativa manda o vídeo ajustado para as redes' },
+  travado: { kind: 'rede', hint: 'A Outstand não andou com o envio por mais de 30 minutos (o normal é sair em segundos): cancelamos lá, e a próxima tentativa manda de novo' },
 };
 
 // tries: quantas tentativas esta rede já teve, contando a que acabou de falhar.

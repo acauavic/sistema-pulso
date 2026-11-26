@@ -238,7 +238,7 @@ async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {
             id: pub.id, kind: target.kind, platforms: g.platforms, title: g.title, description: g.description, videoUrl: media.videoFor(g),
             coverUrl: target.kind === 'clip' ? media.coverFor(g) : null, thumbnailUrl: target.kind === 'episode' ? media.coverFor(g) : null, tags: pub.options?.tags || [], accounts: conn.platforms,
             instagram: pub.options?.instagram || null, durationSec: target.durationMs ? target.durationMs / 1000 : null, idempotencyKey: key,
-            sizeBytes: target.size || null, processMedia: Boolean(pub.options?.process_media), ...profile,
+            sizeBytes: target.size || null, ...profile,
           });
         outcomes.push({ g, sent, key });
       } catch (err) { outcomes.push({ g, error: err, key }); }
@@ -489,7 +489,8 @@ async function refresh(pubId) {
 
 // Envio parado na Outstand: o normal é sair em segundos (alguns minutos, se ela ajusta o vídeo). Passado STALL_MS da tentativa com
 // alguma rede ainda "pendente", cancela o post lá (para não sair depois, duplicado) e essas redes viram falha passageira: a próxima
-// tentativa cria um post novo, com o vídeo ajustado para as redes (process_media). Se o cancelamento falhar, segue esperando.
+// tentativa cria um post novo, com o mesmo vídeo (ajustar o vídeo é cobrado e só vale se a gestão ligou). Se o cancelamento falhar,
+// segue esperando.
 const STALL_MS = Number(process.env.PUBLISH_STALL_MIN || 30) * 60_000;
 async function stallCheck(pub, sts) {
   const stuck = sts.filter(({ part, st }) => part.provider === 'outstand' && part.request_id && st.state === 'enviando');
@@ -504,10 +505,6 @@ async function stallCheck(pub, sts) {
     x.st = { state: finalState(results), results, error: null };
     done.push(x.part);
     console.warn(`[publicação ${pub.id}] envio parado na Outstand desde ${new Date(since).toISOString()}: cancelado (${x.part.request_id})`);
-  }
-  if (done.length) {
-    await db.query("UPDATE episode_publications SET options = options || '{\"process_media\": true}'::jsonb WHERE id = $1", [pub.id]);
-    pub.options = { ...(pub.options || {}), process_media: true };
   }
   return done;
 }

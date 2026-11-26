@@ -72,7 +72,7 @@ describe('Outstand como terceira via para publicar nas redes', () => {
     assert.equal(b.youtube.title, 'Saúde e negócios'); assert.equal(b.youtube.isShort, true); assert.equal(b.youtube.privacyStatus, 'public'); assert.equal(b.youtube.content, 'Legenda do corte #pulso'); assert.equal(b.youtube.thumbnailUrl, undefined, 'Shorts não levam capa pela API');
     assert.equal(b.instagram.reelCoverUrl, 'https://b2.test/c.jpg'); assert.deepEqual(b.instagram.collaborators, ['lia.prado', 'marca']); assert.equal(b.instagram.userTags, undefined, 'a Outstand exige x e y e o Instagram recusa posição em vídeo: no Reel a marcação fica de fora');
     assert.match(b._notes[0], /@ana\.foto ficou de fora\. Para o post aparecer no perfil da pessoa, use o collab/);
-    assert.equal(ost.heavy(400 * 1024 * 1024), true, 'acima de 300 MB a Outstand ajusta o vídeo'); assert.equal(ost.heavy(260 * 1024 * 1024), false);
+    assert.equal(ost.heavy, undefined, 'arquivo pesado não liga mais o ajuste do vídeo (é cobrado)');
     assert.equal(b.tiktok.postMode, 'DIRECT_POST'); assert.equal(b.facebook.publishAsReel, true);
     assert.ok(b.idempotency.startsWith('pulso-7-')); assert.deepEqual(b._missing, []);
     assert.equal(b.processMedia, undefined, 'sem ajustar o vídeo, nada é refeito (nem cobrado)');
@@ -182,12 +182,12 @@ describe('Outstand como terceira via para publicar nas redes', () => {
     } finally { h.config.outstand.live = false; }
   });
 
-  it('envio parado na Outstand: depois de 30 min cancela lá, a rede vira nova tentativa e o reenvio pede o vídeo ajustado', async () => {
+  it('envio parado na Outstand: depois de 30 min cancela lá, a rede vira nova tentativa e o reenvio vai sem ajustar o vídeo (cobrado)', async () => {
     h.config.outstand.live = true; ost.resetCache(); state.accounts = ACCOUNTS();
     try {
       calls.length = 0;
       const pub = await publishing.create({ clipId: clip.id, platforms: ['instagram'], title: 'Corte parado', description: 'Legenda', userId: u.gestao.id });
-      assert.equal(pub.status, 'enviando'); assert.equal(sent().body.processMedia, undefined, 'arquivo leve vai como está');
+      assert.equal(pub.status, 'enviando'); assert.equal(sent().body.processMedia, undefined, 'vai como está: só a chave de Integrações liga o ajuste do vídeo (cobrado)');
       assert.equal(pub.options.clip, clip.id, 'a publicação guarda o corte (se ele for apagado, nunca vira o episódio)');
       assert.equal((await publishing.refresh(pub.id)).status, 'enviando', 'antes de 30 min, só espera');
       assert.ok(!calls.some((c) => c.method === 'DELETE'));
@@ -196,13 +196,13 @@ describe('Outstand como terceira via para publicar nas redes', () => {
       assert.ok(calls.some((c) => c.method === 'DELETE' && c.path === '/v1/posts/op1'), 'cancelou o post parado na Outstand (não sai depois, duplicado)');
       assert.equal(done.status, 'erro');
       const ig = done.results.find((r) => r.platform === 'instagram');
-      assert.equal(ig.code, 'travado'); assert.ok(ig.retry_at, 'volta sozinho'); assert.match(ig.hint, /cancelamos lá, e a próxima tentativa manda o vídeo ajustado/);
-      assert.equal(done.options.process_media, true);
+      assert.equal(ig.code, 'travado'); assert.ok(ig.retry_at, 'volta sozinho'); assert.match(ig.hint, /cancelamos lá, e a próxima tentativa manda de novo/);
+      assert.equal(done.options.process_media, undefined);
       const due = new Date(Date.now() - 1000).toISOString();
       await q('UPDATE episode_publications SET retry_at = $2, results = $3 WHERE id = $1', [pub.id, due, JSON.stringify(done.results.map((r) => ({ ...r, retry_at: due })))]);
       calls.length = 0;
       await publishing.retryDue();
-      assert.equal(sent().body.processMedia, true, 'a nova tentativa manda a Outstand ajustar o vídeo');
+      assert.equal(sent().body.processMedia, undefined, 'a nova tentativa manda o mesmo vídeo, sem ajuste cobrado');
     } finally { h.config.outstand.live = false; }
   });
 

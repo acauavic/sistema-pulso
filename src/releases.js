@@ -4,6 +4,12 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.9.2', date: '2026-11-26', title: 'O vídeo vai para a Outstand como foi enviado',
+    items: [
+      { kind: 'ajuste', text: 'A Outstand não ajusta mais o vídeo sozinha (cobra US$ 0,05 a cada 10 segundos por versão refeita). Antes, corte acima de 300 MB e envio que ficou parado iam com o ajuste ligado. Agora o ajuste só acontece se a gestão ligar em Integrações. Os cortes devem sair do editor em 1080p, até 10 Mbps.' },
+    ],
+  },
+  {
     version: '2.9.1', date: '2026-11-24', title: 'Criar vídeo para gravar também em "Todos os projetos"',
     items: [
       { kind: 'ajuste', text: 'Em Episódios e vídeos, o botão Novo abre um menu quando há mais de uma opção: "Vídeo para gravar" (nasce em pré-produção, com pauta e roteiro) e o registro do que já foi gravado. Antes, em "Todos os projetos", só aparecia "Registrar episódio gravado" e não dava para começar um vídeo do Projeto 100 sem trocar de projeto.' },

@@ -24,8 +24,8 @@ const PROVIDERS = {
     connected: (o) => ost.connected(o), resetCache: () => ost.resetCache(),
     // o vídeo e as imagens chegam aqui já hospedados no armazenamento da Outstand (publishing.prepareMedia): o TikTok só busca de
     // domínio verificado, e se a hospedagem falha a publicação espera e tenta de novo (nunca sai com o link do Backblaze)
-    // ajusta o vídeo para cada rede se a gestão ligou em Integrações, se o arquivo é pesado (ost.heavy) ou se o envio anterior travou
-    sendVideo: async (args) => ost.send({ ...ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: Boolean(args.processMedia) || ost.heavy(args.sizeBytes) || await ost.processMedia() }), _durationSec: args.durationSec || null }),
+    // ajusta o vídeo para cada rede (processMedia, cobrado à parte) só se a gestão ligou em Integrações; nada liga sozinho
+    sendVideo: async (args) => ost.send({ ...ost.buildPost({ ...args, tiktokMode: await ost.tiktokMode(), processMedia: await ost.processMedia() }), _durationSec: args.durationSec || null }),
     sendPhotos: async (args) => ost.send(ost.buildPhotoPost({ ...args, tiktokMode: await ost.tiktokMode() })),
     status: ({ request_id, job_id }) => ost.status({ request_id, job_id }),
     cancel: (requestId) => ost.cancel(requestId),

@@ -143,10 +143,8 @@ const videoTagNote = (ig) => (ig?.tags?.length
   ? [`Marcação no Reel não vai pela Outstand (o Instagram só aceita marcar pessoas em foto por ela): ${ig.tags.map((t) => `@${String(t.username).replace(/^@/, '')}`).join(', ')} ficou de fora. Para o post aparecer no perfil da pessoa, use o collab.`]
   : []);
 
-// Vídeo pesado demais para mandar como está: acima disso a Outstand ajusta o vídeo (1080p, até 10 Mbps) antes de mandar às redes.
-// Corte 4K de 622 MB ficou horas parado na Outstand (11/11/2026); os de até 260 MB saíram como estavam.
-const HEAVY_BYTES = 300 * 1024 * 1024;
-const heavy = (size) => Number(size) > HEAVY_BYTES;
+// Ajustar o vídeo (processMedia) só quando a gestão liga em Integrações: desde 26/11/2026 nada liga sozinho (o corte acima de 300 MB
+// e o envio parado ligavam, e a Outstand cobra US$ 0,05 a cada 10 s por versão refeita). Os cortes saem do editor em 1080p, até 10 Mbps.
 
 // Opções de cada rede (o bloco com o nome da rede). Devolve { instagram?, youtube?, tiktok?, facebook? }.
 function networkBlocks(platforms, { kind, media, title, description, coverUrl, thumbnailUrl, tags, instagram, tiktokPostMode }) {
@@ -422,4 +420,4 @@ async function instagramAuthUrl(redirectUri) {
   return url;
 }
 
-module.exports = { NETWORKS, HEAVY_BYTES, heavy, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator, privateReply, replyToComment, listComments, deleteReply, instagramAuthUrl, MESSAGING_SCOPES, sendMessage };
+module.exports = { NETWORKS, cancel, hostMedia, hosted, forgetHosted, fileOf, connected, resetCache, tiktokMode, setTiktokMode, processMedia, setProcessMedia, instagramData, buildPost, buildPhotoPost, normalizeResults, stateOf, send, status, reason, tiktokCreator, privateReply, replyToComment, listComments, deleteReply, instagramAuthUrl, MESSAGING_SCOPES, sendMessage };
