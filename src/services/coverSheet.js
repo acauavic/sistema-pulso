@@ -175,7 +175,7 @@ async function generate(episodeId) {
       ctx.meta?.yt_title ? `Título do YouTube (a capa não repete o título): ${ctx.meta.yt_title}` : '',
       '', 'Transcrição com os tempos reais:', ctx.transcript.segments.map((s) => `[${L.toClock(s.start_ms)}] ${s.text}`).join('\n'),
     ].filter((x) => x !== null).join('\n');
-    const { data } = await gemini.generateJson({ system: SYSTEM, parts: [{ text: brief }], schema: SCHEMA, temperature: 0.6, timeoutMs: 150_000, attempts: 3 });
+    const { data } = await gemini.generateJson({ feature: 'capas_ficha', system: SYSTEM, parts: [{ text: brief }], schema: SCHEMA, temperature: 0.6, timeoutMs: 150_000, attempts: 3 });
     raw = data;
   }
   const by = raw ? 'ia' : 'sugestoes';

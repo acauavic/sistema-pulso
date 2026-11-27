@@ -1,32 +1,41 @@
 // Gemini (Google): texto estruturado (JSON) e leitura de imagens. Modelo configurável (padrão: gemini-3.8-flash).
+// Raciocínio: toda chamada vai com thinkingLevel 'low' (sem isso o modelo pensa no nível máximo, e o Google cobra o raciocínio
+// como saída). Quem precisar de mais passa `thinking: 'high'`; `thinking: null` manda sem a configuração.
+// Consumo: cada chamada (e cada nova tentativa) vira uma linha em ai_usage com a função (`feature`) e os tokens (services/aiUsage).
 const config = require('../config');
+
+const THINKING = 'low';
+const record = (args) => require('./aiUsage').record(args);
+const thinkingOf = (level) => (level ? { thinkingConfig: { thinkingLevel: level } } : {});
 
 const imagePart = (buffer, mime = 'image/jpeg') => ({ inline_data: { mime_type: mime, data: Buffer.from(buffer).toString('base64') } });
 
 // Chama o modelo pedindo JSON que obedece ao `schema` (formato OpenAPI do Gemini). Tenta de novo em 429/5xx.
-async function generateJson({ system, parts, schema, temperature = 0.7, thinking = null, model = config.gemini.model, timeoutMs = 180_000, attempts = 5, retryDelayMs = 3000 }) {
+async function generateJson({ system, parts, schema, temperature = 0.7, thinking = THINKING, feature = null, model = config.gemini.model, timeoutMs = 180_000, attempts = 5, retryDelayMs = 3000 }) {
   if (!config.geminiConfigured) throw new Error('IA não configurada (GEMINI_KEY).');
   const body = {
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
     contents: [{ role: 'user', parts }],
     generationConfig: {
       temperature, responseMimeType: 'application/json', ...(schema ? { responseSchema: schema } : {}),
-      ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}), // 'low' = respostas bem mais rápidas (leitura de imagens)
+      ...thinkingOf(thinking),
     },
   };
   let lastErr;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    let res;
+    let res; const t0 = Date.now();
     try {
       res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': config.gemini.key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) { // passou do tempo ou a rede caiu: tenta de novo (antes, derrubava o trabalho inteiro na primeira vez)
       lastErr = err;
+      await record({ feature, model, ok: false, error: err.message, ms: Date.now() - t0 });
       if (attempt < attempts) await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
       continue;
     }
     const json = await res.json().catch(() => ({}));
+    await record({ feature, model, usage: json.usageMetadata, ok: res.ok, status: res.status, error: res.ok ? null : json.error?.message || `HTTP ${res.status}`, ms: Date.now() - t0 });
     if (res.ok) {
       const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
       if (!text) { lastErr = new Error(`Gemini não devolveu texto (${json.candidates?.[0]?.finishReason || json.promptFeedback?.blockReason || 'sem motivo'}).`); } else {
@@ -43,20 +52,25 @@ async function generateJson({ system, parts, schema, temperature = 0.7, thinking
 
 // Conversa com ferramentas (function calling). contents: [{ role: 'user'|'model', parts }]. Devolve a resposta do modelo:
 // { text, calls: [{ name, args }], parts } — quem chama executa as ferramentas e chama de novo com os resultados.
-async function chat({ system, contents, tools = [], temperature = 0.5, model = config.gemini.model, timeoutMs = 60_000, attempts = 2 }) {
+async function chat({ system, contents, tools = [], temperature = 0.5, thinking = THINKING, feature = null, model = config.gemini.model, timeoutMs = 60_000, attempts = 2 }) {
   if (!config.geminiConfigured) throw new Error('IA não configurada (GEMINI_KEY).');
   const body = {
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
     contents,
     ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
-    generationConfig: { temperature },
+    generationConfig: { temperature, ...thinkingOf(thinking) },
   };
   let lastErr;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': config.gemini.key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
-    });
+    const t0 = Date.now();
+    let res;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': config.gemini.key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) { await record({ feature, model, ok: false, error: err.message, ms: Date.now() - t0 }); throw err; }
     const json = await res.json().catch(() => ({}));
+    await record({ feature, model, usage: json.usageMetadata, ok: res.ok, status: res.status, error: res.ok ? null : json.error?.message || `HTTP ${res.status}`, ms: Date.now() - t0 });
     if (res.ok) {
       const parts = json.candidates?.[0]?.content?.parts || [];
       const calls = parts.filter((p) => p.functionCall).map((p) => ({ name: p.functionCall.name, args: p.functionCall.args || {} }));
@@ -75,23 +89,25 @@ async function chat({ system, contents, tools = [], temperature = 0.5, model = c
 // Igual ao chat, mas a resposta chega aos pedaços (streamGenerateContent em SSE): onText(pedaço) é chamado a cada trecho de
 // texto, para a tela ir escrevendo enquanto o modelo gera. Devolve { text, calls, parts } como o chat.
 // Sem novas tentativas no meio do texto (já foi mostrado): só tenta de novo se falhar antes do primeiro pedaço.
-async function chatStream({ system, contents, tools = [], temperature = 0.5, model = config.gemini.model, timeoutMs = 60_000, attempts = 2, onText = () => {} }) {
+async function chatStream({ system, contents, tools = [], temperature = 0.5, thinking = THINKING, feature = null, model = config.gemini.model, timeoutMs = 60_000, attempts = 2, onText = () => {} }) {
   if (!config.geminiConfigured) throw new Error('IA não configurada (GEMINI_KEY).');
   const body = {
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
     contents,
     ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
-    generationConfig: { temperature },
+    generationConfig: { temperature, ...thinkingOf(thinking) },
   };
   let lastErr;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    let started = false;
+    let started = false; const t0 = Date.now(); let usage = null; let recorded = false;
+    const log = async (fields) => { if (recorded) return; recorded = true; await record({ feature, model, usage, ms: Date.now() - t0, ...fields }); };
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': config.gemini.key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
+        await log({ ok: false, status: res.status, error: json.error?.message || `HTTP ${res.status}` });
         lastErr = new Error(`Gemini recusou (${res.status}): ${json.error?.message || 'erro desconhecido'}`);
         if (res.status !== 429 && res.status < 500) throw lastErr;
       } else {
@@ -100,6 +116,7 @@ async function chatStream({ system, contents, tools = [], temperature = 0.5, mod
         const handle = (line) => {
           if (!line.startsWith('data:')) return;
           let json; try { json = JSON.parse(line.slice(5).trim()); } catch { return; }
+          if (json.usageMetadata) usage = json.usageMetadata; // vem no último pedaço, com o total da resposta
           const cand = json.candidates?.[0];
           if (cand?.finishReason) finish = cand.finishReason;
           for (const part of cand?.content?.parts || []) {
@@ -112,6 +129,7 @@ async function chatStream({ system, contents, tools = [], temperature = 0.5, mod
           while ((i = buf.indexOf('\n')) >= 0) { handle(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
         }
         handle(buf.trim());
+        await log({ ok: true, status: res.status });
         text = text.trim();
         // o turno do modelo volta no histórico como veio: texto (se houve) + as chamadas de ferramenta (com a assinatura delas)
         const parts = [...(text ? [{ text }] : []), ...callParts];
@@ -119,6 +137,7 @@ async function chatStream({ system, contents, tools = [], temperature = 0.5, mod
         lastErr = new Error(`Gemini não respondeu (${finish || 'sem motivo'}).`);
       }
     } catch (err) {
+      await log({ ok: false, error: err.message });
       if (started) throw err; // já mostrou parte do texto: não repete
       lastErr = err;
       if (/recusou \((4\d\d)\)/.test(err.message) && !/\(429\)/.test(err.message)) throw err;

@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.10.0', date: '2026-11-26', title: 'Consumo da IA à vista e IA mais econômica',
+    items: [
+      { kind: 'novo', text: 'Gestão > Sistema > Consumo da IA: cada chamada ao Gemini entra com a parte do sistema que chamou (respostas a comentários, textos do corte, assistente…), os tokens e o custo estimado, por função e por dia, em 7 ou 30 dias. Quando os créditos ou o limite de gasto acabam, a página avisa.' },
+      { kind: 'ajuste', text: 'A IA pensa menos antes de responder (raciocínio baixo em todas as chamadas). O raciocínio é cobrado como texto gerado e era o que mais pesava na conta.' },
+      { kind: 'ajuste', text: 'As respostas a comentários vão à IA em lotes de 40, e não mais de 25.' },
+    ],
+  },
+  {
     version: '2.9.2', date: '2026-11-26', title: 'O vídeo vai para a Outstand como foi enviado',
     items: [
       { kind: 'ajuste', text: 'A Outstand não ajusta mais o vídeo sozinha (cobra US$ 0,05 a cada 10 segundos por versão refeita). Antes, corte acima de 300 MB e envio que ficou parado iam com o ajuste ligado. Agora o ajuste só acontece se a gestão ligar em Integrações. Os cortes devem sair do editor em 1080p, até 10 Mbps.' },

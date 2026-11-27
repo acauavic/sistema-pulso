@@ -359,7 +359,7 @@ async function ask({ user: quem, conversationId = null, text, page = null, audio
   let reply = '';
   try {
     for (let round = 0; round < MAX_ROUNDS; round += 1) {
-      const req = { system: systemPrompt(user, page), contents, tools: tools.map((t) => t.decl) };
+      const req = { feature: 'assistente', system: systemPrompt(user, page), contents, tools: tools.map((t) => t.decl) };
       const r = onEvent ? await gemini.chatStream({ ...req, onText: (t) => onEvent('delta', t) }) : await gemini.chat(req);
       if (!r.calls.length) { reply = r.text; break; }
       if (onEvent) { if (r.text) onEvent('reset'); for (const c of r.calls) onEvent('tool', c.name); }

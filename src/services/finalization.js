@@ -114,7 +114,7 @@ async function analyzeFrames(frames, { onProgress, attempts, timeoutMs } = {}) {
       parts.push({ text: `Quadro índice ${start + i} (${L.toClock(f.at_ms)}):` });
       parts.push(gemini.imagePart(fs.readFileSync(f.small)));
     });
-    const { data } = await gemini.generateJson({ parts, schema: FRAME_SCHEMA, temperature: 0.1, thinking: 'low', ...(attempts ? { attempts } : {}), ...(timeoutMs ? { timeoutMs } : {}) });
+    const { data } = await gemini.generateJson({ feature: 'quadros', parts, schema: FRAME_SCHEMA, temperature: 0.1, ...(attempts ? { attempts } : {}), ...(timeoutMs ? { timeoutMs } : {}) });
     for (const q of data.quadros || []) {
       const idx = Number(q.indice);
       if (Number.isInteger(idx) && idx >= start && idx < start + batch.length) {
@@ -295,13 +295,13 @@ async function suggestMetadata({ episode, guest, sponsors, transcript, durationM
   const system = `${MARCA}`;
   const prompt = `${buildContext({ episode, guest, sponsors })}\n\n${instructions(durationMs)}\n\nTRANSCRIÇÃO:\n${transcriptForPrompt(transcript.segments)}`;
   onProgress?.('Escrevendo títulos, descrições e capítulos…');
-  const first = await gemini.generateJson({ system, parts: [{ text: prompt }], schema: SUGGEST_SCHEMA, temperature: 0.8 });
+  const first = await gemini.generateJson({ feature: 'episodio_textos', system, parts: [{ text: prompt }], schema: SUGGEST_SCHEMA, temperature: 0.8 });
   let result = normalizeSuggestions(first.data, { durationMs, episode, guest, sponsors });
   let attempts = 1;
   if (result.issues.length) {
     onProgress?.('Ajustando o que passou dos limites…');
     const fix = `${prompt}\n\nSUA RESPOSTA ANTERIOR TEVE PROBLEMAS. Corrija e devolva o JSON completo de novo:\n- ${result.issues.join('\n- ')}`;
-    const second = await gemini.generateJson({ system, parts: [{ text: fix }], schema: SUGGEST_SCHEMA, temperature: 0.5 });
+    const second = await gemini.generateJson({ feature: 'episodio_textos', system, parts: [{ text: fix }], schema: SUGGEST_SCHEMA, temperature: 0.5 });
     const again = normalizeSuggestions(second.data, { durationMs, episode, guest, sponsors });
     attempts = 2;
     if (again.issues.length <= result.issues.length) result = again;

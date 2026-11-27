@@ -295,7 +295,8 @@ async function inviteAllowed(username) {
   return true;
 }
 
-// Triagem dos comentários novos de uma publicação (em lotes de 25).
+// Triagem dos comentários novos de uma publicação (em lotes de BATCH, uma chamada à IA por lote).
+const BATCH = 40;
 // Quem a IA é: o nome público do projeto e o que ele é (Gestão > Projetos).
 function whoOf(projectId) {
   const projects = require('./projects');
@@ -313,7 +314,7 @@ async function classifyPublication(pubId) {
   const ctx = { team: c.team_handles.map(handleOf), guestIg: handleOf(post.guest_ig), keywords };
   let classified = 0; const needTeam = []; let proposed = 0; const tried = [];
   for (let round = 0; round < 20; round += 1) {
-    const { rows } = await db.query("SELECT * FROM social_comments WHERE publication_id = $1 AND status = 'nova' AND NOT (id = ANY($2::bigint[])) ORDER BY commented_at NULLS LAST, id LIMIT 25", [pubId, tried]);
+    const { rows } = await db.query("SELECT * FROM social_comments WHERE publication_id = $1 AND status = 'nova' AND NOT (id = ANY($2::bigint[])) ORDER BY commented_at NULLS LAST, id LIMIT $3", [pubId, tried, BATCH]);
     if (!rows.length) break;
     const forAi = [];
     for (const row of rows) {
@@ -334,7 +335,7 @@ async function classifyPublication(pubId) {
       '', 'Comentários (JSON):',
       JSON.stringify(forAi.map((r) => ({ id: String(r.id), usuario: r.author_username, texto: r.text, curtidas: r.likes, conversa: r.thread, e_resposta_ao_pulso: Boolean(r.parent_comment_id) }))),
     ].filter(Boolean).join('\n');
-    const { data } = await gemini.generateJson({ system: SYSTEM(whoOf(post.project_id)), parts: [{ text: brief }], schema: SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
+    const { data } = await gemini.generateJson({ feature: 'comentarios', system: SYSTEM(whoOf(post.project_id)), parts: [{ text: brief }], schema: SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
     const byId = new Map((data?.itens || []).map((i) => [String(i.id), i]));
     for (const row of forAi) {
       const it = byId.get(String(row.id));
@@ -580,10 +581,10 @@ async function catchUpDms({ postDays = 60, projectId = null } = {}) {
     seen.add(who); pick.push(r);
   }
   let proposed = 0;
-  for (let i = 0; i < pick.length; i += 25) {
-    const part = pick.slice(i, i + 25);
+  for (let i = 0; i < pick.length; i += BATCH) {
+    const part = pick.slice(i, i + BATCH);
     const brief = `Comentários (JSON):\n${JSON.stringify(part.map((r) => ({ id: String(r.id), usuario: r.author_username, texto: r.text, conversa: r.thread, resposta_dada: r.reply_text || undefined })))}`;
-    const { data } = await gemini.generateJson({ system: DM_SYSTEM(whoOf(projectId)), parts: [{ text: brief }], schema: DM_SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
+    const { data } = await gemini.generateJson({ feature: 'comentarios_direct', system: DM_SYSTEM(whoOf(projectId)), parts: [{ text: brief }], schema: DM_SCHEMA, temperature: 0.7, timeoutMs: 90_000, attempts: 3 });
     const byId = new Map((data?.itens || []).map((it) => [String(it.id), it]));
     for (const r of part) {
       const dm = cleanDm(byId.get(String(r.id))?.direct);

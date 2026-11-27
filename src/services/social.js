@@ -205,7 +205,7 @@ async function generateIdeas(episodeId, kinds, userId = null) {
     '', `Conversa:\n${L.fitWords(src.text, 24000)}`,
   ].filter(Boolean).join('\n') }];
   let data;
-  try { ({ data } = await gemini.generateJson({ parts, schema: IDEAS_SCHEMA, temperature: 0.7, attempts: 2, timeoutMs: 90_000 })); } catch (err) {
+  try { ({ data } = await gemini.generateJson({ feature: 'ideias', parts, schema: IDEAS_SCHEMA, temperature: 0.7, attempts: 2, timeoutMs: 90_000 })); } catch (err) {
     return { created: 0, skipped: 0, error: /429|quota|RESOURCE_EXHAUSTED/i.test(err.message) ? 'A cota gratuita da IA acabou por hoje. Tente amanhã ou ative o faturamento do Gemini.' : `A IA não respondeu: ${err.message}` };
   }
   let created = 0; let skipped = 0;

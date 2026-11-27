@@ -211,7 +211,7 @@ async function writeTexts({ episode = null, guest = null, transcript, hashtags =
     let data; let avoid = [];
     const examples = await require('./postMetrics').examples(); // os cortes mais vistos viram referência (quando há números)
     for (let round = 0; round < 2; round += 1) {
-      ({ data } = await gemini.generateJson({ parts: [{ text: textsPrompt({ episode, guest, transcript, avoid, examples }) }], schema: TEXTS_SCHEMA, temperature: 0.7 }));
+      ({ data } = await gemini.generateJson({ feature: 'corte_textos', parts: [{ text: textsPrompt({ episode, guest, transcript, avoid, examples }) }], schema: TEXTS_SCHEMA, temperature: 0.7 }));
       avoid = SC.bannedIn(`${data.titulo || ''} ${data.legenda || ''} ${(data.textos_capa || []).join(' ')}`);
       if (!avoid.length) break;
     }

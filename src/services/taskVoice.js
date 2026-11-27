@@ -77,7 +77,7 @@ async function organize({ text, user, now = new Date(), origin = 'voz' }) {
     `PATROCINADORES (id | empresa):\n${list(ctx.sponsors, (s) => `${s.id} | ${s.company}`)}`,
     `${fromChat ? 'CONVERSA' : 'FALA TRANSCRITA'}:\n"""${speech}"""`,
   ].join('\n\n');
-  const { data } = await gemini.generateJson({ system: systemPrompt(user, today, weekday, nowHM, fromChat ? 'mensagem' : 'voz'), parts: [{ text: prompt }], schema: SCHEMA, temperature: 0.2, thinking: 'low', timeoutMs: 45_000, attempts: 2 });
+  const { data } = await gemini.generateJson({ feature: 'tarefa_voz', system: systemPrompt(user, today, weekday, nowHM, fromChat ? 'mensagem' : 'voz'), parts: [{ text: prompt }], schema: SCHEMA, temperature: 0.2, timeoutMs: 45_000, attempts: 2 });
 
   const title = String(data.titulo || '').replace(/\s+/g, ' ').trim().replace(/[.。]+$/, '').slice(0, 200);
   if (!title) return { error: fromChat ? 'Não encontrei uma tarefa nessa mensagem. Escreva o título na janela.' : 'Não encontrei uma tarefa nessa fala. Tente de novo dizendo o que precisa ser feito.' };

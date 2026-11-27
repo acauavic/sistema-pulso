@@ -222,6 +222,12 @@ router.get('/gestao/desempenho', requirePerm('integrations.manage'), wrap(async 
   res.render('gestao/desempenho', { title: 'Desempenho', r: await perf.report(days), LIMITS: perf.LIMITS });
 }));
 
+// Consumo da IA: quantas chamadas ao Gemini, quantos tokens e quanto custou (estimativa), por função e por dia.
+router.get('/gestao/consumo-ia', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const days = [7, 30].includes(Number(req.query.dias)) ? Number(req.query.dias) : 7;
+  res.render('gestao/consumo-ia', { title: 'Consumo da IA', r: await require('../services/aiUsage').report(days) });
+}));
+
 router.get('/gestao/sistema', requirePerm('integrations.manage'), wrap(async (req, res) => {
   const [counts, failed, running, workers, runs, pubSending, pubWaiting, pubAction] = await Promise.all([
     db.query("SELECT status, count(*)::int AS n FROM jobs WHERE status <> 'done' OR finished_at > now() - interval '24 hours' GROUP BY status"),

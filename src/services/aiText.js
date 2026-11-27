@@ -111,7 +111,7 @@ async function suggest({ field, coverKind = null, current = '', shortcut = null,
     ctx.transcript && key !== 'resposta' ? `\nTranscrição (trecho): ${L.fitWords(ctx.transcript, ctx.clip ? 3000 : 5000)}` : '',
   ].filter((x) => x !== '').join('\n') }];
   let data;
-  try { ({ data } = await gemini.generateJson({ parts, schema: SCHEMA, temperature: shortcut === 'variar' ? 0.95 : 0.8, timeoutMs: 45_000, attempts: 2 })); } catch (err) {
+  try { ({ data } = await gemini.generateJson({ feature: 'sugerir_texto', parts, schema: SCHEMA, temperature: shortcut === 'variar' ? 0.95 : 0.8, timeoutMs: 45_000, attempts: 2 })); } catch (err) {
     console.error(`[ia-texto] ${key}:`, err.message);
     return { error: gemini.friendlyError ? gemini.friendlyError(err) : 'A IA não respondeu agora. Tente de novo.', status: 502 };
   }
