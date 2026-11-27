@@ -62,6 +62,16 @@ const formatOf = (c) => {
   return 'quadrado';
 };
 const pubOf = (c) => (c.pub ? c.pub.stage : 'nao');
+// Falha ao publicar (contentBoard.failOf): o estado, o motivo e as redes que ainda não receberam o post.
+function failFields() {
+  const B = require('./contentBoard'); const P = require('./uploadPost').PLATFORMS;
+  return [
+    { key: 'falha', label: 'Falha ao publicar', type: 'enum', get: (x) => (x.fail ? x.fail.state : 'nenhuma'), options: [['acao', 'Falhou e precisa de ação'], ['tentativa', 'Falhou, com nova tentativa marcada'], ['nenhuma', 'Sem falha']] },
+    { key: 'falha_motivo', label: 'Motivo da falha', type: 'enum', get: (x) => (x.fail ? x.fail.reasons : null), options: B.FAIL_REASONS },
+    { key: 'falha_rede', label: 'Rede que falhou', type: 'enum', get: (x) => (x.fail ? x.fail.platforms : null), options: Object.keys(P).map((k) => [k, P[k].label]) },
+  ];
+}
+const aiField = () => ({ key: 'leitura', label: 'Leitura da IA incompleta', type: 'bool', get: (x) => Boolean(x.aiIncomplete) });
 
 // Tipos de vídeo de Gestão > Categorias: os ativos na ordem e, no fim, os desativados (vídeos antigos ainda podem ter).
 function videoTypeOptions() {
@@ -82,6 +92,7 @@ async function clipFields(projectIds = null) {
     { key: 'categoria', label: 'Categoria', type: 'enum', get: (c) => c.video_type, options: videoTypeOptions() },
     { key: 'social', label: 'Situação no Social', type: 'enum', get: pubOf, options: [['nao', 'Não publicado'], ['fila', 'Na fila (agendado ou em revisão)'], ['publicado', 'Publicado']] },
     { key: 'status', label: 'Vídeo', type: 'enum', get: (c) => c.status, options: [['pronto', 'Pronto'], ['enviando', 'Enviando'], ['processando', 'Processando'], ['erro', 'Com erro']] },
+    ...failFields(), aiField(),
     { key: 'formato', label: 'Formato', type: 'enum', get: formatOf, options: [['vertical', 'Vertical (9:16)'], ['horizontal', 'Horizontal (16:9)'], ['quadrado', 'Quadrado']] },
     { key: 'gancho', label: 'Gancho (título do post)', type: 'text', get: (c) => c.post_title },
     { key: 'nome', label: 'Nome interno', type: 'text', get: (c) => c.title },
@@ -178,6 +189,7 @@ async function boardFields(projectIds = null) {
   return [
     { key: 'tipo', label: 'Tipo', type: 'enum', get: (k) => k.type, options: [['pedido', 'Pedido'], ['corte', 'Vídeo'], ['post', 'Post'], ['story', 'Story'], ['carrossel', 'Carrossel']] },
     { key: 'etapa', label: 'Etapa', type: 'enum', get: (k) => k.stage, options: opt(STAGES) },
+    ...failFields(), aiField(),
     { key: 'conteudo', label: 'Tipo de conteúdo', type: 'text', get: (k) => k.kind },
     { key: 'titulo', label: 'Título', type: 'text', get: (k) => k.title },
     { key: 'responsavel', label: 'Responsável (pedido)', type: 'text', get: (k) => (k.type === 'pedido' && k.who !== 'sem responsável' ? k.who : null) },
@@ -199,6 +211,7 @@ async function postFields(projectIds = null) {
   return [
     { key: 'tipo', label: 'Tipo', type: 'enum', get: (p) => p.kind, options: [['post_quote', 'Post de frase'], ['post_split', 'Tela dividida'], ['carousel', 'Carrossel']] },
     { key: 'social', label: 'Situação no Social', type: 'enum', get: pubOf, options: [['nao', 'Não publicado'], ['fila', 'Na fila (agendado ou em revisão)'], ['publicado', 'Publicado']] },
+    ...failFields(),
     { key: 'aprovado', label: 'Aprovado', type: 'bool', get: (p) => Boolean(p.approved) },
     { key: 'automatico', label: 'Feito pela IA', type: 'bool', get: (p) => Boolean(p.auto) },
     { key: 'texto', label: 'Texto', type: 'text', get: (p) => p.label },

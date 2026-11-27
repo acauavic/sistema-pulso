@@ -139,7 +139,10 @@ function matcher({ filters, mode }, fields) {
         const s = String(v ?? '').toLowerCase(); const q = String(value).toLowerCase();
         return op === 'contem' ? s.includes(q) : op === 'nao_contem' ? !s.includes(q) : s === q;
       }
-      if (f.type === 'enum' || f.type === 'user') { const has = value.includes(String(v ?? '')); return op === 'em' ? has : !has; }
+      if (f.type === 'enum' || f.type === 'user') { // valor em lista (ex.: as redes que falharam): vale se alguma estiver entre as escolhidas
+        const has = Array.isArray(v) ? v.some((x) => value.includes(String(x))) : value.includes(String(v ?? ''));
+        return op === 'em' ? has : !has;
+      }
       if (f.type === 'number') { if (v == null) return false; const n = Number(v); return op === 'maior' ? n > value : op === 'menor' ? n < value : n === value; }
       if (f.type === 'date') {
         const d = brDate(v); if (!d) return false;

@@ -534,6 +534,7 @@ async function tick() {
   await giveUpSilent();
   await precheckScheduled();
   await fillLinks();
+  await resumeAfterOutage();
 }
 
 // O link de algumas redes (o TikTok, por exemplo) chega depois que o post já saiu: nas 6 h seguintes, confere de novo a cada 10 min
@@ -556,6 +557,74 @@ async function fillLinks() {
     await db.query('UPDATE episode_publications SET results = $2, options = options || $3 WHERE id = $1', [pub.id, JSON.stringify(results), JSON.stringify({ links_at: new Date().toISOString() })]);
   }
   return rows.length;
+}
+
+// ---------------------------------------------------------------- o provedor voltou
+// Assinatura vencida, chave trocada ou a lista de contas que não veio (402/401/403, e "sem conta" no mesmo período) param o envio e
+// pedem ação, porque reenviar igual não resolve. Quando o provedor da rede volta a responder com a conta dela, o que falhou só por
+// isso nos últimos 3 dias volta para a fila sozinho, de 20 em 20 minutos (sem cair em cima do que já está agendado), e a gestão é
+// avisada uma vez. Cada publicação volta no máximo 2 vezes: se cair de novo, fica para a equipe.
+const RESUME_CODES = ['provedor_chave', 'sem_conta'];
+const RESUME_GAP = 20 * 60_000;
+let resumeCheckedAt = 0;
+async function resumeAfterOutage({ now = Date.now(), force = false } = {}) {
+  if (!force && now - resumeCheckedAt < 2 * 60_000) return [];
+  resumeCheckedAt = now;
+  const { rows } = await db.query(
+    `SELECT p.*, coalesce(c.project_id, e.project_id) AS project_id FROM episode_publications p
+       LEFT JOIN episode_clips c ON c.id = p.clip_id LEFT JOIN episodes e ON e.id = p.episode_id
+      WHERE p.status IN ('erro','parcial') AND p.retry_at IS NULL AND p.updated_at > now() - interval '3 days'
+        AND coalesce((p.options->>'resumed')::int, 0) < 2
+        AND jsonb_path_exists(p.results, '$[*] ? (@.ok == false && (@.code == "provedor_chave" || @.code == "sem_conta"))')
+      ORDER BY coalesce(p.scheduled_at, p.created_at), p.id LIMIT 40`);
+  if (!rows.length) return [];
+  const map = await social.routeMap();
+  const health = new Map(); // "provedor|projeto" -> contas por rede, ou null se o provedor ainda não responde
+  const accountsOf = async (providerId, projectId) => {
+    const k = `${providerId}|${projectId}`;
+    if (!health.has(k)) {
+      let nets = null;
+      try {
+        const pv = social.get(providerId);
+        if (pv.live()) { const r = await pv.connected({ ...social.profileFor(projectId), fresh: true }); nets = r && r.ok ? r.platforms || {} : null; }
+      } catch { nets = null; }
+      health.set(k, nets);
+    }
+    return health.get(k);
+  };
+  const { rows: busy } = await db.query("SELECT coalesce(CASE WHEN status = 'agendado' THEN scheduled_at END, retry_at) AS at FROM episode_publications WHERE (status = 'agendado' AND scheduled_at > now()) OR (status IN ('erro','parcial') AND retry_at > now())");
+  const taken = busy.map((b) => new Date(b.at).getTime());
+  let slot = now + 2 * 60_000;
+  const nextSlot = () => { while (taken.some((t) => Math.abs(t - slot) < RESUME_GAP)) slot += 5 * 60_000; const at = slot; taken.push(at); slot += RESUME_GAP; return at; };
+  const when = (iso) => require('../utils/format').formatSoon(iso);
+  const back = [];
+  for (const pub of rows) {
+    const nets = (pub.results || []).filter((r) => !r.ok && !r.skipped && RESUME_CODES.includes(r.code)).map((r) => r.platform);
+    let ready = nets.length > 0;
+    for (const net of nets) {
+      const acc = (await accountsOf(map[net], pub.project_id))?.[net];
+      if (!acc || acc.reauth) { ready = false; break; }
+    }
+    if (!ready) continue;
+    const at = new Date(nextSlot()).toISOString();
+    const tries = { ...(pub.options?.tries || {}) }; for (const n of nets) tries[n] = 0;
+    const results = pub.results.map((r) => (nets.includes(r.platform) && !r.ok ? { ...r, retry_at: at, action: false, hint: `O provedor voltou: sai de novo ${when(at)}.` } : r));
+    const { rowCount } = await db.query("UPDATE episode_publications SET results = $2, retry_at = $3, error = NULL, options = options || $4, updated_at = now() WHERE id = $1 AND status IN ('erro','parcial') AND retry_at IS NULL",
+      [pub.id, JSON.stringify(results), at, JSON.stringify({ tries, resumed: (Number(pub.options?.resumed) || 0) + 1 })]);
+    if (!rowCount) continue;
+    await addEvent(pub.episode_id, null, `O provedor voltou: ${pub.title} sai de novo ${when(at)}.`);
+    back.push({ id: pub.id, at, nets });
+  }
+  if (back.length) {
+    console.warn(`[publicações] o provedor voltou: ${back.length} de volta à fila (${back.map((b) => `#${b.id} ${b.nets.join('/')}`).join(', ')})`);
+    const { rows: who } = await db.query("SELECT id FROM users WHERE active AND role IN ('superadmin','gestao')");
+    await require('./notify').notify({
+      type: 'rotina', users: who.map((r) => r.id), title: 'O provedor voltou: posts de volta à fila',
+      body: `${back.length === 1 ? '1 post que tinha falhado volta' : `${back.length} posts que tinham falhado voltam`} sozinho${back.length === 1 ? '' : 's'}, de 20 em 20 minutos a partir de ${when(back[0].at)}. Em Conteúdo, o filtro "Falha ao publicar" mostra cada um.`,
+      url: `/social/publicacoes/${back[0].id}`, entity: { type: 'publication', id: back[0].id }, dedupe: `retomada-${new Date(now).toISOString().slice(0, 13)}`,
+    }).catch((err) => console.error('Aviso de retomada:', err.message));
+  }
+  return back;
 }
 
 // Novas tentativas marcadas que venceram: reenvia só as redes cuja hora chegou (as outras seguem esperando a delas).
@@ -816,4 +885,4 @@ async function resubmit(pubId, user) {
   return pub || null;
 }
 
-module.exports = { stallCheck, orphanClip, networkOf, parseLinks, markManual, createManual, loadTarget, create, dispatch, refresh, tick, retry, resend, textOf, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };
+module.exports = { resumeAfterOutage, stallCheck, orphanClip, networkOf, parseLinks, markManual, createManual, loadTarget, create, dispatch, refresh, tick, retry, resend, textOf, retryDue, stopRetries, recoverInterrupted, precheckScheduled, fillLinks, attemptsOf, cancel, approve, reject, resubmit, finalState, MEDIA_LABEL };

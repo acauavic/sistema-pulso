@@ -69,6 +69,15 @@ router.post('/conteudo/em-massa/cortes', requirePerm('episodes.read'), wrap(asyn
     await req.flash('ok', out.n ? `${plural(out.n, 'vídeo agora é', 'vídeos agora são')} ${out.label}.` : `Os vídeos marcados já eram ${out.label}.`);
     return res.redirect(to);
   }
+  if (req.body.acao === 'reler') { // a mesma "Refazer a leitura" do corte, para vários: a IA lê de novo e sugere título, legenda e capas
+    const { rows: ok } = await db.query("UPDATE episode_clips SET status = 'processando', error = NULL, updated_at = now() WHERE id = ANY($1) AND status IN ('pronto','erro') AND storage_key IS NOT NULL RETURNING id", [list.map((c) => c.id)]);
+    for (const c of ok) await require('../services/jobs').enqueue('corte', { refId: c.id });
+    await audit(req, 'corte.reler', 'clip', null, { ids: ok.map((c) => c.id), em_massa: true });
+    const left = list.length - ok.length;
+    if (!ok.length) await req.flash('error', 'Nenhum dos cortes marcados pode ser lido de novo agora (ainda estão subindo ou sendo lidos).');
+    else await req.flash('ok', `${plural(ok.length, 'corte na fila', 'cortes na fila')} para a IA ler de novo. Leva alguns minutos por corte.${left ? ` ${plural(left, 'ficou', 'ficaram')} de fora: ainda ${left === 1 ? 'está' : 'estão'} subindo ou sendo ${left === 1 ? 'lido' : 'lidos'}.` : ''}`);
+    return res.redirect(to);
+  }
   if (req.body.acao === 'excluir') {
     const ready = list.filter((c) => c.status !== 'enviando'); // envio pela metade se cancela na bandeja de envios
     const { batch, n } = await toTrash('clip', ready.map((c) => c.id), req.user, {

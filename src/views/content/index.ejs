@@ -65,6 +65,7 @@
               <% if (k.type === 'pedido') { %><% if (k.priority) { %><span class="warn"<%- cardUi.attr('pedido') %>>prioridade</span><% } %><span<%- cardUi.attr('pedido') %>><%- icon('user', 12) %><%= k.who %></span><% if (k.due) { %><span class="<%= k.late ? 'late' : '' %>"<%- cardUi.attr('pedido') %>><%- icon('calendar', 12) %><%= dueShort(k.due) %><%= k.late ? ' · atrasado' : '' %></span><% } %><% if (k.rounds) { %><span<%- cardUi.attr('pedido') %>><%= k.rounds %>ª volta</span><% } %><% } %>
               <% if (k.chip) { %><span class="<%= k.chip === 'erro' ? 'late' : '' %>"<%- cardUi.attr('situacao') %>><%= k.chip %></span><% } %>
               <% if (k.warn) { %><span class="warn"<%- cardUi.attr('situacao') %>><%= k.warn %></span><% } %>
+              <% if (k.fail) { %><span class="<%= k.fail.state === 'acao' ? 'late' : 'warn' %>" title="<%= k.fail.state === 'acao' ? 'Falhou ao publicar e precisa de ação' : 'Falhou ao publicar; nova tentativa marcada' %>"<%- cardUi.attr('situacao') %>><%= k.fail.state === 'acao' ? 'falhou' : 'nova tentativa' %> · <%= k.fail.labels.join(' · ') %></span><% } %>
               <% if (k.slides) { %><span<%- cardUi.attr('situacao') %>><%= k.slides %> slides</span><% } %>
               <% if (k.views) { %><span class="views"<%- cardUi.attr('views') %>><%- icon('eye', 12) %><%= fmt.compact(k.views) %></span><% } %>
               <% if (k.pub) { %><span class="nets"<%- cardUi.attr('redes') %>><%= k.pub.stage === 'fila' ? k.pub.label + ' · ' : '' %><%= k.pub.platforms.join(' · ') %><%= k.pub.at ? ' · ' + dayShort(k.pub.at) : '' %></span><% if (k.pub.trial) { %> <span class="badge b-trial" title="Reel de teste no Instagram: aparece primeiro só para quem não segue"<%- cardUi.attr('redes') %>>Reel de teste</span><% } %><% } %>
@@ -133,6 +134,7 @@
         <% if (perm.cover) { %><button class="btn sm" type="button" data-dl-open="modal-capas-lote" disabled><%- icon('image', 14) %> Capas e textos</button><% } %>
         <button class="btn sm <%= perm.publish ? '' : 'primary' %>" type="button" data-dl-open="modal-massa-cortes" disabled>Atribuir ao episódio</button>
         <button class="btn sm" type="button" data-dl-open="modal-massa-categoria" disabled><%- icon('tag', 14) %> Categoria</button>
+        <button class="btn sm" type="button" data-dl-do="reler" data-busy="Pondo na fila…" data-confirm="Reler {n} corte(s) com a IA? Ela lê cada vídeo de novo e refaz o título e as capas sugeridas. A legenda que já existe e as capas editadas ou aprovadas ficam." disabled><%- icon('sparkles', 14) %> Reler com IA</button>
         <button class="btn sm ghost" type="button" data-dl-go disabled><%- icon('download', 14) %> Baixar</button>
         <button class="link small danger-link" type="button" data-dl-do="excluir" data-confirm="Mandar {n} corte(s) para a lixeira? Ficam 15 dias lá e dá para restaurar." disabled>excluir</button>
         <button class="btn sm ghost" type="button" data-dl-cancel>Cancelar</button>

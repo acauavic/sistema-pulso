@@ -32,6 +32,47 @@ async function publicationIndex() {
   return { byClip, byCover };
 }
 
+// ---------------------------------------------------------------- falhas de publicação (filtro "Falha ao publicar" do Conteúdo)
+// O motivo, agrupado pelo código do erro (services/publishErrors): o que a equipe faz com cada um é diferente.
+const FAIL_REASONS = [
+  ['provedor', 'Provedor ou conta (assinatura, chave, conexão)'], ['limite', 'Limite da rede (posts por dia, fila do YouTube)'],
+  ['arquivo', 'Arquivo ou formato do vídeo'], ['conteudo', 'A rede recusou o post (perfil, marcação, texto)'], ['outro', 'Outro motivo'],
+];
+const REASON_OF = {
+  provedor_chave: 'provedor', sem_conta: 'provedor', provedor_fora: 'provedor', conta: 'provedor', travado: 'provedor', interrompido: 'provedor', sem_resposta: 'provedor', tiktok_bloqueado: 'provedor', tiktok_privado: 'provedor',
+  tiktok_limite_diario: 'limite', tiktok_cota: 'limite', limite: 'limite', youtube_fila: 'limite',
+  arquivo_indisponivel: 'arquivo', arquivo_sumiu: 'arquivo', arquivo_incompleto: 'arquivo', formato: 'arquivo', tiktok_dominio: 'arquivo', em_preparo: 'arquivo', removido: 'arquivo',
+  ig_perfil: 'conteudo', ig_marcacao: 'conteudo', texto_longo: 'conteudo', repetido: 'conteudo', recusado: 'conteudo',
+};
+// Falha ainda não resolvida de um conteúdo: rede que falhou numa publicação (erro ou parcial) e não saiu em nenhuma publicação
+// dele. { state: 'tentativa' (nova tentativa marcada) | 'acao', reasons, platforms (chaves), retryAt, pubId } ou null.
+function failOf(pubs) {
+  if (!pubs?.length) return null;
+  const live = new Set(pubs.flatMap((p) => (p.results || []).filter((r) => r.ok).map((r) => r.platform)));
+  const open = [];
+  for (const p of pubs) {
+    if (!['erro', 'parcial'].includes(p.status)) continue;
+    for (const r of p.results || []) if (!r.ok && !r.skipped && !live.has(r.platform)) open.push({ ...r, pubId: p.id });
+  }
+  if (!open.length) return null;
+  const waiting = open.filter((r) => r.retry_at);
+  return {
+    state: waiting.length ? 'tentativa' : 'acao', reasons: [...new Set(open.map((r) => REASON_OF[r.code] || 'outro'))], platforms: [...new Set(open.map((r) => r.platform))], labels: [...new Set(open.map((r) => PLATFORM(r.platform)))],
+    retryAt: waiting.length ? waiting.map((r) => r.retry_at).sort()[0] : null, pubId: open[open.length - 1].pubId,
+  };
+}
+async function failureIndex() {
+  const { rows } = await db.query(
+    "SELECT id, clip_id, cover_ids, status, results FROM episode_publications WHERE status IN ('erro','parcial','publicado') AND (clip_id IS NOT NULL OR cardinality(cover_ids) > 0) ORDER BY updated_at");
+  const byClip = new Map(); const byCover = new Map();
+  const put = (map, key, p) => { const list = map.get(key) || []; list.push(p); map.set(key, list); };
+  for (const p of rows) { if (p.clip_id) put(byClip, p.clip_id, p); for (const id of p.cover_ids || []) put(byCover, id, p); }
+  return { byClip, byCover, ofClip: (id) => failOf(byClip.get(id)), ofCovers: (ids) => failOf([...new Map(ids.flatMap((id) => byCover.get(id) || []).map((p) => [p.id, p])).values()]) };
+}
+
+// Leitura pela IA que não terminou: o corte deu erro, ou ficou sem capa ou sem transcrição porque a IA falhou ("Ler de novo" resolve).
+const aiIncomplete = (c) => c.status === 'erro' || (c.status === 'pronto' && (!c.cover_id || /ainda não foram geradas|não montadas|Transcrição indisponível/.test(c.note || '')));
+
 // Reel de teste no Instagram (a publicação foi ou vai como trial reel).
 const trialPub = (p) => Boolean(p.options?.instagram?.trial) && p.platforms.includes('instagram');
 
@@ -58,7 +99,7 @@ const thumb = (id, at) => `/capas/${id}/imagem?v=${new Date(at).getTime()}&w=640
 // Todas as peças, já com etapa. episodeId: só de um episódio. recentDays: corta o "Publicado" antigo (null = tudo).
 // projectIds: só as peças do recorte (scope.idsOf); a imagem herda o projeto do episódio ou do pedido dela.
 async function build({ episodeId = null, projectIds = null, recentDays = 60, today = new Date().toISOString().slice(0, 10) } = {}) {
-  const idx = await publicationIndex();
+  const [idx, fx] = await Promise.all([publicationIndex(), failureIndex()]);
   const epFilter = (col) => (episodeId ? ` AND ${col} = ${Number(episodeId)}` : '');
   const pids = projectIds ? projectIds.map(Number).filter(Number.isInteger) : null;
   const inProject = (expr) => (pids ? ` AND ${expr} = ANY('{${pids.join(',')}}'::int[])` : '');
@@ -66,7 +107,7 @@ async function build({ episodeId = null, projectIds = null, recentDays = 60, tod
   const [reqs, clipRows, coverRows] = await Promise.all([
     db.query(`SELECT r.*, a.name AS assignee_name, e.number AS episode_number, e.title AS episode_title FROM content_requests r
       LEFT JOIN users a ON a.id = r.assignee_id LEFT JOIN episodes e ON e.id = r.episode_id WHERE r.status = ANY($1)${epFilter('r.episode_id')}${inProject('r.project_id')}`, [requests.OPEN]),
-    db.query(`SELECT c.id, c.title, c.post_title, c.status, c.error, c.duration_ms, c.width, c.height, c.cover_id, c.episode_id, c.request_id, c.created_at, c.updated_at, c.project_id,
+    db.query(`SELECT c.id, c.title, c.post_title, c.status, c.error, c.note, c.duration_ms, c.width, c.height, c.cover_id, c.episode_id, c.request_id, c.created_at, c.updated_at, c.project_id,
         cv.updated_at AS cover_at, e.number AS episode_number, e.title AS episode_title, r.status AS request_status, r.kind AS request_kind, r.title AS request_title
       FROM episode_clips c LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN episode_covers cv ON cv.id = c.cover_id LEFT JOIN content_requests r ON r.id = c.request_id
       WHERE (c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes')${epFilter('c.episode_id')}${inProject('c.project_id')}`),
@@ -92,6 +133,7 @@ async function build({ episodeId = null, projectIds = null, recentDays = 60, tod
       episode: epLabel(c.episode_number, c.episode_title, c.project_id), episodeId: c.episode_id, thumb: c.cover_id ? thumb(c.cover_id, c.cover_at) : null, vertical: !c.width || c.height >= c.width,
       chip: c.status === 'erro' ? 'erro' : c.status === 'processando' ? 'lendo' : c.status === 'enviando' ? 'enviando' : null, pub: st, media: 'video', at: st?.at || c.created_at, created: c.created_at, updated: c.updated_at,
       warn: c.status === 'pronto' && !c.episode_id && !c.request_id ? 'atribuir episódio' : null, publishable: c.status === 'pronto' && Boolean(c.episode_id || c.request_id),
+      fail: fx.ofClip(c.id), aiIncomplete: aiIncomplete(c),
     });
   }
   // imagens: carrossel = um cartão por grupo; post e story = um por imagem
@@ -104,7 +146,7 @@ async function build({ episodeId = null, projectIds = null, recentDays = 60, tod
     cards.push({
       key: `i${c.id}`, projectId: c.project_id, type: story ? 'story' : 'post', stage: st ? st.stage : 'pronto', title: c.request_title || c.label || (c.kind === 'post_split' ? 'Tela dividida' : 'Post de frase'),
       href: c.request_id ? requests.url(c.request_id) : `/capas/${c.id}/editar`, kind: story ? 'Story' : c.kind === 'post_split' ? 'Tela dividida' : c.kind === 'entrega' ? 'Post' : 'Post de frase',
-      episode: epLabel(c.episode_number, c.episode_title, c.project_id), episodeId: c.episode_id, thumb: thumb(c.id, c.updated_at), pub: st, media: story ? 'story' : 'imagem', coverIds: [c.id], approved: c.approved, at: st?.at || c.created_at, created: c.created_at, updated: c.updated_at, publishable: true,
+      episode: epLabel(c.episode_number, c.episode_title, c.project_id), episodeId: c.episode_id, thumb: thumb(c.id, c.updated_at), pub: st, fail: fx.ofCovers([c.id]), media: story ? 'story' : 'imagem', coverIds: [c.id], approved: c.approved, at: st?.at || c.created_at, created: c.created_at, updated: c.updated_at, publishable: true,
     });
   }
   for (const [k, slides] of groups) {
@@ -112,7 +154,7 @@ async function build({ episodeId = null, projectIds = null, recentDays = 60, tod
     const ids = slides.map((s) => s.id); const st = stateOfCovers(idx, ids); const first = slides[0];
     cards.push({
       key: `g${k}`, projectId: first.project_id, type: 'carrossel', stage: st ? st.stage : 'pronto', title: first.request_title || first.label || 'Carrossel', href: first.request_id ? requests.url(first.request_id) : `/capas/${first.id}/editar`,
-      kind: 'Carrossel', episode: epLabel(first.episode_number, first.episode_title, first.project_id), episodeId: first.episode_id, thumb: thumb(first.id, first.updated_at), slides: slides.length, pub: st, media: 'carrossel', coverIds: ids, at: st?.at || first.created_at, created: first.created_at, updated: slides.reduce((m, x) => (new Date(x.updated_at) > new Date(m) ? x.updated_at : m), first.updated_at), publishable: true,
+      kind: 'Carrossel', episode: epLabel(first.episode_number, first.episode_title, first.project_id), episodeId: first.episode_id, thumb: thumb(first.id, first.updated_at), slides: slides.length, pub: st, fail: fx.ofCovers(ids), media: 'carrossel', coverIds: ids, at: st?.at || first.created_at, created: first.created_at, updated: slides.reduce((m, x) => (new Date(x.updated_at) > new Date(m) ? x.updated_at : m), first.updated_at), publishable: true,
     });
   }
   const cutoff = recentDays ? Date.now() - recentDays * 86400_000 : null;
@@ -123,4 +165,4 @@ async function build({ episodeId = null, projectIds = null, recentDays = 60, tod
   return { columns, cards, hiddenOld };
 }
 
-module.exports = { STAGES, STAGE_LABEL, COUNTS, publicationIndex, stateOf, stateOfCovers, build };
+module.exports = { STAGES, STAGE_LABEL, COUNTS, FAIL_REASONS, publicationIndex, failureIndex, failOf, aiIncomplete, stateOf, stateOfCovers, build };

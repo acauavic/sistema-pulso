@@ -4,6 +4,14 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.12.0', date: '2026-11-27', title: 'Post que falhou volta sozinho e aparece no Conteúdo; reler com IA em massa',
+    items: [
+      { kind: 'novo', text: 'Quando a Outstand (ou outro provedor) volta depois de uma assinatura vencida, chave trocada ou contas que sumiram, os posts que falharam só por isso nos últimos 3 dias voltam sozinhos para a fila, de 20 em 20 minutos, sem cair em cima do que já está agendado. A gestão recebe um aviso. Antes, ficavam parados em erro até alguém reenviar um por um.' },
+      { kind: 'novo', text: 'Conteúdo: filtros "Falha ao publicar" (precisa de ação ou nova tentativa marcada), "Motivo da falha" (provedor ou conta, limite da rede, arquivo, recusa da rede), "Rede que falhou" e "Leitura da IA incompleta". O cartão do corte diz em que rede falhou e quando tenta de novo; o quadro também.' },
+      { kind: 'novo', text: 'Conteúdo > Cortes: "Reler com IA" na seleção em massa. A IA lê de novo cada corte marcado e refaz o título e as capas sugeridas; a legenda que já existe e as capas editadas ou aprovadas ficam.' },
+    ],
+  },
+  {
     version: '2.11.0', date: '2026-11-26', title: 'O editor completo de capas voltou, também para os modelos novos',
     items: [
       { kind: 'novo', text: 'As capas dos modelos do guia (thumbnails do YouTube, capa do Spotify e capas dos cortes) abrem no editor completo: cada parte (frase, destaque, tarja, nome, rótulo, logotipo, linha) muda de texto, fonte, peso, tamanho, cor e lugar, e a foto se aproxima, se enquadra e se espelha dentro do painel. O botão "Editar" do cartão abre o editor completo ou a janela "Ajustar pelo modelo".' },

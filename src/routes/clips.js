@@ -54,7 +54,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   const pids = require('../services/scope').idsOf(req);
   const coverProject = `coalesce(e.project_id, r.project_id, ${Number(require('../services/projects').defaultId())})`;
   const clipFilter = `(c.request_id IS NULL OR r.status = 'aprovado' OR r.kind = 'cortes') AND c.project_id = ANY($1::int[]) ${only ? 'AND c.episode_id = $2' : ''}`;
-  const [clipRows, episodes, postCountRow, idx, reqs, people, episodeList] = await Promise.all([
+  const [clipRows, episodes, postCountRow, idx, reqs, people, episodeList, fx] = await Promise.all([
     db.query(
       `SELECT c.*, e.number AS ep_number, e.title AS ep_title, g.name AS guest_name, r.title AS request_title FROM episode_clips c
          LEFT JOIN episodes e ON e.id = c.episode_id LEFT JOIN guests g ON g.id = e.guest_id LEFT JOIN content_requests r ON r.id = c.request_id
@@ -65,6 +65,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     board.publicationIndex(),
     R.list({ episodeId: only, projectIds: pids }), db.query("SELECT id, name, role FROM users WHERE active AND role IN ('editor_video','gestao','superadmin') ORDER BY (role = 'editor_video') DESC, name"),
     db.query('SELECT id, number, title, project_id FROM episodes WHERE project_id = ANY($1::int[]) ORDER BY number DESC NULLS LAST, id DESC LIMIT 80', [pids]),
+    board.failureIndex(), // o que falhou ao publicar e ainda não saiu (filtro "Falha ao publicar")
   ]);
   const byEpisode = {};
   for (const e of episodes.rows) byEpisode[e.id] = e;
@@ -95,7 +96,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
   // Cortes: situação (só os prontos para postar), ordem e páginas de 60
   const situacao = req.query.situacao === 'pronto' ? 'pronto' : '';
   const ordem = ['antigos', 'episodio', 'duracao'].includes(req.query.ordem) ? req.query.ordem : 'recentes';
-  const allClips = clipRows.rows.map((c) => ({ ...c, pub: board.stateOf(idx.byClip.get(c.id)) }));
+  const allClips = clipRows.rows.map((c) => ({ ...c, pub: board.stateOf(idx.byClip.get(c.id)), fail: fx.ofClip(c.id), aiIncomplete: board.aiIncomplete(c) }));
   const readyCount = allClips.filter((c) => c.status === 'pronto' && (c.episode_id || c.request_id) && !c.pub).length;
   let list = []; let clipPager = null; let clipTotals = null; let running = false;
   if (vista === 'cortes') {
@@ -138,7 +139,7 @@ router.get('/conteudo', requirePerm('episodes.read'), wrap(async (req, res) => {
     ]);
     const f = await filterUiSvc.build(req, { entity: 'post', action: '/conteudo', fields: await fieldsDef.postFields(pids), keep: { vista: 'posts', episodio: only || '' } });
     filterUi = f.ui;
-    const shownPosts = posts.rows.map((p) => ({ ...p, pub: board.stateOf(idx.byCover.get(p.id)) })).filter(f.passes);
+    const shownPosts = posts.rows.map((p) => ({ ...p, pub: board.stateOf(idx.byCover.get(p.id)), fail: fx.ofCovers([p.id]) })).filter(f.passes);
     const hasFrames = new Set(withFrames.rows.map((r) => r.episode_id));
     for (const e of episodes.rows) {
       const mine = shownPosts.filter((p) => p.episode_id === e.id);
