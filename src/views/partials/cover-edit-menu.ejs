@@ -1,0 +1,12 @@
+<%#
+  "Editar" de uma capa dos modelos do guia: um botão só com as duas formas (regra do menu de opções). Variáveis: cover (a capa),
+  editHref (endereço do editor completo), label (texto do botão; padrão "Editar"), ghost (botão fantasma). A página precisa da
+  janela Ajustar (partials/cover-adjust.ejs + capas.js).
+%>
+<details class="row-menu new-menu edit-menu">
+  <summary class="btn sm<%= locals.ghost ? ' ghost' : '' %>"><%- icon('pencil', 14) %> <%= locals.label || 'Editar' %> <%- icon('chevron-down', 14) %></summary>
+  <div class="row-menu-list">
+    <a class="link" href="<%= editHref %>"><b>Editor completo</b><span class="small muted">Texto, letra, cor, tamanho e posição de cada parte</span></a>
+    <button class="link" type="button" data-ajustar-open="/capas/<%= cover.id %>/ajustar"><b>Ajustar pelo modelo</b><span class="small muted">Troca o modelo, a foto ou o texto, com os limites do guia</span></button>
+  </div>
+</details>

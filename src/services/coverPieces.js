@@ -50,7 +50,11 @@ async function render(built, buffers) {
   };
   return res;
 }
+// O texto que está de fato na capa (camadas principais e tarjas, na ordem do desenho): vale para a capa mexida no editor completo,
+// em que o texto pode ter saído da ficha.
+const textOfLayers = (spec) => M.tidy((spec.layers || []).filter((l) => !l.hidden && (l.type === 'tarja' || (l.type === 'text' && (l.role || 'main') === 'main'))).map((l) => l.text).join(' '));
 const labelOf = (spec) => {
+  if (spec.edited) return `${spec.angle ? `${M.ANGLES[spec.angle]}: ` : ''}${textOfLayers(spec)}`.slice(0, 160);
   const s = spec.sheet || {}; const m = M.MODELS[spec.model];
   const txt = m.fields.includes('pre') ? [s.pre, s.hl, s.post].filter(Boolean).join(' ') : m.fields.includes('setup') ? `${s.setup} ${s.punch}` : m.fields.includes('num') ? `${s.num} ${s.line}` : m.fields.includes('quote') ? s.quote : s.hook;
   return `${spec.angle ? `${M.ANGLES[spec.angle]}: ` : ''}${M.tidy(txt)}`.slice(0, 160);
@@ -183,7 +187,8 @@ async function refresh(episodeId, { only = null, userId = null } = {}) {
   let redone = 0; let stale = 0;
   for (const c of rows) {
     if (only && c.id !== only) continue;
-    if (c.approved && !only) { await db.query('UPDATE episode_covers SET stale = true WHERE id = $1', [c.id]); stale += 1; continue; }
+    // aprovada ou mexida no editor completo: não é trocada sozinha (o Atualizar do cartão refaz, com confirmação)
+    if ((c.approved || c.spec?.edited) && !only) { await db.query('UPDATE episode_covers SET stale = true WHERE id = $1', [c.id]); stale += 1; continue; }
     const frame = all.find((f) => f.ref === c.spec?.photo?.ref) || all[0];
     const pick = await best(c.model, sheets.dataFor(sheet, ctx.episode, c.angle), frame, frame ? await store.imageBuffers(all, [frame.ref]) : {}, { angle: c.angle, flip: Boolean(c.spec?.flip), face: c.spec?.photo?.face || null });
     if (pick.error) { await db.query('UPDATE episode_covers SET stale = true WHERE id = $1', [c.id]); stale += 1; continue; }
@@ -216,6 +221,7 @@ function clipBase({ episode = null, guest = null, epSheet = null } = {}) {
 }
 // O texto da capa de corte por modelo (para as listas e para o campo "Texto da capa").
 function clipText(spec) {
+  if (spec?.edited) return textOfLayers(spec); // mexida no editor completo: o texto é o da imagem
   const s = spec?.sheet || {};
   return M.tidy(spec?.model === 'RL-C' ? [s.pre, s.hl, s.post].filter(Boolean).join(' ') : spec?.model === 'RL-B' ? s.quote : s.hook);
 }
@@ -274,6 +280,28 @@ async function adjustClip(cover, input, userId = null) {
   return { row };
 }
 
+// ---------------------------------------------------------------- editor completo
+// Grava uma capa dos modelos mexida no editor completo (o spec já passou pelo specSanitizer, com base = a capa guardada). As zonas
+// de rosto saem das fotos do próprio desenho (o zoom e o enquadramento que a pessoa deu), e valem os mesmos limites de arquivo e o
+// mesmo teste de redução das peças. Mantém a aprovação e o "desatualizada". Devolve { row, lint }.
+async function saveEdited(cover, spec, userId = null) {
+  const all = await store.loadFrames(cover.episode_id, { clipId: cover.clip_id ?? null, custom: true });
+  const byRef = Object.fromEntries(all.map((f) => [f.ref, f]));
+  const info = (ref) => (byRef[ref] ? { face: M.faceOf(byRef[ref].analysis?.rostos, spec.photo?.ref === ref ? spec.photo.face : null) } : null);
+  const ctxData = { faces: M.facesOf(spec, info), blocks: [] };
+  const ph = (spec.layers || []).find((l) => l.type === 'photo' && l.ref && l.img && !l.hidden && byRef[l.ref]);
+  const sc = ph ? M.photoScale(ph, { w: byRef[ph.ref].width, h: byRef[ph.ref].height }, spec.scale || 1) : null;
+  const zoom = sc ? Math.round(sc.real * 10) / 10 : null;
+  const built = { spec, ctxData, notes: { zoom, soft: Boolean(sc?.soft) }, warnings: sc?.soft ? [`Foto ampliada ${String(zoom).replace('.', ',')}×: fica sem nitidez. Troque por uma foto maior.`] : [] };
+  const res = await render(built, await store.imageBuffers(all, store.refsOf(spec)));
+  const row = await replace(cover, { built, res }, userId, { stale: Boolean(cover.stale) });
+  if (cover.clip_id) {
+    const { rows: [r] } = await db.query('UPDATE episode_covers SET label = $2 WHERE id = $1 RETURNING *', [row.id, `Capa: ${clipText(spec)}`.slice(0, 160)]);
+    return { row: r, lint: res.lint };
+  }
+  return { row, lint: res.lint };
+}
+
 // Arquivo para baixar no padrão do guia: PNG quando cabe no limite da peça, senão o JPG guardado.
 const pieceName = (episode, cover, ext) => {
   const ep = episode?.number ? `ep${String(episode.number).padStart(3, '0')}` : `episodio${cover.episode_id}`;
@@ -295,4 +323,4 @@ async function download(cover, episode) {
   return { buffer: Buffer.from(await obj.arrayBuffer()), mime: 'image/jpeg', name: pieceName(episode, cover, 'jpg') };
 }
 
-module.exports = { YT_MAX, SP_MAX, LETTERS, photoOf, build, render, best, insert, generate, adjust, replace, refresh, missing, download, pieceName, labelOf, clipBase, clipText, clipDataFor, clipOptions, adjustClip };
+module.exports = { YT_MAX, SP_MAX, LETTERS, photoOf, build, render, best, insert, generate, adjust, replace, refresh, missing, download, pieceName, labelOf, textOfLayers, clipBase, clipText, clipDataFor, clipOptions, adjustClip, saveEdited };

@@ -5,11 +5,15 @@ const engine = require('../public/design/engine');
 
 const FONT_DIR = path.join(__dirname, '..', 'public', 'fonts');
 let fontsReady = false;
+// Todos os pesos hospedados, cada um na família de verdade: o editor de capas deixa escolher o peso (specSanitizer.FONT_WEIGHTS),
+// e o servidor precisa desenhar a mesma letra que o navegador mostrou.
 function ensureFonts() {
   if (fontsReady) return;
   for (const [file, family] of [
-    ['space-grotesk-latin-700-normal.woff2', 'Space Grotesk'], ['space-grotesk-latin-500-normal.woff2', 'Space Grotesk Medium'],
-    ['instrument-serif-latin-400-italic.woff2', 'Instrument Serif'], ['inter-latin-500-normal.woff2', 'Inter'], ['jetbrains-mono-latin-500-normal.woff2', 'JetBrains Mono'],
+    ...[400, 500, 600, 700].map((w) => [`space-grotesk-latin-${w}-normal.woff2`, 'Space Grotesk']),
+    ['instrument-serif-latin-400-italic.woff2', 'Instrument Serif'],
+    ...[400, 500, 600].map((w) => [`inter-latin-${w}-normal.woff2`, 'Inter']),
+    ...[400, 500].map((w) => [`jetbrains-mono-latin-${w}-normal.woff2`, 'JetBrains Mono']),
   ]) GlobalFonts.registerFromPath(path.join(FONT_DIR, file), family);
   fontsReady = true;
 }

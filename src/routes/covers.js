@@ -119,14 +119,17 @@ router.get(both('/editar'), requirePerm('episodes.read'), wrap(async (req, res) 
     ? await db.query('SELECT id, label, position FROM episode_covers WHERE clip_id = $1 ORDER BY position', [c.clip_id])
     : await db.query('SELECT id, label, position FROM episode_covers WHERE episode_id = $1 AND kind = $2 AND group_key IS NOT DISTINCT FROM $3 ORDER BY position', [c.episode_id, c.kind, c.group_key]);
   const voltar = safeBack(req.query.voltar);
+  const model = c.model && M.MODELS[c.model] ? { code: c.model, name: M.MODELS[c.model].name, angle: c.angle ? M.ANGLES[c.angle] : null } : null;
   res.render('episodes/editor', {
-    title: `Editar — ${KINDS[c.kind]}`, ep, cover: c, kindLabel: KINDS[c.kind], voltar,
+    title: `Editar — ${KINDS[c.kind]}`, ep, cover: c, kindLabel: KINDS[c.kind], voltar, model,
     // Vindo do post: a capa do corte é a escolhida (as outras sugestões não entram); slides do carrossel continuam com os números.
     siblings: voltar && c.clip_id ? [] : siblings.rows, backUrl: voltar || homeOf(c),
-    backLabel: voltar ? 'Voltar ao post' : (c.clip_id ? 'Voltar ao corte' : (c.kind === 'youtube_thumb' ? 'Voltar ao episódio' : 'Voltar ao conteúdo')),
+    backLabel: voltar ? 'Voltar ao post' : (c.clip_id ? 'Voltar ao corte' : (EP_PIECES.includes(c.kind) ? 'Voltar ao episódio' : 'Voltar ao conteúdo')),
+    editUrl: `/capas/${c.id}/editar${voltar ? `?voltar=${encodeURIComponent(voltar)}` : ''}`,
     editorData: {
       spec: c.spec, ctx: c.ctx, lint: c.lint, frames, format: engine.FORMATS[c.spec.format], saveUrl: `/capas/${c.id}`, uploadUrl: c.clip_id ? `/capas/imagem?corte=${c.clip_id}` : `/capas/imagem?episodio=${c.episode_id}`,
       imageBase: '/quadros/', brand: engine.BRAND, photos: await episodePhotos(await episodeOfCover(c)), photoUrl: `/capas/${c.id}/foto`,
+      model: Boolean(model), weights: require('../services/specSanitizer').FONT_WEIGHTS,
     },
   });
 }));
@@ -185,10 +188,15 @@ router.post(both(), requirePerm('episodes.read'), wrap(async (req, res) => {
   const frames = await store.loadFrames(c.episode_id, { clipId: c.clip_id ?? null, custom: true });
   let spec;
   try {
-    spec = sanitizeSpec(req.body.spec, { allowedRefs: new Set(frames.map((f) => f.ref)) });
+    spec = sanitizeSpec(req.body.spec, { allowedRefs: new Set(frames.map((f) => f.ref)), base: c.model ? c.spec : null });
     if (spec.format !== c.spec.format) throw new Error('O formato da capa não pode mudar.');
   } catch (err) {
     return res.status(400).json({ ok: false, error: err.message });
+  }
+  if (c.model && M.MODELS[c.model]) { // capa dos modelos do guia: as regras das peças (rosto pela foto, limite do arquivo, teste de redução)
+    const { row, lint } = await pieces.saveEdited(c, spec, req.user.id);
+    if (c.episode_id) await prod.addEvent(c.episode_id, req.user.id, 'capas', `Capa editada no editor completo: ${row.label || KINDS[c.kind]}`);
+    return res.json({ ok: true, lint, updated_at: row.updated_at, size_bytes: row.size_bytes });
   }
   const ctx = { faces: [], blocks: [], insets: [] };
   const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
@@ -272,7 +280,7 @@ router.get(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
       ref: f.ref, url: `/quadros/${f.id}`, w: f.width, h: f.height, face: pieces.photoOf(f).face, photo: Boolean(f.analysis?.from_file), custom: Boolean(f.analysis?.custom), fileId: f.analysis?.from_file || null,
     }));
     return res.json({
-      ok: true, cover: { id: c.id, kind: c.kind, model: c.model, angle: null, flip: false, photo: c.spec?.photo || null },
+      ok: true, cover: { id: c.id, kind: c.kind, model: c.model, angle: null, flip: false, photo: c.spec?.photo || null, edited: Boolean(c.spec?.edited) },
       data: { ...(c.spec?.sheet || {}) }, quoteFound: true,
       frames, photos: await episodePhotos(await episodeOfCover(c)), photoUrl: `/capas/${c.id}/foto`, saveUrl: `/capas/${c.id}/ajustar`, special: null,
     });
@@ -287,7 +295,7 @@ router.get(ADJUST, requirePerm('episodes.read'), wrap(async (req, res) => {
   const recent = g?.number && ctx.episode?.number && ctx.episode.number - g.number < 5 && ctx.episode.number > g.number;
   res.json({
     ok: true,
-    cover: { id: c.id, kind: c.kind, model: c.model, angle: c.angle, flip: Boolean(c.spec?.flip), photo: c.spec?.photo || null },
+    cover: { id: c.id, kind: c.kind, model: c.model, angle: c.angle, flip: Boolean(c.spec?.flip), photo: c.spec?.photo || null, edited: Boolean(c.spec?.edited) },
     data: sheets.dataFor(sheet, ctx.episode, c.angle), quoteFound: sheet.quote?.found !== false,
     frames, photos: c.id ? await episodePhotos(c.episode_id) : [], photoUrl: c.id ? `/capas/${c.id}/foto` : null, saveUrl: c.id ? `/capas/${c.id}/ajustar` : `/episodios/${c.episode_id}/capas/angulo/${c.angle}/ajustar`,
     special: g?.number ? { last: `EP.${String(g.number).padStart(3, '0')}`, recent: Boolean(recent) } : null,

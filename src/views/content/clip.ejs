@@ -67,7 +67,7 @@
             </form>
             <% }) %>
           </div>
-          <% if (chosen && perm.cover && chosen.model) { %><p class="row small"><button class="btn sm" type="button" data-ajustar-open="/capas/<%= chosen.id %>/ajustar"><%- icon('sliders-horizontal', 14) %> Ajustar capa</button><span class="muted">Mude o gancho, o modelo ou a foto.</span></p>
+          <% if (chosen && perm.cover && chosen.model) { %><p class="row small"><%- include('../partials/cover-edit-menu', { cover: chosen, editHref: '/capas/' + chosen.id + '/editar', label: 'Editar capa' }) %><span class="muted">Mude o gancho, o modelo, a foto ou cada detalhe.</span></p>
           <% } else if (chosen && perm.cover) { %><p class="row small"><a class="btn sm" href="/capas/<%= chosen.id %>/editar">Editar capa</a><span class="muted">Troque o quadro ou envie uma imagem sua.</span></p><% } %>
           <% var badCover = chosen && chosen.lint && (chosen.lint.issues || [])[0]; if (badCover) { %><p class="small bad-text m-0"><%= badCover %></p><% } %>
         </div>

@@ -372,6 +372,7 @@
     }
     if (layer.type === 'rect') return { x: layer.x, y: layer.y, w: layer.w, h: layer.h };
     if (layer.type === 'arrow') return { x: layer.x, y: layer.y, w: layer.size, h: layer.size };
+    if (layer.type === 'pulse') { const k = layer.beat || 10; return { x: layer.x, y: layer.y - k, w: layer.w, h: 2 * k }; } // o batimento sobe e desce `beat` px
     return { x: layer.x || 0, y: layer.y || 0, w: layer.w || 0, h: layer.h || 0 };
   }
 
@@ -391,37 +392,40 @@
     const base = layer.css ? cssBaseline(ctx, layer.size, layer.lineHeight || 1.05) : 0;
     const hl = layer.highlight; // { color, lines: 'last' | n } -> destaca a última linha (um único elemento lime por peça)
     const marks = layer.marks && layer.marks.words && layer.marks.words.length ? new Set(layer.marks.words) : null; // palavras em outra cor (índice na frase)
+    const strokeW = layer.stroke && layer.stroke.width > 0 ? layer.stroke.width * layer.size : 0;
+    const withShadow = (fn) => {
+      if (!layer.shadow) { fn(); return; }
+      ctx.save(); ctx.shadowColor = `rgba(0,0,0,${0.55 * layer.shadow})`; ctx.shadowBlur = layer.size * 0.12 * layer.shadow;
+      if (layer.shadowAngle == null) ctx.shadowOffsetY = layer.size * 0.025 * layer.shadow; // sombra clássica, um pouco abaixo
+      else { // direção escolhida (graus: 0 = direita, 90 = baixo) e distância (0 = brilho em volta)
+        const d = layer.size * 0.1 * (layer.shadowDistance ?? 0.4); const rad = (layer.shadowAngle * Math.PI) / 180;
+        ctx.shadowOffsetX = Math.cos(rad) * d; ctx.shadowOffsetY = Math.sin(rad) * d;
+      }
+      fn(); ctx.restore();
+    };
     let wordAt = 0;
     box.lines.forEach((line, i) => {
       const lineW = box.widths[i];
       const x = layer.align === 'center' ? layer.x + (layer.w - lineW) / 2 : layer.align === 'right' ? layer.x + layer.w - lineW : layer.x;
       const y = layer.css ? layer.y + i * lh + base : layer.y + i * lh + (lh - layer.size) / 2 - layer.size * 0.08;
-      if (marks) { // palavra por palavra: as marcadas saem na cor do destaque (um destaque por peça)
-        let cx = x; const space = ctx.measureText(' ').width;
+      // Trechos da linha com a cor de cada um: palavra por palavra quando há palavras marcadas (as marcadas na cor do destaque),
+      // senão a linha inteira. Sombra e contorno valem para os dois casos.
+      let runs;
+      if (marks) {
+        runs = []; let cx = x; const space = ctx.measureText(' ').width;
         for (const word of line.split(' ')) {
           if (!word) continue;
-          ctx.fillStyle = marks.has(wordAt) ? (layer.marks.color || BRAND.lime) : layer.color;
-          ctx.fillText(word, cx, y); cx += ctx.measureText(word).width + space; wordAt += 1;
+          runs.push({ t: word, x: cx, color: marks.has(wordAt) ? (layer.marks.color || BRAND.lime) : layer.color });
+          cx += ctx.measureText(word).width + space; wordAt += 1;
         }
-        return;
+      } else {
+        const isHl = hl && (hl.lines === 'last' ? i === box.lines.length - 1 : hl.lines === i);
+        runs = [{ t: line, x, color: isHl ? hl.color : layer.color }];
       }
-      const isHl = hl && (hl.lines === 'last' ? i === box.lines.length - 1 : hl.lines === i);
-      const fill = isHl ? hl.color : layer.color;
-      const strokeW = layer.stroke && layer.stroke.width > 0 ? layer.stroke.width * layer.size : 0;
-      const withShadow = (fn) => {
-        if (!layer.shadow) { fn(); return; }
-        ctx.save(); ctx.shadowColor = `rgba(0,0,0,${0.55 * layer.shadow})`; ctx.shadowBlur = layer.size * 0.12 * layer.shadow;
-        if (layer.shadowAngle == null) ctx.shadowOffsetY = layer.size * 0.025 * layer.shadow; // sombra clássica, um pouco abaixo
-        else { // direção escolhida (graus: 0 = direita, 90 = baixo) e distância (0 = brilho em volta)
-          const d = layer.size * 0.1 * (layer.shadowDistance ?? 0.4); const rad = (layer.shadowAngle * Math.PI) / 180;
-          ctx.shadowOffsetX = Math.cos(rad) * d; ctx.shadowOffsetY = Math.sin(rad) * d;
-        }
-        fn(); ctx.restore();
-      };
       if (strokeW) { // contorno: desenhado antes (com a sombra) e o preenchimento por cima, limpo
-        withShadow(() => { ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.lineWidth = strokeW * 2; ctx.strokeStyle = layer.stroke.color || BRAND.black; ctx.strokeText(line, x, y); });
-        ctx.fillStyle = fill; ctx.fillText(line, x, y);
-      } else withShadow(() => { ctx.fillStyle = fill; ctx.fillText(line, x, y); });
+        withShadow(() => { ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.lineWidth = strokeW * 2; ctx.strokeStyle = layer.stroke.color || BRAND.black; for (const r of runs) ctx.strokeText(r.t, r.x, y); });
+        for (const r of runs) { ctx.fillStyle = r.color; ctx.fillText(r.t, r.x, y); }
+      } else withShadow(() => { for (const r of runs) { ctx.fillStyle = r.color; ctx.fillText(r.t, r.x, y); } });
     });
     return box;
   }
@@ -539,7 +543,12 @@
       if (f.brightness != null && f.brightness !== 1) parts.push(`brightness(${f.brightness})`);
       if (parts.length) ctx.filter = parts.join(' ');
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(im, x + layer.img.x, y + layer.img.y, layer.img.w, layer.img.h);
+      if (layer.mirror) { // espelha só a foto, dentro da própria caixa (o editor guarda o rosto no mesmo ponto do painel)
+        ctx.save(); const mx = x + layer.img.x + layer.img.w / 2;
+        ctx.translate(mx, 0); ctx.scale(-1, 1); ctx.translate(-mx, 0);
+        ctx.drawImage(im, x + layer.img.x, y + layer.img.y, layer.img.w, layer.img.h);
+        ctx.restore();
+      } else ctx.drawImage(im, x + layer.img.x, y + layer.img.y, layer.img.w, layer.img.h);
       ctx.filter = 'none';
       if (layer.fade > 0 && layer.img.y > 0) {
         const top = y + layer.img.y;

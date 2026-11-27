@@ -4,6 +4,15 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.11.0', date: '2026-11-26', title: 'O editor completo de capas voltou, também para os modelos novos',
+    items: [
+      { kind: 'novo', text: 'As capas dos modelos do guia (thumbnails do YouTube, capa do Spotify e capas dos cortes) abrem no editor completo: cada parte (frase, destaque, tarja, nome, rótulo, logotipo, linha) muda de texto, fonte, peso, tamanho, cor e lugar, e a foto se aproxima, se enquadra e se espelha dentro do painel. O botão "Editar" do cartão abre o editor completo ou a janela "Ajustar pelo modelo".' },
+      { kind: 'novo', text: 'No editor: tocar nas palavras marca o destaque e escolhe a cor dele; cores da marca e "outra cor"; o quadradinho no canto aumenta ou diminui a parte (com Shift, só a largura da caixa do texto); dois toques num texto vão direto para o texto; ordem das camadas, duplicar, ocultar, transparência, refazer (Ctrl+Shift+Z) e o teste de redução de 168 px ao vivo.' },
+      { kind: 'ajuste', text: 'A capa mexida no editor completo não é trocada sozinha quando a ficha muda: fica "desatualizada", e o Atualizar e a janela Ajustar pedem confirmação antes de montar de novo pelo modelo.' },
+      { kind: 'correcao', text: '"Editar capa" na publicação e no Novo post abria o editor antigo, que apagava a foto, a tarja e o degradê das capas dos modelos ao salvar. Agora abre o editor completo, que guarda tudo.' },
+    ],
+  },
+  {
     version: '2.10.0', date: '2026-11-26', title: 'Consumo da IA à vista e IA mais econômica',
     items: [
       { kind: 'novo', text: 'Gestão > Sistema > Consumo da IA: cada chamada ao Gemini entra com a parte do sistema que chamou (respostas a comentários, textos do corte, assistente…), os tokens e o custo estimado, por função e por dia, em 7 ou 30 dias. Quando os créditos ou o limite de gasto acabam, a página avisa.' },

@@ -2,7 +2,8 @@
   Capas do episódio pelo guia de peças (docs/referencias/capas). Variáveis: ep, covers, meta, frames, perm, csrf, fmt, aiReady,
   coverModels (public/design/models.js), coverMissing (o que falta para um ângulo sair), capasTab.
   Jornada: quem finaliza o episódio chega aqui depois da análise por IA; quer sair com as thumbnails do teste A/B e a capa do
-  Spotify aprovadas; o próximo passo é o checklist. Um clique gera tudo; cada capa tem só Aprovar e Ajustar; o resto fica no menu.
+  Spotify aprovadas; o próximo passo é o checklist. Um clique gera tudo; cada capa tem só Aprovar e Editar (que abre o editor
+  completo ou a janela Ajustar pelo modelo); o resto fica no menu.
 %>
 <%
   var M = coverModels;
@@ -45,9 +46,10 @@
         <form method="post" action="/episodios/<%= ep.id %>/capas/<%= c.id %>/aprovar" class="inline"><%- csrfField %><input type="hidden" name="aprovar" value="1"><button class="btn sm <%= firstGood && firstGood.id === c.id && locals.stepNext !== false ? 'primary' : '' %>" type="submit"><%- icon('check', 14) %> Aprovar</button></form>
         <% } %>
         <% if (c.stale && designers) { %>
-        <form method="post" action="/capas/<%= c.id %>/atualizar" class="inline" data-busy="Atualizando…"><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw', 14) %> Atualizar</button></form>
-        <% } else if (designers && c.model) { %>
-        <button class="btn sm <%= c.approved ? '' : 'ghost' %>" type="button" data-ajustar-open="/capas/<%= c.id %>/ajustar"><%- icon('sliders-horizontal', 14) %> Ajustar</button>
+        <form method="post" action="/capas/<%= c.id %>/atualizar" class="inline" data-busy="Atualizando…"<% if (c.edited) { %> data-confirm="Montar esta capa de novo com a ficha atual? O que foi mexido no editor completo se perde."<% } %>><%- csrfField %><button class="btn sm" type="submit"><%- icon('refresh-cw', 14) %> Atualizar</button></form>
+        <% } %>
+        <% if (designers && c.model) { %>
+        <%- include('../partials/cover-edit-menu', { cover: c, editHref: '/episodios/' + ep.id + '/capas/' + c.id + '/editar', ghost: !c.approved }) %>
         <% } else if (designers) { %><a class="btn sm ghost" href="/episodios/<%= ep.id %>/capas/<%= c.id %>/editar">Editar</a><% } %>
         <details class="row-menu"><summary class="icon-btn" aria-label="Mais ações desta capa"><%- icon('ellipsis', 16) %></summary>
           <div class="row-menu-list">

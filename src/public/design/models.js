@@ -493,7 +493,43 @@
   }
   const modelsFor = (kind, angle = null) => Object.keys(MODELS).filter((id) => MODELS[id].kind === kind && (!angle || !MODELS[id].angles || MODELS[id].angles.includes(angle)));
 
+  // ---------------------------------------------------------------- editor completo (a capa já montada, mexida à mão)
+  const DEFAULT_FACE = { x: 0.5, y: 0.38, h: 0.25 }; // o mesmo que o recorte usa quando a foto não tem rosto lido
+  // O rosto de um quadro (centro e altura de 0 a 1): a marcação feita à mão, senão o maior rosto da análise; null = não achou.
+  function faceOf(rostos, manual = null) {
+    if (manual && [manual.x, manual.y, manual.h].every(Number.isFinite)) return { x: manual.x, y: manual.y, h: manual.h };
+    const r = (rostos || []).slice().sort((a, b) => b.w * b.h - a.w * a.h)[0];
+    return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2, h: r.h } : null;
+  }
+  // As zonas de rosto de um desenho pronto: a mesma elipse (+40 px) que o modelo marca, seguindo o zoom, o enquadramento e o
+  // espelho que a pessoa deu à foto no editor. info(ref) -> { face } ou null.
+  function facesOf(spec, info) {
+    const out = [];
+    for (const l of spec.layers || []) {
+      if (l.type !== 'photo' || l.hidden || !l.ref || !l.img) continue;
+      const f = (info(l.ref) || {}).face || DEFAULT_FACE;
+      const fx = l.mirror ? 1 - f.x : f.x;
+      const eh = f.h * l.img.h * 1.12; const ew = eh * 0.74;
+      out.push({ ...E.grow({ x: l.x + l.img.x + fx * l.img.w - ew / 2, y: l.y + l.img.y + f.y * l.img.h - eh / 2, w: ew, h: eh }, 36), oval: true });
+    }
+    return out;
+  }
+  // Quanto a foto está ampliada no painel. zoom: 1 = o mínimo que cobre o painel; real: a ampliação do arquivo (exp = 3 no Spotify).
+  function photoScale(layer, photo, exp = 1) {
+    const min = Math.max(layer.w / photo.w, layer.h / photo.h);
+    const s = layer.img.w / photo.w;
+    return { zoom: s / min, min, s, real: s * exp, soft: Math.round(s * exp * 10) / 10 > MAX_ZOOM };
+  }
+  // Põe a foto no painel com escala s e canto (x, y), dentro dos limites do recorte: ela sempre cobre o painel dos lados e embaixo,
+  // e no alto pode começar até 22% abaixo (a borda some no fundo, como no guia). Devolve { img, fade }.
+  function placePhoto(layer, photo, { s, x, y }) {
+    const scale = Math.max(s, Math.max(layer.w / photo.w, layer.h / photo.h));
+    const w = photo.w * scale; const h = photo.h * scale;
+    const cx = Math.min(0, Math.max(layer.w - w, x)); const cy = Math.min(layer.h * 0.22, Math.max(layer.h - h, y));
+    return { img: { x: Math.round(cx), y: Math.round(cy), w: Math.round(w), h: Math.round(h) }, fade: cy > 1 ? Math.round(Math.min(h * 0.16, 240)) : 0 };
+  }
+
   // As peças de desenho, para quem monta outras cenas com as mesmas medidas (os vídeos do convidado: services/videoScenes.js).
   const parts = { text, mono, logo, rect, gradient, tarja, photoLayer, stack, heightOf, fitted, boxOf, wordmarkWidth, tarjaFit, epLabel, upper, MONO_LH, SHADE };
-  return { MODELS, ANGLES, AXES, LIMITS, KIND_LIMITS, MAX_ZOOM, limitOf, fieldError, problems, build, crop, reads, modelsFor, countWords, wordsOf, tidy, ep3, hookMarks, parts };
+  return { MODELS, ANGLES, AXES, LIMITS, KIND_LIMITS, MAX_ZOOM, DEFAULT_FACE, limitOf, fieldError, problems, build, crop, reads, modelsFor, countWords, wordsOf, tidy, ep3, hookMarks, faceOf, facesOf, photoScale, placePhoto, parts };
 }));

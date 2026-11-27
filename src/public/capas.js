@@ -224,14 +224,18 @@
 
   async function open(url, opener) {
     opener?.setAttribute('aria-busy', 'true');
+    opener?.closest('details[open]')?.removeAttribute('open'); // aberta pelo menu "Editar": o menu fecha
     try {
       const res = await fetch(url, { headers: { Accept: 'application/json' } });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || 'Não consegui abrir esta capa.');
+      // aberta de dentro do editor completo: depois de salvar, volta para ele (só endereço das capas, nunca um link de fora)
+      const back = opener?.dataset.ajustarBack && /^\/(capas|episodios)\/[\w/?=&%-]+$/.test(opener.dataset.ajustarBack) ? opener.dataset.ajustarBack : null;
       st = {
         cover: json.cover, data: { ...json.data }, frames: json.frames, photos: json.photos || [], photoUrl: json.photoUrl, saveUrl: json.saveUrl, special: json.special, quoteFound: json.quoteFound,
-        model: json.cover.model, frame: json.cover.photo?.ref || json.frames[0]?.ref || null, flip: json.cover.flip, faces: {}, images: {}, srcTab: 'quadros',
+        model: json.cover.model, frame: json.cover.photo?.ref || json.frames[0]?.ref || null, flip: json.cover.flip, faces: {}, images: {}, srcTab: 'quadros', back,
       };
+      $('[data-aj-edited]').hidden = !json.cover.edited;
       if (json.cover.photo?.face && st.frame) st.faces[st.frame] = json.cover.photo.face;
       const cur = frameNow();
       if (cur && cur.photo) st.srcTab = 'fotos';
@@ -251,6 +255,7 @@
   $('[data-aj-save]').addEventListener('click', async () => {
     const btn = $('[data-aj-save]'); const err = $('[data-aj-error]');
     const m = M.MODELS[st.model];
+    if (st.cover.edited && !window.confirm('Montar esta capa de novo pelo modelo? O que foi mexido no editor completo se perde.')) return;
     btn.disabled = true; btn.textContent = 'Salvando…'; err.textContent = '';
     try {
       const f = frameNow();
@@ -260,7 +265,8 @@
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || 'Não consegui salvar. Tente de novo.');
-      const to = new URL(json.back, window.location.href);
+      window.dispatchEvent(new CustomEvent('pulso:capa-ajustada')); // o editor completo, se estiver aberto, não pergunta "sair sem salvar?"
+      const to = new URL(st.back || json.back, window.location.href);
       if (to.pathname + to.search === window.location.pathname + window.location.search) { window.location.hash = to.hash; window.location.reload(); } else window.location.assign(to.href);
     } catch (e2) { err.textContent = e2.message; btn.disabled = false; btn.textContent = 'Salvar'; }
   });

@@ -137,6 +137,11 @@ Em todas: testes automatizados (limites da ficha, cada modelo gera sem problema 
 
 - **Ajuste fino no editor livre**: as capas dos modelos do guia não abrem no editor livre (ele não conhece as camadas novas: foto recortada, tarja, degradê). Em troca, a aba Foto da janela Ajustar ganhou "toque no rosto", Aproximar, Afastar e Espelhar o desenho. Capas antigas e posts continuam no editor livre.
 - **Credencial**: o limite na tela é de 8 palavras (o ideal continua 6), porque o próprio guia usa uma credencial de 8.
+- **O editor livre voltou (2.11.0, 26/11/2026, pedido do dono)**: "quero voltar a ter aquele poder de edição completo". O editor
+  completo passou a conhecer as camadas novas (foto recortada, tarja, degradê, pontos, linha de pulso, rótulos contornados) e abre
+  as capas dos modelos, como o plano previa em 3.2: o cartão tem um "Editar" só, com Editor completo e Ajustar pelo modelo. Depois
+  do editor a capa fica "editada" (`spec.edited`): a ficha nova não a sobrescreve (vira desatualizada) e montar de novo pelo
+  modelo pede confirmação. No editor livre os limites de palavras do guia não travam: a conferência e o teste de redução avisam.
 
 ## 11. Perguntas originais (respondidas acima)
 
