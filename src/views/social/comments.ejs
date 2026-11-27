@@ -91,6 +91,13 @@
     <button class="btn primary" type="submit"><%- icon('check') %> Aprovar todas (<%= counts.aprovar %>)</button>
   </form>
 </div>
+<% } else if (vista === 'equipe' && (failed.replies || failed.dms)) { var nf = failed.replies + failed.dms; %>
+<div class="cmt-bulk">
+  <p class="m-0"><% if (failed.replies) { %><span class="mono"><%= failed.replies %></span> resposta<%= failed.replies === 1 ? '' : 's' %><% } %><%= failed.replies && failed.dms ? ' e ' : '' %><% if (failed.dms) { %><span class="mono"><%= failed.dms %></span> direct<%= failed.dms === 1 ? '' : 's' %><% } %> não <%= nf === 1 ? 'saiu' : 'saíram' %> por erro (o motivo está em cada um). Dá para mandar tudo de novo.</p>
+  <form method="post" action="/social/comentarios/tentar-todas" class="inline" data-confirm="Tentar de novo <%= nf %> envio<%= nf === 1 ? '' : 's' %> com erro? Voltam para a fila e saem aos poucos, até <%= cfg.per_hour %> por hora." data-busy="Pondo na fila…"><%- csrfField %><%- back %><% if (pubId) { %><input type="hidden" name="pub" value="<%= pubId %>"><% } %>
+    <button class="btn primary" type="submit"><%- icon('rotate-ccw') %> Tentar de novo todas (<%= nf %>)</button>
+  </form>
+</div>
 <% } else if (vista === 'fila' && rows.length) { %>
 <p class="small muted cmt-pace"><%- icon('clock', 14) %> Saem uma por vez, com intervalo variado, até <%= cfg.per_hour %> por hora e só das <%= cfg.from %>h às <%= cfg.to %>h. A ordem mistura os posts.<%= cfg.on ? '' : ' As respostas por IA estão desligadas: a fila está parada.' %></p>
 <% } %>

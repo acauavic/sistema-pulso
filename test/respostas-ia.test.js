@@ -185,6 +185,21 @@ describe('Respostas por IA nos comentários (Social > Comentários)', () => {
     assert.equal((await as.prod.act('/social/comentarios/config', { mode: 'automatico' }, { from: '/social/comentarios' })).status, 403);
   });
 
+  it('tentar de novo em massa: respostas e directs que deram erro voltam para a fila', async () => {
+    const [a, b] = await q("SELECT id FROM social_comments WHERE status = 'aprovada' ORDER BY id LIMIT 2");
+    await q("UPDATE social_comments SET status = 'erro', error = 'Outstand recusou (402): Your organization does not have an active subscription.', attempts = 2 WHERE id = ANY($1)", [[a.id, b.id]]);
+    await q("UPDATE social_comments SET dm_status = 'erro', dm_text = 'Entra na comunidade: {comunidade}', dm_error = 'falhou' WHERE id = $1", [a.id]);
+    const page = (await as.prod.get('/social/comentarios?vista=equipe')).text;
+    assert.match(page, /Tentar de novo todas \(3\)/); assert.match(page, /2<\/span> respostas e <span class="mono">1<\/span> direct não saíram por erro/);
+    const r = await as.prod.act('/social/comentarios/tentar-todas', {}, { from: '/social/comentarios' });
+    assert.equal(r.status, 302);
+    const rows = await q('SELECT status, error, attempts, dm_status, dm_error FROM social_comments WHERE id = ANY($1) ORDER BY id', [[a.id, b.id]]);
+    assert.deepEqual(rows.map((x) => [x.status, x.error, x.attempts]), [['aprovada', null, 0], ['aprovada', null, 0]]);
+    assert.deepEqual([rows[0].dm_status, rows[0].dm_error], ['aprovada', null]);
+    assert.match((await as.prod.get('/social/comentarios')).text, /2 respostas voltaram e 1 direct voltou para a fila/);
+    assert.doesNotMatch((await as.prod.get('/social/comentarios?vista=equipe')).text, /Tentar de novo todas/);
+  });
+
   it('envio aos poucos: horário, intervalo, limite por hora, mistura os posts e manda o platform_post_id', async () => {
     await R.setConfig({ mode: 'aprovar', per_hour: '25', from: '8', to: '23', team_handles: '' });
     assert.equal((await R.sendTick({ now: at('2026-11-19T05:00:00Z') })).reason, 'fora do horário', '02:00 em Brasília');

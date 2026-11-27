@@ -492,6 +492,7 @@ router.get('/social/comentarios', requirePerm('social.comments'), wrap(async (re
     title: 'Comentários', tab: 'comentarios', cfg, counts, rows, more, vista, pubId, posts, eta, VIEWS: replies.VIEWS, MODES: replies.MODES, NETWORK_LABEL: replies.NETWORK_LABEL,
     summary: replies.summary(cfg), lastSweep: parse(sweepState), canSetup: can(req.user, 'social.automate'), outstandLive: config.outstand.live,
     aiReady: config.geminiConfigured, outstandReady: config.outstandConfigured, showAll, REPLY_MAX: replies.REPLY_MAX,
+    failed: (await db.query(`SELECT count(*) FILTER (WHERE status = 'erro' AND coalesce(reply_text, '') <> '')::int AS replies, count(*) FILTER (WHERE dm_status = 'erro' AND coalesce(dm_text, '') <> '')::int AS dms FROM social_comments${pubId ? ' WHERE publication_id = $1' : ''}`, pubId ? [pubId] : [])).rows[0],
     dmToday: await replies.dmToday(), communityOk: Boolean((await require('../services/commentAutomation').links(require('../services/scope').target(req, {}))).whatsapp_community), DM_DAYS: replies.DM_PER_PERSON_DAYS,
   });
 }));
@@ -540,6 +541,15 @@ router.post('/social/comentarios/aprovar-todas', requirePerm('social.comments'),
   const n = await replies.approveAll({ userId: req.user.id, pubId });
   await audit(req, 'respostas_ia.aprovadas', 'publication', pubId, { n });
   await req.flash('ok', n ? `${fmt.plural(n, 'resposta foi', 'respostas foram')} para a fila. Saem aos poucos, no ritmo configurado.` : 'Nada para aprovar.');
+  res.redirect(backTo(req));
+}));
+
+router.post('/social/comentarios/tentar-todas', requirePerm('social.comments'), wrap(async (req, res) => {
+  const pubId = isIntId(String(req.body.pub || '')) ? Number(req.body.pub) : null;
+  const { replies: n, dms } = await replies.retryAll({ userId: req.user.id, pubId });
+  await audit(req, 'respostas_ia.tentar_todas', 'publication', pubId, { n, dms });
+  const parts = [n ? fmt.plural(n, 'resposta voltou', 'respostas voltaram') : '', dms ? fmt.plural(dms, 'direct voltou', 'directs voltaram') : ''].filter(Boolean);
+  await req.flash('ok', parts.length ? `${parts.join(' e ')} para a fila. Saem aos poucos, no ritmo configurado.` : 'Nada com erro para tentar de novo.');
   res.redirect(backTo(req));
 }));
 

@@ -397,7 +397,9 @@ async function warnTeam(post, needTeam, proposed) {
 const hourBR = (d = new Date()) => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23' }).format(d));
 const inWindow = (c, d = new Date()) => { const h = hourBR(d); return h >= c.from && h < c.to; };
 const baseGap = (c) => 3600_000 / Math.max(1, c.per_hour);
-const randomGap = (c) => Math.max(45_000, baseGap(c) * (0.6 + Math.random() * 0.8));
+// Intervalo variado (a conta não parece robô) em volta do ritmo escolhido: de 70% a 110% do intervalo médio, nunca abaixo de 40 s.
+// A rotina olha a fila a cada 15 s, então a média sai perto do pedido (antes, de minuto em minuto, 60 por hora viravam ~40).
+const randomGap = (c) => Math.max(40_000, baseGap(c) * (0.7 + Math.random() * 0.4));
 
 function friendly(err) {
   const m = String(err?.message || err);
@@ -408,7 +410,7 @@ function friendly(err) {
   return m.slice(0, 300);
 }
 
-// Uma volta da rotina (a cada minuto): manda no máximo uma resposta, se o horário, o limite e o intervalo deixam.
+// Uma volta da rotina (a cada 15 s): manda no máximo uma resposta, se o horário, o limite e o intervalo deixam.
 // `projectId`: a rotina roda um projeto por vez (configuração, limites e fila são dele).
 // As rotinas rodam para cada projeto que usa redes (cada um com a configuração, a fila e os limites dele).
 async function eachProject(fn) {
@@ -623,6 +625,15 @@ async function approveAll({ userId, pubId = null }) {
   const { rows } = await db.query(`SELECT id FROM social_comments WHERE status = 'proposta' ${pubId ? 'AND publication_id = $1' : ''}`, pubId ? [pubId] : []);
   return approve(rows.map((r) => r.id), userId);
 }
+// "Tentar de novo" em massa: toda resposta que deu erro (com o texto pronto) volta para a fila, e o direct que deu erro também
+// (o envio da resposta e o do direct são separados). Devolve { replies, dms }.
+async function retryAll({ userId, pubId = null }) {
+  const where = pubId ? 'AND publication_id = $1' : ''; const args = pubId ? [pubId] : [];
+  const { rows } = await db.query(`SELECT id FROM social_comments WHERE status = 'erro' AND coalesce(reply_text, '') <> '' ${where}`, args);
+  const replies = rows.length ? await approve(rows.map((r) => r.id), userId) : 0;
+  const { rowCount: dms } = await db.query(`UPDATE social_comments SET dm_status = 'aprovada', dm_error = NULL WHERE dm_status = 'erro' AND coalesce(dm_text, '') <> '' ${where}`, args);
+  return { replies, dms };
+}
 // Texto escrito (ou editado) por alguém: vai para a fila. Só emoji = reação.
 // dm: undefined = não mexe no direct; '' = sem direct; texto = o direct (só Instagram, e só se a pessoa não recebeu um há pouco).
 async function setReply(id, text, userId, { dm } = {}) {
@@ -720,7 +731,7 @@ async function ofPublication(pubId) {
 }
 
 module.exports = {
-  KEY, SEND_KEY, NETWORKS, NETWORK_LABEL, MODES, DEFAULTS, VIEWS, EMOJIS, REPLY_MAX, SYSTEM,
+  retryAll, KEY, SEND_KEY, NETWORKS, NETWORK_LABEL, MODES, DEFAULTS, VIEWS, EMOJIS, REPLY_MAX, SYSTEM,
   getConfig, setConfig, summary, watchedPosts, postContext, ingest, sweep, fromWebhook, classifyPublication, cleanReply,
   hourBR, inWindow, sendTick, estimate, friendly, approve, approveAll, setReply, skip, unqueue, undo,
   DM_KEY, DM_PER_PERSON_DAYS, sendTickAll, dmTickAll, eachProject, cleanDm, looksLikeCode, dmRecently, inviteAllowed, communityLink, catchUpDms, renderDm, dmTick, dmToday, skipDm, counts, pendingCount, list, postsWithComments, ofPublication,

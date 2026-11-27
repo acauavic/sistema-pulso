@@ -4,6 +4,13 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
+    version: '2.13.0', date: '2026-11-27', title: 'Respostas a comentários no ritmo pedido e "Tentar de novo" em massa',
+    items: [
+      { kind: 'novo', text: 'Social > Comentários, aba "Precisam de você": "Tentar de novo todas" manda de volta para a fila, de uma vez, todas as respostas e os directs que deram erro (como os que pararam quando a assinatura da Outstand venceu).' },
+      { kind: 'correcao', text: 'As respostas saem no ritmo configurado. A rotina olhava a fila de minuto em minuto e perdia a vez: 60 por hora viravam uns 40, e 25 viravam uns 20. Agora ela olha a cada 15 segundos, e o intervalo continua variado.' },
+    ],
+  },
+  {
     version: '2.12.0', date: '2026-11-27', title: 'Post que falhou volta sozinho e aparece no Conteúdo; reler com IA em massa',
     items: [
       { kind: 'novo', text: 'Quando a Outstand (ou outro provedor) volta depois de uma assinatura vencida, chave trocada ou contas que sumiram, os posts que falharam só por isso nos últimos 3 dias voltam sozinhos para a fila, de 20 em 20 minutos, sem cair em cima do que já está agendado. A gestão recebe um aviso. Antes, ficavam parados em erro até alguém reenviar um por um.' },
