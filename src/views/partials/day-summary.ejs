@@ -1,0 +1,112 @@
+<%
+  // Resumo do dia no Início. day: { day, today, min, isToday, weekday, prev, next }; ds: daySummary.summary().
+  // Um painel só, com três caminhos desenhados como linha com pontos (do convite ao episódio, da prospecção ao patrocínio, e o do
+  // conteúdo), os motivos de perda dos convidados (30 dias) e as redes e tarefas embaixo. O número grande é o do dia; embaixo, como
+  // estava no fim dele (hoje: até agora). Ponto aceso = algo aconteceu no dia; número zerado fica apagado. Medir não é ação: o único
+  // lime é o ponto "ao vivo" de hoje.
+  var g = ds.guests, sp = ds.sponsors, e = ds.episodes, c = ds.clips, sc = ds.scheduled, t = ds.tasks, s = ds.social;
+  var num = function (n) { return Number(n).toLocaleString('pt-BR'); };
+  var signed = function (n) { return n === null || n === undefined ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('pt-BR'); };
+  var plural = function (n, one, many) { return Number(n) === 1 ? one : many; };
+  // cada linha de baixo é uma lista de partes { pre, n, t } separadas por " · ": o número fica mais claro que o texto
+  var flowGuests = [
+    { l: 'Convites enviados', n: g.sent, href: '/convidados?view=lista&status=convite_enviado', sub: [{ n: g.waiting, t: 'aguardando resposta' }] },
+    { l: 'Aceitos', n: g.accepted, href: '/convidados?view=lista&status=em_agendamento', sub: [{ n: g.scheduling, t: 'em agendamento' }] },
+    { l: 'Agendados', n: g.scheduledIn, href: '/convidados?view=lista&status=agendado', sub: [{ n: g.scheduled, t: 'com data marcada' }] },
+    { l: 'Gravados', n: e.recordedIn, href: '/episodios', sub: [{ n: e.toPublish, t: 'a publicar' }] },
+    { l: 'Publicados', n: e.publishedIn, href: '/episodios?view=lista', sub: [{ n: e.published, t: plural(e.published, 'episódio no ar', 'episódios no ar') }] },
+  ];
+  // patrocínio: a etapa (Prospecção → Em negociação → Ganho) e, no meio, a cadência (abordagem e follow-ups, Registrar abordagem)
+  var cadence = can('outreach.manage') ? '/gestao/cadencia' : '/patrocinadores?view=lista&stage=prospect';
+  var lateN = sp.due + sp.late;
+  var followSub = day.isToday
+    ? [{ n: sp.due, t: 'para hoje' }].concat(sp.late ? [{ n: sp.late, t: plural(sp.late, 'atrasado', 'atrasados'), bad: true }] : [])
+    : (lateN ? [{ n: lateN, t: plural(lateN, 'ficou atrasado', 'ficaram atrasados'), bad: true }] : [{ t: 'nenhum ficou atrasado' }]);
+  var flowSponsors = [
+    { l: 'Entraram em prospecção', n: sp.entered, href: '/patrocinadores?view=lista&stage=prospect', sub: [{ n: sp.prospecting, t: 'em prospecção' }] },
+    { l: 'Abordados', n: sp.approached, href: cadence, sub: [{ n: sp.toApproach, t: 'a abordar' }], title: 'Primeira abordagem registrada no dia' },
+    { l: 'Follow-ups', n: sp.followed, href: cadence, sub: followSub, title: 'Patrocinadores já abordados que receberam contato de novo no dia (um por patrocinador)' },
+    { l: 'Interessados', n: sp.interested, href: '/patrocinadores?view=lista&stage=negociacao', sub: [{ n: sp.negotiating, t: 'em negociação' }] },
+    { l: 'Fechados', n: sp.closed, href: '/patrocinadores', sub: [{ n: sp.active, t: plural(sp.active, 'patrocínio ativo', 'patrocínios ativos') }] },
+  ];
+  var schedSub = day.isToday
+    ? [{ n: sc.pending, t: 'a sair' }, { n: sc.out, t: 'no ar' }].concat(sc.failed ? [{ n: sc.failed, t: 'com erro', bad: true }] : [])
+    : [{ n: sc.out, t: 'no ar' }].concat(sc.pending + sc.failed ? [{ n: sc.pending + sc.failed, t: plural(sc.pending + sc.failed, 'não saiu', 'não saíram'), bad: true }] : []);
+  var flowContent = [
+    { l: 'Cortes subidos', n: c.uploaded, href: '/conteudo?vista=cortes', sub: c.uploadedByTeam ? [{ n: c.uploadedByTeam, t: 'subidos pela gestão' }] : [{ t: 'pelo editor' }] },
+    { l: 'Revisões', n: c.versions, href: '/conteudo?vista=cortes', sub: c.versions ? [{ pre: 'em', n: c.revised, t: plural(c.revised, 'corte', 'cortes') }] : [{ t: 'versões novas de cortes' }] },
+    { l: day.isToday ? 'Agendados para hoje' : 'Agendados para o dia', n: sc.total, href: '/social/publicacoes?status=agendado', sub: sc.total ? schedSub : [{ t: 'cortes e posts' }], title: sc.total ? num(sc.clips) + ' ' + plural(sc.clips, 'corte', 'cortes') + ' e ' + num(sc.posts) + ' ' + plural(sc.posts, 'post', 'posts') : '' },
+    { l: 'Cortes postados', n: c.posted, href: '/social/publicacoes', sub: c.networkPosts ? [{ n: c.networkPosts, t: plural(c.networkPosts, 'post nas redes', 'posts nas redes') }] : [{ t: 'foram ao ar no dia' }] },
+    { l: 'Reels de teste', n: c.trials, href: '/social/publicacoes', sub: [{ t: 'no Instagram' }] },
+  ];
+  var showSocial = s && can('social.read');
+  var nets = showSocial ? [['instagram', 'Instagram', 'seguidores'], ['youtube', 'YouTube', 'inscritos']].map(function (x) { return { l: x[1], v: s[x[0]], unit: x[2] }; }) : [];
+  var readAt = function (v) { return v.readAt ? 'Última leitura ' + (day.isToday ? 'hoje' : 'do dia') + ' às ' + fmt.formatDateTime(v.readAt).slice(-5) : 'Sem leitura neste dia'; };
+%>
+<% var subLine = function (parts) { %><span class="day-sub"><% parts.forEach(function (p, i) { %><%= i ? ' · ' : '' %><%= p.pre ? p.pre + ' ' : '' %><% if (p.n !== undefined && p.n !== null) { %><b class="<%= p.bad ? 'bad' : '' %>"><%= typeof p.n === 'number' ? num(p.n) : p.n %></b> <% } %><%= p.t %><% }) %></span><% }; %>
+<% var flow = function (nodes) { %>
+      <div class="day-flow">
+        <% nodes.forEach(function (x) { %>
+        <a class="day-node <%= x.n ? '' : 'is-zero' %>" href="<%= x.href %>"<% if (x.title) { %> title="<%= x.title %>"<% } %>>
+          <span class="day-dot" aria-hidden="true"></span>
+          <span class="day-l"><%= x.l %></span>
+          <span class="day-n"><%= num(x.n) %></span>
+          <% subLine(x.sub) %>
+        </a>
+        <% }) %>
+      </div>
+<% }; %>
+<section class="day-sum" id="resumo" aria-labelledby="resumo-h">
+  <div class="day-sum-head">
+    <h2 id="resumo-h">Resumo do dia <span class="day-when"><% if (day.isToday) { %><span class="day-live" aria-hidden="true"></span>HOJE, ATÉ AGORA<% } else { %><%= day.weekday.toUpperCase() %><% } %></span></h2>
+    <%- include('day-nav') %>
+  </div>
+
+  <div class="day-panel">
+    <% if (can('guests.read')) { %>
+    <section class="day-band" aria-labelledby="day-b1">
+      <div class="day-band-head">
+        <h3 class="day-band-t" id="day-b1">Do convite ao episódio</h3>
+        <a class="day-aside <%= g.lost ? '' : 'is-zero' %>" href="/convidados?view=lista&amp;status=perdido"><% if (g.lost) { %><b><%= num(g.lost) %></b> <%= plural(g.lost, 'perdido', 'perdidos') %> no dia<% } else { %>nenhum perdido no dia<% } %></a>
+      </div>
+      <% flow(flowGuests) %>
+    </section>
+    <%- include('loss-reasons', { losses: ds.losses, mineOnly: false, bandId: 'day-b-loss' }) %>
+    <% } %>
+
+    <% if (can('sponsors.read')) { %>
+    <section class="day-band" aria-labelledby="day-b-sp">
+      <div class="day-band-head">
+        <h3 class="day-band-t" id="day-b-sp">Da prospecção ao patrocínio</h3>
+        <a class="day-aside <%= sp.lost ? '' : 'is-zero' %>" href="/patrocinadores?view=lista&amp;stage=perdido"><% if (sp.lost) { %><b><%= num(sp.lost) %></b> <%= plural(sp.lost, 'perdido', 'perdidos') %> no dia<% } else { %>nenhum perdido no dia<% } %></a>
+      </div>
+      <% flow(flowSponsors) %>
+    </section>
+    <% } %>
+
+    <section class="day-band" aria-labelledby="day-b2">
+      <div class="day-band-head"><h3 class="day-band-t" id="day-b2">Conteúdo</h3></div>
+      <% flow(flowContent) %>
+    </section>
+
+    <% if (locals.cmtDay) { %><%- include('comments-band', { bandId: 'day-b-cmt' }) %><% } %>
+
+    <section class="day-band" aria-labelledby="day-b3">
+      <div class="day-band-head"><h3 class="day-band-t" id="day-b3"><%= showSocial ? 'Redes e tarefas' : 'Tarefas' %></h3></div>
+      <div class="day-cells">
+        <% nets.forEach(function (x) { var v = x.v; %>
+        <a class="day-cell <%= v.gain ? (v.gain < 0 ? 'is-down' : '') : 'is-zero' %>" href="/social/insights" title="<%= readAt(v) %>">
+          <span class="day-l"><%= x.l %></span>
+          <span class="day-n"><%= signed(v.gain) %></span>
+          <% subLine(v.total === null ? [{ t: 'sem leitura' }] : [{ n: v.total, t: x.unit }].concat(v.week !== null ? [{ n: signed(v.week), t: 'na semana' }] : [])) %>
+        </a>
+        <% }) %>
+        <a class="day-cell <%= t.late ? 'is-bad' : 'is-zero' %>" href="/tarefas?escopo=todas">
+          <span class="day-l">Tarefas atrasadas</span>
+          <span class="day-n"><%= num(t.late) %></span>
+          <% subLine([{ pre: 'de', n: t.open, t: 'em aberto' }]) %>
+        </a>
+      </div>
+    </section>
+  </div>
+</section>

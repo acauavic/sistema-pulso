@@ -1,0 +1,229 @@
+// Área Tarefas: minhas, hoje e todas; em lista, quadro (Kanban) ou calendário. Status: a fazer, fazendo, feito e bloqueada (com motivo).
+const express = require('express');
+const config = require('../config');
+const groq = require('../services/groq');
+const taskVoice = require('../services/taskVoice');
+const attachments = require('../services/attachments');
+const { createLimiter } = require('../auth/rateLimit');
+const db = require('../db/pool');
+const tasks = require('../services/tasks');
+const comments = require('../services/comments');
+const C = require('../constants');
+const { can } = require('../permissions');
+const { requirePerm } = require('../middleware');
+const { audit } = require('../services/audit');
+const recordChanges = require('../services/recordChanges');
+const { wrap, isIntId, isUuid } = require('../utils/wrap');
+
+const router = express.Router();
+const voiceLimiter = createLimiter({ name: 'tarefa-voz', max: 30, windowMs: 10 * 60_000 });
+const MAX_AUDIO = 8 * 1024 * 1024; // ~2 min de voz
+const voiceReady = () => config.groqConfigured && config.geminiConfigured;
+const SCOPES = { minhas: 'Minhas tarefas', hoje: 'Hoje', todas: 'Todas' };
+const VIEWS = { lista: 'Lista', quadro: 'Quadro', calendario: 'Calendário' };
+const DONE_DAYS = 14; // no quadro, "Feito" mostra as duas últimas semanas; o que terminou antes fica atrás de um link
+const wantsJson = (req) => /json/.test(req.get('accept') || '');
+const notFound = (res) => res.status(404).render('error', { title: 'Não encontrado', message: 'Tarefa não encontrada.' });
+// Anexos que a pessoa enviou para esta tarefa: imagens que estão no texto + documentos listados no formulário.
+const attachmentIdsOf = (values, body) => [...(values.attachmentIds || []), ...[].concat(body.attachment_ids || [])];
+const backTo = (req, fallback) => { const v = String(req.body.voltar || ''); return /^\/(?!\/)[\w\-/?=&#.%]*$/.test(v) ? v : fallback; };
+
+// Calendário do mês (semanas de segunda a domingo).
+function monthGrid(ym) {
+  const [y, m] = (/^\d{4}-\d{2}$/.test(ym || '') ? ym : tasks.todayISO().slice(0, 7)).split('-').map(Number);
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const start = new Date(first); start.setUTCDate(1 - ((first.getUTCDay() + 6) % 7));
+  const days = [];
+  for (let i = 0; i < 42; i += 1) { const d = new Date(start); d.setUTCDate(start.getUTCDate() + i); days.push({ iso: d.toISOString().slice(0, 10), day: d.getUTCDate(), inMonth: d.getUTCMonth() === m - 1 }); }
+  const weeks = []; for (let i = 0; i < 42; i += 7) weeks.push(days.slice(i, i + 7));
+  if (!weeks[5].some((d) => d.inMonth)) weeks.pop();
+  const shift = (n) => { const d = new Date(Date.UTC(y, m - 1 + n, 1)); return d.toISOString().slice(0, 7); };
+  const raw = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(first);
+  const label = raw.charAt(0).toUpperCase() + raw.slice(1); // "Outubro de 2026"
+  return { ym: `${y}-${String(m).padStart(2, '0')}`, label, weeks, from: weeks[0][0].iso, to: weeks.at(-1)[6].iso, prev: shift(-1), next: shift(1) };
+}
+
+const isoOf = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : d ? String(d).slice(0, 10) : null);
+
+// Colunas do quadro. "Feito" cresce para sempre: mostra o que terminou nas duas últimas semanas e deixa o resto atrás de um link.
+// Dentro de cada coluna a ordem é a da lista (prazo; atrasadas primeiro); em "Feito", o que terminou por último vem em cima.
+function boardOf(items, allDone = false) {
+  const cut = new Date(Date.now() - DONE_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const done = items.filter((t) => t.status === 'feito');
+  const recent = done.filter((t) => (isoOf(t.completed_at) || '') >= cut);
+  const columns = Object.keys(C.TASK_STATUSES).map((key) => ({
+    key,
+    label: C.TASK_STATUSES[key],
+    items: key !== 'feito' ? items.filter((t) => t.status === key)
+      : [...(allDone ? done : recent)].sort((a, b) => new Date(b.completed_at || 0) - new Date(a.completed_at || 0)),
+  }));
+  return { columns, hiddenDone: allDone ? 0 : done.length - recent.length, allDone, days: DONE_DAYS };
+}
+
+const linkOptions = (req) => tasks.linkOptions(require('../services/scope').idsOf(req));
+// Tarefa que a pessoa alcança: do projeto dela ou geral (sem projeto). De outro projeto, como se não existisse.
+const taskFor = async (req) => {
+  const task = await tasks.get(req.params.id);
+  return task && require('../services/scope').canSee(req, task.project_id) ? task : null;
+};
+
+// Liga a tarefa a um item (episódio, convidado, patrocinador), se existir.
+async function readLinks(body) {
+  const links = {};
+  for (const [field, table, key] of [['episode_id', 'episodes', 'episodeId'], ['guest_id', 'guests', 'guestId'], ['sponsor_id', 'sponsors', 'sponsorId']]) {
+    if (isIntId(body[field])) { const { rows } = await db.query(`SELECT 1 FROM ${table} WHERE id = $1`, [body[field]]); if (rows.length) links[key] = Number(body[field]); }
+  }
+  return links;
+}
+
+router.get('/tarefas', requirePerm('tasks.read'), wrap(async (req, res) => {
+  const prefs = require('../services/prefs');
+  const scope = SCOPES[req.query.escopo] ? req.query.escopo : 'minhas';
+  // a visão escolhida da última vez volta igual (guardada na pessoa, vale no computador e no celular)
+  const saved = prefs.get(req.user, 'tarefas_visao');
+  const view = VIEWS[req.query.visao] ? req.query.visao : (VIEWS[saved] ? saved : 'lista');
+  if (req.query.visao) await prefs.set(req.user, 'tarefas_visao', view);
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const cal = view === 'calendario' ? monthGrid(req.query.mes) : null;
+  const pids = require('../services/scope').idsOf(req); // os projetos da pessoa, ou o escolhido no menu (tarefa geral aparece sempre)
+  const items = await tasks.list({ user: req.user, scope, q, projectIds: pids, ...(cal ? { from: cal.from, to: cal.to } : {}) });
+  const [opts, counts] = await Promise.all([
+    linkOptions(req),
+    db.query(`SELECT count(*) FILTER (WHERE assignee_id = $1 AND status <> 'feito')::int AS minhas,
+                     count(*) FILTER (WHERE assignee_id = $1 AND status <> 'feito' AND due_on <= $2)::int AS hoje,
+                     count(*) FILTER (WHERE status <> 'feito')::int AS todas FROM tasks
+               WHERE project_id IS NULL OR project_id = ANY($3::int[])`, [req.user.id, tasks.todayISO(), pids]),
+  ]);
+  const prefill = { episode_id: req.query.episodio || '', guest_id: req.query.convidado || '', sponsor_id: req.query.patrocinador || '' };
+  res.render('tasks/index', {
+    title: 'Tarefas', items, scope, view, q, cal, scopes: SCOPES, views: VIEWS, counts: counts.rows[0], ...opts, prefill, openNew: req.query.nova === '1', board: view === 'quadro' ? boardOf(items, req.query.feitas === 'todas') : null,
+    voiceReady: voiceReady(), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), isoOf, C, canEdit: (t) => tasks.canEdit(req.user, t),
+  });
+}));
+
+// Tarefa por voz: o navegador manda o áudio, o servidor transcreve e organiza em um rascunho de tarefa (nada é criado aqui).
+router.post('/tarefas/voz', requirePerm('tasks.write'), express.raw({ type: () => true, limit: MAX_AUDIO }), wrap(async (req, res) => {
+  const fail = (status, error) => res.status(status).json({ ok: false, error });
+  if (!voiceReady()) return fail(503, 'A tarefa por voz precisa da transcrição (Groq) e da IA (Gemini) configuradas neste servidor.');
+  const type = String(req.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!type.startsWith('audio/') && type !== 'video/webm') return fail(400, 'Formato de áudio não aceito.');
+  if (!Buffer.isBuffer(req.body) || req.body.length < 500) return fail(400, 'A gravação ficou vazia. Tente de novo.');
+  if (!await voiceLimiter.hit(req.user.id)) return fail(429, 'Muitas gravações seguidas. Espere alguns minutos.');
+  let text;
+  try { text = await groq.transcribe(req.body, { filename: `tarefa.${type.split('/')[1] || 'webm'}`, contentType: type }); } catch (err) {
+    console.error('[tarefa por voz] transcrição:', err.message);
+    return fail(502, 'Não consegui entender o áudio agora. Tente de novo ou escreva a tarefa.');
+  }
+  if (!text) return fail(422, 'Não ouvi nada na gravação. Tente de novo mais perto do microfone.');
+  let r;
+  try { r = await taskVoice.organize({ text, user: req.user }); } catch (err) {
+    console.error('[tarefa por voz] organização:', err.message);
+    return fail(502, 'Entendi o áudio, mas não consegui organizar a tarefa agora. Tente de novo.');
+  }
+  if (r.error) return res.status(422).json({ ok: false, error: r.error, transcript: text });
+  await audit(req, 'tarefa.voz', 'task', null, { caracteres: text.length });
+  res.json({ ok: true, transcript: text, draft: r.draft, warnings: r.warnings });
+}));
+
+router.post('/tarefas', requirePerm('tasks.write'), wrap(async (req, res) => {
+  const { values, error } = tasks.parse(req.body);
+  if (error) { if (wantsJson(req)) return res.status(422).json({ ok: false, error }); await req.flash('error', error); return res.redirect(backTo(req, '/tarefas')); }
+  let assignee = isUuid(req.body.assignee_id) ? req.body.assignee_id : null;
+  if (assignee && assignee !== req.user.id && !can(req.user, 'tasks.write')) assignee = null;
+  // tarefa solta: do projeto escolhido no menu; em "Todos os projetos", a do campo Projeto, que começa em Geral (sem projeto)
+  values.project_id = require('../services/scope').target(req, req.body);
+  if (req.scope.multi && !req.scope.current && !req.scope.ids.includes(Number(req.body.project_id))) values.project_id = null;
+  const task = await tasks.create({ values, user: req.user, assigneeId: assignee, links: await readLinks(req.body) });
+  await attachments.link(attachmentIdsOf(values, req.body), 'task', task.id, req.user);
+  // nasceu de uma mensagem do chat: guarda o link de volta (só se quem cria vê a mensagem) e a mensagem mostra "TAREFA · …"
+  const chat = require('../services/chat');
+  if (isIntId(req.body.source_message_id) && await chat.canSeeMessage(req.user.id, req.body.source_message_id)) {
+    await db.query('UPDATE tasks SET source_message_id = $2, source_scope = $3 WHERE id = $1', [task.id, Number(req.body.source_message_id), req.body.source_scope === 'thread' ? 'thread' : 'mensagem']);
+    await chat.noteTask(Number(req.body.source_message_id));
+  }
+  await audit(req, 'tarefa.criada', 'task', task.id, { titulo: task.title });
+  // "Repetir": esta é a primeira; a rotina cria as próximas (fica em Gestão > Rotinas)
+  const repeat = await require('../services/recurring').fromTask(task, String(req.body.repete || ''), req.user);
+  if (wantsJson(req)) return res.json({ ok: true, task });
+  await req.flash('ok', repeat ? `Tarefa criada. ${require('../services/recurring').describe(repeat)}, ela aparece de novo.` : 'Tarefa criada.');
+  res.redirect(backTo(req, `/tarefas/${task.id}`));
+}));
+
+router.get('/tarefas/:id', requirePerm('tasks.read'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const task = await taskFor(req);
+  if (!task) return notFound(res);
+  const [opts, thread, files] = await Promise.all([linkOptions(req), comments.list('task', task.id), attachments.forEntity('task', task.id)]);
+  const origin = task.source_message_id ? await require('../services/chat').taskOrigin(task.source_message_id, req.user.id) : null;
+  res.render('tasks/show', { title: task.title, task, origin, ...opts, comments: thread, docs: files.filter((a) => a.kind === 'file'), C, isoOf, editable: tasks.canEdit(req.user, task), today: tasks.todayISO(), lateOf: (t) => tasks.isLate(t), repeat: await repeatOf(task, req.user) });
+}));
+
+// A tarefa nasceu de uma rotina que se repete (ativa): a frase e se quem vê pode parar (quem criou a repetição ou a gestão das rotinas).
+async function repeatOf(task, user) {
+  if (!task.routine_id) return null;
+  const { rows: [r] } = await db.query("SELECT * FROM task_routines WHERE id = $1 AND trigger = 'recorrente' AND active", [task.routine_id]);
+  if (!r) return null;
+  return { text: require('../services/recurring').describe(r), canStop: can(user, 'routines.manage') || String(r.created_by || '') === String(user.id) };
+}
+
+router.post('/tarefas/:id/parar-de-repetir', requirePerm('tasks.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const task = await taskFor(req);
+  if (!task) return notFound(res);
+  const rep = await repeatOf(task, req.user);
+  if (!rep || !rep.canStop) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem criou a repetição ou a gestão das rotinas pode parar.' });
+  await db.query('UPDATE task_routines SET active = false, updated_at = now() WHERE id = $1', [task.routine_id]);
+  await audit(req, 'rotina.parada', 'routine', task.routine_id, { tarefa: task.id });
+  await req.flash('ok', 'Não repete mais. Esta tarefa continua.');
+  return res.redirect(`/tarefas/${task.id}`);
+}));
+
+router.post('/tarefas/:id', requirePerm('tasks.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const task = await taskFor(req);
+  if (!task) return notFound(res);
+  if (!tasks.canEdit(req.user, task)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Você só altera tarefas que criou ou que são suas.' });
+  const { values, error } = tasks.parse({ ...task, due_on: isoOf(task.due_on) || '', due_time: task.due_time || '', ...req.body });
+  if (error) { await req.flash('error', error); return res.redirect(`/tarefas/${task.id}`); }
+  const links = await readLinks(req.body);
+  const before = await recordChanges.snapshot('task', task.id);
+  const result = await tasks.update(task, values, req.user, { assigneeId: req.body.assignee_id !== undefined ? (isUuid(req.body.assignee_id) ? req.body.assignee_id : null) : undefined });
+  if (result.error) { await req.flash('error', result.error); return res.redirect(`/tarefas/${task.id}`); }
+  await attachments.link(attachmentIdsOf(values, req.body), 'task', task.id, req.user);
+  if (req.body.episode_id !== undefined) await db.query('UPDATE tasks SET episode_id = $2, guest_id = $3, sponsor_id = $4 WHERE id = $1', [task.id, links.episodeId || null, links.guestId || null, links.sponsorId || null]);
+  await recordChanges.updated({ type: 'task', before, actor: req.user });
+  await req.flash('ok', 'Tarefa salva.');
+  res.redirect(backTo(req, `/tarefas/${task.id}`));
+}));
+
+// Mudança rápida de status (quadro e lista). Bloqueada exige motivo.
+router.post('/tarefas/:id/status', requirePerm('tasks.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return res.status(404).json({ ok: false });
+  const task = await tasks.get(req.params.id);
+  if (!task) return res.status(404).json({ ok: false, error: 'Tarefa não encontrada.' });
+  if (!tasks.canEdit(req.user, task)) return res.status(403).json({ ok: false, error: 'Você só altera tarefas que criou ou que são suas.' });
+  const status = String(req.body.status || '');
+  if (!tasks.STATUSES.includes(status)) return res.status(400).json({ ok: false, error: 'Status inválido.' });
+  const reason = String(req.body.block_reason || '').trim().slice(0, 500);
+  if (status === 'bloqueada' && !reason) return res.status(422).json({ ok: false, error: 'Diga o motivo do bloqueio.' });
+  const result = await tasks.update(task, { status, block_reason: status === 'bloqueada' ? reason : null }, req.user);
+  if (result.error) return res.status(result.status || 422).json({ ok: false, error: result.error });
+  if (task.episode_id && result.task.status !== task.status) await require('../services/production').addEvent(task.episode_id, req.user.id, 'tarefa', `${task.title}: ${C.TASK_STATUSES[status]}`);
+  if (wantsJson(req)) return res.json({ ok: true, task: result.task });
+  res.redirect(backTo(req, `/tarefas/${task.id}`));
+}));
+
+router.post('/tarefas/:id/excluir', requirePerm('tasks.write'), wrap(async (req, res) => {
+  if (!isIntId(req.params.id)) return notFound(res);
+  const task = await taskFor(req);
+  if (!task) return notFound(res);
+  if (!can(req.user, 'tasks.manage') && String(task.created_by) !== String(req.user.id)) return res.status(403).render('error', { title: 'Sem permissão', message: 'Só quem criou (ou a gestão) apaga a tarefa.' });
+  const gone = await recordChanges.snapshot('task', task.id);
+  const t = await require('../services/trash').remove('task', task.id, { user: req.user }); // leva os comentários e anexos junto
+  await recordChanges.deleted({ type: 'task', row: gone, actor: req.user });
+  await audit(req, 'tarefa.excluida', 'task', task.id, { titulo: task.title });
+  if (t && !wantsJson(req)) await req.flash('ok', 'Tarefa na lixeira.', { undo: t.batch });
+  res.redirect(backTo(req, '/tarefas'));
+}));
+
+module.exports = router;

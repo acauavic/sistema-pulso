@@ -38,24 +38,32 @@ function clearCookie(res) {
 }
 
 // Resolve o usuário da sessão. Desativado/sem senha = sem sessão.
-async function loadSession(req) {
+// Sessão em uso se renova (com `res`): passada a metade do prazo, ganha mais `sessionDays`. Quem usa o app instalado
+// no celular todo dia não cai no login; sessão parada por `sessionDays` expira como antes.
+async function loadSession(req, res = null) {
   const token = parseCookies(req.headers.cookie)[COOKIE];
   if (!token) return null;
   const tokenHash = sha256(token);
+  const maxAge = config.sessionDays * 86400;
   const { rows } = await db.query(
-    `SELECT s.token_hash, s.flash,
-            u.id, u.name, u.email, u.role, u.active
+    `SELECT s.token_hash, s.flash, s.expires_at < now() + ($2 || ' seconds')::interval AS renew,
+            u.id, u.name, u.email, u.role, u.role_id, u.active, u.prefs, u.house,
+            (u.access_until IS NOT NULL AND u.access_until < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS expired
        FROM sessions s JOIN users u ON u.id = s.user_id
-      WHERE s.token_hash = $1 AND s.expires_at > now()`,
-    [tokenHash],
+      WHERE s.token_hash = $1 AND s.expires_at > now() AND s.created_at > now() - interval '90 days'`, // prazo máximo: entra de novo a cada 90 dias
+    [tokenHash, String(Math.floor(maxAge / 2))],
   );
   const row = rows[0];
-  if (!row || !row.active) return null;
+  if (!row || !row.active || row.expired) return null; // acesso com data de fim: depois dela, a sessão não vale
+  if (row.renew && res) {
+    await db.query("UPDATE sessions SET expires_at = now() + ($2 || ' seconds')::interval WHERE token_hash = $1", [tokenHash, String(maxAge)]);
+    res.append('Set-Cookie', `${COOKIE}=${encodeURIComponent(token)}; Max-Age=${maxAge}; ${cookieOptions()}`);
+  }
   return {
     tokenHash: row.token_hash,
     flash: row.flash,
     csrf: crypto.createHmac('sha256', config.sessionSecret).update(row.token_hash).digest('hex'),
-    user: { id: row.id, name: row.name, email: row.email, role: row.role },
+    user: { id: row.id, name: row.name, email: row.email, role: row.role, role_id: row.role_id, house: row.house, prefs: row.prefs || {} },
   };
 }
 
@@ -67,8 +75,8 @@ async function destroyUserSessions(userId, exceptHash = null) {
   await db.query('DELETE FROM sessions WHERE user_id = $1 AND token_hash IS DISTINCT FROM $2', [userId, exceptHash]);
 }
 
-async function setFlash(tokenHash, type, message) {
-  await db.query('UPDATE sessions SET flash = $2 WHERE token_hash = $1', [tokenHash, JSON.stringify({ type, message })]);
+async function setFlash(tokenHash, type, message, extra = null) {
+  await db.query('UPDATE sessions SET flash = $2 WHERE token_hash = $1', [tokenHash, JSON.stringify({ type, message, ...(extra || {}) })]);
 }
 
 async function clearFlash(tokenHash) {

@@ -1,0 +1,19 @@
+<%# Campo Projeto, o primeiro do formulário de criação: só aparece para quem participa de mais de um projeto e está em
+    "Todos os projetos". Com um projeto escolhido no menu (ou um projeto só), o item nasce nele e nada aparece.
+    Variáveis: value (id já escolhido, ao voltar de um erro); general: true mostra a opção "Geral" (tarefa sem projeto), já marcada;
+    hint: frase curta embaixo (opcional); only: ids aceitos (os outros projetos não aparecem; sobrando um, ele vai escondido). %>
+<% if (projectScope && projectScope.multi && !projectScope.current) {
+     var _pv = typeof value !== 'undefined' && value != null ? String(value) : '';
+     var _general = typeof general !== 'undefined' && general;
+     var _hint = typeof hint !== 'undefined' ? hint : '';
+     var _list = typeof only !== 'undefined' && only ? projectScope.projects.filter(function (p) { return only.indexOf(p.id) >= 0; }) : projectScope.projects; %>
+<% if (_list.length === 1 && !_general) { %><input type="hidden" name="project_id" value="<%= _list[0].id %>"><% } else { %>
+<div class="project-field">
+  <fieldset class="seg-radio"><legend>Projeto<%= _general ? '' : ' *' %></legend>
+    <% if (_general) { %><label><input type="radio" name="project_id" value=""<%= _pv === '' ? ' checked' : '' %>><span>Geral</span></label><% } %>
+    <% _list.forEach(function (p) { %><label><input type="radio" name="project_id" value="<%= p.id %>"<%= _pv === String(p.id) ? ' checked' : '' %><%= _general ? '' : ' required' %>><span><%= p.name %></span></label><% }) %>
+  </fieldset>
+  <% if (_hint) { %><p class="small muted m-0"><%= _hint %></p><% } %>
+</div>
+<% } %>
+<% } %>

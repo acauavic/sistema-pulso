@@ -1,0 +1,4 @@
+<%# O que a pessoa vive na gravação (topo das páginas da plateia). Variáveis: benefits ([ícone, título, texto]), icon. %>
+<ul class="pl-benefits">
+  <% benefits.forEach(function (b) { %><li><%- icon(b[0], 18) %><span><strong><%= b[1] %></strong> <%= b[2] %></span></li><% }) %>
+</ul>

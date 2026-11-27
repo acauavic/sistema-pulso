@@ -1,0 +1,24 @@
+<%
+  // Navegação do dia (setas, calendário e "Hoje") do Resumo do dia e do Seu dia. Para a produtora, também a troca entre o Seu dia e
+  // o resumo da equipe (?visao=equipe), que segue junto ao trocar de dia. Variáveis: day; locals.isProducer, locals.visao.
+  // Em outra página (Números dos comentários): locals.dayBase (o endereço) e locals.dayHash (a âncora).
+  var base = locals.dayBase || '/', hash = locals.dayHash === undefined ? '#resumo' : locals.dayHash;
+  var team = !locals.dayBase && locals.isProducer && locals.visao === 'equipe';
+  var go = function (d, v) { return base + '?dia=' + d + ((v === undefined ? team : v === 'equipe') ? '&visao=equipe' : '') + hash; };
+%>
+<div class="day-head-r">
+  <% if (locals.isProducer && !locals.dayBase) { %>
+  <div class="seg" role="group" aria-label="De quem são os números">
+    <a class="<%= team ? '' : 'on' %>" href="<%= go(day.day, 'meu') %>"<%- team ? '' : ' aria-current="true"' %>>Seu dia</a>
+    <a class="<%= team ? 'on' : '' %>" href="<%= go(day.day, 'equipe') %>"<%- team ? ' aria-current="true"' : '' %>>Equipe</a>
+  </div>
+  <% } %>
+  <form class="day-nav" method="get" action="<%= base + hash %>">
+    <% if (team) { %><input type="hidden" name="visao" value="equipe"><% } %>
+    <% if (day.prev) { %><a class="btn sm" href="<%= go(day.prev) %>" aria-label="Dia anterior"><%- icon('chevron-left') %></a><% } else { %><span class="btn sm" aria-disabled="true"><%- icon('chevron-left') %></span><% } %>
+    <label class="sr-only" for="dia-escolha">Escolher o dia</label>
+    <input type="date" id="dia-escolha" name="dia" value="<%= day.day %>" min="<%= day.min %>" max="<%= day.today %>" data-day-pick>
+    <% if (day.next) { %><a class="btn sm" href="<%= go(day.next) %>" aria-label="Próximo dia"><%- icon('chevron-right') %></a><% } else { %><span class="btn sm" aria-disabled="true"><%- icon('chevron-right') %></span><% } %>
+    <% if (!day.isToday) { %><a class="btn sm ghost" href="<%= team ? '/?visao=equipe#resumo' : base + hash %>">Hoje</a><% } %>
+  </form>
+</div>

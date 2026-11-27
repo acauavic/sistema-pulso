@@ -1,0 +1,32 @@
+<%#
+  Boas-vindas à nova versão (v2): aparece uma vez por pessoa, na primeira tela depois da atualização, no lugar do aviso
+  "Sistema atualizado". A abertura é o Sinal subindo barra a barra, o monograma e as frases entrando em sequência
+  (parado com movimento reduzido). "Começar" marca a versão como vista; "Ver tudo o que mudou" abre as Novidades.
+  Sem script, os botões são formulário e link comuns.
+%>
+<% var first = fmt.firstName(currentUser.name); %>
+<div class="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-h" aria-describedby="welcome-lede" data-welcome>
+  <div class="welcome-card">
+    <div class="welcome-mark" aria-hidden="true">
+      <svg class="welcome-signal" viewBox="0 0 34 30" focusable="false"><rect class="s1" x="0" y="11" width="6" height="8"/><rect class="s2" x="9" y="7.5" width="6" height="15"/><rect class="s3" x="18" y="4" width="6" height="22"/><rect class="s4" x="27" y="0.5" width="6" height="29"/></svg>
+      <img class="welcome-st" src="/static/favicon.svg?v=<%= assetV %>" alt="" width="56" height="56">
+    </div>
+    <span class="kicker welcome-kicker">Health Scale Studio · v<%= appVersion %></span>
+    <h1 class="welcome-h" id="welcome-h"><span class="welcome-voice">Boas-vindas,</span> <%= first %>.</h1>
+    <p class="welcome-lede" id="welcome-lede">Esta é a nova versão do Health Scale Studio: a casa de todos os projetos, num lugar só. As telas que você usa continuam onde estavam.</p>
+    <ul class="welcome-list">
+      <li><%- icon('layers', 18) %><span><strong>Projetos lado a lado.</strong> Pulso e Projeto 100 no mesmo sistema; o seletor fica no topo do menu.</span></li>
+      <li><%- icon('link', 18) %><span><strong>Aprovação por link.</strong> Quem aprova pauta, roteiro e vídeo responde pelo celular, sem login.</span></li>
+      <li><%- icon('calendar', 18) %><span><strong>Sessões de gravação.</strong> A fila do dia, com o roteiro aprovado para ler.</span></li>
+      <li><%- icon('smartphone', 18) %><span><strong>Endereço novo.</strong> studio.healthscale.com.br. Quem usa o app no celular instala de novo e liga os alertas.</span></li>
+    </ul>
+    <div class="welcome-actions">
+      <form method="post" action="/novidades/visto" data-welcome-form>
+        <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= currentPath %>">
+        <button class="btn primary lg" type="submit" data-welcome-start>Começar</button>
+      </form>
+      <a class="link" href="/novidades">Ver tudo o que mudou</a>
+    </div>
+  </div>
+</div>
+<script src="/static/welcome.js?v=<%= assetV %>" defer></script>

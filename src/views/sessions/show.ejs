@@ -1,0 +1,209 @@
+<%- include('../partials/head') %>
+<%#
+  A sessão de gravação. Jornada: antes do dia, a produção escolhe e ordena os vídeos (e vê se o estúdio está livre); no dia,
+  pelo celular, a página é a fila: cada vídeo com o roteiro aprovado para ler, a anotação e "Gravado"; no fim, "Encerrar
+  sessão" com a duração real. Depois, o link do estúdio e a distribuição do material entre os vídeos.
+%>
+<%
+  var d = new Date(s.starts_at);
+  var when = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' }).replace(/^./, function (c) { return c.toUpperCase(); }) + ' · ' + d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+  var planned = s.status === 'planejada';
+  var done = videos.filter(function (v) { return v.status !== 'pre_producao'; });
+  var allDone = videos.length && done.length === videos.length;
+  var firstOpen = (videos.find(function (v) { return v.status === 'pre_producao'; }) || {}).id; /* o lime da fila: o próximo a gravar */
+  var stateChip = function (st) { var P = { aprovada: ['aprovado', 'b-green'], aprovacao: ['em aprovação', 'b-st-agendado'], ajustes: ['com ajustes', 'b-amber'], elaboracao: ['em elaboração', 'b-gray'] }; return P[st] || ['sem roteiro', 'b-amber']; };
+  var hm = function (m) { return { h: Math.floor((m || 0) / 60), m: (m || 0) % 60 }; };
+  var plannedHm = hm(s.planned_minutes); var actualHm = hm(s.actual_minutes || s.planned_minutes);
+  var inputValue = fmt.toInputValue(s.starts_at);
+%>
+<div class="page-head">
+  <div>
+    <span class="kicker">Sessão de gravação <%- include('../partials/project-tag', { id: s.project_id }) %></span>
+    <h1 class="sess-when"><%= when %></h1>
+    <p class="mono small muted m-0"><%= s.place || 'local a definir' %> · <%= S.fmtMinutes(s.actual_minutes || s.planned_minutes) %><%= s.actual_minutes ? ' de estúdio' : ' previstas' %> · <%= videos.length %> vídeo<%= videos.length === 1 ? '' : 's' %> <span class="badge <%= S.STATUS[s.status].badge %>"><%= S.STATUS[s.status].label %></span></p>
+  </div>
+  <div class="row">
+    <a class="btn ghost" href="/sessoes"><%- icon('arrow-left') %> Sessões</a>
+    <% if (manage && planned) { %>
+      <button class="btn" type="button" data-modal-open="modal-sess-editar"><%- icon('pencil') %> Editar</button>
+      <details class="row-menu">
+        <summary class="icon-btn" aria-label="Mais ações"><%- icon('ellipsis') %></summary>
+        <div class="row-menu-list">
+          <form method="post" action="/sessoes/<%= s.id %>/cancelar" data-confirm="Cancelar a sessão? Os vídeos continuam na pré-produção.">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><button type="submit" class="link small danger-link">cancelar a sessão</button>
+          </form>
+        </div>
+      </details>
+    <% } %>
+  </div>
+</div>
+
+<% if (s.notes) { %><p class="notice"><%- icon('info', 14) %> <%= s.notes %></p><% } %>
+<% conflicts.forEach(function (c) { %>
+<p class="notice"><%- icon('calendar', 14) %> Estúdio ocupado no mesmo horário: <% if (c.url) { %><a href="<%= c.url %>"><%= c.label %></a><% } else { %><%= c.label %><% } %> · <span class="mono"><%= fmt.formatDateTime(c.at) %></span> <%- include('../partials/project-tag', { id: c.projectId }) %></p>
+<% }) %>
+<% var semRoteiro = planned ? videos.filter(function (v) { return v.status === 'pre_producao' && v.roteiro_state !== 'aprovada' && v.pauta_state !== 'aprovada'; }) : []; %>
+<% if (semRoteiro.length) { %><p class="notice"><%- icon('file-text', 14) %> <span class="mono"><%= semRoteiro.length %></span> vídeo<%= semRoteiro.length === 1 ? '' : 's' %> sem pauta nem roteiro aprovado. Dá para gravar assim mesmo.</p><% } %>
+
+<section class="card" id="fila">
+  <div class="row spread">
+    <h2 class="m-0">Fila de gravação <span class="mono muted small"><%= done.length %> de <%= videos.length %> gravados</span></h2>
+    <% if (manage && planned) { %><button class="btn sm <%= videos.length ? 'ghost' : 'primary' %>" type="button" data-modal-open="modal-sess-videos"><%- icon('list') %> Escolher vídeos</button><% } %>
+  </div>
+  <% if (!videos.length) { %>
+    <div class="empty"><%- include('../partials/signal') %><strong>Nenhum vídeo na sessão</strong><p class="muted m-0">Escolha os vídeos em Pré-produção que vão ser gravados nesta ida ao estúdio.</p></div>
+  <% } %>
+  <ol class="sess-list">
+    <% videos.forEach(function (v, i) { var rec = v.status !== 'pre_producao'; var chip = stateChip(v.roteiro_state || v.pauta_state);
+         var script = v.roteiro_html || v.roteiro_body || v.roteiro_link ? { html: v.roteiro_html, body: v.roteiro_body, link: v.roteiro_link, kind: 'Roteiro' } : (v.pauta_html || v.pauta_body || v.pauta_link ? { html: v.pauta_html, body: v.pauta_body, link: v.pauta_link, kind: 'Pauta' } : null); %>
+    <li class="sess-item <%= rec ? 'is-done' : '' %>" id="v-<%= v.id %>">
+      <span class="sess-pos mono"><%= i + 1 %></span>
+      <div class="sess-body">
+        <div class="sess-head">
+          <a class="sess-name" href="/episodios/<%= v.id %>"><%= videoNo(v.number, v.project_id) %> · <%= v.title %></a>
+          <span class="badge <%= rec ? 'b-st-gravado' : chip[1] %>"><%= rec ? 'gravado' : chip[0] %></span>
+          <% if (rec && v.recording_minutes) { %><span class="mono small muted"><%= v.recording_minutes %> min de estúdio</span><% } %>
+        </div>
+        <% if (script) { %>
+        <details class="sess-script" <%= !rec && v.id === firstOpen ? 'open' : '' %>>
+          <summary class="small"><%- icon('file-text', 14) %> <%= script.kind %> para ler</summary>
+          <% if (script.link) { %><p><a href="<%= script.link %>" target="_blank" rel="noopener"><%= script.link.replace(/^https?:\/\//, '') %></a></p><% } else { %>
+          <div class="rich-content sess-read"><%- fmt.richHtml(script.html, script.body) %></div><% } %>
+        </details>
+        <% } %>
+        <% if (v.session_note && !(manage && planned)) { %><p class="small muted m-0"><%- icon('message-square', 12) %> <%= v.session_note %></p><% } %>
+        <% if (manage && s.status !== 'cancelada') { %>
+        <form method="post" action="/sessoes/<%= s.id %>/videos/<%= v.id %>/nota" class="sess-note">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="text" name="note" maxlength="500" value="<%= v.session_note || '' %>" placeholder="Anotação (ex.: take 3 é o bom)" aria-label="Anotação do vídeo <%= i + 1 %>">
+          <button class="btn sm ghost" type="submit">Salvar</button>
+        </form>
+        <% } %>
+      </div>
+      <div class="sess-acts">
+        <% if (manage && planned && !rec) { %>
+        <form method="post" action="/sessoes/<%= s.id %>/videos/<%= v.id %>/gravado" data-busy="Marcando…">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm <%= v.id === firstOpen ? 'primary' : '' %>" type="submit"><%- icon('check', 14) %> Gravado</button>
+        </form>
+        <details class="row-menu">
+          <summary class="icon-btn" aria-label="Mais ações do vídeo <%= i + 1 %>"><%- icon('ellipsis') %></summary>
+          <div class="row-menu-list">
+            <% if (i > 0) { %><form method="post" action="/sessoes/<%= s.id %>/videos/<%= v.id %>/mover"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="dir" value="up"><button class="link small" type="submit">subir na fila</button></form><% } %>
+            <% if (i < videos.length - 1) { %><form method="post" action="/sessoes/<%= s.id %>/videos/<%= v.id %>/mover"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="dir" value="down"><button class="link small" type="submit">descer na fila</button></form><% } %>
+            <form method="post" action="/sessoes/<%= s.id %>/videos/<%= v.id %>/tirar" data-confirm="Tirar este vídeo da sessão? Ele continua na pré-produção."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">tirar da sessão</button></form>
+          </div>
+        </details>
+        <% } %>
+      </div>
+    </li>
+    <% }) %>
+  </ol>
+  <% if (manage && planned && videos.length) { %>
+  <div class="sess-close">
+    <p class="small muted m-0">Acabou? Encerre com a duração real: as horas do estúdio são divididas entre os vídeos gravados<%= done.length ? ' (' + done.length + ' até agora)' : '' %>, e o link do estúdio fica pronto para o material.</p>
+    <button class="btn <%= allDone ? 'primary' : '' %>" type="button" data-modal-open="modal-sess-encerrar"><%- icon('clock') %> Encerrar sessão</button>
+  </div>
+  <% } %>
+</section>
+
+<% if (s.status === 'encerrada') { %>
+<section class="card" id="material">
+  <div class="row spread">
+    <h2 class="m-0">Estúdio e material</h2>
+    <% if (manage) { %><button class="btn sm ghost" type="button" data-modal-open="modal-sess-duracao"><%- icon('pencil', 14) %> Corrigir a duração</button><% } %>
+  </div>
+  <p class="small muted"><span class="mono"><%= S.fmtMinutes(s.actual_minutes) %></span> de estúdio para <span class="mono"><%= done.length %></span> vídeo<%= done.length === 1 ? '' : 's' %>: cada um leva a parte dele (está em cada vídeo, e no banco de horas).</p>
+  <% if (link) { %>
+  <div class="studio-link">
+    <p class="m-0"><strong>Link do estúdio da sessão</strong> <span class="mono small muted">um link para todo o material</span></p>
+    <p class="mono small m-0"><%= link.url %></p>
+    <div class="row"><button class="btn sm<%= pending.length ? '' : ' primary' %>" type="button" data-copy="<%= link.url %>"><%- icon('copy', 14) %> Copiar link</button></div>
+  </div>
+  <% } else if (manage) { %>
+  <form method="post" action="/sessoes/<%= s.id %>/link"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm" type="submit"><%- icon('link', 14) %> Gerar link do estúdio</button></form>
+  <% } %>
+  <% if (pending.length) { %>
+  <form method="post" action="/sessoes/<%= s.id %>/arquivos" class="stack top-gap">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h3 class="m-0">De qual vídeo é cada arquivo <span class="mono muted small"><%= pending.length %></span></h3>
+    <ul class="plain sess-files">
+      <% pending.forEach(function (f) { %>
+      <li>
+        <span class="mono small sess-file-name"><%= f.source_path || f.filename %></span>
+        <span class="mono small muted"><%= fmt.formatBytes(f.size_bytes) %><%= f.status !== 'pronto' ? ' · enviando' : '' %></span>
+        <select name="arquivo_<%= f.id %>" aria-label="Vídeo do arquivo <%= f.filename %>" data-native>
+          <option value="">Escolha…</option>
+          <% videos.filter(function (v) { return v.status !== 'pre_producao'; }).forEach(function (v, i) { %><option value="<%= v.id %>"><%= i + 1 %> · <%= v.title %></option><% }) %>
+        </select>
+      </li>
+      <% }) %>
+    </ul>
+    <div class="row"><button class="btn primary" type="submit">Mandar para os vídeos</button></div>
+  </form>
+  <% } %>
+</section>
+<% } %>
+
+<% if (manage && planned) { %>
+<dialog class="modal" id="modal-sess-editar" aria-labelledby="sess-editar-h">
+  <form method="post" action="/sessoes/<%= s.id %>" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="sess-editar-h">Editar a sessão</h2>
+    <label>Dia e hora *<input type="datetime-local" name="starts_at" value="<%= inputValue %>" required></label>
+    <div class="grid-2">
+      <label>Duração prevista (horas) *<input type="number" name="horas" min="0" max="24" step="1" value="<%= plannedHm.h %>" required></label>
+      <label>e minutos<input type="number" name="minutos" min="0" max="59" step="5" value="<%= plannedHm.m %>"></label>
+    </div>
+    <label>Local<input type="text" name="place" maxlength="160" value="<%= s.place || '' %>"></label>
+    <label>Observação<textarea name="notes" rows="2" maxlength="1000"><%= s.notes || '' %></textarea></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="modal-sess-videos" aria-labelledby="sess-videos-h" <%= abrir === 'videos' ? 'data-open-on-load' : '' %>>
+  <form method="post" action="/sessoes/<%= s.id %>/videos" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="sess-videos-h">Vídeos da sessão</h2>
+    <p class="small muted m-0">Os que estão em Pré-produção. A ordem da fila é a da marcação; depois dá para subir e descer.</p>
+    <% if (!candidates.length && !videos.length) { %><p class="muted">Nenhum vídeo em Pré-produção neste projeto. Crie em <a href="/episodios">Vídeos</a> > Novo vídeo.</p><% } %>
+    <% if (candidates.length + done.length > 8) { %><div class="row list-filter"><input type="search" placeholder="Buscar pelo título ou número" aria-label="Buscar vídeo" data-list-filter="#sess-cands" data-list-item="label" autocomplete="off"><span class="mono small muted list-filter-count" data-list-filter-count></span></div><% } %>
+    <div class="check-list" id="sess-cands">
+      <% done.forEach(function (v) { %><label class="check-row"><input type="checkbox" name="video" value="<%= v.id %>" checked disabled> <%= videoNo(v.number, v.project_id) %> · <%= v.title %> <span class="mono small muted">gravado</span></label><% }) %>
+      <% candidates.forEach(function (c) { var inSession = videos.some(function (v) { return v.id === c.id; }); %>
+      <label class="check-row"><input type="checkbox" name="video" value="<%= c.id %>" <%= inSession ? 'checked' : '' %>> <%= videoNo(c.number, s.project_id) %> · <%= c.title %>
+        <% if (c.roteiro_state === 'aprovada' || c.pauta_state === 'aprovada') { %><span class="mono small muted">roteiro aprovado</span><% } else { %><span class="mono small warn">sem roteiro aprovado</span><% } %></label>
+      <% }) %>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar a fila</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="modal-sess-encerrar" aria-labelledby="sess-encerrar-h">
+  <form method="post" action="/sessoes/<%= s.id %>/encerrar" class="stack" data-busy="Encerrando…">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="sess-encerrar-h">Encerrar a sessão</h2>
+    <p class="small muted m-0">Quanto tempo de estúdio a sessão usou de verdade. Ele é dividido entre os <span class="mono"><%= done.length %></span> vídeos marcados como gravados<% if (done.length < videos.length) { %>; os outros <span class="mono"><%= videos.length - done.length %></span> voltam para a pré-produção, sem sessão<% } %>.</p>
+    <div class="grid-2">
+      <label>Horas *<input type="number" name="horas" min="0" max="24" step="1" value="<%= actualHm.h %>" required></label>
+      <label>e minutos<input type="number" name="minutos" min="0" max="59" step="1" value="<%= actualHm.m %>"></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Encerrar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<% if (manage && s.status === 'encerrada') { %>
+<dialog class="modal" id="modal-sess-duracao" aria-labelledby="sess-duracao-h">
+  <form method="post" action="/sessoes/<%= s.id %>/duracao" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="sess-duracao-h">Corrigir a duração</h2>
+    <p class="small muted m-0">O estúdio de cada vídeo e o banco de horas são refeitos com a duração nova.</p>
+    <div class="grid-2">
+      <label>Horas *<input type="number" name="horas" min="0" max="24" step="1" value="<%= actualHm.h %>" required></label>
+      <label>e minutos<input type="number" name="minutos" min="0" max="59" step="1" value="<%= actualHm.m %>"></label>
+    </div>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<%- include('../partials/foot') %>

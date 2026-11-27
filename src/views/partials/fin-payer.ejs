@@ -1,0 +1,13 @@
+<%#
+  Quem pagou / quem recebeu, só em projeto com acordo de parceria (Projeto 100): a casa ou uma pessoa do parceiro (do bolso dele).
+  Lê locals.partnerPeople ([{ projectId, projectName, people }]); sem parceria no recorte, não aparece nada.
+%>
+<% var pp = (typeof locals !== 'undefined' && locals.partnerPeople) || []; if (pp.length) { %>
+<label><% if (typeof payerLabel !== 'undefined' && payerLabel) { %><%= payerLabel %><% } else { %><span data-when="direction=saida">Quem pagou</span><span data-when="direction=entrada">Quem recebeu</span><% } %>
+  <select name="pago_por" data-native>
+    <option value="casa">A casa</option>
+    <% pp.forEach(function (p) { %><optgroup label="Parceiro do <%= p.projectName %>"><% p.people.forEach(function (n) { %><option value="parceiro:<%= n %>"><%= n %> (do bolso)</option><% }) %></optgroup><% }) %>
+  </select>
+  <small class="muted">O que o parceiro paga do bolso não sai do caixa da casa: entra no custo do projeto e volta para ele no acerto.</small>
+</label>
+<% } %>

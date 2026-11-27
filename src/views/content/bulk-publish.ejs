@@ -1,0 +1,95 @@
+<%- include('../partials/head') %>
+<%
+  var ig = platforms.indexOf('instagram') >= 0;
+  var trials = rows.filter(function (r) { return r.trial; }).length;
+  var dayOf = function (r) { return fmt.formatDateTime(r.at).slice(0, 5); };
+  var backHref = '/conteudo?vista=cortes' + (episodio ? '&episodio=' + episodio : '');
+  var isWeek = typeof week !== 'undefined' && week;
+  var br = function (ymd) { return String(ymd || '').split('-').reverse().slice(0, 2).join('/'); };
+%>
+<div class="page-head">
+  <% if (isWeek) { %>
+  <div><span class="kicker">Conteúdo · agenda da semana</span><h1>Semana de <span class="mono"><%= br(opts.start) %></span> a <span class="mono"><%= br(weekEnd) %></span></h1></div>
+  <div class="row"><button class="btn" type="button" data-modal-open="modal-semana"><%- icon('sliders-horizontal') %> Ajustar</button><a class="btn ghost" href="<%= backHref %>"><%- icon('arrow-left') %> Voltar aos cortes</a></div>
+  <% } else { %>
+  <div><span class="kicker">Conteúdo · publicar em massa</span><h1>Agenda de <span class="mono"><%= rows.length %></span> <%= rows.length === 1 ? 'corte' : 'cortes' %></h1></div>
+  <div class="row"><a class="btn ghost" href="<%= backHref %>"><%- icon('arrow-left') %> Voltar aos cortes</a></div>
+  <% } %>
+</div>
+<% if (isWeek) { %>
+<dialog class="modal modal-wide" id="modal-semana" aria-labelledby="msem-h"<%= openSettings ? ' data-open-on-load' : '' %>>
+  <form method="post" action="/conteudo/semana/ajustes" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="msem-h">Como a semana é montada</h2>
+    <p class="small muted">Fica guardado: toda segunda de manhã chega o aviso com a agenda pronta, já com estas escolhas.</p>
+    <fieldset class="channels"><legend>Redes</legend>
+      <% Object.keys(uploadPost.PLATFORMS).filter(function (k) { return uploadPost.PLATFORMS[k].clip; }).forEach(function (k) { %>
+      <label class="check"><input type="checkbox" name="platforms" value="<%= k %>" <%= pilot.platforms.indexOf(k) >= 0 ? 'checked' : '' %>> <%= uploadPost.PLATFORMS[k].clipLabel || uploadPost.PLATFORMS[k].label %></label>
+      <% }) %>
+    </fieldset>
+    <div class="grid-3">
+      <label>Por dia<input type="number" name="por_dia" min="1" max="24" value="<%= pilot.perDay %>" class="num-input" required></label>
+      <label>Das<input type="time" name="de" value="<%= pilot.from %>" step="300" required></label>
+      <label>Até<input type="time" name="ate" value="<%= pilot.to %>" step="300" required></label>
+    </div>
+    <div class="grid-2">
+      <label>Reel de teste por dia <small class="muted">(Instagram)</small><input type="number" name="teste_por_dia" min="0" max="24" value="<%= pilot.trialPerDay %>" class="num-input"></label>
+      <label>Reel de teste libera
+        <select name="teste_modo"><option value="auto" <%= pilot.trialMode === 'auto' ? 'selected' : '' %>>Sozinho, se for bem</option><option value="manual" <%= pilot.trialMode === 'manual' ? 'selected' : '' %>>Eu libero no app</option></select>
+      </label>
+    </div>
+    <%- include('../partials/auto-fields', { auto: autoDefaults, bulk: true }) %>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Salvar e remontar</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+<p class="lead">
+  <%= platforms.map(labelOf).join(' · ') %>. <span class="mono"><%= opts.perDay %></span> por dia, das <span class="mono"><%= hhmm(opts.from) %></span> às <span class="mono"><%= hhmm(opts.to) %></span>, a partir de <span class="mono"><%= opts.start.split('-').reverse().join('/') %></span><%= days.length > 1 ? ', em ' + days.length + ' dias' : '' %>.
+  <% if (auto) { %>Automação no Instagram: quem comentar a palavra recebe o link no direct por <span class="mono"><%= auto.days %></span> dias.<% } %>
+    <% if (ig && trials) { %><span class="mono"><%= trials %></span> <%= trials === 1 ? 'vai' : 'vão' %> ao Instagram como Reel de teste (<%= opts.trialMode === 'manual' ? 'você libera no app' : 'libera sozinho se for bem' %>).<% } %>
+</p>
+<% if (isWeek) { %><p class="small muted">Montada com os cortes prontos que ainda não saíram, um episódio de cada vez (o que foi ao ar mais recentemente primeiro). Confira, troque horários ou desmarque o Reel de teste e agende: nada sai sem você agendar.</p><% } %>
+
+<% if (skipped.length) { %>
+<div class="notice small">
+  <strong><%= skipped.length %> <%= skipped.length === 1 ? 'corte ficou' : 'cortes ficaram' %> de fora:</strong>
+  <%= skipped.slice(0, 6).map(function (s) { return (s.clip.post_title || s.clip.title) + ' (' + s.why + ')'; }).join('; ') %><%= skipped.length > 6 ? '…' : '' %>
+</div>
+<% } %>
+
+<% if (!rows.length) { %>
+<div class="empty top-gap"><%- include('../partials/signal') %><p><strong>Nada para agendar.</strong></p><p class="muted small">Os cortes marcados já saíram, estão na fila ou ainda não estão prontos.</p><p><a class="btn sm" href="<%= backHref %>">Voltar aos cortes</a></p></div>
+<% } else { %>
+<form method="post" action="/conteudo/em-massa/publicar" data-busy="Agendando…">
+  <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="episodio" value="<%= episodio %>"><input type="hidden" name="teste_modo" value="<%= opts.trialMode %>">
+  <% platforms.forEach(function (p) { %><input type="hidden" name="platforms" value="<%= p %>"><% }) %>
+  <% if (auto) { %><input type="hidden" name="auto_on" value="1"><input type="hidden" name="auto_palavra" value="<%= auto.keyword %>"><input type="hidden" name="auto_mensagem" value="<%= auto.message %>"><input type="hidden" name="auto_resposta" value="<%= auto.reply || '' %>"><input type="hidden" name="auto_dias" value="<%= auto.days %>"><% } %>
+  <% days.forEach(function (d) { var mine = rows.filter(function (r) { return dayOf(r) === d; }); %>
+  <section class="agenda-day">
+    <h2><span class="mono"><%= d %></span> <span class="small muted"><%= mine.length %> <%= mine.length === 1 ? 'post' : 'posts' %></span></h2>
+    <% mine.forEach(function (r) { var c = r.clip; %>
+    <div class="agenda-row">
+      <input type="hidden" name="ids" value="<%= c.id %>">
+      <label class="when"><span class="sr-only">Horário de <%= c.post_title || c.title %></span><input type="datetime-local" name="at_<%= c.id %>" value="<%= fmt.toInputValue(r.at) %>" step="300" required></label>
+      <% if (r.cover) { %><img src="/capas/<%= r.cover.id %>/imagem?v=<%= new Date(r.cover.updated_at).getTime() %>&w=640" alt="" loading="lazy"><% } else { %><span class="poster-empty"><%- icon('film', 16) %></span><% } %>
+      <div>
+        <a href="/cortes/<%= c.id %>" target="_blank" rel="noopener"><strong><%= c.post_title || c.title %></strong></a>
+        <p class="handle muted m-0"><%= c.ep_number ? videoNo(c.ep_number, c.project_id) + ' · ' : '' %><%= c.title %><%= c.duration_ms ? ' · ' + fmt.formatClock(c.duration_ms) : '' %><%= r.cover ? '' : ' · sem capa' %><%= auto ? ' · comente ' + keywordOf(c) : '' %></p>
+      </div>
+      <% if (ig) { %><label class="check small trial-cell"><input type="checkbox" name="teste_<%= c.id %>" value="1" <%= r.trial ? 'checked' : '' %>> Reel de teste</label><% } %>
+    </div>
+    <% }) %>
+  </section>
+  <% }) %>
+  <div class="stack sticky-actions">
+    <% if (review) { %>
+    <p class="small muted">Vai para a revisão da gestão; cada post sai no horário marcado depois de aprovado.</p>
+    <div class="row"><button class="btn primary" type="submit">Enviar <%= rows.length %> para revisão</button><a class="btn ghost" href="<%= backHref %>">Cancelar</a></div>
+    <% } else { %>
+    <label class="check"><input type="checkbox" name="confirmar" value="1" required> Entendi que isto agenda as publicações nas redes escolhidas.</label>
+    <div class="row"><button class="btn primary" type="submit">Agendar <%= rows.length %> <%= rows.length === 1 ? 'publicação' : 'publicações' %></button><a class="btn ghost" href="<%= backHref %>">Cancelar</a></div>
+    <% } %>
+  </div>
+</form>
+<% } %>
+<%- include('../partials/foot') %>

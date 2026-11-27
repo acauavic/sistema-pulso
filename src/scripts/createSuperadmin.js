@@ -30,6 +30,7 @@ async function main() {
      ON CONFLICT (lower(email)) DO UPDATE
        SET role = 'superadmin', active = true, password_hash = COALESCE($3, users.password_hash), updated_at = now()
      RETURNING id, email, name, password_hash`, [name, email, hash]);
+  await db.query('INSERT INTO project_members (project_id, user_id, finance) SELECT id, $1, true FROM projects WHERE active ON CONFLICT DO NOTHING', [user.id]);
   console.log(`Superadmin pronto: ${user.email}`);
 
   if (!user.password_hash) {

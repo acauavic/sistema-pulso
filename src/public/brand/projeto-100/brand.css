@@ -1,0 +1,52 @@
+/* Marca do Projeto 100 nas páginas públicas (docs/manual-de-marca-projeto-100.md).
+   Entra DEPOIS do CSS da página e troca só os tokens: a estrutura, os espaços e os componentes continuam os mesmos.
+   "Chegar lá. Inteiro." Azul 100 é a ação; o violeta marca o que é de fora; o rosa é acento, nunca fundo de texto. */
+
+@font-face { font-family: "Archivo"; font-weight: 400 800; font-display: swap; src: url(/static/fonts/archivo-latin-wght-normal.woff2) format("woff2"); }
+
+:root {
+  /* paleta */
+  --p100-azul: #3158FF;
+  --p100-violeta: #9A55EA;
+  --p100-rosa: #FF4E9B;
+  --p100-noite: #0E0F1A;
+  --p100-grafite: #5B5E6B;
+  --p100-nevoa: #ECEEF3;
+  --p100-papel: #F7F7F4;
+
+  /* ação (onde o Pulso usa lime) e externo (onde usa plum) */
+  --lime: var(--p100-azul);
+  --plum: var(--p100-violeta);
+  --plum-soft: #F1E9FD;
+  --bone: var(--p100-nevoa);
+
+  /* texto e superfícies: o tema claro das páginas do convidado */
+  --text: var(--p100-noite);
+  --text-2: #3A3D49;
+  --muted: var(--p100-grafite);
+  --line: var(--p100-nevoa);
+  --line-strong: #D7DAE3;
+  --bg: var(--p100-papel);
+  --surface: #FFFFFF;
+  --raised: var(--p100-nevoa);
+}
+
+/* display em Archivo (o Pulso usa Space Grotesk); o texto corrido continua em Inter */
+h1, h2, h3, h4, .pt-wordmark, .pl-wordmark, .pp-serif, .stat-n {
+  font-family: "Archivo", system-ui, sans-serif;
+  letter-spacing: -.03em;
+}
+
+/* o ponto da marca do Pulso não existe aqui: no lugar dele, o gradiente do projeto */
+.pt-wordmark span, .pl-wordmark span { color: var(--p100-rosa); }
+
+/* botão principal: azul com texto branco (no Pulso é preto com ponto lime) */
+.pt-btn, .pl-btn, .pp-btn { background: var(--p100-azul); color: #FFFFFF; border-color: var(--p100-azul); }
+.pt-btn:hover, .pl-btn:hover, .pp-btn:hover { background: #2546D8; border-color: #2546D8; }
+.pt-btn .dot, .pl-btn .dot, .pp-btn .dot { display: none; }
+
+/* faixa e selo: o gradiente da marca, usado com parcimônia (nunca atrás de texto longo) */
+.pt-gradient, .pl-gradient, .pp-gradient {
+  background: linear-gradient(135deg, var(--p100-azul), var(--p100-violeta) 55%, var(--p100-rosa));
+  color: #FFFFFF;
+}

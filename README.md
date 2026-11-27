@@ -1,4 +1,8 @@
-# 🎙️ Pulso Gestão — gestão do podcast
+# Health Scale Studio — painel da equipe
+
+> Antes "Pulso Gestão". Desde a v1.95.0 o painel tem a identidade da Health Scale (nome, monograma "St", verde, Archivo); tudo o que
+> o convidado, o patrocinador e a plateia veem continua com a marca do Pulso. O sistema está virando multiprojetos
+> (`docs/superpowers/specs/2026-11-20-multiprojetos-design.md`).
 
 Painel web para a equipe do **Podcast Pulso**: usuários com perfis de acesso, um mini-CRM de
 **convidados** (quadro estilo Kanban) e geração do **link do convite** (página personalizada +
@@ -10,13 +14,31 @@ link curto no YOURLS + envio por e-mail via Brevo).
 ## Índice
 
 - [O que tem](#o-que-tem)
+- [Projetos](#projetos)
+- [Vídeos, episódios e pauta](#vídeos-episódios-e-pauta)
 - [Perfis e permissões](#perfis-e-permissões)
 - [Como o convite funciona](#como-o-convite-funciona)
 - [Rodando localmente](#rodando-localmente)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Testes](#testes)
 - [Deploy (Docker Swarm + Traefik)](#deploy-docker-swarm--traefik)
-- [Modelos de convite (HTML)](#modelos-de-convite-html)
+- [Convite fixo e rastreio de cliques](#convite-fixo-e-rastreio-de-cliques)
+- [Importação por CSV](#importação-por-csv)
+- [Central de patrocinadores](#central-de-patrocinadores)
+- [Produção de episódios](#produção-de-episódios)
+- [Pulso Podcast com Plateia](#pulso-podcast-com-plateia)
+- [Portal do convidado](#portal-do-convidado)
+- [Financeiro: contas, custos automáticos e estoque](#financeiro-contas-custos-automáticos-e-estoque)
+- [Social: publicações, novo post, ideias, insights e automações](#social-publicações-novo-post-ideias-insights-e-automações)
+- [Post feito por fora do sistema](#post-feito-por-fora-do-sistema)
+- [Colaboração: tarefas, comentários, notificações e busca](#colaboração-tarefas-comentários-notificações-e-busca)
+- [Resumo do dia no Início](#resumo-do-dia-no-início)
+- [Início da produtora (Seu dia)](#início-da-produtora-seu-dia)
+- [Metas por pessoa](#metas-por-pessoa)
+- [Página pós-gravação](#página-pós-gravação)
+- [Site do Pulso (podcastpulso.com)](#site-do-pulso-podcastpulsocom)
+- [Arquitetura: processos, fila, rotinas e avisos](#arquitetura-processos-fila-rotinas-e-avisos)
+- [Assistente de IA](#assistente-de-ia)
 - [Segurança](#segurança)
 - [Identidade visual](#identidade-visual)
 - [Estrutura do código](#estrutura-do-código)
@@ -29,12 +51,115 @@ link curto no YOURLS + envio por e-mail via Brevo).
   (só superadmin), busca e filtros. Travas: ninguém muda o próprio perfil, desativa ou exclui a si
   mesmo; sempre sobra um superadmin ativo; só superadmin mexe em superadmin.
 - **Convidados (CRM)**: quadro com arrastar-e-soltar entre etapas (Prospecção → Convite enviado →
-  Confirmado → Gravado → Publicado, mais Recusou/Cancelado), visão em lista, filtros por
-  responsável, linha do tempo com anotações e histórico automático.
-- **Convite**: gera link exclusivo + link curto no YOURLS, prévia, envio por e-mail (Brevo) e
-  resposta do convidado direto na página (aceito/recusado atualiza a etapa e avisa o responsável).
-- **Modelos de convite**: editor do HTML (com variáveis) e prévia; o seu convite do Pulso já vem como padrão.
+  Em agendamento → Agendado → Gravado → Publicado, mais Perdido/Cancelado), visão em lista, filtros por
+  responsável, linha do tempo com anotações e histórico automático. [Cadastro e regras](#etapas-do-convidado-e-regras-para-avançar).
+- **Importação por CSV**: planilha com nome, Instagram e perfil (+ opcionais), com prévia de erros e duplicados.
+- **Central de patrocinadores**: CRM em quadro (Prospecção → Em negociação → Ganho → Ativo, mais Inativo/Perdido), media kit (sem planos nem preços: o que a marca pode ter, vagas reais, marcas que já estão com o Pulso e "Agendar uma conversa"), formulário de cadastro com voz e portal do patrocinador, tudo por **magic link reutilizável** (sem criar conta). [Detalhes](#central-de-patrocinadores).
+- **Episódios (linha de produção)**: do convidado agendado até a publicação — material bruto no Backblaze, edição, revisão com comentários na minutagem, análise por IA, capas e posts com editor visual, cortes verticais e publicação nas redes. [Detalhes](#produção-de-episódios).
+- **Convite fixo**: gera link exclusivo + link curto no YOURLS, prévia, envio por e-mail (Brevo). Os botões do
+  convite levam ao WhatsApp da produção **passando por um redirecionador próprio que conta os cliques**.
+- **Início da produtora (Seu dia)**: o plano do dia (feito de previsto, contra as metas), o que o dia rendeu, os motivos de perda dos convidados, o que está quente agora, os aceitos sem data, a agenda e as tarefas dela. [Detalhes](#início-da-produtora-seu-dia).
+- **Metas por pessoa**: até 3 metas para cada pessoa (o que contar, período, alvo, número ou porcentagem), contadas sozinhas e mostradas no Início de cada um. [Detalhes](#metas-por-pessoa).
+- **Início com o Resumo do dia**: convites enviados, aceitos e perdidos, patrocinadores (entraram em prospecção, abordados, follow-ups, interessados, fechados), etapas, episódios, cortes, revisões, posts, Reels de teste, seguidores e tarefas atrasadas de qualquer dia. [Detalhes](#resumo-do-dia-no-início).
+- **Calendário**: tudo que tem data (tarefas, gravações, lembretes, publicações, contas, parcerias) com filtros e visualizações salvas. [Detalhes](#calendário).
 - **Auditoria** das ações sensíveis e tela de **Integrações** (status + testes seguros).
+
+## Projetos
+
+O sistema cuida de mais de um projeto (hoje: **Pulso** e **Projeto 100**). A regra: **cadastro é da casa, trabalho e
+dinheiro são sempre de um projeto**. Convidados, patrocinadores, episódios, cortes, pedidos de conteúdo e ideias têm
+`project_id` obrigatório; tarefa pode ser de um projeto ou geral (sem projeto).
+
+- **Quem participa de quê**: `project_members` (no cadastro do usuário, "Onde essa pessoa trabalha", e em Gestão >
+  Sistema > Projetos). Usuário novo entra no projeto padrão (o ativo de menor `position`, hoje o Pulso). Toda pessoa
+  participa de pelo menos um projeto.
+- **Três perguntas separadas**: **o que a pessoa faz** (o perfil, `src/permissions.js`), **onde ela faz** (os projetos
+  marcados) e **se ela é da equipe da casa** (`users.house`). A equipe da casa alcança o que é geral: usuários,
+  projetos, integrações, categorias, rotinas, notificações, lembretes, busca, contatos, cadência, estoque, auditoria e
+  lixeira completa (`HOUSE_PERMISSIONS`); quem não é perde isso mesmo com perfil de Gestão, e o superadmin é sempre da
+  casa. O **financeiro** pede o perfil (`finance.read`) **e** o interruptor "Vê o financeiro" naquele projeto.
+- **Redes por projeto**: cada projeto tem as contas dele no provedor (`UPLOAD_POST_USER_<SLUG>`,
+  `ZERNIO_PROFILE_ID_<SLUG>`, `OUTSTAND_ACCOUNTS_<SLUG>`; sem variável, as contas de sempre — a chave de API é uma só).
+  A publicação sai pela conta do projeto do corte/vídeo; publicações, insights, comentários, automações e ideias seguem
+  o seletor; os números das redes são guardados por projeto. A configuração das respostas por IA, os links (canal,
+  comunidade, Spotify) e o contexto da IA (`projects.ai_context`, em Gestão > Projetos) também são por projeto.
+  **Ainda da casa**: os Números dos comentários (Social > Comentários > Números) somam os posts de todos os projetos.
+- **Marca por projeto nas páginas públicas** (`src/public/brand/<slug>/`): `favicon.svg`, `favicon.ico`,
+  `apple-touch-icon.png` e `brand.css` (uma folha que troca **só os tokens** — ação, externo, texto, fundo e o display;
+  nada de layout). O passo do domínio põe `res.locals.brandDir` e `res.locals.brandCss`, e as páginas públicas em EJS
+  (portal do convidado, pós-gravação, plateia, cadastro e portal do patrocinador) carregam a folha depois da delas.
+  **Convite, media kit e capas geradas ficam fora**: são documentos e modelos com texto, wordmark e tipografia
+  próprios; cada projeto ganha a versão dele (trabalho de design, não de cor).
+- **Módulos**: tela de um módulo que nenhum projeto da pessoa usa responde 404 (`scope.requireModule`); o menu já não
+  mostra, e trocar para um projeto que não usa a tela aberta leva ao Início.
+- **Isolamento**: página, ação ou arquivo de projeto que a pessoa não participa responde 404. O teste
+  `test/project-isolation.test.js` percorre **todas** as rotas GET registradas no Express com ids do outro projeto e
+  falha se algum marcador aparecer — rota nova entra na conferência sozinha.
+- **Seletor** (topo do menu, só para quem participa de mais de um): Todos os projetos, ou um deles. A escolha fica em
+  `users.last_project_id`. Seguem o recorte: Convidados, Patrocinadores, Episódios/Vídeos, Conteúdo, Tarefas, Pautas,
+  Início, Resumo do dia, Seu dia, Calendário, Busca, Avisos e Financeiro. Ainda mostram tudo: Social e Plateia
+  — próximas fases.
+- **Criar**: o item nasce no projeto escolhido; em "Todos os projetos" o formulário pergunta. Item ligado a outro herda
+  o projeto dele (episódio do convidado, corte do episódio, tarefa do patrocinador).
+- **No código**: `services/projects.js` (lista em memória, membros, projeto padrão, nome público) e `services/scope.js`
+  (o único lugar que decide o recorte: `where` nas listas, `assert` nas páginas de detalhe, `target` na criação,
+  `financeIdsOf` no dinheiro).
+- **Endereços** (`services/publicUrl.js`, `services/hostContext.js`): o painel fica no endereço da casa e cada projeto
+  tem o endereço das páginas públicas dele (`projects.public_host`), o encurtador (`short_link_host` +
+  `YOURLS_LINK_<SLUG>`/`YOURLS_KEY_<SLUG>`) e o remetente dos e-mails (`mail_from_name`/`mail_from_address`). Quem liga
+  é a gestão, em Gestão > Projetos > "Fora do painel"; **em branco, tudo continua num endereço só** (é assim em
+  desenvolvimento e no teste). Com o endereço ligado: tela do painel aberta no domínio público vai para o painel, link
+  público aberto no domínio errado vai para o certo, e o ícone do navegador/celular sai de `public/brand/<slug>/`
+  (sem arquivos próprios, usa os do projeto padrão). O nome que quem está de fora lê é `projects.public_name`
+  (`projects.publicName()`): o do Pulso é "Podcast Pulso", como sempre.
+- **Módulos** (`projects.modules`): o menu mostra só o que o projeto escolhido usa. O Projeto 100 usa tarefas,
+  produção (vídeos) e convidados; convites, portal, plateia, redes e financeiro entram nas fases deles.
+- **Empresa e contrato**: a identidade do patrocinador é de uma **empresa** da casa (`companies`: nome, site, tipo e
+  contato) e a linha de `sponsors` é o **contrato** dela num projeto (etapa, plano, valor, vigência, entregáveis,
+  portal, material). `services/companies.js` espelha igual ao `people.js`. "Abrir negociação também no…" cria o contrato
+  no outro projeto, e na aba Material "Trazer do outro projeto" copia os arquivos da empresa dentro do próprio
+  armazenamento (cada contrato com a chave dele).
+- **Pessoa e participação**: a identidade do convidado é de uma **pessoa** da casa (`people`) e a linha de `guests` é a
+  **participação** dela num projeto (etapa, tema, convite, portal, plateia). `services/people.js` é o único lugar que
+  escreve identidade: grava a pessoa e todas as participações dela na mesma transação (as colunas continuam em `guests`
+  como cópia espelhada). No cadastro, "Em outros projetos" mostra onde mais ela está e "Convidar também para…" cria a
+  participação no outro projeto sem digitar de novo. A mesma pessoa em dois projetos não é duplicata; duas pessoas
+  parecidas em projetos diferentes se resolvem com "É a mesma pessoa" (as duas participações ficam).
+- Desenho completo e as fases: `docs/superpowers/specs/2026-11-20-multiprojetos-design.md`.
+
+## Vídeos, episódios e pauta
+
+O episódio é o caso "podcast" de uma coisa mais geral, o **vídeo** (`episodes.format`: `podcast` ou `video`; o padrão vem
+do projeto). O que muda:
+
+- **Numeração por projeto**: `EP.012` no Pulso e `V.003` no Projeto 100 convivem (`UNIQUE (project_id, number)`), e o
+  prefixo é do projeto (`projects.number_prefix`). Nas telas, use `videoNo(numero, projectId)`.
+- **Pré-produção**: etapa nova, antes de Gravado. "Vídeo para gravar" (nos projetos que gravam vídeo; em "Todos os projetos"
+  também, perguntando o projeto só entre os de vídeo) cria o vídeo nela, com título e data prevista. Com mais de uma opção, o
+  botão **Novo** abre um menu com ela e o registro do que já foi gravado; as tarefas das rotinas, os custos automáticos e o link do estúdio só nascem quando alguém usa
+  **Marcar como gravado**. O episódio que vem do convidado continua nascendo em Gravado.
+- **Formato**: vídeo não mostra Spotify, capa do Spotify nem os vídeos de lançamento do convidado.
+- **Pauta e roteiro** (`pautas`): um documento de cada tipo por vídeo (ou por convidado, enquanto o episódio não
+  existe), com quem escreve, prazo, texto no editor rico ou link. Estados: A fazer → Em elaboração → Enviada para
+  aprovação → Ajustes pedidos → Aprovada. **A aprovação acontece no WhatsApp**: o sistema não manda nada sozinho;
+  "Copiar para o WhatsApp" copia o texto e marca a pauta como enviada, e a resposta é registrada por gestão ou
+  produtora. Quadro por estado em `/episodios?view=pautas`; as que travaram aparecem no "Seu dia".
+- **Aprovação por link** (`services/approvals.js`, `routes/approvals.js`, página pública `routes/approvalPublic.js` em
+  `/aprovar/:token`): na pauta/roteiro, no vídeo em revisão e nas capas do YouTube, "Gerar link de aprovação" cria um link
+  (30 dias) e a mensagem para o grupo. Quem aprova abre sem login, no endereço e com a marca do projeto, escreve o nome e
+  responde **uma vez**. Cada link vale para uma versão (`pauta_versions` guarda a cópia de cada envio; no vídeo, o
+  `episode_files.id` enviado): mudou depois, o link avisa "substituída". No vídeo, os comentários na minutagem entram em
+  `episode_comments` com `external_name`, e a resposta muda a etapa (`production.move(..., { trusted: true })`): aprovado
+  → Em finalização, ajustes → Em edição. Aviso novo `aprovacao`.
+- **Sessão de gravação** (`services/sessions.js`, `routes/sessions.js`, telas em `views/sessions/`; `/sessoes`): várias
+  gravações numa ida ao estúdio. A sessão tem dia e hora, duração prevista e local; os vídeos (em Pré-produção, do projeto
+  da sessão) entram com `episodes.session_id`/`session_position`. "Gravado" na fila leva o vídeo a Gravado com a data da
+  sessão. **As horas são da sessão**: a duração (prevista enquanto não encerra, real depois) é dividida em minutos inteiros
+  entre os vídeos gravados e vai para `episodes.recording_minutes` — o que o custo de estúdio (`finance.recomputeStudio`) e
+  o banco de horas já usam. Sessão planejada reserva horas (`sessions.reservations`). Encerrar devolve à pré-produção o que
+  não foi gravado e cria **um** link do estúdio para a sessão (fica no primeiro vídeo gravado, com `session_id`); o que
+  chega por ele fica `session_pending` até a equipe dizer de qual vídeo é. Aviso de estúdio ocupado (outra sessão ou
+  convidado agendado, de qualquer projeto; de outro projeto aparece só "Estúdio ocupado por outro projeto").
 
 ## Perfis e permissões
 
@@ -44,27 +169,314 @@ Quatro perfis: **Superadmin**, **Gestão**, **Produtora**, **Editor de Vídeo**.
 Para mudar, edite só `src/permissions.js` — todas as telas e rotas consultam esse arquivo.
 
 - **Superadmin**: tudo, inclusive excluir usuários e gerenciar outros superadmins.
-- **Gestão**: usuários (exceto superadmin, sem excluir), convidados (inclusive excluir), modelos, auditoria e integrações.
-- **Produtora**: convidados (criar/editar, gerar e enviar convite) e ver modelos.
-- **Editor de Vídeo**: somente leitura em convidados.
+- **Gestão**: usuários (exceto superadmin, sem excluir), convidados (inclusive excluir), auditoria, integrações e o **Financeiro**.
+- **Produtora**: convidados (criar/editar, importar CSV, gerar e enviar convite) e o **Estoque** (sem valores).
+- **Editor de Vídeo**: **só lê** convidados e patrocinadores (briefing, datas, restrições), sem criar nem mudar nada. Não vê plateia, social nem financeiro. O **Início** dele é a fila de edição, os episódios dele (com "ajustes pedidos") e as tarefas dele. Na página do episódio ele vê só os passos que faz (os da produção aparecem como "Esta etapa está com…"), **não sobe material bruto** (é da produção) e sobe o **vídeo editado** depois de assumir a edição. Recebe avisos: **liberado para edição** (todos os editores), **ajustes pedidos**, **vídeo aprovado**, **pronto** e **publicado** (tipo "Etapas do episódio", configurável e silenciável); a produção é avisada de quem assumiu e quem devolveu, e quem revisa, de que há vídeo para revisar.
 
-## Como o convite funciona
+### Funções sob medida (Gestão > Equipe > Funções)
 
-1. Cadastre o convidado (nome, gênero, dupla?, tema, data sugerida, responsável).
-2. **Gerar link do convite**: cria um token secreto e imprevisível e a página
+Os quatro perfis acima viraram as quatro **funções de fábrica** (mesmos poderes; a matriz de `src/permissions.js` continua
+sendo a delas enquanto ninguém edita). A gestão cria outras (`roles`), escolhendo, por área (`permissions.AREAS`), o que a
+função acessa — Não vê | Vê | Edita | Gerencia, ou caixa por caixa — e como ela **trabalha no dia a dia** (`roles.base`:
+o Início, os avisos padrão e as tarefas do calendário; é o que `users.role` guarda).
+
+- **Por projeto**: cada pessoa tem uma função padrão (`users.role_id`) e pode ter outra em cada projeto
+  (`project_members.role_id`). `permissions.can(pessoa, permissão, projeto)` lê a função daquele projeto; sem projeto, a
+  soma das funções dela (é o que decide se a rota abre).
+- **A trava**: `requirePerm(permissão)` estreita o recorte (`scope.narrow`) aos projetos em que a função dá aquela
+  permissão, e o **guarda do item** (`scope.guardItem` no `app.js`, e de novo depois do `requirePerm`) lê o id do item no
+  endereço (`scope.ITEMS`: convidado, patrocinador, vídeo, corte, pedido, capa, tarefa, pauta, sessão, publicação,
+  comentário, ideia, inscrição da plateia) e responde 404 fora disso, em GET e em POST.
+- **Financeiro**: o interruptor "Vê o financeiro" saiu; vê o dinheiro de um projeto quem tem, nele, uma função com a área
+  Financeiro. A migração 106 deu "Gestão sem financeiro" a quem estava com o interruptor desligado.
+- **Acesso até** (`users.access_until`): depois do dia, a sessão cai e o login não entra (freelancer).
+
+## Etapas do convidado e regras para avançar
+
+**Convidado é a pessoa; episódio é o produto.** O funil do convidado vai de Prospecção até **Gravado** (o fim dele). Antes da
+gravação existe só a **agenda**: convidados em Agendado, com a data confirmada, aparecem no **media kit** ("Quem vem por aí", em galeria,
+com a data no cartão; episódios já gravados entram com a data de estreia, e todos levam o alcance do cadastro) e podem ser **reservados por patrocinadores** (aparecem no portal deles). Quando a conversa é gravada, **nasce o
+episódio** (com as tarefas das rotinas e a data da gravação) e as reservas viram vínculo do episódio. O que se publica é o episódio.
+
+Convidado de episódio patrocinado: pode ser **alguém do patrocinador** ou **alguém indicado por ele** (campo "Ligado a um
+patrocinador" no cadastro; a gravação já fica reservada para o patrocinador). Episódio só com os hosts é registrado direto pelo
+patrocinador (ver Episódios).
+
+Cadastro inicial (mínimo): **nome, Instagram e perfil** (médico, influencer, empresário ou profissional da saúde).
+Opcionais na criação: WhatsApp, e-mail e motivo do convite. O resto se completa depois.
+
+- **Em agendamento** exige **e-mail e/ou WhatsApp**.
+- **Agendado** exige **data e hora da gravação** + confirmação de agenda no **Estúdio**, com os **hosts** e com o **convidado**.
+- **Em agendamento** e **Agendado** exigem a **foto do convidado** (ela vai para a agenda da plateia e para os patrocinadores). Se só falta a foto, abre a janela "Foto do convidado" (`?abrir=foto&para=<etapa>`); depois do envio a mudança de etapa termina sozinha. No formulário, o resto é salvo e a etapa espera a foto; cadastro novo direto nessas etapas entra em Convite enviado até a foto. Exceções: quem aceita pelo convite público e a importação por CSV (a foto vem depois). Precisa do Backblaze configurado.
+- **Foto do convidado, moldura única 4:3**: ao enviar (ou trocar) a foto, abre o **recorte** (`src/public/cropper.js`): arraste, aproxime (mouse, toque, teclado) e veja a prévia nos três tamanhos em que ela aparece. O que sobe é um **JPEG 1200×900** já enquadrado, então a mesma imagem serve a todos os lugares: página da plateia, **agenda do media kit** (no lugar do círculo "Foto"), **calendário e lista de convidados do portal do patrocinador** e o painel (`.guest-photo`). Aceita originais de até 40 MB (o recorte reduz); avisa quando a foto é pequena para a moldura. Foto com a moldura em `src/services/guestPhotos.js` (`FRAME`). O original não é guardado: para reenquadrar, envie de novo.
+  - No **media kit** a agenda é uma **galeria** (carrossel que passa sozinho, setas, deslizar no celular) que cabe no slide sem rolagem vertical; clicar no convidado abre a foto grande com a data e o link do Instagram (setas e Esc no teclado). O kit é servido com `CSP: sandbox` (origem opaca), por isso a foto assinada responde com `Cross-Origin-Resource-Policy: cross-origin`; com `same-origin` o navegador bloquearia a imagem.
+  - Media kit e portal recebem a foto por **endereço assinado e com validade de 24 h** (`GET /agenda/foto/:id?e=…&s=…`, HMAC com o segredo de sessão), porque o kit roda isolado e sem cookie; o servidor só assina o endereço de quem ele mesmo decidiu mostrar naquela página. Sem foto, o kit mantém o espaço "Foto" e o portal mostra as iniciais.
+- **Edição em massa** (Convidados > Lista, só `guests.write`): marque os convidados e use "Editar em massa" para mudar **etapa, responsável, perfil, gênero e patrocinador** (campo em branco = não alterar; patrocinador pede ainda "indicados" ou "pessoas do patrocinador"). Código em `src/services/guestBulk.js`. Cada convidado passa pelas regras de uma edição individual: quem não tem o que a etapa exige (foto, contato, motivo da perda) **não muda de etapa** e aparece no resultado; o resto da mudança vale. **Agendado e Gravado não vão em massa** (pedem a agenda e criam episódio). Perdido pede o motivo para todos. Máximo de 200 por vez; cada convidado ganha uma linha no histórico e a ação vai para a auditoria; quem ganha convidados recebe um aviso só.
+- **Zerar aceite** (aba Convite do convidado): apaga o contador de cliques em "Aceitar", a resposta e o recado, e devolve o convidado para **Prospecção** (o link do convite continua o mesmo). Vale para Convite enviado, Em agendamento, Perdido e Cancelado; quem já está Agendado ou Gravado não passa (cancele a gravação antes). Fica no histórico e na auditoria (`convidado.aceite_zerado`).
+- **Perdido** exige o **motivo da perda**: Recusado, Sem agenda próxima, Nunca respondeu, Parou de responder, Conflito de interesse ou Outros (com descrição). O banco não aceita Perdido sem motivo, e sair de Perdido apaga o motivo antigo. O cartão do quadro mostra o motivo.
+- Prospecção, Convite enviado, Gravado e Cancelado não exigem nada. (Os links do YouTube e do Spotify são do episódio.)
+
+As regras valem no formulário, no seletor "Mover de etapa" e ao arrastar no quadro. Regras em `src/services/guestRules.js`.
+
+**A página do convidado guia o próximo passo.** No topo ficam o passo a passo do funil e um cartão **Próximo passo**
+que mostra só o que importa na etapa atual, com um botão principal:
+
+- **Prospecção**: gerar o link do convite → enviar por e-mail (janela com assunto e mensagem) ou copiar para o WhatsApp.
+- **Convite enviado**: quando foi enviado e aberto; **Aceitou o convite** (se não houver contato, uma janela pede e-mail ou WhatsApp), reenviar e **Marcar como perdido** (janela com o motivo).
+- **Em agendamento**: **Definir data da gravação** abre uma janela com a data e a confirmação com **estúdio, hosts e convidado**.
+  Com as três, vai para Agendado (e o episódio nasce); sem elas, a data fica salva como proposta e o cartão mostra quem falta.
+- **Agendado**: a data em destaque com a contagem ("em 5 dias"), link do episódio, **Marcar como gravado**, **Remarcar**
+  (nova data pede nova confirmação; sem as três, volta para Em agendamento e a linha do tempo registra a remarcação) e cancelar.
+- **Gravado** (fim do convidado): a etapa do episódio e o link para ele; quando o episódio vai ao ar, os links. **Perdido** (com o motivo) e **Cancelado**: retomar contato.
+
+O resto fica em abas (**Resumo** com dados preenchidos, comentários e tarefas; **Convite** com link, cliques e prévia; **Histórico**).
+Mudar a etapa à mão e excluir ficam em "Outras ações". Os botões passam por `POST /convidados/:id/avancar`, que salva só os
+campos da janela e move a etapa se as regras deixarem. Arrastar para uma etapa que exige dados abre a página do convidado já
+com a janela certa (`?abrir=contato|agenda|publicacao`).
+
+No **formulário**, os campos aparecem conforme a etapa (data da gravação a partir de Em agendamento; links em Publicado) e
+"Sobre o convidado" e a etapa ficam recolhidos. **Ao preencher ou mudar a data da gravação, abre a janela de confirmação**
+(estúdio, hosts, convidado); confirmando as três, a etapa passa para Agendado ao salvar.
+
+## Convite fixo e rastreio de cliques
+
+1. Cadastre o convidado e use **Gerar link do convite**: cria um token secreto e imprevisível e a página
    `…/convite/<token>`, e encurta no YOURLS com o nome curto do convidado
    (`link.podcastpulso.com/maria`; se ocupado, `mariasouza`, depois `maria-x7k2`).
    Se o YOURLS estiver fora, o link completo continua valendo.
-3. Envie pelo **e-mail** (botão no próprio card) ou copie o link curto e mande pelo WhatsApp.
-4. A página do convite mostra o modelo escolhido com os dados do convidado. Ao abrir, o sistema
-   registra "convidado abriu o convite" (ignora robôs de pré-visualização do WhatsApp/Facebook).
-5. O convidado pode **aceitar/recusar** na própria página (com recado opcional): a etapa muda para
-   *Confirmado*/*Recusou* e o responsável recebe um e-mail. O botão de WhatsApp do modelo continua existindo.
-6. **Gerar novo link** invalida o anterior (o token antigo passa a dar 404).
+2. Envie pelo **e-mail** (botão no próprio card) ou copie o link curto e mande pelo WhatsApp.
+3. A página do convite é **sempre a mesma** (`src/templates/convite-pulso.html`); o sistema só injeta nome, gênero e dupla.
+   Ao abrir, registra "convidado abriu o convite" (ignora robôs de pré-visualização do WhatsApp/Facebook).
+4. Botões **Aceitar o convite** e **Confirmar presença** apontam para `/convite/<token>/aceitar`: o sistema conta o clique,
+   muda o convidado para **Em agendamento**, avisa o responsável por e-mail e mostra a página
+   "Convite aceito, te levando para o WhatsApp…", que redireciona em 3 s para o WhatsApp da produção com mensagem pronta.
+5. **Falar com a produção** aponta para `/convite/<token>/producao`: conta o clique e redireciona direto.
+6. Quem não puder participar usa o formulário "Não vai poder participar?" (recado opcional): etapa **Perdido** com motivo **Recusado** (o convidado não escolhe motivo; o recado fica como descrição) e aviso ao responsável.
+7. **Gerar novo link** invalida o anterior (o token antigo passa a dar 404).
+
+**Por que o rastreio é interno e não o YOURLS:** o YOURLS só conta cliques que passam por ele e não sabe quem clicou;
+aqui cada clique já fica ligado ao convidado (tabela `invite_clicks` + linha do tempo + contagem no detalhe) e o botão
+de aceitar não depende de um serviço externo. O YOURLS segue só encurtando o link do convite.
+Robôs de pré-visualização (WhatsApp, Facebook, Slack…) seguem o redirecionamento sem contar clique nem mudar etapa.
+O número da produção vem de `PRODUCAO_WHATSAPP`.
+
+## Importação por CSV
+
+**Convidados → Importar CSV** (baixe o modelo na própria tela). Colunas: `nome`, `instagram`, `perfil` (obrigatórias) e
+`whatsapp`, `email`, `motivo do convite`, `genero`, `status` e `data da gravação` (opcionais; gênero padrão masculino). Aceita `;` `,` ou tab, aspas e UTF-8
+com/sem BOM, até 500 linhas. O perfil aceita variações (médica, influenciador, empresária, profissional de saúde…).
+**Status** (ou `etapa`): Prospecção (padrão), Convite enviado, Em agendamento (pede e-mail ou WhatsApp), Agendado, Gravado, Publicado, Perdido (pede a coluna `motivo da perda`; texto livre vira Outros; status "Recusou" já entra como Perdido/Recusado) ou Cancelado.
+**Data da gravação**: `25/11/2026 14:30` no horário de Brasília (a hora pode vir numa coluna `hora`). **Agendado** exige data e hora futuras
+e entra com estúdio, hosts e convidado confirmados (aparece na agenda e avisa a equipe). **Gravado** e **Publicado** trazem o histórico: pedem a data da gravação (só o dia basta, não pode ser futura) e criam o episódio já na etapa (Gravado ou Publicado), **sem tarefas, custos automáticos nem avisos**. Opcionais: `episódio` (número; sem ele, continua a numeração na ordem das datas de gravação; número já usado vira duplicado), `youtube`, `spotify` e `publicado em`.
+Primeiro mostra uma **prévia** (pronto / erro / duplicado — Instagram ou e-mail já cadastrado ou repetido no arquivo);
+ao confirmar, só as linhas prontas viram convidados, com você como responsável. Colunas extras: `observações` (vai para as observações do convidado) e `título do episódio` (histórico).
+Pelo terminal (mesmas regras, prévia sem `--gravar`): `node src/scripts/importGuests.js arquivo.csv email@quem.importa [--gravar]` (no servidor: `docker compose exec -T web node src/scripts/importGuests.js - email --gravar < arquivo.csv`).
+
+## Central de patrocinadores
+
+**Menu Patrocinadores** (quadro e lista).
+
+**Convite do convidado** (`src/templates/convite-pulso.html`, `src/services/inviteTemplate.js`, `src/services/inviteShowcase.js`): página fixa do Pulso com os dados do convidado. Na aba Convite, "Como o convite chega" define o formato (de mesa ou com plateia) e o texto "Por que você" (com "Sugerir com IA"), que aparece no topo. O convite mostra o período pela hora marcada, "Quem já sentou à mesa" com a mesma galeria do media kit (Gestão > Galeria do media kit) e os cortes de cada convidado, e a seção "Os cortes" com até 4 cortes escolhidos nessa mesma página (só com capa). O de plateia deixa o formato claro desde a abertura e traz fotos e o vídeo da gravação com plateia numa janela.
+
+**Link do estúdio** (`src/services/studioLinks.js`, `src/routes/studioUpload.js`, `src/views/studio/`, `src/public/estudio.js`): quando o episódio nasce (gravação feita), ele ganha um link `/estudio/<token>` para o estúdio subir o material sem login. A página aceita pastas ou arquivos soltos, guarda o caminho de cada arquivo (as câmeras repetem nomes) e envia pelo mesmo motor do painel (`uploads.js`, partes direto ao Backblaze, com retomada). "Terminei o envio" fecha o link e avisa a equipe; "Pedir reenvio" (aba Material) gera outro. Limites: 200 GB por arquivo, 1 TB e 500 arquivos por link, 7 dias sem uso fecha. O link só deixa enviar para aquele episódio e só enxerga os arquivos que ele criou. "Organizar" muda tipo e rótulo de cada arquivo. O número do estúdio fica em Gestão > WhatsApp dos convites (`ESTUDIO_WHATSAPP` como padrão).
+
+**Duplicatas** (`src/services/duplicates.js`, rotas em `src/routes/duplicates.js`): convidado com o mesmo @, e-mail ou telefone, ou patrocinador com a mesma empresa ou site, é duplicata certa; nome parecido (e, no patrocinador, o mesmo e-mail ou telefone de contato) é possível. Ao cadastrar, o formulário mostra o que já existe antes de gravar ("Cadastrar mesmo assim" grava). O cadastro com duplicata mostra uma faixa com "Comparar e juntar" (`/duplicatas/convidados|patrocinadores/:a/:b`): escolhe-se qual fica e o valor de cada campo diferente; tudo que aponta para o outro (chaves estrangeiras lidas do banco, comentários e abordagens) passa para o que fica, e o outro vai para a lixeira. "Não é duplicata" guarda o par em `duplicate_dismissals`. Lista geral em Gestão > Sistema > Duplicatas.
+
+**Reuniões** (aba no cadastro, `src/services/sponsorMeetings.js`, tabela `sponsor_meetings`): "Marcar reunião" (data e hora, 30/45/60/90 min, Google Meet ou presencial com endereço, e-mails da empresa, responsável e mais gente da equipe, assunto e pauta). A reunião é gravada no painel e criada no Google Agenda do Pulso **em nome da conta do Workspace** (`GOOGLE_IMPERSONATE`, com delegação em todo o domínio para a conta de serviço, escopo `calendar.events`): o Google cria o Meet, manda o convite e recolhe as respostas; o organizador que o convidado vê é o calendário Pulso Podcast. Remarcar e cancelar usam `sendUpdates=all`. A rotina `reunioes` (15 min) reenvia o que ficou pendente e lê do Google horário, Meet, respostas e cancelamento. Falha do Google não perde a reunião: o cartão mostra o motivo e "Tentar de novo". O resumo (por enquanto colado à mão) fica na reunião; `saveSummary` é o ponto de entrada do futuro webhook. As reuniões aparecem no Calendário do painel (tipo "Reuniões com patrocinador", fora do espelho do Google para não duplicar) e na linha do tempo. Teste em Gestão > Integrações > Google Agenda > "Testar reuniões".
+
+- **Cadastro**: empresa, site, tipo (marca pessoal ou negócio), cota (Ouro ou Diamond), valor (R$), responsável **na empresa** (nome, WhatsApp, e-mail), quem cuida na nossa equipe, pagamento, vigência.
+- **Regras de etapa** (`src/services/sponsors.js`, valem no formulário, no seletor e ao arrastar): **Ganho** exige cota, valor, nome do responsável e e-mail e/ou WhatsApp; **Ativo** exige cota, valor e a data do pagamento. Se faltar algo, a página do patrocinador abre a janela que pede só esses dados (`?abrir=ganho|ativo`).
+- **Página guiada**: passo a passo (Prospecção → Em negociação → Ganho → Ativo) e cartão **Próximo passo** por etapa: gerar links e copiar o media kit; **Fechou** (janela com cota, valor e responsável); em Ganho, o andamento do formulário, o link do formulário e **Pagamento confirmado** (janela com data do pagamento e vigência); em Ativo, a vigência, o portal e as entregas. Abas: Resumo, Briefing, Entregas (só depois de Ganho), Links e Histórico. Os botões usam `POST /patrocinadores/:id/avancar`.
+- **Galeria do media kit** (Gestão > Convites e parcerias > Galeria do media kit, `src/services/kitGallery.js`, permissão `plans.manage`): o slide "Quem já sentou à mesa" mostra os episódios **gravados** (publicados ou ainda em produção) que a equipe marcar ("Mostrar no kit"); foto, nome e Instagram vêm do convidado, e **alcance** e **frase de apresentação** são editáveis por episódio (em branco: traço e cargo/empresa do cadastro). O slide mostra **um convidado em destaque** (foto quadrada grande, alcance, nome, frase e Instagram, trocando sozinho a cada 5 s; passar o mouse ou clicar numa foto mostra aquela) e **todos os outros numa grade de fotos quadradas**, sem passar de página: o número de colunas se ajusta para caber na tela. No celular, cada convidado vira um cartão com a foto e a frase embaixo, 2 por linha. O rodapé conta os episódios no ar e os gravados a caminho (vem do sistema). Enquanto nenhum episódio for marcado, o kit mostra a galeria padrão de lançamento (fixa no template).
+- **Vídeos sem travar (1.60)** (`src/services/videoViews.js`, migração 066): versão leve só para assistir (lado menor 720 px, H.264 CRF 23 com teto de 3 Mbps, quadro-chave a cada 2 s, `+faststart`), gerada pelo trabalho `video_leve` numa pista própria da fila (`jobs.VIDEO`), com `nice` e 4 threads. Vale para a versão mais nova do editado de cada episódio e para o vídeo atual de cada corte; original até 1080p, H.264 e 6 Mbps fica como está (`status = 'original'`). `/ver`, `/cortes/:id/video` e o corte do portal do convidado tocam a leve; `?original=1` e baixar entregam o original. A rotina `versao-leve` (5 min) pede as que faltam, mais novas primeiro, e apaga as de arquivos que deixaram de tocar.
+- **Mensagens (1.59)** (`src/services/chat.js`, `chatRelay.js`, `chatBus.js`, `src/routes/chat.js`, `src/public/chat.js`, migração 065): conversas individuais e grupos, threads, edição, reações, áudio (anexos com transcrição) e resumo com IA. Entrega: `client_id` único por autor (reenviar não duplica); a mensagem e a linha da `chat_outbox` entram na mesma transação; o `chatRelay` publica no RabbitMQ com confirmação e, sem ele, entrega pelo Postgres (`pg_notify` e fila `jobs`); toda escrita sobe a `rev` da conversa com a linha travada, e o navegador pede `/novidades?desde=rev` ao reconectar. O RabbitMQ (`RABBITMQ_URL`) só carrega códigos: topic `pulso.chat`, `evento.*` para uma fila temporária por cópia do painel, `tarefa.*` em fila quorum durável consumida pelo worker (5 tentativas, depois `pulso.chat.mortas`) e `espera.*` com prazo de 8 s antes do aviso (fila `pulso.chat.espera.8s`). **Avisos (1.62)**: mensagem e reação avisam com som e vibração (push urgente que fica na tela; com o painel aberto, toque curto e aviso em destaque, desligável em Notificações). Desde a 1.63.1 o aviso de mensagem é próprio (`chatAlerts.js`, tabela `chat_alerts`): não entra na lista de Notificações nem no sino, só no celular, no aviso do painel e no contador de Mensagens. Grupos mostram na conversa quem criou, entrou, saiu e mudou o nome (migração 067). **Menções e citações (1.63)**: `@Nome` e `@todos` nos grupos; `#` cita episódio, corte, convidado, patrocinador, publicação ou tarefa como link clicável (`/mensagens/referencias`); cada pessoa escolhe avisos de grupo (todas | só quando me marcarem, em Notificações > Alertas) e cada conversa tem a sua regra (padrão | todas | só menções | nenhum). Migração 068. Teste contra broker real: `TEST_RABBITMQ_URL=amqp://… npm test -- test/mensagensrabbit.test.js`. **Respostas não lidas (1.90)**: dentro de cada conversa, uma faixa junta as respostas novas nas threads que a pessoa segue (escreveu o original, respondeu ou foi marcada); a leitura de cada thread fica em `chat_thread_reads`, e abrir a thread marca como lida. **Criar tarefa da mensagem (1.90)**: o ícone de tarefa na mensagem abre a janela Nova tarefa ali mesmo; a IA (Gemini) lê a mensagem ou, se a pessoa escolher, a thread inteira, e preenche título, detalhes, responsável, prazo, categoria e vínculos. A tarefa guarda a mensagem de origem (`tasks.source_message_id`), a mensagem mostra "Tarefa · …" e a página da tarefa leva de volta (o nome da conversa só para quem participa).
+- **Revisão que não se perde (1.57)** (`src/services/review.js`, migração 063): o comentário da revisão guarda a versão comentada e não some com o arquivo (FK `SET NULL`; versão com comentários não pode ser removida). O editor marca "feito" (`POST /episodios/:id/comentarios/:cid/feito`); ao subir a próxima versão, vira "feito na vN" (`versionUploaded`); quem revisa confere (`/resolver`) ou devolve (`/ainda-nao`). `GET /episodios/:id/marcadores?formato=premiere|davinci|texto&quais=abertos|todos&fps=&inicio=01|00` gera o XML do Final Cut 7 que o Premiere importa como sequência com os marcadores (1.58; quadros desde 00:00:00:00, cor em `pproColor`, sequência no tamanho do vídeo), o EDL de marcadores do DaVinci Resolve (timecode sem drop frame, cor por estado, duração do trecho) ou a lista em texto; quadros por segundo e tamanho vêm do vídeo (lidos no envio, `episode_files.fps/width/height`, migração 064). As minutagens são orientação, e os arquivos dizem isso.
+- **Velocidade (1.56)**: imagens para ver em WebP (`src/services/webImage.js`, guardadas em `PREVIEW_DIR/webp`; "Baixar" manda o original), estáticos em Brotli/gzip com cache de 1 ano (`src/utils/staticFiles.js`), duas cópias do painel atrás do Caddy (`deploy/docker-compose.yml`, `deploy.replicas`), assistente em tempo real (SSE, `gemini.chatStream`), Publicar agora com espera máxima (`PUBLISH_WAIT_MS`, padrão 8 s; depois segue em segundo plano), medição de desempenho (`src/services/perf.js`: `Server-Timing`, requisições acima de `SLOW_REQUEST_MS` em `slow_requests`, velocidade real do navegador em `web_vitals` por `src/public/vitals.js`, consultas do banco por `pg_stat_statements`) em Gestão > Desempenho. OpenTelemetry opcional: `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SAMPLE`) manda os traces das requisições lentas em OTLP/HTTP.
+- **Carregamento com esqueleto e desempenho** (`src/public/skeleton.js`, `src/utils/requestCache.js`, migração 061): ao abrir outra página, se ela demorar, a área de conteúdo mostra o contorno da tela que vem (lista, cadastro, painel, quadro ou calendário) até a página chegar; downloads não mostram. No servidor, o que a mesma página lê várias vezes (ajustes, lista da equipe, configuração dos avisos) vai ao banco uma vez por requisição, as telas não consultam item por item (N+1) e as consultas mais frequentes têm índice.
+- **Envio de material em segundo plano** (`src/public/uploads.js` + `producao.js`): na aba Material do episódio, "Enviar material" (ou arrastar) aceita vários arquivos de uma vez; a janela de triagem classifica por tipo e deixa escolher vídeo do episódio × bastidores (vídeos), fotografias × bastidores (imagens), com **rótulo só para vídeos e áudios do episódio**. A fila (4 arquivos ao mesmo tempo, 4 partes em voo, tentativas com espera, retoma sozinha sem internet, cancelar e tentar de novo) vive em `window.PulsoUploads` e mostra uma **bandeja** em todas as telas. Como o painel é feito de páginas inteiras, enquanto há envio ativo os links e formulários abrem num quadro (`iframe`) sobre a página que envia; sem envio ativo, a navegação é a de sempre. Fechar ou recarregar a aba interrompe (o navegador avisa). Vale também para o vídeo editado e os cortes. No histórico do episódio, fotografias e bastidores somam numa linha (`production.addFileEvent`, com lock por episódio).
+- **Plateia: pessoa à mão e lembrete do dia** (`audience.addLead`, `audience.reminderTick`): em Plateia > Pedidos, **Adicionar pessoa** inclui alguém combinado por fora na gravação de um convidado Agendado (nome, WhatsApp validado por país, situação inicial Novo pedido ou Selecionada com valor/isento; `plateia_leads.added_by`). Não passa pela página pública: sem aceite online, sem evento de funil, sem aviso. A rotina `plateia-lembrete` (a cada 30 min, a partir das 6h de Brasília) cria **uma** tarefa no dia da gravação quando há **Selecionados** (`confirmado`) naquele convidado: responsável = dono do convidado se for produtora, senão a primeira produtora ativa (depois gestão); descrição com nomes, WhatsApp e mensagem sugerida, atualizada enquanto não estiver feita. Não repete (`tasks.auto_key`) e não cria se a gravação já passou.
+- **Plateia: CRUD dos pedidos e telas** (v1.14.0): criar = Adicionar pessoa; ler = lista em tabela (`.ptable`) e quadro (`.pboard`); editar = janela `modal-editar` (`POST /plateia/painel/leads/:id/editar`: nome, WhatsApp, gravação, observações; a conta a receber acompanha); excluir = botão dentro dessa janela (`POST …/excluir`, recusa pedido já pago; cancela a conta não paga). Ações pequenas são ícones com dica; a situação na lista é um chip com menu. O quadro preenche a altura (`.main:has(.pane:not([hidden]) .pboard)`), com rolagem vertical por coluna e horizontal no pé da tela.
+- **Plateia em quadro**: em Plateia > Pedidos, o seletor **Quadro | Lista** (`?vista=quadro`) mostra uma coluna por situação; arrastar chama `POST /plateia/painel/leads/:id/mover` (JSON; Selecionado é recusado ali e a coluna abre a janela de confirmação, `data-drop-open`; sair de Selecionado cancela a conta a receber ainda não paga e recarrega para mostrar o aviso). Busca (`q`: nome, WhatsApp ou convidado) e filtros por episódio e origem (`origem=pagina|equipe`) valem nas duas visões; o filtro de situação só existe na Lista.
+- **Texto rico, anexos e áudio nas tarefas** (`src/services/richText.js`, `attachments.js`, `linkPreview.js`, `src/routes/attachments.js`, `src/public/richtext.js`, `partials/rich-editor.ejs`): a descrição da tarefa e **todas as caixas de comentário** (tarefa, convidado, patrocinador, episódio, corte e a revisão do vídeo na minutagem) têm editor com formatação, tabelas, imagens coladas (Ctrl+V) ou arrastadas, anexos PDF/HTML/ZIP (até 25 MB; imagem 10 MB), links como URL ou miniatura e @menções. Os comentários também gravam **áudio com transcrição** (Groq; até ~2 min). O servidor limpa o HTML por lista branca (`sanitize-html`) e guarda HTML + texto puro. Anexos vão para o Backblaze (privado) e são servidos por `/anexos/:id` (URL assinada; documentos sempre baixam, HTML anexado nunca roda no painel). A miniatura de link é lida no servidor com proteção contra rede interna (SSRF) e cache de 7 dias. Exige Backblaze configurado para anexos; sem Groq o áudio sobe sem transcrição.
+- **Assistente de IA** (`src/services/assistant.js` + `assistantReads.js`, `assistantActions.js`, `assistantLookup.js`, `assistantKnowledge.js`): conversa por texto ou áudio, com histórico. **Consulta** (buscar, tarefas, agenda, calendário, episódios, convidado, lista de convidados, patrocinador, social, números, follow-ups, plateia, financeiro, contas, estoque, notificações, novidades, equipe, comentários) e **explica como fazer** pela base de conhecimento (`como_fazer`, um assunto por área, com quem faz e se o perfil faz). **Age** quando a pessoa pede: criar e atualizar tarefas, comentar, registrar abordagem, trocar responsável, criar convidado, mudar etapa de convidado, avançar episódio e plateia (adicionar, situação, selecionar). Cada ferramenta só aparece para o perfil que pode usá-la, usa as mesmas regras das telas, acha o item sem chutar (se houver mais de um, pergunta) e grava auditoria `assistente.*`. Ações de efeito maior devolvem `precisa_confirmar` com um resumo e só executam com `confirmado=true` depois do sim da pessoa. Não publica, não lança nem paga contas, não apaga e não mexe em configurações. Ao mudar um fluxo do sistema, atualize `assistantKnowledge.js`.
+- **Tarefas com hora** (`tasks.due_time`, migração 039): o prazo segue sendo a data (`due_on`) e ganha hora opcional (horário de Brasília, `Hora` ao lado de `Vence em`; só a hora = hoje; sem data não há hora). `tasks.isLate` decide o atraso (sem hora: fim do dia; com hora: passou da hora). `dueTick` (a cada 15 min) avisa "vence hoje às 14h" de manhã, "Falta pouco" na última hora e "atrasada" quando passa, uma vez por dia; criar, atribuir e mudar o prazo notificam com a hora. Quando a tarefa vai para Fazendo ou Feito, os avisos dela ainda não lidos de prazo e bloqueio ficam como lidos para todos, e o de atribuição para quem mexeu (`notifications.topic`, `notify.clearTopics`); nos dias seguintes o prazo continua avisando. Telas, calendário, tarefa por voz (`vence_hora`) e assistente (`hora`) usam o mesmo campo. Rotinas continuam só com data.
+- **Tarefa por voz** (`src/services/taskVoice.js`, `src/public/tarefa-voz.js`, `POST /tarefas/voz`): em Tarefas, "Falar tarefa" (cabeçalho) ou o botão dentro de "Nova tarefa" grava até 2 min; o servidor transcreve (Groq Whisper) e o Gemini organiza **uma** tarefa (JSON por schema): título no imperativo, detalhes enxutos, responsável (só quem existe na equipe; "eu" = quem fala), prazo (data real, nunca no passado), tipo e vínculos (só itens existentes). É só um **rascunho**: preenche a janela e a pessoa cria com "Criar tarefa". Exige `GROQ_APIKEY` e `GEMINI_KEY` (sem elas o botão não aparece); limite de 30 gravações por 10 min por pessoa.
+- **Magic link reutilizável**: **Gerar links** cria um token por patrocinador. Abrir `/patrocinador/<token>` (media kit), `/patrocinador/<token>/cadastro` ou `/patrocinador/<token>/portal` cria uma **sessão** (cookie `pulso_sp`, HttpOnly, 30 dias) e redireciona para uma URL limpa (`/patrocinador/kit|cadastro|portal`), sem o token. O link vale quantas vezes for aberto, em qualquer aparelho, até a equipe **gerar novos links** (isso derruba todos os acessos abertos). Ações do patrocinador usam token CSRF da sessão. Robôs de pré-visualização não ganham sessão.
+- **Media kit** (`src/templates/media-kit.html`, o deck do Pulso): "Quero ser patrocinador" conta o clique, leva de Prospecção para Em negociação, avisa a equipe e abre o WhatsApp comercial (`PATROCINIO_WHATSAPP`); "Falar com a equipe" conta e redireciona.
+- **Formulário de cadastro em etapas** (a partir de Ganho): **uma pergunta por vez**, com uma barra de etapas no topo (respondida = preto, **pendente = listrado âmbar**, por responder = branco) e um resumo no fim. Cinco perguntas (logo, página, oferta, apresentação, destaques) têm **"Responder depois"**: viram **pendência**, guardada no link; quatro aceitam **"não se aplica"** (página, oferta, restrições, slogan), que conta como respondida. Cada resposta é salva na hora (`/patrocinador/resposta`); ao voltar pelo mesmo link o formulário abre na primeira pergunta ainda em aberto. A equipe vê o andamento (8 segmentos), as pendências e um selo "N pendências" no quadro, e é avisada (uma vez por situação) quando ele fecha o formulário. O formulário só conta como **respondido** quando as 8 perguntas estão respondidas. Sem JavaScript, a página inteira continua enviável. Conteúdo das perguntas: logo em PNG (avisa se não tiver transparência), página de divulgação e brinde, oferta/ação especial, apresentação da empresa, pontos de destaque, restrições, slogan e objetivo. As 4 perguntas de texto corrido têm **resposta por voz**: o navegador grava, o servidor guarda o áudio e transcreve com **Whisper large-v3 (Groq)**, e a pessoa revisa/edita o texto antes de enviar. O patrocinador pode voltar e editar; a equipe também edita em **Editar briefing**. O áudio e a transcrição original ficam no cadastro.
+- **Gravações e episódios**: em Entregas, o patrocinador **reserva gravações marcadas** da agenda (inserção ou exclusivo) e marca os **episódios gravados**. Na gravação, a reserva vira vínculo do episódio. **Convidados do patrocínio** (da empresa ou indicados) ficam no Resumo, com o botão **Indicar convidado**; "Registrar episódio gravado só com os hosts" abre o cadastro de episódio já com o patrocinador.
+- **Patrocínio ativo**: confira os episódios, cadastre **entregáveis** (episódio exclusivo, inserções, cortes exclusivos, cortes com participação, moldura, QR Code, presença nas plataformas; cada um com quantidade, status, link e observação) e envie **moldura** e **QR Code** pela aba Material (vão para o entregável e o portal). O **portal** (`/patrocinador/portal`, só em Ativo/Inativo) reproduz o portal original: entregas, episódio exclusivo, calendário (gravações reservadas como "Gravação marcada" + episódios), bios dos convidados, moldura e QR Code. Não tem JavaScript.
+- **Planos de patrocínio** (Gestão > Planos de patrocínio, `src/services/plans.js`): só **Ouro e Diamond**. A gestão edita **nome, valor, textos e entregáveis** (e, no Diamond, as opções "escolha 1 de N" e se inclui tudo do Ouro). Isso gera, direto do banco, os slides **Ouro**, **Diamond** e o **comparativo** do media kit, o nome da cota e as **entregas do portal** (com descrição) e os entregáveis de cada patrocinador. Ao mudar o plano, todo patrocinador da cota acompanha (entregável novo chega na hora; retirar tira de todos). Na página do patrocinador (aba Entregas) cada entregável do plano pode ser **personalizado só para ele** (nome, descrição, quantidade; "voltar ao padrão do plano" desfaz), dá para **criar entregáveis só dele** e **reaplicar o plano**. Trocar a cota troca os entregáveis do plano e mantém os personalizados. Na mesma tela há a regra **"Episódio exclusivo não recebe inserção"** (ligada por padrão, `app_settings.block_insertion_in_exclusive`): episódio que é entrega de um patrocinador não aceita inserção de outro, nem pelo episódio nem pela página do patrocinador.
+- **Arquivos** ficam num bucket **privado** do Backblaze B2 (API S3, assinatura SigV4 própria em `src/services/b2.js`); nada é público, tudo passa pelo servidor. A chave pode ter **restrição de prefixo** (o sistema usa o prefixo da própria chave, ex.: `pp/patrocinadores/<id>/…`).
+- **Ainda não feito**: etapa de **aprovação da moldura e do QR Code pelo patrocinador** e integração por WhatsApp (o modelo de dados comporta, é o próximo passo).
+
+
+### Material do patrocinador (aba Material)
+
+A partir de **Ganho** (e em Ativo e Inativo), a página do patrocinador ganha a aba **Material**, com as pastas **Logos**, **Moldura**,
+**QR Code** e **Material da marca** (manual, apresentações, peças, vídeos de inserção), no mesmo desenho do material do episódio: a pasta
+abre, cada arquivo tem miniatura (imagem) e **Baixar**, e **Selecionar** e **Baixar tudo** juntam vários num ZIP só. Pasta vazia aparece
+apagada, para mostrar o que falta.
+
+- **Enviar material** (quem edita patrocinadores): escolha ou arraste vários arquivos; a janela de envio sugere a pasta pelo tipo e pela
+  extensão (imagem e SVG/AI/EPS em Logos, PDF e vídeo em Material da marca) e dá para mudar cada um ou "todos como…". Os arquivos sobem
+  pela fila de envios dos episódios (em partes, direto ao Backblaze, retomando de onde pararam; até 20 GB por arquivo). Repetido pode ser
+  ignorado, substituído (o antigo sai quando o novo chega inteiro) ou mantido.
+- **Logo principal**: a do media kit, do portal do patrocinador e do episódio patrocinado. A primeira logo vira a principal; "usar como
+  principal" troca. A logo que o patrocinador manda pelo formulário entra em Logos e só troca a que ele mesmo tinha mandado.
+- **Moldura e QR Code** que chegam viram o arquivo do entregável e aparecem no portal.
+- **Quem pode**: quem vê patrocinadores (o editor também) vê e baixa; quem edita envia, troca a logo principal, descarta envios parados e
+  manda para a lixeira. No episódio patrocinado, "Todo o material" leva às pastas.
+- Código: `src/services/sponsorMaterial.js`, `src/routes/sponsorMaterial.js`, `src/views/sponsors/_material.ejs`, migração
+  `082_material_do_patrocinador.sql` (`sponsor_files.status`, `is_main`, partes em `sponsor_file_parts`); o ZIP é o `/baixar.zip` (item `s`).
+## Produção de episódios
+
+**Menu Episódios**: quadro por etapa e lista. A tela do episódio é organizada em **abas por etapa** — *Resumo* (dados, observações, patrocinadores, tarefas em janela), *Material* (bruto e vídeo editado: depois de enviados viram lista com "Baixar" e o envio fica recolhido), *Revisão* (**só enquanto o episódio está em revisão**; depois os comentários vão para o histórico e o editor vê só os "ajustes pedidos"), *Finalização* (IA, thumbnail, YouTube) e *Histórico*. O episódio **nasce gravado**: quando o convidado vai para **Gravado**, ou pelo botão **Registrar episódio gravado** (quem sentou à mesa: convidado do CRM, convidado novo cadastrado ali, ou **só os hosts** — aí o patrocinador é obrigatório e pode ser cadastrado ali também). Funil: Gravado → Disponível para edição → Em edição → Em revisão → Em finalização → Pronto para publicar → Publicado. Cada passo tem trava (ver o botão "Próximo passo" no episódio).
+
+- **Revisão do vídeo**: comentar, resolver e apagar acontecem na própria página (sem recarregar; o vídeo segue onde estava). O player tem voltar/avançar 5 e 10 s, play/pause, velocidade (0,5× a 2×) e tempo; clicar na linha dos marcadores leva até o ponto. Atalhos no computador: espaço pausa, ← → 5 s, J L 10 s, `,` `.` um quadro, C comenta neste ponto, Ctrl/⌘+Enter envia.
+- **Papéis** (matriz provisória em `src/permissions.js`): produtora sobe o material bruto e edita capas (inclusive na hora de agendar o post); editor de vídeo assume a edição, envia o vídeo editado e mexe em capas; gestão revisa, aprova, finaliza, publica. Superadmin faz tudo.
+- **Material bruto e vídeo editado** (Backblaze B2 privado): envio em **partes de 16 MB** pelo servidor (sem CORS), com retomada de parte e verificação; download e player por **link assinado**. O editor vê patrocinadores do episódio (moldura, QR Code, restrições) e as observações da gestão.
+- **Ordem de edição** (`src/services/editOrder.js`): o editor vê o que editar primeiro (1º, 2º, 3º…), pela **data de veiculação**: entram os episódios disponíveis para edição e em edição (inclusive os que voltaram com ajustes pedidos), quem vai ao ar antes vem primeiro, no mesmo dia vale o número e sem data vai para o fim (ajuste não fura a fila). Aparece no **Início do editor** ("Ordem de edição", uma lista só, com a situação de cada um), em **Episódios** (as colunas Disponível para edição e Em edição nessa ordem, com a posição no cartão; coluna "Ordem" na lista) e na **página do episódio** ("1º na ordem de edição · vai ao ar…"). A data fica vermelha se já passou e âmbar se é hoje ou nos próximos 2 dias. **Liberar para edição** de um episódio sem data abre uma janela com a data de veiculação (opcional), e o aviso ao editor diz a posição.
+- **Checklists padronizados**: modelos editáveis; itens obrigatórios travam "enviar para revisão" e "finalizar". Editor e gestão marcam.
+- **Tarefas automáticas** (cortes, bastidores, extra) e **revisão com player**: comentários presos ao segundo do vídeo, resolvidos um a um; "pedir ajustes" volta para edição (contador de revisões).
+- **Transcrição logo depois do envio**: quando o vídeo editado termina de subir, o trabalho `transcricao` (pista pesada do `worker`) faz o FFmpeg ler o vídeo pelo link do Backblaze e guardar só o áudio (o vídeo passa pela rede, mas não ocupa o disco do servidor); a Groq transcreve e o texto fica guardado com o arquivo de origem. O card "Vídeo editado" mostra "Transcrição da versão N: pronta / em andamento". Versão nova do vídeo = transcrição nova. A análise por IA da finalização reaproveita esse texto (se não houver, transcreve como antes).
+- **Análise por IA** (ao aprovar para **Em finalização**, em segundo plano — fila no Postgres, roda no processo `worker`): FFmpeg extrai áudio e quadros → **Groq Whisper large-v3** transcreve com tempos → **Gemini** (`GEMINI_MODEL`, padrão `gemini-3.8-flash`) lê os quadros (rostos, legenda queimada, nitidez) e escreve 3 títulos, 3 textos de thumbnail, descrições do YouTube e Spotify, capítulos, tags, frases fortes e momentos para cortes, no tom da marca. **Tudo é validado contra os limites das plataformas** (`src/services/platformLimits.js`: YouTube título 100 / descrição 5000 bytes / tags 500 / thumbnail 1280×720 ≤ 2 MB; Instagram e TikTok 2200; Spotify) e a equipe edita antes de salvar. A IA só preenche o que está vazio.
+- **Capas e posts** (`src/public/design/engine.js`, o mesmo motor no servidor com `@napi-rs/canvas` e no navegador): 3 thumbnails, posts de frase, **tela dividida** e **carrossel** (preto → plum → bone). Regras: **nenhum texto sobre rosto**, nem sobre legenda queimada (a legenda é evitada, cortada fora ou **escondida por uma faixa escura**), dentro das zonas seguras de cada formato (Reels/TikTok: topo 300 px e base 300 px; grade do Instagram em 3:4), quebra de linha editorial (sem palavra pendurada nem linha órfã), contraste conferido e wordmark `pulso.` com o ponto lime. Cada capa tem uma **conferência** (problemas e avisos) e um **editor visual** simples: arrastar e redimensionar texto, fonte, cor, trocar o fundo por um **quadro do vídeo**, uma **fotografia do episódio** (material bruto, inclusive bastidores) **ou uma imagem sua** (a IA tenta achar os rostos; sem isso o editor avisa que não foi conferida), **girar, espelhar e ajustar a foto** (brilho, contraste, saturação, desfoque, preto e branco), sombra do texto **para qualquer lado**, contorno, **sugestões da IA para o texto** (atalhos ou pedido livre), zonas desenhadas por cima (zona segura, rostos, legendas, recorte do feed), desfazer e salvar. A thumbnail **aprovada** (a principal) é exigida para finalizar.
+- **Capas pelos modelos do guia** (`src/public/design/models.js`, `src/services/coverSheet.js`, `src/services/coverPieces.js`; guia do designer em `docs/referencias/capas/`): na Finalização, o passo **Capas e vídeos** gera de uma vez **3 thumbnails do YouTube** (uma por ângulo: curiosidade, contraste e autoridade, cada uma num modelo) e a **capa do Spotify** (3000 × 3000, abaixo de 512 KB). Os textos vêm da **ficha do episódio** (nome como aparece, credencial, frase literal conferida na transcrição, número dito, gancho por ângulo), escrita pela IA e editável. Cada peça passa pelo **teste de redução** (lê no tamanho do celular?), pelos limites de palavras do guia e pelo aviso de foto ampliada. **Ajustar** abre uma janela com prévia ao vivo: Texto, Modelo (8 de thumbnail, 3 de Spotify, 3 de Reels) e Foto (quadro do vídeo ou fotografia da gravação, tocar no rosto, aproximar, afastar, espelhar). Dá para aprovar várias thumbnails: a primeira é a principal e as outras saem num ZIP para o teste de miniatura do YouTube. Baixar entrega PNG quando cabe em 2 MB, senão JPG. Os **cortes** recebem 3 capas dos modelos de Reels (gancho, tarja central, frase literal). Capas antigas e posts seguem no editor visual.
+- **Versão para as redes (2.13)** (`src/services/socialRendition.js`, migração 109 `social_renditions`, trabalho `video_redes`): corte com lado menor acima de 1080 px ou acima de 12 Mbps ganha uma cópia em 1080p (H.264, CRF 20, até 10 Mbps, AAC 192k, o mesmo FFmpeg da versão leve) e só ela vai para as redes (`publishing.socialVersion`, na hora de enviar e na conferência 3 h antes; sem a cópia pronta, `em_preparo` e nova tentativa em minutos). Pedida ao terminar a leitura do corte e pela rotina `versao-redes` (cortes pesados com post na fila); cópia de arquivo que saiu do sistema é apagada. Erro na cópia = vai o original.
+- **Falhas de publicação e retomada (2.12)** (`publishing.resumeAfterOutage`, a cada volta do agendador, no máximo a cada 2 min; `contentBoard.failOf`): rede que falhou com `provedor_chave` ou `sem_conta` nos últimos 3 dias volta sozinha para a fila quando o provedor dela (rota de `social_routes`) responde com a conta da rede, de 20 em 20 min, longe do que já está agendado; no máximo 2 vezes por publicação (`options.resumed`); a gestão recebe um aviso. Em Conteúdo (Quadro, Cortes e Posts), filtros "Falha ao publicar", "Motivo da falha", "Rede que falhou" e "Leitura da IA incompleta", e o cartão diz onde falhou. "Reler com IA" em massa em Conteúdo > Cortes (`/conteudo/em-massa/cortes`, `acao=reler`).
+- **Editor completo de capas (2.11)** (`src/public/editor.js`, `views/episodes/editor.ejs`): o "Editar" do cartão abre o **editor completo** ou a janela **Ajustar pelo modelo**. O editor completo vale para todas as capas, inclusive as dos modelos do guia: cada parte (frase, destaque, tarja, nome, rótulo, logotipo, linha de pulso) muda de texto, fonte e peso (os pesos hospedados, os mesmos no navegador e no servidor), tamanho, cor (as da marca e outra cor), lugar e transparência; as palavras em destaque se marcam com um toque; o canto aumenta ou diminui; dá para adicionar texto, tarja, logotipo e linha, mudar a ordem, duplicar, ocultar, desfazer e refazer. A foto do modelo se aproxima, se enquadra e se espelha **dentro do painel** (o rosto fica no lugar; nunca sobra buraco), e a zona do rosto, a conferência e o teste de redução acompanham ao vivo. Ao salvar, o servidor confere o desenho (`specSanitizer` com a capa guardada como base: modelo, ficha, zona segura e escala do arquivo vêm dela), recalcula o rosto pela foto do desenho e aplica as regras das peças (`coverPieces.saveEdited`: 2 MB no YouTube, 3000 px e 512 KB no Spotify, teste de redução). A capa fica `spec.edited`: a ficha nova não a troca sozinha (vira "desatualizada"), e Atualizar e Ajustar pedem confirmação antes de montar de novo pelo modelo.
+- **Vídeos do convidado** (`src/services/videoScenes.js`, `src/services/guestVideos.js`, aba Vídeos do mesmo passo): **story de lançamento** (11 s, sem som) e **teaser** (15 s, com a frase na voz do convidado, tirada do vídeo editado, e a legenda palavra por palavra). Os quadros são desenhados pelo motor das capas e montados pelo FFmpeg em 1080 × 1920; ficam prontos em 1 a 2 minutos, em segundo plano. Saem sem trilha: ela entra na hora de postar.
+- **Conteúdo** (menu próprio, fora do card do episódio): abre num **quadro da linha de produção** (Pedido → Em produção → Em revisão → Pronto para postar → Na fila → Publicado, com as redes onde saiu) e tem as abas **cortes**, **posts de frase, tela dividida e carrosséis** e **pedidos**. **Pedidos de conteúdo**: a gestão ou a produtora pede ao editor um trailer do canal, vídeo avulso, corte, post, carrossel ou story (com ou sem episódio, briefing, prazo); o editor começa, entrega (vídeo ou imagens) e manda para a revisão; a gestão aprova ou pede ajustes; aprovado, entra no Social (avulso publica sem episódio). O episódio só mostra um resumo (publicados/total) e o link. O **editor sobe vários cortes de uma vez** (envio em partes, direto para o Backblaze); o sistema **lê cada vídeo** (formato, duração, fala com Groq, quadros e rostos com Gemini), dá o nome interno **Corte N** e sugere **título, legenda com hashtags e 3 capas**. Depois o corte é **atribuído a um episódio** (todo episódio já nasce gravado); ao atribuir, as capas são refeitas com o convidado e o número do episódio. Corte horizontal é aceito, com aviso (Reels/TikTok/Shorts pedem vertical). Os momentos que a IA achou no episódio aparecem só como **dica** do que cortar; nada é cortado sozinho. Sem a leitura de rostos da IA, o corte fica pronto e as capas esperam ("Ler de novo").
+- **Vídeo do episódio é horizontal**: o vídeo editado só é aceito se for **horizontal (largura > altura)**. O navegador confere antes de subir gigabytes; o servidor confere de novo com `ffprobe` e recusa vertical, quadrado ou arquivo ilegível (explicando que cortes verticais vão em Conteúdo). Desligue só em teste: `VIDEO_FORMAT_CHECK=false`.
+- **Publicação nas redes** (Upload-Post, `src/services/uploadPost.js` e `publishing.js`): **o episódio inteiro vai só para o YouTube** (título, descrição, tags e thumbnail aprovada; o link volta para o episódio); **cortes (publicados na página do corte, depois de atribuídos a um episódio) vão por padrão para TikTok, YouTube Shorts e Instagram Reels** (Reels com capa; Shorts sem thumbnail, que o YouTube não aceita). Só quem tem conta conectada no perfil do Upload-Post aparece liberado. Confere os limites antes de enviar, pede confirmação, aceita **agendamento** (nosso: o link do vídeo é gerado na hora de enviar), acompanha o andamento, permite tentar de novo e cancelar agendados. **Só a gestão publica.** **Automação de comentário → direct** (`src/services/commentAutomation.js`, webhook `POST /webhooks/outstand`): ao publicar, "Automação no Instagram" cria uma regra presa à publicação; o comentário chega pela Outstand (assinatura HMAC com o segredo de Integrações), vira `social_inbox` e o trabalho `comentario_recebido` responde no direct de quem comentou a palavra (uma vez por comentário), com os links de Social > Automações. **Publicar em massa** (`src/services/bulkPublish.js`, Conteúdo > Cortes): os cortes marcados viram uma agenda (redes, início, janela do dia, por dia, Reels de teste por dia), conferida numa página antes de criar uma publicação agendada por corte; **capas em lote** em `/conteudo/capas-em-lote` (escolher a capa e reescrever o texto, com IA para todos). **Chamada por rede** (`src/services/socialCopy.js`): a legenda vai sem chamada e cada rede recebe a sua no fim (YouTube: inscreva-se; Instagram: siga o perfil; TikTok: segue...), escrita pela IA para o corte (`episode_clips.ctas`) ou a padrão da rede; editável na janela de publicar e gravada em `options.ctas`. A IA de título, capa e legenda segue as regras de copy do mesmo arquivo (gancho, tensão, promessa concreta; frases genéricas proibidas).
+- ⚠️ **Modo de teste por padrão**: sem `UPLOAD_POST_LIVE=true` o painel monta e confere o pedido e marca como "simulado" — **nada é enviado às redes**. Ligue só depois de conectar as contas no Upload-Post e decidir publicar de verdade.
+- **Consumo da IA (2.10)** (`src/services/aiUsage.js`, `/gestao/consumo-ia`, migração 108): cada chamada ao Gemini (`gemini.generateJson`, `chat`, `chatStream`, inclusive as novas tentativas e as recusadas) grava uma linha em `ai_usage` com a função (`feature`), o modelo e os tokens de entrada, resposta e raciocínio. A tela mostra por função e por dia, com o custo estimado pelo preço de tabela (`GEMINI_PRICE_IN`/`GEMINI_PRICE_OUT`, padrão US$ 0,50 e 3,00 por milhão; a saída inclui o raciocínio) e avisa quando o Google recusa por créditos ou limite de gasto. Toda chamada vai com `thinkingLevel: 'low'` (quem precisar passa `thinking`). Linhas com mais de 400 dias saem na limpeza.
+- **Serviços externos** (chaves no `.env`): `BB_*`/`BUCKET_NAME`, `GROQ_APIKEY`, `GEMINI_KEY`, `UPLOAD_POST_KEY` (+ `UPLOAD_POST_USER`, `UPLOAD_POST_LIVE`). Sem chave, a parte correspondente fica desativada e a tela avisa. **Gemini no plano gratuito tem limite diário baixo** (vimos 20 chamadas/dia): uma análise de episódio usa ~4 chamadas, cada corte 2 (textos e capas) — para uso real ative o faturamento.
+- **FFmpeg** precisa estar instalado (o `Dockerfile` já instala). Os testes cortam vídeo de verdade.
+
+## Financeiro: contas, custos automáticos e estoque
+
+Menu **Financeiro** (gestão e superadmin; a produtora vê só o **Estoque**). Código em `src/services/finance.js`, `src/routes/finance.js`, `src/views/finance/`, migração `019_financeiro.sql`.
+
+- **De quem é o dinheiro** (`src/services/finOwner.js`, migração 100): todo lançamento é **de um projeto** ou **compartilhado**, com a divisão em `fin_entry_splits` somando o valor (nunca os dois, nunca nenhum). O que está ligado a um vídeo, convidado ou patrocinador **herda o projeto dele** (receita de patrocínio cai no projeto do contrato). Sem vínculo, o formulário tem **"De quem é"** (Pulso | Projeto 100 | Compartilhado, com os valores por projeto, meio a meio para começar); no compartilhado em branco, a divisão de hoje fica, na mesma proporção. O Financeiro segue o projeto escolhido no menu **e** o interruptor "Vê o financeiro" daquele projeto: um projeto mostra só o que é dele mais a parte dele nos compartilhados; em "Todos os projetos", o consolidado, com a sigla na linha. A soma dos projetos é sempre o consolidado. O **caixa inicial** é da casa: só entra no caixa de hoje quando o recorte é a casa toda.
+- **Resumo**: caixa hoje, a pagar em 7 dias, atrasado, resultado do mês, o que pede atenção, estoque para repor, projeção dos próximos 4 meses (entra, sai, caixa previsto), **resultado por projeto** (com mais de um à vista) e custo por episódio. O caixa parte de um saldo inicial (Custos automáticos > Estúdio e caixa).
+- **Contas** (`fin_entries`): tudo que se paga (**A pagar**) e se recebe (**A receber**), com **Histórico** por mês, busca, categoria e **exportação em planilha** (CSV com `;` para o contador). Novo lançamento pode ser parcelado (mensal). "Pagar/Receber" aceita outro valor e data (o lançamento guarda o que foi pago de verdade) e dá para desfazer.
+- **Estúdio automático**: o convidado ir para **Agendado** lança o **sinal** (padrão R$ 150, vence na hora). Ao **gravar o episódio** as contas migram para o episódio e nasce o **saldo** = duração × hora (R$ 300/h) − sinal. Registrar a **duração real** no episódio (aba Financeiro) refaz o saldo; se o saldo já foi pago, a diferença vira **hora extra**. Valores em Custos automáticos > Estúdio e caixa.
+- **Banco de horas do estúdio** (`src/services/hourBank.js`, migração 086): em Custos automáticos > Estúdio e caixa, **Ligar banco de horas** escolhe o primeiro episódio do banco e registra a primeira compra. A partir dele (mesmo dia em diante), as gravações não geram sinal, saldo nem hora extra: o convidado **Agendado** reserva a duração esperada e o episódio gravado usa a duração real (ou a esperada). Ao ligar, o estúdio ainda não pago desses episódios e das gravações marcadas é cancelado pelo sistema; o pago fica. O Resumo do Financeiro mostra o cartão (disponível = comprado − usado − reservado, pode ficar negativo), **Registrar compra** (despesa paga de estúdio) e "Ver uso". Com 3 h ou menos (ajustável), a rotina avisa a gestão uma vez por dia e faixa, e uma faixa aparece no Início e no Financeiro. **Com mais de um projeto**: o pacote continua um só, da casa, e o cartão mostra uma linha por projeto ("Pulso · 6,5 de 10 h"), com aviso quando um passa da **cota** (`fin_hour_quotas`, orçamento por compra, mudada em **Ajustar cotas**; a compra nova herda a proporção da anterior). A **despesa da compra é dividida pelo uso** de cada projeto — cada gravação consome horas do pacote mais antigo com saldo, pelo preço dele — e o que ainda não foi usado segue a cota, para a divisão somar sempre o valor pago.
+- **Custos automáticos por episódio** (`fin_rules`): edição, Uber dos hosts, etc. Cada regra tem o gatilho (gravação agendada, episódio gravado, episódio publicado), o valor e o vencimento (dia do gatilho, da gravação ou da veiculação ± dias). Mudar a data da gravação move os vencimentos ainda em aberto. **"Vale para"** diz em que projeto a regra vale (em branco = todos); o custo que ela gera é do projeto do vídeo ou do convidado que disparou.
+- **Custos mensais** (`fin_recurring`): salário da produtora, assinaturas… lançados todo mês com 3 meses de antecedência (rotina horária + ao abrir o resumo), sem duplicar. Como não têm vínculo de onde herdar, guardam **de quem é** (um projeto ou a divisão padrão) e repassam a cada mês lançado.
+- **Patrocínio**: na página do patrocinador, **Pagamento** → "Combinar pagamento" (à vista ou N parcelas mensais) lança as parcelas em **A receber**; o **primeiro recebimento confirma o pagamento** do patrocinador (exigido para ficar Ativo). "Refazer parcelas" só mexe no que falta receber.
+- **Estoque** (`fin_stock_items`, `fin_stock_moves`): canecas, caixas de presente, cartões… cada item tem **quanto sai por episódio**, prazo de reposição e custo médio. Cada **episódio gravado desconta sozinho** (uma vez só) e o sistema mostra **para quantos episódios dá, quando acaba e até quando comprar** (considerando episódios/mês e o prazo de reposição); itens sem uso fixo avisam por saldo mínimo. **Registrar compra** (quem mexe no financeiro) coloca no estoque, atualiza o custo médio e cria a conta a pagar (à vista, parcelada ou já paga). "Acertar ou dar baixa" cobre contagem, perda e brinde avulso. **Cada item é de um projeto ou compartilhado** (`fin_stock_items.project_id`, vazio = compartilhado): a lista mostra os do recorte e os compartilhados, e o vídeo gravado desconta só o que é do projeto dele ou compartilhado.
+- **Planilhas** (`utils/csv.js`: BOM, ";", número como número): financeiro do mês ou do ano (`/financeiro/exportar.csv?mes=` ou `?ano=`, com `q` e `cat`), convidados com os filtros da lista (`/convidados/exportar.csv`), plateia com os filtros do painel. Importação de convidados lê UTF-8 ou Windows-1252 e pede o projeto em "Todos".
+- **Comprovante** (anexos com `entity_type = 'fin_entry'` e `purpose` conta/pagamento): na janela de novo lançamento, na de editar e na de pagar (`partials/receipt-field.ejs` + `public/comprovante.js`, que envia pelo `/anexos` e põe o id no formulário); depois, pelo clipe da linha (`POST /financeiro/lancamentos/:id/comprovantes`). Quem vê é o financeiro do projeto do lançamento.
+- **Avisos**: a rotina `financeiro` (1 h) notifica a gestão (tipo "Financeiro", configurável em Gestão > Notificações) sobre contas vencendo em 3 dias/atrasadas, recebimentos atrasados e estoque a repor, no máximo uma vez por dia/mês. O painel inicial mostra uma faixa-resumo; a busca global acha contas e itens de estoque.
+- Apagar convidado, episódio ou patrocinador cancela o que era automático e ainda não foi pago (e devolve ao estoque o que o episódio gastou).
+- Permissões: `finance.read`/`finance.write` (superadmin, gestão), `stock.read`/`stock.write` (também produtora; sem ver valores nem comprar).
+
+### Parceria (acerto com o parceiro)
+
+`services/partnership.js`, aba **Financeiro > Parceria** (`/financeiro/parceria`, só quando algum projeto do recorte tem
+acordo) e o extrato público `/extrato/:token` (`routes/partnershipPublic.js`). O acordo (`partnerships`: parceiro, quem
+paga do bolso do lado dele, parte da casa no lucro, desde quando) do Projeto 100 nasce na migração 105 (Dr. José Bento e
+Pedro, 50%, desde 01/11/2026), editável na tela.
+
+- **A regra**: só o que foi pago ou recebido, desde o começo do acordo, do projeto mais a parte dele nos compartilhados.
+  `fin_entries.account` diz em que conta o dinheiro passou (`casa` | `parceiro`, com `account_person`). Enquanto a receita
+  não passa do custo, ela é devolução, repartida na proporção do que cada lado gastou; o excedente é lucro, que só é
+  dividido num acerto.
+- **Acerto** (`settle`): o lucro que a casa escolhe distribuir + a transferência que zera as contas
+  (`partnership_settlements.transfer_cents`: > 0 a casa paga, < 0 o parceiro repassa), gerada como conta da categoria
+  `acerto` (fora do resultado, do acerto e do custo por episódio).
+- **Caixa**: o que é da conta do parceiro não entra em `cashNow`, nos atrasados, no "a pagar em 7 dias" nem na projeção.
+- **Mês fechado** (`partnership_closings`): grava o extrato; `partnership.lockedReason` recusa editar, desfazer e pagar com
+  data no mês fechado. Reabrir pede motivo.
+
+## Pulso Podcast com Plateia
+
+Página **pública** `/plateia` (sem login, indexável) para o público pedir para assistir às gravações. Código: `src/routes/plateia.js` (público), `src/routes/plateiaAdmin.js` (interno), `src/services/audience.js`, `src/views/plateia/`, `src/public/plateia.{css,js}`, migração `021_plateia.sql`.
+
+- **Compartilhamento e SEO**: título, descrição, Open Graph e Twitter Card definidos em `routes/plateia.js`; imagem `src/public/og-plateia.jpg` (1200×630, foto da mesa do estúdio).
+- **Condições e aceite**: a página mostra o aviso "Condições da plateia" (episódio condicionado à conformidade e à disponibilidade do convidado; pode ser cancelado ou ter a plateia externa vetada sem aviso prévio; o valor será devolvido) e o pedido só segue com o checkbox "Li e aceito" marcado. O servidor recusa sem `terms: true`; guarda `terms_accepted_at` e `terms_version` no pedido (`TERMS_VERSION` em `services/audience.js`; mudou o texto, aumente a versão).
+- **Página do convidado** (`/plateia/com/:slug`, migração `051`, `services/audiencePage.js`, `views/plateia/guest.ejs`): no cadastro do convidado aberto para plateia, a aba **Página da plateia** ativa uma página só daquela gravação (endereço pelo nome). Personaliza: como será (texto), horário de chegada da plateia, até 6 fotos (moldura 4:3) e um bloco extra; o que fica vazio não aparece. O pedido é o mesmo da página geral (mesma janela, `plateia/_signup.ejs`). Fora da agenda (passou, lotou ou encerrou) a página mostra "Inscrições encerradas".
+- **Vídeo dos bastidores** (seção "Veja como é participar do Pulso Podcast", `plateia/_reels.ejs`, nas duas páginas, logo depois do topo): vertical 9:16, `app_settings` `plateia_reels_webm_key` (VP9/Opus), `plateia_reels_key` (MP4 H.264, para quem não toca WebM) e `plateia_reels_poster_key` (capa). `/plateia/video/bastidores.{webm,mp4}` redireciona para um link assinado do Backblaze (6 h) e a CSP da página libera o endereço do Backblaze em `media-src` só quando há vídeo. Sem as chaves, a seção não aparece. Para trocar: converter para 720×1280 (`-movflags +faststart` no MP4), subir ao B2 e trocar as três chaves.
+- **Topo**: "Conheça de perto [convidado]" (na geral, "quem move a saúde") + "e participe também da gravação" ; a lista de benefícios (`BENEFITS` em `routes/plateia.js`, `plateia/_benefits.ejs`) fica na seção do vídeo, abaixo do texto (sem vídeo, no topo).
+- **Link de parceiro** (`plateia_partners`): `/plateia/com/:slug/:token`, com nome do parceiro, logo opcional (aparece só no convite daquele link) e limite de vagas opcional. Quem entra por ele vê "participação isenta, convite de [parceiro]" (não indexável); o pedido leva `partner_id`/`partner_name`, não ganha link de pagamento e a janela de seleção já vem em "Isento". Vagas ocupadas = pedidos do parceiro que não estão em Não selecionado ou Desistiu; esgotado (ou desativado), o link mostra o valor normal e o pedido segue sem isenção.
+- **WhatsApp da produção** (`plateia/_whatsapp.ejs`, nas duas páginas): botão flutuante "Dúvidas? Fale com a produção" que abre o WhatsApp da produtora (`plateia_whatsapp`) com mensagem pronta; só aparece com o número informado. O clique conta como evento `contact` (Resultados) e vai ao Pixel como `Contact`.
+- **Card da gravação**: foto, nome, @ do Instagram (link), tema, data, horário e local. O valor fica só no topo da página e na janela de inscrição.
+- **Agenda automática**: sai dos convidados em **Agendado**, com data futura e "Aberto para plateia" marcado (padrão). No card do convidado (quando Agendado/Em agendamento) há a caixa "Aberto para plateia" para tirá-lo e o seletor de vagas (Disponível, Lotado, Inscrições encerradas). A foto do convidado é enviada no mesmo card (PNG/JPEG/WebP, até 5 MB; só é pública enquanto ele está na agenda). Tema = campo "Temas" do convidado.
+- **Plateia escolhida, não aberta**: a copy deixa claro que pedir participação **não garante a vaga**; a produção seleciona a plateia de cada gravação por afinidade com o convidado e o tema (vagas limitadas, tom de exclusividade sem urgência falsa). Situações do pedido: Novo pedido, Em avaliação, Selecionado, Não selecionado, Desistiu.
+- **Fluxo**: escolher o episódio → nome completo + WhatsApp (país, validação por país; BR com DDD) → revisão (convidado, data, horário, R$ se selecionado, duração + aviso de que **não confirma a vaga**) → "Continuar pelo WhatsApp" abre `wa.me/<produtora>` com a mensagem pronta. O pedido vira um **lead** já na etapa de revisão e **avisa a equipe** (notificação "Plateia"); quem não abrir o WhatsApp aparece como "não abriu o WhatsApp"; a mesma pessoa no mesmo episódio não duplica nem avisa de novo. Nada é cobrado nem confirmado pela página. O fundo do topo é o vídeo do media kit.
+- **Confirmar e cobrar**: no painel, o botão **Confirmar participação** pede o valor combinado (padrão R$ 197), o prazo e se já recebeu; a pessoa vira *Selecionada* e o valor entra em **Contas a receber** do Financeiro (categoria Plateia, `auto_key plateia-lead-<id>`). A produtora marca "Recebi o pagamento" (ou desfaz) ali mesmo; mudar para Não selecionado/Desistiu cancela a conta ainda não recebida (o que já foi recebido fica). Selecionar só é possível por essa janela. Migração 023.
+- **Valor da vaga**: o geral fica em Plateia > Ajustes; cada gravação pode ter o seu no cadastro do convidado ("Podcast com plateia" > editar; vazio = o geral). Página, agenda (com valores diferentes, cada cartão mostra o seu e o resumo diz "a partir de"), mensagem de WhatsApp, pedido e conta a receber usam o valor da gravação; pedidos já feitos guardam o valor da época.
+- **Medição**: UTMs, `fbclid`/`gclid` e origem ficam guardados no navegador (primeiro toque até aparecer uma campanha nova) e vão com cada evento e inscrição. Eventos: visita, clique na agenda, clique em "Quero participar" (com o episódio), formulário aberto, inscrição e abertura do WhatsApp (`plateia_events`, robôs ignorados). **Meta Pixel**: usa o do sistema (`META_PIXEL_ID`, com o do Pulso como padrão) ou o que a gestão informar em Plateia > Ajustes; dispara `PageView` e `ViewContent` ao abrir, `InitiateCheckout` ao abrir o formulário e **`Lead` ao enviar o formulário de interesse** (a conversão). **GA4** só carrega se a gestão informar o ID.
+- **Meta Pixel nas outras páginas públicas**: media kit, cadastro e portal do patrocinador, convite e portal do convidado mandam `PageView` e `ViewContent` (com o nome da página) por `src/public/pixel.js`. O convite e o portal do convidado têm o código secreto no endereço: aberto pelo navegador, o link guarda o código num cookie e vai para um endereço limpo (`/convite/abrir`, `/convidado/meu-portal`), para o código não ir para a Meta junto com o endereço da página. Robôs de pré-visualização continuam recebendo a página no próprio link. `META_PIXEL_ID=off` desliga o Pixel.
+- **Painel** (menu Plateia; produtora e gestão veem, só a gestão ajusta): Inscrições (WhatsApp direto, situação Novo/Em atendimento/Confirmado/Desistiu, exportação CSV), Agenda (o que está público agora), Resultados (funil, por episódio, por origem/UTM em 7/30/90 dias) e Ajustes (página no ar, preço R$ 197, duração, local, WhatsApp da produtora, IDs de rastreamento, imagens do topo e do estúdio).
+- Segurança: POSTs públicos com limite por IP, isca anti-robô, telefone e texto validados no servidor, CSP sem script inline, imagens validadas pelos primeiros bytes.
+
+## Portal do convidado
+
+Cada convidado com episódio tem a aba **Portal** no cadastro. **Ativar portal** cria uma página só dele (`/convidado/<token>`, sem login, fora dos buscadores) que se atualiza sozinha durante a semana do episódio:
+
+- **Cronograma**: os cortes em collab começam na segunda da semana em que o episódio sai, o episódio vai ao ar (data de veiculação) e os cortes exclusivos aparecem com ele. "Cronograma e aviso" ajusta as datas (vazio = automático).
+- **Posts em collab** (redes em ícones, abaixo de "Clique e veja:"): o sistema reconhece pelo @ do Instagram do cadastro no collab da publicação. Os demais posts do episódio aparecem em "Outros posts sobre você". O episódio no YouTube vira collab quando a equipe marca a collab do canal do convidado (que ele pode pedir pelo portal).
+- **Cortes exclusivos**: todo corte do episódio sem publicação, a não ser que a equipe tire ("tirar" na aba ou "tirar do portal" no corte). O convidado assiste, copia a legenda e baixa.
+- **Episódio e fotos**: o vídeo do YouTube e o player do Spotify incorporados (link que não dá para incorporar vira botão) e o link do Instagram; fotos do material que a equipe escolher, em galeria que passa sozinha, com "Baixar esta foto" e "Baixar todas" (um ZIP com todas, montado enquanto baixa).
+- **Calendário de posts**: o que está agendado no Social para o convidado (do episódio dele ou com o @ dele no collab) aparece sozinho, com dia, hora, redes e a capa; Reel de teste fica de fora, e o post que vai ao ar sai do calendário e entra na lista de posts. A equipe ainda pode montar à mão a previsão do que não foi agendado (data, horário provável e o que sai), na mesma lista.
+- **Vídeo do episódio para baixar**: desligado por padrão. A aba Portal libera ("liberar para baixar") a versão mais nova do vídeo editado; o portal acompanha cada versão nova.
+- **Validade**: o material fica disponível por 60 dias a partir do primeiro envio do link (a data aparece no portal). Depois o link mostra que expirou; a aba Portal estende por mais 60 dias.
+- **Avisos**: "Enviar link" manda por e-mail ou abre o WhatsApp com a mensagem pronta. Cada post novo em collab depois disso avisa o convidado: por e-mail sai sozinho (rotina de 10 min); no WhatsApp a equipe recebe um lembrete e usa "Avisar no WhatsApp".
+
+## Social: publicações, novo post, ideias, insights e automações
+
+**Números dos posts** (`src/services/postMetrics.js`, migração 078, rotina `metricas-posts` a cada 6 h): views, curtidas, comentários,
+compartilhamentos e alcance de cada publicação que saiu pelo painel nos últimos 90 dias, por rede (Outstand: `GET /v1/posts/{id}/analytics`,
+uma consulta por post; Zernio: lista de posts da conta, casada pelo link). Aparecem na publicação (por rede), no corte (total), no cartão do
+quadro e em Insights > "O que publicamos" ("Cortes que mais funcionaram"); os 5 mais vistos entram como referência no prompt de copy.
+**Agendados** (Conteúdo, aba `?vista=agenda`, `services/postAgenda.js`): o que sai ou saiu num dia ou numa semana, com o horário, as
+redes, a marca de Reel de teste e um mapa de horários (régua de 0h a 24h por dia). Os botões de voltar do corte, do pedido e da publicação
+levam de volta à lista de onde a pessoa veio, com os filtros (lembrança na aba do navegador).
+**Agenda da semana** (`/conteudo/semana`, `bulkPublish.weekPicks`): a semana montada com os cortes prontos, um episódio de cada vez, para
+conferir e agendar; "Ajustar" guarda as escolhas (`app_settings.piloto_semana`) e a rotina `piloto-semana` avisa a equipe na segunda de manhã.
+**Palavra no direct**: o webhook da Outstand também aceita `message.received`; a mensagem vira `social_inbox` e o trabalho `direct_recebido`
+responde na conversa (`POST /v1/conversations/{id}/messages`) quando há automação de Direct ativa com a palavra.
+
+**Menu Social** (`src/routes/social.js`, `src/services/social.js`). Tudo passa pelo Upload-Post e, **sem `UPLOAD_POST_LIVE=true`,
+nada sai para as redes** (posts, edições, respostas e directs ficam como "simulado"; leituras — números, comentários, directs — são reais).
+
+- **Publicações**: tudo o que foi publicado, agendado, testado ou deu erro (vídeo, post, carrossel, story), com filtros. No detalhe: onde saiu, links, tentar de novo, cancelar agendamento e **editar**. Agendado: muda texto e horário aqui. Publicado: a edição vai para as redes que deixam (**YouTube, Facebook, LinkedIn, X**); **Instagram, TikTok e Threads não permitem editar pela API** e a tela avisa.
+- **Novo post**: mostra **só o que ainda não foi usado** (publicação simulada ou com erro não "gasta" o conteúdo): cortes prontos, posts de imagem, carrosséis (slides na ordem) e stories (imagens verticais). Escolhe as redes conectadas, legenda e horário. Imagens vão por `/upload_photos` (story = `media_type=STORIES`, só Instagram).
+- **Ideias**: escolha um, vários ou todos os episódios com transcrição e o que quer (cortes, stories, carrosséis). O Gemini lê a conversa (com as marcas de tempo) e sugere título, gancho, trecho com início/fim e frase, slides e legenda. **Memória**: o pedido leva tudo o que já foi sugerido, cortado ou publicado do episódio e a resposta é filtrada (título igual ou parecido não entra). Ideia **aprovada vira tarefa** (corte vai para o editor do episódio); "Já fizemos" e "Descartar" saem da lista e continuam na memória. Vários episódios vão para a fila e avisam por notificação.
+- **Insights**: cada rede lida no provedor em que está conectada (o mesmo da publicação: hoje Instagram, Facebook, TikTok e Threads pela Outstand; YouTube e X pela Zernio). Resumo com seguidores e variação em 7 dias; aba por rede com os números de 30 dias, gráfico de seguidores por dia e os posts que mais renderam. Lidos no máximo uma vez por hora (o X pela Outstand, uma vez por dia, porque é cobrado) e guardados como a foto do dia. Código: `src/services/socialInsights.js`.
+- **Automações** (estilo ManyChat): gatilho **comentário** (num post ou nos 10 mais recentes; Instagram, Facebook ou YouTube) ou **direct** (Instagram), **palavras-chave** (sem caixa/acento; vazio = todos) e ação: **direct para quem comentou** (até 3 botões com link), **resposta pública** ou os dois. Nasce **pausada**; ativar pede confirmação e só responde o que chegar **depois** de ativar, **uma vez por comentário/mensagem** (tabela `social_events`). Roda a cada 5 minutos (ou "Rodar agora") e mostra a atividade (enviado, simulado, sem palavra-chave, erro). Limites da Meta: direct para comentário só até 7 dias; responder direct só até 24 h depois da mensagem da pessoa.
+- **Comentários (respostas por IA)**: a IA lê os comentários dos posts que saíram pela Outstand (Instagram, Facebook, Threads; na hora pelo aviso da Outstand e a cada hora pela leitura dos posts de 14 dias) e propõe responder (curto, no tom da marca, terminando com pergunta), reagir com um emoji, ignorar (conversa com o convidado, marcação, robô, vazio) ou chamar a equipe (pesado: orientação de saúde, ameaça, reclamação séria; gestão e produtora recebem o aviso "Comentários nas redes"). **Aprovar antes** (padrão) ou **automático**; a produtora aprova, edita e responde, a gestão liga e configura. Envio aos poucos: intervalo variado, até N por hora (padrão 25), só no horário (padrão 8h–23h), sem repetir o mesmo post em sequência; resposta enviada pode ser apagada. Cada publicação tem o interruptor "Respostas por IA". No Instagram, a IA também convida a seguir o Pulso em parte das respostas (no máximo 1 a cada 4, uma vez por pessoa) e manda, depois da resposta pública, um direct com o link da comunidade para quem comentou com conteúdo (até 150 por dia, um por pessoa a cada 30 dias, até 7 dias depois do comentário; o link vem de Social > Automações). **Números** (Social > Comentários > Números, por dia, e a faixa "Comentários nas redes" do Resumo do dia e do Seu dia): caminho do comentário à comunidade, quem voltou a comentar, posts que mais conversaram, saúde da automação (erros com o motivo, leituras, avisos) e barras de 30 em 30 minutos; o direct usa um link curto só dele para contar os cliques. Código: `src/services/commentReplies.js` e `src/services/commentStats.js`.
+- **Aprovação**: a **produtora monta o post e envia para revisão** (o post fica "Em revisão" e já reserva o conteúdo); a gestão recebe
+  aviso (e vê o contador no menu Social), **aprova** (agenda, se o horário pedido ainda está no futuro, ou publica na hora) ou **devolve
+  com nota**; quem pediu ajusta e reenvia, ou retira o pedido. Vale também para publicar um corte pela página dele.
+- **Permissões**: ver = superadmin, gestão e produtora; pedir post (`social.request`) e tocar ideias = os mesmos; publicar direto,
+  aprovar, editar posts e automatizar (`social.publish`, `social.automate`) = gestão e superadmin.
+
+## Colaboração: tarefas, comentários, notificações e busca
+
+- **Filtros combináveis** (botão **Filtros** em Convidados, Episódios, Patrocinadores e nas quatro abas de Conteúdo, no estilo do ClickUp; toda lista tem "Criado em" e "Atualizado em"): cada filtro é campo + condição + valor ("Etapa é Agendado ou Gravado", "E-mail está vazio", "Data da gravação nos últimos 7 dias", "Tem episódio: não"), e a lista mostra o que passa em todos (E) ou em qualquer um (OU). Convidados filtra etapa, responsável, perfil, os campos de texto, datas (gravação, estreia, cadastro, convite enviado/visto, resposta, na etapa desde) e conexões (patrocinador indicado, tem episódio, episódio publicado, reservado por patrocinador, foto, plateia, portal). Cortes filtra categoria, situação no Social, estado do vídeo, formato (vertical/horizontal, pela largura e altura), gancho, nome, legenda, convidado, duração, quem subiu, datas e conexões (episódio, pedido, capa, portal, Reel de teste). Os filtros vão no endereço (`f=campo~condição~valor`, `m=ou`), então dá para mandar o link. **Visualizações salvas** guardam uma combinação com nome, só sua ou da equipe. Campos e condições vêm de uma lista fechada no servidor (`services/filterFields.js`); o valor vai sempre como parâmetro.
+  Episódios filtra etapa, editor, título, número, convidado, recados, links, rodadas, datas (veiculação, gravação, publicação) e conexões (convidado, patrocinador, material, ajustes, tarefas, cortes, media kit). Patrocinadores filtra etapa, responsável, tipo, plano, contato, valor, origem, datas (contrato, pagamento, media kit visto, briefing) e conexões (logo, episódio, reserva, oficial/escondido no site, media kit). Quadro, Posts e Pedidos filtram tipo, etapa/situação, responsável, prazo, prioridade, atraso, aprovação e episódio.
+- **Campos do cartão**: em cada quadro, o botão **Campos do cartão** escolhe o que aparece nos cartões (padrão = o cartão de sempre; extras como e-mail, telefone, datas e contrato). A escolha fica no navegador de cada pessoa (`localStorage`); "Restaurar padrão" volta ao original. No quadro de Convidados, quem está em Gravado mostra a estreia prevista ou "estreia não preenchida".
+- **Categoria do vídeo**: todo vídeo de Conteúdo > Cortes tem um tipo de Gestão > Categorias (nasce do tipo do pedido; sem pedido, "Cortes do episódio"). Muda na página do vídeo ("mudar") ou em vários pela seleção (**Categoria**).
+- **Tarefas** (menu Tarefas): *Minhas tarefas*, *Hoje* (minhas que vencem hoje ou estão atrasadas) e *Todas*, em **lista** (agrupada em atrasadas, hoje, próximas, sem prazo, feitas), **quadro** (Kanban: a fazer, fazendo, feito, **bloqueada** — bloquear sempre pede o **motivo**) e **calendário** (pelo dia de vencimento). Uma tarefa pode ser solta ou ligada a um episódio, convidado ou patrocinador; cada uma tem página própria com comentários. Quem criou, o responsável e a gestão mexem; quem criou (ou a gestão) apaga.
+- **Estreia prevista** (convidado em Agendado, antes de existir o episódio): a data de publicação planejada. Aparece no site, no media kit ("Quem vem por aí", como estreia), no portal do patrocinador, no Calendário (publicação prevista) e no portal do convidado; quando o episódio nasce, vira a data de publicação dele.
+- **Categorias** (Gestão > Sistema > Categorias, permissão `catalog.manage`): os **tipos de vídeo** (Corte, Cortes do episódio, Trailer, Vídeo avulso, Q&A, Bastidores, Conteúdo extra, Outro e os que a gestão criar) e as **categorias de tarefa** (Geral, Cortes, Q&A, Bastidores, Conteúdo extra, Outro e as novas). Criar, renomear e desativar; nada se apaga, então o histórico continua com o nome. Desativado some das listas de escolha. Os tipos novos entram em Pedir conteúdo (grupo Vídeo) e na meta **Vídeos entregues** (por tipo: a primeira vez que cada vídeo foi enviado para revisão, de quem enviou; cortes do episódio seguem em "Cortes subidos"). Código: `services/catalog.js` (atualiza `C.TASK_KINDS` e `contentRequests.KINDS` a cada 30 s por processo), `routes/catalog.js`, tabelas `task_categories` e `video_types` (migração `083_categorias_e_rotinas.sql`).
+- **Rotinas que se repetem** (Gestão > Rotinas, "Repete"; ou "Repetir" na tarefa nova): todo dia útil, toda semana nos dias marcados ou todo mês no dia escolhido (num mês mais curto, o último dia), com hora opcional e responsável fixo ou ninguém. No dia, a partir das 5h, a rotina cria a tarefa ou o **pedido de conteúdo** (do tipo de vídeo escolhido), com vencimento no próprio dia; uma vez por dia, mesmo com dois processos (`services/recurring.js`, agendador `rotinas-recorrentes`). A tarefa que nasceu de uma repetição mostra "Repete: …" e "parar de repetir" (quem criou ou a gestão).
+- **Rotinas de tarefas** (Gestão > Rotinas): tarefas que nascem sozinhas em momentos da produção (episódio criado ou cada etapa), com **vencimento padrão** contado do gatilho, da gravação ou da veiculação, e responsável por regra (o editor, o responsável pelo convidado, uma pessoa fixa ou ninguém). O vencimento de cada tarefa continua editável. As três tarefas que já nasciam com o episódio viraram rotinas (cortes 7 dias após a gravação, bastidores 3, conteúdo extra 10).
+- **Comentários** em convidados, patrocinadores, episódios, cortes e tarefas. **@Nome** menciona e avisa a pessoa; o responsável pelo item e quem já comentou também são avisados.
+- **Reações nos comentários** (`src/services/reactions.js`): 6 emojis fixos, em comentários de item e da revisão do vídeo; quem escreveu recebe o aviso `reacao`, ligado por padrão, que cada pessoa silencia em Notificações.
+- **Responsável na bolinha** (como no ClickUp): clique no avatar para trocar o responsável do convidado, do patrocinador, o editor do episódio ou o responsável da tarefa, nos quadros, listas e páginas. A pessoa escolhida é avisada.
+- **Notificações** (sino no menu, com contador que se atualiza sozinho): **tarefas** (atribuída a você, bloqueada, concluída, vence hoje, atrasada), **comentários**, **agendamentos concluídos** (convidado agendado) e **rotinas do sistema** (análise por IA pronta ou com erro, corte lido, publicação, patrocinador respondeu o formulário). Cada pessoa silencia o que não quer; a gestão define, por tipo, se vai para o painel, se vai por e-mail e quais perfis recebem os avisos gerais. Ninguém é avisado da própria ação.
+- **Painel de gestão** (menu Gestão): usuários, **logs** (auditoria), notificações, rotinas de tarefas, busca global e integrações, com abas em comum.
+- **Busca global** (**Ctrl/⌘ + K** ou **/**): busca convidados, patrocinadores, episódios (inclusive "ep 12"), tarefas, cortes, comentários e pessoas, e executa atalhos (criar convidado, nova tarefa, enviar cortes, ir para…, alternar tema). Novos tipos de dados entram com um provedor em `src/services/search.js`; novos atalhos, em `ACTIONS` no mesmo arquivo.
 
 ## Rodando localmente
 
-Requisitos: Node 22+ e um Postgres.
+Requisitos: Node 22+, um Postgres e **FFmpeg** (`brew install ffmpeg`) para a parte de episódios.
 
 ```bash
 cp .env.example .env          # preencha PODCAST_DATABASE_URL e, se quiser, Brevo/YOURLS
@@ -76,6 +488,8 @@ npm run dev                   # http://localhost:3100
 
 Dicas de dev:
 
+- ⚠️ Variáveis já exportadas no seu terminal **têm prioridade sobre o `.env`**. Se o shell tiver `YOURLS_LINK`/`YOURLS_KEY` reais,
+  o `npm run dev` cria links de verdade no YOURLS mesmo com o `.env` vazio: rode `YOURLS_LINK= YOURLS_KEY= npm run dev`.
 - `MAIL_DRY_RUN=true` não envia e-mail; só registra no console.
 - Para não criar links no YOURLS de verdade enquanto testa, deixe `YOURLS_LINK`/`YOURLS_KEY` vazios
   (o sistema usa o link completo). Em **Integrações** há um teste de conexão que **não grava nada**.
@@ -89,7 +503,11 @@ Veja `.env.example` (comentado). Resumo:
 - **Brevo (SMTP)**: `BREVO_SERVER`, `BREVO_PORT`, `BREVO_USER` (login SMTP), `BREVO_CHAVE_SMTP` (chave SMTP,
   não a chave de API), `BREVO_EMAIL` (remetente validado), `BREVO_FROM_NAME` (opcional).
 - **YOURLS**: `YOURLS_LINK` (host), `YOURLS_KEY` (signature da página *Tools* do YOURLS).
-- **Opcionais**: `PUBLIC_BASE_URL` (domínio dos convites), `PODCAST_NAME`, `AUTO_MIGRATE`, `PORT`.
+- **Patrocinadores**: `BB_KEY_ID`, `BB_APPLICATION_KEY`, `BUCKET_NAME` (Backblaze B2; `BB_ENDPOINT` e `BB_PREFIX` são descobertos pela chave, só informe para forçar), `GROQ_APIKEY` (transcrição de voz; `GROQ_WHISPER_MODEL` opcional) e `PATROCINIO_WHATSAPP`.
+- **Episódios**: `GEMINI_KEY` (`GEMINI_MODEL` opcional), `UPLOAD_POST_KEY`, `UPLOAD_POST_USER` (padrão `default`), `UPLOAD_POST_LIVE` (**padrão `false`: só simula**), `ROLE` (`web`, `worker` ou `all`, padrão `all`; ver Arquitetura), `VIDEO_FORMAT_CHECK` (padrão `true`; `false` só em teste), `UPLOAD_PART_BYTES` (só em teste).
+- **Opcionais**: `PUBLIC_BASE_URL` (endereço público quando o projeto não tem o seu), `PRODUCAO_WHATSAPP` (destino dos botões do convite), `AUTO_MIGRATE`, `PORT`. O nome que quem está de fora lê fica em Gestão > Projetos (nome público), não em variável.
+- **"Não sou robô" (Cloudflare Turnstile)**: `TURNSTILE_SITE_KEY` (pública) e `TURNSTILE_SECRET_KEY`. Com as duas, o login, o "Esqueci minha senha", o link do estúdio (uma vez, vale 12 h), o pedido da plateia e os formulários do site pedem a confirmação; sem elas, desligado. Se o Cloudflare não responder, deixa passar e os limites de tentativa continuam valendo.
+- **Site do Pulso**: `SITE_ORIGIN` (origens do podcastpulso.com, separadas por vírgula; padrão `https://podcastpulso.com,https://www.podcastpulso.com`). Só elas recebem CORS e mandam os formulários; a primeira é o endereço para onde os formulários sem JavaScript voltam (`/obrigado/` ou `/ops/`). Ver [Site do Pulso](#site-do-pulso-podcastpulsocom).
 
 ## Testes
 
@@ -99,7 +517,18 @@ TEST_DATABASE_URL=postgresql://usuario:senha@localhost:5432/pulso_test npm test
 ```
 
 Cobre autenticação, CSRF, roles, CRUD de usuários, fluxo completo do convite (YOURLS **simulado**,
-e-mail em dry-run — nada externo é chamado), página pública, RSVP, modelos e o convite do Pulso.
+e-mail em dry-run — nada externo é chamado), página pública, rastreio de cliques, regras de etapa, importação CSV, o convite do Pulso a central de patrocinadores e a **produção de episódios** (Backblaze, Groq, Gemini e Upload-Post **simulados**; a suíte bloqueia qualquer chamada real a eles; os cortes e a análise rodam FFmpeg de verdade).
+
+## Deploy numa VPS única (Docker Compose + Caddy)
+
+**Domínios**: `DOMINIO` (o de sempre, `sistema.podcastpulso.com`) e `DOMINIOS_EXTRAS` (separados por espaço: o painel
+`studio.healthscale.com.br` e o endereço público de cada projeto, como `links.projeto100.com`) no `deploy/.env`; o Caddy
+emite o certificado de cada um. `APP_BASE_URL` é o painel; `PUBLIC_BASE_URL` é o endereço público de sempre (sem ele, os
+links públicos seguiriam o painel). Quem decide o que abre em cada domínio é `services/hostContext.js`, com o endereço de
+cada projeto em Gestão > Projetos. Ao trocar o domínio do painel: os domínios novos entram no widget do "Não sou robô" do
+Cloudflare, e o envio direto ao Backblaze é religado em Integrações (o CORS passa a listar todas as origens).
+
+`deploy/instalar.sh` instala o Docker, baixa o código, gera `SESSION_SECRET` e a senha do Postgres, pergunta o domínio e o e-mail do superadmin e sobe Postgres + painel (web) + fila/rotinas (worker) + Caddy com HTTPS automático (`deploy/docker-compose.yml`). **O domínio precisa apontar (DNS tipo A) para o IP do servidor antes**; sem domínio, basta apertar Enter e o script usa `<ip-com-tracos>.sslip.io`, que já tem HTTPS. Sem HTTPS o login não funciona em produção (cookie Secure). O script também cria 2 GB de swap em VPS pequena e agenda backup diário do banco (`deploy/backup.sh`): 14 dias em `/opt/pulso-backups` e uma cópia no Backblaze (`<prefixo>/backups/banco/`, 30 dias; bucket próprio com `BACKUP_BUCKET_NAME`, `BACKUP_BB_KEY_ID`, `BACKUP_BB_APPLICATION_KEY`). O SSH da VPS de produção só aceita chave, com fail2ban. Segredos e integrações ficam em `deploy/.env` no servidor (nunca no git). Atualizar: `cd /opt/pulso && git pull && cd deploy && docker compose up -d --build`.
 
 ## Deploy (Docker Swarm + Traefik)
 
@@ -112,24 +541,307 @@ Padrão da VPS (Docker Swarm + Traefik). Em linhas gerais:
 5. Crie o 1º superadmin dentro do container: `docker exec -it <container> node src/scripts/createSuperadmin.js voce@dominio.com "Seu Nome"`.
 6. Em **Integrações**, clique em *Testar conexão* (YOURLS) e *Enviar e-mail de teste* (Brevo).
 
-Mantenha **1 réplica** (o limitador de tentativas de login fica em memória).
+Dois serviços com a mesma imagem: **`pulso_gestao`** (`ROLE=web`, pode ter várias réplicas) e **`pulso_worker`** (`ROLE=worker`: fila e
+rotinas). Numa máquina só, um serviço com `ROLE=all` (padrão) também funciona. Depois do deploy, confira **Gestão > Sistema**.
 Na Brevo, o remetente (`BREVO_EMAIL`) e o domínio precisam estar validados (SPF/DKIM) para não cair em spam.
 
-## Modelos de convite (HTML)
+## Lembretes da gravação e aviso de aceite
 
-Em **Modelos** você cola o HTML do convite e usa variáveis `{{assim}}`. Valores são sempre escapados.
+- **Aceite do convite**: quando o convidado aceita (ou recusa) pelo link, vira notificação no painel (tipo "Respostas ao convite"): vai para quem cuida do convidado e para os perfis escolhidos em Gestão > Notificações (padrão: gestão, produtora e superadmin). O e-mail ao responsável continua.
+- **Lembretes** (`src/services/reminders.js`, tabela `guest_reminders`, migração `026`): com o convidado em **Agendado**, o sistema monta a agenda e, na hora de cada lembrete, avisa a produtora (tipo "Lembretes da gravação"; push também, se ligado). A mensagem fica pronta no card "Lembretes da gravação" da página do convidado, com **Enviar pelo WhatsApp** (um link para o `wa.me` que abre a conversa já com o texto, e o sistema marca como enviado em segundo plano; a produtora ainda aperta enviar no WhatsApp), **Reenviar pelo WhatsApp** depois de enviado (conta "2×" e atualiza quem e quando) e "Já enviei" para quem mandou por outro canal.
+  - **3 dias antes** (lembrar a data) · **1 dia antes** (confirmar que está tudo certo) · **no dia, de manhã** (com o endereço) · **3 horas antes** (saber se está tudo certo).
+  - Gravação cedo (antes de manhã + 3 h): sem lembretes no dia; o de 1 dia antes leva o endereço. Lembrete do dia e o de 3 horas a menos de 1h30 um do outro: fica só o de 3 horas, com o endereço.
+  - Remarcar refaz o ciclo; sair de Agendado cancela o que não foi enviado. Uma rotina (5 min) dispara os avisos, uma vez cada.
+  - **Onde a produtora trabalha**: **Notificações > Lembretes da gravação** (aba ao lado de "Avisos", com o número dos que esperam). A fila mostra "Na hora de mandar" (mensagem pronta, botão do WhatsApp e "Já enviei"), "Próximos" (o próximo de cada convidado agendado) e "Enviados nos últimos 7 dias". A mesma mensagem aparece no card da página do convidado. A rotina não avisa lembrete vencido: se a hora do próximo já passou, o anterior perde a vez.
+  - **Gestão > Lembretes da gravação**: endereço do estúdio, horário da manhã (padrão 09:00) e os quatro textos, com `{primeiro_nome}`, `{nome}`, `{dia}`, `{data}`, `{hora}` e `{endereco}`.
 
-- `{{nome}}`, `{{primeiro_nome}}`, `{{empresa}}`, `{{cargo}}`, `{{tema}}`, `{{data_gravacao}}`, `{{responsavel}}`, `{{podcast}}`, `{{link_convite}}`
-- `{{genero}}` (`m`/`f`) e `{{plural}}` (`1` quando for dupla)
-- `{{guest_json}}` — `{nome, plural, sexo}` em JSON seguro para usar dentro de `<script>`
-- `{{bloco_resposta}}` — botões "Aceito / Não consigo participar" prontos (sem ele o convidado não responde pela página)
+## Menu lateral e quadros
 
-O modelo padrão (`src/templates/convite-pulso.html`) é o convite do Pulso que antes era personalizado
-por URL (`?nome=…&s=f`): agora o servidor injeta os dados, as fotos foram extraídas do HTML para
-`src/public/convite/` (o arquivo caiu de ~1 MB para ~42 KB) e foi acrescentado o bloco de resposta
-na seção final. Para usar outro HTML, crie um novo modelo e marque como padrão.
+- **Menu recolhível** (computador): o botão no topo do menu leva a só ícones (76 px, com o nome na dica e "p." no lugar do logo); a escolha fica guardada neste navegador e vale em todas as telas (`theme.js` aplica antes de pintar). No celular o menu vira a barra de baixo (ver "App no celular"). Em tela baixa só a lista de itens rola; usuário, tema e "Sair" ficam sempre à vista.
+- **Quadros (Kanban)** de Episódios, Convidados, Patrocinadores e Tarefas ocupam a altura da tela: a **barra de rolagem horizontal fica no pé da tela** (grossa e sempre visível) e **cada coluna rola para baixo sozinha** quando tem cartões demais, como no ClickUp. No celular, o quadro rola normalmente com a página.
 
-Imagens, fontes e CSS externos do modelo precisam ser `https://`. Limite de 200 KB por modelo.
+## Pagamento da plateia (InfinitePay)
+
+Código: `src/services/infinitePay.js`, `src/routes/infinitepay.js`, migração `034_infinitepay.sql` (`plateia_pay_links`). Documentação da InfinitePay: https://www.infinitepay.io/checkout-documentacao. Para ligar: informe `INFINITEPAY_HANDLE` (InfiniteTag sem o `$`) no `deploy/.env` e ative o **checkout externo** em app.infinitepay.io/external-checkout. Fluxo: a produtora muda o pedido para **Em avaliação** e o sistema cria o link (`POST https://api.checkout.infinitepay.io/links`, valor em centavos, `order_nsu` = `pl<pedido>-<aleatório>`, `webhook_url` e `redirect_url` já no link) com o valor da página; no pedido, "Link de pagamento" permite **copiar**, **enviar pelo WhatsApp** e **alterar o valor** (cria um link novo; o anterior fica "substituído", mas se alguém pagar por ele o pagamento vale igual). Pagou: a InfinitePay chama `POST /webhooks/infinitepay/<segredo>`; como o webhook **não é assinado**, o endereço leva um segredo (derivado do `SESSION_SECRET`, ou `INFINITEPAY_WEBHOOK_SECRET`) e o sistema só aceita depois de perguntar à API (`payment_check`) se o pagamento existe. Então o pedido vira Selecionado, a conta entra como **paga** no Financeiro (valor `amount`; o `paid_amount` com taxa fica no link), a equipe é avisada, e reenvios do webhook (mesmo `transaction_nsu`) não duplicam. Respostas: 200 recebido/duplicado/desconhecido, 400 quando a API não confirma (a InfinitePay tenta de novo). O cliente volta para `/plateia/pagamento-concluido`. Em **Gestão > Integrações** há o status e um botão que gera um link de teste de R$ 1,00. O "Confirmar participação" manual continua valendo (dinheiro, transferência).
+
+## WhatsApp dos convites
+
+**Gestão > Convites e parcerias > WhatsApp dos convites** (`contacts.manage`; `src/services/contacts.js`). Define para onde vai quem clica nos botões do convite do convidado ("Aceitar o convite", "Falar com a produção") e do media kit/portal do patrocinador ("Quero ser patrocinador", "Falar com a equipe"): o **número** e a **mensagem pronta** de cada botão (`{nome}` = convidado ou empresa, `{podcast}`). Em branco vale o padrão do servidor (`PRODUCAO_WHATSAPP`, `PATROCINIO_WHATSAPP`) e as mensagens de sempre. O WhatsApp da página pública da plateia continua em Plateia > Ajustes. O menu da gestão tem grupos com abas internas (Visão geral, Equipe, Operação, Convites e parcerias, Sistema).
+
+## Resumo do dia no Início
+
+O Início (de quem não é só editor de vídeo) abre com o **Resumo do dia**. O número grande é o do dia; embaixo, como estava no fim
+daquele dia (hoje: até agora). As setas e o calendário levam a qualquer dia desde o primeiro convidado cadastrado, e o dia vai no
+endereço (`/?dia=2026-11-17`). Cada número leva à lista dele.
+
+- **Visual**: um painel só. "Do convite ao episódio", "Da prospecção ao patrocínio" e "Conteúdo" são caminhos desenhados como uma linha
+  com pontos (o ponto aceso é onde algo aconteceu no dia; número zerado fica apagado); "Redes e tarefas" fica embaixo, em células. Hoje
+  aparece com o ponto "ao vivo".
+- **Convidados**: **Convites enviados** (entrou em Convite enviado no dia; embaixo, quantos aguardam resposta), **Aceitos** (saiu de
+  Prospecção, Convite enviado ou Perdido para Em agendamento ou Agendado; embaixo, quantos estão em agendamento), **Agendados** (entraram
+  em Agendado no dia; embaixo, quantos têm data marcada) e **Perdidos** no dia (ao lado do título). Mudança desfeita no mesmo dia (arrastou
+  errado e voltou) não conta.
+- **Patrocínio** (logo abaixo dos convidados; quem vê patrocinadores): **Entraram em prospecção** (pelo cadastro ou voltando para
+  Prospecção; embaixo, quantos estão em prospecção), **Abordados** (a primeira abordagem do ciclo registrada no dia, em Registrar
+  abordagem; embaixo, quantos estão em Prospecção sem nenhuma abordagem), **Follow-ups** (patrocinadores já abordados que receberam contato
+  de novo no dia, um por patrocinador mesmo por mais de um canal; embaixo, hoje, os follow-ups para hoje e os atrasados da cadência; num dia
+  que passou, quantos ficaram atrasados), **Interessados** (entraram em Em negociação; embaixo, quantos estão em negociação), **Fechados**
+  (entraram em Ganho, ou em Ativo sem passar por Ganho; embaixo, os patrocínios ativos) e **Perdidos** no dia (ao lado do título). O ciclo
+  da cadência começa quando o patrocinador entra em Prospecção, e cada abordagem pertence ao ciclo em que foi registrada. As etapas vêm do
+  `sponsor_stage_log` (toda mudança de etapa, de qualquer caminho, por gatilho).
+- **Episódios** (no mesmo caminho dos convidados): **Gravados** no dia (pela data da gravação; embaixo, quantos estão gravados e ainda
+  sem publicar) e **Publicados** no dia (embaixo, o total no ar).
+- **Conteúdo**: **Cortes subidos** (pelo editor; o que a gestão subiu aparece à parte), **Revisões** (versão nova de um corte que já
+  existia), **Agendados para hoje** (cortes e posts marcados para o dia, pela hora marcada: quantos já saíram, quantos ainda vão sair e
+  se algum deu erro; num dia que passou, quantos não saíram), **Cortes postados** (cada corte uma vez no dia, na hora em que foi ao ar: a
+  da rede, a agendada ou a do envio) e **Reels de teste** (publicação marcada como Reel de teste que foi ao ar no Instagram).
+- **Redes e tarefas**: seguidores no **Instagram** e inscritos no **YouTube** (o saldo do dia: a última leitura do dia menos a do dia
+  anterior; sem a nossa leitura, a série de totais do provedor; senão, "sem leitura"; embaixo, o total e o saldo da semana) e **Tarefas
+  atrasadas** (no fim do dia; hoje, agora).
+- **Por que os convidados foram perdidos** (logo abaixo do caminho dos convidados): os motivos marcados nos convidados que entraram em
+  Perdido nos últimos 30 dias até o dia escolhido (e continuavam perdidos no fim dele), do mais comum para o menos, com a quantidade, a
+  porcentagem e uma barra.
+- **Registro das etapas**: a tabela `guest_stage_log` (migração `079_resumo_do_dia.sql`) guarda toda mudança de etapa por gatilho, venha
+  de onde vier (quadro, cadastro, edição em massa, aceite ou recusa pelo link, convite por e-mail, importação). O passado foi refeito pela
+  linha do tempo dos convidados (`guest_stage_backfill()`).
+- **Leitura do fim do dia**: a rotina `insights-fim-do-dia` lê Instagram e YouTube de novo depois das 23:40, para o saldo fechar perto da
+  meia-noite (a rotina `insights` lê as redes de 3 em 3 horas).
+- Código: `src/services/daySummary.js`, `src/views/partials/day-summary.ejs`.
+
+## Início da produtora (Seu dia)
+
+A produtora abre o Início no **Seu dia**, os números dela no mesmo desenho do Resumo do dia, com as mesmas setas e calendário. O botão
+**Seu dia | Equipe** troca para o resumo da equipe (`/?visao=equipe`), e a escolha segue junto ao trocar de dia. As outras pessoas abrem
+direto no resumo da equipe. O que é dela: convidados e patrocinadores de que ela é responsável (nos follow-ups e no que está quente,
+também os sem responsável); abordagens, por quem registrou; reuniões, por quem marcou; tarefas, pela pessoa da tarefa.
+
+- **Plano do dia (feito de previsto)**: o número grande é o feito; ao lado, o previsto ou a meta; embaixo, uma barra (lime só quando a
+  meta é batida).
+  - **Abordagens novas de patrocinadores**: a primeira abordagem de cada patrocinador no ciclo (follow-up não conta), contra a meta
+    diária dela; embaixo, quantos patrocinadores dela estão a abordar.
+  - **Follow-ups de patrocinadores** e **de convidados**: os marcados para o dia (a cadência como estava quando o dia começou) e quantos
+    ela fez. Feito = recebeu contato no dia ou saiu da etapa nele (respondeu, avançou ou foi perdido). Embaixo, quantos faltam (num dia
+    que passou, quantos ficaram sem fazer) e os atrasados de antes que seguem sem contato.
+  - **Convites enviados**: contra a meta diária de convites; embaixo, quantos aguardam resposta.
+  - **Tarefas**: as com prazo no dia e quantas ela fez; embaixo, quantas faltam e as atrasadas.
+  - Meta por dia útil não vale no fim de semana. As metas que não estão no plano (por semana, por mês ou de outra coisa) aparecem em
+    **Minhas metas**, no fim do painel.
+- **O que o dia rendeu**: convites aceitos (embaixo, quantos estão em agendamento), convidados perdidos (com o motivo), patrocinadores
+  interessados (foram para Em negociação), reuniões que ela marcou (e a próxima) e patrocínios fechados (embaixo, os ativos).
+- **Por que seus convidados foram perdidos**: os motivos dos últimos 30 dias, como no resumo da equipe, só com os convidados dela.
+- **Hoje**: os follow-ups que faltam e **Quentes agora**: patrocinador que abriu o media kit ou pediu uma conversa e convidado que abriu
+  o convite e não respondeu, nas últimas 48 horas e sem abordagem registrada depois (os 5 mais recentes). Embaixo, os **aceitos sem
+  data** (convidados em Em agendamento) com há quantos dias, em média.
+- **Próximas gravações e reuniões** (todas as gravações e as reuniões dela) e **Suas tarefas** (abertas, com prazo até daqui a uma
+  semana ou já vencido), no lugar de "Próximas gravações" e "Atividade recente".
+- Código: `src/services/myDay.js`, `src/views/partials/my-day.ejs`, `today-producer.ejs`, `producer-agenda.ejs`, `day-nav.ejs` e
+  `loss-reasons.ejs`.
+
+## Metas por pessoa
+
+Em **Gestão > Equipe > Metas** (permissão `goals.manage`: gestão e superadmin), cada pessoa ativa ganha até **3 metas**. Cada meta tem:
+**o que contar** (escolhido por categoria), **o período** (por dia útil, que não cobra sábado e domingo; por semana, de segunda a domingo;
+por mês), **o alvo** e **como aparece** (número "12 de 20" ou porcentagem da meta; taxa aparece sempre em porcentagem e vai até 100).
+O sistema conta sozinho (`src/services/goals.js`, tabela `user_goals`, migração `080_metas.sql`):
+
+- **Convidados** (dos convidados de que a pessoa é responsável): convites enviados, convites aceitos, gravações marcadas, taxa de aceite
+  (aceites ÷ convites enviados) e abordagens de convidados (as que a pessoa registrou).
+- **Patrocinadores**: abordagens novas de patrocinadores (a primeira abordagem de cada patrocinador no ciclo, registrada pela pessoa;
+  follow-up não conta), reuniões agendadas (marcadas pela pessoa, sem as canceladas) e patrocínios fechados (patrocinadores dela que
+  entraram em Ganho).
+- **Conteúdo**: cortes subidos e revisões de corte (versões novas que a pessoa subiu) e posts publicados (os dela que foram ao ar).
+- **Produção**: episódios entregues para revisão (contam as reentregas depois de ajustes) e episódios publicados (da equipe).
+- **Tarefas**: tarefas concluídas e tarefas no prazo (feitas até o prazo ÷ feitas com prazo).
+- **Da equipe** (o mesmo número para quem tiver a meta): seguidores no Instagram, inscritos no YouTube, cortes postados e Reels de teste.
+
+Cada pessoa vê as dela no **Início** (no cartão "Hoje"; o editor, embaixo do "Seu ritmo"; a produtora, no plano do Seu dia e em Minhas metas), com quanto já fez, a barra de andamento (lime
+quando bate) e quanto falta até o fim do período. A página da gestão mostra todas as pessoas com o andamento e, embaixo, o que cada
+métrica conta. A antiga meta diária de abordagens de patrocinadores da Cadência virou uma meta (`abordagens_patrocinadores`, por dia
+útil), com o mesmo número para quem tinha; produtora nova não ganha meta sozinha.
+
+**Seu ritmo** (Início do editor): cortes subidos e revisões de corte de hoje e da semana, episódios entregues na semana (e quantos foram
+reentregas depois de ajustes) e a próxima entrega (o 1º da ordem de edição), com as metas dele embaixo.
+
+## Página pós-gravação
+
+`/pos-gravacao` (endereço completo em Gestão > WhatsApp dos convites, com "Abrir" e "Copiar link") é a página do **QR Code do cartão
+de agradecimento**: a mesma para todos os convidados, sem login, sem link no resto do site e fora dos buscadores (`noindex` no cabeçalho e
+na página). Agradece, mostra o que acontece depois da gravação (triagem e edição; na sexta-feira antes do episódio, o portal do convidado com a
+data do episódio; bastidores e aviso na semana; episódio e cortes no ar), o que tem no portal (fotos, o episódio com os links do YouTube
+e do Spotify, posts em collab em tempo real, a agenda dos cortes e os cortes inéditos), os cortes em collab (distribuição em parceria, sem custo), as redes onde o Pulso posta e o WhatsApp da produção. O número e a
+mensagem do WhatsApp ("Na página pós-gravação") ficam em Gestão > WhatsApp dos convites; o texto da página está em
+`src/views/portal/pos-gravacao.ejs` (rota `src/routes/postRecording.js`). Para o cartão: aponte o link do QR Code para esse endereço.
+
+## Site do Pulso (podcastpulso.com)
+
+O sistema é a fonte dos dados do site e recebe os formulários dele (`src/routes/siteApi.js`, sem login nem CSRF; migração 084).
+
+- **`GET /api/site/v1/dados`** (`src/services/siteData.js`): um JSON só, contrato versionado (`version: 1`), com `mesa`, `episodios`, `posts`, `agenda` (`vai_ao_ar` e `gravacoes`), `patrocinador_oficial`, `apoiadores` e `plateia`. Só o que já é público: nada de telefone, e-mail, valores, responsável, notas ou tokens. Cache de 60 s, CORS só para `SITE_ORIGIN`, limite por IP.
+- **Imagens** (`src/services/siteImages.js`): foto do convidado, logo do patrocinador (a principal, já pronta) e capa de post vão em endereço absoluto assinado (`/api/site/v1/imagem/:tipo/:id?e=…&s=…`), válido por 24 h e preso ao tipo e ao id; assinatura ruim, vencida ou sem imagem dá o mesmo 404.
+- **Formulários** `POST /api/site/v1/convidado` e `POST /api/site/v1/patrocinador` (`src/services/siteLeads.js`): JSON (resposta `{ ok }`) ou formulário comum (303 para o site). O pedido vira convidado ou patrocinador em Prospecção, com origem `site` e a UTM da visita, e a gestão recebe o aviso "Pedidos pelo site". Isca para robôs, validação campo a campo e limite por IP.
+- **No painel**: o patrocinador tem "Patrocinador oficial no site" (no máximo um; ao juntar duplicatas o selo passa para o que fica, e restaurar da lixeira com outro oficial volta sem o selo) e "Esconder do site". Apoiadores = Ganho, Ativo ou Inativo com logo. O convidado agendado tem "Estreia prevista", que vira a data de veiculação do episódio quando ele é criado.
+
+## Cadência de abordagem
+
+Código: `src/services/outreach.js`, `src/routes/outreach.js`, migração `035_cadencia.sql` (`outreach_attempts`, `outreach_goals` (sem uso desde a 1.78.0: as metas ficam em `user_goals`), `stage_entered_at` com gatilho em `guests`/`sponsors`). A cadência vale para convidados em **Convite enviado** e patrocinadores em **Prospecção**. Cada contato é um registro (canal: Instagram, e-mail, WhatsApp, telefone ou outro; o **endereço** usado, que pode ser vários por pessoa; resultado "enviei" ou "respondeu"; data; observação) feito pelo botão **Registrar abordagem** da página do convidado/patrocinador (permissão `guests.write`/`sponsors.write`; dá para apagar um registro errado). **Regras** (Gestão > Cadência > Configurar): dias de espera entre as abordagens, por tipo (padrão convidados 3, 4, 7, 7; patrocinadores 3, 5, 7, 14). O relógio do convidado começa quando ele entra na etapa (o convite é a abordagem 0); o do patrocinador, na primeira abordagem registrada (sem nenhuma = "a abordar"). Estados: em dia, hoje, atrasado, **possível perdido** (acabaram os intervalos e a última espera passou sem resposta; só indica, a pessoa decide e o motivo sugerido é "Nunca respondeu") e respondeu (para a cadência). Reentrar na etapa abre um ciclo novo (o histórico fica). **Meta diária** de abordagens de patrocinadores: desde a 1.78.0 é uma das metas de cada pessoa, em [Gestão > Metas](#metas-por-pessoa) (dias úteis); desde a 1.81.0 conta só abordagens novas (a primeira de cada patrocinador no ciclo). Onde aparece: **Início** (card "Hoje": follow-ups e progresso da meta), **quadro e lista de convidados** (estado do card e filtro "Só follow-ups pendentes"), páginas do convidado/patrocinador (próximo passo e card "Abordagens" com histórico por canal) e **Gestão > Cadência** (permissão `outreach.manage`, gestão e superadmin): abordagens por canal, por pessoa, respostas, atrasados, cumprimento da meta, fila de quem precisa de ação e qualidade do preenchimento (sem abordagem, sem endereço, sem responsável). A rotina `cadencia` manda, nos dias úteis depois das 8h, um aviso para a **produção** (tipo de notificação "Follow-ups"): cada produtora recebe os dela, e o que está com a gestão, com o editor ou sem responsável vai para todas as produtoras. Gestão e superadmin não recebem.
+
+## Google Agenda
+
+O que tem data no painel vai para o Google Agenda do Pulso Podcast (`src/services/googleCalendar.js`), usando as mesmas fontes do **Calendário** (gravações, lembretes, cobranças da plateia, tarefas, publicações, posts, a receber/pagar e parcerias), nos próximos 240 dias. Em **Gestão > Integrações > O que vai para a agenda** a gestão liga ou desliga cada tipo (só gravações vêm ligadas) e define a **duração** de gravações, lembretes e posts (15 a 720 min; padrão 120/15/15); os outros tipos entram como evento de dia inteiro. Gravação: título "Gravação Pulso: Nome", local = endereço dos lembretes, descrição com tema, Instagram, responsável, confirmações da agenda e link do painel; "a confirmar com o convidado" ainda não vai. **Criar, atualizar e remover**: o evento acompanha data, tema e responsável; some se o item deixa de existir ou valer (convidado perdido/apagado, tarefa excluída, conta cancelada) ou se o tipo é desligado; o que já foi feito (gravado, concluído, pago) fica no Google como histórico. Depois de qualquer gravação no painel (POST) a sincronização roda em ~3 s, e a rotina `google-agenda` confere a cada minuto. O id do evento é derivado da chave do item (`pulso` + hex), então nada duplica.
+
+**Convite por e-mail ao convidado** (`src/services/calendarInvites.js`, desligado por padrão; opção no mesmo botão): a conta de serviço do Google não convida pessoas, então o convite vai por e-mail da marca com um `.ics` (Gmail, Outlook e Apple Calendário mostram "Adicionar"). Convidado em Agendado, com data futura e e-mail no CRM recebe o convite; remarcou, recebe a nova data (mesmo UID, `SEQUENCE` maior); perdeu/cancelou/voltou para agendamento, recebe o cancelamento; gravado antes da hora não manda nada. Ao ligar, quem já estava agendado fica registrado e **não** recebe e-mail. Rotina `convite-agenda` a cada minuto (e junto com a sincronização depois de qualquer alteração).
+
+Usa **conta de serviço** (sem tela de login): ative a Google Calendar API, crie a conta e a chave JSON, compartilhe a agenda com o e-mail da conta (permissão "Fazer alterações em eventos") e preencha no `deploy/.env` `GOOGLE_CALENDAR_ID` e `GOOGLE_SERVICE_ACCOUNT_B64` (ou `_JSON`). Status, teste de conexão e "Sincronizar agora" ficam em **Gestão > Integrações**. Sem as variáveis, a integração fica desligada.
+
+## Versões e Novidades
+
+O sistema tem número de versão (semver) em `package.json`, e o histórico em `src/releases.js` (a primeira entrada é a versão no ar; o teste confere que as duas batem). A página **Novidades** (`/novidades`, menu: clique em `v1.1.0` no rodapé) lista as versões. Toda pessoa vê, uma vez por versão nova, o aviso "Sistema atualizado" com o título do lançamento e um X para dispensar (`users.release_seen`). Para lançar: acrescente a entrada no topo de `src/releases.js`, suba o `version` do `package.json` e publique.
+
+## Calendário
+
+Menu **Calendário** (`/calendario`): tudo que tem data e prazo num lugar só (`src/services/calendar.js`, `src/routes/calendar.js`, `src/views/calendar/`).
+
+- **O que aparece** (cada tipo só para quem tem a permissão do assunto): **Gravações** (convidados em Agendado, Em agendamento "a confirmar" e já gravados; mais gravações só com os hosts), **Lembretes da gravação** (os 4 de cada agendado, com enviado/atrasado), **Cobranças da plateia** (o pagamento combinado com quem foi selecionado, no vencimento; visível para quem vê a plateia), **Tarefas** (pelo vencimento), **Publicação de episódios** (`aired_on`), **Posts nas redes** (agendados), **A receber** e **A pagar** (contas do Financeiro, com valor; só `finance.read`) e **Início e fim de parcerias** (patrocínio ganho ou ativo). Horários e dias em Brasília. Cada evento abre a página do item; o que está feito fica apagado e o que passou do prazo, em vermelho.
+- **Modos**: **Mês** (segunda a domingo; dia cheio vira "+N mais" e leva para a semana), **Semana** e **Lista** (30 dias, só os dias com evento). No celular a grade vira uma coluna só com os dias que têm evento.
+- **Filtros**: um botão **Filtros** (com o número do que está filtrado e um resumo ao lado) abre um painel com os **tipos** (chips para marcar, "Marcar/Desmarcar todos"), o **responsável** (todos, só os meus ou uma pessoa) e **ocultar concluídos**; **Aplicar** fecha o painel. Fecha também ao clicar fora ou com Esc.
+- **Quem responde pelo quê** (`ROLE_DUTIES` em `calendar.js`): "só os meus" (ou a escolha de uma pessoa) traz o que está no nome dela **e o que é do perfil dela**, mesmo sem responsável cadastrado. **Gestão e Superadmin**: todas as gravações, contas a pagar e contas a receber. **Produtora**: todos os lembretes da gravação e as cobranças da plateia (as suas gravações são as dos convidados dela). Editor de vídeo: só o que está no nome dele. O painel avisa o que o perfil inclui. A conta da plateia aparece uma vez só: como cobrança (se o tipo estiver marcado) ou como "a receber".
+- **Visualizações**: combinações salvas de modo, tipos, responsável e concluídos. Da casa: **Tudo**, **Meu trabalho** (semana, só os meus e os do meu perfil, sem concluídos), **Produção** e **Dinheiro** (só para quem vê o financeiro). Qualquer pessoa salva as suas ("Salvar esta visualização" aparece quando os filtros não batem com nenhuma); **Gestão e Superadmin** (`calendar.share`) também compartilham com a equipe e apagam as dos outros. A visualização da equipe abre para cada perfil já limitada ao que ele enxerga.
+- O **assistente de IA** consulta o calendário (`calendario`): "o que tenho esta semana?".
+
+## Instagram: collab e marcação
+
+Na janela de publicar (corte, post, carrossel), com o Instagram marcado: **Collab** (até 3 perfis) e **Marcar pessoas**, com busca e sugestões (o convidado do
+episódio já vem no collab; convidados com Instagram e perfis já usados aparecem na lista; dá para digitar ou colar vários @). Em post/carrossel, toque na
+imagem para posicionar cada marcação. Vai pelos dois provedores. Código: `src/services/igPeople.js`, `src/views/partials/ig-people.ejs`, `src/public/igpeople.js`.
+
+**Reel de teste** (só em Reel): o Instagram mostra primeiro a quem não segue a conta. Duas formas: "Libera sozinho se for bem" (`SS_PERFORMANCE`) ou "Eu libero no
+app" (`MANUAL`). Não aceita collab. Fica em `options.instagram.trial`; cada provedor recebe o campo dele (Outstand `trialReel`, Zernio `trialParams`, Upload-Post
+`share_mode`). Liberar depois de publicado é no app do Instagram (a API não faz). A publicação, a lista, o corte e o Conteúdo mostram o chip "Reel de teste".
+
+## Conteúdos do episódio (pedidos)
+
+Ao criar o episódio, quem cria marca o que pedir ao editor: **Cortes**, **Q&A**, **Bastidores** e **Conteúdo extra**. Vêm das rotinas "Episódio criado" de Gestão > Rotinas que estão como "pedido de conteúdo", com prazo, responsável, se vêm marcadas e se são prioridade. Cada marcado vira um pedido de conteúdo (`content_requests`), e a entrega sobe no sistema, sem Drive. O episódio criado a partir do convidado gravado usa os que vêm marcados. **Cortes** é um pedido contínuo: cada corte sobe quando fica pronto e já pode ser publicado no Social. O editor conclui a leva com "Concluir cortes", e "Retomar" reabre. Os outros pedidos seguem o fluxo de sempre: entrega, revisão, aprovado e Social.
+
+## Post feito por fora do sistema
+
+Quando um corte é postado pelo app da rede (emergência, ou o sistema falhou), registre o link para o sistema saber que ele saiu:
+
+- **Trocar o vídeo do corte**: enquanto não foi publicado, "Trocar vídeo" na página do corte sobe uma nova versão (`clip_versions` guarda as anteriores). Título, legenda, capa escolhida e comentários continuam; publicação agendada ou em revisão sai com o vídeo novo.
+- **Trecho na revisão**: o comentário da revisão do vídeo pode ter início e fim (`episode_comments.end_ms`), marcados por arraste na linha do tempo, pelo botão ou pelas teclas I e O.
+- **Corte que não passou pelo sistema**: na página do corte, "Postado por fora? Registrar o link". Cole o link do post em cada rede (um por linha; a rede é reconhecida pelo endereço), o collab do Instagram (já vem com o @ do convidado) e quando saiu. Vira uma publicação no ar, com o texto do corte: conta no Conteúdo, no Social e no portal do convidado (inclusive como collab).
+- **Rede que falhou numa publicação**: na linha da rede, "postei por fora" abre a janela com a rede e o link. A rede passa a contar como no ar e as novas tentativas automáticas daquela rede param.
+
+Rede registrada por fora não é editada pelo provedor (edite pelo app da rede).
+
+## Lixeira
+
+O que se apaga (episódio, convidado, patrocinador, tarefa, corte, imagem/post, pedido de conteúdo, arquivo do episódio ou do patrocinador, lançamento manual) vai para a **Lixeira** (`/lixeira`, rodapé do menu; para a gestão, também em Gestão > Sistema) e fica **15 dias**. `src/services/trash.js` guarda, numa linha de `trash_items` (migração `050`), o item e tudo o que o banco apagaria junto: lê as chaves estrangeiras do próprio Postgres (cascata vira linha guardada; `SET NULL` vira ligação a refazer), mais comentários e anexos (que apontam por `entity_type`/`entity_id`) e o que a exclusão muda por fora (o financeiro cancela os lançamentos automáticos do episódio: o estado anterior volta ao restaurar). Restaurar devolve as linhas com os mesmos ids (pais antes dos filhos; o que depende de algo que não existe mais avisa qual item restaurar antes). Os arquivos no Backblaze **não** são apagados na exclusão: a rotina `limpeza` (6 h) apaga de vez o que venceu, com os arquivos, desde que nenhum item vivo use a mesma chave. Depois de apagar, o aviso traz **Desfazer** (`req.flash(tipo, texto, { undo: lote })`), que devolve o lote inteiro. Cada pessoa vê e restaura o que apagou; `trash.manage` (gestão) vê tudo e apaga de vez. Envio pela metade (`enviando`) não vai para a lixeira: é cancelado.
+
+**Ações em massa no Conteúdo** (`src/routes/contentBulk.js`, mesma seleção do `baixar.js` com `data-dl-do` / `data-dl-open`): Cortes (atribuir ao episódio, baixar, lixeira), Posts e carrosséis (aprovar, tirar aprovação, baixar, lixeira) e Pedidos (responsável, prazo e prioridade numa janela; cancelar; lixeira). Cada item passa pela mesma permissão da ação individual; os que não podem ficam de fora e o aviso conta.
+
+## Redes sociais: Upload-Post, Zernio ou Outstand
+
+As publicações (episódio no YouTube, cortes, posts, carrosséis e stories) saem pelo provedor escolhido em **Integrações > Redes sociais**:
+**Upload-Post** (`UPLOAD_POST_KEY`, `UPLOAD_POST_LIVE`), **Zernio** (`ZERNIO_API_KEY`, opcional `ZERNIO_PROFILE_ID`, `ZERNIO_LIVE`) ou **Outstand** (`OUTSTAND_API_KEY`, `OUTSTAND_LIVE`). Sem a variável
+`*_LIVE=true` o provedor só simula, até a gestão ligar a **publicação de verdade** em Integrações > Redes sociais (a escolha do painel vale mais que a variável, na hora, com confirmação e auditoria). Cada publicação guarda por onde saiu e é acompanhada lá. Insights seguem o provedor de cada rede. Comentários, directs, automações e a edição
+de um post já publicado continuam pelo Upload-Post. Código: `src/services/socialApi.js`, `src/services/zernio.js`, `src/services/outstand.js`.
+
+**Uma rede por provedor**: o provedor em uso é o padrão e `app_settings.social_routes` (JSON rede → provedor, editado em Integrações > "Cada rede por um provedor") manda redes específicas por outro, por exemplo o X pela Zernio e o resto pela Outstand. `socialApi.plan()` divide as redes de uma publicação por provedor; cada um recebe só as suas e o andamento é acompanhado em cada um (`options.parts`, `options.routes`, `options.send_errors`; cada resultado leva `provider`). Um provedor que falha ao enviar não derruba o outro: a rede que falhou aparece com o erro e a publicação fica "parcial". **Vigia das contas**: `services/socialHealth.js` (rotina `contas-redes`, 15 min, e o botão "Verificar agora") guarda em `social_account_status` o estado de cada (provedor, rede): `ok`, `reauth` (acesso vencido) ou `sumiu` (já esteve conectada e não aparece mais). Só avisa o que importa (a conta que publica a rede e o Upload-Post inteiro), com o tipo de aviso `integracao`; provedor que não responde não conclui nada. O envio de uma rede em `reauth` é recusado com a explicação.
+
+**Outstand** (`api.outstand.so`, docs em outstand.so/docs): contas conectadas no painel deles (OAuth; chaves gerenciadas para Instagram, TikTok, YouTube, Facebook, Threads e LinkedIn). O painel envia na hora (o agendamento é nosso; a Outstand só agenda até 30 dias e não reagenda), com `Idempotency-Key` (repetir após falha de rede não duplica) e acompanha por `GET /v1/posts/:id`. Collab e marcação vão em `instagram.collaborators` / `userTags` (x e y obrigatórios na Outstand; como o Instagram recusa posição em vídeo, a marcação só vai em foto e o Reel leva só o collab, com aviso na publicação). **TikTok**: o modo padrão da Outstand é rascunho (a pessoa termina no app); aqui a gestão escolhe "publicar direto" (exige a privacidade vinda de `creator-info`) ou "rascunho", em Integrações. **Editar**: o `PATCH /v1/posts/:id` só vale para post que ainda não saiu (409 depois de publicado), por isso o provedor tem `canEdit: false`; depois de publicado, edita-se no app da rede. Ajustar o vídeo (`processMedia`) é opcional e cobrado (US$ 0,05 a cada 10 s, por versão refeita); só vai quando a gestão liga em Integrações (desde a 2.9.2 nada liga sozinho: os cortes saem do editor em 1080p, até 10 Mbps). **Envio parado**: rede ainda pendente 30 min depois do início da tentativa (`PUBLISH_STALL_MIN`) faz o painel cancelar o post na Outstand e tentar de novo com o mesmo vídeo (`publishing.stallCheck`). **Armazenamento da Outstand**: o vídeo dos cortes, as imagens e as capas sobem antes para o armazenamento dela (`/v1/media/upload` -> PUT -> `/confirm`, 60 dias) e todas as redes baixam de lá (o TikTok só baixa de domínio verificado). A cópia fica em `hosted_media` e é reaproveitada nas novas tentativas. **Reenvio**: numa publicação parcial, "Reenviar as que falharam" manda só as redes com erro (as que saíram ficam como estão).
+
+**Corrigir e reenviar** (`publishing.resend`, `POST /social/publicacoes/:id/reenviar`, `src/public/reenviar.js`): reenvia só as redes escolhidas que não estão no ar (as que falharam ou que ainda não receberam o post, que entram em `platforms`), com a mesma conferência de quando se publica. Título e legenda editados viram texto próprio daquelas redes (`options.texts[rede]`; o `dispatch` divide cada provedor por variação de texto, cada uma com a sua chave de repetição) e o collab/marcação do Instagram troca quando o Instagram vai junto. O que já saiu fica como está.
+
+**Entrega garantida** (`src/services/publishing.js`, `publishErrors.js`, `mediaCheck.js`, migração `048`):
+- **Arquivo conferido antes**: nada vai às redes sem o arquivo inteiro. Ao subir para a Outstand, os bytes são contados contra o tamanho registrado. Quem não vai pela Outstand (o episódio, ou o X pela Zernio quando a cópia foi reaproveitada) lê o arquivo inteiro no Backblaze; acima de 400 MB, 1 byte por parte. Em 27/10/2026 uma parte de um corte passou a responder 503 no Backblaze: o Reel saiu pela metade e as outras redes falharam. Hoje esse caso para no começo e espera.
+- **Nova tentativa na hora certa**: cada erro vira um código (`publishErrors.classify`). O que é passageiro volta sozinho só nas redes que falharam (2 min, 10 min, 30 min, 1 h, 3 h e 6 h), e a fila compartilhada do YouTube na Outstand volta no `retryAt` que ela informa (são 100 envios por dia para todos, liberados a cada 15 min, e no máximo 5 por organização até as 4 horas finais do dia do Pacífico). O que precisa de ação (reconectar conta, arquivo novo, formato recusado) para e avisa quem pediu e a gestão.
+- **Envio sem resposta**: se o POST ficou sem resposta, a próxima tentativa repete a mesma `Idempotency-Key`, para não publicar duas vezes. Envio interrompido no meio (o servidor reiniciou) volta em 1 minuto. Sem resposta do provedor por 48 h, a rede fica marcada como "sem resposta".
+- **Texto por rede**: o X (280 caracteres, pela contagem dele) e o Threads (500) recebem a versão que cabe (`L.fitText`): parágrafos ou frases inteiras, sem cortar palavra. A tela avisa na hora de publicar. No Threads, texto maior faria a Outstand recusar o post inteiro.
+- **Antes do horário**: agendados das próximas 3 horas têm o material conferido de hora em hora, e a equipe é avisada se estiver ruim. A duração do corte é conferida por rede ao agendar (Reels do Facebook até 90 s, Shorts até 3 min, Threads até 5 min, TikTok até o limite da conta).
+- **Observabilidade**: cada tentativa fica em `publication_attempts` ("Histórico de envio" na publicação). Gestão > Sistema mostra "Publicações nas redes". `src/services/watchdog.js` avisa a gestão se o worker some por 3 min, a rotina para por 15 min ou um agendado atrasa 10 min, e reinicia o worker se o banco não responder.
+
+## Envio de material: repetidos, retomada e armazenamento cheio
+
+- **Velocidade (envio direto)**: o servidor fica na Europa (RTT de ~240 ms do Brasil), então passar o arquivo por ele limita o envio a poucos MB/s. Com o **envio direto** o navegador manda cada parte (até 64 MB nos arquivos grandes; parte maior rende mais por conexão) para um link assinado do Backblaze (6 conexões ao mesmo tempo, o máximo que o navegador abre com o Backblaze) e só avisa o painel depois; em teste foram ~27 MB/s contra ~3 MB/s. Precisa do CORS do bucket: **Integrações > Armazenamento (Backblaze) > Ligar envio direto** (ou, no Backblaze, Buckets > CORS Rules: permitir `PUT` da origem do painel e expor o cabeçalho `ETag`). Sem o CORS a fila volta sozinha ao caminho pelo servidor. `UPLOAD_DIRECT=false` desliga. Código: `src/services/directUpload.js`, `src/public/uploads.js`.
+- **Arquivos repetidos**: ao escolher arquivos, o sistema confere pelo nome o que já existe no episódio. O que tinha parado no meio **continua de onde parou**; para os que já subiram inteiros, a pessoa escolhe **não enviar de novo** (padrão), **substituir** (o antigo sai só quando o novo termina) ou **manter os dois**.
+- **Não terminou**: envio sem nenhuma parte nova há 30 minutos aparece marcado; o card explica que basta escolher os mesmos arquivos de novo, e dá para descartar todos de uma vez (libera o espaço das partes no Backblaze).
+- **Armazenamento cheio**: quando a conta do Backblaze chega ao limite (painel do Backblaze > **Caps & Alerts**), o envio para com a explicação, a gestão recebe um aviso e "Tentar todos de novo" retoma depois que o limite for aumentado.
+- **Baixar vários arquivos**: em cada pasta do material, "Selecionar" (marca arquivos, mostra quantos e quanto pesa; Shift marca um intervalo) e "Baixar tudo" (só com 2+ arquivos prontos); a galeria tem "Selecionar" e "Baixar pasta"; em **Conteúdo > Posts**, cada episódio com 2+ imagens tem "Selecionar" (marca também clicando na imagem) e "Baixar tudo". Com 2 ou mais arquivos sai **um ZIP só**: `src/public/baixar.js` chama `/baixar.zip?itens=…` (`src/routes/bulkDownload.js`), que lê cada arquivo do Backblaze aos pedaços e monta o ZIP enquanto ele baixa (sem compressão, ZIP64 acima de 4 GB, tamanho exato no `Content-Length` para o navegador mostrar o andamento). Um arquivo sozinho continua sendo o link `/baixar` (link assinado do Backblaze). Acima de 2 GB o sistema confirma antes.
+- **Galeria**: botão no card do material abre a janela com as pastas, miniaturas de fotos e vídeos e visualização grande. As miniaturas são feitas **pelo navegador no envio** (nada é baixado do Backblaze) e guardadas **no disco do servidor** (volume `previews` no Docker, `PREVIEW_DIR`); o que faltar o servidor gera uma única vez. Código: `src/services/previews.js`, rota `/episodios/:id/arquivos/:fid/previa`.
+
+## Material do episódio em pastas
+
+No card do episódio, o **Material bruto** aparece em pastas (Vídeos do episódio, Áudios, Bastidores, Fotografias, Outros; só as que têm arquivo), com
+subpastas pelo rótulo dentro de Vídeos, Áudios e Outros. O **Vídeo editado** tem uma pasta por versão, com os comentários de revisão daquela versão. A pasta
+aberta é lembrada quando a página recarrega. Código: `src/views/episodes/show.ejs`, `src/public/producao.js`, estilos `.folder*` em `app.css`.
+
+## Avisos de alteração e exclusão de cadastro
+
+Quando alguém altera ou exclui um convidado, patrocinador, episódio, corte ou tarefa, o **responsável** (dono do convidado ou patrocinador, editor
+do episódio, quem criou o corte, responsável pela tarefa) recebe um aviso: "Fulano alterou o convidado X" com **o que mudou** (nome, e-mail,
+etapa…), ou "Fulano excluiu…". Quem fez a ação não é avisado. Em tarefas, status, prazo, hora e responsável já tinham aviso próprio e não se repetem.
+
+- **Configurável**: em **Gestão > Notificações**, "Cadastro alterado" e "Cadastro excluído" ligam/desligam painel e e-mail; cada pessoa silencia em **Notificações**.
+- Código: `src/services/recordChanges.js` (novo cadastro com responsável entra em `PLACES`), tipos `alteracao` e `exclusao`, migração `042`.
+
+## Comentários: editar e apagar
+
+Em todas as caixas de comentário (convidado, patrocinador, episódio, corte, tarefa e revisão do vídeo), quem escreveu edita pelo **ícone de lápis**
+(janela com o texto atual, novos anexos e áudio, e dá para tirar anexos) e apaga pela **lixeira**; a gestão também apaga os dos outros. Um lápis pequeno marca o
+editado. As ações são ícones (nome na dica). Quem for mencionado só na edição recebe o aviso de menção.
+
+## App no celular (PWA)
+
+O painel instala como app (Android, iPhone e computador). No celular, o Início mostra **Use o Pulso como app** (Android abre o pedido de
+instalação; no iPhone, uma janela mostra o caminho no Safari: Compartilhar > Adicionar à Tela de Início); o rodapé do menu tem
+**Instalar o app**. Instalado, o Início oferece **Ativar alertas** e o número de não lidas aparece no ícone. Segurar o ícone mostra os atalhos
+(Nova tarefa, Tarefas, Agenda, Notificações).
+
+- **Barra de baixo** no celular: Painel + dois atalhos conforme o perfil (Tarefas, Agenda, Convidados ou Episódios) + Avisos + Menu (abre o menu completo).
+- **Sem internet**: a página "Sem conexão" (`src/public/offline.html`) aparece e recarrega sozinha quando a rede volta. Só os arquivos
+  fixos (`/static`) ficam guardados no aparelho, por versão; as páginas sempre vêm do servidor.
+- Código: `src/public/sw.js` (servido em `/sw.js` com a versão dos arquivos), `src/public/pwa.js`, `src/public/push.js`,
+  `src/public/manifest.webmanifest`, `src/views/partials/app-card.ejs`.
+- A sessão se renova enquanto é usada (sai sozinha depois de 7 dias sem uso), para o app instalado não pedir login toda semana.
+
+## Alertas no navegador (Web Push)
+
+Em **Notificações > Alertas neste aparelho**, cada pessoa liga os alertas no navegador ou celular que está usando. Toda notificação
+nova (as mesmas do sino, respeitando o que a pessoa silenciou) também vai para os aparelhos dela pela fila (`push_notificacao`),
+**mesmo com o painel fechado**. Com o painel aberto e em primeiro plano, vale só o aviso flutuante (sem alerta duplicado).
+Sem push no aparelho, mas com alertas permitidos, a aba aberta em segundo plano também mostra o alerta do sistema.
+
+- Código: `src/services/push.js`, `src/public/push.js`, service worker `src/public/sw.js` (servido em `/sw.js`), manifesto `/manifest.webmanifest`, migração `024_push.sql`.
+- Chaves: `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (o `deploy/instalar.sh` gera; ou `npx web-push generate-vapid-keys`). Sem elas, o bloco avisa que não está configurado. Trocar as chaves desliga os aparelhos já inscritos.
+- **iPhone/iPad**: só funciona com o painel adicionado à Tela de Início (Compartilhar > Adicionar à Tela de Início) e aberto por lá (iOS 16.4+).
+- Aparelho que o serviço de push diz não existir mais (404/410) é removido sozinho.
+
+## Arquitetura: processos, fila, rotinas e avisos
+
+Detalhes e decisões em [`docs/relatorio-arquitetura-2026-10.md`](docs/relatorio-arquitetura-2026-10.md).
+
+- **Processos** (`ROLE`): `web` atende o painel; `worker` roda a fila e as rotinas; `all` faz os dois (desenvolvimento).
+- **Fila** (`src/services/jobs.js`, tabela `jobs`): Postgres com `SKIP LOCKED`; acorda na hora com `LISTEN/NOTIFY`; **quatro pistas**
+  por worker (cortes: até 5 ao mesmo tempo, `CORTES_EM_PARALELO` de 1 a 10; pesada: finalização e transcrição, uma por vez; video:
+  versão leve, uma por vez; leve: e-mails e ideias); falha passageira tenta de novo (30 s, 2 min, 8 min; cota da IA,
+  15 min); sinal de vida a cada 15 s e devolução do que ficou preso.
+- **Rotinas** (`src/services/scheduler.js`): publicar agendados (30 s), fila travada (1 min), tarefas vencendo (15 min), automações
+  (5 min), limpeza (6 h). Cada uma roda em **uma réplica por vez** (trava consultiva do Postgres); a última execução fica em `scheduler_runs`.
+- **Avisos em tempo real** (`src/services/realtime.js`): `GET /eventos` (SSE) + `pg_notify`. Notificação nova vira aviso flutuante na hora.
+- **Limitador de tentativas** no banco (`rate_hits`): vale para todas as réplicas.
+- **Gestão > Sistema**: processos vivos, fila, rotinas e trabalhos que falharam, com "Tentar de novo".
+- **Sem Redis**: o Postgres faz fila, trava e barramento; ver o relatório para quando reconsiderar.
+
+## Assistente de IA
+
+Botão flutuante em todas as páginas (`src/services/assistant.js`, `src/routes/assistant.js`, `src/public/assistant.js`).
+Conversa por **texto ou voz** (grava até 2 min; Groq Whisper transcreve), com **histórico por pessoa** (abrir, continuar, apagar).
+Consulta o painel por ferramentas que **respeitam o perfil** (busca, tarefas, agenda, episódios, convidado, patrocinador, redes) e
+responde com links internos.
+- **Números**: a ferramenta `numeros` conta o que o perfil pode ver (convidados por etapa e por motivo de perda, sem responsável, sem foto; patrocinadores, episódios, tarefas, redes, plateia e financeiro). O que o perfil não vê vem em `sem_acesso_para_o_seu_perfil` e o assistente diz quem vê. `lista_convidados` mostra quem está em cada etapa.
+- **Cadastro**: `criar_convidado` (só `guests.write`) cadastra em Prospecção, com a pessoa como responsável, validando Instagram, perfil e duplicidade; pergunta o que faltar (nome, Instagram e perfil). Também cria **tarefa** quando pedido. Não publica, não muda etapa, não edita e não apaga.
+- **Instrução por perfil**: o prompt leva o que o perfil da pessoa pode fazer, o que não pode e quem pode (`src/services/assistantGuide.js`, derivado de `src/permissions.js`). Permissão nova sem descrição ali derruba os testes. Usa o Gemini
+(`GEMINI_KEY`); limite de 40 perguntas a cada 10 min por pessoa.
 
 ## Segurança
 
@@ -139,10 +851,12 @@ Imagens, fontes e CSS externos do modelo precisam ser `https://`. Limite de 200 
 - Limite de tentativas de login (só falhas contam) e resposta idêntica no "esqueci a senha" (não revela se o e-mail existe).
 - CSP restritiva no painel (sem script inline). A **página pública do convite roda em `sandbox`**
   (origem opaca, sem cookies, sem `fetch`): o convite do Pulso usa JavaScript, mas esse script não consegue
-  tocar no painel nem em dados da sessão, mesmo que alguém coloque código malicioso num modelo.
+  tocar no painel nem em dados da sessão, mesmo que um nome de convidado tente injetar código (os valores são sempre escapados).
 - Papéis checados no servidor em cada rota; ações sensíveis vão para a **Auditoria**.
 
 ## Identidade visual
+
+Favicon = **o Ponto** (ponto lime sobre preto): `src/public/favicon.svg`, `favicon.ico` e `apple-touch-icon.png` (também servidos na raiz).
 
 O painel segue o **Design System de interface** e o **Manual de Marca** do Pulso:
 
@@ -159,14 +873,19 @@ Fontes (Space Grotesk, Inter, JetBrains Mono, Instrument Serif) e ícones Lucide
 .
 ├── src/
 │   ├── index.js · app.js · config.js · middleware.js · permissions.js · constants.js
-│   ├── db/            pool, migrate (advisory lock), seed, migrations/*.sql
+│   ├── db/            pool, migrate (advisory lock), migrations/*.sql
 │   ├── auth/          password (scrypt), sessions, tokens (e-mail), rateLimit
-│   ├── services/      mailer (Brevo), yourls, guests, inviteTemplate, audit
-│   ├── routes/        auth, users, guests, templates, public (convite), misc (início/auditoria/integrações)
+│   ├── services/      mailer (Brevo), yourls, guests, guestRules (regras de etapa), csvImport, inviteTemplate, publicPages, audit,
+│   │                  sponsors (regras, briefing, arquivos), sponsorSessions (magic link), b2 (Backblaze S3), groq (Whisper), gemini,
+│   │                  production (etapas, arquivos), finalization/finalizationJob (IA), jobs (fila), media (FFmpeg), platformLimits,
+│   │                  designs/covers/coverStore/specSanitizer (capas e posts), coverSheet/coverPieces (capas pelos modelos do guia), videoScenes/guestVideos (story e teaser), clips (cortes), uploadPost/publishing (redes),
+│   │                  notify (notificações), comments, responsible (bolinha), tasks (tarefas e rotinas), search (busca global),
+│   │                  social (conteúdo sem uso, ideias com memória, automações, insights)
+│   ├── routes/        auth, users, guests, guestImport, sponsors, episodes, covers, clips, collab (comentários/notificações/busca/responsável), tasks, gestao, social, public (convite + rastreio), sponsorPublic (kit/formulário/portal), misc (início/auditoria/integrações)
 │   ├── views/         EJS (painel)
-│   ├── public/        app.css (tokens), app.js, theme.js, fonts/, convite/ (fotos do modelo Pulso)
+│   ├── public/        app.css (tokens), app.js, theme.js, producao.js, social.js, editor.js, design/engine.js (motor das capas), design/models.js (modelos do guia), capas.js (janela Ajustar), fonts/, convite/ (fotos do modelo Pulso)
 │   ├── utils/         format (datas em Brasília), icons (Lucide), wrap, …
-│   ├── templates/     convite-pulso.html (padrão) e convite-simples.html (exemplo)
+│   ├── templates/     convite-pulso.html (o convite fixo), media-kit.html (o deck do patrocinador)
 │   └── scripts/       createSuperadmin.js
 ├── docs/              design-system.md, manual-de-marca.md, referencias/ (HTML do designer)
 ├── CLAUDE.md · AGENTS.md · memory.md   instruções e memória pra IA
@@ -177,4 +896,6 @@ Fontes (Space Grotesk, Inter, JetBrains Mono, Instrument Serif) e ícones Lucide
 
 - Matriz de permissões por perfil (provisória — ver acima).
 - Envio de convite só por e-mail (WhatsApp é manual: copiar o link curto).
-- Sem importação em massa de convidados e sem upload de imagens dentro da tela de modelos (use links `https://`).
+- Métricas de cliques só no detalhe de cada convidado/patrocinador (sem painel agregado ainda).
+- Aprovação de moldura e QR Code pelo patrocinador (e WhatsApp) — planejado.
+- Publicação real nas redes **nunca foi disparada** (só simulada e testada com mocks); o TikTok ainda não está conectado ao perfil do Upload-Post. Métricas pós-publicação, Spotify (sem API pública de upload) e carrossel/foto no Instagram ainda não.

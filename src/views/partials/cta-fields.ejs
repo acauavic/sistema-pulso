@@ -1,0 +1,15 @@
+<%#
+  Chamada do fim do texto, uma por rede (no YouTube é se inscrever, no Instagram é seguir o perfil...).
+  locals: ctas = { rede: texto } (já preenchido: a do corte ou a padrão), nets = [{ key, label }].
+  Fica fechado: o resumo mostra que a chamada vai; abrir é só para quem quer mudar.
+%>
+<details class="cta-box">
+  <summary><span class="cta-box-title">Chamada no fim da legenda, por rede</span> <span class="small muted">cada rede recebe a sua</span></summary>
+  <label class="check"><input type="checkbox" name="cta_on" value="1" checked> Terminar a legenda com a chamada da rede</label>
+  <p class="small muted m-0">Só vai para as redes marcadas acima. Campo vazio = sem chamada naquela rede.</p>
+  <div class="cta-list">
+    <% nets.forEach(function (n) { %>
+    <label><span class="mono small"><%= n.label %></span><input type="text" name="cta_<%= n.key %>" value="<%= ctas[n.key] || '' %>" maxlength="140" data-fill-cta="<%= n.key %>"></label>
+    <% }) %>
+  </div>
+</details>

@@ -1,0 +1,8 @@
+<%# Paginação simples das listas longas. Variáveis: pager = { page, hasNext, url(n) } (url monta o endereço da página n, mantendo os filtros). %>
+<% if (pager && (pager.page > 1 || pager.hasNext)) { %>
+<nav class="pager" aria-label="Páginas">
+  <% if (pager.page > 1) { %><a class="btn sm" href="<%= pager.url(pager.page - 1) %>" rel="prev"><%- icon('chevron-left', 14) %> Mais recentes</a><% } else { %><span></span><% } %>
+  <span class="mono small muted">Página <%= pager.page %></span>
+  <% if (pager.hasNext) { %><a class="btn sm" href="<%= pager.url(pager.page + 1) %>" rel="next">Mais antigos <%- icon('chevron-right', 14) %></a><% } else { %><span></span><% } %>
+</nav>
+<% } %>

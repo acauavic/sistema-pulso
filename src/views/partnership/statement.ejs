@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><%= title %></title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="icon" href="<%= brandDir %>/favicon.svg?v=<%= assetV %>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="<%= brandDir %>/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/portal.css?v=<%= assetV %>">
+<link rel="stylesheet" href="/static/aprovacao.css?v=<%= assetV %>">
+<% if (typeof brandCss !== 'undefined' && brandCss) { %><link rel="stylesheet" href="<%= brandCss %>?v=<%= assetV %>"><% } %>
+</head>
+<body class="ap">
+<%#
+  Extrato da parceria, só leitura. Jornada: o parceiro abre pelo link e entende em segundos quanto foi gasto, quanto voltou e
+  quanto de lucro existe; embaixo, mês a mês e os acertos. Números em mono; sem botão (nada a fazer aqui).
+%>
+<% var part = L.partnership; var hp = Math.round(part.house_pct); var t = preview.transfer; %>
+<header class="pt-top">
+  <span class="pt-wordmark"><%= publicName %></span>
+  <span class="pt-mono pt-muted">Extrato da parceria</span>
+</header>
+<main class="pt-wrap ap-wrap">
+  <section class="ap-hero">
+    <span class="pt-kicker">Parceria · casa <%= hp %>% · <%= part.partner_name %> <%= 100 - hp %>%</span>
+    <h1>Como está a conta</h1>
+    <p class="pt-lede">Primeiro, o custo volta para quem pagou. O que passa disso é lucro, dividido quando a distribuição é feita. Só entra aqui o que já foi pago ou recebido.</p>
+  </section>
+
+  <section class="pt-sec">
+    <ul class="ap-figures">
+      <li><span class="pt-mono pt-muted">Custo total</span><strong class="pt-mono-in"><%= money(L.costs.total) %></strong><span class="pt-muted">casa <%= money(L.costs.casa) %> · parceiro <%= money(L.costs.parceiro) %></span></li>
+      <li><span class="pt-mono pt-muted">Já voltou</span><strong class="pt-mono-in"><%= money(L.recovered.total) %></strong><span class="pt-muted">de <%= money(L.revenue.total) %> recebidos</span></li>
+      <li><span class="pt-mono pt-muted">Falta recuperar</span><strong class="pt-mono-in"><%= money(L.toRecover.total) %></strong><span class="pt-muted">casa <%= money(L.toRecover.casa) %> · parceiro <%= money(L.toRecover.parceiro) %></span></li>
+      <li><span class="pt-mono pt-muted">Lucro a distribuir</span><strong class="pt-mono-in"><%= money(L.profit.available) %></strong><span class="pt-muted"><%= money(L.profit.distributed) %> já distribuídos</span></li>
+    </ul>
+  </section>
+
+  <section class="pt-sec">
+    <h2>Mês a mês</h2>
+    <ol class="pt-steps">
+      <% months.forEach(function (m) { %>
+      <li><span class="pt-date pt-mono"><%= m.short %><%= m.closed ? ' · fechado' : '' %></span>
+        <div><h3>Custos <%= money(m.costCasa + m.costParceiro) %> · receitas <%= money(m.revCasa + m.revParceiro) %></h3>
+        <p>No fim do mês: falta recuperar <%= money(m.toRecover) %><%= m.profitAvailable ? ', lucro a distribuir ' + money(m.profitAvailable) : '' %>.</p></div></li>
+      <% }) %>
+    </ol>
+  </section>
+
+  <% if (settled.length) { %>
+  <section class="pt-sec">
+    <h2>Acertos</h2>
+    <ol class="pt-steps">
+      <% settled.forEach(function (st) { var x = Number(st.transfer_cents); %>
+      <li><span class="pt-date pt-mono"><%= fmt.formatDayShort(st.settled_on) %></span>
+        <div><h3><%= x > 0 ? 'A casa paga ' + money(x) + ' a ' + part.partner_name : x < 0 ? part.partner_name + ' repassa ' + money(-x) + ' à casa' : 'Sem transferência' %></h3>
+        <p>Lucro distribuído: <%= money(st.profit_cents) %>.</p></div></li>
+      <% }) %>
+    </ol>
+  </section>
+  <% } %>
+  <p class="pt-muted ap-foot">Atualizado em <%= fmt.formatDateTime(new Date()) %>.</p>
+</main>
+</body>
+</html>

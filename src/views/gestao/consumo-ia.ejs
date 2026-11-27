@@ -1,0 +1,75 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Gestão</span><h1>Consumo da IA</h1></div>
+  <div class="seg" role="group" aria-label="Período">
+    <a class="<%= r.days === 7 ? 'on' : '' %>" href="/gestao/consumo-ia?dias=7"<%- r.days === 7 ? ' aria-current="page"' : '' %>>7 dias</a>
+    <a class="<%= r.days === 30 ? 'on' : '' %>" href="/gestao/consumo-ia?dias=30"<%- r.days === 30 ? ' aria-current="page"' : '' %>>30 dias</a>
+  </div>
+</div>
+<%- include('../partials/gestao-nav', { active: 'consumo-ia' }) %>
+<%
+  var tok = function (n) { n = Number(n) || 0; if (n >= 1e6) return (n / 1e6).toFixed(1).replace('.', ',') + ' mi'; if (n >= 1e4) return Math.round(n / 1e3) + ' mil'; return n.toLocaleString('pt-BR'); };
+  var usd = function (v) { v = Number(v) || 0; if (v > 0 && v < 0.01) return '< US$ 0,01'; return 'US$ ' + v.toFixed(2).replace('.', ','); };
+  var pct = function (v) { return Math.round((Number(v) || 0) * 100) + '%'; };
+  var dayLabel = function (d) { var p = d.split('-'); return p[2] + '/' + p[1]; };
+  var t = r.total;
+%>
+<p class="lead">Cada chamada ao Gemini, de que parte do sistema ela veio e quanto custou. Últimos <span class="mono"><%= r.days %></span> dias.</p>
+
+<% if (r.stopped) { %><p class="notice notice-bad"><%= r.stopped.text %> <span class="mono small">Última tentativa às <%= fmt.formatDateTime(r.stopped.at) %>.</span></p><% } %>
+
+<% if (!t.calls) { %>
+  <div class="empty"><%- include('../partials/signal') %><h3>Nenhuma chamada à IA neste período</h3><p>Cada vez que o sistema pede algo ao Gemini (responder um comentário, escrever os textos de um corte, o assistente) a chamada entra aqui, com os tokens e o custo estimado.</p></div>
+<% } else { %>
+  <section class="stat-grid" aria-label="Resumo do período">
+    <div class="stat"><span class="stat-label">Custo estimado</span><span class="stat-n money"><%= usd(t.cost) %></span></div>
+    <div class="stat"><span class="stat-label">Chamadas</span><span class="stat-n"><%= t.calls.toLocaleString('pt-BR') %></span><% if (t.failed) { %><span class="stat-delta"><%= t.failed %> recusadas ou sem resposta</span><% } %></div>
+    <div class="stat"><span class="stat-label">Tokens de entrada</span><span class="stat-n"><%= tok(t.input_tokens) %></span></div>
+    <div class="stat"><span class="stat-label">Tokens de saída</span><span class="stat-n"><%= tok(t.output_tokens + t.thinking_tokens) %></span><span class="stat-delta"><%= tok(t.thinking_tokens) %> de raciocínio</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Por função</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Função</th><th class="num">Chamadas</th><th class="num">Entrada</th><th class="num">Resposta</th><th class="num">Raciocínio</th><th class="num">Custo</th><th class="num">Parte</th></tr></thead>
+        <tbody>
+          <% r.features.forEach(function (f) { %>
+          <tr>
+            <td><%= f.label %><% if (f.failed) { %> <span class="mono small bad-text"><%= f.failed %> falharam</span><% } %></td>
+            <td class="num mono"><%= f.calls.toLocaleString('pt-BR') %></td>
+            <td class="num mono"><%= tok(f.input_tokens) %></td>
+            <td class="num mono"><%= tok(f.output_tokens) %></td>
+            <td class="num mono"><%= tok(f.thinking_tokens) %></td>
+            <td class="num mono"><%= usd(f.cost) %></td>
+            <td class="num mono"><%= pct(f.share) %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card top-gap">
+    <h2>Por dia</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Dia</th><th class="num">Chamadas</th><th class="num">Entrada</th><th class="num">Saída</th><th class="num">Custo</th></tr></thead>
+        <tbody>
+          <% r.byDay.forEach(function (d) { %>
+          <tr>
+            <td class="mono"><%= dayLabel(d.day) %></td>
+            <td class="num mono"><%= d.calls.toLocaleString('pt-BR') %><% if (d.failed) { %> <span class="small bad-text">· <%= d.failed %> falharam</span><% } %></td>
+            <td class="num mono"><%= tok(d.input_tokens) %></td>
+            <td class="num mono"><%= tok(d.output_tokens + d.thinking_tokens) %></td>
+            <td class="num mono"><%= usd(d.cost) %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>
+
+<p class="small muted top-gap">Custo estimado pelo preço de tabela: <span class="mono"><%= usd(r.prices.input) %></span> por milhão de tokens de entrada e <span class="mono"><%= usd(r.prices.output) %></span> por milhão de saída (a resposta e o raciocínio, que o Google cobra como saída). A conta de verdade fica no Google AI Studio.</p>
+<%- include('../partials/foot') %>

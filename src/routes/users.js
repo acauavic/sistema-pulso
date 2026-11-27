@@ -1,8 +1,9 @@
 const express = require('express');
+const { userMessage } = require('../utils/userMessage');
 const db = require('../db/pool');
 const config = require('../config');
 const sessions = require('../auth/sessions');
-const { createAuthToken } = require('../auth/tokens');
+const { createAuthToken, revokeAuthTokens } = require('../auth/tokens');
 const mailer = require('../services/mailer');
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
@@ -56,35 +57,75 @@ router.get('/usuarios', requirePerm('users.read'), wrap(async (req, res) => {
 }));
 
 // ---- criar ----
-router.get('/usuarios/novo', requirePerm('users.write'), (req, res) => {
-  res.render('users/form', { title: 'Novo usuário', target: null, values: { role: 'produtora' }, roles: assignableRoles(req.user.role), error: null });
-});
+// Onde a pessoa trabalha e se vê o dinheiro de cada lugar: a tela mostra uma linha por projeto.
+const projectsSvc = require('../services/projects');
+const rolesSvc = require('../services/roles');
+const projectRows = async (userId) => {
+  await projectsSvc.refresh();
+  const mine = userId ? await projectsSvc.membershipsOf(userId) : [];
+  const by = new Map(mine.map((m) => [Number(m.project_id), m]));
+  return projectsSvc.all().map((p) => ({ id: p.id, name: p.name, member: by.has(p.id), roleId: by.get(p.id) ? by.get(p.id).role_id : null }));
+};
+// O que a tela mandou: projeto[] marcados e a função de cada um (funcao_<id>; vazio = a padrão). Sem o campo `acesso`, a tela
+// não mexeu nisso (os projetos de hoje ficam como estão). Projeto novo nasce com o padrão marcado.
+const projectsFromBody = (body, fallbackId, allowed) => {
+  if (!body.acesso) return null;
+  const ids = [].concat(body.projetos || []).map(Number).filter(Boolean);
+  const list = ids.length ? ids : (fallbackId ? [fallbackId] : []);
+  return list.map((id) => {
+    const rid = Number(body[`funcao_${id}`]);
+    return { id, finance: true, roleId: allowed.some((r) => r.id === rid) ? rid : null };
+  });
+};
+// A função escolhida (role_id), ou o perfil em texto de antes (role). Só vale a que quem edita pode dar.
+const roleFromBody = (body, allowed) => {
+  const byId = allowed.find((r) => r.id === Number(body.role_id));
+  if (byId) return byId;
+  return body.role ? allowed.find((r) => r.builtin && r.key === body.role) || null : null;
+};
+const accessUntil = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : null);
+
+router.get('/usuarios/novo', requirePerm('users.write'), wrap(async (req, res) => {
+  res.render('users/form', {
+    title: 'Novo usuário', target: null, values: { role: 'produtora', role_id: (rolesSvc.byKey('produtora') || {}).id, house: true }, roles: rolesSvc.assignable(req.user), error: null,
+    projectRows: await projectRows(null), isSelf: false,
+  });
+}));
 
 router.post('/usuarios', requirePerm('users.write'), wrap(async (req, res) => {
-  const values = { name: clean(req.body.name, 120), email: clean(req.body.email, 254).toLowerCase(), role: req.body.role };
-  const roles = assignableRoles(req.user.role);
+  const roles = rolesSvc.assignable(req.user);
+  const role = roleFromBody(req.body, roles);
+  const values = {
+    name: clean(req.body.name, 120), email: clean(req.body.email, 254).toLowerCase(), role: role ? role.base : req.body.role, role_id: role ? role.id : null,
+    house: req.body.house === '1' || (role && role.base === 'superadmin'), // o superadmin é sempre da casa
+    access_until: accessUntil(req.body.access_until),
+  };
+  const chosen = projectsFromBody(req.body, projectsSvc.defaultId(), roles) || [{ id: projectsSvc.defaultId(), finance: true }];
   const error =
     values.name.length < 2 ? 'Informe o nome.'
       : !isEmail(values.email) ? 'E-mail inválido.'
-        : !roles.includes(values.role) ? 'Perfil inválido para o seu nível de acesso.'
+        : !role ? 'Função inválida para o seu nível de acesso.'
           : null;
-  if (error) return res.status(400).render('users/form', { title: 'Novo usuário', target: null, values, roles, error });
+  if (error) return res.status(400).render('users/form', { title: 'Novo usuário', target: null, values, roles, error, projectRows: await projectRows(null), isSelf: false });
 
   let user;
   try {
     ({ rows: [user] } = await db.query(
-      'INSERT INTO users (name, email, role) VALUES ($1, $2, $3) RETURNING *', [values.name, values.email, values.role]));
+      'INSERT INTO users (name, email, role, role_id, house, access_until) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [values.name, values.email, values.role, values.role_id, values.house, values.access_until]));
   } catch (err) {
-    if (err.code === PG_UNIQUE) return res.status(409).render('users/form', { title: 'Novo usuário', target: null, values, roles, error: 'Já existe um usuário com este e-mail.' });
+    if (err.code === PG_UNIQUE) return res.status(409).render('users/form', { title: 'Novo usuário', target: null, values, roles, error: 'Já existe um usuário com este e-mail.', projectRows: await projectRows(null), isSelf: false });
     throw err;
   }
+  const set = await projectsSvc.setUserProjects(user.id, chosen); // onde ela trabalha e onde vê o dinheiro
+  if (set.error) await projectsSvc.addMember(user.id, projectsSvc.defaultId(), { finance: true });
   await audit(req, 'usuario.criado', 'user', user.id, { email: user.email, role: user.role });
   try {
     await sendAccessLink(user, req.user.name);
     await req.flash('ok', `Usuário criado. Enviamos o link para ${user.email} definir a senha.`);
   } catch (err) {
     console.error('Falha ao enviar convite de usuário:', err.message);
-    await req.flash('error', `Usuário criado, mas o e-mail NÃO foi enviado (${err.message}). Use "Reenviar acesso" quando o e-mail estiver funcionando.`);
+    await req.flash('error', 'Usuário criado, mas o e-mail de acesso não saiu. Use "Reenviar acesso" no menu da linha daqui a pouco.');
   }
   return res.redirect('/usuarios');
 }));
@@ -94,7 +135,10 @@ router.get('/usuarios/:id/editar', requirePerm('users.write'), wrap(async (req, 
   const target = await findUser(req.params.id);
   if (!target) return notFound(res);
   if (!canManageUser(req.user.role, target.role)) return forbidden(res);
-  return res.render('users/form', { title: `Editar ${target.name}`, target, values: target, roles: assignableRoles(req.user.role), error: null, isSelf: target.id === req.user.id });
+  return res.render('users/form', {
+    title: `Editar ${target.name}`, target, values: target, roles: rolesSvc.assignable(req.user), error: null,
+    isSelf: target.id === req.user.id, projectRows: await projectRows(target.id),
+  });
 }));
 
 router.post('/usuarios/:id', requirePerm('users.write'), wrap(async (req, res) => {
@@ -103,31 +147,52 @@ router.post('/usuarios/:id', requirePerm('users.write'), wrap(async (req, res) =
   if (!canManageUser(req.user.role, target.role)) return forbidden(res);
 
   const isSelf = target.id === req.user.id;
-  const roles = assignableRoles(req.user.role);
+  const roles = rolesSvc.assignable(req.user);
+  const role = isSelf ? rolesSvc.get(target.role_id) : roleFromBody(req.body, roles); // ninguém muda a própria função
   const values = {
     name: clean(req.body.name, 120),
     email: clean(req.body.email, 254).toLowerCase(),
-    role: isSelf ? target.role : req.body.role, // ninguém muda o próprio perfil
+    role: role ? role.base : target.role,
+    role_id: role ? role.id : target.role_id,
+    // equipe da casa: ninguém muda a sua (não dá para se trancar fora), e o superadmin é sempre da casa
+    house: isSelf || !req.body.acesso ? target.house : (req.body.house === '1' || (role && role.base === 'superadmin')),
+    access_until: isSelf || !req.body.acesso ? target.access_until : accessUntil(req.body.access_until),
   };
-  const rerender = (status, error) => res.status(status).render('users/form', { title: `Editar ${target.name}`, target, values: { ...target, ...values }, roles, error, isSelf });
+  const chosen = projectsFromBody(req.body, null, roles); // null = a tela não mandou a parte de acesso
+  const rerender = async (status, error) => res.status(status).render('users/form', {
+    title: `Editar ${target.name}`, target, values: { ...target, ...values }, roles, error, isSelf, projectRows: await projectRows(target.id),
+  });
 
   if (values.name.length < 2) return rerender(400, 'Informe o nome.');
+  if (chosen && !chosen.length) return rerender(400, 'Marque pelo menos um projeto: toda pessoa trabalha em algum.');
   if (!isEmail(values.email)) return rerender(400, 'E-mail inválido.');
-  if (!isSelf && !roles.includes(values.role)) return rerender(400, 'Perfil inválido para o seu nível de acesso.');
+  if (!isSelf && !role) return rerender(400, 'Função inválida para o seu nível de acesso.');
+  // trocar o e-mail de quem já tem senha e depois "Enviar nova senha" daria a conta da pessoa a quem trocou: só o superadmin pode
+  const emailChanged = values.email !== target.email;
+  if (emailChanged && !isSelf && target.password_hash && req.user.role !== 'superadmin') {
+    return rerender(403, 'Esta pessoa já tem senha: só o superadmin troca o e-mail dela. Se ela mudou de e-mail, peça a um superadmin.');
+  }
   if (target.role === 'superadmin' && values.role !== 'superadmin' && (await otherActiveSuperadmins(target.id)) === 0) {
     return rerender(400, 'Este é o único superadmin ativo. Promova outra pessoa antes de rebaixá-lo.');
   }
 
+  if (chosen) {
+    const set = await projectsSvc.setUserProjects(target.id, chosen);
+    if (set.error) return rerender(400, set.error);
+  }
   try {
-    await db.query('UPDATE users SET name = $2, email = $3, role = $4, updated_at = now() WHERE id = $1',
-      [target.id, values.name, values.email, values.role]);
+    await db.query('UPDATE users SET name = $2, email = $3, role = $4, role_id = $5, house = $6, access_until = $7, updated_at = now() WHERE id = $1',
+      [target.id, values.name, values.email, values.role, values.role_id, values.house, values.access_until]);
   } catch (err) {
     if (err.code === PG_UNIQUE) return rerender(409, 'Já existe um usuário com este e-mail.');
     throw err;
   }
-  if (values.role !== target.role || values.email !== target.email) await sessions.destroyUserSessions(target.id); // força novo login
+  if (values.role !== target.role || values.house !== target.house || emailChanged) await sessions.destroyUserSessions(target.id); // força novo login
+  if (emailChanged) await revokeAuthTokens(target.id); // convite/redefinição que já foi para o e-mail antigo deixa de valer
   await audit(req, 'usuario.editado', 'user', target.id, {
-    de: { email: target.email, role: target.role }, para: { email: values.email, role: values.role },
+    de: { email: target.email, role: target.role, casa: target.house }, para: { email: values.email, role: values.role, casa: values.house },
+    funcao: values.role_id !== target.role_id ? (rolesSvc.get(values.role_id) || {}).name : undefined,
+    projetos: chosen ? chosen.map((c) => `${c.id}${c.roleId ? ` (${(rolesSvc.get(c.roleId) || {}).name})` : ''}`).join(', ') : undefined,
   });
   await req.flash('ok', 'Usuário atualizado.');
   return res.redirect('/usuarios');
@@ -162,7 +227,7 @@ router.post('/usuarios/:id/reenviar', requirePerm('users.write'), wrap(async (re
     await req.flash('ok', `Link de acesso enviado para ${target.email}.`);
   } catch (err) {
     console.error('Falha ao reenviar acesso:', err.message);
-    await req.flash('error', `Não foi possível enviar o e-mail: ${err.message}`);
+    await req.flash('error', 'O e-mail de acesso não saiu. Confira o endereço e tente de novo daqui a pouco.');
   }
   return res.redirect('/usuarios');
 }));

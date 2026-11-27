@@ -16,6 +16,14 @@ function formatDateTime(v) {
   return valid(d) ? dateTimeFmt.format(d).replace(',', '') : '—';
 }
 
+// Hora de algo que acontece logo (nova tentativa de publicação): "11:15" se for hoje, "28/10 04:01" em outro dia. Horário de Brasília.
+const hourFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+function formatSoon(v) {
+  const d = toDate(v);
+  if (!valid(d)) return '';
+  return dateFmt.format(d) === dateFmt.format(new Date()) ? hourFmt.format(d) : `${dateFmt.format(d).slice(0, 5)} ${hourFmt.format(d)}`;
+}
+
 function formatDate(v) {
   const d = toDate(v);
   return valid(d) ? dateFmt.format(d) : '—';
@@ -45,6 +53,33 @@ function slugify(text) {
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
     .slice(0, 30);
+}
+
+// Número curto para views e alcance: 950, 12,3 mil, 1,2 mi.
+function compact(n) {
+  const v = Number(n) || 0;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace('.', ',').replace(/,0$/, '')} mi`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(v >= 1e4 ? 0 : 1).replace('.', ',').replace(/,0$/, '')} mil`;
+  return String(Math.round(v));
+}
+
+// "1 aviso" / "3 avisos": plural de verdade em vez de "aviso(s)".
+function plural(n, one, many) { return `${n} ${Number(n) === 1 ? one : many}`; }
+
+// Telefone legível: "48999720273" -> "(48) 99972-0273"; com 55 na frente, "+55 (48) 99972-0273". Fora desse formato, volta como veio.
+function phone(p) {
+  const raw = String(p || '').trim(); const d = raw.replace(/\D/g, '');
+  const local = (x) => (x.length === 11 ? `(${x.slice(0, 2)}) ${x.slice(2, 7)}-${x.slice(7)}` : x.length === 10 ? `(${x.slice(0, 2)}) ${x.slice(2, 6)}-${x.slice(6)}` : null);
+  if (raw.startsWith('+') && !d.startsWith('55')) return raw; // outro país: como foi digitado
+  if (d.length === 10 || d.length === 11) return local(d);
+  if ((d.length === 12 || d.length === 13) && d.startsWith('55')) return `+55 ${local(d.slice(2))}`;
+  return raw;
+}
+// Link do WhatsApp (wa.me) para o número; número brasileiro sem DDI ganha o 55. Sem dígitos suficientes, null.
+function waLink(p) {
+  const raw = String(p || '').trim(); const d = raw.replace(/\D/g, '');
+  if (d.length < 10) return null;
+  return `https://wa.me/${d.length <= 11 && !raw.startsWith('+') ? `55${d}` : d}`;
 }
 
 function firstName(name) {
@@ -83,8 +118,95 @@ function greeting() {
 const EMAIL_RE = /^[^\s@<>"',;:]+@[^\s@<>"',;:]+\.[^\s@<>"',;:]{2,}$/;
 const isEmail = (value) => typeof value === 'string' && value.length <= 254 && EMAIL_RE.test(value);
 
-module.exports = {
-  TZ, formatDateTime, formatDate, formatLong, toInputValue, parseInputDateTime,
+const brlFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatBRL = (cents) => (cents == null || cents === '' ? '—' : brlFmt.format(Number(cents) / 100));
+
+// "15.000,00" / "15000" / "R$ 6.000,5" -> centavos; vazio -> null; inválido -> NaN
+function parseBRL(input) {
+  const raw = String(input ?? '').replace(/[R$\s]/g, '');
+  if (!raw) return null;
+  const n = /,/.test(raw) ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(/\.(?=\d{3}(\D|$))/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(n)) return NaN;
+  return Math.round(Number(n) * 100);
+}
+
+// <input type="date"> (AAAA-MM-DD) <-> Date/string do banco
+function parseInputDate(str) {
+  if (!str) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return NaN;
+  const d = new Date(`${str}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== str ? NaN : str;
+}
+const toInputDate = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : (v ? String(v).slice(0, 10) : ''));
+// DATE do pg chega como Date à meia-noite local; mostramos dd/mm/aaaa sem deslocar o dia
+function formatDay(v) {
+  if (!v) return '—';
+  const s = v instanceof Date ? `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}` : String(v).slice(0, 10);
+  const [y, m, d] = s.split('-');
+  return `${d}/${m}/${y}`;
+}
+const LONG_MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+// "23 de outubro de 2026"
+function formatDayLong(v) {
+  const [d, m, y] = formatDay(v).split('/');
+  return y ? `${Number(d)} de ${LONG_MONTHS[Number(m) - 1]} de ${y}` : '';
+}
+// 12582912 -> "12 MB"; 13_194_139_533 -> "12,3 GB"
+function formatBytes(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v < 0) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0; let x = v;
+  while (x >= 1024 && i < units.length - 1) { x /= 1024; i += 1; }
+  return `${x >= 100 || i === 0 ? Math.round(x) : x.toFixed(1).replace('.', ',')} ${units[i]}`;
+}
+// 754000 ms -> "12:34"; 3_725_000 -> "1:02:05"
+function formatClock(ms) {
+  const t = Math.max(0, Math.floor(Number(ms) / 1000));
+  const h = Math.floor(t / 3600); const m = Math.floor((t % 3600) / 60); const s = t % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+// Ponto ou trecho do vídeo: "1:32" ou "1:32 – 1:40".
+const formatRange = (at, end = null) => (end == null ? formatClock(at) : `${formatClock(at)} – ${formatClock(end)}`);
+const formatDayShort = (v) => formatDay(v).slice(0, 5);
+// Hora do prazo das tarefas: 'HH:MM' ou 'HH:MM:SS' (coluna TIME) -> "14h" / "14h30".
+const timeParts = (v) => { const m = String(v || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/); return m ? { h: m[1], m: m[2] } : null; };
+const formatTime = (v) => { const t = timeParts(v); return t ? (t.m === '00' ? `${Number(t.h)}h` : `${Number(t.h)}h${t.m}`) : ''; };
+const toInputTime = (v) => { const t = timeParts(v); return t ? `${t.h}:${t.m}` : ''; };
+const formatDue = (d, t) => (d ? `${formatDay(d)}${formatTime(t) ? ` às ${formatTime(t)}` : ''}` : '');
+const formatDueShort = (d, t) => (d ? `${formatDayShort(d)}${formatTime(t) ? ` · ${formatTime(t)}` : ''}` : '');
+
+// HTML guardado (já limpo) ou, em registros antigos, o texto puro formatado.
+const richHtml = (html, plain) => require('../services/richText').display(html, plain);
+// Número do vídeo com o prefixo do projeto: EP.012 no Pulso, V.003 no Projeto 100. Sem número, nada (vídeo ainda em pauta).
+const epNo = (n, prefix = 'EP.') => (n ? `${prefix}${String(n).padStart(3, '0')}` : '');
+const epLabel = (n, title, prefix = 'EP.') => [epNo(n, prefix), title].filter(Boolean).join(' · ');
+
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Texto de comentário: escapa o HTML e destaca as menções (@Nome) de pessoas da equipe.
+function commentHtml(text, names = []) {
+  const html = escHtml(text);
+  const list = [...new Set(names.flatMap((n) => [n, n.split(/\s+/)[0]]))].filter(Boolean).sort((x, y) => y.length - x.length)
+    .map((n) => escHtml(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const marked = list.length ? html.replace(new RegExp(`@(?:${list.join('|')})(?![\\p{L}\\p{N}])`, 'giu'), (m) => `<span class="mention">${m}</span>`) : html;
+  return marked.replace(/\n/g, '<br>');
+}
+// "hoje", "amanhã", "em 5 dias", "ontem", "há 3 dias" (dias no calendário de Brasília)
+function relativeDays(v, now = new Date()) {
+  const d = toDate(v);
+  if (!valid(d)) return '';
+  const day = (x) => Date.UTC(...dateFmt.format(x).split('/').reverse().map((n, i) => (i === 1 ? Number(n) - 1 : Number(n))));
+  const diff = Math.round((day(d) - day(now)) / 86400000);
+  if (diff === 0) return 'hoje';
+  if (diff === 1) return 'amanhã';
+  if (diff === -1) return 'ontem';
+  return diff > 0 ? `em ${diff} dias` : `há ${-diff} dias`;
+}
+const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
+
+module.exports = { epNo, epLabel, compact, plural, phone, waLink, formatRange, escHtml, richHtml, commentHtml, initials, relativeDays,
+  formatBRL, parseBRL, parseInputDate, toInputDate, formatDay, formatDayShort, formatDayLong, timeParts, formatTime, toInputTime, formatDue, formatDueShort, formatBytes, formatClock,
+  TZ, formatDateTime, formatDate, formatSoon, formatLong, toInputValue, parseInputDateTime,
   shortDate, monthShort, dayNum, todayLabel, greeting,
   slugify, firstName, clean, isEmail,
 };

@@ -1,0 +1,66 @@
+<%- include('../partials/head') %>
+<%#
+  Sessões de gravação. Jornada: a produção marca a ida ao estúdio (dia, hora, duração prevista, local) e, na página da sessão,
+  escolhe os vídeos. As próximas aparecem primeiro; as que passaram ficam embaixo, com a duração real.
+%>
+<div class="page-head">
+  <div><span class="kicker">Produção</span><h1>Sessões de gravação</h1></div>
+  <div class="row">
+    <a class="btn ghost" href="/episodios"><%- icon('film') %> <%= videoLabel %></a>
+    <% if (can('production.manage')) { %><button class="btn primary" type="button" data-modal-open="modal-sessao"><%- icon('plus') %> Nova sessão</button><% } %>
+  </div>
+</div>
+<p class="lead">Uma ida ao estúdio para gravar vários vídeos. As horas do estúdio são da sessão: cada vídeo gravado leva a parte dele.</p>
+
+<% if (can('production.manage')) { %>
+<dialog class="modal" id="modal-sessao" aria-labelledby="sessao-h" <%= typeof abrir !== 'undefined' && abrir === 'nova' ? 'data-open-on-load' : '' %>>
+  <form method="post" action="/sessoes" class="stack" data-busy="Marcando…">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h2 id="sessao-h">Nova sessão de gravação</h2>
+    <p class="small muted m-0">Depois de marcar, você escolhe os vídeos (os que estão em Pré-produção). * obrigatório</p>
+    <%- include('../partials/project-field', { hint: 'De que projeto são os vídeos desta sessão.' }) %>
+    <label>Dia e hora *<input type="datetime-local" name="starts_at" required></label>
+    <div class="grid-2">
+      <label>Duração prevista (horas) *<input type="number" name="horas" min="0" max="24" step="1" value="2" required></label>
+      <label>e minutos<input type="number" name="minutos" min="0" max="59" step="5" value="0"></label>
+    </div>
+    <label>Local<input type="text" name="place" maxlength="160" placeholder="ex.: Estúdio da Health Scale"></label>
+    <label>Observação<textarea name="notes" rows="2" maxlength="1000" placeholder="ex.: levar a camisa azul para os vídeos 3 a 6"></textarea></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Marcar a sessão</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>
+<% } %>
+
+<% var row = function (s) { var d = new Date(s.starts_at); %>
+  <a class="req-row sess-row" href="/sessoes/<%= s.id %>">
+    <span class="sess-date"><span class="mono"><%= d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short' }).replace('.', '') %></span><strong><%= d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }) %></strong><span class="mono"><%= d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) %></span></span>
+    <span class="sess-main">
+      <span class="sess-title"><%= s.place || 'Sessão de gravação' %> <%- include('../partials/project-tag', { id: s.project_id }) %></span>
+      <span class="mono small muted"><%= s.videos %> vídeo<%= s.videos === 1 ? '' : 's' %><%= s.status === 'planejada' && s.recorded ? ' · ' + s.recorded + ' gravado' + (s.recorded === 1 ? '' : 's') : '' %> · <%= S.fmtMinutes(s.actual_minutes || s.planned_minutes) %><%= s.actual_minutes ? '' : ' previstas' %></span>
+    </span>
+    <span class="badge <%= S.STATUS[s.status].badge %>"><%= S.STATUS[s.status].label %></span>
+  </a>
+<% }; %>
+
+<% if (!upcoming.length && !past.length) { %>
+<section class="card empty">
+  <%- include('../partials/signal') %>
+  <h2>Nenhuma sessão ainda</h2>
+  <p class="muted">Marque a próxima ida ao estúdio e escolha os vídeos que vão ser gravados. No dia, a página da sessão vira a fila de gravação.</p>
+</section>
+<% } %>
+
+<% if (upcoming.length) { %>
+<section class="card">
+  <h2>Próximas</h2>
+  <div class="req-list"><% upcoming.forEach(row) %></div>
+</section>
+<% } %>
+
+<% if (past.length) { %>
+<section class="card">
+  <h2>Anteriores</h2>
+  <div class="req-list"><% past.forEach(row) %></div>
+</section>
+<% } %>
+<%- include('../partials/foot') %>

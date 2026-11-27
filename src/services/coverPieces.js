@@ -1,0 +1,326 @@
+// Peças do episódio a partir da ficha (coverSheet) e dos modelos do guia (public/design/models.js): as 3 thumbnails do teste
+// A/B (uma por ângulo) e a capa do Spotify. Também refaz uma peça quando alguém ajusta texto, modelo ou foto, e monta os arquivos
+// para baixar no padrão do guia (pulso_ep018_yt_A.png).
+const db = require('../db/pool');
+const b2 = require('./b2');
+const covers = require('./covers');
+const store = require('./coverStore');
+const sheets = require('./coverSheet');
+const M = require('../public/design/models');
+
+const YT_MAX = 1.9 * 1024 * 1024; // o YouTube aceita até 2 MB
+const SP_MAX = 500 * 1024; // o Spotify pede abaixo de 512 KB
+const LETTERS = { curiosidade: 'A', contraste: 'B', autoridade: 'C' };
+
+// A foto no formato dos modelos: o rosto maior do quadro (centro e altura, de 0 a 1). face: marcação feita à mão, se houver.
+function photoOf(frame, face = null) {
+  if (!frame) return null;
+  const f = (frame.analysis?.rostos || []).slice().sort((a, b) => b.w * b.h - a.w * a.h)[0];
+  const auto = f ? { x: f.x + f.w / 2, y: f.y + f.h / 2, h: f.h } : null;
+  return { ref: frame.ref, w: frame.width, h: frame.height, face: face || auto, noFace: !face && !auto };
+}
+const cleanFace = (f) => {
+  if (!f || typeof f !== 'object') return null;
+  const n = (v, lo, hi) => { const x = Number(v); return Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : null; };
+  const out = { x: n(f.x, 0, 1), y: n(f.y, 0, 1), h: n(f.h, 0.04, 0.95) };
+  return out.x === null || out.y === null || out.h === null ? null : out;
+};
+
+// Monta e confere (sem gravar). Devolve { spec, ctxData, notes, warnings } ou { error: [...] }.
+function build(modelId, data, frame, { flip = false, angle = null, face = null } = {}) {
+  const photo = photoOf(frame, face);
+  const built = M.build(covers.measureContext(), modelId, data, photo, { flip, angle });
+  if (built.error) return built;
+  if (photo) { built.spec.photo = { ref: photo.ref, ...(face ? { face } : {}) }; if (photo.noFace) built.warnings.push('Não achei o rosto nesta foto: marque o rosto ou troque a foto.'); }
+  return built;
+}
+
+// Renderiza no tamanho final: thumbnail até 2 MB, Spotify 3000×3000 abaixo de 512 KB.
+async function render(built, buffers) {
+  const kind = M.MODELS[built.spec.model].kind;
+  let quality = kind === 'spotify_cover' ? 0.9 : 0.92;
+  const limit = kind === 'spotify_cover' ? SP_MAX : kind === 'youtube_thumb' ? YT_MAX : Infinity;
+  let res = await covers.renderSpec(built.spec, buffers, built.ctxData, { type: 'image/jpeg', quality });
+  while (res.buffer.length > limit && quality > 0.5) { quality -= 0.06; res = await covers.renderSpec(built.spec, buffers, built.ctxData, { type: 'image/jpeg', quality }); }
+  const reads = M.reads(built.spec);
+  res.lint = {
+    ...res.lint, warnings: [...res.lint.warnings, ...(built.warnings || [])], reads,
+    ...(reads === false ? { issues: [...res.lint.issues, 'Não lê a 168 px: o destaque está pequeno ou a capa tem palavras demais.'], ok: false } : {}),
+    zoom: built.notes?.zoom ?? null,
+  };
+  return res;
+}
+// O texto que está de fato na capa (camadas principais e tarjas, na ordem do desenho): vale para a capa mexida no editor completo,
+// em que o texto pode ter saído da ficha.
+const textOfLayers = (spec) => M.tidy((spec.layers || []).filter((l) => !l.hidden && (l.type === 'tarja' || (l.type === 'text' && (l.role || 'main') === 'main'))).map((l) => l.text).join(' '));
+const labelOf = (spec) => {
+  if (spec.edited) return `${spec.angle ? `${M.ANGLES[spec.angle]}: ` : ''}${textOfLayers(spec)}`.slice(0, 160);
+  const s = spec.sheet || {}; const m = M.MODELS[spec.model];
+  const txt = m.fields.includes('pre') ? [s.pre, s.hl, s.post].filter(Boolean).join(' ') : m.fields.includes('setup') ? `${s.setup} ${s.punch}` : m.fields.includes('num') ? `${s.num} ${s.line}` : m.fields.includes('quote') ? s.quote : s.hook;
+  return `${spec.angle ? `${M.ANGLES[spec.angle]}: ` : ''}${M.tidy(txt)}`.slice(0, 160);
+};
+
+// Tenta o desenho normal e o espelhado e fica com o que tem menos problema (texto sobre o rosto, por exemplo).
+async function best(modelId, data, frame, buffers, opts = {}) {
+  const tries = opts.flip === undefined ? [false, true] : [Boolean(opts.flip)];
+  let pick = null;
+  for (const flip of tries) {
+    const built = build(modelId, data, frame, { ...opts, flip });
+    if (built.error) return built;
+    const res = await render(built, buffers);
+    const score = res.lint.issues.length * 10 + res.lint.warnings.length;
+    if (!pick || score < pick.score) pick = { built, res, score };
+    if (!score || !M.MODELS[modelId].angles) break; // Spotify e Reels não espelham
+  }
+  return pick;
+}
+
+async function insert(episodeId, pick, { kind, position = 0, userId = null, clipId = null, auto = true, group = null, label = null }) {
+  const row = await store.insertCover(episodeId, { kind, spec: pick.built.spec, ctx: pick.built.ctxData, lint: pick.res.lint, label: label || labelOf(pick.built.spec), position, clipId, group }, pick.res, userId);
+  const { rows: [out] } = await db.query('UPDATE episode_covers SET model = $2, angle = $3, auto = $4 WHERE id = $1 RETURNING *', [row.id, pick.built.spec.model, pick.built.spec.angle || null, auto]);
+  return out;
+}
+
+// Para a capa do Spotify, foto de câmera antes de quadro do vídeo (o arquivo sai em 3000 px: quadro de 1080p fica ampliado).
+const spotifyFrame = (frames, fallback) => frames.filter((f) => f.analysis?.from_file && (f.analysis.rostos || []).length).sort((a, b) => b.width * b.height - a.width * a.height)[0] || fallback;
+
+// Gera a ficha (se não houver) e as peças: 3 thumbnails, uma por ângulo, e a capa do Spotify. Não toca no que foi aprovado ou ajustado.
+// Devolve { created, fails: [{ what, reasons }], sheet }.
+async function generate(episodeId, { userId = null, onProgress, newSheet = false } = {}) {
+  const ctx = await sheets.context(episodeId);
+  if (!ctx.episode) throw new Error('Episódio não encontrado.');
+  // a capa do Spotify é do podcast; um vídeo só leva as thumbnails
+  const isPodcast = ctx.episode.format !== 'video';
+  const all = await store.loadFrames(episodeId, { clipId: null, custom: true });
+  const frames = all.filter((f) => !f.analysis?.custom);
+  if (!all.length) throw new Error('Não há quadros analisados para montar as capas.');
+  onProgress?.('Preenchendo a ficha…');
+  const sheet = (!newSheet && ctx.meta?.cover_sheet) || await sheets.generate(episodeId);
+  const kinds = isPodcast ? ['youtube_thumb', 'spotify_cover'] : ['youtube_thumb'];
+  const { rows: old } = await db.query('DELETE FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND auto AND NOT approved AND kind = ANY($2) RETURNING storage_key', [episodeId, kinds]);
+  for (const o of old) await b2.deleteObject(o.storage_key).catch(() => {});
+  const { rows: kept } = await db.query('SELECT kind, angle FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND kind = ANY($2) AND model IS NOT NULL', [episodeId, kinds]);
+  const durationMs = ctx.transcript?.duration_ms || Math.max(...all.map((f) => f.at_ms)) * 1.05;
+  const withFace = frames.filter((f) => (f.analysis?.rostos || []).length);
+  const picks = store.pickFrames(withFace.length >= 3 ? withFace : (frames.length ? frames : all), 3, durationMs);
+  const created = []; const fails = []; const buffers = {};
+  const load = async (frame) => { if (!(frame.ref in buffers)) Object.assign(buffers, await store.imageBuffers(all, [frame.ref])); return { [frame.ref]: buffers[frame.ref] }; };
+
+  onProgress?.('Montando as thumbnails…');
+  for (const [i, angle] of sheets.ANGLE_KEYS.entries()) {
+    if (kept.some((k) => k.kind === 'youtube_thumb' && k.angle === angle)) continue; // já tem uma aprovada ou ajustada
+    const frame = picks[i % picks.length];
+    const model = sheets.pickModel(sheet, angle, sheet.angles?.[angle]?.model);
+    const pick = await best(model, sheets.dataFor(sheet, ctx.episode, angle), frame, await load(frame), { angle });
+    if (pick.error) { fails.push({ what: M.ANGLES[angle], angle, model, reasons: pick.error }); continue; }
+    created.push(await insert(episodeId, pick, { kind: 'youtube_thumb', position: i, userId }));
+  }
+  if (isPodcast && !kept.some((k) => k.kind === 'spotify_cover')) {
+    onProgress?.('Montando a capa do Spotify…');
+    const frame = spotifyFrame(all, picks[0]);
+    const pick = await best('SP-A', sheets.dataFor(sheet, ctx.episode), frame, await load(frame), { flip: false });
+    if (pick.error) fails.push({ what: 'Spotify', model: 'SP-A', reasons: pick.error });
+    else created.push(await insert(episodeId, pick, { kind: 'spotify_cover', userId }));
+  }
+  return { created, fails, sheet };
+}
+
+// Refaz uma peça com o que a pessoa escolheu na janela Ajustar: { model, fields, frame (ref), flip, face }.
+// Guarda os textos na ficha (os campos são dela) e troca a imagem. Devolve { row } ou { error: [...] }.
+async function adjust(cover, input, userId = null) {
+  const model = M.MODELS[input.model] && M.MODELS[input.model].kind === cover.kind ? input.model : cover.model;
+  if (!model) return { error: ['Esta capa não usa um modelo do guia.'] };
+  const ctx = await sheets.context(cover.episode_id);
+  const fields = input.fields || {};
+  const patch = {};
+  if (cover.kind === 'youtube_thumb') {
+    Object.assign(patch, { angle: cover.angle, model }, Object.fromEntries(['pre', 'hl', 'post', 'setup', 'punch', 'num', 'line'].filter((k) => fields[k] !== undefined).map((k) => [k, fields[k]])));
+    if (fields.quote !== undefined) patch.quote = fields.quote;
+  } else if (cover.kind === 'spotify_cover') {
+    if (fields.hook !== undefined) patch.spotify_hook = fields.hook;
+    if (fields.guest !== undefined) patch.guest = fields.guest;
+  }
+  // confere antes de gravar a ficha: o que não cabe não entra
+  const draft = { ...(ctx.meta?.cover_sheet || {}), angles: { ...(ctx.meta?.cover_sheet?.angles || {}) } };
+  if (patch.angle) draft.angles[patch.angle] = { ...(draft.angles[patch.angle] || {}), ...Object.fromEntries(Object.entries(patch).filter(([k]) => !['angle', 'quote'].includes(k)).map(([k, v]) => [k, sheets.clean(v)])) };
+  if (patch.quote !== undefined) draft.quote = { ...(draft.quote || {}), text: sheets.clean(patch.quote) };
+  if (patch.spotify_hook !== undefined) draft.spotify_hook = sheets.clean(patch.spotify_hook);
+  if (patch.guest !== undefined) draft.guest = sheets.clean(patch.guest);
+  const data = sheets.dataFor(draft, ctx.episode, cover.angle);
+  const errs = M.problems(model, data);
+  if (errs.length) return { error: errs };
+
+  const all = await store.loadFrames(cover.episode_id, { clipId: null, custom: true });
+  const ref = input.frame && all.some((f) => f.ref === input.frame) ? input.frame : cover.spec?.photo?.ref;
+  const frame = all.find((f) => f.ref === ref) || all[0];
+  const face = cleanFace(input.face) || (ref === cover.spec?.photo?.ref ? cover.spec?.photo?.face : null) || null;
+  const flip = input.flip !== undefined ? Boolean(input.flip) : Boolean(cover.spec?.flip);
+  const pick = await best(model, data, frame, frame ? await store.imageBuffers(all, [frame.ref]) : {}, { angle: cover.angle, flip, face });
+  if (pick.error) return { error: pick.error };
+  await sheets.update(cover.episode_id, patch);
+  if (!cover.id) return { row: await insert(cover.episode_id, pick, { kind: cover.kind, position: cover.position || 0, userId, auto: false }) }; // ângulo que ainda não tinha capa
+  return { row: await replace(cover, pick, userId) };
+}
+
+// Troca a imagem e o desenho de uma capa que já existe (mantém a aprovação).
+async function replace(cover, pick, userId = null, { stale = false } = {}) {
+  const key = await b2.keyFor(...store.ownerKey(cover.episode_id, cover.clip_id), 'capas', `${cover.kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.jpg`);
+  await b2.putObject(key, pick.res.buffer, 'image/jpeg');
+  const { rows: [row] } = await db.query(
+    `UPDATE episode_covers SET spec = $2, ctx = $3, lint = $4, storage_key = $5, width = $6, height = $7, size_bytes = $8, model = $9, label = $10, auto = false, stale = $11, updated_at = now()
+      WHERE id = $1 RETURNING *`,
+    [cover.id, JSON.stringify(pick.built.spec), JSON.stringify(pick.built.ctxData), JSON.stringify(pick.res.lint), key, pick.res.width, pick.res.height, pick.res.buffer.length, pick.built.spec.model, labelOf(pick.built.spec), stale]);
+  await b2.deleteObject(cover.storage_key).catch((err) => console.error('Falha ao apagar imagem antiga:', err.message));
+  store.prewarm(row, pick.res.buffer);
+  void userId;
+  return row;
+}
+
+// A base da ficha mudou (nome, credencial, eixo): refaz as peças do episódio com a mesma foto e o mesmo modelo. A aprovada não é
+// trocada sozinha: fica marcada como desatualizada, com o botão Atualizar. only: refaz só esta capa (o Atualizar).
+async function refresh(episodeId, { only = null, userId = null } = {}) {
+  const ctx = await sheets.context(episodeId);
+  const sheet = ctx.meta?.cover_sheet;
+  if (!sheet) return { redone: 0, stale: 0 };
+  const { rows } = await db.query("SELECT * FROM episode_covers WHERE episode_id = $1 AND clip_id IS NULL AND model IS NOT NULL AND kind IN ('youtube_thumb', 'spotify_cover') ORDER BY id", [episodeId]);
+  const all = await store.loadFrames(episodeId, { clipId: null, custom: true });
+  let redone = 0; let stale = 0;
+  for (const c of rows) {
+    if (only && c.id !== only) continue;
+    // aprovada ou mexida no editor completo: não é trocada sozinha (o Atualizar do cartão refaz, com confirmação)
+    if ((c.approved || c.spec?.edited) && !only) { await db.query('UPDATE episode_covers SET stale = true WHERE id = $1', [c.id]); stale += 1; continue; }
+    const frame = all.find((f) => f.ref === c.spec?.photo?.ref) || all[0];
+    const pick = await best(c.model, sheets.dataFor(sheet, ctx.episode, c.angle), frame, frame ? await store.imageBuffers(all, [frame.ref]) : {}, { angle: c.angle, flip: Boolean(c.spec?.flip), face: c.spec?.photo?.face || null });
+    if (pick.error) { await db.query('UPDATE episode_covers SET stale = true WHERE id = $1', [c.id]); stale += 1; continue; }
+    const auto = c.auto;
+    await replace(c, pick, userId);
+    if (auto) await db.query('UPDATE episode_covers SET auto = true WHERE id = $1', [c.id]); // continua sendo "do sistema": a ficha é que mudou
+    redone += 1;
+  }
+  return { redone, stale };
+}
+
+// O que falta para cada ângulo sair (para o cartão tracejado da tela). [{ what, angle, model, reasons }]
+function missing(sheet, episode, coversList) {
+  if (!sheet) return [];
+  const out = [];
+  for (const angle of sheets.ANGLE_KEYS) {
+    if (coversList.some((c) => c.kind === 'youtube_thumb' && c.angle === angle)) continue;
+    const model = sheets.pickModel(sheet, angle, sheet.angles?.[angle]?.model);
+    const reasons = M.problems(model, sheets.dataFor(sheet, episode, angle));
+    if (reasons.length) out.push({ what: M.ANGLES[angle], angle, model, reasons });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- capas de corte (Reels 1080×1920)
+// O que todo modelo de corte recebe: nome, credencial (a da ficha do episódio, se houver) e o número do episódio.
+function clipBase({ episode = null, guest = null, epSheet = null } = {}) {
+  const role = sheets.clean(guest?.positioning || guest?.job_title || '');
+  return { guest: sheets.clean(epSheet?.guest || guest?.name || ''), tag: sheets.clean(epSheet?.tag || (M.countWords(role) <= 8 ? role : '')), ep: episode?.number || '' };
+}
+// O texto da capa de corte por modelo (para as listas e para o campo "Texto da capa").
+function clipText(spec) {
+  if (spec?.edited) return textOfLayers(spec); // mexida no editor completo: o texto é o da imagem
+  const s = spec?.sheet || {};
+  return M.tidy(spec?.model === 'RL-C' ? [s.pre, s.hl, s.post].filter(Boolean).join(' ') : spec?.model === 'RL-B' ? s.quote : s.hook);
+}
+// Os campos de um modelo de corte a partir de um texto só (o campo "Texto da capa"): gancho, tarja ou frase.
+function clipDataFor(model, text, base, keep = {}) {
+  const t = sheets.clean(text);
+  if (model === 'RL-C') return { ...base, ...sheets.splitText(t) };
+  if (model === 'RL-B') return { ...base, quote: t };
+  const hl = keep.hl && M.hookMarks(t, keep.hl).words.length ? keep.hl : sheets.splitText(t).hl;
+  return { ...base, hook: t, hl, sub: keep.sub || '' };
+}
+// Até 3 opções em modelos diferentes: o gancho (RL-A), a tarja central (RL-C) e a frase literal (RL-B). Só entra o que cabe nos
+// limites do guia. [] = os textos do corte não servem para os modelos (quem chama cai na capa antiga).
+function clipOptions(clip, base) {
+  const cs = clip.cover_sheet || {}; const texts = (clip.cover_texts || []).map(sheets.clean).filter(Boolean);
+  const hook = sheets.clean(cs.hook) || texts[0] || sheets.clean(clip.post_title);
+  const out = [];
+  const push = (model, data) => {
+    if (!M.tidy(clipText({ model, sheet: data }))) return;
+    if (M.problems(model, data).length || out.some((o) => o.model === model && clipText({ model, sheet: o.data }) === clipText({ model, sheet: data }))) return;
+    out.push({ model, data });
+  };
+  if (hook) push('RL-A', clipDataFor('RL-A', hook, base, { hl: cs.hl, sub: cs.sub }));
+  for (const t of [texts[1], texts[0], hook].filter(Boolean)) { if (out.some((o) => o.model === 'RL-C')) break; push('RL-C', clipDataFor('RL-C', t, base)); }
+  if (cs.quote) push('RL-B', clipDataFor('RL-B', cs.quote, base));
+  for (const t of texts.slice(1)) { if (out.length >= 3) break; push('RL-A', clipDataFor('RL-A', t, base)); }
+  return out.slice(0, 3);
+}
+
+// Refaz a capa de um corte com o que veio da janela Ajustar (ou das capas em lote). Guarda os textos na ficha do corte.
+async function adjustClip(cover, input, userId = null) {
+  const model = M.MODELS[input.model]?.kind === 'reel_cover' ? input.model : (cover.model || 'RL-A');
+  const { rows: [clip] } = await db.query('SELECT * FROM episode_clips WHERE id = $1', [cover.clip_id]);
+  if (!clip) return { error: ['Corte não encontrado.'] };
+  const ctx = clip.episode_id ? await sheets.context(clip.episode_id) : { episode: null, meta: null };
+  const { rows: [guest] } = ctx.episode?.guest_id ? await db.query('SELECT name, positioning, job_title FROM guests WHERE id = $1', [ctx.episode.guest_id]) : { rows: [] };
+  const fields = Object.fromEntries(Object.entries(input.fields || {}).filter(([k, v]) => ['hook', 'hl', 'sub', 'quote', 'pre', 'post'].includes(k) && v !== undefined && v !== null).map(([k, v]) => [k, sheets.clean(v)]));
+  const data = { ...clipBase({ episode: ctx.episode, guest, epSheet: ctx.meta?.cover_sheet }), ...(cover.spec?.sheet || {}), ...fields };
+  const errs = M.problems(model, data);
+  if (errs.length) return { error: errs };
+  const all = await store.loadFrames(null, { clipId: clip.id, custom: true });
+  const ref = input.frame && all.some((f) => f.ref === input.frame) ? input.frame : (cover.spec?.photo?.ref || cover.spec?.bg?.ref);
+  const frame = all.find((f) => f.ref === ref) || store.pickFrames(all, 1, clip.duration_ms || 60_000)[0];
+  if (!frame) return { error: ['Este corte ainda não tem quadros lidos: use "Ler de novo" no corte.'] };
+  const face = cleanFace(input.face) || (ref === cover.spec?.photo?.ref ? cover.spec?.photo?.face : null) || null;
+  const pick = await best(model, data, frame, await store.imageBuffers(all, [frame.ref]), { face, flip: false });
+  if (pick.error) return { error: pick.error };
+  const sheet = { ...(clip.cover_sheet || {}), ...Object.fromEntries(['hook', 'hl', 'sub', 'quote'].filter((k) => fields[k] !== undefined).map((k) => [k, fields[k]])), by: 'equipe', updated_at: new Date().toISOString() };
+  await db.query('UPDATE episode_clips SET cover_sheet = $2, updated_at = now() WHERE id = $1', [clip.id, JSON.stringify(sheet)]);
+  if (!cover.id) { // capa nova (capas em lote): fica escolhida e aprovada
+    const { rows: [{ n }] } = await db.query('SELECT coalesce(max(position), -1) + 1 AS n FROM episode_covers WHERE clip_id = $1', [clip.id]);
+    return { row: await insert(clip.episode_id, pick, { kind: 'reel_cover', position: n, userId, clipId: clip.id, auto: false, group: `clip-${clip.id}`, label: `Capa: ${clipText(pick.built.spec)}` }) };
+  }
+  const row = await replace(cover, pick, userId);
+  await db.query('UPDATE episode_covers SET label = $2 WHERE id = $1', [row.id, `Capa: ${clipText(pick.built.spec)}`.slice(0, 160)]);
+  return { row };
+}
+
+// ---------------------------------------------------------------- editor completo
+// Grava uma capa dos modelos mexida no editor completo (o spec já passou pelo specSanitizer, com base = a capa guardada). As zonas
+// de rosto saem das fotos do próprio desenho (o zoom e o enquadramento que a pessoa deu), e valem os mesmos limites de arquivo e o
+// mesmo teste de redução das peças. Mantém a aprovação e o "desatualizada". Devolve { row, lint }.
+async function saveEdited(cover, spec, userId = null) {
+  const all = await store.loadFrames(cover.episode_id, { clipId: cover.clip_id ?? null, custom: true });
+  const byRef = Object.fromEntries(all.map((f) => [f.ref, f]));
+  const info = (ref) => (byRef[ref] ? { face: M.faceOf(byRef[ref].analysis?.rostos, spec.photo?.ref === ref ? spec.photo.face : null) } : null);
+  const ctxData = { faces: M.facesOf(spec, info), blocks: [] };
+  const ph = (spec.layers || []).find((l) => l.type === 'photo' && l.ref && l.img && !l.hidden && byRef[l.ref]);
+  const sc = ph ? M.photoScale(ph, { w: byRef[ph.ref].width, h: byRef[ph.ref].height }, spec.scale || 1) : null;
+  const zoom = sc ? Math.round(sc.real * 10) / 10 : null;
+  const built = { spec, ctxData, notes: { zoom, soft: Boolean(sc?.soft) }, warnings: sc?.soft ? [`Foto ampliada ${String(zoom).replace('.', ',')}×: fica sem nitidez. Troque por uma foto maior.`] : [] };
+  const res = await render(built, await store.imageBuffers(all, store.refsOf(spec)));
+  const row = await replace(cover, { built, res }, userId, { stale: Boolean(cover.stale) });
+  if (cover.clip_id) {
+    const { rows: [r] } = await db.query('UPDATE episode_covers SET label = $2 WHERE id = $1 RETURNING *', [row.id, `Capa: ${clipText(spec)}`.slice(0, 160)]);
+    return { row: r, lint: res.lint };
+  }
+  return { row, lint: res.lint };
+}
+
+// Arquivo para baixar no padrão do guia: PNG quando cabe no limite da peça, senão o JPG guardado.
+const pieceName = (episode, cover, ext) => {
+  const ep = episode?.number ? `ep${String(episode.number).padStart(3, '0')}` : `episodio${cover.episode_id}`;
+  const part = cover.kind === 'spotify_cover' ? 'spotify' : `yt_${LETTERS[cover.angle] || cover.position + 1}`;
+  const slug = require('./projects').get(episode?.project_id)?.slug || 'pulso'; // o nome do arquivo leva o projeto
+  return `${slug.replace(/-/g, '')}_${ep}_${part}.${ext}`;
+};
+async function download(cover, episode) {
+  if (cover.kind === 'youtube_thumb' && cover.model && cover.spec) {
+    try {
+      const all = await store.loadFrames(cover.episode_id, { clipId: null, custom: true });
+      const buffers = await store.imageBuffers(all, store.refsOf(cover.spec));
+      const png = await covers.renderSpec(cover.spec, buffers, cover.ctx || {}, { type: 'image/png' });
+      if (png.buffer.length <= YT_MAX) return { buffer: png.buffer, mime: 'image/png', name: pieceName(episode, cover, 'png') };
+    } catch (err) { console.error('PNG da thumbnail:', err.message); }
+  }
+  const obj = await b2.getObject(cover.storage_key);
+  if (!obj) return null;
+  return { buffer: Buffer.from(await obj.arrayBuffer()), mime: 'image/jpeg', name: pieceName(episode, cover, 'jpg') };
+}
+
+module.exports = { YT_MAX, SP_MAX, LETTERS, photoOf, build, render, best, insert, generate, adjust, replace, refresh, missing, download, pieceName, labelOf, textOfLayers, clipBase, clipText, clipDataFor, clipOptions, adjustClip, saveEdited };

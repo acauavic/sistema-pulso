@@ -1,0 +1,30 @@
+<%
+  // Faixa "Comentários" do Resumo do dia e do Seu dia: o que as respostas por IA fizeram no dia. Variáveis: day, cmtDay
+  // (commentStats.brief), bandId. Cada célula leva aos Números do mesmo dia. Medir não é ação: nada de lime; vermelho só no erro.
+  var k = cmtDay, href = '/social/comentarios/numeros?dia=' + day.day;
+  var n = function (v) { return Number(v || 0).toLocaleString('pt-BR'); };
+  var pl = function (v, one, many) { return Number(v) === 1 ? one : many; };
+  var sub = function (parts) { %><span class="day-sub"><% parts.forEach(function (p, i) { %><%= i ? ' · ' : '' %><% if (p.n !== undefined) { %><b class="<%= p.bad ? 'bad' : '' %>"><%= n(p.n) %></b> <% } %><%= p.t %><% }) %></span><% };
+  var cells = [
+    { l: 'Comentários', v: k.received, s: [{ t: pl(k.received, 'lido no dia', 'lidos no dia') }] },
+    { l: 'Respondidos', v: k.replied, s: k.replied ? [{ n: k.text, t: 'em texto' }, { n: k.reactions, t: pl(k.reactions, 'reação', 'reações') }] : [{ t: 'pela IA' }] },
+    { l: 'Directs', v: k.dms, s: k.clicks.day !== null ? [{ n: k.clicks.day, t: pl(k.clicks.day, 'clique no link', 'cliques no link') }] : (k.dmQueue && day.isToday ? [{ n: k.dmQueue, t: 'na fila' }] : [{ t: 'com a comunidade' }]) },
+    { l: 'Voltaram a comentar', v: k.back.back, s: k.back.replied ? [{ t: 'de ' + n(k.back.replied) + ' respondidos' + (k.back.rate !== null ? ' · ' + k.back.rate + '%' : '') }] : [{ t: 'depois da resposta' }] },
+    { l: 'Erros', v: k.problems, bad: k.problems > 0, s: k.team ? [{ n: k.team, t: pl(k.team, 'espera a equipe', 'esperam a equipe'), bad: true }] : [{ t: k.problems ? 'ver o motivo' : 'tudo certo' }] },
+  ];
+%>
+<section class="day-band" aria-labelledby="<%= bandId %>">
+  <div class="day-band-head">
+    <h3 class="day-band-t" id="<%= bandId %>">Comentários nas redes</h3>
+    <a class="day-aside" href="<%= href %>">ver os números</a>
+  </div>
+  <div class="day-cells c5">
+    <% cells.forEach(function (c) { %>
+    <a class="day-cell <%= c.bad ? 'is-bad' : (c.v ? '' : 'is-zero') %>" href="<%= href %>">
+      <span class="day-l"><%= c.l %></span>
+      <span class="day-n"><%= n(c.v) %></span>
+      <% sub(c.s) %>
+    </a>
+    <% }) %>
+  </div>
+</section>

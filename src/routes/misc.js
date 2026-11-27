@@ -5,42 +5,326 @@ const mailer = require('../services/mailer');
 const yourls = require('../services/yourls');
 const { audit } = require('../services/audit');
 const { requirePerm } = require('../middleware');
-const { GUEST_STATUSES } = require('../constants');
 const { wrap } = require('../utils/wrap');
+const { can } = require('../permissions');
 
 const router = express.Router();
 
-router.get('/', wrap(async (req, res) => {
-  const [counts, upcoming, recent, mine] = await Promise.all([
-    db.query('SELECT status, count(*)::int AS n FROM guests GROUP BY status'),
-    db.query(`SELECT id, name, topic, proposed_at FROM guests
-               WHERE status = 'confirmado' AND proposed_at >= now() ORDER BY proposed_at LIMIT 6`),
-    db.query(`SELECT e.type, e.message, e.created_at, g.id AS guest_id, g.name AS guest_name, u.name AS user_name
-                FROM guest_events e JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.user_id
-               ORDER BY e.created_at DESC, e.id DESC LIMIT 10`),
-    db.query(`SELECT count(*)::int AS n FROM guests WHERE owner_id = $1 AND status IN ('prospect','convite_enviado')`, [req.user.id]),
+// Seletor de projeto (topo do menu): guarda a escolha da pessoa e volta para a mesma tela. Vazio = todos os projetos.
+router.post('/projeto', wrap(async (req, res) => {
+  const scope = require('../services/scope');
+  const raw = String(req.body.project || '');
+  const id = raw === '' ? null : Number(raw);
+  if (id !== null && !req.scope.ids.includes(id)) return res.status(400).render('error', { title: 'Projeto inválido', message: 'Você não participa deste projeto.' });
+  const projects = require('../services/projects');
+  await projects.setLast(req.user.id, id);
+  // a tela aberta é de algo que o projeto escolhido não usa (ex.: Plateia no Projeto 100): em vez de uma tela vazia, o Início
+  const back = scope.localPath(req.body.voltar);
+  const mod = id ? scope.moduleOfPath(back) : null;
+  res.redirect(mod && !projects.has(projects.get(id), mod) ? '/' : back);
+}));
+
+// Início de quem só edita vídeo (production.edit sem production.manage): a ordem de edição (o que editar primeiro, pela data de
+// veiculação), os episódios dele que já saíram da edição e as tarefas dele. Nada de convidados, patrocinadores ou financeiro.
+async function editorHome(req, res) {
+  const me = req.user.id;
+  const pids = require('../services/scope').idsOf(req); // o recorte de projeto da pessoa
+  const goalsSvc = require('../services/goals');
+  const [order, { rows: mine }, { rows: tasks }, rhythm, myGoals] = await Promise.all([
+    require('../services/editOrder').list(pids),
+    db.query(`SELECT id, number, title, status, review_round, project_id FROM episodes WHERE editor_id = $1 AND status IN ('em_revisao', 'em_finalizacao', 'pronto_publicar')
+                AND project_id = ANY($2::int[])
+               ORDER BY CASE status WHEN 'em_revisao' THEN 0 ELSE 1 END, number DESC NULLS LAST`, [me, pids]),
+    db.query("SELECT id, title, status, due_on, to_char(due_time, 'HH24:MI') AS due_time, project_id FROM tasks WHERE assignee_id = $1 AND status <> 'feito' AND (project_id IS NULL OR project_id = ANY($2::int[])) ORDER BY due_on NULLS LAST, due_time NULLS LAST, id LIMIT 8", [me, pids]),
+    goalsSvc.rhythmFor(me), // Seu ritmo: cortes e revisões de hoje e da semana, entregas da semana, próxima entrega
+    goalsSvc.progressFor(me), // Minhas metas (Gestão > Metas)
   ]);
-  const byStatus = Object.fromEntries(counts.rows.map((r) => [r.status, r.n]));
+  const queue = order.filter((e) => e.status === 'disponivel_edicao');
+  const inEdit = order.filter((e) => e.status === 'em_edicao' && e.editor_id === me);
+  const adjust = inEdit.filter((e) => e.review_round > 0);
+  // pedidos de conteúdo: os meus e os sem responsável que ainda não começaram (qualquer editor pode pegar)
+  const { rows: requests } = await db.query(
+    `SELECT id, kind, title, status, due_on, rounds, assignee_id, project_id FROM content_requests
+      WHERE status IN ('pedido','producao','revisao') AND (assignee_id = $1 OR (assignee_id IS NULL AND status = 'pedido'))
+        AND project_id = ANY($2::int[])
+      ORDER BY CASE WHEN status = 'producao' AND rounds > 0 THEN 0 WHEN status = 'producao' THEN 1 WHEN status = 'pedido' THEN 2 ELSE 3 END, due_on NULLS LAST, id`, [me, pids]);
+  res.render('dashboard-editor', { requests, requestKinds: require('../services/contentRequests').KINDS, title: 'Início', order, queue, inEditCount: inEdit.length, mine, rhythm, myGoals, tasks: tasks.map((t) => ({ ...t, late: require('../services/tasks').isLate(t) })), adjustCount: adjust.length, today: require('../services/calendar').todayISO(), EPISODE_STATUSES: require('../constants').EPISODE_STATUSES });
+}
+
+router.get('/', wrap(async (req, res) => {
+  if (can(req.user, 'production.edit') && !can(req.user, 'production.manage')) return editorHome(req, res);
+  // painel: os três blocos (convidados, financeiro, cadência) começam juntos
+  const fin = require('../services/finance');
+  const outreach = require('../services/outreach');
+  const finPids = require('../services/scope').financeIdsOf(req); // dinheiro: só os projetos em que a pessoa vê o financeiro
+  const finOwner = require('../services/finOwner');
+  const pMoney = can(req.user, 'finance.read') && finPids.length ? Promise.all([fin.counts({ pids: finPids }), fin.stockItems({ pids: finPids }), db.query(
+    // mesma conta do Financeiro ("A pagar em 7 dias"): de hoje até daqui a 7 dias; o atrasado aparece à parte
+    `SELECT coalesce(sum(${finOwner.share('e', '$2')}) FILTER (WHERE e.direction = 'saida' AND e.due_on BETWEEN $1::date AND ($1::date + 7)), 0)::bigint AS out7
+       FROM fin_entries e WHERE e.status = 'previsto' AND ${finOwner.where('e', '$2')}`,
+    [new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()), finPids]),
+    // o banco de horas nunca derruba o Início: se falhar, a faixa de aviso só não aparece
+    require('../services/hourBank').status({ pids: finPids }).catch((err) => { console.error('Banco de horas (Início):', err.message); return null; })]) : null;
+  const pOut = can(req.user, 'guests.write') || can(req.user, 'sponsors.write') ? outreach.todayFor(req.user, require('../services/scope').idsOf(req)) : null;
+  // Resumo do dia: o dia vem do endereço (?dia=AAAA-MM-DD); sem ele, hoje. A produtora abre no "Seu dia" (os números dela) e vê o
+  // resumo da equipe em ?visao=equipe; as outras pessoas abrem no resumo da equipe.
+  const daySummary = require('../services/daySummary');
+  const myDay = require('../services/myDay');
+  const pids = require('../services/scope').idsOf(req); // o recorte de projeto de quem está olhando
+  const isProducer = myDay.isProducer(req.user);
+  const visao = isProducer && req.query.visao !== 'equipe' ? 'meu' : 'equipe';
+  const day = await daySummary.pick(req.query.dia);
+  const quiet = (p) => { if (p) p.catch(() => {}); return p; }; // se outra consulta falhar antes, esta não vira rejeição solta (o erro aparece no await)
+  const pDay = quiet(visao === 'equipe' ? daySummary.summary(day.day, { isToday: day.isToday, pids }) : null);
+  const pMine = quiet(visao === 'meu' ? myDay.plan(req.user, day.day, day.isToday, pids) : null);
+  const pNow = quiet(isProducer ? myDay.now(req.user, day.today, pids) : null);
+  const pGoals = quiet(require('../services/goals').progressFor(req.user.id)); // Minhas metas (Gestão > Metas), no cartão Hoje
+  // faixa "Comentários nas redes" (respostas por IA) para quem cuida dos comentários; se falhar, a faixa só não aparece
+  const pCmt = can(req.user, 'social.comments') ? require('../services/commentStats').brief(day.day, { isToday: day.isToday })
+    .catch((err) => { console.error('Comentários (Início):', err.message); return null; }) : null;
+  const [upcoming, recent, mine] = await Promise.all([
+    isProducer ? { rows: [] } : db.query(`SELECT id, name, topic, proposed_at, project_id FROM guests
+               WHERE status = 'agendado' AND proposed_at >= now() AND project_id = ANY($1::int[]) ORDER BY proposed_at LIMIT 6`, [pids]),
+    isProducer ? { rows: [] } : db.query(`SELECT e.type, e.message, e.created_at, g.id AS guest_id, g.name AS guest_name, u.name AS user_name
+                FROM guest_events e JOIN guests g ON g.id = e.guest_id LEFT JOIN users u ON u.id = e.user_id
+               WHERE g.project_id = ANY($1::int[])
+               ORDER BY e.created_at DESC, e.id DESC LIMIT 10`, [pids]),
+    db.query(`SELECT count(*)::int AS n FROM guests WHERE owner_id = $1 AND status IN ('prospect','convite_enviado') AND project_id = ANY($2::int[])`, [req.user.id, pids]),
+  ]);
+  let money = null;
+  if (pMoney) {
+    const [c, stock, { rows: [week] }, bank] = await pMoney;
+    money = { late: c.atrasados, out7: Number(week.out7), toBuy: stock.filter((i) => i.active && ['comprar', 'acabou'].includes(i.state)).length,
+      // banco de horas do estúdio acabando: faixa de aviso acima do resumo do dinheiro
+      bankAlert: bank && bank.low ? { text: require('../services/hourBank').alertText(bank), bad: require('../services/hourBank').isOut(bank) } : null };
+  }
+  const outToday = pOut ? await pOut : null;
+  if (outToday) outToday.items = outToday.items.map((x) => ({ ...x, d: outreach.describe(x) }));
+  const myGoals = await pGoals;
+  // "Pautas que travaram": atrasadas ou com ajustes pedidos, no recorte de projeto da pessoa (só para quem escreve pauta)
+  const pautaSvc = require('../services/pautas');
+  const pautasTravadas = visao === 'meu' && can(req.user, 'pautas.write')
+    ? await pautaSvc.stuck({ projectIds: pids }).catch((err) => { console.error('Pautas (Início):', err.message); return []; })
+    : [];
   res.render('dashboard', {
-    title: 'Início', cards: GUEST_STATUSES.map((s) => ({ ...s, n: byStatus[s.key] || 0 })),
+    pautaSvc, pautasTravadas,
+    money, outToday, CHANNELS: outreach.CHANNELS, outBase: (k) => outreach.KINDS[k].base,
+    title: 'Início', day, ds: await pDay, mineDay: await pMine, mineNow: await pNow, myGoals, isProducer, visao, cmtDay: await pCmt,
+    producerLine: isProducer ? myDay.line(outToday, myGoals) : '',
     upcoming: upcoming.rows, recent: recent.rows, myOpen: mine.rows[0].n,
   });
 }));
 
 router.get('/auditoria', requirePerm('audit.read'), wrap(async (req, res) => {
-  const { rows } = await db.query('SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT 300');
-  res.render('audit', { title: 'Auditoria', rows });
+  const { pageOf, paginate } = require('../utils/pager');
+  const pg = pageOf(req, 100); // 100 por página (antes: só os 300 mais recentes, o resto não aparecia)
+  const labels = require('../utils/auditLabels');
+  const area = labels.AREAS[req.query.area] ? req.query.area : '';
+  const quem = String(req.query.quem || '').trim().slice(0, 254);
+  const [{ rows: raw }, { rows: people }] = await Promise.all([
+    db.query(`SELECT * FROM audit_log WHERE ($1 = '' OR split_part(action, '.', 1) = $1) AND ($2 = '' OR user_email = $2)
+               ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4`, [area, quem, pg.limit, pg.offset]),
+    db.query("SELECT DISTINCT user_email FROM audit_log WHERE user_email IS NOT NULL AND created_at > now() - interval '180 days' ORDER BY 1 LIMIT 100"),
+  ]);
+  const { rows, pager } = paginate(req, raw, pg);
+  res.render('audit', { title: 'Auditoria', rows, pager, area, quem, people: people.map((p) => p.user_email), areas: labels.AREAS, auditLabel: labels.auditLabel, entityLabel: labels.entityLabel });
 }));
 
 // ---- integrações: status + testes seguros (sem expor segredos) ----
-router.get('/integracoes', requirePerm('integrations.manage'), (req, res) => {
+router.get('/integracoes', requirePerm('integrations.manage'), wrap(async (req, res) => {
   res.render('integrations', {
+    google: { ...(await require('../services/googleCalendar').status()), types: await require('../services/googleCalendar').settings(), meet: config.googleMeetConfigured, meetSubject: config.google.subject },
+    inviteOn: await require('../services/calendarInvites').enabled(),
+    calTypes: require('../services/googleCalendar').MIRROR_TYPES(), timed: require('../services/googleCalendar').TIMED,
     title: 'Integrações',
     smtp: { ok: config.mailConfigured, dry: config.mailDryRun, host: config.brevo.host, port: config.brevo.port, from: config.brevo.from },
     yourls: { ok: config.yourlsConfigured, base: config.yourls.base },
+    rabbit: { ...await require('../services/chatBus').status(), pending: (await require('../db/pool').query('SELECT count(*)::int AS n FROM chat_outbox WHERE published_at IS NULL')).rows[0].n, last: (await require('../db/pool').query("SELECT via, count(*)::int AS n FROM chat_outbox WHERE published_at > now() - interval '24 hours' GROUP BY via")).rows },
+    infinitepay: { ok: config.infinitepayConfigured, handle: config.infinitepay.handle, webhook: config.infinitepayConfigured ? require('../services/infinitePay').webhookUrl() : '' },
     appBaseUrl: config.appBaseUrl,
+    storage: config.storageConfigured ? { direct: config.uploadDirect, origin: new URL(config.appBaseUrl).origin, cors: await require('../services/b2').corsStatus(new URL(config.appBaseUrl).origin) } : null,
+    social: { active: await require('../services/socialApi').activeId(), providers: await Promise.all(require('../services/socialApi').list().map(async (p) => ({ id: p.id, label: p.label, configured: p.configured(), live: p.live(), by: p.by, env: p.env, liveEnv: p.liveEnv, source: await require('../services/socialApi').liveSource(p.id) }))), outstandTiktok: await require('../services/outstand').tiktokMode(), outstandProcess: await require('../services/outstand').processMedia(),
+      routeMap: await require('../services/socialApi').routeMap(), overrides: await require('../services/socialApi').routes(), networks: Object.fromEntries(Object.entries(require('../services/socialApi').PLATFORMS).map(([k, v]) => [k, v.label])),
+      accounts: await require('../services/socialHealth').overview({ pids: require('../services/scope').idsOf(req) }), problems: await require('../services/socialHealth').problems({ pids: require('../services/scope').idsOf(req) }) },
+    comments: await commentsSetup(),
   });
-});
+}));
+
+// Comentários e directs pela Outstand (automação de comentário → direct): estado, reconexão com acesso às mensagens e segredo do aviso.
+async function commentsSetup() {
+  const automation = require('../services/commentAutomation');
+  const ost = require('../services/outstand');
+  const conn = config.outstandConfigured ? await ost.connected().catch(() => ({ platforms: {} })) : { platforms: {} };
+  return { configured: config.outstandConfigured, handle: String(conn.platforms?.instagram?.handle || '').replace(/^@/, ''), status: await automation.state(), webhookUrl: `${config.appBaseUrl.replace(/\/$/, '')}/webhooks/outstand` };
+}
+router.post('/integracoes/outstand/segredo', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  await require('../services/commentAutomation').newSecret();
+  await audit(req, 'integracao.outstand_segredo', 'settings', null);
+  await req.flash('ok', 'Segredo gerado. Cole o endereço e o segredo no aviso (webhook) da Outstand.');
+  res.redirect('/integracoes#comentarios');
+}));
+router.post('/integracoes/outstand/mensagens', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  try {
+    const url = await require('../services/outstand').instagramAuthUrl(`${config.appBaseUrl.replace(/\/$/, '')}/integracoes/outstand/voltou`);
+    await audit(req, 'integracao.outstand_reconectar', 'settings', null);
+    // Não dá para responder com redirecionamento para fora: a CSP do painel (form-action 'self') faz o navegador barrar em silêncio
+    // um formulário que termina em outro site. Uma página do painel leva ao Instagram.
+    return res.render('integrations-go', { title: 'Reconectar o Instagram', url });
+  } catch (err) {
+    await req.flash('error', `Não consegui abrir a reconexão: ${err.message}`);
+    return res.redirect('/integracoes#comentarios');
+  }
+}));
+router.get('/integracoes/outstand/voltou', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const automation = require('../services/commentAutomation');
+  if (req.query.error || !req.query.success) {
+    await req.flash('error', `O Instagram não foi reconectado${req.query.error ? `: ${String(req.query.error).slice(0, 120)}` : ''}. Tente de novo e aprove o acesso às mensagens.`);
+  } else {
+    await automation.note({ reconnected_at: new Date().toISOString(), reconnected_user: String(req.query.username || '').slice(0, 60) });
+    require('../services/outstand').resetCache();
+    await req.flash('ok', `Instagram${req.query.username ? ` @${String(req.query.username).slice(0, 60)}` : ''} reconectado com acesso às mensagens.`);
+  }
+  res.redirect('/integracoes#comentarios');
+}));
+
+// Envio direto ao Backblaze: liga ou desliga o CORS do bucket (a regra que deixa o navegador enviar as partes sem passar pelo servidor).
+router.post('/integracoes/armazenamento/cors', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const b2 = require('../services/b2');
+  const origin = new URL(config.appBaseUrl).origin;
+  const origins = require('../services/publicUrl').allOrigins(); // o painel e os endereços públicos (o link do estúdio também envia direto)
+  const on = req.body.acao === 'ligar';
+  try {
+    if (on) await b2.putCors(origins); else await b2.deleteCors();
+    await audit(req, on ? 'integracao.cors_ligado' : 'integracao.cors_desligado', 'system', null, { origem: origin });
+    await req.flash('ok', on ? 'Envio direto ligado: a partir do próximo envio, os arquivos vão do navegador direto ao Backblaze.' : 'Envio direto desligado: os arquivos voltam a passar pelo servidor.');
+  } catch (err) {
+    await req.flash('error', `${err.message}. Se a chave do Backblaze não pode mudar o bucket, ligue em Buckets > ${config.b2.bucket} > CORS Rules (permitir PUT de ${origin} e expor o cabeçalho ETag).`);
+  }
+  res.redirect('/integracoes#armazenamento');
+}));
+
+// Redes sociais: por qual provedor as publicações saem (Upload-Post, Zernio ou Outstand) e teste de conexão (só leitura).
+router.post('/integracoes/redes', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const api = require('../services/socialApi');
+  try {
+    const before = await api.activeId();
+    await api.choose(String(req.body.provedor || ''));
+    await audit(req, 'integracao.redes_provedor', 'system', null, { de: before, para: req.body.provedor });
+    await req.flash('ok', `Publicações passam a sair ${api.get(req.body.provedor).by}. As que já saíram continuam sendo acompanhadas por onde foram.`);
+  } catch (err) { await req.flash('error', err.message); }
+  res.redirect('/integracoes#redes');
+}));
+
+// Publicar de verdade ou só simular, por provedor. Ligar pede a confirmação na tela e fica na auditoria.
+router.post('/integracoes/redes/modo', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const api = require('../services/socialApi');
+  const id = String(req.body.provedor || ''); const on = req.body.ligar === '1';
+  try {
+    if (on && req.body.confirmar !== '1') throw new Error('Confirme que entende que a publicação passa a sair de verdade nas redes.');
+    await api.setLive(id, on);
+    await audit(req, on ? 'integracao.redes_publicar_de_verdade' : 'integracao.redes_modo_teste', 'system', null, { provedor: id });
+    await req.flash('ok', on
+      ? `${api.get(id).label}: publicação de verdade ligada. O que for publicado ${id === 'uploadpost' ? '(e as respostas das automações) ' : ''}sai nas redes.`
+      : `${api.get(id).label}: modo de teste. Os pedidos são montados e conferidos, mas nada sai para as redes.`);
+  } catch (err) { await req.flash('error', err.message); }
+  res.redirect('/integracoes#redes');
+}));
+
+// Outstand: o TikTok sai direto ou como rascunho na caixa do TikTok (a pessoa termina no app) e se o vídeo é ajustado para cada rede.
+router.post('/integracoes/redes/outstand', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const ost = require('../services/outstand');
+  const mode = req.body.modo === 'rascunho' ? 'rascunho' : 'direto';
+  const adjust = req.body.ajustar === '1';
+  await ost.setTiktokMode(mode); await ost.setProcessMedia(adjust);
+  await audit(req, 'integracao.redes_outstand_opcoes', 'system', null, { provedor: 'outstand', tiktok: mode, ajustar_video: adjust });
+  await req.flash('ok', `Outstand: TikTok ${mode === 'direto' ? 'publica direto na conta' : 'vai como rascunho na caixa do TikTok (quem publica termina no app)'}; ${adjust ? 'o vídeo é ajustado para cada rede quando precisa' : 'o vídeo vai como está'}.`);
+  res.redirect('/integracoes#redes');
+}));
+
+router.post('/integracoes/redes/testar', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const api = require('../services/socialApi');
+  const p = api.get(String(req.body.provedor || ''));
+  const conn = await p.connected({ force: true });
+  if (conn.ok) await require('../services/socialHealth').check({ only: [p.id] }); // também atualiza o estado das contas (e avisa se alguma caiu)
+  const names = Object.entries(conn.platforms || {}).map(([k, a]) => `${api.PLATFORMS[k]?.label || k}${a.handle ? ` (@${String(a.handle).replace(/^@/, '')})` : ''}${a.reauth ? ' — reconectar' : ''}`);
+  await req.flash(conn.ok ? 'ok' : 'error', conn.ok ? `${p.label} respondeu. Contas conectadas: ${names.join(', ') || 'nenhuma'}.` : `${p.label}: ${conn.error}`);
+  res.redirect('/integracoes#redes');
+}));
+
+// Verifica agora as contas de todos os provedores configurados (o worker faz isto sozinho a cada 15 min) e avisa a gestão do que caiu.
+router.post('/integracoes/redes/verificar', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const r = await require('../services/socialHealth').check();
+  const bits = [];
+  if (r.problems.length) bits.push(`Precisam de atenção: ${r.problems.map((x) => x.text).join('; ')}.`);
+  if (r.errors.length) bits.push(`Sem resposta: ${r.errors.map((e) => `${e.label} (${e.error})`).join('; ')}.`);
+  await audit(req, 'integracao.redes_verificar', 'system', null, { problemas: r.problems.length, sem_resposta: r.errors.length });
+  await req.flash(bits.length ? 'error' : 'ok', bits.length ? bits.join(' ') : 'Todas as contas conectadas estão funcionando.');
+  res.redirect('/integracoes#redes');
+}));
+
+// Cada rede por um provedor: o padrão é o provedor em uso; aqui a gestão manda redes específicas por outro (ex.: X pela Zernio).
+router.post('/integracoes/redes/rotas', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const api = require('../services/socialApi');
+  try {
+    const map = {};
+    for (const net of Object.keys(api.PLATFORMS)) { const v = String(req.body[`rota_${net}`] || ''); if (v && v !== 'padrao') map[net] = v; }
+    const before = await api.routes();
+    const saved = await api.setRoutes(map);
+    await audit(req, 'integracao.redes_rotas', 'system', null, { antes: before, depois: saved });
+    await require('../services/socialHealth').check({ notify: false }).catch(() => {});
+    await req.flash('ok', Object.keys(saved).length ? `Redes por outro provedor: ${Object.entries(saved).map(([n, id]) => `${api.PLATFORMS[n].label} ${api.get(id).by}`).join(', ')}. As demais saem pelo provedor em uso.` : 'Todas as redes saem pelo provedor em uso.');
+  } catch (err) { await req.flash('error', err.message); }
+  res.redirect('/integracoes#redes');
+}));
+
+// Link de teste de R$ 1,00 (só gera o link para conferir o handle; ninguém é cobrado se não pagar).
+router.post('/integracoes/infinitepay', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  try {
+    const ip = require('../services/infinitePay');
+    const { rows: [lead] } = await db.query("SELECT id, name, phone, guest_name, recording_at FROM plateia_leads ORDER BY id DESC LIMIT 1");
+    if (!lead) throw new Error('Ainda não há nenhum pedido na plateia para testar.');
+    const link = await ip.createLink({ lead, amountCents: 100, userId: req.user.id, description: 'Teste de integração Pulso (R$ 1,00)' });
+    await audit(req, 'integracao.teste_infinitepay', 'system', null, {});
+    await req.flash('ok', `A InfinitePay respondeu. Link de teste de R$ 1,00: ${link.url}`);
+  } catch (err) {
+    await req.flash('error', `InfinitePay: ${err.message}`);
+  }
+  res.redirect('/integracoes');
+}));
+
+router.post('/integracoes/google/tipos', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const gcal = require('../services/googleCalendar');
+  const saved = await gcal.saveSettings(req.body);
+  await require('../services/calendarInvites').setEnabled(req.body.invite === 'on');
+  await audit(req, 'integracao.google_tipos', 'system', null, { ligados: Object.keys(saved).filter((k) => saved[k].enabled), convite_email: req.body.invite === 'on' });
+  gcal.kick();
+  await req.flash('ok', 'Pronto: a agenda do Google será ajustada em instantes.');
+  res.redirect('/integracoes');
+}));
+
+router.post('/integracoes/google', requirePerm('integrations.manage'), wrap(async (req, res) => {
+  const gcal = require('../services/googleCalendar');
+  try {
+    if (req.body.acao === 'sincronizar') {
+      const r = await gcal.sync();
+      await audit(req, 'integracao.google_sync', 'system', null, { ...r, errors: r.errors.length });
+      const txt = `Google Agenda: ${r.created} criado(s), ${r.updated} atualizado(s), ${r.removed} removido(s), ${r.unchanged} sem mudança.`;
+      await req.flash(r.errors.length ? 'error' : 'ok', r.errors.length ? `${txt} Falhas: ${r.errors.slice(0, 3).join(' | ')}` : txt);
+    } else if (req.body.acao === 'reunioes') {
+      const r = await require('../services/sponsorMeetings').check();
+      await audit(req, 'integracao.google_reunioes', 'system', null, { ok: r.ok, meet: r.meet || false });
+      await req.flash(r.ok && r.meet && r.invite ? 'ok' : 'error', r.ok
+        ? (r.meet && r.invite ? 'Reuniões com Meet funcionando: o Google criou um evento de teste com Meet e convidado, remarcou e apagou (sem enviar e-mail).' : `O Google criou o evento de teste, mas sem ${r.meet ? 'convidado' : 'Meet'}. Confira a delegação no Admin do Workspace.`)
+        : r.error);
+    } else {
+      const r = await gcal.ping();
+      await req.flash('ok', `Google Agenda respondeu. A conta de serviço ${r.serviceAccount} consegue acessar a agenda.`);
+    }
+  } catch (err) {
+    await req.flash('error', err.message);
+  }
+  res.redirect('/integracoes');
+}));
 
 router.post('/integracoes/yourls', requirePerm('integrations.manage'), wrap(async (req, res) => {
   try {
@@ -56,7 +340,7 @@ router.post('/integracoes/email', requirePerm('integrations.manage'), wrap(async
   try {
     await mailer.sendMail({
       to: req.user.email,
-      subject: `Teste de e-mail — ${config.podcastName}`,
+      subject: `Teste de e-mail — ${require('../services/projects').publicName(null)}`,
       html: `<p>Se você recebeu esta mensagem, o SMTP da Brevo está funcionando.</p>`,
     });
     await audit(req, 'integracao.teste_email', 'system', null, { to: req.user.email });
@@ -65,6 +349,12 @@ router.post('/integracoes/email', requirePerm('integrations.manage'), wrap(async
     await req.flash('error', `Falha no envio: ${err.message}`);
   }
   res.redirect('/integracoes');
+}));
+
+// Velocidade real: o navegador manda (sendBeacon) as medições da página ao sair dela. Sem resposta útil: 204.
+router.post('/metricas/vitals', wrap(async (req, res) => {
+  await require('../services/perf').saveVitals(req.user, req.body || {});
+  res.status(204).end();
 }));
 
 module.exports = router;

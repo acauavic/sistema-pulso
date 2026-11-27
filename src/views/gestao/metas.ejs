@@ -1,0 +1,86 @@
+<%- include('../partials/head') %>
+<div class="page-head">
+  <div><span class="kicker">Gestão · Equipe</span><h1>Metas</h1></div>
+</div>
+<%- include('../partials/gestao-nav', { active: 'metas' }) %>
+<p class="lead">Até <%= MAX %> metas por pessoa: o que contar, o período e o alvo. O sistema conta sozinho, com o que já registra, e cada pessoa vê as dela no Início.</p>
+
+<div class="goal-people">
+  <% people.forEach(function (p) { var first = p.name.split(' ')[0]; var shown = Math.min(MAX, p.goals.length + 1); %>
+  <section class="card goal-person" id="metas-<%= p.id %>" aria-labelledby="gp-<%= p.id %>">
+    <div class="goal-person-head">
+      <h2 id="gp-<%= p.id %>"><%= p.name %> <span class="badge b-gray"><%= ROLES[p.role] ? ROLES[p.role].label : p.role %></span></h2>
+      <button class="btn sm" type="button" data-modal-open="metas-<%= p.id %>-janela"><%= p.goals.length ? 'Editar metas' : 'Definir metas' %></button>
+    </div>
+    <% if (!p.progress.length) { %>
+      <p class="small muted">Sem metas ainda. Use Editar metas para dar a primeira.</p>
+    <% } else { %>
+      <%- include('../partials/goals-list', { list: p.progress }) %>
+    <% } %>
+  </section>
+
+  <dialog class="modal goal-modal" id="metas-<%= p.id %>-janela" aria-labelledby="gm-<%= p.id %>"<%= openFor === p.id ? ' data-open-on-load' : '' %>>
+    <form method="post" action="/gestao/metas/<%= p.id %>" class="stack" data-goal-form>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h2 id="gm-<%= p.id %>">Metas de <%= first %></h2>
+      <p class="small muted">Até <%= MAX %>. O sistema conta sozinho; <%= first %> vê as metas no Início.</p>
+      <% for (var i = 1; i <= MAX; i++) { var g = p.goals[i - 1] || {}; var m = g.metric ? METRICS[g.metric] : null; %>
+      <fieldset class="goal-slot" data-goal-slot<%= i > shown ? ' hidden' : '' %>>
+        <legend>Meta <%= i %><% if (m) { %> <button class="link small" type="button" data-goal-clear>tirar</button><% } %></legend>
+        <div class="grid-2">
+          <label>Categoria
+            <select data-goal-cat data-native>
+              <option value="">Todas</option>
+              <% Object.keys(CATEGORIES).forEach(function (c) { %><option value="<%= c %>" <%= m && m.cat === c ? 'selected' : '' %>><%= CATEGORIES[c] %></option><% }) %>
+            </select>
+          </label>
+          <label>O que contar
+            <select name="metric_<%= i %>" data-goal-metric data-native>
+              <option value="">Escolha…</option>
+              <% Object.keys(METRICS).forEach(function (k) { var x = METRICS[k]; %><option value="<%= k %>" data-cat="<%= x.cat %>" data-rate="<%= x.kind === 'rate' ? '1' : '' %>" data-param="<%= x.param ? '1' : '' %>" <%= g.metric === k ? 'selected' : '' %>><%= x.label %><%= x.kind === 'rate' ? ' (%)' : '' %></option><% }) %>
+            </select>
+          </label>
+          <label data-goal-param hidden>Tipo de vídeo
+            <select name="param_<%= i %>" data-native>
+              <option value="">Escolha…</option>
+              <% videoTypes.forEach(function (t) { %><option value="<%= t.key %>" <%= g.param === t.key ? 'selected' : '' %>><%= t.label %></option><% }) %>
+            </select>
+          </label>
+        </div>
+        <div class="grid-3">
+          <label>Período
+            <select name="period_<%= i %>" data-native>
+              <% Object.keys(PERIODS).forEach(function (k) { %><option value="<%= k %>" <%= (g.period || 'semana') === k ? 'selected' : '' %>><%= PERIODS[k] %></option><% }) %>
+            </select>
+          </label>
+          <label>Meta
+            <input type="number" name="target_<%= i %>" min="0" step="any" inputmode="decimal" value="<%= g.target ? Number(g.target) : '' %>" placeholder="<%= m && m.kind === 'rate' ? 'ex.: 40 (%)' : 'ex.: 20' %>" data-goal-target>
+          </label>
+          <label>Aparece como
+            <select name="display_<%= i %>" data-goal-display data-native>
+              <% Object.keys(DISPLAYS).forEach(function (k) { %><option value="<%= k %>" <%= (g.display || 'numero') === k ? 'selected' : '' %>><%= DISPLAYS[k] %></option><% }) %>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+      <% } %>
+      <% if (shown < MAX) { %><button class="btn sm ghost goal-add" type="button" data-goal-add><%- icon('plus') %> Adicionar meta</button><% } %>
+      <p class="small muted">Taxa (%) aparece sempre em porcentagem, e o alvo vai até 100. "Por dia útil" não cobra sábado e domingo; a semana vai de segunda a domingo.</p>
+      <div class="row modal-actions"><button class="btn primary" type="submit">Salvar metas</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </form>
+  </dialog>
+  <% }) %>
+</div>
+
+<details class="more top-gap goal-catalog">
+  <summary>O que cada métrica conta</summary>
+  <% Object.keys(CATEGORIES).forEach(function (c) { %>
+  <h3 class="kicker top-gap"><%= CATEGORIES[c] %></h3>
+  <dl class="kv kv-wide">
+    <% Object.keys(METRICS).filter(function (k) { return METRICS[k].cat === c; }).forEach(function (k) { %>
+    <dt><%= METRICS[k].label %><%= METRICS[k].kind === 'rate' ? ' (%)' : '' %></dt><dd><%= METRICS[k].hint %></dd>
+    <% }) %>
+  </dl>
+  <% }) %>
+</details>
+<%- include('../partials/foot') %>

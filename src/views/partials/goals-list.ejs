@@ -1,0 +1,11 @@
+<%# Metas com o andamento (goals.progress). Variável: list. O lime só aparece na barra da meta batida. %>
+<ul class="plain goal-list">
+  <% list.forEach(function (g) { %>
+  <li class="goal-item <%= g.met ? 'is-met' : '' %>">
+    <span class="goal-item-l"><%= g.label %> · <%= g.periodLabel %><%= g.team ? ' · equipe' : '' %></span>
+    <span class="goal-item-v"><span class="goal-item-n"><%= g.main %></span><% if (g.rest) { %> <span class="goal-item-of"><%= g.rest %></span><% } %><% if (g.note) { %> <span class="goal-item-note"><%= g.note %></span><% } %></span>
+    <svg class="goal-bar <%= g.met ? 'hit' : '' %>" viewBox="0 0 100 6" preserveAspectRatio="none" role="img" aria-label="<%= g.bar %>% da meta"><rect class="bg" width="100" height="6" rx="3"/><rect class="fg" width="<%= g.bar %>" height="6" rx="3"/></svg>
+    <span class="goal-item-p"><%= g.pace %></span>
+  </li>
+  <% }) %>
+</ul>

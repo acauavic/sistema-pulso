@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pulso Podcast — Convite</title>
+<link rel="icon" href="{{brand_dir}}/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1060,6 +1061,101 @@
   .pulso-rsvp-wrap form button[value="aceito"] { background: var(--black) !important; color: var(--white) !important; border: 2px solid var(--black) !important; }
   .pulso-rsvp-wrap form button[value="recusado"] { background: transparent !important; color: var(--black) !important; border: 2px solid var(--black) !important; }
   .pulso-rsvp-wrap .pulso-rsvp-state { border-radius: 0 !important; font-weight: 600; border: 2px solid var(--black); background: var(--white) !important; color: var(--black) !important; }
+
+  /* ===== cortes de quem já veio, destaques, plateia e janelas (convite v2) ===== */
+
+  .clips-intro { font-size: 19px; line-height: 1.6; color: var(--charcoal); max-width: 760px; margin-bottom: 18px; }
+  .clips-facts { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 44px; }
+  .clips-facts span { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 7px 12px; border: 1px solid rgba(0,0,0,0.14); background: var(--white); }
+  .clips-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .clip-card { margin: 0; }
+  .clip-card video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; background: var(--black); display: block; border-radius: 6px; }
+  .clip-card figcaption { margin-top: 10px; font-size: 13px; line-height: 1.4; color: var(--charcoal); }
+
+  .plateia-block { margin-top: 90px; padding-top: 60px; border-top: 1px solid rgba(255,255,255,0.12); display: grid; grid-template-columns: 1fr 1.4fr; gap: 48px; align-items: start; }
+  .plateia-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; color: var(--lime); text-transform: uppercase; margin-bottom: 16px; }
+  .plateia-block h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: clamp(28px, 3vw, 40px); letter-spacing: -0.03em; line-height: 1.08; margin-bottom: 20px; color: var(--white); }
+  .plateia-block p { color: var(--gray-300); font-size: 16px; line-height: 1.65; margin-bottom: 14px; }
+  .plateia-play { margin-top: 18px; display: inline-flex; align-items: center; gap: 10px; padding: 16px 24px; background: transparent; color: var(--white); border: 2px solid var(--white); font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; cursor: pointer; }
+  .plateia-play::before { content: ''; width: 0; height: 0; border-left: 10px solid var(--lime); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+  .plateia-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .plateia-gallery img { width: 100%; aspect-ratio: 9 / 14; object-fit: cover; display: block; border-radius: 6px; }
+  .plateia-gallery img:nth-child(1) { grid-row: span 2; aspect-ratio: auto; height: 100%; }
+
+  .pmodal { position: fixed; inset: 0; z-index: 10000; background: rgba(10,10,10,0.88); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .pmodal[hidden] { display: none; }
+  .pmodal-box { position: relative; width: min(1100px, 100%); max-height: calc(100vh - 48px); overflow: auto; }
+  .pmodal-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; color: var(--white); }
+  .pmodal-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
+  .pmodal-close { background: transparent; border: 2px solid var(--white); color: var(--white); width: 42px; height: 42px; border-radius: 50%; font-size: 20px; line-height: 1; cursor: pointer; flex: none; }
+  .pmodal-videos { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .pmodal-videos figure { margin: 0; width: min(320px, 100%); }
+  .pmodal-videos video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; background: var(--black); display: block; border-radius: 6px; }
+  .pmodal-videos figcaption { margin-top: 8px; font-size: 13px; color: var(--gray-300); line-height: 1.4; }
+  .pmodal-videos.single figure { width: min(380px, 100%); }
+  body.pmodal-open { overflow: hidden; }
+
+  .topics-note { margin-top: 28px; font-size: 15px; color: var(--gray-500); max-width: 720px; }
+
+  @media (max-width: 900px) {
+    .clips-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .plateia-block { grid-template-columns: 1fr; gap: 32px; margin-top: 60px; }
+    .plateia-gallery { grid-template-columns: repeat(2, 1fr); }
+    .plateia-gallery img:nth-child(1) { grid-row: auto; aspect-ratio: 9 / 14; height: auto; }
+    .pmodal { padding: 12px; align-items: flex-start; }
+    .pmodal-videos figure, .pmodal-videos.single figure { width: 100%; }
+  }
+
+  /* ===== quem já sentou à mesa: destaque que troca sozinho + grade (mesmo desenho do media kit) ===== */
+  .mesa { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 32px; align-items: start; }
+  .mesa-feature { background: var(--black); color: var(--white); position: relative; overflow: hidden; display: flex; flex-direction: column; }
+  .mesa-feature-photo { position: relative; aspect-ratio: 1; background: var(--charcoal); overflow: hidden; }
+  .mesa-feature-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 25%; transition: opacity .35s ease, transform 5.2s linear; }
+  .mesa-feature.playing .mesa-feature-photo img { transform: scale(1.05); }
+  .mesa-feature.swap .mesa-feature-photo img, .mesa-feature.swap .mesa-feature-body { opacity: 0; }
+  .mesa-feature-idx { position: absolute; top: 12px; left: 14px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.12em; color: var(--white); background: rgba(10,10,10,0.6); padding: 4px 8px; border-radius: 2px; }
+  .mesa-feature-body { display: flex; flex-direction: column; gap: 8px; padding: 18px 20px 20px; transition: opacity .35s ease; }
+  .mesa-feature-aud { display: flex; align-items: baseline; gap: 8px; }
+  .mesa-feature-aud[hidden] { display: none; }
+  .mesa-feature-aud .num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; letter-spacing: -0.03em; line-height: 1; color: var(--lime); }
+  .mesa-feature-aud .lbl { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gray-300); }
+  .mesa-feature-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; line-height: 1.15; }
+  .mesa-feature-cred { font-size: 13px; line-height: 1.45; color: var(--gray-300); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 3.6em; }
+  .mesa-feature-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+  .mesa-clips { display: inline-flex; align-items: center; gap: 8px; background: var(--white); color: var(--black); border: 0; padding: 10px 16px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .mesa-clips::before { content: ''; width: 0; height: 0; border-left: 8px solid var(--black); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+  .mesa-clips[hidden] { display: none; }
+  .mesa-feature-link { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--white); text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.5); padding-bottom: 2px; }
+  .mesa-progress { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: rgba(255,255,255,0.12); z-index: 3; }
+  .mesa-progress span { display: block; height: 100%; width: 0; background: var(--white); }
+  .mesa-feature.playing .mesa-progress span { width: 100%; transition: width 5s linear; }
+  .mesa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 16px 12px; }
+  .mesa-card { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; min-width: 0; }
+  .mesa-thumb { position: relative; aspect-ratio: 1; background: var(--gray-100); overflow: hidden; outline: 2px solid transparent; outline-offset: 2px; transition: outline-color .2s; }
+  .mesa-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 25%; transition: transform .4s ease; }
+  .mesa-thumb .play { position: absolute; right: 6px; bottom: 6px; width: 22px; height: 22px; border-radius: 50%; background: rgba(10,10,10,0.72); display: flex; align-items: center; justify-content: center; }
+  .mesa-thumb .play::before { content: ''; width: 0; height: 0; border-left: 7px solid var(--lime); border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; margin-left: 2px; }
+  .mesa-card:hover .mesa-thumb img { transform: scale(1.05); }
+  .mesa-card.active .mesa-thumb, .mesa-card:focus-visible .mesa-thumb { outline-color: var(--black); }
+  .mesa-card:focus-visible { outline: none; }
+  .mesa-card-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mesa-card-aud { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; color: var(--gray-500); margin-top: -3px; white-space: nowrap; }
+  .mesa-card-aud:empty { display: none; }
+
+  /* ===== cabeçalho da seção de cortes: título e texto lado a lado ===== */
+  .clips-head { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 56px; align-items: end; margin-bottom: 48px; }
+  .clips-head .section-number { margin-bottom: 18px; }
+  .clips-head .section-title { margin: 0; }
+  .clips-head .clips-intro { margin-bottom: 18px; }
+  .clips-head .clips-facts { margin-bottom: 0; }
+
+  .intro-format { display: inline-block; margin-top: 18px; background: var(--lime); color: var(--black); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; padding: 8px 14px; }
+
+  @media (max-width: 900px) {
+    .mesa { grid-template-columns: 1fr; gap: 24px; }
+    .mesa-grid { grid-template-columns: repeat(3, 1fr); gap: 12px 10px; }
+    .clips-head { grid-template-columns: 1fr; gap: 24px; }
+  }
 </style>
 </head>
 <body class="intro-active">
@@ -1074,6 +1170,7 @@
     <div class="intro-name" id="intro-name"></div>
     <div class="intro-main" id="intro-main">Esse é o nosso convite<br>pra você,</div>
     <div class="intro-sub" id="intro-sub">veja o que te aguarda...</div>
+    {{intro_formato_html}}
   </div>
 
   <div class="intro-progress" id="intro-progress"></div>
@@ -1093,7 +1190,7 @@
 
   <div class="invite-topbar">
     <div class="invite-logo">pulso<span>.</span></div>
-    <div class="invite-badge" id="badge">Convite Exclusivo</div>
+    <div class="invite-badge" id="badge">{{formato_selo}}</div>
   </div>
 
   <div class="invite-center">
@@ -1102,19 +1199,16 @@
     <div class="invite-statement" id="invite-statement">
       você é nosso <span class="highlight">convidado</span><br>para o Pulso Podcast.
     </div>
-    <p class="invite-desc" id="invite-desc">
-      Selecionamos uma conversa por vez. Escolhemos você pela trajetória que construiu
-      e pela perspectiva que acreditamos que o nosso público precisa ouvir.
-    </p>
+    <p class="invite-desc" id="invite-desc">{{convite_desc}}</p>
     <div class="invite-hero-cta">
-      <a href="https://wa.me/5512991053852" class="btn-accept">Aceitar o convite →</a>
+      <a href="{{link_aceitar}}" class="btn-accept">Aceitar o convite →</a>
     </div>
   </div>
 
   <div class="invite-footer">
     <div><strong>Estúdio</strong>GH · Alphaville, SP</div>
     <div><strong>Hosts</strong>Ane Ranzi · Acauã Victor</div>
-    <div><strong>Formato</strong>Áudio + Vídeo · 60–90min</div>
+    <div><strong>Formato</strong>{{formato_rodape}}</div>
     <div><strong>Periodicidade</strong>Semanal</div>
   </div>
 </header>
@@ -1132,26 +1226,27 @@
   <div class="about">
     <div class="about-text">
       <p>
-        Pulso é o podcast que coloca em evidência as pessoas e ideias que estão
-        transformando a saúde no Brasil e no mundo.
+        Pulso é o podcast das conversas que estão movimentando a saúde: quem cuida,
+        quem inova e quem escolheu viver com mais saúde.
       </p>
       <p>
-        Gravado no Estúdio GH, em Alphaville, reunimos médicos, empresários e
-        líderes da saúde para conversas profundas sobre trajetórias reais,
-        inovação, empreendedorismo e inteligência artificial.
+        Gravado no Estúdio GH, em Alphaville, recebe médicos, profissionais da saúde,
+        empreendedores e pessoas com histórias que inspiram, para conversas sem pressa
+        sobre inovação, mentalidade, estilo de vida e trajetórias reais.
       </p>
       <p>
-        Cada episódio é uma produção cinematográfica — áudio, vídeo e fotografia
-        de alto padrão — feita para durar e para alcançar quem importa.
+        O objetivo é duplo: ajudar o profissional da saúde a ser um profissional melhor
+        e levar ao público mais saúde e qualidade de vida. Cada episódio é uma produção
+        cinematográfica, feita para durar e para alcançar quem importa.
       </p>
     </div>
 
     <div class="about-card">
       <div class="about-card-eyebrow">O QUE ACONTECE NO DIA</div>
-      <h3>Uma manhã de conversa. Produção completa incluída.</h3>
+      <h3>{{periodo_card}} Produção completa incluída.</h3>
       <ul>
         <li><span class="bullet"></span> Episódio completo em estúdio profissional</li>
-        <li><span class="bullet"></span> 15 a 30 cortes editados para redes sociais</li>
+        <li><span class="bullet"></span> 15 a 30 cortes editados, postados em collab</li>
         <li><span class="bullet"></span> Distribuição em todas as plataformas</li>
       </ul>
     </div>
@@ -1234,71 +1329,41 @@
     conecta à audiência de quem já esteve aqui.
   </p>
 
-  <div class="guests-grid">
-      <div class="guest-card">
-        <img src="/static/convite/img-3.jpg" alt="Guto Galamba">
-        <div class="guest-scrim">
-          <span class="guest-audience">+3,6M no Instagram</span>
-          <div class="guest-name">Guto Galamba</div>
-          <p class="guest-cred">Empresário, comunicador e influenciador ligado ao universo da saúde, comportamento e negócios.</p>
+  <div class="mesa" id="mesa">
+    <article class="mesa-feature" id="mesaFeature" aria-live="polite">
+      <div class="mesa-progress" aria-hidden="true"><span></span></div>
+      <div class="mesa-feature-photo"><img id="mfPhoto" alt=""><span class="mesa-feature-idx" id="mfIdx"></span></div>
+      <div class="mesa-feature-body">
+        <div class="mesa-feature-aud"><span class="num" id="mfAud"></span><span class="lbl">seguidores</span></div>
+        <h3 class="mesa-feature-name" id="mfName"></h3>
+        <p class="mesa-feature-cred" id="mfCred"></p>
+        <div class="mesa-feature-actions">
+          <button type="button" class="mesa-clips" id="mfClips" hidden>Ver cortes</button>
+          <a class="mesa-feature-link" id="mfLink" target="_blank" rel="noopener">Instagram &rarr;</a>
         </div>
       </div>
-      <div class="guest-card">
-        <img src="/static/convite/img-4.jpg" alt="Dra. Tamiris Mariano">
-        <div class="guest-scrim">
-          <span class="guest-audience">+2,2M no Instagram</span>
-          <div class="guest-name">Dra. Tamiris Mariano</div>
-          <p class="guest-cred">Médica e criadora de conteúdo com forte presença digital na área da saúde.</p>
-        </div>
-      </div>
-      <div class="guest-card">
-        <img src="/static/convite/img-5.jpg" alt="Dr. Márcio Martins">
-        <div class="guest-scrim">
-          <span class="guest-audience">+987K no Instagram</span>
-          <div class="guest-name">Dr. Márcio Martins</div>
-          <p class="guest-cred">Médico, empresário e referência digital no universo de saúde, performance e empreendedorismo médico.</p>
-        </div>
-      </div>
-      <div class="guest-card">
-        <img src="/static/convite/img-6.jpg" alt="Dra. Rachel Furtado">
-        <div class="guest-scrim">
-          <span class="guest-audience">+166K no Instagram</span>
-          <div class="guest-name">Dra. Rachel Furtado</div>
-          <p class="guest-cred">Profissional da saúde e criadora de conteúdo com presença relevante no ambiente digital.</p>
-        </div>
-      </div>
-      <div class="guest-card">
-        <img src="/static/convite/img-7.jpg" alt="Fillipe Holzer">
-        <div class="guest-scrim">
-          <span class="guest-audience">+109K no Instagram</span>
-          <div class="guest-name">Fillipe Holzer</div>
-          <p class="guest-cred">Empresário e profissional com trajetória ligada a negócios, inovação e empreendedorismo.</p>
-        </div>
-      </div>
-      <div class="guest-card">
-        <img src="/static/convite/img-8.jpg" alt="Dr. Carlos Torres">
-        <div class="guest-scrim">
-          <span class="guest-audience">+28K no Instagram</span>
-          <div class="guest-name">Dr. Carlos Torres</div>
-          <p class="guest-cred">Médico que direcionou sua trajetória profissional para o universo da inteligência artificial e transformação tecnológica.</p>
-        </div>
-      </div>
+    </article>
+    <div class="mesa-side">
+      <div class="mesa-grid" id="mesaGrid" role="list" aria-label="Convidados que já sentaram à mesa"></div>
+    </div>
   </div>
 
   <div class="guests-footnote">
-    <span><strong>14 episódios</strong> até set/2026 · 1 novo por semana</span>
+    <span>{{rodape_mesa}}</span>
     <span>E isso é apenas o começo.</span>
   </div>
 </section>
+
+{{cortes_html}}
 
 <!-- 04 A EXPERIÊNCIA -->
 <div class="day-section">
   <div class="day-inner">
     <div class="section-header">
-      <div class="section-number">04 · A EXPERIÊNCIA</div>
+      <div class="section-number">05 · A EXPERIÊNCIA</div>
       <div>
         <div class="section-eyebrow" style="color:var(--lime)" id="day-eyebrow">COMO É O DIA DE GRAVAÇÃO</div>
-        <h2 class="section-title">Uma manhã.<br>Uma conversa<br>que fica.</h2>
+        <h2 class="section-title">{{periodo_titulo}}<br>Uma conversa<br>que fica.</h2>
       </div>
     </div>
 
@@ -1314,8 +1379,8 @@
       <div class="day-item">
         <div class="day-num">02</div>
         <div>
-          <h4>Gravação em estúdio</h4>
-          <p>Uma sessão de 60 a 90 minutos no Estúdio GH, com equipe técnica completa. Iluminação cinematográfica, múltiplas câmeras e áudio profissional — você só precisa aparecer e conversar.</p>
+          <h4>{{gravacao_titulo}}</h4>
+          <p>{{gravacao_texto}}</p>
         </div>
       </div>
 
@@ -1351,13 +1416,14 @@
         </div>
       </div>
     </div>
+    {{plateia_html}}
   </div>
 </div>
 
 <!-- 05 PAUTAS -->
 <section>
   <div class="section-header">
-    <div class="section-number">05 · PAUTAS</div>
+    <div class="section-number">06 · PAUTAS</div>
     <div>
       <div class="section-eyebrow">SOBRE O QUE CONVERSAMOS</div>
       <h2 class="section-title">Quatro eixos.<br>Conversas reais.</h2>
@@ -1368,38 +1434,39 @@
     <div class="topic">
       <div class="topic-num">01</div>
       <div>
-        <h3>Histórias</h3>
-        <p>Trajetórias reais de quem construiu algo significativo na saúde.</p>
+        <h3>Saúde e inovação</h3>
+        <p>O que está mudando o cuidado, da tecnologia e da IA à forma de atender.</p>
       </div>
     </div>
     <div class="topic">
       <div class="topic-num">02</div>
       <div>
-        <h3>Inovação</h3>
-        <p>O que está mudando o setor e quem está na vanguarda.</p>
+        <h3>Mentalidade</h3>
+        <p>Como pensam e decidem as pessoas que constroem algo relevante.</p>
       </div>
     </div>
     <div class="topic">
       <div class="topic-num">03</div>
       <div>
-        <h3>Empreendedorismo</h3>
-        <p>Como criar, escalar e liderar negócios na saúde.</p>
+        <h3>Estilo de vida</h3>
+        <p>Hábitos, rotina e escolhas que levam a mais saúde e qualidade de vida.</p>
       </div>
     </div>
     <div class="topic">
       <div class="topic-num">04</div>
       <div>
-        <h3>Inteligência Artificial</h3>
-        <p>O impacto da IA na medicina, diagnóstico e gestão.</p>
+        <h3>Histórias inspiradoras</h3>
+        <p>Trajetórias reais, com as viradas, os erros e o que ficou de aprendizado.</p>
       </div>
     </div>
   </div>
+  <p class="topics-note">Carreira, empreendedorismo e tecnologia atravessam todas as conversas.</p>
 </section>
 
 <!-- 06 ESTÚDIO -->
 <section style="padding-top:0;">
   <div class="section-header">
-    <div class="section-number">06 · ESTÚDIO</div>
+    <div class="section-number">07 · ESTÚDIO</div>
     <div>
       <div class="section-eyebrow">ONDE TUDO ACONTECE</div>
       <h2 class="section-title">Estúdio GH<br>Alphaville.</h2>
@@ -1427,7 +1494,7 @@
     </div>
 
     <div class="studio-visual">
-      <img src="/static/convite/img-9.jpg" alt="Estúdio GH, Alphaville">
+      <img loading="lazy" decoding="async" src="/static/convite/img-9.jpg" alt="Estúdio GH, Alphaville">
       <div class="studio-location">
         <div class="city">GH.</div>
         <div class="label">A L P H A V I L L E · S P</div>
@@ -1444,11 +1511,11 @@
       Fale com a produção para alinhar a pauta e confirmar sua data no Estúdio GH.
     </p>
     <div class="cta-buttons">
-      <a href="https://wa.me/5512991053852" class="cta-btn">Confirmar presença →</a>
-      <a href="https://wa.me/5512991053852" class="cta-btn outline">Falar com a produção</a>
+      <a href="{{link_aceitar}}" class="cta-btn">Confirmar presença →</a>
+      <a href="{{link_producao}}" class="cta-btn outline">Falar com a produção</a>
     </div>
     <div class="pulso-rsvp-wrap">
-      <div class="pulso-rsvp-title">Ou responda por aqui</div>
+      <div class="pulso-rsvp-title">Não vai poder participar?</div>
       {{bloco_resposta}}
     </div>
   </div>
@@ -1459,7 +1526,7 @@
   <div class="footer-inner">
     <div class="footer-logo">pulso<span class="dot">.</span></div>
     <div class="footer-meta">
-      <div><strong>Brand</strong>Pulso Podcast<br>Saúde · Inovação · IA</div>
+      <div><strong>Brand</strong>Pulso Podcast<br>Saúde · Inovação · Histórias</div>
       <div><strong>Estúdio</strong>GH<br>Alphaville, SP</div>
       <div><strong>Hosts</strong>Ane Ranzi<br>Acauã Victor</div>
       <div>
@@ -1471,6 +1538,14 @@
     </div>
   </div>
 </footer>
+
+<div class="pmodal" id="pmodal" hidden role="dialog" aria-modal="true" aria-labelledby="pmodal-title">
+  <div class="pmodal-box">
+    <div class="pmodal-head"><div class="pmodal-title" id="pmodal-title"></div><button type="button" class="pmodal-close" data-pmodal-close aria-label="Fechar">×</button></div>
+    <div class="pmodal-videos" id="pmodal-videos"></div>
+  </div>
+</div>
+<script type="application/json" id="pulso-vitrine">{{vitrine_json}}</script>
 
 <!-- ================================================
      SCRIPTS
@@ -1505,9 +1580,10 @@
     ? (sex === 'f' ? 'nossas' : 'nossos')
     : (sex === 'f' ? 'nossa'  : 'nosso');
 
+  const podcastWord = G.plateia ? 'para o Pulso Podcast <span class="highlight">com plateia</span>.' : 'para o Pulso Podcast.';
   document.getElementById('invite-statement').innerHTML = plural
-    ? 'vocês são ' + possessiveWord + ' <span class="highlight">' + guestWord + '</span><br>para o Pulso Podcast.'
-    : 'você é ' + possessiveWord + ' <span class="highlight">' + guestWord + '</span><br>para o Pulso Podcast.';
+    ? 'vocês são ' + possessiveWord + ' <span class="highlight">' + guestWord + '</span><br>' + podcastWord
+    : 'você é ' + possessiveWord + ' <span class="highlight">' + guestWord + '</span><br>' + podcastWord;
 
   if (!displayName) return;
 
@@ -1518,7 +1594,7 @@
     nameEl.style.fontSize = 'clamp(32px, 4.5vw, 72px)';
   }
 
-  document.getElementById('invite-desc').textContent = plural
+  if (!G.motivo) document.getElementById('invite-desc').textContent = plural
     ? 'Selecionamos uma conversa por vez. Escolhemos vocês pela trajetória construída e pela perspectiva que acreditamos que o nosso público precisa ouvir.'
     : 'Selecionamos uma conversa por vez. Escolhemos você pela trajetória que construiu e pela perspectiva que acreditamos que o nosso público precisa ouvir.';
 
@@ -1533,6 +1609,95 @@
   document.getElementById('cta-desc').textContent = plural
     ? 'Falem com a produção para alinhar a pauta e confirmar a data de gravação no Estúdio GH.'
     : 'Fale com a produção para alinhar sua data de gravação no Estúdio GH.';
+})();
+
+/* --------------------------------------------------
+   JANELAS: cortes de quem já veio (clique na foto) e o vídeo da plateia
+-------------------------------------------------- */
+(function () {
+  let V = {};
+  try { V = JSON.parse(document.getElementById('pulso-vitrine').textContent || '{}'); } catch (e) { V = {}; }
+  const modal = document.getElementById('pmodal');
+  const box = document.getElementById('pmodal-videos');
+  const title = document.getElementById('pmodal-title');
+  let back = null;
+  function close() {
+    box.querySelectorAll('video').forEach(function (v) { v.pause(); });
+    box.innerHTML = ''; modal.hidden = true; document.body.classList.remove('pmodal-open');
+    if (back) back.focus();
+  }
+  function open(t, items, from) {
+    back = from || null; title.textContent = t; box.innerHTML = '';
+    box.classList.toggle('single', items.length === 1);
+    items.forEach(function (it, i) {
+      const fig = document.createElement('figure');
+      const v = document.createElement('video');
+      v.controls = true; v.playsInline = true; v.preload = i === 0 ? 'metadata' : 'none';
+      if (it.poster) v.poster = it.poster;
+      (it.sources || [{ src: it.src }]).forEach(function (s) { const so = document.createElement('source'); so.src = s.src; if (s.type) so.type = s.type; v.appendChild(so); });
+      fig.appendChild(v);
+      if (it.title) { const c = document.createElement('figcaption'); c.textContent = it.title; fig.appendChild(c); }
+      box.appendChild(fig);
+    });
+    modal.hidden = false; document.body.classList.add('pmodal-open');
+    modal.querySelector('[data-pmodal-close]').focus();
+  }
+  modal.addEventListener('click', function (e) { if (e.target === modal || e.target.closest('[data-pmodal-close]')) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) close(); });
+  // ---- quem já sentou à mesa: destaque que troca a cada 5 s (enquanto a seção está na tela) + grade; "Ver cortes" abre a janela
+  const M = V.mesa || [];
+  const grid = document.getElementById('mesaGrid'), feat = document.getElementById('mesaFeature'), mesaEl = document.getElementById('mesa');
+  const mf = { photo: document.getElementById('mfPhoto'), idx: document.getElementById('mfIdx'), aud: document.getElementById('mfAud'), name: document.getElementById('mfName'), cred: document.getElementById('mfCred'), link: document.getElementById('mfLink'), clips: document.getElementById('mfClips') };
+  const clipsOf = function (g) { return (V.cortes || {})[String(g.ep)] || []; };
+  const hasAud = function (g) { return g.audience && g.audience !== '—' && g.audience !== '-'; };
+  const pad2 = function (n) { return String(n).padStart(2, '0'); };
+  if (!M.length) { mesaEl.hidden = true; } else {
+    M.forEach(function (g, i) {
+      const c = document.createElement('button'); c.type = 'button'; c.className = 'mesa-card'; c.setAttribute('role', 'listitem'); c.dataset.i = i; c.setAttribute('aria-label', g.name);
+      const th = document.createElement('span'); th.className = 'mesa-thumb';
+      if (g.photo) { const im = document.createElement('img'); im.src = g.photo; im.alt = ''; im.loading = 'lazy'; th.appendChild(im); }
+      if (clipsOf(g).length) { const pl = document.createElement('span'); pl.className = 'play'; pl.title = 'Tem cortes'; th.appendChild(pl); }
+      const nm = document.createElement('span'); nm.className = 'mesa-card-name'; nm.textContent = g.name;
+      const au = document.createElement('span'); au.className = 'mesa-card-aud'; au.textContent = hasAud(g) ? g.audience : '';
+      c.append(th, nm, au); grid.appendChild(c);
+    });
+    const cards = Array.prototype.slice.call(grid.children);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let cur = -1, timer = null, visible = false, paused = false;
+    function bar() { feat.classList.remove('playing'); void feat.offsetWidth; if (visible && !paused && !reduce && M.length > 1) feat.classList.add('playing'); }
+    function show(i, now) {
+      i = (i + M.length) % M.length; if (i === cur) return; cur = i;
+      cards.forEach(function (c, k) { c.classList.toggle('active', k === i); });
+      const g = M[i];
+      const fill = function () {
+        if (g.photo) mf.photo.src = g.photo; else mf.photo.removeAttribute('src');
+        mf.photo.alt = g.name; mf.idx.textContent = pad2(i + 1) + ' / ' + pad2(M.length);
+        mf.aud.textContent = g.audience || ''; mf.aud.parentNode.hidden = !hasAud(g);
+        mf.name.textContent = g.name; mf.cred.textContent = g.credential || '';
+        mf.link.href = g.handle ? 'https://www.instagram.com/' + g.handle : 'https://www.instagram.com/explore/search/keyword/?q=' + encodeURIComponent(g.name);
+        mf.clips.hidden = !clipsOf(g).length;
+        feat.classList.remove('swap');
+      };
+      if (now || reduce) fill(); else { feat.classList.add('swap'); setTimeout(fill, 180); }
+      bar();
+    }
+    function start() { stop(); if (reduce || M.length < 2) return; timer = setInterval(function () { if (visible && !paused) show(cur + 1); }, 5000); bar(); }
+    function stop() { if (timer) clearInterval(timer); timer = null; }
+    grid.addEventListener('click', function (e) { const c = e.target.closest('.mesa-card'); if (c) { show(Number(c.dataset.i)); paused = true; feat.classList.remove('playing'); } });
+    grid.addEventListener('mouseover', function (e) { const c = e.target.closest('.mesa-card'); if (c) show(Number(c.dataset.i)); });
+    grid.addEventListener('focusin', function (e) { const c = e.target.closest('.mesa-card'); if (c) show(Number(c.dataset.i)); });
+    mesaEl.addEventListener('mouseenter', function () { paused = true; feat.classList.remove('playing'); });
+    mesaEl.addEventListener('mouseleave', function () { paused = false; start(); });
+    mf.clips.addEventListener('click', function () { const g = M[cur]; if (g) { paused = true; feat.classList.remove('playing'); open('Cortes com ' + g.name, clipsOf(g), mf.clips); } });
+    show(0, true);
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible) start(); else { stop(); feat.classList.remove('playing'); } }, { threshold: 0.4 }).observe(mesaEl);
+    } else { visible = true; start(); }
+  }
+  document.querySelectorAll('[data-plateia-video]').forEach(function (b) {
+    if (!V.plateia) { b.hidden = true; return; }
+    b.addEventListener('click', function () { open('Como é uma gravação com plateia', [V.plateia], b); });
+  });
 })();
 
 /* --------------------------------------------------

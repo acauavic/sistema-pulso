@@ -1,0 +1,46 @@
+<%- include('../partials/head') %>
+<% var backHref = '/conteudo?vista=cortes' + (episodio ? '&episodio=' + episodio : ''); %>
+<div class="page-head">
+  <div><span class="kicker">Conteúdo · capas em lote</span><h1>Capas de <span class="mono"><%= rows.length %></span> <%= rows.length === 1 ? 'corte' : 'cortes' %></h1></div>
+  <div class="row">
+    <a class="btn ghost" href="<%= backHref %>"><%- icon('arrow-left') %> Voltar aos cortes</a>
+    <% if (aiOn) { %><button class="btn" type="button" data-cover-ai-all><%- icon('sparkles', 16) %> Sugerir textos para todos</button><% } %>
+  </div>
+</div>
+<p class="lead">Escolha a capa de cada corte. Para trocar o texto, escreva o novo: ao salvar, o sistema monta uma capa nova com ele, sobre o mesmo quadro do vídeo, e ela fica escolhida.</p>
+<p class="small muted" data-cover-ai-status role="status" aria-live="polite"></p>
+
+<form method="post" action="/conteudo/capas-em-lote" data-busy="Salvando as capas…" data-cover-batch>
+  <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="episodio" value="<%= episodio %>">
+  <% rows.forEach(function (c) { %>
+  <div class="bulk-cover-row" data-cover-row="<%= c.id %>">
+    <input type="hidden" name="ids" value="<%= c.id %>">
+    <div>
+      <span class="ktype mono small"><%= c.ep_number ? videoNo(c.ep_number, c.project_id) + ' · ' : '' %><%= c.title %></span>
+      <p class="m-0"><a href="/cortes/<%= c.id %>" target="_blank" rel="noopener"><strong><%= c.post_title || c.title %></strong></a></p>
+      <% if (c.guest_name) { %><p class="small muted m-0"><%= c.guest_name %></p><% } %>
+    </div>
+    <div class="cover-picks" role="radiogroup" aria-label="Capa de <%= c.post_title || c.title %>">
+      <% if (!c.covers.length) { %><p class="small muted"><%= c.has_frames ? 'Sem capa ainda: escreva um texto para gerar a primeira.' : 'Sem capa e sem quadros lidos: use "Refazer a leitura" na página do corte.' %></p><% } %>
+      <% c.covers.forEach(function (v) { %>
+      <label class="cover-pick" title="<%= v.label || 'Capa' %>">
+        <input type="radio" name="capa_<%= c.id %>" value="<%= v.id %>" <%= c.chosen && c.chosen.id === v.id ? 'checked' : '' %>>
+        <img src="/capas/<%= v.id %>/imagem?v=<%= new Date(v.updated_at).getTime() %>&w=640" alt="<%= v.label || 'Capa' %>" loading="lazy">
+        <% if (v.spec && v.spec.model && coverModels[v.spec.model]) { %><span class="mono small muted cover-model"><%= coverModels[v.spec.model].name %></span><% } %>
+      </label>
+      <% }) %>
+    </div>
+    <div class="stack">
+      <input type="hidden" name="antes_<%= c.id %>" value="<%= c.text %>">
+      <label>Texto da capa
+        <input type="text" name="texto_<%= c.id %>" value="<%= c.text %>" maxlength="90" placeholder="<%= c.text ? '' : (c.chosen ? 'A capa escolhida já vem com o texto na imagem; escreva para gerar outra' : 'Escreva para gerar a capa') %>" data-ai="capa" data-ai-clip="<%= c.id %>" data-ai-kind="reel_cover" data-cover-text="<%= c.id %>">
+      </label>
+      <div class="ai-chips" data-cover-alts="<%= c.id %>" hidden></div>
+    </div>
+  </div>
+  <% }) %>
+  <div class="row top-gap"><button class="btn primary" type="submit">Salvar as capas</button><a class="btn ghost" href="<%= backHref %>">Cancelar</a></div>
+</form>
+<%- include('../partials/ai-assist') %>
+<script src="/static/capaslote.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

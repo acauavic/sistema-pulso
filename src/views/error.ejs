@@ -1,8 +1,10 @@
 <%- include('partials/head') %>
 <div class="card <%= currentUser ? '' : 'auth-card' %>">
-  <span class="kicker">Erro</span>
-  <h1 style="margin-bottom:12px"><%= title %></h1>
+  <h1 class="mb-12"><%= title %></h1>
   <p class="muted"><%= message %></p>
-  <p style="margin:20px 0 0"><a class="btn" href="<%= currentUser ? '/' : '/login' %>">Voltar ao início</a></p>
+  <div class="row mt-20">
+    <button class="btn" type="button" data-go-back><%- typeof icon === 'function' ? icon('arrow-left') : '' %> Voltar</button>
+    <a class="btn ghost" href="<%= currentUser ? '/' : '/login' %>"><%= currentUser ? 'Ir para o início' : 'Ir para o login' %></a>
+  </div>
 </div>
 <%- include('partials/foot') %>

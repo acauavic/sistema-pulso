@@ -1,0 +1,32 @@
+<%# Cartão de tarefa (quadro). Variáveis: t; back (para onde voltar depois de mover). %>
+<% var due = isoOf(t.due_on); var late = lateOf(t); var edit = canEdit(t); var backTo = typeof back !== 'undefined' ? back : '/tarefas?visao=quadro'; %>
+<article class="task-card st-<%= t.status %> <%= late ? 'late' : '' %> <%= t.status === 'bloqueada' ? 'is-blocked' : '' %>" data-task="<%= t.id %>" draggable="<%= edit ? 'true' : 'false' %>">
+  <div class="tc-top">
+    <a href="/tarefas/<%= t.id %>" class="tc-title"><%= t.title %></a>
+    <%- include('../partials/dot', { type: 'task', id: t.id, user: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null, editable: edit }) %>
+  </div>
+  <%# mover sem arrastar (no celular o arrastar não existe; no computador funciona pelo teclado) %>
+  <% if (edit) { %>
+    <details class="row-menu tc-move">
+      <summary title="Mover esta tarefa" aria-label="Mover <%= t.title %>"><%- icon('ellipsis', 16) %></summary>
+      <div class="row-menu-list">
+        <span class="kicker m-0">Mover para</span>
+        <% Object.keys(C.TASK_STATUSES).forEach(function (k) { if (k === t.status) return; %>
+        <form method="post" action="/tarefas/<%= t.id %>/status"<%- k === 'bloqueada' ? ' data-block-form' : '' %>>
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= backTo %>"><input type="hidden" name="status" value="<%= k %>">
+          <button type="submit"><%= C.TASK_STATUSES[k] %></button>
+        </form>
+        <% }) %>
+      </div>
+    </details>
+  <% } %>
+  <p class="small err" data-reason <%= t.status === 'bloqueada' ? '' : 'hidden' %>><%= t.status === 'bloqueada' ? 'Bloqueada: ' + t.block_reason : '' %></p>
+  <div class="tc-meta handle">
+    <%- include('../partials/project-tag', { id: t.project_id }) %>
+    <% if (due) { %><span class="<%= late ? 'err' : '' %>"><%- icon('clock', 12) %> <%= fmt.formatDueShort(t.due_on, t.due_time) %><%= late ? ' · atrasada' : '' %></span><% } %>
+    <% if (t.episode_id) { %><span><%= videoNo(t.episode_number, t.project_id) || 'Episódio' %></span><% } %>
+    <% if (t.guest_id) { %><span><%= t.guest_name %></span><% } %>
+    <% if (t.sponsor_id) { %><span><%= t.sponsor_name %></span><% } %>
+    <% if (t.comments) { %><span><%- icon('message-square', 12) %> <%= t.comments %></span><% } %>
+  </div>
+</article>

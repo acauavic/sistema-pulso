@@ -1,0 +1,78 @@
+<%- include('../partials/head') %>
+<%#
+  Funções. Jornada: a gestão quer dar a alguém de fora (o financeiro do parceiro, um editor freelancer) só o que ele precisa.
+  Cria a função (nome, como trabalha no dia a dia, o que acessa por área) e depois escolhe, na janela do usuário, a função em
+  cada projeto. As de fábrica aparecem primeiro; Superadmin é travada.
+%>
+<%
+  var B = { gestao: 'Gestão', produtora: 'Produtora', editor_video: 'Editor de Vídeo', superadmin: 'Superadmin' };
+  var form = function (r) { var perms = r ? R.permsOf(r) : []; var id = r ? r.id : 'nova'; %>
+  <dialog class="modal modal-wide" id="role-<%= id %>" aria-labelledby="role-<%= id %>-h" <%= editar && r && editar === r.id ? 'data-open-on-load' : '' %>>
+    <form method="post" action="/gestao/funcoes<%= r ? '/' + r.id : '' %>" class="stack" data-role-form>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h2 id="role-<%= id %>-h"><%= r ? 'Editar ' + r.name : 'Nova função' %></h2>
+      <% if (r && r.builtin) { %><p class="small muted m-0">Função de fábrica: o nome e o jeito de trabalhar não mudam; o que ela acessa pode mudar (e voltar ao padrão depois).</p><% } %>
+      <div class="grid-2">
+        <label>Nome *<input type="text" name="name" maxlength="60" required value="<%= r ? r.name : '' %>" placeholder="ex.: Financeiro do parceiro" <%= r && r.builtin ? 'readonly' : '' %>></label>
+        <label>Trabalha como *
+          <select name="base" data-native <%= r && r.builtin ? 'disabled' : '' %>>
+            <% ['gestao', 'produtora', 'editor_video'].forEach(function (b) { %><option value="<%= b %>" <%= r && r.base === b ? 'selected' : '' %>><%= B[b] %></option><% }) %>
+          </select>
+          <small class="muted">Decide o Início, os avisos que chegam e as tarefas do calendário.</small>
+        </label>
+      </div>
+      <p class="label-text m-0">O que acessa</p>
+      <div class="role-areas">
+        <% AREAS.forEach(function (a) { var level = R.levelOf(perms, a); var list = [].concat(a.read, a.edit, a.manage); %>
+        <fieldset class="role-area" data-role-area data-read="<%= a.read.join(' ') %>" data-edit="<%= a.edit.join(' ') %>" data-manage="<%= a.manage.join(' ') %>">
+          <legend><%= a.label %> <span class="mono small muted" data-role-level-label><%= R.LEVELS[level] %></span></legend>
+          <div class="seg role-presets" role="group" aria-label="Nível em <%= a.label %>">
+            <button type="button" data-role-level="nenhum">Não vê</button><button type="button" data-role-level="ve">Vê</button><% if (a.edit.length) { %><button type="button" data-role-level="edita">Edita</button><% } %><% if (a.manage.length) { %><button type="button" data-role-level="gerencia">Gerencia</button><% } %>
+          </div>
+          <details class="role-detail" <%= level === 'parcial' ? 'open' : '' %>>
+            <summary class="small muted">ajustar caixa por caixa</summary>
+            <% list.forEach(function (p) { %><label class="check-row"><input type="checkbox" name="perm" value="<%= p %>" <%= perms.indexOf(p) >= 0 ? 'checked' : '' %>> <%= PERM_LABELS[p] %></label><% }) %>
+          </details>
+        </fieldset>
+        <% }) %>
+      </div>
+      <div class="row modal-actions"><button class="btn primary" type="submit"><%= r ? 'Salvar' : 'Criar a função' %></button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </form>
+  </dialog>
+<% }; %>
+
+<div class="page-head">
+  <div><span class="kicker">Gestão · Equipe</span><h1>Funções</h1></div>
+  <button class="btn primary" type="button" data-modal-open="role-nova"><%- icon('plus') %> Nova função</button>
+</div>
+<%- include('../partials/gestao-nav', { active: 'funcoes' }) %>
+<p class="lead">A função diz o que a pessoa acessa. Cada pessoa tem uma função padrão e pode ter outra em cada projeto (na janela do usuário): editora no Pulso, gestora no Projeto 100.</p>
+
+<section class="card">
+  <ul class="plain cat-list">
+    <% list.forEach(function (r) { var u = usage[r.id] || { people: 0, in_projects: 0 }; var edited = r.builtin && r.perms != null; %>
+    <li class="cat-row">
+      <div class="plan-list-main">
+        <strong><%= r.name %></strong>
+        <span class="mono small muted">TRABALHA COMO <%= B[r.base].toUpperCase() %> · <%= R.permsOf(r).length %> DE <%= R.ALL.length %> PERMISSÕES · <%= u.people %> PESSOA<%= u.people === 1 ? '' : 'S' %><%= u.in_projects ? ' · ' + u.in_projects + ' EM PROJETO' : '' %></span>
+      </div>
+      <span class="row">
+        <% if (r.locked) { %><span class="badge b-gray">travada</span><% } else if (r.builtin) { %><span class="badge b-gray"><%= edited ? 'de fábrica · editada' : 'de fábrica' %></span><% } %>
+        <% if (!r.locked) { %><button class="btn sm ghost" type="button" data-modal-open="role-<%= r.id %>"><%- icon('pencil', 14) %> Editar</button><% } %>
+        <details class="row-menu">
+          <summary class="icon-btn" aria-label="Mais ações de <%= r.name %>"><%- icon('ellipsis') %></summary>
+          <div class="row-menu-list">
+            <form method="post" action="/gestao/funcoes/<%= r.id %>/duplicar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">duplicar</button></form>
+            <% if (edited) { %><form method="post" action="/gestao/funcoes/<%= r.id %>/padrao" data-confirm="Voltar <%= r.name %> ao padrão de fábrica? As mudanças feitas nela se perdem."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small" type="submit">voltar ao padrão</button></form><% } %>
+            <% if (!r.builtin) { %><form method="post" action="/gestao/funcoes/<%= r.id %>/excluir" data-confirm="Apagar a função <%= r.name %> de vez? Não dá para desfazer."><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link small danger-link" type="submit">excluir</button></form><% } %>
+          </div>
+        </details>
+      </span>
+    </li>
+    <% }) %>
+  </ul>
+</section>
+
+<% form(null); list.filter(function (r) { return !r.locked; }).forEach(function (r) { form(r); }); %>
+<script src="/static/funcoes.js?v=<%= assetV %>" defer></script>
+<%- include('../partials/foot') %>

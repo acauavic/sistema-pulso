@@ -1,0 +1,8 @@
+<%# Comprovante (PDF ou foto) numa janela do Financeiro: escolher o arquivo já envia (pelos anexos) e o id vai num campo
+    escondido "comprovante" do formulário (src/public/comprovante.js). Variáveis: label (opcional), hint (frase embaixo). %>
+<div class="receipt-field" data-receipt-box>
+  <span class="label-text"><%= typeof label !== 'undefined' ? label : 'Comprovante' %></span>
+  <label class="btn sm receipt-pick"><%- icon('paperclip', 14) %> Anexar arquivo<input type="file" class="sr-only" data-receipt accept="application/pdf,image/png,image/jpeg,image/webp" multiple></label>
+  <ul class="plain receipt-list" data-receipt-list></ul>
+  <p class="small muted m-0" data-receipt-msg aria-live="polite" data-receipt-hint="<%= typeof hint !== 'undefined' ? hint : '' %>"><%= typeof hint !== 'undefined' ? hint : '' %></p>
+</div>

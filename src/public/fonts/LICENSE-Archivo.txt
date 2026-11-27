@@ -1,0 +1,10 @@
+Archivo (archivo-latin-wght-normal.woff2)
+Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+The license is available with a FAQ at: https://openfontlicense.org
+
+Summary of the terms: the font may be used, studied, modified and redistributed freely, embedded in documents and
+software, as long as it is not sold by itself, the copyright and this license notice travel with it, modified versions
+do not use the Reserved Font Names without permission, and derivative fonts stay under this same license.
+The full license text is the SIL Open Font License 1.1, at the address above.

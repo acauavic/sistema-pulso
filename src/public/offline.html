@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0E0F0D">
+  <title>Sem conexão · Health Scale Studio</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<!-- Guardada pelo service worker (sw.js) e mostrada quando a navegação falha sem internet. -->
+<div class="auth"><div class="auth-box">
+  <div class="auth-brand">
+    <div class="brand brand-sign" role="img" aria-label="Health Scale Studio"><img class="brand-logo" src="/static/brand/studio/health-scale-logo.png" alt="" width="720" height="114"><span class="brand-rule"></span><span class="brand-name">STUDIO</span></div>
+  </div>
+  <div class="card auth-card offline-card">
+    <svg class="signal flat" viewBox="0 0 34 30" aria-hidden="true" focusable="false"><rect class="s1" x="0" y="11" width="6" height="8"/><rect class="s2" x="9" y="7.5" width="6" height="15"/><rect class="s3" x="18" y="4" width="6" height="22"/><rect class="s4" x="27" y="0.5" width="6" height="29"/></svg>
+    <span class="kicker">Sem conexão</span>
+    <h1>Sem internet no momento.</h1>
+    <p class="muted">Assim que o aparelho voltar a se conectar, a página abre sozinha. O que já estava salvo continua no servidor.</p>
+    <a class="btn primary" href="" data-retry>Tentar de novo</a>
+  </div>
+</div></div>
+<script src="/static/offline.js"></script>
+</body>
+</html>

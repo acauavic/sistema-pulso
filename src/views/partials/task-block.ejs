@@ -1,0 +1,10 @@
+<%# Janela do motivo do bloqueio (quadro e lista de tarefas): no lugar da caixinha do navegador. O motivo é obrigatório e
+    aparece no cartão e na linha, para a equipe saber o que falta. Quem abre é o src/public/collab.js. %>
+<dialog class="modal" id="modal-bloquear" aria-labelledby="modal-bloquear-h">
+  <form method="dialog" class="stack">
+    <h2 id="modal-bloquear-h">Por que está bloqueada?</h2>
+    <p class="small muted m-0">O motivo fica visível para a equipe, no cartão e na lista.</p>
+    <label>Motivo *<input type="text" name="reason" maxlength="200" required placeholder="ex.: esperando o material do convidado"></label>
+    <div class="row modal-actions"><button class="btn primary" type="submit">Bloquear</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+  </form>
+</dialog>

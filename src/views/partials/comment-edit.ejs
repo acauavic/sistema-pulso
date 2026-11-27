@@ -1,0 +1,14 @@
+<%# Janela única de edição de comentário (aberta pelo botão com lápis: [data-comment-edit]). review = comentário da revisão do vídeo (salva sem recarregar). %>
+<dialog class="modal modal-wide" id="<%= locals.review ? 'modal-review-edit' : 'modal-comment-edit' %>" aria-labelledby="ce-h"<%- locals.review ? ' data-review-edit' : '' %>>
+  <form method="post" action="" data-comment-edit-form<%- locals.review ? ' data-review="1"' : '' %>>
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="" data-ce-back>
+    <h2 id="ce-h">Editar comentário</h2>
+    <%- include('rich-editor', locals.review ? { name: 'body_html', attach: 'anexos', placeholder: 'Edite o comentário…', label: 'Comentário', size: 'sm', audio: true, ctrlEnter: true } : { name: 'texto_html', attach: 'anexos', placeholder: 'Edite o comentário… use @ para chamar alguém.', label: 'Comentário', size: 'sm', audio: true, mentions: true, required: true, ctrlEnter: true }) %>
+    <ul class="plain ce-files" data-ce-files></ul>
+    <div class="row modal-actions">
+      <button class="btn primary icon-only" type="submit" aria-label="Salvar a edição" title="Salvar (Ctrl+Enter)"><%- icon('check', 16) %></button>
+      <button class="btn icon-only" type="button" data-modal-close aria-label="Cancelar" title="Cancelar"><%- icon('x', 16) %></button>
+    </div>
+  </form>
+</dialog>
+<template data-ce-icons><span data-i="trash-2"><%- icon('trash-2', 14) %></span><span data-i="rotate-ccw"><%- icon('rotate-ccw', 14) %></span></template>

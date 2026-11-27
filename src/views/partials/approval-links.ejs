@@ -1,0 +1,55 @@
+<%#
+  Link de aprovação de um item (pauta/roteiro, vídeo em revisão, capas). Variáveis: links (approvals.listFor, o mais novo
+  primeiro), action (POST que gera o link), canCreate, idKey (único na página), sentTo (sugestão de para quem), what (o que vai
+  para aprovação, em minúsculas), tone ('primary' quando gerar é o próximo passo da área), voltar.
+  Jornada: quem produz gera o link, copia a mensagem para o grupo do WhatsApp e espera; a resposta chega sozinha (aviso + histórico).
+%>
+<%
+  var cur = links[0] || null; var older = links.slice(1);
+  var waiting = cur && cur.state === 'aberto';
+  var answerChip = function (l) { return l.answer === 'aprovado' ? '<span class="badge b-green">aprovado</span>' : '<span class="badge b-amber">ajustes pedidos</span>'; };
+  var stateLabel = { aberto: 'aguardando', respondido: 'respondido', vencido: 'vencido', revogado: 'cancelado', substituido: 'substituído' };
+%>
+<div class="appr" id="appr-<%= idKey %>">
+  <% if (waiting) { %>
+  <p class="appr-line small"><span class="badge b-st-agendado">aguardando resposta</span>
+    Link enviado <span class="mono"><%= fmt.formatDateTime(cur.created_at) %></span> para <%= cur.sent_to %> · vale até <span class="mono"><%= fmt.formatDayShort(cur.expires_at) %></span></p>
+  <div class="row appr-actions">
+    <button class="btn sm" type="button" data-copy="<%= cur.message %>"><%- icon('copy', 14) %> Copiar mensagem</button>
+    <a class="link small" href="<%= cur.url %>" target="_blank" rel="noopener">abrir o link</a>
+    <% if (canCreate) { %>
+    <form method="post" action="/aprovacoes/<%= cur.id %>/revogar" class="inline" data-confirm="Cancelar este link? Quem tiver recebido não vai mais conseguir responder.">
+      <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= voltar %>">
+      <button class="link small" type="submit">cancelar o link</button>
+    </form>
+    <% } %>
+  </div>
+  <% } else if (cur && cur.state === 'respondido') { %>
+  <p class="appr-line small"><%- answerChip(cur) %> por <strong><%= cur.answer_name %></strong> pelo link · <span class="mono"><%= fmt.formatDateTime(cur.answered_at) %></span></p>
+  <% if (cur.answer_note) { %><p class="appr-note small"><%= cur.answer_note %></p><% } %>
+  <% } %>
+
+  <% if (canCreate && !waiting) { %>
+  <button class="btn sm <%= tone || '' %>" type="button" data-modal-open="appr-new-<%= idKey %>"><%- icon('link', 14) %> <%= cur ? 'Gerar link novo' : 'Gerar link de aprovação' %></button>
+  <dialog class="modal" id="appr-new-<%= idKey %>" aria-labelledby="appr-new-<%= idKey %>-h">
+    <form method="post" action="<%= action %>" class="stack" data-busy="Gerando…">
+      <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="voltar" value="<%= voltar %>">
+      <h2 id="appr-new-<%= idKey %>-h">Link de aprovação</h2>
+      <p class="small muted m-0">Quem aprova abre o link no celular, sem login, vê <%= what %> e responde uma vez: aprovar ou pedir ajustes. O link vale 30 dias e só para esta versão.</p>
+      <label>Para quem<input type="text" name="to" value="<%= sentTo %>" maxlength="120" placeholder="ex.: Grupo Projeto 100"></label>
+      <div class="row modal-actions"><button class="btn primary" type="submit">Gerar o link</button><button class="btn ghost" type="button" data-modal-close>Cancelar</button></div>
+    </form>
+  </dialog>
+  <% } %>
+
+  <% if (older.length || (cur && !waiting && cur.state !== 'respondido')) { %>
+  <details class="appr-hist">
+    <summary class="small muted">Links anteriores <span class="mono"><%= links.length - (waiting || (cur && cur.state === 'respondido') ? 1 : 0) %></span></summary>
+    <ul class="plain small">
+      <% links.slice(waiting || (cur && cur.state === 'respondido') ? 1 : 0).forEach(function (l) { %>
+      <li><span class="mono muted"><%= fmt.formatDayShort(l.created_at) %></span> <%= l.sent_to || '' %> · <%= l.state === 'respondido' ? (l.answer === 'aprovado' ? 'aprovado' : 'ajustes') + ' por ' + l.answer_name : stateLabel[l.state] %></li>
+      <% }) %>
+    </ul>
+  </details>
+  <% } %>
+</div>

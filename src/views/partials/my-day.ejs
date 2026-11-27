@@ -1,0 +1,106 @@
+<%
+  // Seu dia, o Início da produtora (services/myDay.plan), no lugar do Resumo do dia da equipe (que fica a um toque, em "Equipe").
+  // O plano do dia (feito de previsto), o que o dia rendeu, os motivos de perda dos convidados dela (30 dias) e as metas que não
+  // estão no plano. O número grande é o feito; a barra, o andamento (lime só quando a meta é batida). Medir não é ação.
+  var m = mineDay;
+  var num = function (n) { return Number(n).toLocaleString('pt-BR'); };
+  var plural = function (n, one, many) { return Number(n) === 1 ? one : many; };
+  var pct = function (n, of) { return of ? Math.max(0, Math.min(100, Math.round((n / of) * 100))) : 0; };
+  var forDay = day.isToday ? 'hoje' : 'o dia';
+  // follow-ups marcados para o dia: hoje, quantos faltam; num dia que passou, quantos ficaram sem fazer; e os atrasados de antes
+  var followSub = function (f) {
+    var parts = []; var left = f.due - f.done;
+    if (!f.due) parts.push({ t: 'nada marcado para ' + forDay });
+    else if (!left) parts.push({ t: 'todos feitos' });
+    else parts.push(day.isToday ? { pre: 'faltam', n: left } : { n: left, t: plural(left, 'ficou sem fazer', 'ficaram sem fazer'), bad: true });
+    if (f.late) parts.push({ n: f.late, t: plural(f.late, 'atrasado', 'atrasados'), bad: true });
+    return parts;
+  };
+  var t = m.tasks, tLeft = t.due - t.done, taskSub = [];
+  if (t.due && tLeft) taskSub.push(day.isToday ? { pre: 'faltam', n: tLeft } : { n: tLeft, t: plural(tLeft, 'ficou para depois', 'ficaram para depois'), bad: true });
+  if (t.late) taskSub.push({ n: t.late, t: plural(t.late, 'atrasada', 'atrasadas'), bad: true });
+  if (!taskSub.length) taskSub.push({ t: t.due ? 'todas feitas' : 'nenhuma para ' + forDay });
+  var goalOf = function (x) { return x.target ? { of: 'de ' + num(x.target) + ' · meta', bar: pct(x.n, x.target), hit: x.n >= x.target } : { of: '', bar: null, hit: false }; };
+  var ofDue = function (f, one, many) { return f.due ? { of: 'de ' + num(f.due) + ' ' + plural(f.due, one, many), bar: pct(f.done, f.due) } : { of: '', bar: null }; };
+  var a = m.approaches, inv = m.invites, r = m.results;
+  var plan = [
+    Object.assign({ l: 'Abordagens novas de patrocinadores', n: a.n, href: '/patrocinadores?view=lista&stage=prospect&owner=eu', sub: [{ n: a.toApproach, t: 'a abordar' }] }, goalOf(a)),
+    Object.assign({ l: 'Follow-ups de patrocinadores', n: m.sponsorFollow.done, href: '/patrocinadores?view=lista&stage=prospect&owner=eu', sub: followSub(m.sponsorFollow) }, ofDue(m.sponsorFollow, 'previsto', 'previstos')),
+    Object.assign({ l: 'Convites enviados', n: inv.n, href: '/convidados?view=lista&status=convite_enviado&owner=eu', sub: [{ n: inv.waiting, t: 'aguardando resposta' }] }, goalOf(inv)),
+    Object.assign({ l: 'Follow-ups de convidados', n: m.guestFollow.done, href: '/convidados?view=lista&status=convite_enviado&followup=1', sub: followSub(m.guestFollow) }, ofDue(m.guestFollow, 'previsto', 'previstos')),
+    Object.assign({ l: 'Tarefas', n: t.done, href: '/tarefas', sub: taskSub }, t.due ? { of: 'de ' + num(t.due) + ' para ' + forDay, bar: pct(t.done, t.due) } : { of: '', bar: null }),
+  ];
+  var results = [
+    { l: 'Convites aceitos', n: r.accepted, href: '/convidados?view=lista&status=em_agendamento&owner=eu', sub: [{ n: r.scheduling, t: 'em agendamento' }] },
+    { l: 'Convidados perdidos', n: r.lost, bad: r.lost > 0, href: '/convidados?view=lista&status=perdido&owner=eu', sub: r.lost ? [{ t: r.lostReasons.join(' · ').toLowerCase() }] : [{ t: 'nenhum no dia' }] },
+    { l: 'Patrocinadores interessados', n: r.interested, href: '/patrocinadores?view=lista&stage=negociacao&owner=eu', sub: [{ n: r.negotiating, t: 'em negociação' }] },
+    { l: 'Reuniões marcadas', n: r.booked, href: '/patrocinadores?owner=eu', sub: r.nextMeeting ? [{ pre: 'próxima', n: r.nextMeeting }] : [{ t: 'nenhuma marcada à frente' }] },
+    { l: 'Patrocínios fechados', n: r.closed, href: '/patrocinadores?owner=eu', sub: [{ n: r.active, t: plural(r.active, 'ativo', 'ativos') }] },
+  ];
+%>
+<% var subLine = function (parts) { %><span class="day-sub"><% parts.forEach(function (p, i) { %><%= i ? ' · ' : '' %><%= p.pre ? p.pre + ' ' : '' %><% if (p.n !== undefined && p.n !== null) { %><b class="<%= p.bad ? 'bad' : '' %>"><%= typeof p.n === 'number' ? num(p.n) : p.n %></b> <% } %><%= p.t || '' %><% }) %></span><% }; %>
+<section class="day-sum" id="resumo" aria-labelledby="resumo-h">
+  <div class="day-sum-head">
+    <h2 id="resumo-h">Seu dia <span class="day-when"><% if (day.isToday) { %><span class="day-live" aria-hidden="true"></span>HOJE, ATÉ AGORA<% } else { %><%= day.weekday.toUpperCase() %><% } %></span></h2>
+    <%- include('day-nav') %>
+  </div>
+
+  <div class="day-panel">
+    <section class="day-band" aria-labelledby="mine-b1">
+      <div class="day-band-head">
+        <h3 class="day-band-t" id="mine-b1">Plano do dia · feito de previsto</h3>
+        <span class="day-aside"><%= m.weekend ? 'fim de semana: sem meta diária' : 'conta sozinho com o que você registra' %></span>
+      </div>
+      <div class="day-cells c5">
+        <% plan.forEach(function (x) { %>
+        <a class="day-cell <%= x.n ? '' : 'is-zero' %>" href="<%= x.href %>">
+          <span class="day-l"><%= x.l %></span>
+          <span class="plan-n">
+            <span class="plan-v"><span class="day-n"><%= num(x.n) %></span><% if (x.of) { %><span class="plan-of"><%= x.of %></span><% } %></span>
+            <% if (x.bar !== null) { %><svg class="goal-bar <%= x.hit ? 'hit' : '' %>" viewBox="0 0 100 6" preserveAspectRatio="none" role="img" aria-label="<%= x.bar %>% <%= x.of.indexOf('meta') > -1 ? 'da meta' : 'do previsto' %>"><rect class="bg" width="100" height="6" rx="3"/><rect class="fg" width="<%= x.bar %>" height="6" rx="3"/></svg><% } %>
+          </span>
+          <% subLine(x.sub) %>
+        </a>
+        <% }) %>
+      </div>
+    </section>
+
+    <section class="day-band" aria-labelledby="mine-b2">
+      <div class="day-band-head"><h3 class="day-band-t" id="mine-b2">O que o dia rendeu</h3></div>
+      <div class="day-cells c5">
+        <% results.forEach(function (x) { %>
+        <a class="day-cell <%= x.bad ? 'is-bad' : (x.n ? '' : 'is-zero') %>" href="<%= x.href %>">
+          <span class="day-l"><%= x.l %></span>
+          <span class="day-n"><%= num(x.n) %></span>
+          <% subLine(x.sub) %>
+        </a>
+        <% }) %>
+      </div>
+    </section>
+
+    <% if ((locals.pautasTravadas || []).length) { %>
+    <section class="day-band" aria-labelledby="mine-b-pauta">
+      <div class="day-band-head"><h3 class="day-band-t" id="mine-b-pauta">Pautas que travaram</h3><a class="link small" href="/episodios?view=pautas">ver o quadro</a></div>
+      <ul class="plain pauta-stuck">
+        <% pautasTravadas.forEach(function (p) { %>
+        <li>
+          <a href="<%= p.episode_id ? '/episodios/' + p.episode_id + '#pauta' : '/convidados/' + p.guest_id + '#pauta' %>"><strong><%= p.episode_title || p.guest_name %></strong></a>
+          <span class="handle muted"><%= pautaSvc.KINDS[p.kind].label %> · <%= p.state === 'ajustes' ? 'ajustes pedidos' : 'prazo ' + fmt.formatDayShort(p.due_on) %></span>
+        </li>
+        <% }) %>
+      </ul>
+    </section>
+    <% } %>
+
+    <%- include('loss-reasons', { losses: m.losses, mineOnly: true, bandId: 'mine-b3' }) %>
+
+    <% if (locals.cmtDay) { %><%- include('comments-band', { bandId: 'mine-b-cmt' }) %><% } %>
+
+    <% if (m.otherGoals.length) { %>
+    <section class="day-band" aria-labelledby="mine-b4">
+      <div class="day-band-head"><h3 class="day-band-t" id="mine-b4">Minhas metas</h3></div>
+      <div class="rhythm-goals"><%- include('goals-list', { list: m.otherGoals }) %></div>
+    </section>
+    <% } %>
+  </div>
+</section>

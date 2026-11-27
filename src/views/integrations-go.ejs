@@ -1,0 +1,16 @@
+<%- include('partials/head') %>
+<%
+  // Ponte para o Instagram (reconectar com acesso às mensagens). O formulário do painel só pode terminar no próprio painel (CSP
+  // form-action 'self'), então ele chega aqui e esta página leva ao Instagram: na hora (app.js, data-auto-open) ou pelo botão.
+%>
+<section class="card go-card">
+  <span class="kicker mono">Comentários e directs</span>
+  <h2>Abrindo o Instagram…</h2>
+  <p class="muted">Entre com a conta do projeto e aprove o acesso às mensagens. Depois, o Instagram volta para Integrações sozinho.</p>
+  <div class="row top-gap">
+    <a class="btn primary" href="<%= url %>" data-auto-open rel="noreferrer"><%- icon('instagram') %> Abrir o Instagram</a>
+    <a class="btn ghost" href="/integracoes#comentarios">Voltar</a>
+  </div>
+  <p class="small muted m-0 top-gap">Se o Instagram não abrir sozinho em alguns segundos, use o botão.</p>
+</section>
+<%- include('partials/foot') %>
