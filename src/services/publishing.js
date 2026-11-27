@@ -36,6 +36,16 @@ function targetOf(pub) {
   return loadTarget({ episodeId: pub.episode_id, clipId: pub.clip_id, media: pub.media, coverIds: pub.cover_ids });
 }
 
+// Corte pesado (4K, taxa alta) vai para as redes pela versão em 1080p (services/socialRendition). Ainda não pronta: espera
+// ("em preparo", nova tentativa em minutos). Só na hora de enviar: criar e reenviar continuam olhando o corte de sempre.
+async function socialVersion(target) {
+  if (target.kind !== 'clip') return target;
+  const r = await require('./socialRendition').pick(target.clip);
+  if (!r) return target;
+  if (r.waiting) throw targetError('em_preparo', 'Preparando a versão do vídeo para as redes (1080p, até 10 Mbps): o original é pesado demais para o Instagram, o Threads e o X. Sai assim que ficar pronta.');
+  return { ...target, videoKey: r.key, size: r.size, mime: 'video/mp4', partSize: null, rendition: true };
+}
+
 // De que projeto é o que está sendo publicado (o corte manda; senão o episódio): as contas das redes são as dele.
 const projectOf = (target) => (target && ((target.clip && target.clip.project_id) || (target.covers && target.covers[0] && target.covers[0].project_id) || (target.episode && target.episode.project_id))) || null;
 
@@ -218,7 +228,7 @@ async function dispatch(pubId, { only = null, keep = [], trigger = 'agora' } = {
   const attempt = await startAttempt(pub.id, trigger, platforms);
   let outcomes = [];
   try {
-    const target = await targetOf(pub);
+    const target = await socialVersion(await targetOf(pub));
     const profile = social.profileFor(projectOf(target)); // as contas são as do projeto do corte/episódio
     // agendado/revisão: sai pelos provedores atuais na hora de enviar (a gestão pode ter trocado nesse meio-tempo)
     const groups = await social.plan(platforms);
@@ -689,10 +699,14 @@ async function precheckScheduled() {
   if (!pub) return null;
   const precheck = { at: new Date().toISOString(), ok: true };
   try {
-    const target = await targetOf(pub);
+    const target = await socialVersion(await targetOf(pub)); // corte pesado: pede a versão para as redes já aqui, horas antes
     const groups = await social.plan(pub.platforms);
     if (groups.some((g) => g.provider.live())) await prepareMedia(pub, target, groups);
   } catch (err) {
+    if (err.code === 'em_preparo') { // a versão para as redes está sendo feita: não é problema, só confere de novo na próxima hora
+      await db.query("UPDATE episode_publications SET options = options || $2 WHERE id = $1", [pub.id, JSON.stringify({ precheck: { ...precheck, waiting: true } })]);
+      return precheck;
+    }
     Object.assign(precheck, { ok: false, error: String(err.message).slice(0, 300), code: err.code || null });
     const c = E.classify(err.message, { code: err.code });
     console.warn(`[publicação ${pub.id}] conferência antes do horário: ${err.message}`);

@@ -4,8 +4,9 @@
 // kind: novo | ajuste | correcao
 module.exports = [
   {
-    version: '2.13.0', date: '2026-11-27', title: 'Respostas a comentários no ritmo pedido e "Tentar de novo" em massa',
+    version: '2.13.0', date: '2026-11-27', title: 'Corte em 4K sai em todas as redes; respostas no ritmo pedido e "Tentar de novo" em massa',
     items: [
+      { kind: 'correcao', text: 'Corte pesado (4K ou acima de 12 Mbps) ganha sozinho uma versão em 1080p, até 10 Mbps, feita no servidor, e é ela que vai para as redes. O Instagram não terminava de processar 4K de meio giga, o Threads recusava e o X travava ("sem espaço em disco"). O original continua sendo o que se baixa. Se o post sair antes de a versão ficar pronta, ele espera alguns minutos.' },
       { kind: 'novo', text: 'Social > Comentários, aba "Precisam de você": "Tentar de novo todas" manda de volta para a fila, de uma vez, todas as respostas e os directs que deram erro (como os que pararam quando a assinatura da Outstand venceu).' },
       { kind: 'correcao', text: 'As respostas saem no ritmo configurado. A rotina olhava a fila de minuto em minuto e perdia a vez: 60 por hora viravam uns 40, e 25 viravam uns 20. Agora ela olha a cada 15 segundos, e o intervalo continua variado.' },
     ],

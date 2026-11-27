@@ -39,6 +39,7 @@ function registerRoutines() {
   scheduler.every('comentarios-cliques', 30 * 60_000, () => require('./services/commentStats').snapshotClicks(), { delayMs: 200_000 }); // cliques no link do direct (Números)
   scheduler.every('comentarios-varredura-longa', 6 * 3600_000, () => require('./services/commentReplies').sweep({ days: 14 }), { delayMs: 170_000 }); // e os de até 14 dias, de 6 em 6 horas
   scheduler.every('automacoes', 5 * 60_000, () => require('./services/social').runRules(), { delayMs: 60_000 });
+  scheduler.every('versao-redes', 5 * 60_000, () => require('./services/socialRendition').tick(), { delayMs: 100_000 }); // cortes pesados com post na fila: a cópia em 1080p antes da hora
   scheduler.every('versao-leve', 5 * 60_000, () => require('./services/videoViews').tick(), { delayMs: 90_000 }); // vídeos sem versão leve (os mais novos primeiro) e limpeza
   scheduler.every('financeiro', 3600_000, () => require('./services/finance').tick(), { delayMs: 45_000 });
   scheduler.every('limpeza', 6 * 3600_000, async () => {
@@ -75,6 +76,7 @@ async function main() {
   require('./services/notify');
   require('./services/push'); // registra o trabalho 'push_notificacao'
   require('./services/videoViews'); // registra 'video_leve' (versão leve para assistir)
+  require('./services/socialRendition'); // registra 'video_redes' (versão em 1080p para as redes)
   require('./services/guestVideos'); // registra 'video_convidado' (story de lançamento e teaser)
   const chat = require('./services/chat'); // registra 'chat_tarefa'
 

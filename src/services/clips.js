@@ -445,6 +445,8 @@ async function runProcess(job, { update }) {
     const note = batch ? [clip.note, ...notes].filter(Boolean).join(' ') : notes.join(' ');
     await db.query("UPDATE episode_clips SET status = 'pronto', note = $2, error = NULL, updated_at = now() WHERE id = $1", [clip.id, note || null]);
     await require('./videoViews').ensure(clip.storage_key).catch((err) => console.error('[corte] versão leve:', err.message)); // assistir sem travar
+    const sr = require('./socialRendition'); const { rows: [fresh] } = await db.query('SELECT storage_key, width, height, size_bytes, duration_ms FROM episode_clips WHERE id = $1', [clip.id]);
+    if (sr.heavy(fresh)) await sr.ensure(fresh.storage_key).catch((err) => console.error('[corte] versão para as redes:', err.message)); // 4K pesado: a cópia em 1080p já fica pronta para postar
     if (replaced) {
       await announceNewVersion(clip).catch((err) => console.error('[corte] aviso de nova versão:', err.message));
       return { clip_id: clip.id, version: clip.version, duration_ms: info.duration_ms, covers };

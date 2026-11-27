@@ -65,7 +65,7 @@ const OWN = {
   provedor_chave: { kind: 'conta', hint: 'A chave ou a assinatura do provedor não vale: confira em Integrações' },
   recusado: { kind: 'conteudo', hint: 'O pedido foi recusado' },
   removido: { kind: 'conteudo', hint: 'O material desta publicação foi removido' },
-  em_preparo: { kind: 'arquivo', hint: 'O vídeo está sendo enviado ou lido de novo: a publicação espera ele ficar pronto' },
+  em_preparo: { kind: 'arquivo', hint: 'O vídeo está sendo preparado (enviado, lido de novo ou convertido para as redes): a publicação espera ele ficar pronto' },
   formato: { kind: 'conteudo', hint: 'A rede recusou o formato do arquivo' },
   sem_conta: { kind: 'conta', hint: 'Não há conta conectada para esta rede no provedor' },
   tiktok_privado: { kind: 'conta', hint: 'O app do TikTok só publica como privado: em Integrações, mande o TikTok como rascunho' },

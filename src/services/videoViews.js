@@ -48,21 +48,22 @@ async function inspect(url) {
   return { duration: Number(j.format?.duration || 0), mbps: Number(j.format?.bit_rate || 0) / 1e6, codec: v?.codec_name || null, width: v?.width || 0, height: v?.height || 0, hasAudio: (j.streams || []).some((s) => s.codec_type === 'audio') };
 }
 
-function ffmpegArgs(input, output, hasAudio) {
-  const scale = `scale='if(gt(iw,ih),-2,min(${SHORT_SIDE},iw))':'if(gt(iw,ih),min(${SHORT_SIDE},ih),-2)'`;
+// opts: a versão para as redes usa o mesmo caminho com 1080 px, CRF 20, até 10 Mbps e áudio a 192 kbps (services/socialRendition).
+function ffmpegArgs(input, output, hasAudio, { shortSide = SHORT_SIDE, crf = 23, maxKbps = MAX_KBPS, audioKbps = 128, level = '4.0' } = {}) {
+  const scale = `scale='if(gt(iw,ih),-2,min(${shortSide},iw))':'if(gt(iw,ih),min(${shortSide},ih),-2)'`;
   return ['-v', 'error', '-y', '-nostats', '-progress', 'pipe:1',
     '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_on_network_error', '1', '-reconnect_delay_max', '30',
     '-i', input, '-map', '0:v:0', ...(hasAudio ? ['-map', '0:a:0'] : []),
-    '-vf', scale, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-maxrate', `${MAX_KBPS}k`, '-bufsize', `${MAX_KBPS * 2}k`,
-    '-profile:v', 'high', '-level:v', '4.0', '-pix_fmt', 'yuv420p', '-g', '60', '-keyint_min', '60', '-sc_threshold', '0', '-threads', '4',
-    ...(hasAudio ? ['-c:a', 'aac', '-b:a', '128k', '-ac', '2'] : ['-an']),
+    '-vf', scale, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', String(crf), '-maxrate', `${maxKbps}k`, '-bufsize', `${maxKbps * 2}k`,
+    '-profile:v', 'high', '-level:v', level, '-pix_fmt', 'yuv420p', '-g', '60', '-keyint_min', '60', '-sc_threshold', '0', '-threads', '4',
+    ...(hasAudio ? ['-c:a', 'aac', '-b:a', `${audioKbps}k`, '-ac', '2'] : ['-an']),
     '-movflags', '+faststart', output];
 }
 
 // Roda o FFmpeg com prioridade baixa (o painel continua rápido) e conta o andamento.
-function transcode({ input, output, hasAudio, duration, onProgress }) {
+function transcode({ input, output, hasAudio, duration, onProgress, opts }) {
   return new Promise((resolve, reject) => {
-    const args = ffmpegArgs(input, output, hasAudio);
+    const args = ffmpegArgs(input, output, hasAudio, opts);
     const child = spawn('nice', ['-n', '10', 'ffmpeg', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     let err = ''; let last = -1;
     child.stdout.on('data', (d) => {
@@ -158,4 +159,4 @@ async function tick({ limit = 5 } = {}) {
   return { asked: missing.length, removed: orphans.length };
 }
 
-module.exports = { SHORT_SIDE, MAX_KBPS, LIGHT_MBPS, deps, viewKeyFor, playUrl, ensure, inspect, ffmpegArgs, run, tick };
+module.exports = { SHORT_SIDE, MAX_KBPS, LIGHT_MBPS, deps, uploadFile, viewKeyFor, playUrl, ensure, inspect, ffmpegArgs, run, tick };

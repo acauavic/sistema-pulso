@@ -145,7 +145,7 @@ describe('entrega garantida: arquivo conferido antes, nova tentativa na hora cer
     await dueNow(pub.id); await publishing.tick();
     let p = await pubRow(pub.id);
     assert.equal(p.status, 'erro'); assert.ok(p.results.every((r) => r.code === 'em_preparo' && r.retry_at), 'espera o corte ficar pronto');
-    assert.match(p.results[0].hint, /O vídeo está sendo enviado ou lido de novo/);
+    assert.match(p.results[0].hint, /O vídeo está sendo preparado/);
     // pronto, com outro arquivo (chave nova): sai com ele, hospedado de novo
     h.b2Store.set('pp/cortes/30/video-novo.mp4', { body: Buffer.alloc(4000, 1), contentType: 'video/mp4' });
     await h.db.query("UPDATE episode_clips SET status = 'pronto', storage_key = 'pp/cortes/30/video-novo.mp4', size_bytes = 4000 WHERE id = $1", [clip.id]);
